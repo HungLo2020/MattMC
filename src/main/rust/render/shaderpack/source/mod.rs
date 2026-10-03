@@ -62,6 +62,8 @@ pub struct ShaderPackSource {
     files: BTreeMap<String, String>,
     runtime_semantic_defines: DerivedDefines,
     runtime_option_selection: DerivedOptionSelection,
+    frame_uniform_policies: crate::render::shaderpack::properties::frame_uniforms::FrameUniformPolicies,
+    shadow_policies: crate::render::shaderpack::properties::shadow::ShadowPolicies,
 }
 
 /// The saved pack options interpreted the way Iris applies them: a boolean
@@ -158,6 +160,8 @@ impl ShaderPackSource {
             files: map,
             runtime_semantic_defines: DerivedDefines::default(),
             runtime_option_selection: DerivedOptionSelection::default(),
+            frame_uniform_policies: Default::default(),
+            shadow_policies: Default::default(),
         })
     }
 
@@ -184,6 +188,18 @@ impl ShaderPackSource {
         normalize_source_path(path)
             .ok()
             .and_then(|path| self.files.get(&path).map(String::as_str))
+    }
+
+    pub(crate) fn paths(&self) -> impl Iterator<Item = &str> {
+        self.files.keys().map(String::as_str)
+    }
+
+    pub fn frame_uniform_policy(&self, scope: crate::render::shaderpack::contracts::terrain::TerrainProgramScope) -> GalResult<crate::render::shaderpack::properties::frame_uniforms::ShaderPackFrameUniformPolicy> {
+        self.frame_uniform_policies.get(self, scope)
+    }
+
+    pub fn shadow_policy_for_scope(&self, scope: crate::render::shaderpack::contracts::terrain::TerrainProgramScope) -> GalResult<Option<ShaderPackShadowPolicy>> {
+        self.shadow_policies.get(self, scope)
     }
 
     /// Returns an owned semantic source snapshot for a bounded transport or
@@ -647,6 +663,10 @@ impl ShaderPackSourceStore {
         self.active_shadow_policy
     }
 
+    pub fn active_shadow_policy_for_scope(&self, scope: crate::render::shaderpack::contracts::terrain::TerrainProgramScope) -> GalResult<Option<ShaderPackShadowPolicy>> {
+        self.active.as_ref().map(|source| source.shadow_policy_for_scope(scope)).transpose().map(Option::flatten)
+    }
+
     /// Immutable wetness timing policy derived from the active source
     /// generation. This remains pack data, never Iris smoothing state.
     pub fn active_wetness_policy(&self) -> Option<ShaderPackWetnessPolicy> {
@@ -696,4 +716,3 @@ fn normalize_source_path(path: &str) -> GalResult<String> {
 
 #[cfg(test)]
 mod tests;
-

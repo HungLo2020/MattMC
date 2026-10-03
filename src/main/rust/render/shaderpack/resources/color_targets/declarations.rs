@@ -13,6 +13,7 @@ pub(super) const MAX_SOURCE_COLOR_TARGETS: u32 = 8;
 pub enum ShaderPackColorFormat {
     R11fG11fB10f,
     R32f,
+    R16f,
     Rgb16f,
     Rgba8,
     R8,
@@ -25,6 +26,7 @@ impl ShaderPackColorFormat {
         match value {
             "R11F_G11F_B10F" => Ok(Self::R11fG11fB10f),
             "R32F" => Ok(Self::R32f),
+            "R16F" => Ok(Self::R16f),
             "RGB16F" => Ok(Self::Rgb16f),
             "RGBA8" => Ok(Self::Rgba8),
             "R8" => Ok(Self::R8),
@@ -43,6 +45,7 @@ impl ShaderPackColorFormat {
         match self {
             Self::R11fG11fB10f => TextureFormat::R11fG11fB10f,
             Self::R32f => TextureFormat::R32Float,
+            Self::R16f => TextureFormat::R16Float,
             Self::Rgb16f => TextureFormat::Rgb16Float,
             Self::Rgba8 => TextureFormat::Rgba8Unorm,
             Self::R8 => TextureFormat::R8Unorm,
@@ -61,6 +64,7 @@ impl ShaderPackColorFormat {
             Self::Rgb16f => &[TextureFormat::Rgb16Float, TextureFormat::Rgba16Float],
             Self::R11fG11fB10f => &[TextureFormat::R11fG11fB10f],
             Self::R32f => &[TextureFormat::R32Float],
+            Self::R16f => &[TextureFormat::R16Float],
             Self::Rgba8 => &[TextureFormat::Rgba8Unorm],
             Self::R8 => &[TextureFormat::R8Unorm],
             Self::Rgba8Snorm => &[TextureFormat::Rgba8Snorm],
@@ -130,12 +134,18 @@ impl ShaderPackColorTargetManifest {
         source: &ShaderPackSource,
         bindings: &TerrainSourceResourceBindings,
     ) -> GalResult<Self> {
-        let settings = source.get(PIPELINE_SETTINGS_PATH).ok_or_else(|| {
-            GalError::unsupported_feature(format!(
-                "shader-pack source is missing required color-target declaration file {PIPELINE_SETTINGS_PATH}"
-            ))
-        })?;
+        let Some(settings) = source.get(PIPELINE_SETTINGS_PATH) else {
+            return Self::from_source_for_scope(source, bindings,
+                crate::render::shaderpack::contracts::terrain::TerrainProgramScope::Default);
+        };
         let declarations = parse_pipeline_settings(settings)?;
+        Self::from_declarations(source, bindings, declarations)
+    }
+
+    pub(super) fn from_declarations(
+        source: &ShaderPackSource, bindings: &TerrainSourceResourceBindings,
+        declarations: BTreeMap<u32, SourceColorSlotDecl>,
+    ) -> GalResult<Self> {
         let mut targets = BTreeMap::new();
         for slot in 0..MAX_SOURCE_COLOR_TARGETS {
             let role = bindings.shader_pack_color_output_for_slot(slot)?;

@@ -176,11 +176,19 @@ pub(crate) fn merge_experience_orb_instances(
                 "invalid orb placement ordering or reserved bits",
             ));
         }
-        let instance = crate::render::worldrender::features::experience_orb::ExperienceOrbPlacement {
+        let mut instance = crate::render::worldrender::features::experience_orb::ExperienceOrbPlacement {
             entity_transform: orb.entity_transform,
             camera_orientation: orb.camera_orientation,
             entity_id: orb.entity_id,
         }.instance(orb.mesh_key, orb.mesh_generation, viewport)?;
+        instance.entity_culling = decode_entity_culling_record(orb.entity_culling_mode,
+            orb.entity_culling_flags,orb.entity_culling_bounds,orb.entity_culling_leash_bounds,orb.entity_culling_camera)?;
+        if orb.shadow_only > 1 || (orb.shadow_only == 1 && instance.entity_culling.is_none()) {
+            return Err(GalError::invalid_argument("invalid orb shadow-only extraction role"));
+        }
+        if orb.shadow_only == 1 {
+            instance.stratum = crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER;
+        }
         output.extend(source.by_ref().take(index - cursor));
         cursor = index;
         output.push(instance);
@@ -1070,6 +1078,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
         let transform = decode_mesh_instance_transform(instance)?;
         mesh_instances.push(WorldMeshInstanceRequest {
+            entity_culling: decode_entity_culling(instance, false)?,
+
             model_submission_order: decode_model_submission_order(instance)?,
             item_foil: decode_world_item_foil(instance)?,
             decal_foil: decode_world_decal_foil(instance, false)?,

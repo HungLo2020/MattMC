@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::render::vulkanic::error::{GalError, GalResult};
 
 use crate::render::shaderpack::source::ShaderPackSource;
+use crate::render::shaderpack::properties::custom_uniforms::{CustomUniformDefinition, definitions_from_preprocessed};
 #[cfg(test)]
 use crate::render::shaderpack::source::ShaderSourceFile;
 use crate::render::shaderpack::contracts::terrain::TerrainSourceStages;
@@ -33,6 +34,7 @@ pub struct PreprocessedShaderSource {
     /// (`texture.gbuffers.*`). They are not Rust-owned render targets, so
     /// world-target coordinate lowering must leave them untouched.
     world_custom_samplers: Vec<String>,
+    custom_uniforms: BTreeMap<String, CustomUniformDefinition>,
 }
 
 /// Complete, owned normal-terrain source expansion. This is a diagnostic and
@@ -161,14 +163,20 @@ impl PreprocessedShaderSource {
                 &self.defines,
                 &resolved_paths,
                 &expanded_source,
+                &self.custom_uniforms,
             ),
             expanded_source,
             world_custom_samplers: self.world_custom_samplers.clone(),
+            custom_uniforms: self.custom_uniforms.clone(),
         })
     }
 
     pub(crate) fn world_custom_samplers(&self) -> &[String] {
         &self.world_custom_samplers
+    }
+
+    pub(crate) fn custom_uniforms(&self) -> &BTreeMap<String, CustomUniformDefinition> {
+        &self.custom_uniforms
     }
 }
 
@@ -249,6 +257,7 @@ fn preprocess_artifact_with_protected_defines(
         &defines,
         &resolved_paths,
         &out,
+        &BTreeMap::new(),
     );
     let world_custom_samplers = world_custom_samplers_for_entry(input.source, &entry);
     Ok(PreprocessedShaderSource {
@@ -260,6 +269,7 @@ fn preprocess_artifact_with_protected_defines(
         expanded_source: out,
         fingerprint,
         world_custom_samplers,
+        custom_uniforms: BTreeMap::new(),
     })
 }
 
@@ -327,7 +337,7 @@ pub fn preprocess_artifact_with_runtime_options(
     // or switched-off option is suppressed, as Iris rewrites that line.
     let mut protected_option_defines = option_defines.into_keys().collect::<BTreeSet<_>>();
     protected_option_defines.extend(disabled_option_defines);
-    let artifact = preprocess_artifact_with_protected_defines(
+    let mut artifact = preprocess_artifact_with_protected_defines(
         PreprocessInput {
             source,
             entry,
@@ -335,6 +345,20 @@ pub fn preprocess_artifact_with_runtime_options(
         },
         &protected_option_defines,
     )?;
+    // Expand properties using the same resolved configuration as the stage.
+    // The properties entry itself takes no recursive metadata path.
+    if entry != "shaders.properties" && source.get("shaders.properties").is_some()
+        && (entry.ends_with(".vsh") || entry.ends_with(".fsh") || entry.starts_with("program/")) {
+        let property_defines = artifact.defines.iter()
+            .map(|(key, value)| (key.as_str(), value.as_str())).collect::<Vec<_>>();
+        let properties = preprocess_artifact_with_runtime_options(source, "shaders.properties", &property_defines)?;
+        artifact.custom_uniforms = definitions_from_preprocessed(properties.expanded_source())?;
+        artifact.fingerprint = source_fingerprint(
+            &artifact.pack_name, artifact.source_generation, &artifact.entry_path,
+            &artifact.defines, &artifact.resolved_paths.iter().cloned().collect(),
+            &artifact.expanded_source, &artifact.custom_uniforms,
+        );
+    }
     let constants = source.runtime_constant_values()?;
     if constants.is_empty() {
         return Ok(artifact);
@@ -524,6 +548,7 @@ fn source_fingerprint(
     defines: &[(String, String)],
     resolved_paths: &BTreeSet<String>,
     source: &str,
+    custom_uniforms: &BTreeMap<String, CustomUniformDefinition>,
 ) -> u64 {
     const FNV_OFFSET: u64 = 0xcbf29ce484222325;
     const FNV_PRIME: u64 = 0x100000001b3;
@@ -547,6 +572,12 @@ fn source_fingerprint(
         write(path.as_bytes());
     }
     write(source.as_bytes());
+    for (name, definition) in custom_uniforms {
+        write(name.as_bytes());
+        write(definition.ty.as_bytes());
+        write(definition.expression.as_bytes());
+        write(&[u8::from(definition.uniform)]);
+    }
     hash
 }
 

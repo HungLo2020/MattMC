@@ -13,9 +13,31 @@ final class GraphicsAuditModelCaptureHistory<T> {
     private final Map<Long, List<T>> frames = new TreeMap<>();
     private final HashSet<Long> captures = new HashSet<>();
     private final ToLongFunction<T> frameIndex;
+    private long stagedCapture;
+    private List<T> stagedObservations = List.of();
 
     GraphicsAuditModelCaptureHistory(ToLongFunction<T> frameIndex) {
         this.frameIndex = frameIndex;
+    }
+
+    /** A deferred readback replaces this one pending snapshot, not saved poses. */
+    void stage(long capture, List<T> observations) {
+        if (capture <= 0 || observations.size() > 512) {
+            throw new IllegalStateException("model capture history bounds exceeded");
+        }
+        stagedObservations = observations.stream()
+            .filter(value -> frameIndex.applyAsLong(value) >= capture - 8 && frameIndex.applyAsLong(value) <= capture)
+            .toList();
+        stagedCapture = capture;
+    }
+
+    void commit(long capture) {
+        if (capture != stagedCapture || capture <= 0) {
+            throw new IllegalStateException("model capture history has no matching staged frame");
+        }
+        retain(capture, stagedObservations);
+        stagedCapture = 0;
+        stagedObservations = List.of();
     }
 
     void retain(long capture, List<T> observations) {

@@ -30,6 +30,9 @@ pub enum TexturedMaterialSourceInput {
     CameraAndEnvironment,
     PackNoise,
     MainDepth,
+    /// The compact stream's disabled entity attribute supplies (0, 0, 0, 1).
+    /// This is a source semantic, independent of any live GL attribute state.
+    GenericEntityAttribute,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -334,6 +337,9 @@ pub struct TexturedMaterialPassContract {
     /// Source color slots aligned with `outputs`; these are pack metadata, not
     /// GAL attachment indices or native bindings.
     pub output_color_slots: Vec<u32>,
+    /// Iris applies the resolved alpha test to output zero after the pack main.
+    /// Bits retain an exact, comparable immutable source-contract value.
+    pub alpha_cutoff_bits: Option<u32>,
 }
 
 pub fn derive_textured_material_contract(
@@ -355,22 +361,33 @@ pub fn derive_textured_material_contract(
     let vertex = preprocess_stage(source, &stages.vertex.path, &stages.vertex.defines)?;
     let fragment = preprocess_stage(source, &stages.fragment.path, &stages.fragment.defines)?;
 
-    require(&vertex, "GetLightMapCoordinates()")?;
-    require(&vertex, "gl_Normal")?;
-    require(&vertex, "gl_Color")?;
-    require(&fragment, "texture2D(tex, texCoord)")?;
-    require(&fragment, "color *= glColor")?;
-    require(&fragment, "DoLighting(")?;
-    require(&fragment, "gl_FragData[0] = color")?;
-    require(&fragment, "gl_FragData[1]")?;
-    require(&fragment, "gl_FragData[2]")?;
-
     let slots = parse_draw_buffers_slots(&fragment)?;
-    if slots != [0, 6, 3] {
+    let outputs = if slots.len() == 1 {
+        // One primary output does not imply any particular pack's lighting
+        // helpers. The original paired GLSL still has to lower, bind and compile.
+        require_any(&vertex, &["gl_Vertex", "ftransform"])?;
+        require(&fragment, "gl_FragData[0]")?;
+        vec![TexturedMaterialSourceOutput::LitColor]
+    } else if slots == [0, 6, 3] {
+        require(&vertex, "GetLightMapCoordinates()")?;
+        require(&vertex, "gl_Normal")?;
+        require(&vertex, "gl_Color")?;
+        require(&fragment, "texture2D(tex, texCoord)")?;
+        require(&fragment, "color *= glColor")?;
+        require(&fragment, "DoLighting(")?;
+        require(&fragment, "gl_FragData[0] = color")?;
+        require(&fragment, "gl_FragData[1]")?;
+        require(&fragment, "gl_FragData[2]")?;
+        vec![
+            TexturedMaterialSourceOutput::LitColor,
+            TexturedMaterialSourceOutput::MaterialAuxiliary,
+            TexturedMaterialSourceOutput::TranslucencyAuxiliary,
+        ]
+    } else {
         return Err(GalError::unsupported_feature(format!(
-            "selected textured material source requires unsupported DRAWBUFFERS schema {slots:?}; expected [0, 6, 3]"
+            "selected textured material source requires unsupported DRAWBUFFERS schema {slots:?}; expected one color slot or [0, 6, 3]"
         )));
-    }
+    };
     Ok(TexturedMaterialPassContract {
         pack_name: source.name().to_string(),
         generation: source.generation(),
@@ -385,20 +402,20 @@ pub fn derive_textured_material_contract(
             TexturedMaterialSourceInput::CameraAndEnvironment,
             TexturedMaterialSourceInput::PackNoise,
             TexturedMaterialSourceInput::MainDepth,
+            TexturedMaterialSourceInput::GenericEntityAttribute,
         ],
-        outputs: vec![
-            TexturedMaterialSourceOutput::LitColor,
-            TexturedMaterialSourceOutput::MaterialAuxiliary,
-            TexturedMaterialSourceOutput::TranslucencyAuxiliary,
-        ],
+        outputs,
         output_color_slots: slots,
+        alpha_cutoff_bits: crate::render::shaderpack::properties::shadow::source_alpha_test_cutoff(
+            source, "alphaTest.gbuffers_textured", 0.1,
+        )?.map(f32::to_bits),
     })
 }
 
 /// Reuses the paired source compiler for the bounded material contract while
 /// enforcing that the selected source can be fed exclusively by the generic
-/// semantic material vertex stream. Terrain-only metadata is rejected here,
-/// before any route can interpret default zeroes as a valid block/material.
+/// semantic material vertex stream and its explicit generic entity attribute.
+/// Remaining terrain-only metadata is rejected before route admission.
 pub fn lower_textured_material_source_pair(
     source: &ShaderPackSource,
     contract: &TexturedMaterialPassContract,
@@ -423,9 +440,6 @@ pub fn lower_textured_material_source_pair(
     // Rust position semantic; requiring only the latter incorrectly rejects
     // the normal Complementary entry before the source pair reaches lowering.
     require_any(vertex.expanded_source(), &["gl_Vertex", "ftransform"])?;
-    for unsupported in ["mc_Entity", "mc_midTexCoord", "at_tangent", "at_midBlock"] {
-        require_absent(vertex.expanded_source(), unsupported)?;
-    }
     let lowered = lower_textured_material_stages(&vertex, &fragment)?;
     lowered.require_backend_neutral_lowering()?;
     Ok(lowered)
@@ -474,16 +488,6 @@ fn require_any(source: &str, expressions: &[&str]) -> GalResult<()> {
             "selected textured material source is missing every required expression in {:?}",
             expressions
         )))
-    }
-}
-
-fn require_absent(source: &str, expression: &str) -> GalResult<()> {
-    if source.contains(expression) {
-        Err(GalError::unsupported_feature(format!(
-            "selected textured material source requires unsupported terrain-only attribute '{expression}'"
-        )))
-    } else {
-        Ok(())
     }
 }
 

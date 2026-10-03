@@ -136,6 +136,7 @@ pub(super) fn decode_world_shader_environment_frame(
         screen_brightness: request.screen_brightness,
         far_plane: request.far_plane,
         distant_horizons_render_distance: request.distant_horizons_render_distance,
+        configured_shadow_distance_chunks: request.configured_shadow_distance_chunks,
         relative_eye_position: [
             request.relative_eye_x,
             request.relative_eye_y,

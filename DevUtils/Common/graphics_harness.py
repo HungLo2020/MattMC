@@ -31,7 +31,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
 import artifact_retention
-from capture_window import menu_capture_window
+from capture_window import capture_window_size
+from dh_depth_coverage import CoverageEvidenceError, visible_extension_mask
 
 
 SCHEMA = "mattmc-cross-graphics-audit-v2"
@@ -244,10 +245,10 @@ RUNTIME_PROFILES = {
     "extended": RuntimeProfile("extended", 300, 55, 65, 40, 125, 15, 15, 270, 60, 240, 600, 360, 3000, 200),
 }
 PROFILE_RANK = {name: index for index, name in enumerate(RUNTIME_PROFILE_NAMES)}
-# A selected-source capture has a deliberate two-step transaction: a normal
-# Rust submission confirms the exact resource snapshot, then the following
-# frame is the first frame allowed to execute the source plan. Give that one
-# transition a bounded grace period rather than stretching ordinary rows.
+# Selected-source entry confirms prerequisites through a private normal-graph
+# submission before the same semantic frame executes the selected source plan.
+# Give that initial preparation a bounded grace period rather than stretching
+# ordinary rows; this is not permission for a visible vanilla warmup frame.
 # A selected-source world frame can spend several minutes compiling and
 # uploading the first complete Rust-owned terrain population. This bounded
 # grace applies only after the capture has already recorded a native source
@@ -1386,16 +1387,17 @@ def canonical_fixture_id(args: argparse.Namespace) -> str:
         "1", "true", "yes"
     }:
         dh_flags += "-dh-source-save"
-    if getattr(args, "world_distant_horizons_real_world", False):
-        source_override = os.environ.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
-        if source_override:
-            source_run = Path(source_override).resolve()
-            source_db = source_run / "saves" / world / "data" / "DistantHorizons.sqlite"
-            db_stat = source_db.stat() if source_db.is_file() else None
-            source_key = (str(source_run), db_stat.st_size if db_stat else 0,
-                          db_stat.st_mtime_ns if db_stat else 0)
-            source_id = hashlib.sha256(repr(source_key).encode()).hexdigest()[:12]
-            dh_flags += f"-source-{source_id}"
+    # The explicit save is shared across vanilla, shader, and DH routes. Keep
+    # separate sources out of each other's canonical fixture cache in every mode.
+    source_override = os.environ.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
+    if source_override:
+        source_run = Path(source_override).resolve()
+        source_db = source_run / "saves" / world / "data" / "DistantHorizons.sqlite"
+        db_stat = source_db.stat() if source_db.is_file() else None
+        source_key = (str(source_run), db_stat.st_size if db_stat else 0,
+                      db_stat.st_mtime_ns if db_stat else 0)
+        source_id = hashlib.sha256(repr(source_key).encode()).hexdigest()[:12]
+        dh_flags += f"-source-{source_id}"
     world_profile = getattr(args, "world_profile", "migration-gate")
     diagnostic_pack = os.environ.get("MATTMC_CAPTURE_SHADER_PACK_SOURCE", "").strip()
     if diagnostic_pack:
@@ -1690,11 +1692,7 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
     existing = getattr(args, "_canonical_fixture_run_source", None)
     if existing:
         return Path(existing)
-    source_override = (
-        os.environ.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
-        if getattr(args, "world_distant_horizons_real_world", False)
-        else ""
-    )
+    source_override = os.environ.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
     source_run = Path(source_override).resolve() if source_override else targets["current"].root / "run"
     world = getattr(args, "world", "") or WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")].world
     source_world = source_run / "saves" / world
@@ -25359,29 +25357,28 @@ def dh_visible_extension_visual_evidence(
     if not isinstance(correlation, Mapping) or correlation.get("world_lod_route_selected") is not True:
         return None
     attachment_root = current_artifact.parent / "capture" / "whole_frame_gameplay_attachments"
-    private_path = attachment_root / "attachment-dh_private_color.png"
-    depth_path = attachment_root / "attachment-main_depth.png"
-    if not private_path.is_file() or not depth_path.is_file():
+    manifest = attachments.get("manifest_doc", {})
+    screenshot = deterministic_initial_frame_path(current_artifact)
+    acknowledgement = read_json(
+        screenshot.with_name(f"capture_request_{screenshot.stem}.ack.json")
+    ) if screenshot else None
+    try:
+        if not isinstance(manifest, Mapping) or not isinstance(acknowledgement, Mapping):
+            raise CoverageEvidenceError("missing-depth-manifest-or-screenshot-acknowledgement")
+        if frozen_image.size != current_image.size:
+            raise CoverageEvidenceError("incomparable-image-extents")
+        mask_values, definition = visible_extension_mask(
+            attachment_root, manifest, correlation, acknowledgement, current_image.size,
+        )
+    except (CoverageEvidenceError, OSError, ValueError) as error:
         return {
-            "schema": "mattmc-dh-visible-extension-visual-v1",
+            "schema": "mattmc-dh-visible-extension-visual-v2",
             "passed": False,
-            "status": "missing-full-attachments",
-            "private_color": str(private_path),
-            "main_depth": str(depth_path),
+            "status": "invalid-depth-coverage-evidence",
+            "reason": str(error),
         }
     from PIL import Image
-    private = Image.open(private_path).convert("RGBA")
-    depth = Image.open(depth_path).convert("L")
-    if private.size != current_image.size:
-        private = private.resize(current_image.size, Image.Resampling.NEAREST)
-    if depth.size != current_image.size:
-        depth = depth.resize(current_image.size, Image.Resampling.NEAREST)
-    mask_values = [
-        255 if alpha > 0 and encoded_depth == 0 else 0
-        for alpha, encoded_depth in zip(private.getchannel("A").get_flattened_data(), depth.get_flattened_data())
-    ]
-    mask = Image.new("L", current_image.size, 0)
-    mask.putdata(mask_values)
+    mask = Image.frombytes("L", current_image.size, mask_values)
     mask_output.parent.mkdir(parents=True, exist_ok=True)
     mask.save(mask_output)
     sums = [0, 0, 0]
@@ -25406,10 +25403,10 @@ def dh_visible_extension_visual_evidence(
     enough_coverage = pixel_count >= minimum_pixels
     passed = enough_coverage and all(value <= tolerance for value in mean)
     return {
-        "schema": "mattmc-dh-visible-extension-visual-v1",
+        "schema": "mattmc-dh-visible-extension-visual-v2",
         "passed": passed,
         "status": "complete" if passed else "insufficient-coverage" if not enough_coverage else "visual-mismatch",
-        "definition": "DH private alpha is nonzero while the encoded reversed main depth equals its clear value",
+        "definition": definition,
         "pixel_count": pixel_count,
         "minimum_pixel_count": minimum_pixels,
         "pixel_fraction": pixel_count / total_pixels if total_pixels else 0.0,
@@ -25418,8 +25415,9 @@ def dh_visible_extension_visual_evidence(
         "max_rgb_abs": maxima,
         "mean_rgb_abs_tolerance": tolerance,
         "mask": str(mask_output),
-        "private_color": str(private_path),
-        "main_depth": str(depth_path),
+        "capture_scope": manifest.get("capture_scope"),
+        "gameplay_frame_id": manifest.get("gameplay_frame_id"),
+        "gal_submission_id": manifest.get("gal_submission_id"),
     }
 
 
@@ -32578,6 +32576,10 @@ def normalize_capture_artifact(
                 required = ["main_depth", "world_final_pre_gui", "final_output"]
                 color_attachment_names = ("world_final_pre_gui", "final_output")
                 depth_attachment_names = ("main_depth",)
+            elif attachment_scope == "source-dh-depth-coverage":
+                required = ["source_main_opaque_depth", "source_dh_opaque_depth", "final_output"]
+                color_attachment_names = ("final_output",)
+                depth_attachment_names = ("source_main_opaque_depth", "source_dh_opaque_depth")
             elif attachment_scope == "final-output-only":
                 required = ["final_output"]
                 color_attachment_names = ("final_output",)
@@ -32609,7 +32611,7 @@ def normalize_capture_artifact(
                     "final_output",
                 )
                 depth_attachment_names = ("shadow_depth", "main_depth")
-            if requested_world_distant_horizons and require_complete_gameplay_attachments:
+            if requested_world_distant_horizons and require_complete_gameplay_attachments and attachment_scope != "source-dh-depth-coverage":
                 required.extend(("dh_private_color", "dh_resolved_color"))
                 color_attachment_names += ("dh_private_color", "dh_resolved_color")
             if not isinstance(evidence, dict) or "final_output" not in evidence:
@@ -36167,7 +36169,7 @@ def build_capture_command(
     ) and tool_kind == "capture"
     if getattr(args, "menu_screen", "title") != "title" and not title_screen_capture:
         raise ValueError("--menu-screen requires --title-screen-capture")
-    capture_width, capture_height = menu_capture_window(title_screen_capture)
+    capture_width, capture_height = capture_window_size(title_screen_capture)
     if (os.environ.get("MATTMC_CAPTURE_MENU_MAXIMIZE", "").lower() == "true"
         and os.environ.get("MATTMC_CAPTURE_MENU_RESIZE", "").lower() != "true"):
         raise ValueError("Menu maximize fixture requires the resize fixture")
@@ -38161,6 +38163,8 @@ def build_capture_command(
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY"] = (
             "0" if getattr(args, "rust_full_gameplay_attachments", False) else "1"
         )
+        if mode.shaders == "on" and dh_real_world:
+            env["MATTMC_RUST_SOURCE_DH_DEPTH_COVERAGE"] = "1"
         if getattr(args, "rust_full_gameplay_attachments", False) and mode.shaders == "on":
             # A source-derived shader route needs selected-source promotion so
             # the expensive readback names the admitted source frame.  The

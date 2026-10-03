@@ -1,199 +1,200 @@
-# Rendering migration handoff
+# Rendering parity, stability, and performance
+## Active objective — Goal 5
 
-## Active objective
+Complete realistic end-to-end parity for vanilla, DH, Iris, and Iris+DH against
+Frozen Java OpenGL. Root-cause terrain flicker across all routes; ensure the
+first presented shader-enabled world frame already uses the selected pack.
+Profile before optimizing; demonstrate real-world gains and bounded resources.
+Leave all work **uncommitted in the worktree; no commits or pushes**.
+This goal is **not complete**; no publication is authorized.
+## Current work (2026-10-03)
 
-**Goal 4 — Iris + Distant Horizons together (started 2026-09-28).** Goal 3
-(non-DH pack) notes below remain the regression baseline. Frozen repo:
-`../MattMC_JavaPerfTesting/MattMC`. DH pair: `Capture.py --mode current/frozen
--shaders-on --rust-selected-source-execution --world-distant-horizons-real-world
---world-distant-horizons-opaque`, `MATTMC_CAPTURE_DH_RADIUS_OVERRIDE` (default 8).
-**Fixture:** Frozen's DH reads only DB formats 1-2 (Origin's is Current's 4), so
-use a shared Frozen-generated DB: Frozen `runClient -x test -PmattmcRunGameDir=
-<copy> --args=--quickPlaySingleplayer=Origin` (OpenGL options, DB removed) until
-it stops growing, then `MATTMC_CAPTURE_RUN_SOURCE=<dir>` (scratch `g4src`).
-Iris parity fixes: `dhRenderDistance` = DH radius*16 while DH renders, else vanilla
-chunks (was max); `DISTANT_HORIZONS` in the copied environment for every program
-while DH renders (recollected on toggle); selected-source flag no longer forces DH
-exact-material topology/provenance (opt-in `...rustGalDistantHorizons.
-exactMaterialTopology`); DH programs get the vanilla `far` (was DH distance: the
-pack's smoothstep(far*.5, far*.7) fade discarded all DH); DH depth cleared each
-frame (loaded last frame's depth: only edges passed); fullscreen `dhProjection`
-= Iris DHCompat (gbuffer fov, DH near, far (blocks+512)*sqrt2); DH voxels only via
-a pack `dh_shadow` with `dhShadow.enabled`. Frame order (Frozen LevelRenderer):
-sky -> DH opaque -> vanilla opaque -> ... -> deferred (beginTranslucents) -> DH
-translucent -> vanilla translucent -> composites (was DH after all terrain and
-deferred after water: VL-cloud discard removed all water). Pairs: r4 day
-1.63/1.61/2.28; r32 land (150.5,100,530.5,0,5, shared DB) 19 -> 4.38/4.46/2.89;
-0 VUIDs. **Suspected Frozen bug #2 (awaiting user):** DH hill band ~7 brighter on Current.
-Diag packs (dh_terrain outputs): color/lmCoord/normal/shadow/playerPos match; Frozen's DH
-`noisetex` samples ~black (not pack noise.png) so pow(noise+.5) darkens. No prompt-doc
-edits, commits, pushes or Frozen changes; <=200 lines.
-**Suspected Frozen bug (user: note, ignore).** Look-down r32 (150.5,100,530.5,105,80)
-MAE 15/18/33: Frozen `composite` sees `textureSize(shadowcolor1)=0` with DH (no DH:
-`shadowtex0` 0x0) -> vlFactor pinned 1 -> haze; `final` binds the real maps.
-**DH toggle crash fixed:** voxel volume replacement releases its set-ones first.
-Memory r32 pair Frozen 8.7 vs Current 8.8 GB; night 0.66/0.83/0.61, rain 1.99/2.00/2.05.
-**DH generic objects:** harness disables them unless `MATTMC_CAPTURE_DH_GENERIC=
-true`. Boxes (+material, flags 8-15) expand to the DH source stream, drawn by
-`dh_terrain` with alpha blend like Iris. Unadmitted: generic quads / no LODs.
-Generic-on pairs: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs.
-**Shader toggle:** DH forward owners rebuild on format change; transparent/water
-packed slots reset+flush in both modes; meshes cached with shaders off stay
-unadmitted; Java calls allChanged + resends entity meshes once Rust accepts the
-source (re-arms in 1-2 frames). Real-config copy `~/.cache/mattmc-claude/realrun`
-via scratch `realtest.sh` (kills its client; now `-PmattmcRustProfile=release` like
-RunDev — the old ms figures were a dev build). **Perf (RD10, DH r128, shaders):**
-material wrapper keyed on mesh_asset_generation (now view+sampler) retired every
-pack/DH set per mesh update; lightmap/voxel changes release DH set-one only; shared
-DH scalar block + column-frame ring; generic boxes grouped by DH group ordinal
-(flags 16-31); encoder env switches cached + pass-kind memo; terrain validation
-cached per (stratum,key,generation) (cleared on pack/material/texture change);
-generic validation without geometry. Release: frontend 17.5 ms median, admit 2.1.
-**Memory (real config):** Rust heap 4.25 -> 2.34 GB (Sodium builders 2048 growing; DH off-screen
-columns release CPU payload after upload; shadow-caster sweep retries late chunks). Left: mesh
-vertex 756 MB + semantic 529 MB CPU copies. RSS peaks land 9.1 vs Frozen 9.5, water 10.8 vs 9.7.
+- Base `c87803e75`; static RGB MAE 0.236/0.430/0.466 (`goal5/baseline-vanilla-warm`); narrow.
+- Sky lightmap aliases fixed; before failed/full 2,073 pass/3 ignored (`goal5/sky-lightmap-contract-fix`).
+- Fresh pairs: Complementary RGB 5.051/5.029/5.244 passes; MakeUp 6.860/6.127/3.555 fails6.
+- First shader frame: Complementary97/source97, MakeUp87/source87 clean; other packs/transitions pending.
+- Shadow-only orb crash: mesh-boundary compaction fixed; before reproduced,
+  13 Java tests pass; live pair clean/RGB 5.022/5.043/5.247. Temporary trace removed.
+- Shader/entity moving pair: 1,800 frames each clean; Current/Frozen FPS 38.3/285.2,
+  p95 30.46/5.58 ms; CPU frontend 13.64 ms (prepare 5.99), GPU 7.24; needs optimization.
+- Terrain uniforms share immutable CPU blocks; full 2,073/3 ignored, ABI 68;
+  RGB 4.956/4.982/5.208 passes. Moving FPS 39.1/306.6; prepare 6.07 ms; speedup unproven.
+- Early shadow frustum selection preserves indices/order/validation; six regressions,
+  full Rust 2,079/3 ignored. Real batching 2.489→2.020/2.030 ms (~19%); FPS win unproven:
+  Current control/candidates 38.8/39.6/38.1; Frozen 301.7/303.9/307.4, 1,800 frames each.
+  Fresh RGB 5.011/5.038/5.235 passes, validation clean; first world184/source184.
+  Scoped evidence: `goal5/early-shadow-selection`; flicker and broad parity remain open.
+- Normal translation driver: verified travel/setup/route; forest pose/disk preflight, 60 tool tests.
+  Vanilla Current v4/Frozen v6: X9→3→9, 480 samples/direction, lag1/2/4 zero tiles.
+  Inland vanilla X9→15→9: lag1/2 max0; lag4 2/1 both, motion edges; no parity/flicker acceptance.
+  Inland Complementary v1 excluded: user reports manual input ~10:17; clean repeat pending.
+- Normal Complementary v2/Frozen v1: 480/direction, lag1/2/4 zero tiles, clean/peak5.53GiB.
+- DH ordinary movement: shared v2 DB/radius32/DOUBLE_PASS, 480 samples/direction;
+  actual X9→3→9 verified both. Current return has transient rectangular terrain loss:
+  lag1/2 max133 tiles, lag4 115; Frozen all six analyses max0. Current repeat reproduces
+  max32 tiles; bounded/reaped/validation clean, peak3.95/4.22 GiB. CPU/GAL cause open.
+  `goal5/terrain-translation-dh-source/ordinary-pair-verification.json`; ROI900×350.
+  Fade NONE also reproduces (max53 tiles); buffered trace reproduces (max64), 59 Java tests pass.
+  Explicit trace links one-frame missing column to asset-ack pruning (365→362→365).
+  Fix defers selected-column replacements until presentation; two before-failing regressions,
+  61 Java tests pass; traced fixed all six lag analyses max0, 30k records/no prunes.
+  Untraced repeat all six max0; clean/reaped, peak5.01GiB. Temporary traces removed.
+  Iris+DH Current/Frozen all six max0, clean/reaped; Current peak6.71GiB. General flicker/bounds open.
+- Spectator-in-solid terrain omission: missing Frozen portal bypass root-caused.
+  CPU policy/cache identity fixed; nine Java/native tests pass; live before/Frozen/after
+  confirms restored cave terrain. Clean/reaped, after peak 3.69 GiB; pixel/perf gaps remain.
+  `goal5/terrain-occlusion-policy-fix`; general terrain/DH flicker remains unresolved.
+- Black cave wedges: generic lower sky disc omitted Frozen sky fog. Typed local fan,
+  Rust camera-relative transform/fog/nonwriting depth/back cull fix; ABI 68 unchanged.
+  Full Rust 2,083 pass/3 ignored; 11 Java/native and wiki pass. Real vanilla before/
+  Frozen/after confirms fogged gaps; peak 3.84 GiB (`goal5/dark-sky-disc-fog`).
+  Shader buried pair clean/reaped/active; stronger shafts and severe slowdown remain.
+  Lag4 tiles Current 45/21 vs Frozen 11/9 follow cave edges; flicker unproven.
+- Disabled audit formatting: normal 60s JFR confirmed discarded strings; gate fixed.
+  Nine GUI tests pass; repeat audit allocation samples 5→0; no FPS win claimed.
+  `goal5/audit-formatting-guard`; mesh publication/foil reads need further profiling.
+- Flicker unresolved: native 269/2 ignored; timestamped timeline diagnostics.
+  Controlled 4K vanilla 12k / shader 2.6k pairs clean; videos 480 each/8 s. During
+  video, 122/151 offscreen submissions queued behind unfinished prior presents;
+  shader candidates sparse foliage. 38 tool tests pass (`goal5/gpu-overlap-unmanaged-4k-*`).
+- Fresh uncapped RD10 moving-camera release pair, 1,800 measured frames:
+  Current/Frozen average FPS 164.7/975.3; p95 7.89/1.67 ms; p99 10.34/4.25 ms;
+  peak RSS 3.20/3.77 GiB; entity counts 181/180. This is one workload, not broad
+  performance acceptance. Evidence: `goal5/vanilla-moving-performance`.
+- GUI item-cache eviction moved to the whole-frame boundary; reuse/replacement/
+  cleanup, 85 GUI tests and 26 boundary tests pass. Live Current/Frozen FPS
+  206.5/875.2, entities 182/182, p95 6.55 ms; GUI/lowering 0.37/0.15 ms,
+  batches 43→8, draws 52→17, gain ~25%; repeats pending (`goal5/gui-cache-moving-performance`).
+- Complementary/DH entry initializes private graph/depth and shadows before meshes.
+  V4 world103/source122, clean/RGB 3.826/4.833/4.191; depth proof missing (`goal5/source-entry-dh-v4`).
+- Iris+DH coverage verifier: added opt-in readbacks of the actual main/DH opaque
+  depth snapshots, with exact screenshot/submission identity and float hashes.
+  Exact clear comparisons replace quantized depth; eight Python evidence checks,
+  native owner/restore and 42 LOD tests pass; V5 transfer-source usage corrected.
+  V6 both captures completed, clean validation, first world
+  frame 94 selected source. Mask: 120,552 pixels (13.1%), exact frame 677/submission
+  1292. DH extension RGB MAE 9.686/15.968/11.238 exceeds unchanged tolerance 6;
+  Whole-image MAE 3.944/4.932/4.242 hides far-water mismatch (V6); parity fails.
+- Particle cutouts: Frozen discards alpha ≤0.1; selected textured writer now preserves
+  explicit cutoff/off properties. Sixteen focused checks include native module creation.
+  Exact-frame receipt lookup and one pending producer snapshot fix capture retries;
+  19 Java tests pass. Ordinary flame remained static; no animation parity claim.
+  Hidden/visible leaf pairs pass: maximum visible cell RGB MAE 162.99→2.898,
+  effect maximum 3.145 within unchanged 6; both clients complete, clean validation.
+  Full Rust 1,972/2 ignored; `goal5/particle-leaf-alpha-*-fixed`; flicker unproven.
+- DH noise diagnostic: shared PNG texel (17,23), RGBA [124,196,150,255];
+  Frozen black/Current tinted, clean (`goal5/dh-noise-texel-probe`). Not parity;
+  user decision pending: configured sampling or Frozen's black behavior.
+- Iris+DH original/lease-only runs: 8,562/8,640 builds, no eight quiet frames;
+  Frozen completed (`goal5/iris-dh-overlap-video`, `goal5/iris-dh-overlap-lifecycle-v2`).
+- Reproduced two CPU lifetime errors using real containers: identical replacement
+  close retires a shared generation; snapshot trimming retires live quadtree
+  columns. Atomic CPU leases and protection during trimming fix both regressions.
+  All 82 DH subsystem tests pass. V3/V4 completed both 1,200-frame runs clean;
+  Current stopped at 312/309 builds, 98 visible columns. V4 peak RSS
+  Current/Frozen 5.68/5.98 GiB. V4 video: 460/480 samples, 8 s, max gap
+  34/17 ms; far-island maximum adjacent mean 0.247/0.390 levels/channel.
+  Evidence: `goal5/iris-dh-overlap-lifecycle-v4`; narrow case, flicker unproven.
+  Large-radius/transition memory bounds pending. MakeUp pair: Frozen completed;
+  Current crashed before first world frame (missing source snapshot at correlation).
+  Guarded rejected-source preparation and preserved contract rejection diagnostics;
+  Three entry tests/full Rust pass: 1,975 passed, 2 ignored; release rebuilt. MakeUp V2
+  survives entry with clean validation but rejects `DoLighting` contract; admission unresolved.
+- Single-color source discovery preserves original lighting, output slots and
+  legacy varyings; used attributes remain gated. Rust custom expressions preserve
+  Frozen overloads and typed std140 packing, checked against 32 evaluator cases.
+  Evidence: `goal5/custom-uniform-expressions`; MakeUp's nine custom uniforms resolve.
+- Built-in uniform caches: 26 Frozen cases/reload/resize pass; MakeUp resolves (`goal5/builtin-frame-uniforms`).
+- Standard Iris aliases and stage-selected custom PNGs now resolve in Rust;
+  geometry/fullscreen texture domains and sampled-asset/output identities stay separate.
+  Fixed raw secondary shadow aliasing and late-writer wrapper cache invalidation;
+  partial creations retire on failure. Combined matrices/fog/primary-only shadow fixed.
+  Frozen particle draws prove `mc_Entity=(0,0,0,1)`; composite/disc/Sun native pixels pass.
+  Sky now uses the Y=16 disc; celestial local vertices/matrices/raw clock match Frozen.
+  MakeUp water/LOD bias, output lifecycle and sky UV fixes: full 2,060/3 ignored/release.
+  Historical RGB 7.224/6.456/4.248 fails tolerance 6; foliage/water remain, validation clean.
+- Normal terrain cutout alpha >0.1 (opaque none); selected overrides/main wrappers
+  pass. MakeUp restores leaf holes; RGB MAE 7.576/6.945/3.877 fails
+  (`goal5/makeup-settled-terrain-alpha-fixed-pair`; full 2,064/3 ignored/release/wiki).
+  Animated clocks differ: Current freezes/Frozen advances; matching clocks required.
+- Frame-start clears reset both clear-enabled sides; clear=false history survives.
+  Cached GAL passes; native before red/fixed blue, mips/resize/reject/world/order pass.
+  Full 2,066/3 ignored/release/wiki; Complementary clean RGB 10.327/9.485/8.576 fails
+  (`goal5/complementary-frame-start-clears-pair`); no flicker-root-cause acceptance.
+- Iris horizon now precedes disc: owned 2,076 vertices, capped radius/fog alpha 1.
+  Captured Frozen event 888/native coverage/wall/gates/rejection checks pass.
+  Full Rust 2,070/3 ignored/release/wiki; fresh clean Complementary pair passes
+  RGB 5.050/5.069/5.260; band removed (`goal5/complementary-horizon-fixed-pair`).
+- Scoped shadow/color directives, bounded caches, cutout identity and exact R16F
+  implemented; prior full Rust 2,017 passed/3 ignored and wiki passed. MakeUp:
+  eight targets, 840/105/3/-25 camera, ten modules (`goal5/scoped-pack-directives`).
+- Shadow distances/entity selection: ABI 68 copies user chunks, immutable world
+  renderer/leash bounds, double camera, eligibility and player-only roles. Rust owns
+  distance/frustum/caster decisions; block flags are independent. Java adds bounded
+  off-camera candidates; orb roles survive Rust geometry creation. Unported shadow
+  streams retain admission gaps; six tests/108 Frozen AABBs/23 Java checks pass.
+  Terrain: 9,180 cases; release/wiki/full Rust pass (2,028/3 ignored). Live
+  Complementary first world frame 91/sub109 selected-source, clean settled capture;
+  no world fallback. No Frozen image pair/flicker acceptance.
+- Historical moving vanilla: no coherent tiles in narrow triage; GPU overlap unproven
+- DH DOUBLE_PASS crash fixed: preserve same-frame/no-copy sampled state before fade.
+  Four regressions/full Rust pass (2,032/3 ignored); release/wiki/13 Python pass.
+  Both clients completed 16,000 + 8,000 frames clean; narrow videos 961/943 samples.
+  Lags 1/2/4: Current 0 coherent tiles, Frozen 1 foreground candidate; flicker unproven.
+  Evidence: `goal5/direct-dh-snapshot-state`; paired temporal retry linked there.
+- Explicit source ignored with DH off: selection/cache identity fixed across routes;
+  3 regressions/17 tool/2 harness/wiki pass (`goal5/canonical-world-source`).
+- Corrected shader/DH-off moving pair: both 6,000 frames, 961 samples/8 s;
+  no coherent tiles at lags 1/2/4. One acquired image; GPU overlap unproven
+  (`goal5/moving-shaders-shared-world-video`). Separate validation-off pair:
+  Current/Frozen average FPS 34.6/311.2, median 28.53/3.00 ms; native source
+  preparation 6.52 ms, hazards 3.34 ms, GPU 3.90 ms (baseline).
+- Fixed stale producer-readiness deadlines carried across ready/restart periods;
+  2 regressions failed before, 15 Java checks pass. The initial optimization pair
+  failed this gate; retry completed both 1,800-frame runs, no Current restarts.
+  Inline-storage experiment was slower (hazards 3.34→4.96 ms) and reverted.
+- Destination-vector preservation: nine hazard checks/full Rust 2,033 pass; live
+  pair Current/Frozen median 25.25/2.99 ms, FPS 38.1/317.1. Hazards 3.34→0.87 ms,
+  reads 19,916→19,899; observed 11.5% frame reduction, broader repeats pending:
+  `goal5/hazard-range-allocation/gameplay-destination-preserved`; flicker unproven.
+- Preparation/retirement +source packing: full2,036/window/release pass; 80-byte records,
+  256-byte descriptors; median22.97/2.99ms, uploads3.54→1.25MB/frame, validation clean.
+- Shader resize: both 4,000-frame runs/three X11 resizes pass, validation clean; first-resized frame unproven.
 
-**Screen effects:** in-wall = opaque .1 grey, mirrored window under itemFov (84-119 -> 1.6);
-underwater honors `underwaterOverlay`; fire = projected strips; stratum GUI_SCREEN_EFFECT 50.
-**Tour (real config, DH r128, shaders; nether/end/walk/F5):** walk crashed "shadow
-candidate section bound exceeded" (full sweep > 4096) -> own 12288 bound, nearest kept.
-End fell back all visit (End sky quads: depth disabled) -> skytextured box (selector 2,
-36-vertex primitive, CUSTOM_SKY). MC_RENDER_STAGE_* now Iris ordinals (were stale:
-translucent 15/rain 19/entities 23/HAND); hand = HAND_SOLID/_TRANSLUCENT. 1-frame
-fallbacks remain on dimension change (DH depth snapshot / shadowtex0).
-**Robustness (09-30):** failed recordings discard DH targets (was "already awaiting" forever);
-stale occupancy submissions dropped; empty GUI load/store passes stripped. Tours (shaders+DH
-r128, F1/F3/inventory/pause/chat/F5, RD 16->6->10): 0 crashes. off 0.26-0.43 = water phase.
-**DH water:** dh_water now writes depth like DH TRANSPARENT (dhDepthTex0 vs 1): streaks
-gone, w-north 4.41 -> 4.13. Rings also appear without DH (RD8): deferred 09-26 water gap.
-**Perf baseline 09-30 (bench.sh, g4src copy, shaders, RD10, 720p; Frozen forced OpenGL - the
-09-29 "Frozen 9.5 fps" ran Frozen's Java Vulkan backend, invalid):** fps Cur/Frz DH move
-38.8/215.6, DH static 43.8/242.5, noDH move 44.0/278.9, noDH static 55.9/226.7; RSS 12.3-12.5
-vs 6.2-7.1 GB.
+## Required evidence and remaining work
 
-**Step 2 — Rust-only route (09-30).** Java OpenGL/Vulkan backends, `blaze3d/opengl`, Sodium GL
-renderer/regions/arenas, Iris GL pipeline/programs/samplers/shadows/PBR, DH GL renderers and
-`VulkanicCoreAPI` are deleted (~600 files, −158k lines); route predicates/enums folded away
-(scratch `fold/`: Fold2, Shake, DeadGuards, CutAt, Restore). `VulkanicAPI.initialize` only
-records the backend; `RustSemanticGpuDevice` is the sole device; both backends run the whole-
-frame shell (GL: borrowed context + `glfwSwapBuffers`; GL acquire now returns one stable
-default-framebuffer target id (was per-frame -> 32-pass cap at menu); joins the world, then Rust
-GL rejects "program is missing uniform block for binding 1" — accepted incomplete). Iris = pack
-config/menus;
-`Iris.isPackInUseQuick`/API report the Rust shader route. Tests: Rust 1896 pass; Java 991, only
-the 28 pre-existing Mockito/JDK25 failures (obsolete route/source-contract tests removed).
-Regressions after deletion: day 2.39, glass 7.49, down 7.15, off 0.14-0.25, gun 2.20, pane 2.38,
-DH generic 4.88/4.96/3.09, 0 VUIDs; real config shaders on/off: joins, route active, no crash.
-bench.sh after deletion (Current, moving): DH 38.8 -> 45.0 fps, noDH 44.0 -> 45.9; RSS ~12.5 GB.
-**Architecture boundaries (09-30).** No backend identity in the GAL API (capabilities +
-`ShaderConventions`); opaque `GpuProfileTag` scopes named by the world renderer; GL backend
-lowers GLSL generically; `architecture_boundary.rs` enforces layering. GL conformance tests now
-really run and match Vulkan. Rust GL next gap: `CopyFrameTargetToTexture` (GL allowed incomplete).
-**Render restructure (10-01).** `vulkanic` = GAL + backends only; code motion, census nothing
-lost, giant fns intact: `render/{shaderpack,scene,shared,worldrender,guirender}` (GUI reaches world
-atlases via `GuiAtlasOwner`). GUI move: day 2.64/gun 2.47/pane 2.53 equal on the pre-move snapshot
-(MAE varies by session, cause unknown); DH = noise; A/B noDH fps +0.70+/-0.41, DH +0.11+/-0.29.
-**Bridge move (10-01).** `vulkanic/ffi` -> `render/bridge`; ABI identical (272 symbols, 133 layouts);
-only the bridge creates GALs; profile split (`SubmitProfile` in `WholeFrameProfile`). A/B equal.
-**GAL split + API audit (10-01).** `gal.rs` 5.3k lines -> `gal/` (17 concern modules), tests ->
-`tests/` (11). API audited: internal items narrowed, test-only code `cfg(test)`, renderer-used items
-public; the never-used Tracy zone timer and its GAL flag deleted (ABI field kept, ignored). All
-public items documented; `#![warn(missing_docs)]` kept by a boundary test. Rust 1936 pass. Frozen
-day/glass/down/gun equal to the pre-split snapshot same session (2.61/7.47/7.29/2.43 vs
-2.62/7.44/7.25/2.47); off 0.04, pane 2.54, DH 4.52, 0 VUIDs; settle timeouts hit both trees.
-A/B: noDH fps +0.11+/-0.42, DH +0.73+/-0.47; GAL submit ~1.4 ms, +8+/-12 / -46+/-17 us.
-Docs: new `docs/development/rendering/` (architecture, GAL, bridge, verification).
-Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
-unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
-timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,
-Tracy frame marks. **Unported (tracked):** panorama screenshot (needs Rust offscreen 4096²
-target), Iris shadow-distance slider + color space (Rust uses pack constants), Java mesher
-fallback for non-native block models/custom fluids (fail-closed), world-map region mipmaps.
-## Current gate (2026-09-25)
-
-Canonical pair: `Origin`, 1280x720, `150.5,100,530.5,105,10`, RD 4, DH off, one two-mode
-`Capture.py` run (`--rust-selected-source-execution`), pack ComplementaryHungLoIfied.zip
-(SHA-256 `cb4343913a0d...`) via `MATTMC_CAPTURE_SHADER_PACK_SOURCE`. Mask chat x<1000,y=570..609.
-
-## Validation and history
-
-Celestial/End-sky quads: pre-terrain sky writer only; mips only if declared.
-**Night/rain gap: deferred by the user (2026-09-25); not a Frozen bug.** Night
-5.47/6.78/10.83, rain 8.14/9.34/8.83 (night fog brighter/bluer; dither).
-**Iris hand order (09-25).** depthtex2 snapshot -> hand -> hand depth into main depth
--> depthtex1 -> deferred -> translucents. Entity-shadow decals omitted with a shadow pass.
-**Shadow map (09-25).** Source shadow pipelines use `RasterYDirection::Down`. Java
-sweeps the window for off-camera casters (384/256 per frame; unloaded columns retried).
-Look-down residual is timing (dither 0.5 + `WAVING_SPEED 0`: 4.96/4.52/3.45). Gaps:
-energy swirl unadmitted (Iris: gbuffers_entities, ENTITIES_CUTOUT, pipeline's
-additive blend + texture matrix); no Iris program fallback chains;
-`texture2D(sampler2DShadow, vec2)` rejected; edited water sources unadmitted.
-
-**Glint / motion (09-27):** Iris GLINT key (EQUAL depth, no write) in load-only passes with
-`invariant gl_Position`; same-frame `camera_history` fixed (TAA saw no motion).
-**Held items / hand passes (09-27).** `currentRenderedItemId` resolves from the drawn mesh
-(equip-animation crash); block items use the pack's default-state material; Iris
-`isHandTranslucent` hands draw late into main depth; degenerate TaCZ quads no longer reject.
-Gun icon uses Frozen's PIP pose + GUI lighting modes 6/7 (off-pair 0.14/0.25/0.24). Gaps: gun
-muzzle/stock shading, `gbuffers_hand_water`, dropped flat foil items opaque.
-**Crash robustness (2026-09-27).** A failed armed submission within 60 frames
-of (re)arming disarms and redraws that frame on the vanilla Rust route; later
-failures disarm and return `retryable selected-source failure` (Java resubmits
-once); a missing DH depth snapshot after a world change disarms in admission.
-GUI item layers are compacted, not rejected. Dimension tour: 0 crashes/VUIDs
-(program identities carry a dimension tag, shadow identity a content hash;
-writer-declared shadow roles are staged even if terrain samples none). Below-horizon
-dark disc is sky geometry (skybasic). The old "underwater" 131/152/168 gap was the
-camera inside the seabed: missing in-wall overlay (fixed 09-29, see above).
-**Block edits (09-28):** placed/broken blocks could stay invisible (both routes;
-more often with shaders): an edited section invalidated while its build was in
-flight was re-dispatched into the in-flight gate and dropped, and edits waited
-behind the whole streaming backlog. Invalidations now stay parked until the
-worker completes and enter the pending queue first. Place/remove stress (8
-alternations right after a teleport, shaders on/off): all correct. **Iris
-screen button labels:** `SmoothedFloat` fades now use wall-clock deltas (the
-Iris shader timer never advances on the Rust route). Pre-existing Java failures:
-`CloudSemanticAdmissionTest`/`NativeParticleCollectionTest` (stale source-text asserts).
-**Perf (09-27/28)** superseded by the 09-30 bench.sh baseline above. Done: geometry pages+
-multidraw, identity-keyed terrain batch plans, translucent-order cell reuse, memoized programs,
-`FullscreenPipelineCache`. Left: entities ~4.5 ms, terrain+shadow ~3.6, GAL 2.2, Java ~5.
-**Teleport/validation/voxels (2026-09-28).** Tour (6 teleports, F2, 40 s walk,
-validation on): 0 VUIDs, no post-arm fallback. Fixed: F2 restores PRESENT_SRC;
-colored-light voxels update every frame (sampled volumes in ShaderRead); an
-uninitialized volume uploads a cleared field like Iris; full stream slots wait
-for the oldest; stale pending lightmaps are discarded at frame entry and never
-promoted unuploaded (injected failures 1/5 -> 0/35). Occupancy is exact-
-incremental (randomized equivalence test): per-box patches, in-place shift on
-cell crossings (walking p50 3.9/p95 20 ms). Gap: voxel vertex cache keeps pack material
-ids until the asset reloads. Entity/hand normals = Iris BufferBuilder face normal
-(cow 2.09, banner 2.22). Gun gap: muzzle cap/front sight px. TaCZ: 0 fallbacks.
-**Casters / outline (09-26).** Player casters: entity `shadow` stage only; selection box via
-pack `gbuffers_line` after the opaque flush (MAE .42/.70/.51).
-**Block breaking via `gbuffers_damagedblock` (2026-09-27).** Crumbling draws
-with the pack's damagedblock program after the outline, before
-`beginTranslucents` (vanilla CRUMBLING state, bias -1/-10, alphaTest default
-0.1); terrain cracks copy vanilla model quads with SheetedDecal UVs. An armed
-route meeting an uncoverable frame disarms (`admit_armed_source_frame`). Sign pair 2.54.
-**Translucent/water fixes (2026-09-26).** DYNAMIC sorted runs map to one
-`index_subrange`; source translucent terrain writes depth; discarded frames
-re-queue first-use uploads; sorted-index updates retire cached geometry; Iris
-XHFP normals/tangents (flipped tangent drew a dark triangle over water); world
-stages flip every target access once (incl. `sampler2D` params; pack PNGs not
-flipped). Water pose 152.5,66,499.5,180,25: 16.6 -> 9.74/10.78/9.20.
-**Colored light + shadowtex1 (09-26).** Supported `iris.features.optional` flags define
-`IRIS_FEATURE_<X>` (floodfill compiles); `shadowtex1` = pre-translucent shadow depth copy.
-Water pair 10.79/13.10/10.62 (Frozen's water `color` drops to 0.77x before reflection mix).
-**User: water gap deferred (2026-09-26).**
-**Shader menu (09-26):** works on Vulkan (`Iris.reload` parses a CPU-only menu
-pack, persists `<pack>.txt`; Rust applies saved options). The selected pack runs
-whenever Iris config enables one (`MATTMC_RUST_SELECTED_SOURCE_EXECUTION` only
-overrides); stderr reports `[MattMC shaders] shader route active|vanilla fallback`.
-Source geometry (~0.9 GiB at RD 10): device-local, staged, cap 2 GiB. F2 screenshots: Rust copies the completed
-frame target before present; Java only encodes the PNG. Resize re-arms the route.
-
-## Retained architecture
-
-Shadow-only casters (halo + source frustum) feed only the shadow pass; 2048^2 shadow
-target, Iris white shadow-color clear. Keep one Rust frame/presenter, immutable asset
-validation, indirect terrain submission, static fragment specialization. Goals 1-2
-remain regression baselines (recheck after shared changes). No commit or push.
+| Area | Status / required proof |
+| --- | --- |
+| Vanilla terrain, fluids, transparency | Fresh static, moving and temporal pairs pending |
+| Entities, items/hands, particles, sky/weather | Motion, day/night/rain gameplay pending |
+| GUI, HUD, text, post-processing | Real screens and effect pairs pending |
+| Resource packs | Equivalent non-default packs and real reloads pending |
+| DH opaque, translucent, water, LOD | Ordinary shared-DB movement reproduces loss; cause/fix and broad pairs pending |
+| Iris packs | Cutout rule implemented; multiple packs, broad and animated parity pending |
+| Iris+DH | Shared DB, shader/DH water and terrain pairs pending |
+| Terrain flicker | Reproduce, isolate cause, fix, verify all four routes |
+| First shader world frame | Complementary and MakeUp/DH-off initial frames verified; other packs/transitions pending |
+| Loading/unloading, dimensions | Repeated real transitions pending |
+| Shader toggle/reload, resize/fullscreen | Repeated transitions pending |
+| Memory / GPU resources | Long-run and reload/transition bounds pending |
+## Baseline and harness constraints
+- Sole baseline: `../MattMC_JavaPerfTesting/MattMC`, **Java OpenGL**; never alter Frozen.
+- Use Capture.py/Gameplay.py with equivalent copied worlds/camera/time/settings/packs/DH.
+- Capture stdout/stderr; Rust diagnostics can bypass `latest.log`. Active→fallback fails.
+- One Rust-owned GAL/backend/presenter; Java supplies immutable CPU data, no Iris/DH GPU handles.
+- Supplemental tests do not establish gameplay parity; distinguish flicker from animation.
+- Deterministic captures force GPU retirement and can hide overlap defects;
+  use the gameplay benchmark or RunDev for synchronization/flicker investigation.
+## Historical observations to revalidate (not current acceptance)
+- Frozen DH DB formats 1–2/Current up to 4; shared Frozen fixture in scratch `g4src`; inspect before reuse.
+- Prior gaps: energy swirl/shader fallback/hand-water admission, gun shading, flat foil;
+  custom-model/fluid meshing, world-map mips, panorama capture, shadow/color-space controls.
+  Revalidate and implement as required.
+## Frozen behavior decisions
+- User decision: ignore Frozen look-down haze (zero-sized composite shadow maps); preserve Frozen.
+- Prior unresolved suspicion: DH hill brightness differs because Frozen DH
+  `noisetex` appears black rather than the pack texture. Revalidate evidence;
+  ask the user before treating suspected Frozen behavior as a bug.
+## Additional audit follow-up (unverified review claims)
+- Preparation retries; DRAWBUFFERS/RENDERTARGETS; shadow texture stage; malformed custom uniforms.
+- Entity cap/varyings/attributes/shadow quads/archive checksums; other disabled audit strings unverified.

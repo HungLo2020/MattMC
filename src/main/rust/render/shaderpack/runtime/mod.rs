@@ -63,7 +63,7 @@ use crate::render::shaderpack::contracts::entity::{
 };
 use crate::render::shaderpack::runtime::fullscreen::{FullscreenSourceExecutionPlan, FullscreenSourcePassFrame};
 use crate::render::shaderpack::contracts::fullscreen::{
-    derive_fullscreen_source_chain, derive_sky_source_stage, derive_sky_textured_source_stage,
+    derive_fullscreen_source_chain, derive_pre_terrain_fullscreen_source_chain, derive_sky_source_stage, derive_sky_textured_source_stage,
     FullscreenSourceStage, FullscreenSourceStageKind,
 };
 use crate::render::shaderpack::contracts::hand::{
@@ -110,7 +110,7 @@ use crate::render::shaderpack::source::ShaderPackSource;
 use crate::render::shaderpack::resources::assets::TerrainSourceAssetResources;
 use crate::render::shaderpack::resources::color_targets::{
     resolve_terrain_source_color_attachments, source_color_clear_color,
-    ShaderPackColorBootstrapClearValues, ShaderPackColorBootstrapPlan, ShaderPackColorFramePlan,
+    ShaderPackColorClearValues, ShaderPackColorFramePlan,
     ShaderPackColorSamplingPlan, ShaderPackColorTargetCache, ShaderPackColorTargetIdentity,
     ShaderPackColorTargetManifest, ShaderPackColorTargets, ShaderPackSourceColorResourceCache,
     TerrainSourceColorAttachment,
@@ -121,7 +121,7 @@ use crate::render::shaderpack::uniforms::source::{
 #[cfg(test)]
 use crate::render::shaderpack::contracts::terrain::TerrainPassOutput;
 use crate::render::shaderpack::contracts::terrain::{
-    derive_complementary_translucent_terrain_contract_for_scope, shadow_source_stages_for_scope,
+    derive_translucent_terrain_contract_for_scope, shadow_source_stages_for_scope,
     TerrainPassContract, TerrainPassRequiredResource, TerrainProgramScope,
 };
 use crate::render::shaderpack::resources::bindings::{
@@ -340,4 +340,3 @@ impl ShaderPackRuntimeExecutor {
 
 #[cfg(test)]
 mod tests;
-

@@ -856,23 +856,34 @@ impl VulkanicGal {
         if event.target.is_zero_sized_sampler_marker() {
             return Ok(());
         }
-        if let Some((target, state)) = accesses.destinations.iter().find(|(target, state)| {
-            targets_overlap(*target, event.target) && !access_matches_state(event, *state)
-        }) {
-            return self.validation_error(GalError::submission(
-                StatusCode::InvalidArgument,
-                format!("barrier after {state:?} on {target:?} does not cover {event:?}"),
-            ));
+        let mut consumes_destination = false;
+        for (target, state) in &accesses.destinations {
+            if !targets_overlap(*target, event.target) {
+                continue;
+            }
+            consumes_destination = true;
+            if !access_matches_state(event, *state) {
+                return self.validation_error(GalError::submission(
+                    StatusCode::InvalidArgument,
+                    format!("barrier after {state:?} on {target:?} does not cover {event:?}"),
+                ));
+            }
         }
-        accesses.destinations = accesses
-            .destinations
-            .drain(..)
-            .flat_map(|(target, state)| {
-                subtract_target(target, event.target)
-                    .into_iter()
-                    .map(move |target| (target, state))
-            })
-            .collect();
+        // Most draw accesses do not consume a pending barrier destination.
+        // Preserve that vector directly instead of allocating and splitting
+        // every unrelated range. Overlapping ranges still undergo every
+        // destination-state check above and the same subtraction below.
+        if consumes_destination {
+            accesses.destinations = accesses
+                .destinations
+                .drain(..)
+                .flat_map(|(target, state)| {
+                    subtract_target(target, event.target)
+                        .into_iter()
+                        .map(move |target| (target, state))
+                })
+                .collect();
+        }
         if let Some(profile) = profile.as_deref_mut() {
             match event.mode {
                 AccessMode::Read => {

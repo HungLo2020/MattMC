@@ -1,8 +1,9 @@
 //! Pack-declared semantic bindings for lowered terrain source resources.
 //!
-//! A shader source name is not a backend binding. This module converts an
-//! explicitly transported pack declaration into stable semantic roles; it
-//! intentionally contains neither native handles nor attachment indices.
+//! A shader source name is not a backend binding. Explicit transported
+//! manifests or the standard Iris source protocol resolve names into stable
+//! semantic roles. Pass-specific custom textures require selected-stage
+//! preprocessing; alias discovery creates no native resources.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -13,6 +14,8 @@ use crate::render::shaderpack::source::ShaderPackSource;
 use crate::render::shaderpack::contracts::terrain::{TerrainPassContract, TerrainPassInput, TerrainPassRequiredResource};
 
 pub const TERRAIN_RESOURCE_BINDINGS_PATH: &str = "mattmc/terrain-resource-bindings.properties";
+
+mod legacy;
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum TerrainSourceResourceRole {
@@ -33,6 +36,8 @@ pub enum TerrainSourceResourceRole {
     /// Raw shadow-depth data used by source paths that explicitly reconstruct
     /// or combine shadow depth rather than issuing a compare sample.
     ShadowDepthRaw,
+    /// Raw depth from the opaque-only shadow snapshot.
+    ShadowDepthRawSecondary,
     ShadowColor,
     /// A distinct shadow color target sampled by source stages that retain
     /// multiple shadow attachments. It cannot alias the primary merely
@@ -98,6 +103,7 @@ impl TerrainSourceResourceRole {
             }
             "shadow_depth_secondary" => Ok(Self::ShadowDepthSecondary),
             "shadow_depth_raw" => Ok(Self::ShadowDepthRaw),
+            "shadow_depth_raw_secondary" => Ok(Self::ShadowDepthRawSecondary),
             "shadow_color" => Ok(Self::ShadowColor),
             "shadow_color_secondary" => Ok(Self::ShadowColorSecondary),
             "noise" => Ok(Self::Noise),
@@ -131,6 +137,7 @@ impl TerrainSourceResourceRole {
             | Self::Lightmap
             | Self::Noise
             | Self::ShadowDepthRaw
+            | Self::ShadowDepthRawSecondary
             | Self::ShadowColor
             | Self::ShadowColorSecondary
             | Self::GBufferAlbedo
@@ -158,9 +165,8 @@ impl TerrainSourceResourceRole {
     /// semantic source lowering instead of tying it to an Iris texture unit.
     pub fn resolve_sampled_declaration(&self, type_name: &str) -> GalResult<Self> {
         match (self, type_name) {
-            (Self::ShadowDepthPrimary | Self::ShadowDepthSecondary, "sampler2D") => {
-                Ok(Self::ShadowDepthRaw)
-            }
+            (Self::ShadowDepthPrimary, "sampler2D") => Ok(Self::ShadowDepthRaw),
+            (Self::ShadowDepthSecondary, "sampler2D") => Ok(Self::ShadowDepthRawSecondary),
             _ if self.expected_sampler_type() == type_name => Ok(self.clone()),
             _ => Err(GalError::invalid_argument(format!(
                 "semantic terrain source resource '{}' requires '{}' but source declares '{type_name}'",
@@ -185,6 +191,7 @@ impl TerrainSourceResourceRole {
             | Self::ShadowDepthPrimary
             | Self::ShadowDepthSecondary
             | Self::ShadowDepthRaw
+            | Self::ShadowDepthRawSecondary
             | Self::ShadowColor
             | Self::ShadowColorSecondary
             | Self::Noise
@@ -214,6 +221,7 @@ impl TerrainSourceResourceRole {
             Self::ShadowDepthPrimary => "shadow_depth_primary",
             Self::ShadowDepthSecondary => "shadow_depth_secondary",
             Self::ShadowDepthRaw => "shadow_depth_raw",
+            Self::ShadowDepthRawSecondary => "shadow_depth_raw_secondary",
             Self::ShadowColor => "shadow_color",
             Self::ShadowColorSecondary => "shadow_color_secondary",
             Self::Noise => "noise",
@@ -296,6 +304,7 @@ impl TerrainSourceResourceRole {
             | Self::MaterialSpecularMap
             | Self::Lightmap
             | Self::ShadowDepthRaw
+            | Self::ShadowDepthRawSecondary
             | Self::ShadowColor
             | Self::ShadowColorSecondary
             | Self::Noise
@@ -689,6 +698,34 @@ impl TerrainSourceOwnedResourceSet {
         )
     }
 
+    /// Selects a writer's locally owned color samplers over color bindings
+    /// carried by an admission snapshot. Program-local descriptor ordinals
+    /// can produce different combined handles for the same target image.
+    /// Every other resource role stays unchanged and strict merging remains
+    /// the rule for independently owned non-color subsets.
+    pub(crate) fn with_stage_color_resources(
+        &self,
+        colors: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<Self> {
+        if self.availability.shader_pack_generation() != colors.availability.shader_pack_generation()
+            || self.availability.world_generation() != colors.availability.world_generation()
+        {
+            return Err(GalError::invalid_argument(
+                "stage color bindings must match the snapshot's world and shader-pack generations",
+            ));
+        }
+        let roles = colors.availability.resources().map(|resource| resource.role).collect::<Vec<_>>();
+        if roles.iter().any(|role| !matches!(role, TerrainSourceResourceRole::ShaderPackColor(_)))
+            || !colors.storage_views.is_empty()
+        {
+            return Err(GalError::invalid_argument(
+                "stage color replacement accepts only owned color sampler roles",
+            ));
+        }
+        let base = self.excluding_roles(roles)?;
+        Self::merge([&base, colors])
+    }
+
     /// Removes roles already supplied by an earlier stage of the same source
     /// transaction, but only when their semantic generation and owned GAL
     /// bindings are exactly equal. This lets a confirmed snapshot be carried
@@ -798,12 +835,15 @@ impl TerrainSourceOwnedResourceSet {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TerrainSourceResourceBindings {
     bindings: BTreeMap<String, TerrainSourceResourceRole>,
+    // Protocol outputs remain color identities even when a phase overrides
+    // the corresponding sampler spelling with a custom PNG.
+    color_outputs: BTreeMap<u32, TerrainSourceResourceRole>,
 }
 
 impl TerrainSourceResourceBindings {
     pub fn from_source(source: &ShaderPackSource) -> GalResult<Self> {
         let Some(contents) = source.get(TERRAIN_RESOURCE_BINDINGS_PATH) else {
-            return Ok(Self::default());
+            return Self::from_legacy_source(source);
         };
         let mut bindings = BTreeMap::new();
         for (index, raw_line) in contents.lines().enumerate() {
@@ -837,7 +877,7 @@ impl TerrainSourceResourceBindings {
                 )));
             }
         }
-        Ok(Self { bindings })
+        Ok(Self { bindings, color_outputs: BTreeMap::new() })
     }
 
     pub fn role_for(&self, name: &str) -> Option<TerrainSourceResourceRole> {
@@ -852,6 +892,9 @@ impl TerrainSourceResourceBindings {
         &self,
         slot: u32,
     ) -> GalResult<TerrainSourceResourceRole> {
+        if let Some(role) = self.color_outputs.get(&slot) {
+            return Ok(role.clone());
+        }
         let name = format!("colortex{slot}");
         match self.role_for(&name) {
             Some(role @ TerrainSourceResourceRole::ShaderPackColor(_)) => Ok(role),

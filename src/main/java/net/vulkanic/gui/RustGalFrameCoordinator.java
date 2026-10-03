@@ -687,7 +687,9 @@ public final class RustGalFrameCoordinator {
 			int cancelled = SCHEDULER.cancelAll("shutdown");
 			existing = bridge;
 			retireOutstanding(true);
-			auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted, true));
+			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+				auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted, true));
+			}
 			bridge = null;
 			GUI_ATLAS_REFERENCES.resetAcceptance();
 			bridgeMode = BridgeMode.NONE;
@@ -1273,10 +1275,10 @@ public final class RustGalFrameCoordinator {
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.retire-outstanding");
 			retireOutstanding(forceDeterministicCaptureRetirement());
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.retire-outstanding");
-			// The benchmark records these metrics directly. Building the full audit
-			// line during its measured window allocates a large transient string and
-			// makes the diagnostic path part of the workload under test.
-			if (!GraphicsFrameBenchmark.isMeasurementFrameForDiagnostics()) {
+			// Check the consumer before formatting: ordinary gameplay has no audit
+			// sink. The benchmark records metrics directly during measurement.
+			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+				&& !GraphicsFrameBenchmark.isMeasurementFrameForDiagnostics()) {
 				auditMessage(metricsAuditLine(requests.size(), frameId, submissionId, wholeFrameResult != null));
 			}
 			METRICS.executeNanos += elapsedSince(executeStarted);
@@ -2268,11 +2270,13 @@ public final class RustGalFrameCoordinator {
 	}
 
 	/**
-	 * Publishes pending DH semantic assets before the next render-list preflight.
+	 * Publishes pending DH semantic assets after the visible render-list traversal.
 	 * This is deliberately an asset-only Vulkan operation: it neither consumes
 	 * visible segments nor issues a draw or presentation. Without this phase, a
 	 * first DH frame can reject itself because route admission runs before the
 	 * normal whole-frame GUI batch has an opportunity to acknowledge its assets.
+	 * The collector protects generations already selected for this frame; their
+	 * replacements wait for the post-presentation flush.
 	 */
 	public static void flushPendingWorldLodAssetsForSemanticPreflight() {
 		synchronized (LOCK) {

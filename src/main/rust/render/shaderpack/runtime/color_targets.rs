@@ -17,7 +17,7 @@ pub(super) fn shader_pack_color_name_from_role(role: &str) -> GalResult<String> 
 
 /// One source-generation color transaction for one combined Rust submission.
 ///
-/// This owns only source-color lifecycle semantics: bootstrap clears, explicit
+/// This owns only source-color lifecycle semantics: frame-start clears, explicit
 /// mip prerequisites, feedback copies, and submit-confirmed history. World
 /// frontends supply semantic terrain or DH draws separately, so neither route
 /// can reinterpret attachment state, borrow Iris targets, or advance history
@@ -25,32 +25,23 @@ pub(super) fn shader_pack_color_name_from_role(role: &str) -> GalResult<String> 
 pub(crate) struct ShaderPackSourceColorFrameTransaction {
     pub(super) targets: ShaderPackColorTargets,
     pub(super) frame: ShaderPackColorFramePlan,
-    pub(super) bootstrap: Option<ShaderPackColorBootstrapPlan>,
     pub(super) finalized: bool,
 }
 
 impl ShaderPackSourceColorFrameTransaction {
     pub(super) fn begin(
-        gal: &mut VulkanicGal,
+        _gal: &mut VulkanicGal,
         targets: &ShaderPackColorTargets,
         frame: ShaderPackColorFramePlan,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<Self> {
-        let bootstrap = if frame.requires_initial_clear()? {
-            Some(frame.stage_full_clear(gal, targets, clear_values)?)
-        } else {
-            None
-        };
         let mut transaction = Self {
             targets: targets.clone(),
             frame,
-            bootstrap,
             finalized: false,
         };
-        if let Some(bootstrap) = transaction.bootstrap.as_ref() {
-            transaction.frame.append_full_clear(bootstrap, operations)?;
-        }
+        transaction.frame.append_frame_start_clears(targets, clear_values, operations)?;
         let mipmapped_roles = transaction
             .targets
             .identity
@@ -84,6 +75,19 @@ impl ShaderPackSourceColorFrameTransaction {
     ) -> GalResult<()> {
         self.require_open()?;
         self.frame.record_external_outputs(outputs)
+    }
+
+    /// Resolve the same first-writer clear policy for geometry as fullscreen.
+    /// This mutates only this pass's copy, never the cached target declaration.
+    pub(crate) fn resolve_terrain_color_clear_policy(
+        &self, attachments: &mut [TerrainSourceColorAttachment],
+    ) -> GalResult<()> {
+        self.require_open()?;
+        for attachment in attachments {
+            attachment.clear_each_frame = self.frame.target_clear_required(
+                &attachment.role, attachment.clear_each_frame)?;
+        }
+        Ok(())
     }
 
     /// Appends one lowered fullscreen source consumer after establishing its
@@ -162,9 +166,6 @@ impl ShaderPackSourceColorFrameTransaction {
             ));
         }
         let result = runtime.confirm_source_color_transaction_submission(gal, self.frame);
-        if let Some(bootstrap) = self.bootstrap {
-            bootstrap.destroy(gal);
-        }
         if result.is_err() {
             runtime.discard_source_color_targets_submission(gal);
         }
@@ -172,9 +173,6 @@ impl ShaderPackSourceColorFrameTransaction {
     }
 
     pub(crate) fn discard(self, runtime: &mut ShaderPackRuntimeExecutor, gal: &mut VulkanicGal) {
-        if let Some(bootstrap) = self.bootstrap {
-            bootstrap.destroy(gal);
-        }
         runtime.discard_source_color_targets_submission(gal);
     }
 
@@ -242,28 +240,31 @@ impl ShaderPackRuntimeExecutor {
     /// staging unavailable rather than allocating a target generation with
     /// insufficient history images.
     pub(super) fn complete_source_color_target_requirements(&self) -> GalResult<(Vec<String>, Vec<String>)> {
-        let (preparation, preparation_error) = match &self.source_candidate {
+        let (pre, post, preparation_error) = match &self.source_candidate {
             TerrainSourceCandidateState::Discovered {
-                post_terrain_preparation,
-                post_terrain_preparation_error,
-                ..
-            } => (
-                post_terrain_preparation.as_slice(),
-                post_terrain_preparation_error.as_deref(),
-            ),
-            TerrainSourceCandidateState::Unavailable
-            | TerrainSourceCandidateState::Disabled { .. }
-            | TerrainSourceCandidateState::Rejected { .. } => return Ok((Vec::new(), Vec::new())),
+                pre_terrain_preparation, pre_terrain_preparation_error,
+                post_terrain_preparation, post_terrain_preparation_error, ..
+            } => (pre_terrain_preparation, post_terrain_preparation,
+                pre_terrain_preparation_error.as_deref().or(post_terrain_preparation_error.as_deref())),
+            _ => return Ok((Vec::new(), Vec::new())),
         };
         if let Some(error) = preparation_error {
             return Err(GalError::unsupported_feature(format!(
                 "complete shader-pack fullscreen chain cannot stage named color targets: {error}"
             )));
         }
-        if preparation.is_empty() {
-            return Err(GalError::unsupported_feature(
-                "complete shader-pack fullscreen chain has no retained stages",
-            ));
+        if post.is_empty() {
+            return Err(GalError::unsupported_feature("complete shader-pack fullscreen chain has no retained stages"));
+        }
+        let mut preparation = pre.iter().chain(post.iter()).collect::<Vec<_>>();
+        if let TerrainSourceCandidateState::Discovered {
+            pre_terrain_sky_preparation, pre_terrain_horizon_preparation, ..
+        } = &self.source_candidate {
+            preparation.extend(pre_terrain_sky_preparation.iter());
+            preparation.extend(pre_terrain_horizon_preparation.iter());
+        }
+        if let DistantHorizonsSourceCandidateState::Discovered { pre_terrain_preparation, .. } = &self.distant_horizons_source_candidate {
+            preparation.extend(pre_terrain_preparation.iter().filter(|stage| stage.source_program.is_some()));
         }
         let mut feedback_names = Vec::new();
         let mut mipmapped_names = Vec::new();
@@ -640,7 +641,7 @@ impl ShaderPackRuntimeExecutor {
         &self,
         gal: &mut VulkanicGal,
         targets: &ShaderPackColorTargets,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<ShaderPackSourceColorFrameTransaction> {
         ShaderPackSourceColorFrameTransaction::begin(

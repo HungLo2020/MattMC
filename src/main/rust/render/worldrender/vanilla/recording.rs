@@ -7,8 +7,18 @@ impl WorldPrimitiveFrontend {
         &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
         frame: WorldPrimitiveFrame, clear_background: bool, raster_y_direction: RasterYDirection,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
+        self.append_frame_ops_inner_with_source_preparation(
+            gal, generation, frame_target, frame, clear_background, raster_y_direction, false,
+        )
+    }
+
+    pub(crate) fn append_frame_ops_inner_with_source_preparation(
+        &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
+        frame: WorldPrimitiveFrame, clear_background: bool, raster_y_direction: RasterYDirection,
+        preparing_source_entry: bool,
+    ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
         let previous = self.defer_world_uploads;
-        let result = self.record_frame_ops(gal, generation, frame_target, frame, clear_background, raster_y_direction);
+        let result = self.record_frame_ops(gal, generation, frame_target, frame, clear_background, raster_y_direction, preparing_source_entry);
         self.defer_world_uploads = previous;
         result
     }
@@ -21,6 +31,7 @@ impl WorldPrimitiveFrontend {
         mut frame: WorldPrimitiveFrame,
         clear_background: bool,
         raster_y_direction: RasterYDirection,
+        preparing_source_entry: bool,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
         self.pending_terrain_external_item_entity_written = false;
         // Staged device-local uploads are batched into one flush per frame.
@@ -116,6 +127,13 @@ impl WorldPrimitiveFrontend {
         let target_query_started = std::time::Instant::now();
         let color_format = gal.pass_target_color_format(frame_target)?;
         let color_attachment = gal.pass_target_color_attachment(frame_target)?;
+        let owned_color_texture = if frame_target.kind()
+            == Some(crate::render::vulkanic::handles::HandleKind::RenderTarget)
+        {
+            Some(gal.pass_target_color_texture(frame_target)?)
+        } else {
+            None
+        };
         profile.world_prepare_target_query_nanos = elapsed_nanos_u64(target_query_started);
         let had_resources = self
             .resources
@@ -139,14 +157,14 @@ impl WorldPrimitiveFrontend {
         let use_g_buffer_mesh_path = uses_shader_g_buffer_mesh_path(
             &frame,
             clear_background,
-            // An explicitly requested source route needs one Rust-owned
-            // G-buffer warmup frame to establish depth history before exact
-            // source admission can arm. The warmup still uses the complete
-            // vanilla semantic draw path; source execution remains gated by
-            // the armed flag below.
+            // Source preparation uses the normal semantic graph to establish
+            // depth history; selected execution still requires admission.
             self.runtime_source_execution_is_armed() || source_preparation_warmup,
             self.pending_terrain_fabulous_handoff,
-        );
+        ) || (preparing_source_entry && clear_background && frame.background.enabled
+            && frame.voxel_volume.world_generation != 0);
+        // Entry may contain only sky and a hand while terrain/LOD data streams
+        // in. Its private graph must still initialize the depth snapshots.
         // The direct Rust DH compositor overlays its private sparse target
         // after the background/sky setup and before ordinary opaque terrain.
         // Keep the vanilla sky fan in that target so uncovered pixels retain
@@ -612,6 +630,7 @@ impl WorldPrimitiveFrontend {
                 frame.viewport_height,
                 color_format,
                 final_depth_format,
+                terrain_program_scope_for_sky_type(frame.background.sky_type)?,
                 &mut profile,
             )?;
             g_buffer_final_binding_key = Some(self.ensure_g_buffer_final_binding(
@@ -1311,7 +1330,7 @@ impl WorldPrimitiveFrontend {
             frame.frame_id,
             Some(lod_material_started),
         );
-        if !mesh_batches.is_empty() || !lod_mesh_draws.is_empty() {
+        if !mesh_batches.is_empty() || !lod_mesh_draws.is_empty() || use_g_buffer_mesh_path {
             // The direct vanilla graph and the admitted source graph consume
             // the same immutable frame fog semantics.  Keep this bounded
             // diagnostic at their shared submission boundary so ordinary
@@ -1884,7 +1903,9 @@ impl WorldPrimitiveFrontend {
                     compositor_dh_fog_parameters[18] = -4.0;
                 }
                 if !skip_dh_composite_for_audit {
-                    let previous_vanilla_color = if self.lod_vanilla_snapshot_initialized {
+                    let previous_vanilla_color = if self.lod_vanilla_sample_state_initialized
+                        || self.pending_lod_vanilla_sample_state_established
+                    {
                         TextureUsageState::ShaderRead
                     } else {
                         TextureUsageState::Undefined
@@ -1921,12 +1942,12 @@ impl WorldPrimitiveFrontend {
                     if far_clip_fade {
                         resources.append_vanilla_snapshot(
                             frame_target,
+                            owned_color_texture,
                             depth_texture,
                             previous_vanilla_color,
                             previous_vanilla_depth,
                             &mut ops,
                         );
-                        self.pending_lod_vanilla_snapshot_written = true;
                     } else {
                         resources.append_vanilla_sample_state(
                             previous_vanilla_color,
@@ -1934,6 +1955,10 @@ impl WorldPrimitiveFrontend {
                             &mut ops,
                         );
                     }
+                    // Both paths establish ShaderRead for the resolver. Later
+                    // vanilla fade copies must preserve that same-frame use,
+                    // even when far fade did not need snapshot contents.
+                    self.pending_lod_vanilla_sample_state_established = true;
                     let previous_resolved = if self.lod_direct_composition_initialized {
                         TextureUsageState::ShaderRead
                     } else {
@@ -2331,7 +2356,9 @@ impl WorldPrimitiveFrontend {
                                     "direct DH composition resources missing before deferred composite",
                                 )
                             })?;
-                        let previous_vanilla_state = if self.lod_vanilla_snapshot_initialized {
+                        let previous_vanilla_state = if self.lod_vanilla_sample_state_initialized
+                            || self.pending_lod_vanilla_sample_state_established
+                        {
                             TextureUsageState::ShaderRead
                         } else {
                             TextureUsageState::Undefined
@@ -2339,6 +2366,7 @@ impl WorldPrimitiveFrontend {
                         if vanilla_fade_mode > 0.0 {
                             resources.append_vanilla_snapshot(
                                 frame_target,
+                                owned_color_texture,
                                 depth_texture,
                                 previous_vanilla_state,
                                 previous_vanilla_state,
@@ -2353,7 +2381,7 @@ impl WorldPrimitiveFrontend {
                         }
                         ops.append(&mut deferred_dh_composite_ops);
                         self.pending_lod_direct_composition_written = true;
-                        self.pending_lod_vanilla_snapshot_written = true;
+                        self.pending_lod_vanilla_sample_state_established = true;
                         dh_composite_inserted = true;
                         ops.push(CommandOp::BeginPass {
                             pass,
@@ -2425,7 +2453,9 @@ impl WorldPrimitiveFrontend {
                         "direct DH composition resources missing before deferred composite",
                     )
                 })?;
-            let previous_vanilla_state = if self.lod_vanilla_snapshot_initialized {
+            let previous_vanilla_state = if self.lod_vanilla_sample_state_initialized
+                || self.pending_lod_vanilla_sample_state_established
+            {
                 TextureUsageState::ShaderRead
             } else {
                 TextureUsageState::Undefined
@@ -2433,6 +2463,7 @@ impl WorldPrimitiveFrontend {
             if vanilla_fade_mode > 0.0 || far_clip_fade {
                 resources.append_vanilla_snapshot(
                     frame_target,
+                    owned_color_texture,
                     depth_texture,
                     previous_vanilla_state,
                     previous_vanilla_state,
@@ -2447,7 +2478,7 @@ impl WorldPrimitiveFrontend {
             }
             ops.append(&mut deferred_dh_composite_ops);
             self.pending_lod_direct_composition_written = true;
-            self.pending_lod_vanilla_snapshot_written = true;
+            self.pending_lod_vanilla_sample_state_established = true;
         }
         if !final_double_pass_dh_composite_ops.is_empty() {
             let resources = self
@@ -2463,6 +2494,7 @@ impl WorldPrimitiveFrontend {
             // private DH source exactly once at Frozen's second fade boundary.
             resources.append_vanilla_snapshot(
                 frame_target,
+                owned_color_texture,
                 depth_texture,
                 TextureUsageState::ShaderRead,
                 TextureUsageState::ShaderRead,
@@ -2470,7 +2502,7 @@ impl WorldPrimitiveFrontend {
             );
             ops.append(&mut final_double_pass_dh_composite_ops);
             self.pending_lod_direct_composition_written = true;
-            self.pending_lod_vanilla_snapshot_written = true;
+            self.pending_lod_vanilla_sample_state_established = true;
         }
         if !deferred_entity_layer_ops.is_empty() {
             ops.push(CommandOp::BeginPass {

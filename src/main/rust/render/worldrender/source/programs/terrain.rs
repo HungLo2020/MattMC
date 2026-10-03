@@ -453,8 +453,8 @@ impl WorldPrimitiveFrontend {
             );
             if transaction.shared_uniforms.len() < 64 {
                 transaction.shared_uniforms.push((
-                    prepared.legacy_texture_transforms.clone(),
-                    prepared.scalar_uniforms.clone(),
+                    prepared.legacy_texture_transforms.to_vec(),
+                    prepared.scalar_uniforms.to_vec(),
                     stream.legacy_transform_offset,
                     stream.scalar_uniform_offset,
                 ));
@@ -657,6 +657,7 @@ impl WorldPrimitiveFrontend {
         material_mode: u32,
         _terrain_cull_policy: u32,
         winding: u32,
+        shadow_alpha_cutoff: Option<f32>,
     ) -> GalResult<LoweredSourceTerrainPipelineKey> {
         // Iris disables face culling for the shadow terrain pass so surfaces
         // outside the camera-facing half of a section can still cast shadows.
@@ -674,6 +675,7 @@ impl WorldPrimitiveFrontend {
             winding,
             vec![SHADER_G_BUFFER_COLOR_FORMAT; 2],
             crate::render::vulkanic::resources::RasterYDirection::Down,
+            shadow_alpha_cutoff,
         )
     }
 
@@ -694,6 +696,7 @@ impl WorldPrimitiveFrontend {
             winding,
             color_formats,
             crate::render::vulkanic::resources::RasterYDirection::Up,
+            None,
         )
     }
 
@@ -706,6 +709,7 @@ impl WorldPrimitiveFrontend {
         winding: u32,
         color_formats: Vec<TextureFormat>,
         raster_y_direction: crate::render::vulkanic::resources::RasterYDirection,
+        shadow_alpha_cutoff: Option<f32>,
     ) -> GalResult<LoweredSourceTerrainPipelineKey> {
         let (mut blend, mut depth_write) =
             source_terrain_pipeline_raster_state(program, material_mode)?;
@@ -731,6 +735,13 @@ impl WorldPrimitiveFrontend {
                 "lowered source terrain pipeline requires at least one explicit color output format",
             ));
         }
+        let shadow_alpha_cutoff = if program.terrain_output_color_slots().is_none()
+            && material_mode == WORLD_MATERIAL_MODE_CUTOUT
+        {
+            shadow_alpha_cutoff
+        } else {
+            None
+        };
         let key = LoweredSourceTerrainPipelineKey {
             program: LoweredSourceTerrainProgramKey {
                 shader_program_identity: program.identity.clone(),
@@ -740,6 +751,7 @@ impl WorldPrimitiveFrontend {
             cull_policy,
             winding,
             color_formats: color_formats.clone(),
+            shadow_alpha_cutoff_bits: shadow_alpha_cutoff.map(f32::to_bits),
             raster_y_direction,
         };
         if self
@@ -781,21 +793,6 @@ impl WorldPrimitiveFrontend {
             SelectedSourceRasterProbe::BlendDisabled => blend = BlendMode::Disabled,
         }
         front_face = selected_source_raster_probe_front_face(front_face)?;
-        let shadow_alpha_cutoff = if program.terrain_output_color_slots().is_none()
-            && material_mode == WORLD_MATERIAL_MODE_CUTOUT
-        {
-            let policy = self.shader_pack_sources.active_shadow_policy().ok_or_else(|| {
-                GalError::unsupported_feature("source shadow cutout has no selected shadow policy")
-            })?;
-            if policy.generation() != program.shader_pack_generation {
-                return Err(GalError::invalid_argument(
-                    "source shadow cutout policy generation does not match its program",
-                ));
-            }
-            policy.cutout_alpha_cutoff()
-        } else {
-            None
-        };
         let mut created = Vec::new();
         let result = (|| -> GalResult<LoweredSourceTerrainPipelineResources> {
             let [vertex_desc, fragment_desc] = if program.terrain_output_color_slots().is_none() {
@@ -1032,9 +1029,10 @@ impl WorldPrimitiveFrontend {
         material_mode: u32,
         cull_policy: u32,
         winding: u32,
+        shadow_alpha_cutoff: Option<f32>,
     ) -> GalResult<Vec<TerrainShadowDraw>> {
         self.prepare_lowered_source_shadow_draws_with_first_instance(
-            gal, program, prepared, pack_resources, material_mode, cull_policy, winding,
+            gal, program, prepared, pack_resources, material_mode, cull_policy, winding, shadow_alpha_cutoff,
         )
         .map(|(draws, _)| draws)
     }
@@ -1052,6 +1050,7 @@ impl WorldPrimitiveFrontend {
         material_mode: u32,
         cull_policy: u32,
         winding: u32,
+        shadow_alpha_cutoff: Option<f32>,
     ) -> GalResult<(Vec<TerrainShadowDraw>, Option<u32>)> {
         let frame_data = self.ensure_lowered_source_terrain_frame_data(gal, program, prepared)?;
         let geometry_key = frame_data.geometry_key.clone();
@@ -1064,6 +1063,7 @@ impl WorldPrimitiveFrontend {
             material_mode,
             cull_policy,
             winding,
+            shadow_alpha_cutoff,
         )?;
         let resource_set = self
             .lowered_source_terrain_frame_data_resources
@@ -1121,10 +1121,11 @@ impl WorldPrimitiveFrontend {
         material_mode: u32,
         cull_policy: u32,
         winding: u32,
+        shadow_alpha_cutoff: Option<f32>,
     ) -> GalResult<Vec<TerrainShadowMeshDraw>> {
         let (shadows, multidraw_first_instance) = self
             .prepare_lowered_source_shadow_draws_with_first_instance(
-                gal, program, prepared, pack_resources, material_mode, cull_policy, winding,
+                gal, program, prepared, pack_resources, material_mode, cull_policy, winding, shadow_alpha_cutoff,
             )?;
         let geometry_key =
             self.ensure_lowered_source_terrain_geometry_resources(gal, program, prepared)?;
@@ -1237,9 +1238,10 @@ impl WorldPrimitiveFrontend {
             ));
         }
         let shader_pack_generation = programs.shader_pack_generation()?;
+        let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?.ok_or_else(|| GalError::unsupported_feature("source shadow policy requires a dimension scope"))?;
         let shadow_policy = self
             .shader_pack_sources
-            .active_shadow_policy()
+            .active_shadow_policy_for_scope(scope)?
             .filter(|policy| policy.generation() == shader_pack_generation)
             .ok_or_else(|| {
                 GalError::invalid_argument(
@@ -1250,11 +1252,16 @@ impl WorldPrimitiveFrontend {
         let shadow_frustum = if terrain_program_scope_for_sky_type(frame.background.sky_type)?
             == Some(TerrainProgramScope::Overworld)
         {
-            Some(crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame(
+            Some(crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame_with_distances(
                 shadow_policy,
                 frame.shader_environment.time_of_day,
                 frame.projection_matrix,
                 frame.view_matrix,
+                crate::render::shaderpack::properties::shadow::ShadowCasterFrameDistances {
+                    render_distance_blocks: frame.shader_environment.far_plane,
+                    configured_shadow_distance_chunks: frame.shader_environment.configured_shadow_distance_chunks,
+                },
+                crate::render::shaderpack::properties::shadow::ShadowCasterKind::Terrain,
             )?)
         } else {
             None
@@ -1389,6 +1396,7 @@ impl WorldPrimitiveFrontend {
                     batch.key.material_mode,
                     batch.key.cull_policy,
                     batch.key.winding,
+                    shadow_policy.cutout_alpha_cutoff(),
                 )?;
                 if terrain_draws.len() != shadow_draws.len() {
                     return Err(GalError::invalid_argument(

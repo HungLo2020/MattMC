@@ -61,8 +61,9 @@ pub(crate) struct PreparedSourceTerrainFrame {
     /// A camera-sorted translucent run inside the single selected section:
     /// `(first_index, index_count)` relative to that section.
     pub index_subrange: Option<(u32, u32)>,
-    pub legacy_texture_transforms: Vec<u8>,
-    pub scalar_uniforms: Vec<u8>,
+    /// Immutable packed blocks shared by equal draws within this frame.
+    pub legacy_texture_transforms: Arc<[u8]>,
+    pub scalar_uniforms: Arc<[u8]>,
     pub instance_transforms: Vec<u8>,
 }
 
@@ -201,6 +202,62 @@ impl SourceTerrainFrameTransaction {
 }
 
 impl WorldPrimitiveFrontend {
+    /// Selects shadow-only terrain in original frame order before grouping.
+    /// References and sorted geometry remain validated even outside the frustum.
+    pub(crate) fn source_shadow_terrain_instance_indices(
+        &self,
+        frame: &WorldPrimitiveFrame,
+        shader_pack_generation: u64,
+    ) -> GalResult<Vec<usize>> {
+        let candidates = frame
+            .mesh_instances
+            .iter()
+            .enumerate()
+            .filter(|(_, instance)| {
+                MeshBatchSelection::ShadowOnly.includes(instance)
+                    && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+            });
+        let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?;
+        let frustum = if scope == Some(TerrainProgramScope::Overworld) {
+            let policy = self
+                .shader_pack_sources
+                .active_shadow_policy_for_scope(TerrainProgramScope::Overworld)?
+                .filter(|policy| policy.generation() == shader_pack_generation)
+                .ok_or_else(|| {
+                    GalError::invalid_argument(
+                        "named source shadow policy generation is missing or stale",
+                    )
+                })?;
+            Some(crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame_with_distances(
+                policy, frame.shader_environment.time_of_day, frame.projection_matrix, frame.view_matrix,
+                crate::render::shaderpack::properties::shadow::ShadowCasterFrameDistances {
+                    render_distance_blocks: frame.shader_environment.far_plane,
+                    configured_shadow_distance_chunks: frame.shader_environment.configured_shadow_distance_chunks,
+                }, crate::render::shaderpack::properties::shadow::ShadowCasterKind::Terrain,
+            )?)
+        } else {
+            None
+        };
+        let mut selected = Vec::new();
+        for (index, instance) in candidates {
+            let asset = mesh_batch_asset(frame, self, instance, false)?;
+            if instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 {
+                geometry::translucent_order::validate_instance(instance)?;
+                geometry::translucent_order::validate_geometry(asset)?;
+            }
+            if frustum.as_ref().is_some_and(|frustum| {
+                source_shadow_instance_intersects(
+                    frustum,
+                    instance,
+                    Some(frame.shader_environment.far_plane),
+                )
+            }) {
+                selected.push(index);
+            }
+        }
+        Ok(selected)
+    }
+
     /// The selected source route consumes its own lowered geometry and never
     /// records an ordinary indexed-mesh draw. Snapshot preparation may have
     /// populated ordinary resources while deriving exact semantic state, but
@@ -495,8 +552,8 @@ impl WorldPrimitiveFrontend {
         let (legacy_texture_transforms, scalar_uniforms) = match cached {
             Some(packed) => packed,
             None => {
-                let legacy = program.pack_legacy_texture_transforms(texture_transforms)?;
-                let scalar = program.pack_scalar_uniforms(uniform_frame)?;
+                let legacy: Arc<[u8]> = program.pack_legacy_texture_transforms(texture_transforms)?.into();
+                let scalar: Arc<[u8]> = program.pack_scalar_uniforms(uniform_frame)?.into();
                 if let Some((_, memo)) = self.source_uniform_pack_memo.as_mut() {
                     if memo.len() < 64 {
                         memo.push((
@@ -910,8 +967,8 @@ impl WorldPrimitiveFrontend {
     ) -> Vec<CommandOp> {
         self.source_terrain_frame_upload_ops_for_parts(
             stream,
-            prepared.legacy_texture_transforms.clone(),
-            prepared.scalar_uniforms.clone(),
+            prepared.legacy_texture_transforms.to_vec(),
+            prepared.scalar_uniforms.to_vec(),
             prepared.instance_transforms.clone(),
         )
     }
@@ -1022,10 +1079,10 @@ impl WorldPrimitiveFrontend {
     /// Returns whether the discovered source contract declares either
     /// temporal main-depth role and Rust has explicitly opted into preparing
     /// the source contract. Preparation is distinct from route selection:
-    /// the ordinary Rust graph continues to execute until a later frame has
-    /// confirmed every named source resource and armed the complete plan.
+    /// the ordinary Rust graph confirms these resources before admission,
+    /// including private preparation before the first visible world frame.
     pub(crate) fn source_main_depth_history_required(&self) -> bool {
-        self.runtime_source_execution_requested()
+        self.runtime_source_preparation_requested()
             && self.shader_runtime.as_ref().is_some_and(|runtime| {
                 runtime.candidate_source_requires_resource(
                     TerrainSourceResourceRole::MainDepthBeforeTranslucency,

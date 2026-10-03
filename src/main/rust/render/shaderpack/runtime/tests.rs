@@ -16,6 +16,10 @@ use crate::render::shaderpack::resources::bindings::{
 };
 use std::path::PathBuf;
 
+mod source_pack_probe;
+mod pre_terrain;
+mod legacy_samplers;
+
 fn gal() -> VulkanicGal {
     crate::render::vulkanic::test_support::mock_gal_with_capabilities(presentation_capabilities(
             vulkan_capabilities(),
@@ -1020,7 +1024,7 @@ fn source_shadow_depth_resources_are_generation_bound_compare_samplers() {
     let first = executor
         .ensure_candidate_source_shadow_depth_resources(&mut gal, input)
         .unwrap()
-        .expect("source declares two shadow compare samplers");
+        .expect("source declares compare and post-terrain raw shadow samplers");
     let primary = first
         .combined_sampler_for(TerrainSourceResourceRole::ShadowDepthPrimary)
         .unwrap();
@@ -1028,7 +1032,9 @@ fn source_shadow_depth_resources_are_generation_bound_compare_samplers() {
         .combined_sampler_for(TerrainSourceResourceRole::ShadowDepthSecondary)
         .unwrap();
     assert_ne!(primary, secondary);
-    assert_eq!(2, first.len());
+    assert_eq!(3, first.len());
+    let raw = first.combined_sampler_for(TerrainSourceResourceRole::ShadowDepthRaw).unwrap();
+    assert_ne!(primary, raw, "post-terrain raw depth cannot inherit a compare sampler");
     assert_eq!(
         Some(TerrainSourceResourceRole::ShadowDepthPrimary.expected_sampled_resource_shape()),
         first
@@ -1132,7 +1138,9 @@ fn source_shadow_color_requires_an_owned_color_view_and_retires_generation_bound
     let combined = first
         .combined_sampler_for(TerrainSourceResourceRole::ShadowColor)
         .unwrap();
-    assert_eq!(1, first.len());
+    assert_eq!(2, first.len());
+    let secondary = first.combined_sampler_for(TerrainSourceResourceRole::ShadowColorSecondary).unwrap();
+    assert_ne!(combined, secondary, "post-terrain shadow color retains its distinct role");
     assert_eq!(
         Some(TerrainSourceResourceRole::ShadowColor.expected_sampled_resource_shape()),
         first
@@ -1509,11 +1517,13 @@ fn copied_source_assets_are_generation_coherent_private_runtime_preparation() {
     assert!(executor
         .candidate_source_asset_resource_count()
         .is_some_and(|count| count > 0));
+    let shadow_asset_role = executor.source_resource_binding_plans().into_iter()
+        .find_map(|plan| plan.role_for("gaux4")).expect("shadow source binds gaux4");
     assert!(
         executor
             .source_asset_resources
             .as_ref()
-            .and_then(|resources| resources.combined_sampler_for("gaux4"))
+            .and_then(|resources| resources.combined_sampler_for(shadow_asset_role))
             .is_some(),
         "shadow-only gaux4 must be retained from the separately lowered shadow plan"
     );
@@ -2110,10 +2120,16 @@ fn bundled_overworld_sky_initializer_lowers_as_an_owned_source_stage() {
         .expect("a declared sky stage must either lower or expose a precise error")
         .expect("Complementary's overworld scope declares gbuffers_skybasic");
     assert_eq!("world0/gbuffers_skybasic.fsh", sky.source_stage_path);
+    let horizon = executor.prepared_lowered_pre_terrain_horizon_program().unwrap().unwrap();
+    assert_eq!(FullscreenSourceRasterPrimitive::ShaderPackHorizon, horizon.raster_primitive);
+    assert_eq!(2_076, horizon.raster_primitive.vertex_count());
+    assert_eq!(sky.source_stage_path, horizon.source_stage_path);
+    assert_ne!(sky.identity, horizon.identity, "cached pipelines must retain distinct geometry and uniforms");
+    assert_eq!(sky.outputs, horizon.outputs);
     assert_eq!(
-        FullscreenSourceRasterPrimitive::FullscreenTriangle,
+        FullscreenSourceRasterPrimitive::VanillaSkyDisc,
         sky.raster_primitive,
-        "the semantic sky initializer must cover the complete background target"
+        "the source sky must receive Frozen's disc geometry and depth field"
     );
     assert!(sky
         .vertex
@@ -2159,7 +2175,7 @@ fn bundled_overworld_celestial_stage_lowers_with_owned_quad_semantics() {
         .source
         .contains("uniform VulkanicSourceTerrainUniforms"));
     for declaration in [
-        "float sunAngle;",
+        "float vulkanic_source_celestial_time_of_day;",
         "int moonPhase;",
         "int vulkanic_source_celestial_is_moon;",
         "float vulkanic_source_celestial_alpha;",
@@ -2171,6 +2187,7 @@ fn bundled_overworld_celestial_stage_lowers_with_owned_quad_semantics() {
         );
     }
     for name in [
+        "vulkanic_source_celestial_time_of_day",
         "vulkanic_source_celestial_is_moon",
         "vulkanic_source_celestial_alpha",
         "vulkanic_source_celestial_sun_path_rotation",
@@ -2402,7 +2419,7 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
         .begin_source_color_transaction(
             &mut gal,
             &targets,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -2452,13 +2469,16 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
         },
         CommandOp::Dispatch { groups_x: 1, groups_y: 1, groups_z: 1 },
     ]);
+    let mut initialized_attachments = color_attachments.clone();
+    transaction.resolve_terrain_color_clear_policy(&mut initialized_attachments).unwrap();
+    let initializer_boundary = operations.len();
     executor
         .append_terrain_source_color_pass(
             &mut operations,
             &TerrainSourceColorPassTargets {
-                phase: TerrainSourceColorPassPhase::BootstrapAfterSky,
-                color_attachments: color_attachments.clone(),
-                clear_values: ShaderPackColorBootstrapClearValues {
+                phase: TerrainSourceColorPassPhase::BootstrapAfterInitialization,
+                color_attachments: initialized_attachments,
+                clear_values: ShaderPackColorClearValues {
                     fog_color: ClearColor {
                         r: 0.1,
                         g: 0.2,
@@ -2474,6 +2494,11 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
             &[],
         )
         .unwrap();
+    assert!(operations[initializer_boundary..].iter().any(|op| matches!(op,
+        CommandOp::BeginPass { colors, depth_stencil: Some(depth), .. }
+            if colors.iter().all(|color| color.load_op == AttachmentLoadOp::Load)
+                && depth.load_op == AttachmentLoadOp::Clear)),
+        "terrain must preserve every initialized color slot, including non-primary sky/prepare outputs");
     gal.submit(SubmissionBatch {
         label: "sky-before-terrain".into(),
         command_lists: vec![CommandList::from(CommandListDesc {
@@ -2489,7 +2514,7 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
             &TerrainSourceColorPassTargets {
                 phase: TerrainSourceColorPassPhase::Translucent,
                 color_attachments: color_attachments.clone(),
-                clear_values: ShaderPackColorBootstrapClearValues {
+                clear_values: ShaderPackColorClearValues {
                     fog_color: ClearColor {
                         r: 0.1,
                         g: 0.2,
@@ -2512,7 +2537,7 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
             &TerrainSourceColorPassTargets {
                 phase: TerrainSourceColorPassPhase::TexturedMaterial,
                 color_attachments: color_attachments.clone(),
-                clear_values: ShaderPackColorBootstrapClearValues {
+                clear_values: ShaderPackColorClearValues {
                     fog_color: ClearColor {
                         r: 0.1,
                         g: 0.2,
@@ -2547,7 +2572,7 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
             &TerrainSourceColorPassTargets {
                 phase: TerrainSourceColorPassPhase::Clouds,
                 color_attachments: color_attachments.clone(),
-                clear_values: ShaderPackColorBootstrapClearValues {
+                clear_values: ShaderPackColorClearValues {
                     fog_color: ClearColor {
                         r: 0.1,
                         g: 0.2,
@@ -2612,7 +2637,7 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
     let entity_targets = TerrainSourceColorPassTargets {
         phase: TerrainSourceColorPassPhase::Entities,
         color_attachments: color_attachments.clone(),
-        clear_values: ShaderPackColorBootstrapClearValues {
+        clear_values: ShaderPackColorClearValues {
             fog_color: ClearColor {
                 r: 0.1,
                 g: 0.2,
@@ -2767,7 +2792,7 @@ fn source_color_transaction_bootstraps_once_then_reuses_confirmed_targets() {
         .stage_source_color_targets(&mut gal, 73, extent)
         .unwrap()
         .expect("selected source must stage named color targets");
-    let clear_values = ShaderPackColorBootstrapClearValues {
+    let clear_values = ShaderPackColorClearValues {
         fog_color: ClearColor {
             r: 0.1,
             g: 0.2,
@@ -2804,10 +2829,10 @@ fn source_color_transaction_bootstraps_once_then_reuses_confirmed_targets() {
     let second = executor
         .begin_source_color_transaction(&mut gal, &targets, clear_values, &mut second_ops)
         .unwrap();
-    assert!(
-        second_ops.is_empty(),
-        "a confirmed source target generation must not repeat its bootstrap clears"
-    );
+    let expected_clears = targets.targets().filter(|(_, target)| target.clear_each_frame)
+        .map(|(_, target)| 1 + usize::from(target.previous_view.is_some())).sum::<usize>();
+    assert_eq!(expected_clears, second_ops.iter().filter(|op| matches!(op, CommandOp::BeginPass { .. })).count(),
+        "warm source frames clear both sides only of clear-enabled targets");
     second.discard(&mut executor, &mut gal);
     executor.destroy(&mut gal).unwrap();
 }
@@ -2833,7 +2858,7 @@ fn discarded_source_color_transaction_retires_only_pending_target_generation() {
         .begin_source_color_transaction(
             &mut gal,
             &first,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -3034,8 +3059,8 @@ fn rejected_distant_horizons_source_target_preparation_retires_only_pending_imag
     let staged_resource_count = staged
         .targets()
         .map(|(_, target)| {
-            2 + u64::from(target.current_attachment_view != target.current_view)
-                + u64::from(target.previous_view.is_some()) * 2
+            4 + u64::from(target.current_attachment_view != target.current_view)
+                + u64::from(target.previous_view.is_some()) * 4
                 + u64::from(target.previous_attachment_view.is_some())
         })
         .sum::<u64>();

@@ -3326,6 +3326,54 @@ fn inventory_mesh_atlas_uses_explicit_owner_and_native_sprite_uv_mapping() {
 }
 
 #[test]
+fn cached_gui_items_survive_other_items_in_the_same_frame() {
+    use crate::render::guirender::mesh::GuiItemCache;
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
+        sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
+        width: 1, height: 1, pixels: vec![255; 4],
+    }]).unwrap();
+    for step in 0..3 {
+        let batches = [1, if step == 2 { 3 } else { 2 }].map(|identity| {
+            let mut request = mesh_batch(0);
+            request.sequence = identity;
+            request.item_cache = Some(GuiItemCache { identity, animated: false });
+            request.item_raster_scale = 1;
+            request.render_extent = [0, 0];
+            request.guard_pixels = 0;
+            request.lighting_mode = GuiMeshLightingMode::FrontModel;
+            request.item_lighting = Some(crate::render::guirender::items::material::GuiFlatItemLighting {
+                lightmap_generation: 1, rgb: [1.0; 3],
+            });
+            request.model_transform = [
+                1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+            ];
+            request
+        });
+        let (operations, stats) = frontend
+            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                &mut gal, 1, target, target, None, None, None, false,
+                vec![], vec![], batches.into(),
+            ).unwrap();
+        assert_eq!(stats.mesh_item_count, 2);
+        assert_eq!(stats.mesh_batch_count, [2, 0, 1][step],
+            "unchanged cached items must survive other items and one identity replacement");
+        let token = gal.submit(SubmissionBatch {
+            label: "cached multi-item frame".into(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "cached multi-item commands".into(), operations,
+            })],
+        }).unwrap();
+        gal.retire_through_for_test(token.submission).unwrap();
+    }
+    frontend.reset(&mut gal).unwrap();
+    gal.destroy(target).unwrap();
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+}
+
+#[test]
 fn vulkan_item_cache_retains_pixels_moves_composition_and_invalidates_identity_and_reload() {
     use crate::render::guirender::items::raster::GuiItemRasterTarget;
     use crate::render::guirender::mesh::GuiItemCache;

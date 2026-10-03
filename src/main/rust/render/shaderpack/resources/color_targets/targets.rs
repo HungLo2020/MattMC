@@ -101,6 +101,7 @@ pub(crate) struct ShaderPackColorTarget {
 pub(crate) struct ShaderPackColorTargets {
     pub identity: ShaderPackColorTargetIdentity,
     pub(super) targets: BTreeMap<String, ShaderPackColorTarget>,
+    pub(super) clear_passes: ShaderPackColorClearPasses,
 }
 
 pub(super) fn color_resource_generation(
@@ -295,7 +296,8 @@ impl ShaderPackColorTargets {
                     )));
                 }
             }
-            Ok(Self { identity, targets })
+            let clear_passes = ShaderPackColorClearPasses::create(gal, &identity, &targets, &mut created)?;
+            Ok(Self { identity, targets, clear_passes })
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
@@ -306,6 +308,7 @@ impl ShaderPackColorTargets {
     }
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
+        self.clear_passes.destroy(gal);
         for target in self.targets.into_values() {
             for handle in [
                 target.previous_attachment_view,

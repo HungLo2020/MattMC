@@ -167,6 +167,20 @@ pub fn lower_textured_material_source_pair(
     vertex: &PreprocessedShaderSource,
     fragment: &PreprocessedShaderSource,
 ) -> GalResult<LoweredTexturedMaterialSourcePair> {
+    // Shared pack headers may declare terrain attributes for every program.
+    // An unused declaration is harmless. The compact stream models the
+    // disabled generic mc_Entity attribute explicitly; no other terrain-only
+    // lane may receive invented values.
+    let vertex_identifiers = glsl_identifiers(&remove_known_legacy_attributes(
+        vertex.expanded_source(),
+    )?);
+    for name in ["mc_midTexCoord", "at_tangent", "at_midBlock"] {
+        if vertex_identifiers.contains(name) {
+            return Err(GalError::unsupported_feature(format!(
+                "selected textured material source requires unsupported terrain-only attribute '{name}'"
+            )));
+        }
+    }
     let owned_storage_bindings = TerrainSourceResourceBindings::default();
     let vertex = externalize_owned_semantic_storage_writes(vertex, &owned_storage_bindings)?;
     let fragment = externalize_owned_semantic_storage_writes(fragment, &owned_storage_bindings)?;
@@ -269,15 +283,7 @@ pub fn lower_entity_shadow_source_pair(
             ShadowFragmentOutput::LightShaftColor => TerrainFragmentOutput::MaterialAuxiliary,
         })
         .collect::<Vec<_>>();
-    let wrapped = shadow_fragment
-        .source
-        .replacen("void main()", "void vulkanic_entity_shadow_main()", 1);
-    if wrapped == shadow_fragment.source {
-        return Err(GalError::unsupported_feature(format!(
-            "entity shadow fragment '{}' has no main function for the shadow alpha test",
-            shadow_fragment.entry_path
-        )));
-    }
+    let wrapped = crate::render::shaderpack::lowering::rename_glsl_main(&shadow_fragment.source, "vulkanic_entity_shadow_main")?;
     // Iris applies the pack's shadow alpha test to the shadow colour output.
     // The entity pipeline supplies the cutoff; the default keeps every texel.
     let wrapped = insert_after_version(
@@ -360,15 +366,7 @@ pub(super) fn install_entity_alpha_cutout_hook(fragment: &mut LoweredTerrainFrag
     if !fragment.outputs.contains(&TerrainFragmentOutput::LitColor) {
         return Ok(());
     }
-    let wrapped = fragment
-        .source
-        .replacen("void main()", "void vulkanic_source_entity_main()", 1);
-    if wrapped == fragment.source {
-        return Err(GalError::unsupported_feature(format!(
-            "entity fragment '{}' has no main function for its alpha test",
-            fragment.entry_path
-        )));
-    }
+    let wrapped = crate::render::shaderpack::lowering::rename_glsl_main(&fragment.source, "vulkanic_source_entity_main")?;
     fragment.source = format!(
         "{wrapped}\nvoid main() {{\n    vulkanic_source_entity_main();\n#ifdef VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF\n    if (!({}.a > VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF)) discard;\n#endif\n}}\n",
         TerrainFragmentOutput::LitColor.semantic_name()
@@ -751,6 +749,7 @@ pub fn lower_fullscreen_source_pair_with_raster_primitive(
             &varying_contract,
             &opaque_resource_contract,
             bindings,
+            raster_primitive,
         )?,
         uniform_contract,
         varying_contract,

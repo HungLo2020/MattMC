@@ -2,6 +2,61 @@
 
 use super::*;
 
+// Frozen's composite transformer uses a unit quad, an identity model-view
+// and this projection (including its all-zero Z column). These constants
+// belong to source semantics, not the copied world-camera uniform block.
+const COMPOSITE_TRANSFORM_PREAMBLE: &str = r#"
+const mat4 vulkanic_source_composite_projection = mat4(
+    vec4(2.0, 0.0, 0.0, 0.0), vec4(0.0, 2.0, 0.0, 0.0),
+    vec4(0.0), vec4(-1.0, -1.0, 0.0, 1.0)
+);
+const mat4 vulkanic_source_composite_texture_matrix[8] = mat4[8](
+    mat4(1.0), mat4(1.0), mat4(1.0), mat4(1.0),
+    mat4(1.0), mat4(1.0), mat4(1.0), mat4(1.0)
+);
+"#;
+
+fn lower_composite_transform(mut source: String) -> GalResult<String> {
+    for (legacy, explicit) in [
+        ("gl_ModelViewProjectionMatrix", "(vulkanic_source_composite_projection * mat4(1.0))"),
+        ("gl_ProjectionMatrix", "vulkanic_source_composite_projection"),
+        ("gl_ModelViewMatrix", "mat4(1.0)"),
+        ("gl_NormalMatrix", "mat3(1.0)"),
+        ("gl_TextureMatrix", "vulkanic_source_composite_texture_matrix"),
+        ("gl_Color", "vec4(1.0)"),
+    ] {
+        source = replace_identifier(&source, legacy, explicit);
+    }
+    insert_after_version(&source, COMPOSITE_TRANSFORM_PREAMBLE)
+}
+
+fn uses_composite_transform(entry_path: &str, raster_primitive: FullscreenSourceRasterPrimitive) -> bool {
+    raster_primitive == FullscreenSourceRasterPrimitive::FullscreenTriangle
+        // World source transforms must never acquire composite defaults.
+        && !entry_path.rsplit('/').next().is_some_and(|name| name.starts_with("gbuffers_"))
+}
+
+fn lower_owned_sky_transform(
+    mut source: String,
+    raster_primitive: FullscreenSourceRasterPrimitive,
+) -> GalResult<String> {
+    let model_view = match raster_primitive {
+        FullscreenSourceRasterPrimitive::VanillaSkyDisc
+        | FullscreenSourceRasterPrimitive::ShaderPackHorizon => "gbufferModelView",
+        FullscreenSourceRasterPrimitive::VanillaCelestialQuad => "vulkanic_source_celestial_model_view()",
+        FullscreenSourceRasterPrimitive::FullscreenTriangle => return Ok(source),
+    };
+    for (legacy, explicit) in [
+        ("gl_ModelViewProjectionMatrix", format!("(gbufferProjection * {model_view})")),
+        ("gl_ModelViewMatrix", model_view.to_string()),
+        ("gl_ProjectionMatrix", "gbufferProjection".to_string()),
+        ("gl_NormalMatrix", format!("transpose(inverse(mat3({model_view})))")),
+    ] {
+        source = replace_identifier(&source, legacy, &explicit);
+    }
+    Ok(source)
+}
+
 pub(super) fn lower_fullscreen_source_vertex_with_contracts(
     source: &PreprocessedShaderSource,
     uniform_contract: &TerrainSourceUniformContract,
@@ -13,7 +68,46 @@ pub(super) fn lower_fullscreen_source_vertex_with_contracts(
     lowered = strip_nonopaque_uniforms(&lowered)?;
     let uses_legacy_fog = lower_legacy_fog(&mut lowered);
     lowered = replace_identifier(&lowered, "varying", "out");
+    if uses_composite_transform(source.entry_path(), raster_primitive) {
+        lowered = lower_composite_transform(lowered)?;
+        lowered = replace_identifier(&lowered, "gl_Vertex", "vulkanic_source_fullscreen_vertex()");
+        lowered = replace_identifier(&lowered, "gl_Normal", "vec3(0.0, 0.0, 1.0)");
+        // Frozen's quad has only primary UVs. Unused compatibility texture
+        // coordinate sets retain the generic (0,0,0,1), not the primary UV.
+        for index in 1..=7 {
+            lowered = replace_identifier(&lowered, &format!("gl_MultiTexCoord{index}"), "vec4(0.0, 0.0, 0.0, 1.0)");
+        }
+    } else {
+        lowered = lower_owned_sky_transform(lowered, raster_primitive)?;
+        let vertex = match raster_primitive {
+            FullscreenSourceRasterPrimitive::VanillaSkyDisc => Some("vulkanic_source_fullscreen_sky_position()"),
+            FullscreenSourceRasterPrimitive::ShaderPackHorizon => Some("vulkanic_source_fullscreen_horizon_position()"),
+            FullscreenSourceRasterPrimitive::VanillaCelestialQuad => Some("vulkanic_source_fullscreen_celestial_position()"),
+            FullscreenSourceRasterPrimitive::FullscreenTriangle => None,
+        };
+        if let Some(vertex) = vertex {
+            lowered = replace_identifier(&lowered, "gl_Vertex", vertex);
+            // Frozen's sky/celestial formats have no light attribute. Iris
+            // supplies full-bright coordinates for both compatibility sets,
+            // and aliases texture-matrix slots 1 and 2 to the lightmap matrix.
+            // Keep the owned two-matrix uniform block and its ABI unchanged.
+            for coordinate in ["gl_MultiTexCoord1", "gl_MultiTexCoord2"] {
+                lowered = replace_identifier(&lowered, coordinate, "vec4(240.0, 240.0, 0.0, 1.0)");
+            }
+            lowered = replace_identifier(
+                &lowered,
+                "gl_TextureMatrix",
+                "(mat4[3](vulkanic_source_fullscreen_texture_matrix[0], vulkanic_source_fullscreen_texture_matrix[1], vulkanic_source_fullscreen_texture_matrix[1]))",
+            );
+        }
+    }
     for (legacy, explicit) in [
+        ("texture2DLod", "textureLod"),
+        ("texture3DLod", "textureLod"),
+        ("textureCubeLod", "textureLod"),
+        ("texture2D", "texture"),
+        ("texture3D", "texture"),
+        ("textureCube", "texture"),
         (
             "gl_TextureMatrix",
             "vulkanic_source_fullscreen_texture_matrix",
@@ -34,6 +128,9 @@ pub(super) fn lower_fullscreen_source_vertex_with_contracts(
         &lowered,
         &fullscreen_vertex_semantic_preamble(raster_primitive),
     )?;
+    if raster_primitive == FullscreenSourceRasterPrimitive::VanillaCelestialQuad {
+        lowered = insert_after_version(&lowered, CELESTIAL_MODEL_TRANSFORM)?;
+    }
     if uses_legacy_fog {
         lowered = insert_after_version(&lowered, LEGACY_FOG_SEMANTIC_PREAMBLE)?;
     }
@@ -61,9 +158,15 @@ pub(super) fn lower_fullscreen_source_fragment_with_contracts(
     varying_contract: &TerrainSourceVaryingContract,
     opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
     bindings: &TerrainSourceResourceBindings,
+    raster_primitive: FullscreenSourceRasterPrimitive,
 ) -> GalResult<LoweredFullscreenSourceFragment> {
     let mut lowered = upgrade_version(source.expanded_source())?;
     lowered = strip_nonopaque_uniforms(&lowered)?;
+    if uses_composite_transform(source.entry_path(), raster_primitive) {
+        lowered = lower_composite_transform(lowered)?;
+    } else {
+        lowered = lower_owned_sky_transform(lowered, raster_primitive)?;
+    }
     let uses_legacy_fog = lower_legacy_fog(&mut lowered);
     for (legacy, explicit) in [
         ("texture2DLod", "textureLod"),
@@ -80,7 +183,16 @@ pub(super) fn lower_fullscreen_source_fragment_with_contracts(
     lowered = replace_identifier(&lowered, "varying", "in");
     lowered = apply_varying_locations(&lowered, VaryingStorage::In, varying_contract)?;
     lowered = apply_opaque_resource_bindings(&lowered, opaque_resource_contract)?;
-    let draw_buffer_slots = parse_draw_buffers_slots(source.expanded_source())?;
+    let draw_buffer_slots = if source.entry_path().rsplit('/').next() == Some("final.fsh")
+        && !source.expanded_source().contains("DRAWBUFFERS:") {
+        // The final stage writes the sole displayed color rather than an
+        // indexed scene MRT. Keep it in the Rust-owned primary target for
+        // the normal final-copy path. Other stages still require directives,
+        // and malformed explicit final directives still fail parsing below.
+        vec![0]
+    } else {
+        parse_draw_buffers_slots(source.expanded_source())?
+    };
     let mut outputs = Vec::new();
     for location in 0..8 {
         let provisional_name = format!("out_vulkanic_source_color_{location}");
@@ -150,7 +262,17 @@ pub(super) fn lower_fullscreen_source_fragment_with_contracts(
     // lower-left gl_FragCoord, while source target color images retain their
     // native presentation row order. Depth attachments use that same target
     // coordinate here so color and depth remain aligned during composites.
-    lowered = lower_fullscreen_fragment_coordinates(lowered, uniform_contract)?;
+    lowered = match raster_primitive {
+        FullscreenSourceRasterPrimitive::FullscreenTriangle =>
+            lower_fullscreen_fragment_coordinates(lowered, uniform_contract, varying_contract)?,
+        // Sky/celestial fragments derive screen UVs from source gl_FragCoord.
+        // Their target samplers therefore use the ordinary world conversion;
+        // they do not inherit the composite vertex's image-domain UV stream.
+        FullscreenSourceRasterPrimitive::VanillaSkyDisc
+        | FullscreenSourceRasterPrimitive::ShaderPackHorizon
+        | FullscreenSourceRasterPrimitive::VanillaCelestialQuad =>
+            lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?,
+    };
     lowered = lower_fullscreen_source_history_corner(lowered, uniform_contract)?;
     // Fullscreen shader-pack stages commonly reconstruct view space from a
     // sampled depth value using the legacy OpenGL clip-depth mapping.  The
@@ -158,6 +280,9 @@ pub(super) fn lower_fullscreen_source_fragment_with_contracts(
     // reconstruction forms at the semantic lowering boundary while keeping
     // the OpenGL source expression intact behind the backend define.
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
+    if raster_primitive == FullscreenSourceRasterPrimitive::VanillaCelestialQuad {
+        lowered = insert_after_version(&lowered, CELESTIAL_MODEL_TRANSFORM)?;
+    }
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, &declarations)?;
     let remaining_dialect = analyze_glsl_text(source.entry_path(), &lowered);
@@ -242,11 +367,15 @@ pub(super) fn convert_reprojection_screen_inputs(source: &str) -> String {
 pub(super) fn lower_fullscreen_fragment_coordinates(
     mut source: String,
     uniform_contract: &TerrainSourceUniformContract,
+    varying_contract: &TerrainSourceVaryingContract,
 ) -> GalResult<String> {
-    if !glsl_identifiers(&source).contains("gl_FragCoord") {
+    let reads_fragment_coordinate = glsl_identifiers(&source).contains("gl_FragCoord");
+    let (rewritten, converts_projection) = lower_inline_projection_uvs(&source, varying_contract);
+    source = rewritten;
+    if !reads_fragment_coordinate && !converts_projection {
         return Ok(source);
     }
-    if !uniform_contract
+    if reads_fragment_coordinate && !uniform_contract
         .fields()
         .iter()
         .any(|field| field.name() == "viewHeight")
@@ -255,11 +384,11 @@ pub(super) fn lower_fullscreen_fragment_coordinates(
             "fullscreen source reads gl_FragCoord but does not declare viewHeight for explicit coordinate conversion",
         ));
     }
-    source = replace_identifier(
-        &source,
-        "gl_FragCoord",
-        "vulkanic_source_fullscreen_fragment_coord()",
-    );
+    if reads_fragment_coordinate {
+        source = replace_identifier(
+            &source, "gl_FragCoord", "vulkanic_source_fullscreen_fragment_coord()",
+        );
+    }
     source = source.replace(
         "ivec2 texelCoord = ivec2(vulkanic_source_fullscreen_fragment_coord().xy);",
         "// Source texelCoord addresses the Rust-owned target color storage.\n        ivec2 texelCoord = ivec2(gl_FragCoord.xy);",
@@ -324,8 +453,7 @@ pub(super) fn lower_fullscreen_fragment_coordinates(
             source = source.replace(&source_call, &converted_call);
         }
     }
-    insert_after_version(
-        &source,
+    let fragment_coordinate = if reads_fragment_coordinate {
         r#"vec4 vulkanic_source_fullscreen_fragment_coord() {
     vec4 coordinate = gl_FragCoord;
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
@@ -333,13 +461,17 @@ pub(super) fn lower_fullscreen_fragment_coordinates(
 #endif
     return coordinate;
 }
-vec2 vulkanic_source_fullscreen_screen_uv(vec2 image_uv) {
+"#
+    } else { "" };
+    insert_after_version(
+        &source,
+        &format!("{fragment_coordinate}{}", r#"vec2 vulkanic_source_fullscreen_screen_uv(vec2 image_uv) {
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
     return vec2(image_uv.x, 1.0 - image_uv.y);
 #else
     return image_uv;
 #endif
 }
-"#,
+"#),
     )
 }

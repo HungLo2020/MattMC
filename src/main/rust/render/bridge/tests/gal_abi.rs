@@ -17,6 +17,23 @@ fn gal() -> VulkanicGal {
     crate::render::vulkanic::test_support::mock_gal()
 }
 
+#[test]
+fn exported_struct_layouts_fit_mirrored_capacity_and_include_shadow_distance() {
+    assert_eq!(size_of::<FfiStructLayout>(), 312);
+    for id in 1..=111 {
+        let layout = crate::render::bridge::layout::layout_for_struct(id).unwrap();
+        assert_eq!(layout.header.byte_size as usize, size_of::<FfiStructLayout>());
+        assert!(layout.field_count as usize <= FFI_MAX_STRUCT_LAYOUT_FIELDS);
+        assert!(layout.field_offsets[..layout.field_count as usize].iter()
+            .all(|offset| *offset < layout.byte_size), "struct {id}");
+        assert!(layout.field_offsets[layout.field_count as usize..].iter().all(|offset| *offset == 0));
+    }
+    let shader = crate::render::bridge::layout::layout_for_struct(73).unwrap();
+    assert_eq!(shader.field_count, 65);
+    assert_eq!(shader.field_offsets[64], std::mem::offset_of!(FfiWorldShaderEnvironmentFrame,
+        configured_shadow_distance_chunks) as u32);
+}
+
 fn assert_code<T>(result: Result<T, GalError>, code: StatusCode) {
     let error = match result {
         Ok(_) => panic!("operation unexpectedly succeeded"),
@@ -339,7 +356,7 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V40_VERSION, 40);
     assert_eq!(FFI_ABI_V41_VERSION, 41);
     assert_eq!(FFI_ABI_V42_VERSION, 42);
-    assert_eq!(FFI_ABI_VERSION, 66);
+    assert_eq!(FFI_ABI_VERSION, 68);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);

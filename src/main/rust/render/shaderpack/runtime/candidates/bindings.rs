@@ -43,11 +43,16 @@ impl ShaderPackRuntimeExecutor {
                 source_resource_bindings,
                 source_shadow_resource_bindings,
                 translucent_source_resource_bindings,
+                pre_terrain_preparation,
+                post_terrain_preparation,
                 ..
             } => source_resource_bindings
                 .iter()
                 .chain(source_shadow_resource_bindings.iter())
                 .chain(translucent_source_resource_bindings.iter())
+                .chain(pre_terrain_preparation.iter().chain(post_terrain_preparation.iter())
+                    .filter_map(|stage| stage.source_program.as_ref())
+                    .map(|program| &program.opaque_resource_bindings))
                 .collect(),
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -57,10 +62,16 @@ impl ShaderPackRuntimeExecutor {
             if let DistantHorizonsSourceCandidateState::Discovered {
                 source_resource_bindings,
                 depth_consumer_preparation,
+                pre_terrain_preparation,
                 ..
             } = &self.distant_horizons_source_candidate
             {
                 plans.extend(source_resource_bindings.iter());
+                plans.extend(
+                    pre_terrain_preparation.iter()
+                        .filter_map(|stage| stage.source_program.as_ref())
+                        .map(|program| &program.opaque_resource_bindings),
+                );
                 plans.extend(
                     depth_consumer_preparation
                         .iter()
@@ -122,6 +133,7 @@ impl ShaderPackRuntimeExecutor {
                     TerrainSourceResourceRole::ShadowDepthPrimary
                         | TerrainSourceResourceRole::ShadowDepthSecondary
                         | TerrainSourceResourceRole::ShadowDepthRaw
+                        | TerrainSourceResourceRole::ShadowDepthRawSecondary
                 )
             }));
         }

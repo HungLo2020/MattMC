@@ -1,4 +1,4 @@
-//! Per-frame color-target state, bootstrap clears and layout transitions.
+//! Per-frame color-target state, sampling dependencies and layout transitions.
 
 use super::*;
 
@@ -19,36 +19,6 @@ pub(super) struct ShaderPackColorFrameTargetState {
     pub(super) current_written_this_frame: bool,
 }
 
-/// Semantic values needed for the source-pack's one-time full clear. Fog is
-/// copied gameplay/environment data; the remaining defaults follow the
-/// portable pack target protocol (slot one is depth history, all other
-/// non-primary targets begin transparent black). No Iris framebuffer, target,
-/// or render-state object participates in this contract.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ShaderPackColorBootstrapClearValues {
-    pub fog_color: ClearColor,
-}
-
-#[derive(Debug)]
-pub(super) struct ShaderPackColorBootstrapTarget {
-    pub(super) name: String,
-    pub(super) previous: bool,
-    pub(super) texture: Handle,
-    pub(super) view: Handle,
-    pub(super) render_target: Handle,
-    pub(super) render_pass: Handle,
-    pub(super) clear_color: ClearColor,
-}
-
-/// One bounded, Rust-owned initialization transaction for all current and
-/// feedback sides of a named source color generation. The transient passes
-/// exist only to perform explicit clears through GAL; target images retain
-/// their usual generation lifetime in `ShaderPackColorTargetCache`.
-#[derive(Debug)]
-pub(crate) struct ShaderPackColorBootstrapPlan {
-    pub(super) targets: Vec<ShaderPackColorBootstrapTarget>,
-}
-
 /// The last successfully submitted color-history state for one exact source
 /// target identity. A replacement extent, world, or pack generation starts
 /// uninitialized rather than inheriting images across an incompatible route.
@@ -63,6 +33,7 @@ pub(crate) struct ShaderPackColorFrameState {
 /// target or feedback image semantically valid.
 #[derive(Clone, Debug)]
 pub(crate) struct ShaderPackColorFramePlan {
+    pub(super) frame_start_clears_recorded: bool,
     pub(super) identity: ShaderPackColorTargetIdentity,
     pub(super) targets: BTreeMap<String, ShaderPackColorFrameTargetState>,
 }
@@ -110,14 +81,15 @@ impl ShaderPackColorFramePlan {
             );
         }
         Ok(Self {
+            frame_start_clears_recorded: false,
             identity: targets.identity.clone(),
             targets: frame_targets,
         })
     }
 
     /// A source-generation bootstrap clears every current/feedback image
-    /// exactly once. Later frames preserve the submit-confirmed target state
-    /// and let their declared passes apply the per-target clear/load policy.
+    /// exactly once. Later frames preserve only clear=false targets and clear
+    /// both sides of clear-enabled targets before any source stage.
     /// A partially initialized generation is never safe to guess about.
     pub(crate) fn requires_initial_clear(&self) -> GalResult<bool> {
         let initialized = self
@@ -143,70 +115,6 @@ impl ShaderPackColorFramePlan {
         Err(GalError::invalid_argument(
             "shader-pack color generation has partially initialized current targets",
         ))
-    }
-
-    /// Creates the initial full-clear commands for a fresh source target
-    /// generation. This is intentionally explicit rather than treating an
-    /// allocation as initialized data. Callers record, submit, destroy the
-    /// transient plan, then confirm this frame only when that submission
-    /// succeeds.
-    pub(crate) fn stage_full_clear(
-        &self,
-        gal: &mut VulkanicGal,
-        targets: &ShaderPackColorTargets,
-        values: ShaderPackColorBootstrapClearValues,
-    ) -> GalResult<ShaderPackColorBootstrapPlan> {
-        self.require_targets(targets)?;
-        if self.targets.values().any(|state| {
-            state.current_initialized
-                || state.previous_initialized
-                || state.mipmaps_initialized
-                || state.previous_mipmaps_initialized
-        }) {
-            return Err(GalError::invalid_argument(
-                "shader-pack color full clear is only valid for an uninitialized target generation",
-            ));
-        }
-        ShaderPackColorBootstrapPlan::stage(gal, targets, values)
-    }
-
-    /// Records the full clear and makes the initialized state visible only in
-    /// this in-progress plan. `confirm_frame_submission` remains the sole
-    /// way to expose it to another frame.
-    pub(crate) fn append_full_clear(
-        &mut self,
-        bootstrap: &ShaderPackColorBootstrapPlan,
-        operations: &mut Vec<CommandOp>,
-    ) -> GalResult<()> {
-        if self.targets.values().any(|state| {
-            state.current_initialized
-                || state.previous_initialized
-                || state.mipmaps_initialized
-                || state.previous_mipmaps_initialized
-        }) {
-            return Err(GalError::invalid_argument(
-                "shader-pack color full clear cannot overwrite an already initialized frame plan",
-            ));
-        }
-        bootstrap.append(operations);
-        for state in self.targets.values_mut() {
-            state.current_initialized = true;
-            state.mipmaps_initialized = false;
-            state.previous_mipmaps_initialized = false;
-            state.current_written_this_frame = true;
-            // A target without a previous image leaves this false. The
-            // bootstrap plan contains a previous-side clear exactly for
-            // declared feedback targets.
-        }
-        for target in &bootstrap.targets {
-            if target.previous {
-                self.targets
-                    .get_mut(&target.name)
-                    .expect("bootstrap target name derives from frame target")
-                    .previous_initialized = true;
-            }
-        }
-        Ok(())
     }
 
     /// Returns the prior states for a complete source render target in source
@@ -238,9 +146,9 @@ impl ShaderPackColorFramePlan {
             .collect()
     }
 
-    /// A pack clear declaration applies on the target's first use in this
-    /// frame. Later source writers must load the color produced earlier in
-    /// the same frame (notably skybasic before celestial and terrain).
+    /// Resolve any remaining clear requirement for a writer. The complete
+    /// source transaction clears declared targets at frame start; subsequent
+    /// writers load those values and any earlier source outputs.
     pub(crate) fn attachment_clear_mask(
         &self,
         attachments: &[FullscreenSourceColorAttachment],
@@ -248,15 +156,19 @@ impl ShaderPackColorFramePlan {
         attachments
             .iter()
             .map(|attachment| {
-                let name = attachment.role.shader_pack_color_name().ok_or_else(|| {
-                    GalError::invalid_argument("shader-pack clear attachment is not a named color role")
-                })?;
-                let state = self.targets.get(name).ok_or_else(|| {
-                    GalError::invalid_argument(format!("shader-pack color frame has no target state for '{name}'"))
-                })?;
-                Ok(attachment.clear_each_frame && !state.current_written_this_frame)
+                self.target_clear_required(&attachment.role, attachment.clear_each_frame)
             })
             .collect()
+    }
+
+    pub(crate) fn target_clear_required(
+        &self, role: &TerrainSourceResourceRole, clear_each_frame: bool,
+    ) -> GalResult<bool> {
+        let name = role.shader_pack_color_name().ok_or_else(||
+            GalError::invalid_argument("shader-pack clear attachment is not a named color role"))?;
+        let state = self.targets.get(name).ok_or_else(||
+            GalError::invalid_argument(format!("shader-pack color frame has no target state for '{name}'")))?;
+        Ok(clear_each_frame && !state.current_written_this_frame)
     }
 
     /// A source program may sample the current image only after an earlier
@@ -696,174 +608,6 @@ impl ShaderPackColorFramePlan {
             ));
         }
         Ok(())
-    }
-}
-
-impl ShaderPackColorBootstrapPlan {
-    pub(super) fn stage(
-        gal: &mut VulkanicGal,
-        targets: &ShaderPackColorTargets,
-        values: ShaderPackColorBootstrapClearValues,
-    ) -> GalResult<Self> {
-        let mut created = Vec::new();
-        let result = (|| -> GalResult<Self> {
-            let mut bootstrap_targets = Vec::new();
-            for (name, target) in targets.targets() {
-                let clear_color = source_color_clear_color(
-                    target.source_slot,
-                    target.clear_color_bits,
-                    values.fog_color,
-                );
-                let mut append_target =
-                    |previous: bool, texture: Handle, view: Handle| -> GalResult<()> {
-                        let side = if previous { "previous" } else { "current" };
-                        let label = format!(
-                            "shader-pack-color-bootstrap.world{}-pack{}.{}.{}",
-                            targets.identity.world_generation,
-                            targets.identity.shader_pack_generation,
-                            name,
-                            side,
-                        );
-                        let render_target = gal.create_render_target(RenderTargetDesc {
-                            label: format!("{label}.target"),
-                            color_views: vec![view],
-                            depth_stencil_view: None,
-                            extent: targets.identity.extent,
-                        })?;
-                        created.push(render_target);
-                        let render_pass = gal.create_render_pass(RenderPassDesc {
-                            label: format!("{label}.pass"),
-                            target: render_target,
-                            color_formats: vec![target.format],
-                            depth_format: None,
-                        })?;
-                        created.push(render_pass);
-                        bootstrap_targets.push(ShaderPackColorBootstrapTarget {
-                            name: name.to_string(),
-                            previous,
-                            texture,
-                            view,
-                            render_target,
-                            render_pass,
-                            clear_color,
-                        });
-                        Ok(())
-                    };
-                append_target(
-                    false,
-                    target.current_texture,
-                    target.current_attachment_view,
-                )?;
-                if let (Some(texture), Some(view)) = (target.previous_texture, target.previous_view)
-                {
-                    append_target(
-                        true,
-                        texture,
-                        target.previous_attachment_view.unwrap_or(view),
-                    )?;
-                }
-            }
-            Ok(Self {
-                targets: bootstrap_targets,
-            })
-        })();
-        if result.is_err() {
-            for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
-            }
-        }
-        result
-    }
-
-    pub(super) fn append(&self, operations: &mut Vec<CommandOp>) {
-        for target in &self.targets {
-            operations.push(CommandOp::Barrier(texture_barrier(
-                target.texture,
-                TextureUsageState::Undefined,
-                TextureUsageState::ColorAttachment,
-            )));
-            operations.push(CommandOp::BeginPass {
-                pass: target.render_pass,
-                target: target.render_target,
-                colors: vec![PassAttachment {
-                    view: target.view,
-                    load_op: AttachmentLoadOp::Clear,
-                    store_op: AttachmentStoreOp::Store,
-                    clear_color: Some(target.clear_color),
-                }],
-                depth_stencil: None,
-            });
-            operations.push(CommandOp::EndPass);
-            operations.push(CommandOp::Barrier(texture_barrier(
-                target.texture,
-                TextureUsageState::ColorAttachment,
-                TextureUsageState::ShaderRead,
-            )));
-        }
-    }
-
-    pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
-        for target in self.targets.into_iter().rev() {
-            for handle in [target.render_pass, target.render_target] {
-                let _ = gal.destroy(handle);
-            }
-        }
-    }
-}
-
-pub(crate) fn source_color_clear_color(
-    source_slot: u32,
-    clear_color_bits: Option<[u32; 4]>,
-    fog_color: ClearColor,
-) -> ClearColor {
-    // Capture-only target/readback isolation. This is intentionally scoped to
-    // the named source primary target and cannot alter normal route selection
-    // or material execution.
-    if source_slot == 0
-        && matches!(
-            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_CLEAR_PROBE")
-                .ok()
-                .as_deref()
-                .map(str::trim),
-            Some("primary-red")
-        )
-    {
-        return ClearColor {
-            r: 1.0,
-            g: 0.0,
-            b: 0.0,
-            a: 1.0,
-        };
-    }
-    if let Some([r, g, b, a]) = clear_color_bits {
-        return ClearColor {
-            r: f32::from_bits(r),
-            g: f32::from_bits(g),
-            b: f32::from_bits(b),
-            a: f32::from_bits(a),
-        };
-    }
-    match source_slot {
-        // The portable Iris/OptiFine target contract starts main color at the
-        // semantic fog color and gives depth history a known far-depth value.
-        0 => ClearColor {
-            r: fog_color.r,
-            g: fog_color.g,
-            b: fog_color.b,
-            a: 1.0,
-        },
-        1 => ClearColor {
-            r: 1.0,
-            g: 1.0,
-            b: 1.0,
-            a: 1.0,
-        },
-        _ => ClearColor {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-            a: 0.0,
-        },
     }
 }
 

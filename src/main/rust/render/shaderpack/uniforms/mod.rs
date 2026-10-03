@@ -3,6 +3,7 @@
 
 pub mod source;
 pub mod temporal;
+pub mod celestial;
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 

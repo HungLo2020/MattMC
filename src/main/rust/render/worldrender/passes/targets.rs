@@ -482,6 +482,7 @@ impl WorldPrimitiveFrontend {
         height: u32,
         frame_color_format: ColorFormat,
         final_depth_format: Option<TextureFormat>,
+        source_scope: Option<TerrainProgramScope>,
         profile: &mut WholeFrameProfile,
     ) -> GalResult<()> {
         let extent = Extent3d {
@@ -493,7 +494,7 @@ impl WorldPrimitiveFrontend {
         // The vanilla graph retains its existing viewport-sized attachment.
         let shadow_extent = self
             .shader_pack_sources
-            .active_shadow_policy()
+            .active_shadow_policy_for_scope(source_scope.unwrap_or(TerrainProgramScope::Default))?
             .map(|policy| Extent3d {
                 width: policy.resolution(),
                 height: policy.resolution(),

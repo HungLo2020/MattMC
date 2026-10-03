@@ -60,9 +60,14 @@ pub(crate) struct LocalMaterialMemoGroup {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SourceUniformFrameMemoKey {
     pub(in crate::render::worldrender) frame_id: u64,
+    pub(in crate::render::worldrender) environment_enabled: bool,
     pub(in crate::render::worldrender) world_generation: u64,
+    pub(in crate::render::worldrender) shader_pack_generation: Option<u64>,
+    pub(in crate::render::worldrender) sky_type: u32,
+    pub(in crate::render::worldrender) extent: [u32; 2],
     pub(in crate::render::worldrender) frame_time_bits: u32,
     pub(in crate::render::worldrender) view_bits: [u32; 16],
+    pub(in crate::render::worldrender) projection_bits: [u32; 16],
 }
 
 pub(crate) struct TerrainVoxelSourceMemo {

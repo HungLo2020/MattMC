@@ -1,0 +1,419 @@
+use super::*;
+use crate::render::shaderpack::properties::shadow::{
+    AdvancedShadowCasterFrustum, ShadowCasterFrameDistances, ShadowCasterKind,
+};
+
+fn caster(key: u64, origin: [f32; 3]) -> WorldMeshInstanceRequest {
+    let mut instance = mesh_instance(key, 1);
+    instance.stratum = WORLD_STRATUM_TERRAIN;
+    instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
+    instance.flags = WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY;
+    instance.transform[12..15].copy_from_slice(&origin);
+    instance
+}
+
+fn install_policy(frontend: &mut WorldPrimitiveFrontend, advanced: bool) {
+    frontend
+        .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+            pack_name: "early-shadow-selection".into(),
+            generation: if advanced { 42 } else { 41 },
+            files: vec![
+                ShaderSourceFile::new(
+                    "gbuffers_terrain.fsh",
+                    concat!(
+                        "const float shadowDistance = 80.0;\n",
+                        "const float shadowDistanceRenderMul = 1.0;\n",
+                        "const float sunPathRotation = -25.0;\n",
+                    ),
+                ),
+                ShaderSourceFile::new("shaders.properties", format!("shadow.culling={advanced}\n")),
+            ],
+        })
+        .unwrap();
+}
+
+fn selected_plan(
+    frontend: &mut WorldPrimitiveFrontend,
+    frame: &WorldPrimitiveFrame,
+    indices: &[usize],
+) -> Arc<Vec<MeshBatch>> {
+    let identities = indices
+        .iter()
+        .map(|&index| mesh_batch_instance_key(&frame.mesh_instances[index]))
+        .collect::<Vec<_>>();
+    frontend
+        .cached_mesh_batch_plan_selected(
+            frame,
+            ColorFormat::Rgba8Unorm,
+            RasterYDirection::Up,
+            true,
+            MeshBatchSelection::ShadowOnly,
+            &identities,
+            true,
+            Some(indices),
+        )
+        .unwrap()
+}
+
+fn assert_batches_equal(a: &[MeshBatch], b: &[MeshBatch]) {
+    assert_eq!(a.len(), b.len());
+    for (a, b) in a.iter().zip(b) {
+        assert_eq!(a.key, b.key);
+        assert_eq!(a.indices, b.indices);
+        assert_eq!(a.model_submission_order, b.model_submission_order);
+        assert_eq!(a.index_offset, b.index_offset);
+        assert_eq!(a.index_count, b.index_count);
+        assert_eq!(a.sorted_index_offset, b.sorted_index_offset);
+    }
+}
+
+#[test]
+fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let mut assets = (1..=27)
+        .map(|key| mesh_asset(key, 1, IndexType::U16))
+        .collect::<Vec<_>>();
+    for asset in &mut assets {
+        if asset.mesh_key % 3 == 0 {
+            asset.sections[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
+            asset.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+        } else if asset.mesh_key % 3 == 1 {
+            asset.sections[0].material_mode = WORLD_MATERIAL_MODE_CUTOUT;
+            asset.sections[0].material_id = WORLD_MATERIAL_ID_CUTOUT_TEXTURED;
+        }
+    }
+    frontend
+        .apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new())
+        .unwrap();
+    let mut scene = frame(Vec::new());
+    for x in [-160.0, -8.0, 144.0] {
+        for y in [-144.0, -8.0, 160.0] {
+            for z in [-160.0, -8.0, 144.0] {
+                scene
+                    .mesh_instances
+                    .push(caster(scene.mesh_instances.len() as u64 + 1, [x, y, z]));
+            }
+        }
+    }
+    // Ordinary and outline-only records must keep their positions without
+    // entering the shadow terrain pass.
+    scene.mesh_instances.insert(0, mesh_instance(1, 1));
+    let mut outline = caster(1, [-8.0; 3]);
+    outline.flags |= WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY;
+    scene.mesh_instances.push(outline);
+    for advanced in [false, true] {
+        install_policy(&mut frontend, advanced);
+        let generation = if advanced { 42 } else { 41 };
+        for distance in [32.0, 80.0, 160.0] {
+            for time in [0.0, 0.25, 0.5, 0.75] {
+                scene.shader_environment.far_plane = distance;
+                scene.shader_environment.time_of_day = time;
+                scene.shader_environment.configured_shadow_distance_chunks = 5;
+                let selected = frontend
+                    .source_shadow_terrain_instance_indices(&scene, generation)
+                    .unwrap();
+                let policy = frontend
+                    .shader_pack_sources
+                    .active_shadow_policy_for_scope(TerrainProgramScope::Overworld)
+                    .unwrap()
+                    .unwrap();
+                let frustum = AdvancedShadowCasterFrustum::from_frame_with_distances(
+                    policy,
+                    time,
+                    scene.projection_matrix,
+                    scene.view_matrix,
+                    ShadowCasterFrameDistances {
+                        render_distance_blocks: distance,
+                        configured_shadow_distance_chunks: 5,
+                    },
+                    ShadowCasterKind::Terrain,
+                )
+                .unwrap();
+                let mut late = mesh_batches_filtered(
+                    &scene,
+                    &frontend,
+                    ColorFormat::Rgba8Unorm,
+                    RasterYDirection::Up,
+                    true,
+                    MeshBatchSelection::ShadowOnly,
+                    true,
+                )
+                .unwrap();
+                for batch in &mut late {
+                    batch.indices.retain(|index| {
+                        source_shadow_instance_intersects(
+                            &frustum,
+                            &scene.mesh_instances[*index],
+                            Some(distance),
+                        )
+                    });
+                }
+                late.retain(|batch| !batch.indices.is_empty());
+                let early = selected_plan(&mut frontend, &scene, &selected);
+                assert_batches_equal(&early, &late);
+                assert!(!early.is_empty());
+                assert!(selected.len() < 27);
+            }
+        }
+    }
+    for dimension in [WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_END] {
+        scene.background.sky_type = dimension;
+        assert!(frontend
+            .source_shadow_terrain_instance_indices(&scene, 41)
+            .unwrap()
+            .is_empty());
+    }
+}
+
+#[test]
+fn shadow_batch_selection_preserves_repeated_mesh_grouping_before_culling() {
+    for material_mode in [WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT] {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut assets = vec![
+            mesh_asset(1, 1, IndexType::U16),
+            mesh_asset(2, 1, IndexType::U16),
+        ];
+        for asset in &mut assets {
+            asset.sections[0].material_mode = material_mode;
+            if material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT {
+                asset.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+            }
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new())
+            .unwrap();
+        let mut scene = frame(Vec::new());
+        scene.mesh_instances = vec![
+            caster(1, [200.0; 3]),
+            caster(2, [-8.0; 3]),
+            caster(1, [-8.0; 3]),
+        ];
+        for selected in [vec![1, 2], vec![0, 2]] {
+            let mut late = mesh_batches_filtered(
+                &scene,
+                &frontend,
+                ColorFormat::Rgba8Unorm,
+                RasterYDirection::Up,
+                true,
+                MeshBatchSelection::ShadowOnly,
+                true,
+            )
+            .unwrap();
+            for batch in &mut late {
+                batch.indices.retain(|index| selected.contains(index));
+            }
+            late.retain(|batch| !batch.indices.is_empty());
+            assert_batches_equal(&selected_plan(&mut frontend, &scene, &selected), &late);
+        }
+    }
+}
+
+#[test]
+fn shadow_batch_selection_rebuilds_when_culled_instances_change_shared_mesh_order() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            1,
+            (1..=3)
+                .map(|key| mesh_asset(key, 1, IndexType::U16))
+                .collect(),
+            Vec::new(),
+        )
+        .unwrap();
+    let mut scene = frame(Vec::new());
+    scene.mesh_instances = vec![
+        caster(1, [200.0; 3]),
+        caster(2, [-8.0; 3]),
+        caster(1, [-8.0; 3]),
+    ];
+    let first = selected_plan(&mut frontend, &scene, &[1, 2]);
+    assert_eq!(
+        first
+            .iter()
+            .map(|batch| batch.key.mesh_key)
+            .collect::<Vec<_>>(),
+        [1, 2]
+    );
+    assert!(frontend.mesh_batch_plan_cache.is_empty());
+    // The selected identities and original positions remain equal. Changing
+    // the earlier culled record still changes the full plan's first-seen order.
+    scene.mesh_instances[0].mesh_key = 3;
+    let second = selected_plan(&mut frontend, &scene, &[1, 2]);
+    assert_eq!(
+        second
+            .iter()
+            .map(|batch| batch.key.mesh_key)
+            .collect::<Vec<_>>(),
+        [2, 1]
+    );
+    assert!(!Arc::ptr_eq(&first, &second));
+}
+
+#[test]
+fn shadow_batch_selection_cache_keys_original_positions_and_ignores_unselected_churn() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            1,
+            vec![mesh_asset(1, 1, IndexType::U16)],
+            Vec::new(),
+        )
+        .unwrap();
+    let mut scene = frame(Vec::new());
+    scene.mesh_instances = vec![
+        mesh_instance(1, 1),
+        caster(1, [-8.0; 3]),
+        mesh_instance(1, 1),
+    ];
+    let first = selected_plan(&mut frontend, &scene, &[1]);
+    scene.mesh_instances[0].mesh_key = 999; // Unselected dynamic model, no asset needed.
+    let same = selected_plan(&mut frontend, &scene, &[1]);
+    assert!(Arc::ptr_eq(&first, &same));
+    scene.mesh_instances[2] = scene.mesh_instances[1].clone();
+    scene.mesh_instances[1] = mesh_instance(1, 1);
+    let shifted = selected_plan(&mut frontend, &scene, &[2]);
+    assert!(!Arc::ptr_eq(&first, &shifted));
+    assert_eq!(first[0].indices.as_slice(), &[1]);
+    assert_eq!(shifted[0].indices.as_slice(), &[2]);
+    scene.mesh_instances[1] = scene.mesh_instances[2].clone();
+    scene.mesh_instances[2] = mesh_instance(1, 1);
+    // Included asset replacement invalidates the selected cache even with
+    // unchanged positions; an unrelated model update does not.
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            2,
+            vec![mesh_asset(999, 1, IndexType::U16)],
+            Vec::new(),
+        )
+        .unwrap();
+    assert!(Arc::ptr_eq(
+        &first,
+        &selected_plan(&mut frontend, &scene, &[1])
+    ));
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            3,
+            vec![mesh_asset(1, 2, IndexType::U16)],
+            Vec::new(),
+        )
+        .unwrap();
+    assert!(frontend.mesh_batch_plan_cache.is_empty());
+    scene.mesh_instances[1].mesh_generation = 2;
+
+    assert!(!Arc::ptr_eq(
+        &first,
+        &selected_plan(&mut frontend, &scene, &[1])
+    ));
+}
+
+#[test]
+fn shadow_batch_selection_rejects_invalid_positions_and_bounds_cache() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            1,
+            vec![mesh_asset(1, 1, IndexType::U16)],
+            Vec::new(),
+        )
+        .unwrap();
+    let mut scene = frame(Vec::new());
+    scene.mesh_instances = (0..6).map(|_| mesh_instance(1, 1)).collect();
+    scene.mesh_instances[0] = caster(1, [-8.0; 3]);
+    for indices in [vec![6], vec![1, 0], vec![0, 0]] {
+        assert!(mesh_batches_filtered_indices(
+            &scene,
+            &frontend,
+            ColorFormat::Rgba8Unorm,
+            RasterYDirection::Up,
+            true,
+            MeshBatchSelection::ShadowOnly,
+            true,
+            &indices,
+        )
+        .is_err());
+    }
+    let first = selected_plan(&mut frontend, &scene, &[0]);
+    for index in 1..6 {
+        scene.mesh_instances[index - 1] = mesh_instance(1, 1);
+        scene.mesh_instances[index] = caster(1, [-8.0; 3]);
+        selected_plan(&mut frontend, &scene, &[index]);
+    }
+    assert_eq!(4, frontend.mesh_batch_plan_cache.len());
+    scene.mesh_instances[5] = mesh_instance(1, 1);
+    scene.mesh_instances[0] = caster(1, [-8.0; 3]);
+    assert!(!Arc::ptr_eq(
+        &first,
+        &selected_plan(&mut frontend, &scene, &[0])
+    ));
+}
+
+#[test]
+fn shadow_batch_selection_does_not_hide_invalid_culled_asset_or_sorted_topology() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    install_policy(&mut frontend, false);
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            1,
+            vec![mesh_asset(1, 1, IndexType::U16)],
+            Vec::new(),
+        )
+        .unwrap();
+    let mut scene = frame(Vec::new());
+    scene.shader_environment.far_plane = 32.0;
+    scene.shader_environment.configured_shadow_distance_chunks = 2;
+    scene.mesh_instances = vec![caster(1, [2000.0; 3])];
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .unwrap()
+        .is_empty());
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 42)
+        .is_err());
+    scene.mesh_instances[0].mesh_key = 2;
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .is_err());
+    scene.mesh_instances[0].mesh_key = 1;
+    scene.mesh_instances[0].mesh_generation = 2;
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .is_err());
+    scene.mesh_instances[0].mesh_generation = 1;
+    scene.mesh_instances[0].mesh_section_index = 9;
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .is_err());
+    scene.mesh_instances[0].mesh_section_index = WORLD_MESH_SECTION_ALL;
+    scene.mesh_instances[0].flags |= WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
+    // The installed opaque mesh is not a canonical translucent quad source.
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .is_err());
+    let mut translucent = mesh_asset(1, 2, IndexType::U16);
+    translucent.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+    translucent.sections[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
+    frontend
+        .apply_world_mesh_asset_update(&mut gal, 2, vec![translucent], Vec::new())
+        .unwrap();
+    scene.mesh_instances[0].mesh_generation = 2;
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .unwrap()
+        .is_empty());
+    scene.mesh_instances[0].transform[0] = 2.0;
+    assert!(frontend
+        .source_shadow_terrain_instance_indices(&scene, 41)
+        .is_err());
+}

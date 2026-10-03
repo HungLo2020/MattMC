@@ -5,6 +5,7 @@
 pub(crate) mod background;
 pub(crate) mod border_quads;
 pub(crate) mod crack_quads;
+pub(crate) mod entity_culling;
 pub(crate) mod header;
 pub(crate) mod limits;
 pub(crate) mod material_quads;

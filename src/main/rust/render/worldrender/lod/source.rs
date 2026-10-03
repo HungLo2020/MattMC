@@ -1520,7 +1520,13 @@ impl WorldLodSourceTargets {
                 extent: identity.extent,
                 mip_levels: 1,
                 array_layers: 1,
-                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+                usages: vec![
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferDst,
+                    // Exact-frame diagnostics read the opaque snapshot, not
+                    // the live depth subsequently changed by translucency.
+                    TextureUsage::TransferSrc,
+                ],
             })?;
             created.push(distant_depth_before_translucency_texture);
             let distant_depth_before_translucency_view =

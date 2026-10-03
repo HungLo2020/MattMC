@@ -246,6 +246,12 @@ pub struct FfiWorldMeshInstanceRecord {
     /// Copied packed vanilla UV2 light. This is an instance semantic lane, not
     /// a Java lightmap object or backend resource.
     pub packed_light: u32,
+    /// Bounded immutable entity-culling CPU data; zero mode is canonical absent.
+    pub entity_culling_mode: u32,
+    pub entity_culling_flags: u32,
+    pub entity_culling_bounds: [f64; 6],
+    pub entity_culling_leash_bounds: [f64; 6],
+    pub entity_culling_camera: [f64; 3],
 }
 
 #[repr(C)]
@@ -393,6 +399,10 @@ pub struct FfiWorldShaderEnvironmentFrame {
     /// Appended vanilla CLOUDS pipeline fog range. It is distinct from the
     /// sky range in Frozen and remains copied gameplay data only.
     pub fog_clouds_end: f32,
+    /// Appended in ABI v67: copied user max-shadow distance in chunks.
+    /// Rust combines this setting with source directives; no Iris culler or
+    /// renderer state crosses the bridge.
+    pub configured_shadow_distance_chunks: i32,
 }
 
 /// Coarse inventory of Java feature families observed during the same real
@@ -491,6 +501,12 @@ pub struct FfiWorldExperienceOrbInstanceRecord {
     pub camera_orientation: [f32; 4],
     pub entity_id: i32,
     pub reserved0: u32,
+    pub entity_culling_mode: u32,
+    pub entity_culling_flags: u32,
+    pub entity_culling_bounds: [f64; 6],
+    pub entity_culling_leash_bounds: [f64; 6],
+    pub shadow_only: u32,
+    pub entity_culling_camera: [f64; 3],
 }
 
 #[repr(C)]

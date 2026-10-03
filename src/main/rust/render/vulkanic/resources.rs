@@ -96,6 +96,8 @@ pub enum TextureFormat {
     R8Unorm = 10,
     /// Four-channel signed-normalized color data.
     Rgba8Snorm = 11,
+    /// Single-channel half-float color/resource data.
+    R16Float = 12,
 }
 
 impl TextureFormat {
@@ -112,6 +114,7 @@ impl TextureFormat {
             | Self::Rgba8Snorm => Some(4),
             Self::Rgba16Float => Some(8),
             Self::Rgb16Float => Some(6),
+            Self::R16Float => Some(2),
             Self::R8Uint | Self::R8Unorm => Some(1),
             Self::Depth24Stencil8 => None,
         }

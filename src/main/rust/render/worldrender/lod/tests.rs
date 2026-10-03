@@ -18,7 +18,7 @@ use crate::render::shaderpack::programs::{
     prepare_lowered_distant_horizons_source_program, TerrainSourceTextureTransforms,
 };
 use crate::render::shaderpack::runtime::ShaderPackRuntimeExecutor;
-use crate::render::shaderpack::resources::color_targets::ShaderPackColorBootstrapClearValues;
+use crate::render::shaderpack::resources::color_targets::ShaderPackColorClearValues;
 use crate::render::shaderpack::contracts::terrain::TerrainProgramScope;
 use crate::render::shaderpack::resources::bindings::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet,
@@ -332,9 +332,14 @@ fn distant_source_uniforms() -> TerrainSourceUniformFrame {
         darkness_factor: Some(0.0),
         max_blindness_darkness: Some(0.0),
         sun_angle: Some(0.25),
+        sun_position: None,
+        moon_position: None,
+        shadow_light_position: None,
+        up_position: None,
         celestial_is_moon: Some(0),
         celestial_alpha: Some(1.0),
         celestial_sun_path_rotation: Some(0.0),
+        celestial_time_of_day: Some(0.0),
         rain_strength: Some(0.0),
         rain_factor: Some(0.0),
         thunder_strength: Some(0.0),
@@ -365,6 +370,7 @@ fn distant_source_uniforms() -> TerrainSourceUniformFrame {
         darkness_light_factor: Some(0.0),
         night_vision: Some(0.0),
         eye_brightness: Some([240, 240]),
+        eye_brightness_smooth: None,
         eye_brightness_m: Some(1.0),
         eye_brightness_m2: Some(1.0),
         fog_color: Some([0.5, 0.6, 0.7]),
@@ -2178,6 +2184,13 @@ fn source_target_cache_owns_a_generation_bound_distant_depth_target() {
     assert!(!first.distant_depth_view.is_null());
     assert!(!first.distant_depth_before_translucency_texture.is_null());
     assert!(!first.distant_depth_before_translucency_view.is_null());
+    assert!(
+        gal.texture_view_info(first.distant_depth_before_translucency_view)
+            .unwrap()
+            .usages
+            .contains(&TextureUsage::TransferSrc),
+        "the actual opaque snapshot must permit exact-frame depth readbacks"
+    );
     assert_ne!(
         first.distant_depth_texture,
         first.distant_depth_before_translucency_texture
@@ -2536,7 +2549,7 @@ fn source_opaque_and_depth_transaction_executes_after_pack_semantic_bootstrap() 
         .begin_source_color_transaction(
             &mut gal,
             &colors,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -2726,7 +2739,7 @@ fn source_opaque_and_depth_transaction_executes_after_pack_semantic_bootstrap() 
                         .execution_interface
                         .scalar_uniforms
                         .map(|_| TextureUsageState::Undefined),
-                    clear_values: ShaderPackColorBootstrapClearValues {
+                    clear_values: ShaderPackColorClearValues {
                         fog_color: crate::render::vulkanic::commands::ClearColor {
                             r: 0.0,
                             g: 0.0,

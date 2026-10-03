@@ -209,7 +209,7 @@ impl WorldPrimitiveFrontend {
                         .execution_interface
                         .scalar_uniforms
                         .map(|_| TextureUsageState::Undefined),
-                    clear_values: ShaderPackColorBootstrapClearValues {
+                    clear_values: ShaderPackColorClearValues {
                         fog_color: background_clear_color(&frame.background),
                     },
                     color_attachment_before: Vec::new(),
@@ -274,83 +274,117 @@ impl WorldPrimitiveFrontend {
             .collect())
     }
 
-    /// Stages the optional source-defined sky initializer over the exact
-    /// Rust-owned named-color generation for this frame. The caller appends
-    /// it after the bootstrap clear and before terrain, which makes the sky a
-    /// normal source writer instead of a Java/Iris target dependency.
-    pub(crate) fn prepare_pre_terrain_source_sky_consumer(
+    /// Begin runs before shadows; prepare runs after shadows and before sky.
+    /// Both use the ordinary named-color transaction and sole frame owner.
+    pub(crate) fn prepare_pre_terrain_fullscreen_consumers(
+        &mut self, gal: &mut VulkanicGal, frame: &WorldPrimitiveFrame,
+        targets: &ShaderPackColorTargets,
+    ) -> GalResult<Vec<PreparedNamedSourceFullscreenConsumer>> {
+        let inputs = self.candidate_source_resource_snapshot_for_frame(
+            targets.identity.shader_pack_generation, targets.identity.world_generation, frame.frame_id,
+        )?.resources.clone();
+        let programs = self.shader_runtime.as_ref().ok_or_else(||
+            GalError::backend("shader runtime vanished before pre-terrain fullscreen staging"))?
+            .prepared_lowered_pre_terrain_fullscreen_programs(source_frame_includes_distant_horizons(frame))?
+            .into_iter().map(|program| Arc::new(program.clone())).collect::<Vec<_>>();
+        let mut uniforms = self.source_uniform_frame_for_owned_resources(frame)?;
+        if source_frame_includes_distant_horizons(frame) {
+            apply_distant_horizons_fullscreen_projection(&mut uniforms, &frame.lod_render_frame)?;
+        }
+        // Pack every payload before allocating, so a missing semantic value
+        // cannot leave a partially staged chain alive.
+        let frames = programs.iter().map(|program| Ok(FullscreenSourcePassFrame {
+            texture_transforms: program.pack_texture_transforms(&TerrainSourceTextureTransforms::canonical_minecraft_terrain())?,
+            scalar_uniforms: program.pack_scalar_uniforms(&uniforms)?,
+            texture_transform_before: TextureUsageState::Undefined,
+            scalar_uniform_before: program.execution_interface.scalar_uniforms.map(|_| TextureUsageState::Undefined),
+            clear_values: ShaderPackColorClearValues { fog_color: background_clear_color(&frame.background) },
+            color_attachment_before: Vec::new(), clear_targets_this_pass: None,
+        })).collect::<GalResult<Vec<_>>>()?;
+        let runtime = self.shader_runtime.as_ref().expect("retained shader runtime");
+        let mut consumers = Vec::with_capacity(programs.len());
+        for (program, pass_frame) in programs.into_iter().zip(frames) {
+            match runtime.stage_pre_terrain_fullscreen_execution_plan(gal, &program, targets, &inputs) {
+                Ok(plan) => consumers.push(PreparedNamedSourceFullscreenConsumer { program, plan, frame: pass_frame }),
+                Err(error) => {
+                    destroy_named_source_fullscreen_consumers(gal, consumers);
+                    return Err(error);
+                }
+            }
+        }
+        Ok(consumers)
+    }
+
+    /// Stages the selected sky source first on Iris's horizon and then on
+    /// Minecraft's disc. Separate consumers retain draw-local feedback and
+    /// fog/sky colors inside the same Rust-owned color transaction.
+    pub(crate) fn prepare_pre_terrain_source_sky_consumers(
         &mut self,
         gal: &mut VulkanicGal,
         frame: &WorldPrimitiveFrame,
         color_targets: &ShaderPackColorTargets,
         main_depth_resources: &TerrainSourceOwnedResourceSet,
-    ) -> GalResult<Option<PreparedNamedSourceFullscreenConsumer>> {
-        if !source_sky_initializer_requested(frame) {
-            return Ok(None);
+    ) -> GalResult<Vec<PreparedNamedSourceFullscreenConsumer>> {
+        if !source_sky_initializer_requested(frame) && !source_horizon_initializer_requested(frame) {
+            return Ok(Vec::new());
         }
-        let source_snapshot = self
-            .candidate_source_resource_snapshot_for_frame(
-                color_targets.identity.shader_pack_generation,
-                color_targets.identity.world_generation,
-                frame.frame_id,
-            )?
-            .resources
-            .clone();
-        let (program, plan) = {
+        let programs = {
             let runtime = self.shader_runtime.as_ref().ok_or_else(|| {
                 GalError::backend("shader runtime vanished before source sky staging")
             })?;
-            let Some(program) = runtime.prepared_lowered_pre_terrain_sky_program()? else {
-                return Ok(None);
-            };
-            let unique_main_depth =
-                main_depth_resources.excluding_roles_already_owned_by(&source_snapshot)?;
-            let inputs = if unique_main_depth.len() == 0 {
-                source_snapshot.clone()
-            } else {
-                TerrainSourceOwnedResourceSet::merge([&source_snapshot, &unique_main_depth])?
-            };
-            let plan = runtime.stage_pre_terrain_sky_execution_plan(
-                gal,
-                color_targets,
-                std::slice::from_ref(&inputs),
-                color_targets.identity.extent,
-            )?;
-            (program.clone(), plan)
+            let mut programs = Vec::with_capacity(2);
+            // Frozen draws the horizon for the Overworld (or a custom
+            // skylit dimension). Custom dimensions require separate semantic
+            // admission; End and Nether must not acquire this geometry.
+            if source_horizon_initializer_requested(frame) {
+                programs.extend(runtime.prepared_lowered_pre_terrain_horizon_program()?.cloned());
+            }
+            if source_sky_initializer_requested(frame) {
+                programs.extend(runtime.prepared_lowered_pre_terrain_sky_program()?.cloned());
+            }
+            programs
         };
-        let Some(plan) = plan else {
-            return Ok(None);
-        };
-        let source_uniforms = self.source_uniform_frame_for_owned_resources(frame)?;
-        let scalar_uniforms = program.pack_scalar_uniforms(&source_uniforms)?;
-        self.write_selected_source_sky_uniform_receipt(
+        if programs.is_empty() { return Ok(Vec::new()); }
+        let source_snapshot = self.candidate_source_resource_snapshot_for_frame(
+            color_targets.identity.shader_pack_generation,
+            color_targets.identity.world_generation,
             frame.frame_id,
-            program.identity.as_str(),
-            &program.execution_interface.scalar_uniform_fields,
-            &scalar_uniforms,
-        );
-        self.write_selected_source_sky_program_receipt(frame.frame_id, &program);
-        let frame = FullscreenSourcePassFrame {
-            texture_transforms: program.pack_texture_transforms(
-                &TerrainSourceTextureTransforms::canonical_minecraft_terrain(),
-            )?,
-            scalar_uniforms,
-            texture_transform_before: TextureUsageState::Undefined,
-            scalar_uniform_before: program
-                .execution_interface
-                .scalar_uniforms
-                .map(|_| TextureUsageState::Undefined),
-            clear_values: ShaderPackColorBootstrapClearValues {
-                fog_color: background_clear_color(&frame.background),
-            },
-            color_attachment_before: Vec::new(),
-            clear_targets_this_pass: None,
-        };
-        Ok(Some(PreparedNamedSourceFullscreenConsumer {
-            program: Arc::new(program),
-            plan,
-            frame,
-        }))
+        )?.resources.clone();
+        let unique_main_depth = main_depth_resources.excluding_roles_already_owned_by(&source_snapshot)?;
+        let inputs = TerrainSourceOwnedResourceSet::merge([&source_snapshot, &unique_main_depth])?;
+        let source_uniforms = self.source_uniform_frame_for_owned_resources(frame)?;
+        // Pack both frames before staging resources, so a missing semantic
+        // cannot leak a first draw's plan or partially admit the sky route.
+        let frames = programs.iter().map(|program| -> GalResult<_> {
+            let scalar_uniforms = program.pack_scalar_uniforms(&source_uniforms)?;
+            self.write_selected_source_sky_uniform_receipt(
+                frame.frame_id, program.identity.as_str(),
+                &program.execution_interface.scalar_uniform_fields, &scalar_uniforms,
+            );
+            self.write_selected_source_sky_program_receipt(frame.frame_id, program);
+            Ok(FullscreenSourcePassFrame {
+                texture_transforms: program.pack_texture_transforms(
+                    &TerrainSourceTextureTransforms::canonical_minecraft_terrain(),
+                )?,
+                scalar_uniforms,
+                texture_transform_before: TextureUsageState::Undefined,
+                scalar_uniform_before: program.execution_interface.scalar_uniforms.map(|_| TextureUsageState::Undefined),
+                clear_values: ShaderPackColorClearValues { fog_color: background_clear_color(&frame.background) },
+                color_attachment_before: Vec::new(), clear_targets_this_pass: None,
+            })
+        }).collect::<GalResult<Vec<_>>>()?;
+        let runtime = self.shader_runtime.as_ref().expect("retained shader runtime");
+        let mut consumers = Vec::with_capacity(programs.len());
+        for (program, pass_frame) in programs.into_iter().zip(frames) {
+            match runtime.stage_pre_terrain_fullscreen_execution_plan(gal, &program, color_targets, &inputs) {
+                Ok(plan) => consumers.push(PreparedNamedSourceFullscreenConsumer { program: Arc::new(program), plan, frame: pass_frame }),
+                Err(error) => {
+                    destroy_named_source_fullscreen_consumers(gal, consumers);
+                    return Err(error);
+                }
+            }
+        }
+        Ok(consumers)
     }
 
     /// Stages the source pack's textured vanilla celestial writer twice: once
@@ -466,7 +500,7 @@ impl WorldPrimitiveFrontend {
                         .execution_interface
                         .scalar_uniforms
                         .map(|_| TextureUsageState::Undefined),
-                    clear_values: ShaderPackColorBootstrapClearValues {
+                    clear_values: ShaderPackColorClearValues {
                         fog_color: background_clear_color(&frame.background),
                     },
                     color_attachment_before: Vec::new(),

@@ -297,26 +297,14 @@ impl WorldPrimitiveFrontend {
         // Diagnostic-only receipt for the exact Rust-derived shadow transform.
         // Do not rebuild the temporal source-uniform block after submit: this
         // reads only the immutable source policy and copied frame semantics.
-        let source_shadow_semantics = self
-            .shader_pack_sources
-            .active_shadow_policy()
-            .and_then(|policy| {
-                terrain_program_scope_for_sky_type(frame.background.sky_type)
-                    .ok()
-                    .flatten()
-                    .and_then(|scope| {
-                        policy
-                            .uniforms_with_end_flash(
-                                scope,
-                                frame.shader_environment.time_of_day,
-                                frame.voxel_volume.camera_world_position,
-                                Some([
-                                    frame.background.sky.end_flash_x_angle,
-                                    frame.background.sky.end_flash_y_angle,
-                                ]),
-                            )
-                            .ok()
-                    })
+        let source_shadow_semantics = terrain_program_scope_for_sky_type(frame.background.sky_type)
+            .ok().flatten().and_then(|scope| {
+                self.shader_pack_sources.active_shadow_policy_for_scope(scope).ok().flatten()
+                    .and_then(|policy| policy.uniforms_with_end_flash(
+                        scope, frame.shader_environment.time_of_day,
+                        frame.voxel_volume.camera_world_position,
+                        Some([frame.background.sky.end_flash_x_angle, frame.background.sky.end_flash_y_angle]),
+                    ).ok())
             })
             .map(|shadow| {
                 format!(
@@ -1026,9 +1014,9 @@ pub(crate) fn sky_fog_receipt_json(frame: &WorldPrimitiveFrame) -> GalResult<Str
         .iter()
         .filter(|quad| {
             quad.texture_id == WORLD_MATERIAL_TEXTURE_GENERATED_WHITE
-                && quad.material_id == WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+                && quad.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC
                 && quad.material_mode == WORLD_MATERIAL_MODE_OPAQUE
-                && quad.depth_policy == WORLD_DEPTH_POLICY_DISABLED
+                && quad.depth_policy == WORLD_DEPTH_POLICY_TEST_NO_WRITE
                 && quad.color_argb == 0xff00_0000
         })
         .count();

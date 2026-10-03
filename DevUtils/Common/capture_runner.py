@@ -25,7 +25,7 @@ from pathlib import Path
 from shield_animation_scenarios import SHIELD_ANIMATION_SCENARIOS, SHIELD_ANIMATION_SPRITES, shield_animation_materials, SHIELD_ANIMATION_FRAMES, shield_animation_frames
 
 import artifact_retention
-from capture_window import menu_capture_window
+from capture_window import capture_window_size
 
 
 SHADER_EVENT_PATTERN = (
@@ -1237,7 +1237,7 @@ class CaptureRunner:
             # masking pixels or letting it influence world-color parity.
             upsert_option(voxelmap_file, "Hide Minimap", "true")
             self.append_meta("forced_voxelmap_minimap_hidden=true")
-        width, height = menu_capture_window(self.config.title_screen_capture)
+        width, height = capture_window_size(self.config.title_screen_capture)
         self.append_meta(f"forced_window_width={width}")
         self.append_meta(f"forced_window_height={height}")
         for key, value in forced_options.items():
@@ -1271,7 +1271,7 @@ class CaptureRunner:
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
         if not self.config.title_screen_capture:
             self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={shlex.quote(self.config.world)}")
-        width, height = menu_capture_window(self.config.title_screen_capture)
+        width, height = capture_window_size(self.config.title_screen_capture)
         self.config.client_args = append_client_arg(self.config.client_args, f"--width {width}")
         self.config.client_args = append_client_arg(self.config.client_args, f"--height {height}")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")

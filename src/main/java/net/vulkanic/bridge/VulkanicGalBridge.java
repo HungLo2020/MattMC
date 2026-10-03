@@ -66,6 +66,22 @@ public final class VulkanicGalBridge implements AutoCloseable {
         var orders=ACTIVE_MODEL_ORDERS.get();
         return orders.isEmpty() ? null : orders.peekLast();
     }
+    private record EntityCullingScope(WorldEntityCullingRecord inputs) {}
+    private static final ThreadLocal<ArrayDeque<EntityCullingScope>> ACTIVE_ENTITY_CULLING =
+        ThreadLocal.withInitial(ArrayDeque::new);
+    public static void beginSemanticEntityCulling(WorldEntityCullingRecord inputs) {
+        ACTIVE_ENTITY_CULLING.get().addLast(new EntityCullingScope(inputs));
+    }
+    public static void endSemanticEntityCulling() {
+        var scopes = ACTIVE_ENTITY_CULLING.get();
+        if (scopes.isEmpty()) throw new IllegalStateException("entity culling scope ended without begin");
+        scopes.removeLast();
+        if (scopes.isEmpty()) ACTIVE_ENTITY_CULLING.remove();
+    }
+    public static WorldEntityCullingRecord activeSemanticEntityCulling() {
+        var scopes = ACTIVE_ENTITY_CULLING.get();
+        return scopes.isEmpty() ? null : scopes.peekLast().inputs();
+    }
 	private static final float GUI_UV_OVERLAP_LIMIT = 1.0F / 16.0F;
 	/** Texture bytes already use VulkanicGAL's sampler-row convention. */
 	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC = 0;
@@ -104,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 66;
+	public static final int ABI_VERSION = 68;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -2117,6 +2133,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			encodeWorldItemFoil(item, instance.itemFoil());
 			encodeWorldDecalFoil(item, instance.decalFoil());
 	            encodeModelSubmissionOrder(item, instance.modelSubmissionOrder());
+            if (instance.entityCulling() != null) throw new IllegalArgumentException("first-person meshes cannot carry world entity culling");
+            encodeEntityCulling(item, null);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-meshes");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-world-text-and-lod");
@@ -2335,70 +2353,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		MemorySegment.copy(lodSsaoParameters, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT,
 			Struct.WORLD_LOD_RENDER_FRAME.offset(20), lodSsaoParameters.length);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-lod-frame");
-		shaderEnvironment.set(ValueLayout.JAVA_INT, Struct.WORLD_SHADER_ENVIRONMENT_FRAME.offset(0), Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 1, shaderEnvironmentFrame.enabled() ? 1 : 0);
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 2, shaderEnvironmentFrame.frameCounter());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 3, shaderEnvironmentFrame.worldDay());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 4, shaderEnvironmentFrame.worldGeneration());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 5, shaderEnvironmentFrame.worldTime());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 6, shaderEnvironmentFrame.frameTimeSeconds());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 7, shaderEnvironmentFrame.frameTimeCounter());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 8, shaderEnvironmentFrame.timeOfDay());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 9, shaderEnvironmentFrame.rainStrength());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 10, shaderEnvironmentFrame.thunderStrength());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 11, shaderEnvironmentFrame.skyDarken());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 12, shaderEnvironmentFrame.moonPhase());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 13, shaderEnvironmentFrame.eyeSubmersion());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 14, shaderEnvironmentFrame.screenBrightness());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 15, shaderEnvironmentFrame.farPlane());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 16, shaderEnvironmentFrame.relativeEyeX());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 17, shaderEnvironmentFrame.relativeEyeY());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 18, shaderEnvironmentFrame.relativeEyeZ());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 19, shaderEnvironmentFrame.skyColorRed());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 20, shaderEnvironmentFrame.skyColorGreen());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 21, shaderEnvironmentFrame.skyColorBlue());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 22, shaderEnvironmentFrame.darknessLightFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 23, shaderEnvironmentFrame.nightVision());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 24, shaderEnvironmentFrame.fogColorRed());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 25, shaderEnvironmentFrame.fogColorGreen());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 26, shaderEnvironmentFrame.fogColorBlue());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 27, shaderEnvironmentFrame.biomePrecipitation());
-		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 28, shaderEnvironmentFrame.biomeResourceLocation());
-		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 29, shaderEnvironmentFrame.mainHandItemModelResourceLocation());
-		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 30, shaderEnvironmentFrame.offHandItemModelResourceLocation());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 31, shaderEnvironmentFrame.mainHandItemLightEmission());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 32, shaderEnvironmentFrame.offHandItemLightEmission());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 33, shaderEnvironmentFrame.lightmapEnabled() ? 1 : 0);
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 34, 0);
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 35, shaderEnvironmentFrame.lightmapGeneration());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 36, shaderEnvironmentFrame.lightmapAmbientLightFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 37, shaderEnvironmentFrame.lightmapSkyFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 38, shaderEnvironmentFrame.lightmapBlockFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 39, shaderEnvironmentFrame.lightmapNightVisionFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 40, shaderEnvironmentFrame.lightmapDarknessScale());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 41, shaderEnvironmentFrame.lightmapDarkenWorldFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 42, shaderEnvironmentFrame.lightmapBrightnessFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 43, shaderEnvironmentFrame.lightmapSkyLightRed());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 44, shaderEnvironmentFrame.lightmapSkyLightGreen());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 45, shaderEnvironmentFrame.lightmapSkyLightBlue());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 46, shaderEnvironmentFrame.lightmapAmbientRed());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 47, shaderEnvironmentFrame.lightmapAmbientGreen());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 48, shaderEnvironmentFrame.lightmapAmbientBlue());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 49, shaderEnvironmentFrame.blindness());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 50, shaderEnvironmentFrame.darknessFactor());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 51, shaderEnvironmentFrame.eyeBrightnessBlock());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 52, shaderEnvironmentFrame.eyeBrightnessSky());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 53, shaderEnvironmentFrame.fogParameterColorRed());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 54, shaderEnvironmentFrame.fogParameterColorGreen());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 55, shaderEnvironmentFrame.fogParameterColorBlue());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 56, shaderEnvironmentFrame.fogParameterColorAlpha());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 57, shaderEnvironmentFrame.fogEnvironmentalStart());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 58, shaderEnvironmentFrame.fogEnvironmentalEnd());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 59, shaderEnvironmentFrame.fogRenderDistanceStart());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 60, shaderEnvironmentFrame.fogRenderDistanceEnd());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 61, shaderEnvironmentFrame.distantHorizonsRenderDistance());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 62, shaderEnvironmentFrame.fogSkyEnd());
-		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 63, shaderEnvironmentFrame.fogCloudsEnd());
+		encodeShaderEnvironment(arena, shaderEnvironment, shaderEnvironmentFrame);
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
@@ -2655,6 +2610,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		encodeWorldItemFoil(item, instance.itemFoil());
 		encodeWorldDecalFoil(item, instance.decalFoil());
 		encodeModelSubmissionOrder(item, instance.modelSubmissionOrder());
+		encodeEntityCulling(item, instance.entityCulling());
 	}
 
 	private static void encodeTerrainPlacement(
@@ -3968,8 +3924,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 	/** No Java-generated corners, UV cells, material policy or GPU objects. */
 	public record WorldExperienceOrbInstanceRecord(long meshKey, long meshGeneration, int meshIndex,
-		float[] entityTransform, float[] cameraOrientation, int entityId) {
+		float[] entityTransform, float[] cameraOrientation, int entityId,
+        WorldEntityCullingRecord entityCulling, boolean shadowOnly) {
+        public WorldExperienceOrbInstanceRecord(long meshKey,long meshGeneration,int meshIndex,
+            float[] entityTransform,float[] cameraOrientation,int entityId) {
+            this(meshKey,meshGeneration,meshIndex,entityTransform,cameraOrientation,entityId,
+                activeSemanticEntityCulling(),false);
+        }
 		public WorldExperienceOrbInstanceRecord {
+            if (shadowOnly && entityCulling == null)
+                throw new IllegalArgumentException("shadow-only orb requires copied entity culling inputs");
 			if (meshKey == 0 || meshGeneration == 0 || meshIndex < 0
 				|| entityTransform == null || entityTransform.length != 16
 				|| cameraOrientation == null || cameraOrientation.length != 4)
@@ -4032,6 +3996,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			item.asSlice(layout.offset(5), 16).copyFrom(MemorySegment.ofArray(orb.cameraOrientation));
 			layout.setInt(item, 6, orb.entityId());
 			layout.setInt(item, 7, 0);
+            encodeEntityCulling(item,layout,8,13,orb.entityCulling());
+            layout.setInt(item,12,orb.shadowOnly() ? 1 : 0);
 		}
 		return records;
 	}
@@ -5863,6 +5829,76 @@ public final class VulkanicGalBridge implements AutoCloseable {
         Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item,29,order==null?0:order);
     }
 
+	private static void encodeShaderEnvironment(
+		Arena arena, MemorySegment shaderEnvironment, WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame
+	) {
+		shaderEnvironment.set(ValueLayout.JAVA_INT, Struct.WORLD_SHADER_ENVIRONMENT_FRAME.offset(0), Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 1, shaderEnvironmentFrame.enabled() ? 1 : 0);
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 2, shaderEnvironmentFrame.frameCounter());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 3, shaderEnvironmentFrame.worldDay());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 4, shaderEnvironmentFrame.worldGeneration());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 5, shaderEnvironmentFrame.worldTime());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 6, shaderEnvironmentFrame.frameTimeSeconds());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 7, shaderEnvironmentFrame.frameTimeCounter());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 8, shaderEnvironmentFrame.timeOfDay());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 9, shaderEnvironmentFrame.rainStrength());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 10, shaderEnvironmentFrame.thunderStrength());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 11, shaderEnvironmentFrame.skyDarken());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 12, shaderEnvironmentFrame.moonPhase());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 13, shaderEnvironmentFrame.eyeSubmersion());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 14, shaderEnvironmentFrame.screenBrightness());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 15, shaderEnvironmentFrame.farPlane());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 16, shaderEnvironmentFrame.relativeEyeX());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 17, shaderEnvironmentFrame.relativeEyeY());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 18, shaderEnvironmentFrame.relativeEyeZ());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 19, shaderEnvironmentFrame.skyColorRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 20, shaderEnvironmentFrame.skyColorGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 21, shaderEnvironmentFrame.skyColorBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 22, shaderEnvironmentFrame.darknessLightFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 23, shaderEnvironmentFrame.nightVision());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 24, shaderEnvironmentFrame.fogColorRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 25, shaderEnvironmentFrame.fogColorGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 26, shaderEnvironmentFrame.fogColorBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 27, shaderEnvironmentFrame.biomePrecipitation());
+		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 28, shaderEnvironmentFrame.biomeResourceLocation());
+		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 29, shaderEnvironmentFrame.mainHandItemModelResourceLocation());
+		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 30, shaderEnvironmentFrame.offHandItemModelResourceLocation());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 31, shaderEnvironmentFrame.mainHandItemLightEmission());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 32, shaderEnvironmentFrame.offHandItemLightEmission());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 33, shaderEnvironmentFrame.lightmapEnabled() ? 1 : 0);
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 34, 0);
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 35, shaderEnvironmentFrame.lightmapGeneration());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 36, shaderEnvironmentFrame.lightmapAmbientLightFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 37, shaderEnvironmentFrame.lightmapSkyFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 38, shaderEnvironmentFrame.lightmapBlockFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 39, shaderEnvironmentFrame.lightmapNightVisionFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 40, shaderEnvironmentFrame.lightmapDarknessScale());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 41, shaderEnvironmentFrame.lightmapDarkenWorldFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 42, shaderEnvironmentFrame.lightmapBrightnessFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 43, shaderEnvironmentFrame.lightmapSkyLightRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 44, shaderEnvironmentFrame.lightmapSkyLightGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 45, shaderEnvironmentFrame.lightmapSkyLightBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 46, shaderEnvironmentFrame.lightmapAmbientRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 47, shaderEnvironmentFrame.lightmapAmbientGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 48, shaderEnvironmentFrame.lightmapAmbientBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 49, shaderEnvironmentFrame.blindness());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 50, shaderEnvironmentFrame.darknessFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 51, shaderEnvironmentFrame.eyeBrightnessBlock());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 52, shaderEnvironmentFrame.eyeBrightnessSky());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 53, shaderEnvironmentFrame.fogParameterColorRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 54, shaderEnvironmentFrame.fogParameterColorGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 55, shaderEnvironmentFrame.fogParameterColorBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 56, shaderEnvironmentFrame.fogParameterColorAlpha());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 57, shaderEnvironmentFrame.fogEnvironmentalStart());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 58, shaderEnvironmentFrame.fogEnvironmentalEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 59, shaderEnvironmentFrame.fogRenderDistanceStart());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 60, shaderEnvironmentFrame.fogRenderDistanceEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 61, shaderEnvironmentFrame.distantHorizonsRenderDistance());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 62, shaderEnvironmentFrame.fogSkyEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 63, shaderEnvironmentFrame.fogCloudsEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 64, shaderEnvironmentFrame.configuredShadowDistanceChunks());
+	}
+
 	private static void encodeWorldItemFoil(MemorySegment item, StandardItemFoilRecord foil) {
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 20, foil == null ? 0 : foil.kind().wireValue());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 21, foil == null ? 0L : foil.clockMillis());
@@ -5890,6 +5926,22 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override public float[] normalPose() { return normalPose.clone(); }
 	}
 
+    private static void encodeEntityCulling(MemorySegment item, WorldEntityCullingRecord inputs) {
+        encodeEntityCulling(item,Struct.WORLD_MESH_INSTANCE_RECORD,31,35,inputs);
+    }
+    private static void encodeEntityCulling(MemorySegment item,Struct layout,int firstField,int cameraField,WorldEntityCullingRecord inputs) {
+        layout.setInt(item,firstField,inputs == null ? 0 : 1);
+        layout.setInt(item,firstField+1,inputs == null ? 0 : inputs.flags());
+        for (int i=0; i<6; i++) {
+            item.set(ValueLayout.JAVA_DOUBLE,layout.offset(firstField+2)+i*Double.BYTES,
+                inputs == null ? 0 : inputs.bounds().component(i));
+            item.set(ValueLayout.JAVA_DOUBLE,layout.offset(firstField+3)+i*Double.BYTES,
+                inputs == null || inputs.leashHolderBounds() == null ? 0 : inputs.leashHolderBounds().component(i));
+        }
+        for (int axis=0;axis<3;axis++) item.set(ValueLayout.JAVA_DOUBLE,
+            layout.offset(cameraField)+axis*Double.BYTES,inputs == null ? 0 :
+                switch(axis) {case 0 -> inputs.cameraX();case 1 -> inputs.cameraY();default -> inputs.cameraZ();});
+    }
 	private static void encodeWorldDecalFoil(MemorySegment item, WorldDecalFoilRecord decal) {
 		var layout = Struct.WORLD_MESH_INSTANCE_RECORD;
 		layout.setInt(item, 24, decal == null ? 0 : decal.firstPerson() ? 2 : 1);
@@ -5902,6 +5954,43 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			layout.offset(27) + i * Float.BYTES, normal == null ? 0.0F : normal[i]);
 	}
 
+    /** Full-precision immutable gameplay bounds; independent of model geometry. */
+    public record WorldAabbRecord(double minX,double minY,double minZ,double maxX,double maxY,double maxZ) {
+        public WorldAabbRecord {
+            if (!Double.isFinite(minX) || !Double.isFinite(minY) || !Double.isFinite(minZ)
+                || !Double.isFinite(maxX) || !Double.isFinite(maxY) || !Double.isFinite(maxZ)
+                || minX>maxX || minY>maxY || minZ>maxZ)
+                throw new IllegalArgumentException("entity culling bounds must be finite and ordered");
+        }
+        private double component(int i) {
+            return switch(i) {case 0 -> minX; case 1 -> minY; case 2 -> minZ;
+                case 3 -> maxX; case 4 -> maxY; case 5 -> maxZ;
+                default -> throw new IllegalArgumentException("unknown bounds component");};
+        }
+    }
+    /** Flags mirror worldrender/frame/entity_culling.rs; Java supplies CPU facts only. */
+    public record WorldEntityCullingRecord(int flags,WorldAabbRecord bounds,WorldAabbRecord leashHolderBounds,
+        double cameraX,double cameraY,double cameraZ) {
+        public WorldEntityCullingRecord(int flags,WorldAabbRecord bounds,WorldAabbRecord leashHolderBounds) {
+            this(flags,bounds,leashHolderBounds,0,0,0);
+        }
+        public static final int ELIGIBLE=1, BYPASS_FRUSTUM=2, PLAYER_GROUP=4,
+            UNRESOLVED_HOOKS=8, LEASH_HOLDER=16, PLAYER_ONLY_VARIANT=32;
+        public WorldEntityCullingRecord {
+            Objects.requireNonNull(bounds,"entity culling bounds");
+            if (!Double.isFinite(cameraX) || !Double.isFinite(cameraY) || !Double.isFinite(cameraZ))
+                throw new IllegalArgumentException("entity culling camera must be finite");
+            if ((flags & ~63) != 0 || ((flags & LEASH_HOLDER) != 0) != (leashHolderBounds != null)
+                || ((flags & PLAYER_ONLY_VARIANT) != 0 && (flags & PLAYER_GROUP) == 0))
+                throw new IllegalArgumentException("incoherent entity culling flags");
+        }
+        public WorldEntityCullingRecord withCamera(double x,double y,double z) {
+            return new WorldEntityCullingRecord(flags,bounds,leashHolderBounds,x,y,z);
+        }
+        public WorldEntityCullingRecord asPlayerOnlyVariant() {
+            return new WorldEntityCullingRecord(flags | PLAYER_ONLY_VARIANT,bounds,leashHolderBounds,cameraX,cameraY,cameraZ);
+        }
+    }
 	public record WorldMeshInstanceRecord(
 		int stratum,
 		long meshKey,
@@ -5923,8 +6012,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		StandardItemFoilRecord itemFoil,
 		WorldDecalFoilRecord decalFoil,
 		Integer modelSubmissionOrder,
-		int packedLight
+		int packedLight,
+		WorldEntityCullingRecord entityCulling
 	) {
+        public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
+            int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
+            int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
+            int outlineColorArgb, int flags, int blockEntityId, TerrainSectionPlacement terrainPlacement,
+            StandardItemFoilRecord itemFoil, WorldDecalFoilRecord decalFoil, Integer modelSubmissionOrder, int packedLight) {
+            this(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,
+                transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,flags,
+                blockEntityId,terrainPlacement,itemFoil,decalFoil,modelSubmissionOrder,packedLight,
+                stratum == WORLD_MESH_ENTITY_STRATUM && blockEntityId == -1 ? activeSemanticEntityCulling() : null);
+        }
+
 		private static final float[] TERRAIN_IDENTITY_TRANSFORM = {
 			1.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 1.0F, 0.0F, 0.0F,
@@ -5972,14 +6073,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return new WorldMeshInstanceRecord(WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM, meshKey, meshGeneration,
 				meshSectionIndex, depthPolicy == 3 ? 1 : depthPolicy, cullPolicy, winding, colorArgb, transform,
 				viewportWidth, viewportHeight, entityId, entityColorArgb, 0, 0, -1, (TerrainSectionPlacement) null,
-				(StandardItemFoilRecord) null, (WorldDecalFoilRecord) null, (Integer) null, packedLight);
+				(StandardItemFoilRecord) null, (WorldDecalFoilRecord) null, (Integer) null, packedLight, entityCulling);
 		}
 
 		public WorldMeshInstanceRecord withPackedLight(int light) {
 			return new WorldMeshInstanceRecord(stratum, meshKey, meshGeneration, meshSectionIndex,
 				depthPolicy, cullPolicy, winding, colorArgb, transform, viewportWidth, viewportHeight,
 				entityId, entityColorArgb, outlineColorArgb, flags, blockEntityId, terrainPlacement,
-				itemFoil, decalFoil, modelSubmissionOrder, light);
+				itemFoil, decalFoil, modelSubmissionOrder, light, entityCulling);
 		}
 
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
@@ -5996,7 +6097,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshInstanceRecord withDecalFoil(WorldDecalFoilRecord decal) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-				flags,blockEntityId,terrainPlacement,itemFoil,Objects.requireNonNull(decal),modelSubmissionOrder,packedLight);
+				flags,blockEntityId,terrainPlacement,itemFoil,Objects.requireNonNull(decal),modelSubmissionOrder,packedLight,entityCulling);
 		}
 
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
@@ -6010,7 +6111,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshInstanceRecord withItemFoil(StandardItemFoilRecord foil) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-				flags,blockEntityId,terrainPlacement,Objects.requireNonNull(foil),decalFoil,modelSubmissionOrder,packedLight);
+				flags,blockEntityId,terrainPlacement,Objects.requireNonNull(foil),decalFoil,modelSubmissionOrder,packedLight,entityCulling);
 		}
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
 			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
@@ -6088,6 +6189,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public WorldMeshInstanceRecord {
+            if (entityCulling != null && (terrainPlacement != null || blockEntityId != -1
+                || (stratum != WORLD_MESH_ENTITY_STRATUM && stratum != WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM)))
+                throw new IllegalArgumentException("entity culling inputs require an ordinary entity caster domain");
             if (modelSubmissionOrder != null && (stratum != WORLD_MESH_ENTITY_STRATUM || terrainPlacement != null))
                 throw new IllegalArgumentException("model submission order requires an entity mesh without terrain placement");
 			if (depthPolicy < 0 || depthPolicy > 3
@@ -6155,13 +6259,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
                 throw new IllegalArgumentException("terrain placement cannot carry model submission order");
             return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
                 winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order,packedLight);
+                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order,packedLight,entityCulling);
         }
 
 		public WorldMeshInstanceRecord withTerrainPlacement(TerrainSectionPlacement placement) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,TERRAIN_IDENTITY_TRANSFORM,viewportWidth,viewportHeight,
-				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight);
+				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight,entityCulling);
 		}
 	}
 
@@ -6449,7 +6553,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float fogSkyEnd,
 		/// Vanilla CLOUDS pipeline range. This stays a copied semantic value; no
 		/// Java fog UBO or renderer state crosses the VulkanicGAL boundary.
-		float fogCloudsEnd
+		float fogCloudsEnd,
+		/// User configuration only; Rust derives pack-specific shadow culling.
+		int configuredShadowDistanceChunks
 	) {
 		public static WorldShaderEnvironmentFrameRecord disabled() {
 			return new WorldShaderEnvironmentFrameRecord(
@@ -6466,7 +6572,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 0.0F, 0, 0,
-			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0.0F, 0.0F
+			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0.0F, 0.0F, 0
 		);
 		}
 	}
@@ -7201,18 +7307,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private final int byteSize;
 		private final int alignment;
 		private final int[] offsets;
+		private static final int MAX_LAYOUT_FIELDS = 72;
 
 		Struct(int id) {
 			this.id = id;
 			try (Arena arena = Arena.ofConfined()) {
-				MemorySegment layout = arena.allocate(320, 8);
+				MemorySegment layout = arena.allocate(24L + MAX_LAYOUT_FIELDS * Integer.BYTES, 8);
 				int status = Native.layout(id, layout);
 				if (status != STATUS_OK) {
 					throw new IllegalStateException("Rust ABI layout query failed for struct " + id + " with status " + status);
 				}
+				if (layout.get(ValueLayout.JAVA_INT, 0) != ABI_VERSION
+					|| layout.get(ValueLayout.JAVA_INT, 4) != layout.byteSize()) {
+					throw new IllegalStateException("Rust ABI layout version or capacity differs from Java; rebuild the native library");
+				}
 				this.byteSize = layout.get(ValueLayout.JAVA_INT, 12);
 				this.alignment = layout.get(ValueLayout.JAVA_INT, 16);
 				int fieldCount = layout.get(ValueLayout.JAVA_INT, 20);
+				if (fieldCount < 0 || fieldCount > MAX_LAYOUT_FIELDS) {
+					throw new IllegalStateException("Rust ABI layout exceeds field capacity for struct " + id);
+				}
 				this.offsets = new int[fieldCount];
 				for (int i = 0; i < fieldCount; i++) {
 					this.offsets[i] = layout.get(ValueLayout.JAVA_INT, 24L + i * 4L);

@@ -64,6 +64,57 @@ fn same_usage_write_barriers_are_dependencies_but_read_only_noops_are_rejected()
 }
 
 #[test]
+fn unrelated_accesses_and_partial_reads_preserve_pending_destination_checks() {
+    for transition_before_write in [false, true] {
+        let mut gal = gal();
+        let mut buffers = Vec::new();
+        for label in ["guarded-source", "unrelated-destination"] {
+            buffers.push(gal.create_buffer(BufferDesc {
+                label: label.into(),
+                size: 16,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc, BufferUsage::TransferDst],
+            }).unwrap());
+        }
+        let [source, destination] = [buffers[0], buffers[1]];
+        let barrier = |resource, before, after| CommandOp::Barrier(ResourceBarrier {
+            resource, subresources: None, before, after,
+            src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+        });
+        let mut operations = vec![
+            CommandOp::HostWriteBuffer { buffer: source, offset: 0, data: vec![1; 16] },
+            barrier(source, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+            // This consumes no destination on the source buffer.
+            CommandOp::HostWriteBuffer { buffer: destination, offset: 0, data: vec![2; 16] },
+            barrier(destination, TextureUsageState::TransferDst, TextureUsageState::TransferDst),
+            // Consuming the first four bytes must retain the upper source range.
+            CommandOp::CopyBufferRegion {
+                src: source, src_offset: 0, dst: destination, dst_offset: 0, size: 4,
+            },
+        ];
+        if transition_before_write {
+            operations.push(barrier(source, TextureUsageState::TransferSrc, TextureUsageState::TransferDst));
+        }
+        // The earlier read does not overlap this write. Only the retained
+        // barrier destination can reject its incompatible usage.
+        operations.push(CommandOp::HostWriteBuffer { buffer: source, offset: 8, data: vec![3; 4] });
+        let result = gal.submit(SubmissionBatch {
+            label: "destination-range-preservation".into(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "commands".into(), operations,
+            })],
+        });
+        if transition_before_write {
+            result.unwrap();
+        } else {
+            let error = result.unwrap_err();
+            assert_eq!(error.code, StatusCode::InvalidArgument);
+            assert!(error.message.contains("barrier after TransferSrc"), "{error:?}");
+        }
+    }
+}
+
+#[test]
 fn attachment_and_presentation_hazards_require_semantic_separation() {
     let mut gal = gal_with_capabilities(presentation_capabilities());
     let texture = gal

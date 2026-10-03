@@ -21,8 +21,9 @@ final class ExperienceOrbInstanceEncodingTest {
         orb.cameraOrientation()[3] = 0;
         try (var arena = Arena.ofConfined()) {
             var bytes = encodeExperienceOrbInstances(arena,List.of(orb),2);
-            assertEquals(112,bytes.byteSize());
-            assertEquals(112,bytes.get(ValueLayout.JAVA_INT,0));
+            // ABI 68 appends culling inputs, the shadow role and camera origin.
+            assertEquals(248,bytes.byteSize());
+            assertEquals(248,bytes.get(ValueLayout.JAVA_INT,0));
             assertEquals(1,bytes.get(ValueLayout.JAVA_INT,4));
             assertEquals(7,bytes.get(ValueLayout.JAVA_LONG,8));
             assertEquals(2,bytes.get(ValueLayout.JAVA_LONG,16));
@@ -30,6 +31,9 @@ final class ExperienceOrbInstanceEncodingTest {
             assertArrayEquals(new float[]{0,0,0,1},bytes.asSlice(88,16).toArray(ValueLayout.JAVA_FLOAT));
             assertEquals(42,bytes.get(ValueLayout.JAVA_INT,104));
             assertEquals(0,bytes.get(ValueLayout.JAVA_INT,108));
+            for (long offset=112;offset<248;offset++)
+                assertEquals(0,bytes.get(ValueLayout.JAVA_BYTE,offset),
+                    "absent culling/shadow metadata must be canonical at byte " + offset);
         }
     }
 
@@ -38,7 +42,7 @@ final class ExperienceOrbInstanceEncodingTest {
         var first = new WorldExperienceOrbInstanceRecord(7,2,1,identity(),new float[]{0,0,0,1},42);
         var second = new WorldExperienceOrbInstanceRecord(8,2,0,identity(),new float[]{0,0,0,1},43);
         try (var arena = Arena.ofConfined()) {
-            assertEquals(224,encodeExperienceOrbInstances(arena,List.of(first,first),1).byteSize());
+            assertEquals(496,encodeExperienceOrbInstances(arena,List.of(first,first),1).byteSize());
             assertThrows(IllegalArgumentException.class,()->encodeExperienceOrbInstances(arena,List.of(first,second),1));
             assertThrows(IllegalArgumentException.class,()->encodeExperienceOrbInstances(arena,List.of(first),0));
             assertThrows(IllegalArgumentException.class,()->encodeExperienceOrbInstances(arena,List.of(first),65_536));

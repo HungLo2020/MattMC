@@ -30,6 +30,9 @@ use crate::render::shaderpack::resources::bindings::{
     TerrainSourceSampledResourceShape, TERRAIN_RESOURCE_BINDINGS_PATH,
 };
 
+mod single_color;
+mod terrain_alpha;
+
 #[test]
 fn entity_outline_shader_contract_preserves_outline_color_and_texture_silhouette() {
     assert!(MINIMAL_ENTITY_OUTLINE_VERTEX.contains("WorldMeshVertices"));
@@ -1283,7 +1286,7 @@ fn lowered_translucent_source_program_has_a_separate_output_contract() {
         .translucent_raster_state
         .expect("the prepared translucent program must retain source raster semantics");
     assert_eq!(TerrainTranslucentBlend::SourceAlphaOver, raster.blend);
-    assert!((raster.alpha_test.greater_than() - 0.0001).abs() < f32::EPSILON);
+    assert!((raster.alpha_test.unwrap().greater_than() - 0.0001).abs() < f32::EPSILON);
     assert_eq!(Some(BlendMode::Alpha), program.translucent_blend_mode());
 }
 
@@ -2267,4 +2270,38 @@ fn prepared_textured_material_interface_rejects_mutated_fixed_abi_fields() {
             .len(),
         "the source ABI accepts local UVs; the frontend selects the owned semantic texture binding"
     );
+}
+
+#[test]
+fn prepared_textured_material_alpha_test_runs_after_primary_output_and_can_be_disabled() {
+    use crate::render::shaderpack::contracts::material::{
+        derive_textured_material_contract, lower_textured_material_source_pair,
+    };
+    let source = complete_bundled_pack_source_for_test();
+    let mut contract = derive_textured_material_contract(&source, TerrainProgramScope::Overworld)
+        .unwrap();
+    let lowered = lower_textured_material_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered.opaque_resource_contract().bind_semantic_roles(&declarations).unwrap();
+    for cutoff in [0.1_f32, 0.25] {
+        contract.alpha_cutoff_bits = Some(cutoff.to_bits());
+        let program = prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings)
+            .unwrap();
+        let fragment = &program.fragment.source;
+        let alpha_test = format!("if (!(out_textured_material_lit_color.a > {cutoff:?})) discard;");
+        assert!(fragment.ends_with(&format!(
+            "void main() {{\n    vulkanic_source_textured_main();\n    {alpha_test}\n}}\n"
+        )), "the pack must compute output alpha before the test");
+        assert_eq!(1, fragment.matches("void main()").count());
+        assert_eq!(1, fragment.matches("void vulkanic_source_textured_main()").count());
+    }
+    contract.alpha_cutoff_bits = None;
+    let program = prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings)
+        .unwrap();
+    assert_eq!(lowered.fragment().source(), program.fragment.source);
+    for cutoff in [f32::NAN, f32::INFINITY, -0.1, 1.1] {
+        contract.alpha_cutoff_bits = Some(cutoff.to_bits());
+        assert!(prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings)
+            .unwrap_err().to_string().contains("finite and in [0, 1]"));
+    }
 }

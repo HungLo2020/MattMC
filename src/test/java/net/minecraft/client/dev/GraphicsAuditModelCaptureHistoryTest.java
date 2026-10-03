@@ -53,4 +53,17 @@ class GraphicsAuditModelCaptureHistoryTest {
         for (int i = 1; i < 64; i++) history.retain(100 + i, List.of());
         assertThrows(IllegalStateException.class, () -> history.retain(1000, List.of()));
     }
+
+    @Test void deferredAttemptsKeepOneSnapshotAndCommitOnlyTheAcknowledgedFrame() {
+        var history = new GraphicsAuditModelCaptureHistory<>(ModelMeshDiagnostic::frameIndex);
+        history.retain(10, List.of(observation(10, 1)));
+        for (int frame = 20; frame <= 2000; frame++) {
+            history.stage(frame, List.of(observation(frame, frame)));
+        }
+        assertEquals(List.of(observation(10, 1)), history.merge(List.of()));
+        assertThrows(IllegalStateException.class, () -> history.commit(1999));
+        history.commit(2000);
+        assertEquals(List.of(observation(10, 1), observation(2000, 2000)), history.merge(List.of()));
+        assertThrows(IllegalStateException.class, () -> history.commit(2000));
+    }
 }

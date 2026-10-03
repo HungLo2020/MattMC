@@ -1,0 +1,24 @@
+import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.jvm.toolchain.JavaToolchainService
+
+// Opt-in CPU fixture driver; this init script does not alter normal build tasks.
+gradle.projectsEvaluated {
+    def project = rootProject
+    def toolchains = project.extensions.getByType(JavaToolchainService)
+    def compileTool = project.tasks.register('compileShadowOrbFixture', JavaCompile) {
+        dependsOn project.tasks.named('classes')
+        source project.file('DevUtils/tests/rendering/PrepareShadowOrbFixture.java')
+        classpath = project.sourceSets.main.runtimeClasspath
+        destinationDirectory.set(project.layout.buildDirectory.dir('render-verification/shadow-orb-fixture-tool'))
+        javaCompiler.set(toolchains.compilerFor(project.java.toolchain))
+    }
+    project.tasks.register('prepareShadowOrbFixture', JavaExec) {
+        dependsOn compileTool
+        classpath = project.sourceSets.main.runtimeClasspath + project.files(compileTool.flatMap { it.destinationDirectory })
+        javaLauncher.set(toolchains.launcherFor(project.java.toolchain))
+        mainClass.set('PrepareShadowOrbFixture')
+        jvmArgs '--enable-native-access=ALL-UNNAMED'
+        systemProperty 'mattmc.rust.natives.dir', project.layout.buildDirectory.dir('rust/native').get().asFile.absolutePath
+    }
+}

@@ -463,6 +463,7 @@ fn shared_shader_pack_color_target_formats_create_exact_private_resources() {
     let formats = [
         TextureFormat::R11fG11fB10f,
         TextureFormat::R32Float,
+        TextureFormat::R16Float,
         TextureFormat::Rgb16Float,
         TextureFormat::Rgba8Unorm,
         TextureFormat::R8Unorm,
@@ -497,6 +498,8 @@ fn shared_shader_pack_color_target_formats_create_exact_private_resources() {
             }) {
                 Ok(texture) => texture,
                 Err(error) => {
+                    assert_ne!(format, TextureFormat::R16Float,
+                        "the supported R16F format must execute its exact clear/readback proof: {error}");
                     assert_eq!(
                         StatusCode::UnsupportedFeature,
                         error.code,
@@ -519,9 +522,112 @@ fn shared_shader_pack_color_target_formats_create_exact_private_resources() {
                         backend.name()
                     )
                 });
+            if format == TextureFormat::R16Float {
+                verify_r16_clear_readback(&mut gal, texture, texture_view);
+            }
             gal.destroy(texture_view).unwrap();
             gal.destroy(texture).unwrap();
         }
+    }
+}
+
+fn verify_r16_clear_readback(gal: &mut VulkanicGal, texture: Handle, texture_view: Handle) {
+    let extent = Extent3d {
+        width: 16,
+        height: 8,
+        depth: 1,
+    };
+    let target = gal
+        .create_render_target(RenderTargetDesc {
+            label: "r16-format.target".into(),
+            extent,
+            color_views: vec![texture_view],
+            depth_stencil_view: None,
+        })
+        .unwrap();
+    let pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "r16-format.pass".into(),
+            color_formats: vec![TextureFormat::R16Float],
+            target,
+            depth_format: None,
+        })
+        .unwrap();
+    let readback = gal
+        .create_buffer(BufferDesc {
+            label: "r16-format.readback".into(),
+            size: 256,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let commands = gal
+        .create_command_list(CommandListDesc {
+            label: "r16-format.commands".into(),
+            operations: vec![
+                texture_barrier(
+                    texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                ),
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![PassAttachment {
+                        view: texture_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(ClearColor {
+                            r: 0.5,
+                            g: 0.25,
+                            b: 0.75,
+                            a: 1.0,
+                        }),
+                    }],
+                    depth_stencil: None,
+                },
+                CommandOp::EndPass,
+                texture_barrier(
+                    texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::TransferSrc,
+                ),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer: readback,
+                    buffer_offset: 0,
+                    bytes_per_row: 32,
+                    rows_per_image: 8,
+                    texture,
+                    texture_mip: 0,
+                    texture_layer: 0,
+                    texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                    extent,
+                }),
+                buffer_barrier(readback),
+                CommandOp::HostReadBuffer {
+                    buffer: readback,
+                    offset: 0,
+                    size: 256,
+                },
+            ],
+        })
+        .unwrap();
+    let token = gal
+        .submit(SubmissionBatch {
+            label: "r16-format.submit".into(),
+            command_lists: vec![commands],
+        })
+        .unwrap();
+    gal.retire_through_for_test(token.submission).unwrap();
+    let reads = gal.completed_host_reads();
+    let read = reads.iter().find(|read| read.buffer == readback).unwrap();
+    assert_eq!(
+        vec![0x00, 0x38].repeat(128),
+        read.bytes,
+        "R16F must retain half-float 0.5 with two bytes per texel"
+    );
+    for resource in [readback, pass, target] {
+        gal.destroy(resource).unwrap();
     }
 }
 

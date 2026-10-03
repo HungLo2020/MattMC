@@ -124,6 +124,8 @@ public final class RustGalWholeFrameTerrainSource {
 	 * This is ordinary CPU culling policy, not a renderer-owned fog buffer.
 	 */
 	private float terrainSelectionDistance;
+	/** Frozen disables portal occlusion for smart-cull off or a spectator camera inside solid terrain. */
+	private boolean occlusionCullingEnabled = true;
 	/**
 	 * A completed immutable section may replace the temporary all-closed result
 	 * observed by an earlier traversal wave.  Sodium starts a fresh visibility
@@ -212,8 +214,13 @@ public final class RustGalWholeFrameTerrainSource {
 		this.completedBuildsConsumedThisFrame = 0;
 		this.viewport = viewportProvider.sodium$createViewport();
 		this.terrainSelectionDistance = terrainSelectionDistance;
+		Minecraft minecraft = Minecraft.getInstance();
+		boolean spectatorInSolidBlock = minecraft.player != null && minecraft.player.isSpectator()
+			&& this.level.getBlockState(camera.getBlockPosition()).isSolidRender();
+		this.occlusionCullingEnabled = terrainOcclusionCullingEnabled(minecraft.smartCull, spectatorInSolidBlock);
 		long visibilitySignature = frustum instanceof net.minecraft.client.renderer.culling.Frustum vanillaFrustum
-			? vanillaFrustum.semanticSignature() ^ Float.floatToIntBits(terrainSelectionDistance)
+			? terrainVisibilitySignature(vanillaFrustum.semanticSignature(), terrainSelectionDistance,
+				this.occlusionCullingEnabled)
 			: Long.MIN_VALUE;
 		if (this.observedResourceReloadEpoch != resourceReloadEpoch) {
 			this.resetForResourceReload();
@@ -425,7 +432,7 @@ public final class RustGalWholeFrameTerrainSource {
 				: visibilitySignature;
 		}
 
-			// Capture-only receipt of the final Rust-owned CPU visibility domain.
+		// Capture-only receipt of the final Rust-owned CPU visibility domain.
 		// Wait for the source's existing settled state so startup-empty samples
 		// cannot displace the comparable capture-phase observation.  This does
 		// not provide the renderer with a list or influence admission.
@@ -1024,8 +1031,7 @@ public final class RustGalWholeFrameTerrainSource {
 			int originBit = 1 << GraphDirection.COUNT;
 			int incomingDirections = incoming & directionMask;
 			if ((incoming & originBit) != 0) {
-				int outgoing = OcclusionCuller.getVisibilityConnections(
-					section.getVisibilityData(), GraphDirectionSet.NONE, false);
+				int outgoing = rootVisibilityConnections(section.getVisibilityData(), this.occlusionCullingEnabled);
 				this.propagateVisibility(section, incomingDirections, outgoing, currentViewport, frustum);
 				continue;
 			}
@@ -1034,18 +1040,46 @@ public final class RustGalWholeFrameTerrainSource {
 			this.visibilityBatchIncoming[batchCount] = incomingDirections;
 			batchCount++;
 		}
-		OcclusionCuller.getVisibilityConnectionsForCameraBatch(
+		terrainVisibilityConnectionsForCameraBatch(
 			this.visibilityBatchSections,
 			this.visibilityBatchIncoming,
 			currentViewport,
 			batchCount,
-			this.visibilityBatchOutgoing
+			this.visibilityBatchOutgoing,
+			this.occlusionCullingEnabled
 		);
 		for (int index = 0; index < batchCount; index++) {
 			RenderSection section = this.visibilityBatchSections[index];
 			this.propagateVisibility(section, this.visibilityBatchIncoming[index],
 				this.visibilityBatchOutgoing[index], currentViewport, frustum);
 			this.visibilityBatchSections[index] = null;
+		}
+	}
+
+	static boolean terrainOcclusionCullingEnabled(boolean smartCull, boolean spectatorInSolidBlock) {
+		return smartCull && !spectatorInSolidBlock;
+	}
+
+	static long terrainVisibilitySignature(long frustumSignature, float distance, boolean useOcclusionCulling) {
+		// Policy changes must invalidate both the traversal and its settled visible snapshot.
+		return frustumSignature ^ Float.floatToIntBits(distance)
+			^ (useOcclusionCulling ? 0L : 0x9E3779B97F4A7C15L);
+	}
+
+	static int rootVisibilityConnections(long visibilityData, boolean useOcclusionCulling) {
+		return useOcclusionCulling
+			? OcclusionCuller.getVisibilityConnections(visibilityData, GraphDirectionSet.NONE, false)
+			: GraphDirectionSet.ALL;
+	}
+
+	static void terrainVisibilityConnectionsForCameraBatch(RenderSection[] sections, int[] incoming,
+			Viewport viewport, int count, int[] outgoing, boolean useOcclusionCulling) {
+		if (useOcclusionCulling) {
+			OcclusionCuller.getVisibilityConnectionsForCameraBatch(sections, incoming, viewport, count, outgoing);
+		} else {
+			// Bypass portal and camera-angle masks only. propagateVisibility retains
+			// outward traversal, build-height/window and neighbor frustum/distance checks.
+			java.util.Arrays.fill(outgoing, 0, count, GraphDirectionSet.ALL);
 		}
 	}
 

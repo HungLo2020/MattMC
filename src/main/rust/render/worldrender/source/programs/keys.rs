@@ -103,6 +103,8 @@ pub(crate) struct LoweredSourceTerrainPipelineKey {
     /// fixture target from being reused for a later source-derived target
     /// with a different semantic output schema.
     pub(in crate::render::worldrender) color_formats: Vec<TextureFormat>,
+    /// A dimension-specific shadow alpha specialization belongs in identity.
+    pub(in crate::render::worldrender) shadow_alpha_cutoff_bits: Option<u32>,
     /// Shadow maps rasterize natively (GL memory layout for matrix-addressed
     /// lookups); screen-space writers use the GL-style flipped viewport.
     pub(in crate::render::worldrender) raster_y_direction: crate::render::vulkanic::resources::RasterYDirection,

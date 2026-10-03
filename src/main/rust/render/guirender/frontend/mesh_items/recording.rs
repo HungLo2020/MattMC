@@ -27,19 +27,6 @@ impl GuiFrontend {
             self.destroy_render_resources(gal);
             self.generation = generation;
         }
-        let mut needed_targets = Vec::new();
-        for batch in &mesh_batches {
-            let (extent, _, _) = resolve_gui_mesh_item_raster(batch)?;
-            needed_targets.push((batch.item_cache.map(|cache| cache.identity).unwrap_or(0),
-                Extent3d { width: extent[0], height: extent[1], depth: 1 }));
-        }
-        if self.mesh_targets.has_obsolete_items(generation, &needed_targets) {
-            // Composite programs may be shared: release borrowers before owners.
-            let mut composites: Vec<_> = std::mem::take(&mut self.mesh_composites).into_values().collect();
-            composites.sort_by_key(|resources| resources.owns_shared_resources());
-            for resources in composites { resources.destroy(gal); }
-            self.mesh_targets.retain_items(gal, generation, &needed_targets);
-        }
         // Static item rasters are already retained by the Rust-owned target
         // cache. Once a prior submission has accepted that raster, composing
         // it does not require transforming every source vertex again. Keep

@@ -12,9 +12,9 @@ impl ShaderPackRuntimeExecutor {
         forward_material_draws: &[TerrainForwardMaterialDraw],
     ) -> GalResult<()> {
         self.validate_terrain_material_graph()?;
-        if draws.is_empty() {
-            return Ok(());
-        }
+        // A sky/hand-only entry still needs cleared shadow attachments and
+        // submitted depth snapshots before source admission. Empty geometry
+        // does not make the graph's sampled resources or forward work optional.
         let mut targets = targets;
         targets.translucent_capture_initialized = frame.translucent_capture_initialized;
         let isolation = TerrainGraphIsolation::from_env();

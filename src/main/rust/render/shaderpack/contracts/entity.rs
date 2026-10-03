@@ -181,17 +181,20 @@ pub fn derive_entity_contract(
     let fragment = preprocess_stage(source, &stages.fragment.path, &stages.fragment.defines)?;
 
     require_any(&vertex, &["gl_Vertex", "ftransform"])?;
-    require(&vertex, "GetLightMapCoordinates()")?;
-    require(&vertex, "gl_Normal")?;
-    require(&vertex, "gl_Color")?;
-    require(&fragment, "texture2D(tex, texCoord)")?;
-    require(&fragment, "color *= glColor")?;
-    require(&fragment, "DoLighting(")?;
-    require(&fragment, "gl_FragData[0] = color")?;
-    require(&fragment, "gl_FragData[1]")?;
-
     let slots = parse_draw_buffers_slots(&fragment)?;
+    require(&fragment, "gl_FragData[0]")?;
+    if slots.len() != 1 {
+        require(&vertex, "GetLightMapCoordinates()")?;
+        require(&vertex, "gl_Normal")?;
+        require(&vertex, "gl_Color")?;
+        require(&fragment, "texture2D(tex, texCoord)")?;
+        require(&fragment, "color *= glColor")?;
+        require(&fragment, "DoLighting(")?;
+        require(&fragment, "gl_FragData[0] = color")?;
+        require(&fragment, "gl_FragData[1]")?;
+    }
     let outputs = match slots.as_slice() {
+        [_] => vec![EntitySourceOutput::LitColor],
         [0, 6] => vec![
             EntitySourceOutput::LitColor,
             EntitySourceOutput::MaterialAuxiliary,
@@ -203,7 +206,7 @@ pub fn derive_entity_contract(
         ],
         _ => {
             return Err(GalError::unsupported_feature(format!(
-                "selected entity source requires unsupported DRAWBUFFERS schema {slots:?}; expected [0, 6] or [0, 6, 5]"
+                "selected entity source requires unsupported DRAWBUFFERS schema {slots:?}; expected one color slot, [0, 6] or [0, 6, 5]"
             )));
         }
     };
@@ -408,6 +411,11 @@ pub fn lower_entity_source_pair(
     )?;
     let lowered = lower_entity_source_stages(&vertex, &fragment)?;
     lowered.require_backend_neutral_lowering()?;
+    if contract.outputs.len() == 1 && lowered.fragment().outputs().len() != 1 {
+        return Err(GalError::invalid_argument(
+            "single-color entity source writes undeclared auxiliary outputs",
+        ));
+    }
     Ok(lowered)
 }
 

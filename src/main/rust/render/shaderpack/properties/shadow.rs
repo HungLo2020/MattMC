@@ -20,6 +20,11 @@ const DEFAULT_SHADOW_FAR_PLANE: f32 = 156.0;
 const DEFAULT_SHADOW_INTERVAL: f32 = 2.0;
 const DEFAULT_SUN_PATH_ROTATION_DEGREES: f32 = 0.0;
 
+mod scoped;
+mod selection;
+pub(crate) use scoped::ShadowPolicies;
+pub(crate) use selection::{ShadowCasterFrameDistances, ShadowCasterKind};
+
 /// Immutable pack-generation shadow directives. These are source semantics,
 /// not a cached Java matrix or an OpenGL/Vulkan implementation detail.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -37,6 +42,9 @@ pub struct ShaderPackShadowPolicy {
     sun_path_rotation_degrees: f32,
     supports_end_flash: bool,
     casters: ShadowCasterDirectives,
+    // Compact transported fixtures retain their historical culling contract.
+    // Normal scoped sources retain exact terrain/entity multipliers.
+    caster_distances: Option<selection::ShadowCasterDistancePolicy>,
 }
 
 /// Iris's non-terrain shadow caster directives (`PackShadowDirectives`),
@@ -65,14 +73,15 @@ pub struct ShaderPackShadowUniforms {
 /// to the same camera origin as the copied terrain placements.
 pub(crate) struct AdvancedShadowCasterFrustum {
     planes: Vec<[f32; 4]>,
-    safe_zone: Option<(f32, f32)>,
+    safe_zone: Option<(f64, f64)>,
+    distance_limit: Option<f64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum ShadowCasterSelection {
     Advanced,
     SafeZone,
-    Unsupported,
+    Distance,
 }
 
 impl AdvancedShadowCasterFrustum {
@@ -82,12 +91,39 @@ impl AdvancedShadowCasterFrustum {
         projection: [f32; 16],
         view: [f32; 16],
     ) -> GalResult<Self> {
+        Self::from_frame_with_selection(policy, time_of_day, projection, view, None, ShadowCasterKind::Terrain)
+    }
+
+    pub(crate) fn from_frame_with_distances(
+        policy: ShaderPackShadowPolicy,
+        time_of_day: f32,
+        projection: [f32; 16],
+        view: [f32; 16],
+        distances: ShadowCasterFrameDistances,
+        kind: ShadowCasterKind,
+    ) -> GalResult<Self> {
+        Self::from_frame_with_selection(policy, time_of_day, projection, view, Some(distances), kind)
+    }
+
+    fn from_frame_with_selection(
+        policy: ShaderPackShadowPolicy,
+        time_of_day: f32,
+        projection: [f32; 16],
+        view: [f32; 16],
+        distances: Option<ShadowCasterFrameDistances>,
+        kind: ShadowCasterKind,
+    ) -> GalResult<Self> {
+        let limits = policy.caster_limits(distances, kind)?;
         if !time_of_day.is_finite()
             || projection.iter().chain(view.iter()).any(|value| !value.is_finite())
         {
             return Err(GalError::invalid_argument(
                 "source shadow caster frustum requires finite camera semantics",
             ));
+        }
+        if !limits.use_planes {
+            return Ok(Self { planes: Vec::new(), safe_zone: limits.safe_zone,
+                distance_limit: limits.distance_limit });
         }
         let celestial = multiply(
             multiply(rotation_y(-90.0), rotation_z(policy.sun_path_rotation_degrees)),
@@ -152,15 +188,20 @@ impl AdvancedShadowCasterFrustum {
         if planes.len() > 13 || planes.iter().flatten().any(|value| !value.is_finite()) {
             return Err(GalError::invalid_argument("source shadow caster planes exceed finite bound"));
         }
-        let safe_zone = match policy.require_supported_caster_selection()? {
-            ShadowCasterSelection::Advanced => None,
-            ShadowCasterSelection::SafeZone => Some((policy.voxel_distance, policy.distance)),
-            ShadowCasterSelection::Unsupported => unreachable!(),
-        };
-        Ok(Self { planes, safe_zone })
+        Ok(Self { planes, safe_zone: limits.safe_zone, distance_limit: limits.distance_limit })
     }
 
     pub(crate) fn intersects(&self, min: [f32; 3], max: [f32; 3]) -> bool {
+        self.intersects_double_relative(min.map(f64::from), max.map(f64::from))
+    }
+
+    /// Camera-relative distance boxes used by the terrain/Sodium domain.
+    pub(crate) fn intersects_double_relative(&self, min: [f64; 3], max: [f64; 3]) -> bool {
+        if let Some(distance) = self.distance_limit {
+            if (0..3).any(|axis| max[axis] < -distance || min[axis] > distance) {
+                return false;
+            }
+        }
         if let Some((inner, outer)) = self.safe_zone {
             if (0..3).any(|axis| max[axis] < -outer || min[axis] > outer) {
                 return false;
@@ -169,6 +210,32 @@ impl AdvancedShadowCasterFrustum {
                 return true;
             }
         }
+        let min = min.map(|value| value as f32);
+        let max = max.map(|value| value as f32);
+        self.intersects_planes(min,max)
+    }
+
+    /// Frozen BoxCuller.isCulled(AABB) casts absolute bounds to floats, but
+    /// advanced clipping subtracts the double camera before its float cast.
+    pub(crate) fn intersects_entity_world(&self, bounds: [f64;6], camera: [f64;3]) -> bool {
+        let within = |distance:f64| (0..3).all(|axis| {
+            f64::from(bounds[axis+3] as f32) >= camera[axis]-distance
+                && f64::from(bounds[axis] as f32) <= camera[axis]+distance
+        });
+        if self.distance_limit.is_some_and(|distance| !within(distance)) {return false;}
+        if let Some((_inner,outer))=self.safe_zone {
+            // Preserve Frozen's entity-AABB entry point separately from
+            // Sodium terrain: SafeZoneCullingFrustum.isVisible(AABB) compares
+            // its advanced result to zero. OUTSIDE/INTERSECT/INSIDE are all
+            // nonzero, so every box inside the outer distance limit survives.
+            // The compiled Frozen world-bounds probe covers this behavior.
+            return within(outer);
+        }
+        self.intersects_planes(std::array::from_fn(|i|(bounds[i]-camera[i]) as f32),
+            std::array::from_fn(|i|(bounds[i+3]-camera[i]) as f32))
+    }
+
+    fn intersects_planes(&self,min:[f32;3],max:[f32;3]) -> bool {
         self.planes.iter().all(|plane| {
             let furthest: [f32; 3] = std::array::from_fn(|axis| {
                 if plane[axis] < 0.0 { min[axis] } else { max[axis] }
@@ -227,6 +294,7 @@ impl ShaderPackShadowPolicy {
                 .unwrap_or(DEFAULT_SUN_PATH_ROTATION_DEGREES),
             supports_end_flash: source_bool_property(source, "endFlashShadows")?.unwrap_or(false),
             casters: source_shadow_caster_directives(source)?,
+            caster_distances: None,
         };
         policy.validate()?;
         Ok(Some(policy))
@@ -262,7 +330,7 @@ impl ShaderPackShadowPolicy {
     fn require_supported_caster_selection(self) -> GalResult<ShadowCasterSelection> {
         match self.caster_selection {
             Some(mode @ (ShadowCasterSelection::Advanced | ShadowCasterSelection::SafeZone)) => Ok(mode),
-            Some(ShadowCasterSelection::Unsupported) => Err(GalError::unsupported_feature(
+            Some(ShadowCasterSelection::Distance) => Err(GalError::unsupported_feature(
                 "source shadow-only selection does not support distance-only shadow.culling",
             )),
             None => Err(GalError::unsupported_feature(
@@ -434,6 +502,10 @@ pub(crate) fn source_alpha_test_cutoff(
     let Some(selected) = selected else {
         return Ok(Some(default_cutoff));
     };
+    parse_alpha_cutoff(&selected, property)
+}
+
+fn parse_alpha_cutoff(selected: &str, property: &str) -> GalResult<Option<f32>> {
     if selected == "off" || selected == "false" {
         return Ok(None);
     }
@@ -571,7 +643,7 @@ fn source_caster_selection(source: &ShaderPackSource) -> GalResult<Option<Shadow
         let selection = match value.trim() {
             "true" => ShadowCasterSelection::Advanced,
             "reversed" | "safe_zone" => ShadowCasterSelection::SafeZone,
-            "false" => ShadowCasterSelection::Unsupported,
+            "false" => ShadowCasterSelection::Distance,
             other => return Err(GalError::invalid_argument(format!(
                 "unsupported active shadow.culling value {other}"
             ))),

@@ -197,7 +197,10 @@ pub(crate) fn source_identifiers(source: &str) -> BTreeSet<String> {
     identifiers
 }
 
-fn strip_comments(source: &str) -> String {
+/// Masks comments with whitespace, preserving UTF-8 byte offsets and lines.
+/// Declaration rewriting can then inspect tokens without discarding source
+/// comments that also carry shader-pack directives.
+pub(crate) fn strip_comments(source: &str) -> String {
     let mut output = String::with_capacity(source.len());
     let mut characters = source.chars().peekable();
     let mut block_comment = false;
@@ -206,23 +209,31 @@ fn strip_comments(source: &str) -> String {
             if character == '*' && characters.peek() == Some(&'/') {
                 characters.next();
                 block_comment = false;
+                output.push_str("  ");
             } else if character == '\n' {
                 output.push('\n');
+            } else {
+                for _ in 0..character.len_utf8() { output.push(' '); }
             }
             continue;
         }
         if character == '/' && characters.peek() == Some(&'*') {
             characters.next();
             block_comment = true;
+            // Comments separate tokens: `varying/*note*/vec3` must not
+            // become the single identifier `varyingvec3`.
+            output.push_str("  ");
             continue;
         }
         if character == '/' && characters.peek() == Some(&'/') {
             characters.next();
+            output.push_str("  ");
             for character in characters.by_ref() {
                 if character == '\n' {
                     output.push('\n');
                     break;
                 }
+                for _ in 0..character.len_utf8() { output.push(' '); }
             }
             continue;
         }

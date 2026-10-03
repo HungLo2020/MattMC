@@ -40,6 +40,35 @@ back. It makes no rendering decisions.
 Never rename an exported function or change its signature without the matching
 Java change: Java binds by name and fails at load if a symbol is missing.
 
+ABI 67 appends `configured_shadow_distance_chunks` to the shader environment
+record (struct 73, field 64). Java copies the CPU user setting without clamping
+or interpreting negative values; Rust combines it with copied normal render
+distance and pack policy. Rebuild the native library before using the new Java
+writer. `WorldShaderEnvironmentEncodingTest` verifies the appended field and
+adjacent fog range against the exported native layout, including dirty storage.
+The layout-query result has a fixed 72-field capacity (312 bytes), mirrored by
+Java's query allocation. Each table entry checks its field count at compile time;
+the bridge regression queries all exported records, including the 65-field shader
+environment. Update the native capacity and Java allocation together when growing it.
+
+ABI 68 appends entity culling mode, flags, absolute double bounds, optional
+leash-holder bounds and double camera origin to mesh instances (struct 69,
+fields 31–35). Orb instances (struct 110, 248 bytes, fields 8–13) carry the same facts plus
+an explicit shadow-only role. Absent metadata actively zeroes every appended
+field. The decoder rejects unknown flags, malformed bounds, inconsistent holder
+roles and metadata in first-person, terrain or block-entity domains. Nested Java
+CPU extraction scopes retain immutable records; an inner null scope masks its
+parent and cleanup restores it. Rust owns pack selection and geometry creation.
+Rebuild before running `WorldEntityCullingEncodingTest`; its native checks cover
+large camera origins, exact double values and dirty storage.
+
+Typed orb placements name a boundary in the collected mesh stream. When the
+shadow-only CPU capture removes foil or outline meshes, map those boundaries
+through its kept-mesh prefix before the later source-admission mapping.
+Preserve equal-boundary order, camera placements, culling facts and shadow roles;
+appearance residency and published immutable records must remain unchanged.
+See [the semantic collector](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/ExperienceOrbSemanticCollector.java).
+
 ## Rules the boundary tests enforce
 
 - The bridge uses only the public GAL modules and is the only code that creates

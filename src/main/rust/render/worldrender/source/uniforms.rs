@@ -43,9 +43,14 @@ impl WorldPrimitiveFrontend {
     ) -> GalResult<TerrainSourceUniformFrame> {
         let key = SourceUniformFrameMemoKey {
             frame_id: frame.frame_id,
+            environment_enabled: frame.shader_environment.enabled,
             world_generation: frame.shader_environment.world_generation,
+            shader_pack_generation: self.shader_pack_sources.active_generation(),
+            sky_type: frame.background.sky_type,
+            extent: [frame.viewport_width, frame.viewport_height],
             frame_time_bits: frame.shader_environment.frame_time_seconds.to_bits(),
             view_bits: frame.view_matrix.map(f32::to_bits),
+            projection_bits: frame.projection_matrix.map(f32::to_bits),
         };
         if let Some((memo_key, uniforms)) = self.source_uniform_frame_memo.as_ref() {
             if *memo_key == key {
@@ -263,14 +268,31 @@ impl WorldPrimitiveFrontend {
             uniforms.eye_brightness_m = Some(eye_brightness_m);
             uniforms.eye_brightness_m2 = Some(eye_brightness_m2);
 
-            if let Some(shadow_policy) = self.shader_pack_sources.active_shadow_policy() {
+            let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?
+                .ok_or_else(|| GalError::unsupported_feature("built-in frame uniforms require an explicit dimension scope"))?;
+            let frame_policy = self.shader_pack_sources.active()
+                .ok_or_else(|| GalError::invalid_argument("built-in frame uniforms require an active source"))?
+                .frame_uniform_policy(scope)?;
+            uniforms.eye_brightness_smooth = Some(self.source_temporal_uniforms.eye_brightness_smooth(
+                temporal_key, frame.frame_id, frame.shader_environment.frame_time_seconds,
+                frame.shader_environment.eye_brightness, frame_policy.eye_brightness_half_life_seconds,
+            )?);
+            let celestial = crate::render::shaderpack::uniforms::celestial::CelestialFrameUniforms::from_frame(
+                frame_policy, scope, frame.shader_environment.time_of_day, frame.view_matrix,
+                Some([frame.background.sky.end_flash_x_angle, frame.background.sky.end_flash_y_angle]),
+            )?;
+            uniforms.sun_position = Some(celestial.sun_position);
+            uniforms.moon_position = Some(celestial.moon_position);
+            uniforms.shadow_light_position = Some(celestial.shadow_light_position);
+            uniforms.up_position = Some(celestial.up_position);
+            uniforms.celestial_sun_path_rotation = Some(frame_policy.sun_path_rotation_degrees);
+
+            if let Some(shadow_policy) = self.shader_pack_sources.active_shadow_policy_for_scope(scope)? {
                 if shadow_policy.generation() != shader_pack_generation {
                     return Err(GalError::invalid_argument(
                         "shader-pack source and shadow policy generations differ",
                     ));
                 }
-                uniforms.celestial_sun_path_rotation =
-                    Some(shadow_policy.sun_path_rotation_degrees());
                 let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?
                     .ok_or_else(|| {
                         GalError::unsupported_feature(
@@ -328,7 +350,7 @@ impl WorldPrimitiveFrontend {
             })?;
         let shadow_policy = self
             .shader_pack_sources
-            .active_shadow_policy()
+            .active_shadow_policy_for_scope(scope)?
             .ok_or_else(|| {
                 GalError::unsupported_feature(
                     "puddle occupancy requires a parsed source shadow policy",

@@ -21,6 +21,9 @@ layout(set = 0, binding = 0, std430) readonly buffer WorldMaterialBatch {
     mat4 view;
     mat4 projection;
     vec4 viewport_cutout;
+#ifdef VULKANIC_GAL_SKY_FOG
+    vec4 sky_fog_color;
+#endif
     MaterialQuad quads[4096];
 };
 layout(location = 0) out vec2 v_uv;
@@ -28,6 +31,9 @@ layout(location = 1) out vec4 v_color;
 layout(location = 2) flat out vec4 v_material;
 layout(location = 3) out float v_camera_distance;
 layout(location = 4) out vec2 v_lightmap_uv;
+#ifdef VULKANIC_GAL_SKY_FOG
+layout(location = 5) out float v_cylindrical_distance;
+#endif
 const vec2 corner[4] = vec2[4](
     vec2(0.0, 0.0),
     vec2(1.0, 0.0),
@@ -41,16 +47,24 @@ void main() {
     vec3 top = mix(quad.p0.xyz, quad.p1.xyz, c.x);
     vec3 bottom = mix(quad.p3.xyz, quad.p2.xyz, c.x);
     vec3 position = mix(top, bottom, c.y);
+#ifdef VULKANIC_GAL_SKY_FOG
+    // Frozen computes fog distances from the local bottom fan (Y=-16),
+    // before renderDarkDisc translates its ModelView by Y=12.
+    vec3 local_sky_position = position;
+    position.y += 12.0;
+#endif
     vec2 uv_top = mix(quad.uv0_uv1.xy, quad.uv0_uv1.zw, c.x);
     vec2 uv_bottom = mix(quad.uv2_uv3.zw, quad.uv2_uv3.xy, c.x);
-    // Cloud callsites provide camera-relative positions, mirroring Frozen's
-    // CloudInfo offset contract. All other material producers provide world
-    // positions. Remove translation only for the cloud-family range so a
-    // moving camera cannot apply its translation twice to cloud geometry.
+    // Sky and clouds are camera-relative; ordinary materials retain the
+    // copied world view. Each family's local draw transform remains separate.
     mat4 material_view = view;
+#ifdef VULKANIC_GAL_SKY_FOG
+    material_view[3].xyz = vec3(0.0);
+#else
     if (viewport_cutout.w > 0.0) {
         material_view[3].xyz = vec3(0.0);
     }
+#endif
     vec4 camera_position = material_view * vec4(position, 1.0);
     vec4 clip = projection * camera_position;
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
@@ -75,5 +89,10 @@ void main() {
     // after the copied camera transform, matching Frozen's
     // `fog_spherical_distance` input rather than a world-origin distance.
     v_material = vec4(viewport_cutout.z, viewport_cutout.w, 0.0, 0.0);
+#ifdef VULKANIC_GAL_SKY_FOG
+    v_camera_distance = length(local_sky_position);
+    v_cylindrical_distance = max(length(local_sky_position.xz), abs(local_sky_position.y));
+#else
     v_camera_distance = length(camera_position.xyz);
+#endif
 }

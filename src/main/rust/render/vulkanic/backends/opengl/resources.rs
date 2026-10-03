@@ -1027,6 +1027,11 @@ mod tests {
         assert_eq!(glow::FLOAT, r32.ty);
         assert_eq!(4, r32.bytes_per_pixel);
 
+        let r16 = texture_format(TextureFormat::R16Float).unwrap();
+        assert_eq!(glow::R16F as i32, r16.internal);
+        assert_eq!(glow::HALF_FLOAT, r16.ty);
+        assert_eq!(2, r16.bytes_per_pixel);
+
         let rgb16 = texture_format(TextureFormat::Rgb16Float).unwrap();
         assert_eq!(glow::RGB16F as i32, rgb16.internal);
         assert_eq!(6, rgb16.bytes_per_pixel);
@@ -1312,6 +1317,13 @@ pub(super) fn texture_format(format: TextureFormat) -> GalResult<GlTextureFormat
             external: glow::RED,
             ty: glow::FLOAT,
             bytes_per_pixel: 4,
+            integer: false,
+        }),
+        TextureFormat::R16Float => Ok(GlTextureFormat {
+            internal: glow::R16F as i32,
+            external: glow::RED,
+            ty: glow::HALF_FLOAT,
+            bytes_per_pixel: 2,
             integer: false,
         }),
         TextureFormat::Rgb16Float => Ok(GlTextureFormat {

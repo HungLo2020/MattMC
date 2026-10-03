@@ -41,6 +41,17 @@ pub(in crate::render::worldrender) fn validate_quad(
             format!("unknown world material id {}", quad.material_id),
         ));
     };
+    if quad.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC
+        && (quad.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY
+            || quad.texture_id != WORLD_MATERIAL_TEXTURE_GENERATED_WHITE
+            || quad.source_program != WORLD_MATERIAL_SOURCE_TEXTURED
+            || quad.source_uv_space != WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
+            || quad.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE)
+    {
+        return Err(GalError::invalid_argument(
+            "dark sky disc requires local generated-white sky geometry with non-writing depth tests",
+        ));
+    }
     let dynamic_particle_texture = quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES
         && quad.source_uv_space == WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
         && quad.texture_id != 0;

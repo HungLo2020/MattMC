@@ -484,6 +484,7 @@ public final class GraphicsFrameBenchmark {
 		// across that gap: discard the partial window, settle again, and retain
 		// only one contiguous workload generation for timing and allocation data.
 		measurementRestartsAfterReadinessLoss++;
+		producerWorkloadStartNanos = -1L;
 		lastMeasurementRestartCause = lastProducerWorkloadBlocker
 			+ "; changingCounters=" + staticTerrainLastChangingCounters
 			+ "; mutationSections=" + staticTerrainLastMutationSections
@@ -1068,6 +1069,9 @@ public final class GraphicsFrameBenchmark {
 			}
 		}
 		if (missing.isEmpty()) {
+			// Bound one continuous blocked interval. Startup waiting must not
+			// consume the timeout for a later chunk/LOD mutation after readiness.
+			producerWorkloadStartNanos = -1L;
 			lastProducerWorkloadBlocker = "ready";
 			return true;
 		}

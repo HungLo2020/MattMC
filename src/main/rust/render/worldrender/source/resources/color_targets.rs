@@ -35,7 +35,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         phase: TerrainSourceColorPassPhase,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         if world_generation == 0 || graph_generation == 0 {
@@ -177,7 +177,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         self.stage_source_material_color_pass_targets(
             gal,
@@ -204,7 +204,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         self.stage_source_material_color_pass_targets(
             gal,
@@ -231,7 +231,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         self.stage_source_material_color_pass_targets(
             gal,
@@ -267,7 +267,7 @@ impl WorldPrimitiveFrontend {
         depth_texture: Handle,
         depth_view: Handle,
         depth_format: TextureFormat,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         let key = SourceTerrainColorPassTargetKey {
             world_generation,
@@ -373,7 +373,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         if world_generation == 0 || graph_generation == 0 {
             return Err(GalError::invalid_argument(
@@ -678,7 +678,7 @@ impl WorldPrimitiveFrontend {
         extent: Extent3d,
         program: &LoweredHandSourceProgram,
         color_targets: &ShaderPackColorTargets,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         depth_format: TextureFormat,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         if world_generation == 0 || graph_generation == 0 {
@@ -811,7 +811,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         phase: TerrainSourceColorPassPhase,
         writer: &str,
     ) -> GalResult<&TerrainSourceColorPassTargets> {

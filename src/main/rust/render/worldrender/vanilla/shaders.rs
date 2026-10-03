@@ -34,6 +34,7 @@ pub(in crate::render::worldrender) const WORLD_MATERIAL_VERTEX_SHADER: &[u8] = i
 pub(in crate::render::worldrender) const WORLD_DH_GENERIC_BOX_VERTEX_SHADER: &[u8] = include_bytes!("glsl/dh_generic_box_vertex.glsl");
 
 pub(in crate::render::worldrender) const WORLD_MATERIAL_FRAGMENT_SHADER: &[u8] = include_bytes!("glsl/material_fragment.glsl");
+pub(in crate::render::worldrender) const WORLD_SKY_MATERIAL_FRAGMENT_SHADER: &[u8] = include_bytes!("glsl/sky_material_fragment.glsl");
 
 // Frozen's weather and particle streams use the particle vertex contract: their
 // copied UV2 is converted to a 16x16 integer lightmap coordinate and fetched

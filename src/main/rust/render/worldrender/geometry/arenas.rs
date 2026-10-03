@@ -70,15 +70,17 @@ pub(in crate::render::worldrender) const SOURCE_TERRAIN_GEOMETRY_PAGE_BYTES: u64
 /// vertex and of the u32 index size).
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_GEOMETRY_ALIGNMENT: u64 = 256;
 
-/// Multi-draw terrain addresses its instance records with `firstInstance`
-/// from stream offset 0, so each batch's instance block must start at a
-/// multiple of the 80-byte record as well as the 256-byte stream alignment.
-pub(in crate::render::worldrender) const SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT: u64 = 1280;
+/// Multi-draw terrain binds the instance stream at offset zero and addresses
+/// records with `firstInstance`. Record offsets require the 80-byte stride;
+/// only descriptor offsets (including uniforms and direct instances) need
+/// 256-byte alignment.
+pub(in crate::render::worldrender) const SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT: u64 =
+    TERRAIN_SOURCE_INSTANCE_BYTES as u64;
 
-const _: () = assert!(
-    SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT % WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64 == 0
-        && SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT % TERRAIN_SOURCE_INSTANCE_BYTES as u64 == 0
-);
+// Retain the existing conservative, descriptor-aligned per-batch capacity
+// budget. Packing changes the staged/uploaded bytes, not slot reservations;
+// concatenated reservations still cover alignment of subsequent uniforms.
+const SOURCE_TERRAIN_MULTIDRAW_RESERVATION_PADDING: u64 = 1280;
 
 /// Whole-slot instance bindings stay within Vulkan's guaranteed storage range.
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_MULTIDRAW_INSTANCE_RANGE_MAX: u64 = 128 * 1024 * 1024;
@@ -968,24 +970,43 @@ impl WorldPrimitiveFrontend {
             ));
         }
         let align = WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64;
-        let legacy_offset = 0;
-        let scalar_offset = (scalar_bytes != 0).then_some(align_up_u64(legacy_bytes, align)?);
-        let instance_base = scalar_offset
-            .unwrap_or_else(|| align_up_u64(legacy_bytes, align).expect("validated alignment"));
-        let instance_align = instance_alignment.max(align);
-        let instance_offset = if shared_uniforms.is_some() {
-            0
-        } else {
-            align_up_multiple_u64(
-                instance_base.checked_add(scalar_bytes).ok_or_else(|| {
-                    GalError::invalid_argument("source terrain frame stream scalar range overflow")
-                })?,
-                instance_align,
-            )?
+        if instance_alignment == 0 {
+            return Err(GalError::invalid_argument(
+                "source terrain instance alignment must be non-zero",
+            ));
+        }
+        // Compute absolute offsets independently: a record-aligned batch base
+        // is not necessarily aligned for its uniform descriptors. Shared
+        // uniforms need no new descriptor range, only densely packed records.
+        let layout = |cursor: u64| -> GalResult<(u64, Option<u64>, u64, u64)> {
+            let (legacy, scalar, instance_base) = match shared_uniforms {
+                Some((legacy, scalar)) => (legacy, scalar, cursor),
+                None => {
+                    let legacy = align_up_u64(cursor, align)?;
+                    let legacy_end = legacy.checked_add(legacy_bytes).ok_or_else(|| {
+                        GalError::invalid_argument("source terrain legacy uniform range overflow")
+                    })?;
+                    let scalar = if scalar_bytes != 0 {
+                        Some(align_up_u64(legacy_end, align)?)
+                    } else {
+                        None
+                    };
+                    let end = scalar
+                        .unwrap_or(legacy_end)
+                        .checked_add(scalar_bytes)
+                        .ok_or_else(|| {
+                            GalError::invalid_argument("source terrain scalar uniform range overflow")
+                        })?;
+                    (legacy, scalar, end)
+                }
+            };
+            let instance = align_up_multiple_u64(instance_base, instance_alignment)?;
+            let end = instance.checked_add(instance_bytes).ok_or_else(|| {
+                GalError::invalid_argument("source terrain frame stream range overflow")
+            })?;
+            Ok((legacy, scalar, instance, end))
         };
-        let required = instance_offset.checked_add(instance_bytes).ok_or_else(|| {
-            GalError::invalid_argument("source terrain frame stream range overflow")
-        })?;
+        let required = layout(0)?.3;
         let required_capacity =
             align_up_u64(required, align)?.max(SOURCE_TERRAIN_FRAME_STREAM_MIN_BYTES);
         if required_capacity > LOWERED_SOURCE_FRAME_STREAM_MAX_BYTES {
@@ -1127,34 +1148,21 @@ impl WorldPrimitiveFrontend {
             slot.cursor = 0;
             slot.submission = None;
         }
-        let base_offset = if same_frame {
-            align_up_multiple_u64(slot.cursor, instance_align)?
-        } else {
-            0
-        };
-        let allocation_end = base_offset.checked_add(required).ok_or_else(|| {
-            GalError::invalid_argument("source terrain frame stream allocation cursor overflow")
-        })?;
+        let (legacy_transform_offset, scalar_uniform_offset, instance_offset, allocation_end) =
+            layout(slot.cursor)?;
         if allocation_end > slot.capacity {
             return Err(GalError::invalid_argument(format!(
-                "source terrain frame stream allocation exceeds its bounded slot capacity (frame={frame_id} cursor={} required={required} capacity={})",
+                "source terrain frame stream allocation exceeds its bounded slot capacity (frame={frame_id} cursor={} end={allocation_end} capacity={})",
                 slot.cursor, slot.capacity,
             )));
         }
         slot.cursor = allocation_end;
-        let (legacy_transform_offset, scalar_uniform_offset) = match shared_uniforms {
-            Some(shared) => shared,
-            None => (
-                base_offset + legacy_offset,
-                scalar_offset.map(|offset| base_offset + offset),
-            ),
-        };
         Ok(SourceTerrainFrameStreamAllocation {
             buffer: slot.buffer,
             epoch: slot.epoch,
             legacy_transform_offset,
             scalar_uniform_offset,
-            instance_offset: base_offset + instance_offset,
+            instance_offset,
         })
     }
 
@@ -1193,9 +1201,9 @@ impl WorldPrimitiveFrontend {
         program: &LoweredTerrainSourceProgram,
         instance_count: u64,
     ) -> GalResult<u64> {
-        // Multi-draw instance blocks may start up to one alignment unit later.
+        // Keep the conservative reservation independent of record packing.
         Self::source_frame_stream_payload_bytes(&program.execution_interface, instance_count)?
-            .checked_add(SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT)
+            .checked_add(SOURCE_TERRAIN_MULTIDRAW_RESERVATION_PADDING)
             .ok_or_else(|| GalError::invalid_argument("source terrain frame stream payload overflows"))
     }
 
@@ -1540,20 +1548,79 @@ impl WorldPrimitiveFrontend {
         identities: &[MeshBatchInstanceKey],
         terrain_only: bool,
     ) -> GalResult<Arc<Vec<MeshBatch>>> {
-        let camera_dependent = frame.mesh_instances.iter().any(|instance| {
-            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
-                && selection.includes(instance)
-        });
-        if camera_dependent {
-            return Ok(Arc::new(mesh_batches_filtered(
+        self.cached_mesh_batch_plan_selected(
+            frame,
+            color_format,
+            raster_y_direction,
+            g_buffer,
+            selection,
+            identities,
+            terrain_only,
+            None,
+        )
+    }
+
+    pub(in crate::render::worldrender) fn cached_mesh_batch_plan_selected(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+        color_format: ColorFormat,
+        raster_y_direction: RasterYDirection,
+        g_buffer: bool,
+        selection: MeshBatchSelection,
+        identities: &[MeshBatchInstanceKey],
+        terrain_only: bool,
+        indices: Option<&[usize]>,
+    ) -> GalResult<Arc<Vec<MeshBatch>>> {
+        if let Some(indices) = indices {
+            if indices.len() != identities.len()
+                || indices
+                    .last()
+                    .is_some_and(|index| *index >= frame.mesh_instances.len())
+                || indices.windows(2).any(|pair| pair[0] >= pair[1])
+            {
+                return Err(GalError::invalid_argument(
+                    "selected batch key requires ordered, in-bounds instance positions",
+                ));
+            }
+        }
+        let build = |frontend: &Self| match indices {
+            Some(indices) => mesh_batches_filtered_indices(
                 frame,
-                self,
+                frontend,
                 color_format,
                 raster_y_direction,
                 g_buffer,
                 selection,
                 terrain_only,
-            )?));
+                indices,
+            ),
+            None => mesh_batches_filtered(
+                frame,
+                frontend,
+                color_format,
+                raster_y_direction,
+                g_buffer,
+                selection,
+                terrain_only,
+            ),
+        };
+        let depends_on_camera = |instance: &WorldMeshInstanceRequest| {
+            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
+                && selection.includes(instance)
+        };
+        let camera_dependent = match indices {
+            Some(indices) => indices
+                .iter()
+                .any(|&index| depends_on_camera(&frame.mesh_instances[index])),
+            None => frame.mesh_instances.iter().any(depends_on_camera),
+        };
+        // Repeated meshes retain build-then-filter ordering. Culled instances
+        // can affect that ordering, so the selected-only identity is not a
+        // sufficient cache key for this uncommon path.
+        let repeated_mesh = indices.is_some()
+            && mesh_batch_selection_has_repeated_mesh(frame, selection, terrain_only);
+        if camera_dependent || repeated_mesh {
+            return Ok(Arc::new(build(self)?));
         }
         if let Some(entry) = self.mesh_batch_plan_cache.iter().find(|entry| {
             entry.key.color_format == color_format
@@ -1563,18 +1630,11 @@ impl WorldPrimitiveFrontend {
                 && entry.key.selection == selection
                 && entry.key.terrain_only == terrain_only
                 && entry.key.instances == identities
+                && entry.key.instance_indices.as_deref() == indices
         }) {
             return Ok(Arc::clone(&entry.batches));
         }
-        let batches = Arc::new(mesh_batches_filtered(
-            frame,
-            self,
-            color_format,
-            raster_y_direction,
-            g_buffer,
-            selection,
-            terrain_only,
-        )?);
+        let batches = Arc::new(build(self)?);
         const MAX_MESH_BATCH_PLAN_CACHE: usize = 4;
         if self.mesh_batch_plan_cache.len() >= MAX_MESH_BATCH_PLAN_CACHE {
             self.mesh_batch_plan_cache.remove(0);
@@ -1588,9 +1648,12 @@ impl WorldPrimitiveFrontend {
                 selection,
                 terrain_only,
                 instances: identities.to_vec(),
+                instance_indices: indices.map(<[usize]>::to_vec),
             },
             batches: Arc::clone(&batches),
         });
         Ok(batches)
     }
+
+
 }

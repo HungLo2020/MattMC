@@ -404,6 +404,8 @@ impl WorldPrimitiveFrontend {
                 .winding;
             let semantics =
                 program.resolve_draw_semantics(&mesh.entity_identity, entity_color_argb)?;
+            // Enabled gameplay always needs the derived frame (celestial,
+            // smoothed light, custom expressions), even without atlasSize.
             // Complementary's entity program shares the pack-global
             // `atlasSize` uniform with terrain even though this writer binds a
             // draw-local entity texture for `tex`.  Supply that global from
@@ -411,7 +413,8 @@ impl WorldPrimitiveFrontend {
             // source actually declares it; entity-local material ownership
             // remains separate below.
             let mut uniforms =
-                if render_stage.is_some()
+                if frame.shader_environment.enabled
+                    || render_stage.is_some()
                     || glint
                     || program
                     .scalar_uniform_requirements
@@ -753,8 +756,9 @@ impl WorldPrimitiveFrontend {
             // The owned shader-environment builder resolves the selected
             // pack's held-item IDs and held-light policy from copied gameplay
             // inputs. Use it whenever the selected source names any of those
-            // semantics; tiny conformance sources that name none stay usable
-            // without inventing a terrain atlas dependency.
+            // semantics. Enabled gameplay also uses derived frame semantics;
+            // disabled conformance frames that name none stay usable without
+            // inventing a terrain atlas dependency.
             let requires_owned_hand_uniforms = program
                 .scalar_uniform_requirements
                 .fields()
@@ -772,7 +776,7 @@ impl WorldPrimitiveFrontend {
                         )
                     )
                 });
-            let mut uniforms = if requires_owned_hand_uniforms || glint {
+            let mut uniforms = if frame.shader_environment.enabled || requires_owned_hand_uniforms || glint {
                 self.source_uniform_frame_for_owned_resources(frame)?
             } else {
                 frame.source_uniform_frame()?

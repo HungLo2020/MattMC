@@ -151,7 +151,7 @@ use crate::render::shaderpack::runtime::{
 };
 use crate::render::shaderpack::source::{ShaderPackSourceStore, ShaderPackSourceUpdate};
 use crate::render::shaderpack::resources::color_targets::{
-    ShaderPackColorBootstrapClearValues, ShaderPackColorTargets,
+    ShaderPackColorClearValues, ShaderPackColorTargets,
 };
 use crate::render::shaderpack::vanilla::post_effect::executor::{
     lower_post_effect_fragment_source, lower_post_effect_vertex_source_for_pass,
@@ -671,8 +671,10 @@ pub struct WorldPrimitiveFrontend {
     pending_lod_direct_composition_written: bool,
     lod_ssao_initialized: bool,
     pending_lod_ssao_written: bool,
-    lod_vanilla_snapshot_initialized: bool,
-    pending_lod_vanilla_snapshot_written: bool,
+    /// Accepted submissions established ShaderRead on both snapshots. This
+    /// tracks image usage, including no-copy frames, rather than pixel validity.
+    lod_vanilla_sample_state_initialized: bool,
+    pending_lod_vanilla_sample_state_established: bool,
     pending_terrain_fabulous_handoff: bool,
     pending_terrain_external_item_entity_written: bool,
     g_buffer_depth_history: GBufferDepthHistoryState,

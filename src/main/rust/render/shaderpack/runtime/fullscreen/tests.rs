@@ -1,4 +1,10 @@
 use crate::render::shaderpack::runtime::fullscreen::*;
+mod legacy_transform;
+mod sky_transform;
+mod sky_lightmap;
+mod horizon_transform;
+mod stage_colors;
+mod coordinate_domains;
 use crate::render::vulkanic::test_support::{presentation_capabilities, vulkan_capabilities};
 
 use crate::render::vulkanic::commands::{
@@ -208,7 +214,7 @@ fn rejects_feedback_execution_before_a_confirmed_source_history_frame() {
                 scalar_uniforms: Vec::new(),
                 texture_transform_before: TextureUsageState::Undefined,
                 scalar_uniform_before: None,
-                clear_values: ShaderPackColorBootstrapClearValues {
+                clear_values: ShaderPackColorClearValues {
                     fog_color: crate::render::vulkanic::commands::ClearColor {
                         r: 0.0,
                         g: 0.0,
@@ -784,7 +790,7 @@ fn nonclearing_source_output_records_dont_care_on_first_write() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -851,7 +857,7 @@ fn clearing_source_output_clears_again_after_a_prior_frame() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::ShaderRead,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -913,7 +919,7 @@ fn clearing_primary_source_output_uses_the_semantic_fog_clear() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues { fog_color },
+            clear_values: ShaderPackColorClearValues { fog_color },
             color_attachment_before: vec![TextureUsageState::Undefined],
             clear_targets_this_pass: None,
         },
@@ -962,7 +968,7 @@ fn source_sky_disc_records_its_owned_twenty_four_vertex_geometry() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -1019,7 +1025,7 @@ fn source_celestial_quad_records_owned_sky_box_capacity_geometry() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,

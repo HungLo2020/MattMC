@@ -107,15 +107,8 @@ impl LoweredTerrainSourceProgram {
                 "shadow cutout alpha threshold must be finite and in [0, 1]",
             ));
         }
-        let fragment_source = self
-            .fragment
-            .source
-            .replacen("void main()", "void vulkanic_shadow_cutout_main()", 1);
-        if fragment_source == self.fragment.source {
-            return Err(GalError::unsupported_feature(
-                "shadow cutout source has no main function for the alpha test",
-            ));
-        }
+        let fragment_source = crate::render::shaderpack::lowering::rename_glsl_main(
+            &self.fragment.source, "vulkanic_shadow_cutout_main")?;
         let fragment_source = format!(
             "{fragment_source}\nvoid main() {{\n    vulkanic_shadow_cutout_main();\n    if (!(out_shadow_color.a > {alpha_cutoff:.8})) discard;\n}}\n"
         );
@@ -731,6 +724,15 @@ pub fn prepare_lowered_terrain_source_program(
                 })
         })
         .collect::<GalResult<Vec<_>>>()?;
+    let fragment_source = match contract.normal_alpha_test.cutoff(material_class) {
+        None => lowered.fragment().source().to_owned(),
+        Some(cutoff) => {
+            let renamed = crate::render::shaderpack::lowering::rename_glsl_main(
+                lowered.fragment().source(), "vulkanic_source_terrain_main")?;
+            format!("{renamed}\nvoid main() {{\n    vulkanic_source_terrain_main();\n    if (!({}.a > {cutoff:?})) discard;\n}}\n",
+                crate::render::shaderpack::lowering::TerrainFragmentOutput::LitColor.semantic_name())
+        }
+    };
     let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
             "vulkanic:shader-pack/{}/terrain_{}_source_gen{}{}",
@@ -750,7 +752,7 @@ pub fn prepare_lowered_terrain_source_program(
         fragment: ShaderStageSource {
             stage: ShaderStageKind::Fragment,
             label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
-            source: lowered.fragment().source().to_string(),
+            source: fragment_source,
             entry_point: "main".to_string(),
         },
         execution_interface,
@@ -820,6 +822,17 @@ pub fn prepare_lowered_translucent_terrain_source_program(
                 })
         })
         .collect::<GalResult<Vec<_>>>()?;
+    let fragment_source = match translucent_raster_state.alpha_test {
+        None => lowered.fragment().source().to_owned(),
+        Some(alpha_test) => {
+            let renamed = crate::render::shaderpack::lowering::rename_glsl_main(&lowered.fragment().source(), "vulkanic_source_translucent_main")?;
+            format!(
+                "{renamed}\nvoid main() {{\n    vulkanic_source_translucent_main();\n    if (!({}.a > {:?})) discard;\n}}\n",
+                crate::render::shaderpack::lowering::TranslucentTerrainFragmentOutput::LitColor.semantic_name(),
+                alpha_test.greater_than(),
+            )
+        }
+    };
     let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
             "vulkanic:shader-pack/{}/terrain_translucent_source_gen{}{}",
@@ -844,7 +857,7 @@ pub fn prepare_lowered_translucent_terrain_source_program(
                 "{}:lowered-translucent-fragment",
                 lowered.fragment().entry_path()
             ),
-            source: lowered.fragment().source().to_string(),
+            source: fragment_source,
             entry_point: "main".to_string(),
         },
         execution_interface,

@@ -592,9 +592,11 @@ impl ShaderPackRuntimeExecutor {
                     ShadowFragmentOutput::ShadowColor,
                     ShadowFragmentOutput::LightShaftColor,
                 ];
-                if lowered.fragment().outputs() != expected_outputs {
+                if lowered.fragment().outputs() != expected_outputs
+                    && lowered.fragment().outputs() != [ShadowFragmentOutput::ShadowColor]
+                {
                     return Err(GalError::unsupported_feature(
-                        "selected terrain source shadow output contract is not shadow-color plus light-shaft-color",
+                        "selected terrain source shadow output contract requires primary shadow color with optional secondary color",
                     ));
                 }
                 prepare_lowered_shadow_source_program(pack_name, *generation, lowered, bindings)

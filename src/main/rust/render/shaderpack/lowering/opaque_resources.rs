@@ -58,6 +58,8 @@ pub fn derive_terrain_source_opaque_resource_contract(
 }
 
 pub(super) fn collect_opaque_resources(source: &str) -> GalResult<Vec<SourceOpaqueResourceDeclaration>> {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
+    let source = stripped.as_str();
     let source_without_declarations = strip_opaque_resource_declarations(source)?;
     let referenced = glsl_identifiers(&source_without_declarations);
     let mut resources = Vec::new();
@@ -76,9 +78,11 @@ pub(super) fn collect_opaque_resources(source: &str) -> GalResult<Vec<SourceOpaq
 /// it. Active preprocessor definitions remain in the source and therefore
 /// count as uses conservatively, exactly as scalar-uniform collection does.
 pub(super) fn strip_opaque_resource_declarations(source: &str) -> GalResult<String> {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
     let mut output = String::with_capacity(source.len());
-    for line in source.lines() {
-        if parse_opaque_resource_declaration(line.trim())?.is_some() {
+    for (line, semantic_line) in source.lines().zip(stripped.lines()) {
+        if parse_opaque_resource_declaration(semantic_line.trim())?.is_some() {
+            append_rewritten_declaration_line(&mut output, line, semantic_line, "");
             continue;
         }
         output.push_str(line);
@@ -159,9 +163,10 @@ pub(super) fn apply_opaque_resource_bindings(
     source: &str,
     contract: &TerrainSourceOpaqueResourceContract,
 ) -> GalResult<String> {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
     let mut output = String::with_capacity(source.len());
-    for line in source.lines() {
-        let Some(declaration) = parse_opaque_resource_declaration(line.trim())? else {
+    for (line, semantic_line) in source.lines().zip(stripped.lines()) {
+        let Some(declaration) = parse_opaque_resource_declaration(semantic_line.trim())? else {
             output.push_str(line);
             output.push('\n');
             continue;
@@ -172,17 +177,18 @@ pub(super) fn apply_opaque_resource_bindings(
                 declaration.name
             )));
         };
-        if declaration.qualifiers.is_empty() {
-            output.push_str(&format!(
-                "layout(set = 1, binding = {}) uniform {} {};\n",
+        let replacement = if declaration.qualifiers.is_empty() {
+            format!(
+                "layout(set = 1, binding = {}) uniform {} {};",
                 resource.binding, resource.type_name, resource.name
-            ));
+            )
         } else {
-            output.push_str(&format!(
-                "layout(set = 1, binding = {}) {} uniform {} {};\n",
+            format!(
+                "layout(set = 1, binding = {}) {} uniform {} {};",
                 resource.binding, resource.qualifiers, resource.type_name, resource.name
-            ));
-        }
+            )
+        };
+        append_rewritten_declaration_line(&mut output, line, semantic_line, &replacement);
     }
     Ok(output)
 }

@@ -657,6 +657,7 @@ fn entity_outline_mask_gpu_preparation_owns_stream_and_resource_sets() {
 
 fn test_mesh_instance(mesh_key: u64) -> WorldMeshInstanceRequest {
     WorldMeshInstanceRequest {
+        entity_culling: None,
         model_submission_order: None,
         item_foil: None,
         decal_foil: None,

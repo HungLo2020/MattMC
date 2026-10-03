@@ -111,6 +111,12 @@ fn semantic_particle_record() -> FfiWorldParticleQuadRequest {
 
 fn semantic_orb_instance() -> FfiWorldExperienceOrbInstanceRecord {
     FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
         byte_size: size_of::<FfiWorldExperienceOrbInstanceRecord>() as u32,
         mesh_index: 0,
         mesh_key: 0x0b01,
@@ -136,16 +142,37 @@ fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
     let mut orbs = [
         semantic_orb_instance(),
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0x0b02,
             mesh_index: 1,
             ..semantic_orb_instance()
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0x0b03,
             mesh_index: 1,
             ..semantic_orb_instance()
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0x0b04,
             mesh_index: 2,
             ..semantic_orb_instance()
@@ -178,7 +205,7 @@ fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
     assert_eq!(instance.transform[12], 1.25);
     assert_eq!(orbs[0].entity_transform[12], 999.0);
     let layout = crate::render::bridge::layout::layout_for_struct(110).unwrap();
-    assert_eq!(layout.byte_size, 112);
+    assert_eq!(layout.byte_size, 248);
     assert_eq!(&layout.field_offsets[..8], &[0, 4, 8, 16, 24, 88, 104, 108]);
     let layout = crate::render::bridge::layout::layout_for_struct(53).unwrap();
     assert_eq!(
@@ -192,26 +219,68 @@ fn experience_orb_frame_transport_rejects_bad_placement_order_and_bounds() {
     let good = semantic_orb_instance();
     for bad in [
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             byte_size: 0,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_index: 1,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             reserved0: 1,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             camera_orientation: [0.0; 4],
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             entity_transform: [f32::NAN; 16],
             ..good
         },
@@ -228,6 +297,13 @@ fn experience_orb_frame_transport_rejects_bad_placement_order_and_bounds() {
     let meshes = [mesh_instance()];
     let descending = [
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_index: 1,
             ..good
         },
@@ -2006,6 +2082,7 @@ fn whole_frame_request(
             eye_submersion: 0,
             screen_brightness: 0.0,
             far_plane: 0.0,
+            configured_shadow_distance_chunks: 0,
             relative_eye_x: 0.0,
             relative_eye_y: 0.0,
             relative_eye_z: 0.0,
@@ -2691,7 +2768,13 @@ fn mesh_asset<'a>(
 }
 
 fn mesh_instance() -> FfiWorldMeshInstanceRecord {
+
     FfiWorldMeshInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0; 6],
+        entity_culling_leash_bounds: [0.0; 6],
+        entity_culling_camera: [0.0;3],
         model_submission_order_mode: 0,
         model_submission_order: 0,
         packed_light: 0,
@@ -2726,6 +2809,56 @@ fn mesh_instance() -> FfiWorldMeshInstanceRecord {
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
     }
+}
+
+#[test]
+fn entity_shadow_culling_bridge_preserves_full_precision_and_rejects_bad_domains() {
+    use crate::render::worldrender::frame::entity_culling::*;
+    let mut input = mesh_instance();
+    input.stratum = WORLD_STRATUM_ENTITY_MESH;
+    input.entity_culling_mode = 1;
+    input.entity_culling_flags = ENTITY_CULL_ELIGIBLE | ENTITY_CULL_LEASH_HOLDER;
+    input.entity_culling_bounds = [40.0+1e-10,-0.5,-0.5,41.0,0.5,0.5];
+    input.entity_culling_leash_bounds = [-1.0;6];
+    let request = whole_frame_request_with_mesh_instances(std::slice::from_ref(&input));
+    let (_,_,frame,_) = unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities()).unwrap()};
+    let copied = frame.mesh_instances[0].entity_culling.unwrap();
+    assert_eq!(copied.bounds,input.entity_culling_bounds);
+    assert_eq!(copied.leash_holder_bounds,Some(input.entity_culling_leash_bounds));
+    for bad in 0..7 {
+        let mut invalid = input;
+        match bad {
+            0 => invalid.entity_culling_bounds[0] = f64::NAN,
+            1 => invalid.entity_culling_bounds[0] = 42.0,
+            2 => invalid.entity_culling_flags = 64,
+            3 => invalid.entity_culling_flags = ENTITY_CULL_PLAYER_ONLY_VARIANT,
+            4 => invalid.entity_culling_mode = 0,
+            5 => invalid.block_entity_id = 1,
+            6 => invalid.stratum = WORLD_STRATUM_TERRAIN,
+            _ => unreachable!(),
+        }
+        let request = whole_frame_request_with_mesh_instances(std::slice::from_ref(&invalid));
+        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+    }
+}
+
+#[test]
+fn entity_shadow_culling_orb_transport_keeps_shadow_role_outside_camera_domain() {
+    use crate::render::worldrender::frame::entity_culling::*;
+    let mut orb = semantic_orb_instance();
+    orb.entity_culling_mode = 1;
+    orb.entity_culling_flags = ENTITY_CULL_ELIGIBLE;
+    orb.entity_culling_bounds = [0.0;6];
+    orb.shadow_only = 1;
+    let merged = merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).unwrap();
+    assert_eq!(merged[0].stratum,crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER);
+    assert_eq!(merged[0].entity_culling.unwrap().flags,ENTITY_CULL_ELIGIBLE);
+    orb.shadow_only = 2;
+    assert!(merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).is_err());
+    orb.shadow_only = 1;
+    orb.entity_culling_mode = 0;
+    orb.entity_culling_flags = 0;
+    assert!(merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).is_err());
 }
 
 #[test]
@@ -3425,6 +3558,12 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         translucent_hand_mask: 0,
     };
     let mut hands = vec![FfiWorldMeshInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0; 6],
+        entity_culling_leash_bounds: [0.0; 6],
+        entity_culling_camera: [0.0;3],
+
         model_submission_order_mode: 0,
         model_submission_order: 0,
         packed_light: 0,
@@ -3633,7 +3772,7 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
         );
     }
     let layout = crate::render::bridge::layout::layout_for_struct(69).unwrap();
-    assert_eq!(layout.field_count, 31);
+    assert_eq!(layout.field_count, 36);
     assert_eq!(
         layout.field_offsets[24],
         std::mem::offset_of!(FfiWorldMeshInstanceRecord, decal_foil_mode) as u32
@@ -4082,6 +4221,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
         eye_submersion: 1,
         screen_brightness: 0.5,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         relative_eye_x: 0.25,
         relative_eye_y: -0.5,
         relative_eye_z: 0.75,
@@ -4160,6 +4300,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
             eye_submersion: 1,
             screen_brightness: 0.5,
             far_plane: 192.0,
+            configured_shadow_distance_chunks: 32,
             distant_horizons_render_distance: 256,
             relative_eye_position: [0.25, -0.5, 0.75],
             sky_color: [0.2, 0.4, 0.6],
@@ -4201,6 +4342,14 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
         }
     );
 
+    for distance in [0, 2, 32, -1, i32::MIN, i32::MAX] {
+        request.shader_environment_frame.configured_shadow_distance_chunks = distance;
+        let (_, _, decoded, _) = unsafe {
+            decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap()
+        };
+        assert_eq!(decoded.shader_environment.configured_shadow_distance_chunks, distance);
+    }
+    request.shader_environment_frame.configured_shadow_distance_chunks = 32;
     request.shader_environment_frame.lightmap_generation = 0;
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("enabled lightmap must require a nonzero generation");

@@ -99,6 +99,77 @@ impl WorldPrimitiveFrontend {
         }
     }
 
+    /// Initializes source prerequisites without writing the acquired image.
+    /// The ordinary graph owns depth history, lightmaps and voxel uploads;
+    /// prepare those through an offscreen GAL target, then rebuild admission
+    /// for the same semantic frame and the actual final target. Only the
+    /// subsequent selected-source submission may present this world frame.
+    pub(crate) fn prepare_runtime_source_before_presentation(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: &mut WorldPrimitiveFrame,
+    ) -> GalResult<()> {
+        if self.runtime_source_execution_is_armed()
+            || !self.runtime_source_preparation_requested()
+            || !frame.background.enabled
+            || frame.voxel_volume.world_generation == 0
+            || frame_target.kind() != Some(crate::render::vulkanic::handles::HandleKind::FrameTarget)
+        {
+            return Ok(());
+        }
+        let owner = passes::oriented_target::OrientedWorldTarget::create(
+            gal,
+            "minecraft.source.entry-preparation",
+            passes::oriented_target::WorldTargetDesc {
+                extent: gal.pass_target_extent(frame_target)?,
+                color_format: gal.pass_target_color_format(frame_target)?,
+                raster_y_direction: RasterYDirection::Up,
+            },
+        )?;
+        let result = (|| {
+            self.submit_whole_frame_with_initial_ops(
+                gal, generation, owner.target, frame.clone(), Vec::new(), None,
+                vec![CommandOp::Barrier(texture_barrier(
+                    owner.color_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                ))],
+                true,
+            )?;
+            // Confirmation makes the newly written history available. The
+            // pre-submit snapshot still described the uninitialized history;
+            // rebuild it before testing this frame's source admission.
+            if self.shader_runtime.is_some() && self.shader_pack_sources.active().is_some() {
+                self.ensure_candidate_source_assets_for_frame(
+                    gal, frame.voxel_volume.world_generation, frame.frame_id,
+                    false, source_frame_includes_distant_horizons(frame),
+                )?;
+                // Rejected contracts/assets deliberately leave no snapshot and
+                // retain their admission error. They cannot participate in
+                // final-target correlation or confirmed-depth merging. Keep the
+                // source unarmed instead of turning that rejection into a
+                // backend failure during world entry.
+                if self.candidate_source_resource_snapshot.is_some() {
+                    self.prepare_runtime_source_snapshot(gal, generation, frame_target, frame)?;
+                    self.arm_runtime_source_execution_if_ready(frame);
+                } else {
+                    self.source_execution_armed = false;
+                }
+            }
+            Ok(())
+        })();
+        self.clear_frame_passes_for_targets(gal, &[owner.target]);
+        let mut cleanup = Ok(());
+        for handle in owner.handles_in_destroy_order() {
+            if let Err(error) = gal.destroy(handle) {
+                cleanup = Err(error);
+            }
+        }
+        result.and(cleanup)
+    }
+
     /// Stages the exact current-frame source snapshot before the complete
     /// source executor records its one real submission. This intentionally
     /// uses the ordinary Rust frontend only as a private semantic/resource
@@ -216,18 +287,11 @@ impl WorldPrimitiveFrontend {
                 },
                 source_frame_includes_distant_horizons(frame),
             )?;
-            let missing_roles = {
-                let runtime = self.shader_runtime.as_ref().expect(
-                    "source runtime remains installed while validating merged DH resources",
-                );
-                runtime.candidate_source_missing_resource_roles_for_frame(
-                    self.candidate_source_resource_snapshot
-                        .as_ref()
-                        .map(|snapshot| &snapshot.resources),
-                    source_frame_includes_distant_horizons(frame),
-                )
-            };
-            self.set_candidate_source_missing_resource_roles(missing_roles);
+            // Color preparation just checked the merged resources together
+            // with the complete graph's declared outputs. Those outputs are
+            // initialized by its bootstrap/writers, even when no terrain
+            // draws exist yet. Rechecking without declared outputs would
+            // incorrectly require a previous terrain frame to supply them.
 
             // Rebuilding the exact-frame source resource snapshot above
             // deliberately clears its final-target correlation. Reattach the
@@ -793,14 +857,13 @@ impl WorldPrimitiveFrontend {
             &mesh_identities,
             true,
         );
-        let shadow_batches = self.cached_mesh_batch_plan(
-            &frame,
-            color_format,
-            RasterYDirection::Up,
-            true,
-            MeshBatchSelection::ShadowOnly,
-            &mesh_identities,
-            true,
+        let shadow_indices = self.source_shadow_terrain_instance_indices(
+            &frame, programs.opaque.shader_pack_generation,
+        )?;
+        let shadow_identities = shadow_indices.iter().map(|&index| mesh_identities[index].clone()).collect::<Vec<_>>();
+        let shadow_batches = self.cached_mesh_batch_plan_selected(
+            &frame, color_format, RasterYDirection::Up, true,
+            MeshBatchSelection::ShadowOnly, &shadow_identities, true, Some(&shadow_indices),
         );
         self.mesh_batch_identity_scratch = mesh_identities;
         let (static_batches, shadow_batches) = (static_batches?, shadow_batches?);
@@ -847,7 +910,7 @@ impl WorldPrimitiveFrontend {
             source_shadow_targets,
             source_main_depth,
             frame_target,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: background_clear_color(&frame.background),
             },
         )?;
@@ -1102,6 +1165,12 @@ impl WorldPrimitiveFrontend {
             self.mesh_asset_generation,
             gal.capabilities().shader_conventions,
         )?;
+        let source_dh_depth_coverage = plan.distant_horizons.as_ref().map(|distant_horizons| {
+            (
+                source_main_depth.targets.before_translucency_texture,
+                distant_horizons.depth_targets.distant_depth_before_translucency_texture,
+            )
+        });
         if gameplay_attachment_capture.is_some() {
             for observation in &self.latest_atlas_animation_observations {
                 eprintln!("{observation}");
@@ -1535,6 +1604,9 @@ impl WorldPrimitiveFrontend {
                         "final_output",
                     )?;
                     capture.append_ops(gal, operations, self.g_buffer_resources.as_ref(), None)?;
+                    if let Some((main_depth, dh_depth)) = source_dh_depth_coverage {
+                        capture.append_source_dh_depth_coverage(gal, operations, main_depth, dh_depth)?;
+                    }
                 }
                 Ok(())
             },
@@ -1546,6 +1618,9 @@ impl WorldPrimitiveFrontend {
             Ok(submission) => submission,
             Err(error) => {
                 self.discard_unrecorded_source_frame(gal, frame.frame_id);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 return Err(error);
             }
         };
@@ -1564,6 +1639,9 @@ impl WorldPrimitiveFrontend {
                 &mut operations,
             ) {
                 source_submission.discard(self, gal);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 return Err(error);
             }
         }
@@ -1690,6 +1768,9 @@ impl WorldPrimitiveFrontend {
             .any(|operation| matches!(operation, CommandOp::Present { .. }))
         {
             source_submission.discard(self, gal);
+            if let Some(capture) = gameplay_attachment_capture.take() {
+                capture.discard(gal);
+            }
             return Err(GalError::invalid_argument(
                 "complete source execution rejects embedded presentation; the frame coordinator owns the sole present",
             ));
@@ -1705,6 +1786,9 @@ impl WorldPrimitiveFrontend {
             .count() as u64;
         if source_draw_ops.saturating_add(source_draw_indexed_ops) == 0 {
             source_submission.discard(self, gal);
+            if let Some(capture) = gameplay_attachment_capture.take() {
+                capture.discard(gal);
+            }
             return Err(GalError::invalid_argument(
                 "complete source execution recorded no terrain or fullscreen draws",
             ));
@@ -1774,6 +1858,9 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 source_submission.discard(self, gal);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 if let Some(runtime) = self.shader_runtime.as_mut() {
                     runtime.discard_private_terrain_occupancy_submission();
                 }
@@ -1792,6 +1879,9 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 source_submission.discard(self, gal);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 if let Some(runtime) = self.shader_runtime.as_mut() {
                     runtime.discard_private_terrain_occupancy_submission();
                 }

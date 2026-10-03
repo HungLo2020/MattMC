@@ -140,7 +140,11 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 		EntityRenderer<? super E, ?> entityRenderer = this.getRenderer(entity);
 
 		try {
-			return entityRenderer.createRenderState(entity, f);
+			EntityRenderState state = entityRenderer.createRenderState(entity, f);
+			if (this.camera != null && net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) {
+				state.rustEntityCulling = entityRenderer.copyEntityCulling(entity,this.camera.getPosition());
+			}
+			return state;
 		} catch (Throwable var8) {
 			CrashReport crashReport = CrashReport.forThrowable(var8, "Extracting render state for an entity in world");
 			CrashReportCategory crashReportCategory = crashReport.addCategory("Entity being extracted");
@@ -170,11 +174,16 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 		S entityRenderState, CameraRenderState cameraRenderState, double d, double e, double f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector
 	) {
 		boolean previous = SEMANTIC_SUBMISSION.get();
+		var culling = entityRenderState.rustEntityCulling;
+		var camera = cameraRenderState.pos;
+		net.vulkanic.bridge.VulkanicGalBridge.beginSemanticEntityCulling(
+			culling == null ? null : culling.withCamera(camera.x,camera.y,camera.z));
 		SEMANTIC_SUBMISSION.set(true);
 		try {
 			this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, false);
 		} finally {
-			SEMANTIC_SUBMISSION.set(previous);
+            try {net.vulkanic.bridge.VulkanicGalBridge.endSemanticEntityCulling();}
+            finally {SEMANTIC_SUBMISSION.set(previous);}
 		}
 	}
 

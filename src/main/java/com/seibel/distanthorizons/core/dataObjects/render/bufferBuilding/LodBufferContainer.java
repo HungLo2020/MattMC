@@ -41,6 +41,7 @@ public class LodBufferContainer implements AutoCloseable
 	 * retire that asset from {@link #close()} at the normal DH boundary. */
 	private boolean rustSemanticBuffersPublished = false;
 	private long rustSemanticColumnGeneration = 0L;
+	private net.vulkanic.world.DistantHorizonsSemanticCollector.SemanticColumnLease rustSemanticColumnLease;
 	
 	
 	private CompletableFuture<LodBufferContainer> uploadFuture = null;
@@ -102,11 +103,12 @@ public class LodBufferContainer implements AutoCloseable
 			LodQuadBuilder.SemanticVertexBufferBuild transparent = builder.makeTransparentRustSemanticBuffers();
 			LodQuadBuilder.SemanticVertexBufferBuild transparentUp = builder.makeTransparentUpRustSemanticBuffers();
 			LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp = builder.makeTransparentWaterUpRustSemanticBuffers();
-			this.rustSemanticColumnGeneration = net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
+			this.rustSemanticColumnLease = net.vulkanic.world.DistantHorizonsSemanticCollector.recordOwnedRustSemanticBuiltColumn(
 				this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(),
 				LodQuadBuilder.semanticQuadCoverage(opaque, transparent, transparentUp, transparentWaterUp),
 				opaque, transparent, transparentUp, transparentWaterUp
 			);
+			this.rustSemanticColumnGeneration = this.rustSemanticColumnLease.generation();
 			this.rustSemanticBuffersPublished = true;
 			// This route intentionally owns no Java GL VBO and schedules no Java GL
 			// upload. The immutable semantic packets now belong to the collector.
@@ -168,26 +170,23 @@ public class LodBufferContainer implements AutoCloseable
 	 * upload, or render state). 
 	 */
 	@Override
-	public void close()
+	public synchronized void close()
 	{
 		this.buffersUploaded = false;
 		boolean ownedRustSemanticLifecycle = this.rustSemanticBuffersPublished;
 		this.rustSemanticBuffersPublished = false;
 		// Keep the copied semantic asset lifecycle aligned with the legacy LOD
 		// container. This touches no native renderer object or GL state.
-		if (this.rustSemanticColumnGeneration != 0L)
+		if (this.rustSemanticColumnLease != null)
 		{
-			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(
-				this.pos, this.rustSemanticColumnGeneration
-			);
+			this.rustSemanticColumnLease.close();
 			this.rustSemanticColumnGeneration = 0L;
 		}
 		else if (!ownedRustSemanticLifecycle)
 		{
 			// Legacy observation snapshots do not retain their generation on this
 			// container and therefore still retire by identity. A Rust semantic
-			// empty build owns generation zero: it already removed the prior payload
-			// while it was current and must never erase a later non-empty generation
+			// empty build owns generation zero and must never erase a later non-empty generation
 			// when this old lifecycle marker closes asynchronously.
 			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
 		}

@@ -2157,10 +2157,7 @@ pub(crate) fn source_textured_material_blend(material_mode: u32) -> GalResult<Bl
 /// fixed-function alpha-test state.
 /// `SkyRenderer.renderDarkDisc` as copied by the Java sky producer.
 pub(crate) fn is_vanilla_dark_disc_quad(quad: &WorldMaterialQuadRequest) -> bool {
-    quad.material_id == WORLD_MATERIAL_ID_OPAQUE_TEXTURED
-        && quad.texture_id == WORLD_MATERIAL_TEXTURE_GENERATED_WHITE
-        && quad.depth_policy == WORLD_DEPTH_POLICY_DISABLED
-        && quad.source_program == WORLD_MATERIAL_SOURCE_TEXTURED
+    quad.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC
 }
 
 pub(crate) fn source_entity_alpha_cutoff(material_mode: u32) -> GalResult<Option<f32>> {

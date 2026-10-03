@@ -4,6 +4,10 @@ use crate::render::shaderpack::lowering::*;
 use crate::render::shaderpack::source::preprocess::{preprocess_artifact, PreprocessInput};
 use crate::render::shaderpack::source::{ShaderPackSource, ShaderSourceFile};
 
+mod legacy_inputs;
+mod fullscreen_coordinates;
+mod main_function;
+
 fn fullscreen_probe_test_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
@@ -101,7 +105,7 @@ fn selected_source_fragment_probe_replaces_only_the_named_color_outputs() {
 fn world_target_lowering_flips_fetches_lod_and_target_parameters_but_not_pack_images() {
     let source = concat!(
         "uniform sampler2D depthtex1; uniform sampler2D gaux4; uniform sampler2D colortex6;\n",
-        "float probe(sampler2D depthtex, vec2 uv) { return texture(depthtex, uv).r + textureLod(depthtex, uv, 0.0).r; }\n",
+        "float probe(sampler2D depthtex, vec2 uv) { return texture(depthtex, uv, 0.25).r + textureLod(depthtex, uv, 0.0).r; }\n",
         "float mixed(sampler2D any, vec2 uv) { return texture(any, uv).r; }\n",
         "void main() {\n",
         "  float a = probe(depthtex1, vec2(0.5));\n",
@@ -109,6 +113,7 @@ fn world_target_lowering_flips_fetches_lod_and_target_parameters_but_not_pack_im
         "  vec4 m = texelFetch(colortex6, ivec2(3, 4), 0);\n",
         "  vec4 n = texture(gaux4, vec2(0.25));\n",
         "  vec4 l = textureLod(colortex6, vec2(0.25), 1.0);\n",
+        "  vec4 biased = texture(colortex6, vec2(0.25), -0.5);\n",
         "}\n"
     )
     .to_string();
@@ -118,13 +123,15 @@ fn world_target_lowering_flips_fetches_lod_and_target_parameters_but_not_pack_im
             declarations: Vec::new(),
             fields: Vec::new(),
             std140_size: 0,
+            custom_uniforms: BTreeMap::new(),
         },
         &["gaux4".to_string()],
     )
     .unwrap();
     assert!(lowered.contains("vulkanic_source_fetch_target_colortex6( ivec2(3, 4), 0)"));
     assert!(lowered.contains("vulkanic_source_sample_target_lod_colortex6( vec2(0.25), 1.0)"));
-    assert!(lowered.contains("vulkanic_source_sample_target_parameter(depthtex, uv)"));
+    assert!(lowered.contains("vulkanic_source_sample_target_parameter(depthtex, uv, 0.25)"));
+    assert!(lowered.contains("vulkanic_source_sample_target_parameter(colortex6, vec2(0.25), -0.5)"));
     assert!(lowered.contains("vulkanic_source_sample_target_parameter_lod(depthtex, uv, 0.0)"));
     // Mixed call sites and pack-bound images keep their authored addressing.
     assert!(lowered.contains("return texture(any, uv).r;"));
@@ -1549,7 +1556,7 @@ fn textured_material_lowering_expands_quad_triangles_from_owned_vertex_indices()
         "#version 130\nvarying vec2 uv; void main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
     );
     let fragment = artifact(
-        "#version 130\nvarying vec2 uv; void main() { gl_FragData[0] = vec4(uv, 0.0, 1.0); gl_FragData[1] = vec4(1.0); gl_FragData[2] = vec4(0.0); }",
+        "#version 130\n/* DRAWBUFFERS:063 */\nvarying vec2 uv; void main() { gl_FragData[0] = vec4(uv, 0.0, 1.0); gl_FragData[1] = vec4(1.0); gl_FragData[2] = vec4(0.0); }",
     );
     let lowered = lower_textured_material_source_pair(&vertex, &fragment).unwrap();
     let source = lowered.vertex().source();
@@ -2142,7 +2149,7 @@ fn pair_lowering_uses_one_deterministic_uniform_block_for_both_stages() {
 fn translucent_pair_lowering_keeps_its_auxiliary_output_distinct_from_normal_terrain() {
     let vertex = artifact("#version 130\nvoid main() { gl_Position = gl_Vertex; }");
     let fragment = artifact(
-        "#version 130\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.5); gl_FragData[2] = vec4(0.25); }",
+        "#version 130\n/* DRAWBUFFERS:036 */\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.5); gl_FragData[2] = vec4(0.25); }",
     );
     let lowered = lower_translucent_terrain_source_pair(&vertex, &fragment).unwrap();
     assert_eq!(
@@ -2167,7 +2174,7 @@ fn terrain_and_translucent_fragments_preserve_lower_left_source_fragment_coordin
         "#version 130\nuniform float viewHeight;\nvoid main() { vec2 screen = gl_FragCoord.xy / vec2(1.0, viewHeight); gl_FragData[0] = vec4(screen, 0.0, 1.0); }",
     );
     let translucent_fragment = artifact(
-        "#version 130\nuniform float viewHeight;\nvoid main() { vec2 screen = gl_FragCoord.xy / vec2(1.0, viewHeight); gl_FragData[0] = vec4(screen, 0.0, 1.0); gl_FragData[1] = vec4(1.0); }",
+        "#version 130\n/* DRAWBUFFERS:03 */\nuniform float viewHeight;\nvoid main() { vec2 screen = gl_FragCoord.xy / vec2(1.0, viewHeight); gl_FragData[0] = vec4(screen, 0.0, 1.0); gl_FragData[1] = vec4(1.0); }",
     );
 
     let terrain = lower_terrain_source_pair(&vertex, &terrain_fragment).unwrap();
@@ -2212,15 +2219,16 @@ fn world_material_screen_target_sampling_uses_native_image_coordinates() {
                 array_stride: 0,
             }],
             std140_size: 4,
+            custom_uniforms: BTreeMap::new(),
         },
         &[],
     )
     .unwrap();
 
     assert!(lowered.contains(
-        "#define vulkanic_source_sample_target_depthtex1(source_uv) texture(depthtex1, vulkanic_source_world_target_uv(source_uv))"
+        "return texture(source_sampler, vulkanic_source_world_target_uv(source_uv));"
     ));
-    assert!(lowered.contains("scene = vulkanic_source_sample_target_depthtex1( screen);"));
+    assert!(lowered.contains("scene = vulkanic_source_sample_target_parameter(depthtex1, screen);"));
     assert!(lowered.contains("vec4 atlas = texture(tex, screen);"));
     assert!(lowered.contains("vec2((source_uv).x, 1.0 - (source_uv).y)"));
 }

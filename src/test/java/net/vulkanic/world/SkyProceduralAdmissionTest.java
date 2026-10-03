@@ -17,6 +17,62 @@ class SkyProceduralAdmissionTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void darkDiscCopiesFrozensLocalBottomFanWithoutBakingCameraOrDrawTranslation() throws Exception {
+        var renderer = RustGalWorldPrimitiveRenderer.class;
+        var quads = renderer.getDeclaredField("PENDING_MATERIAL_QUADS");
+        quads.setAccessible(true);
+        var pending = (List<VulkanicGalBridge.WorldMaterialQuadRecord>) quads.get(null);
+        var emit = renderer.getDeclaredMethod("enqueueVanillaDarkDiscLocked", Camera.class);
+        emit.setAccessible(true);
+        var width = renderer.getDeclaredField("pendingViewportWidth");
+        var height = renderer.getDeclaredField("pendingViewportHeight");
+        width.setAccessible(true);
+        height.setAccessible(true);
+        int oldWidth = width.getInt(null), oldHeight = height.getInt(null);
+        int checkpoint = pending.size();
+        try {
+            width.setInt(null, 1280);
+            height.setInt(null, 720);
+            emit.invoke(null, new Camera());
+            var fan = List.copyOf(pending.subList(checkpoint, pending.size()));
+            assertEquals(8, fan.size());
+            var first = fan.getFirst();
+            assertEquals(512.0F, first.p1X(), 0.001F);
+            assertEquals(0.0F, first.p1Z(), 0.001F);
+            assertEquals(362.03867F, first.p2X(), 0.001F);
+            assertEquals(-362.03867F, first.p2Z(), 0.001F);
+            for (var triangle : fan) {
+                assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_SKY_DARK_DISC, triangle.materialId());
+                assertEquals(RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE, triangle.depthPolicy());
+                assertEquals(RustGalWorldPrimitiveRenderer.CULL_BACK, triangle.cullPolicy());
+                assertEquals(-16.0F, triangle.p0Y());
+                assertEquals(-16.0F, triangle.p1Y());
+                assertEquals(-16.0F, triangle.p2Y());
+                assertEquals(-16.0F, triangle.p3Y());
+                assertEquals(triangle.p0X(), triangle.p3X());
+                assertEquals(triangle.p0Z(), triangle.p3Z());
+                assertTrue(triangle.p1Z() * triangle.p2X() - triangle.p1X() * triangle.p2Z() > 0.0F,
+                    "Frozen's bottom fan faces upward");
+            }
+            pending.subList(checkpoint, pending.size()).clear();
+            var camera = new Camera();
+            var position = Camera.class.getDeclaredMethod("setPosition", double.class, double.class, double.class);
+            var rotation = Camera.class.getDeclaredMethod("setRotation", float.class, float.class);
+            position.setAccessible(true);
+            rotation.setAccessible(true);
+            position.invoke(camera, 167.5, 39.62, 553.5);
+            rotation.invoke(camera, 105.0F, 15.0F);
+            emit.invoke(null, camera);
+            assertEquals(fan, pending.subList(checkpoint, pending.size()));
+        } finally {
+            pending.subList(checkpoint, pending.size()).clear();
+            width.setInt(null, oldWidth);
+            height.setInt(null, oldHeight);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void starsDoNotRequireAJavaCopyOfRustsPrivateWhiteTexture() throws Exception {
         var renderer = RustGalWorldPrimitiveRenderer.class;
         var textures = renderer.getDeclaredField("WORLD_MESH_TEXTURES");

@@ -1686,8 +1686,8 @@ impl WorldPrimitiveFrontend {
         self.pending_lod_direct_composition_written = false;
         self.lod_ssao_initialized = false;
         self.pending_lod_ssao_written = false;
-        self.lod_vanilla_snapshot_initialized = false;
-        self.pending_lod_vanilla_snapshot_written = false;
+        self.lod_vanilla_sample_state_initialized = false;
+        self.pending_lod_vanilla_sample_state_established = false;
         self.lod_direct_composition_resources =
             Some(lod::WorldLodDirectCompositionResources::create(
                 gal,

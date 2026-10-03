@@ -35,6 +35,44 @@ fn discovers_explicit_textured_material_semantics_without_renderer_state() {
         .inputs
         .contains(&TexturedMaterialSourceInput::ViewSpaceNormal));
     assert_eq!(3, contract.outputs.len());
+    assert_eq!(Some(0.1_f32.to_bits()), contract.alpha_cutoff_bits);
+}
+
+#[test]
+fn textured_material_alpha_test_honors_pack_override_and_off() {
+    for (property, expected) in [
+        ("GREATER 0.25", Some(0.25_f32.to_bits())),
+        ("off", None),
+        ("false", None),
+    ] {
+        let base = source("063");
+        let mut files = base.files();
+        files.push(ShaderSourceFile::new(
+            "shaders.properties", format!("alphaTest.gbuffers_textured={property}\n"),
+        ));
+        let source = ShaderPackSource::new(base.name(), base.generation(), files).unwrap();
+        let contract = derive_textured_material_contract(&source, TerrainProgramScope::Overworld)
+            .unwrap();
+        assert_eq!(expected, contract.alpha_cutoff_bits, "{property}");
+    }
+}
+
+#[test]
+fn textured_material_alpha_test_rejects_unresolved_or_invalid_properties() {
+    for property in [
+        "alphaTest.gbuffers_textured=GREATER NaN",
+        "alphaTest.gbuffers_textured=GREATER 1.1",
+        "alphaTest.gbuffers_textured=LESS 0.1",
+        "#ifdef CUTOUT\nalphaTest.gbuffers_textured=off\n#endif",
+        "alphaTest.gbuffers_textured=off\nalphaTest.gbuffers_textured=GREATER 0.1",
+    ] {
+        let base = source("063");
+        let mut files = base.files();
+        files.push(ShaderSourceFile::new("shaders.properties", property));
+        let source = ShaderPackSource::new(base.name(), base.generation(), files).unwrap();
+        assert!(derive_textured_material_contract(&source, TerrainProgramScope::Overworld).is_err(),
+            "unsupported alpha semantics must not silently use the default: {property}");
+    }
 }
 
 #[test]
@@ -57,7 +95,10 @@ fn lowers_a_bounded_textured_material_pair_without_terrain_only_attributes() {
         .vertex()
         .source()
         .contains("VulkanicSourceTexturedMaterialVertex"));
-    assert!(!lowered.vertex().source().contains("vulkanic_source_entity"));
+    assert!(lowered.vertex().source().contains(
+        "#define vulkanic_source_entity vec4(0.0, 0.0, 0.0, 1.0)"
+    ));
+    assert!(!lowered.vertex().source().contains("vulkanic_source_vertex.entity"));
     assert!(lowered
         .fragment()
         .source()
@@ -108,7 +149,7 @@ fn rejects_textured_material_source_with_terrain_only_attributes() {
         vec![
             ShaderSourceFile::new(
                 "world0/gbuffers_textured.vsh",
-                "#version 130\n#define VERTEX_SHADER\nvoid main() { vec4 p = gl_Vertex + vec4(mc_Entity.x); vec2 lm = GetLightMapCoordinates(); vec3 n = gl_Normal; vec4 c = gl_Color; gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * p; }",
+                "#version 130\n#define VERTEX_SHADER\nvoid main() { vec4 p = gl_Vertex + vec4(mc_midTexCoord.x); vec2 lm = GetLightMapCoordinates(); vec3 n = gl_Normal; vec4 c = gl_Color; gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * p; }",
             ),
             ShaderSourceFile::new(
                 "world0/gbuffers_textured.fsh",
@@ -122,7 +163,7 @@ fn rejects_textured_material_source_with_terrain_only_attributes() {
     let error = lower_textured_material_source_pair(&source, &contract).unwrap_err();
     assert!(error
         .to_string()
-        .contains("terrain-only attribute 'mc_Entity'"));
+        .contains("terrain-only attribute 'mc_midTexCoord'"));
 }
 
 #[test]

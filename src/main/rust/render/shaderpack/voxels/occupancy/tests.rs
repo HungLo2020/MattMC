@@ -81,6 +81,7 @@ fn materials() -> VoxelMaterialMap {
         operations: vec![TerrainPassOperation::ColoredVoxelLighting],
         required_resources: Default::default(),
         voxel_light_volume_requirements: None,
+        normal_alpha_test: Default::default(),
         translucent_raster_state: None,
         unsupported: Default::default(),
     };

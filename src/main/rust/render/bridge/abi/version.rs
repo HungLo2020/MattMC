@@ -115,7 +115,10 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v53 adds immutable orb appearance assets, lowered to geometry only in Rust.
 /// v54 adds semantic orb placement to the ordered entity mesh stream.
 /// v58 adds explicit equal-depth/write semantics for entity mesh layers.
-pub const FFI_ABI_VERSION: u32 = 66;
+/// v67 appends the copied user shadow-distance setting to shader frames and
+/// expands the layout-query offset table to 72 fields (312 bytes).
+/// v68 appends bounded copied entity culling bounds and extraction roles.
+pub const FFI_ABI_VERSION: u32 = 68;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

@@ -51,6 +51,25 @@ tracking must record each use even when the resource set was not rebound after
 a barrier. Pass fusion may combine attachment load/store passes, but must
 preserve repeated clears and discard boundaries.
 
+For CPU changes to hazard tracking, compare the gameplay benchmark's
+`gal-hazard-analysis` time alongside its read/write-event and barrier counters.
+Keep validation enabled for correctness runs and use a separate validation-off
+workload for timing. Accesses to unrelated ranges preserve the pending destination
+vector; overlapping accesses still validate its state and subtract their covered
+range. Preserve every untouched range and destination-state check when changing
+this hot path.
+
+The standalone GAL `SubmitProfile.resource_creates_delta` and
+`resource_destroys_delta` cover submission only. The world/GUI coordinator
+replaces these two embedded counters with deltas over the accepted whole-frame
+attempt, including frontend preparation and recording-scope retirement. Check
+`gal-command-recording-deferred-destroys` too. Older benchmark artifacts with
+submit-only counters cannot establish absence of per-frame resource churn;
+Completion retirement outside this attempt is outside its destruction delta.
+Compare aggregate GAL counters after completion for leak checks; per-attempt
+creation/destruction imbalance alone is not proof of growth. These are resource
+counts, not GPU memory byte measurements.
+
 ## Changing the GAL
 
 - **Keep it game-agnostic.** If code mentions blocks, entities, the GUI or
@@ -70,6 +89,13 @@ preserve repeated clears and discard boundaries.
   `gal/command_validation.rs`, record its accesses in `gal/hazards.rs`, lower
   it in each backend, and add tests in `vulkanic/tests/`.
 
+Color formats retain their exact channel count and precision. `R16Float`
+uses two bytes per texel for upload/readback and an exact single-channel
+half-float attachment in both private backends. Its appended wire value is 12;
+all prior texture-format values and request layouts remain unchanged. The
+shared color-format conformance test clears it to 0.5 and checks half-float
+readback on both backends, alongside exact resource creation for other formats.
+
 ## Testing
 
 ```sh
@@ -84,6 +110,21 @@ Vulkan or OpenGL). Backend and pixel tests need a working Vulkan and OpenGL
 device.
 
 ## Common errors
+
+GPU timestamp profiling is asynchronous. The Vulkan backend reserves separate
+query pairs for each disjoint timing span, then aggregates spans by scope when
+the submission retires. Repeated passes must not rewrite a scope's old query
+pair without a reset. Each submission supports 128 spans; exceeding that bound
+marks its timing sample unavailable, without changing rendering. Query sets
+remain reserved until their submissions retire. See
+[`lowering.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/backends/vulkan/lowering.rs)
+for allocation and decoding.
+
+Swapchain acquisition metrics describe receipts held by the CPU, not GPU
+completion. For overlap diagnosis, `MATTMC_TRACE_GPU_OVERLAP=1` logs a freshly
+queried timeline and counts incomplete present images separately from resource
+updates. It performs no wait or retirement. See the
+[gameplay verification procedure](RENDER-VERIFICATION.md#4-performance-ab).
 
 | Error | Usual cause |
 | --- | --- |

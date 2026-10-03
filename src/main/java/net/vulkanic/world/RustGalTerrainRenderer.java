@@ -1644,8 +1644,9 @@ public final class RustGalTerrainRenderer {
 	/**
 	 * Publishes the copied Minecraft block atlas as a Rust-owned world-mesh
 	 * resource even when the first visible consumer is Distant Horizons. DH
-	 * exact-atlas draws must not depend on an unrelated near-terrain section
-	 * happening to build first.
+	 * exact-atlas draws and shader material samplers must not depend on an
+	 * unrelated near-terrain section happening to build first. Publish copied
+	 * normal/specular maps with the same immutable atlas generation.
 	 */
 	public static void ensureTerrainAtlasAssetForWorldMesh() {
 		// Semantic-only tests deliberately exercise routing without a live client.
@@ -1659,6 +1660,8 @@ public final class RustGalTerrainRenderer {
 		}
 		ensureAtlasPayload();
 		byte[] payload;
+		byte[] normalPayload;
+		byte[] specularPayload;
 		List<byte[]> mipPayloads;
 		AtlasAnimationResource animation;
 		long generation;
@@ -1667,6 +1670,8 @@ public final class RustGalTerrainRenderer {
 				return;
 			}
 			payload = atlasPayload;
+			normalPayload = normalAtlasPayload;
+			specularPayload = specularAtlasPayload;
 			mipPayloads = atlasMipPayloads;
 			animation = atlasAnimationSource;
 			generation = atlasGeneration;
@@ -1682,6 +1687,18 @@ public final class RustGalTerrainRenderer {
 			RustGalWorldPrimitiveRenderer.registerTerrainAtlasAnimation(texture, animation);
 		} else {
 			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(texture, "terrain-atlas");
+		}
+		if (normalPayload != null) {
+			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(
+				new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_NORMAL_ATLAS, normalPayload),
+				"terrain-normal-atlas");
+		}
+		if (specularPayload != null) {
+			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(
+				new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_SPECULAR_ATLAS, specularPayload),
+				"terrain-specular-atlas");
 		}
 		var registeredTexture = RustGalWorldPrimitiveRenderer.requireRegisteredWorldMeshTexturePayload(texture);
 		synchronized (RustGalTerrainRenderer.class) {

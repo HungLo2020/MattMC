@@ -719,9 +719,9 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
-    /// A complete source plan must be prepared and confirmed by prior Rust
-    /// frames before it can replace the internal Rust graph. In particular,
-    /// source discovery alone is never enough to arm the route.
+    /// A complete source plan requires confirmed Rust-owned prerequisites.
+    /// World entry may prepare those offscreen before the same frame's source
+    /// execution; source discovery alone is never enough to arm the route.
     pub(crate) fn arm_runtime_source_execution_if_ready(&mut self, frame: &WorldPrimitiveFrame) {
         self.arm_runtime_source_execution_if_ready_inner(frame);
         // Keep the decision for the user-facing route report: mesh updates
@@ -1515,8 +1515,8 @@ impl WorldPrimitiveFrontend {
     /// drawn by the vanilla Rust renderer. Say so (and why) on stderr each
     /// time the outcome changes, so a fallback is never silent.
     /// A resized frame cannot reuse the armed source route's extent-bound
-    /// resources. Disarm so this frame renders through the ordinary graph,
-    /// which prepares resources at the new extent; admission re-arms later.
+    /// resources. Disarm so private entry preparation can rebuild resources
+    /// at the new extent before this frame's selected-source execution.
     pub(crate) fn disarm_source_route_on_extent_change(&mut self, frame: &WorldPrimitiveFrame) {
         let extent = (frame.viewport_width, frame.viewport_height);
         if self

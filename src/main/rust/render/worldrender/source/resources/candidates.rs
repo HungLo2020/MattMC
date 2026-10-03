@@ -35,6 +35,19 @@ impl WorldPrimitiveFrontend {
         allow_pending_colored_light: bool,
         includes_distant_horizons: bool,
     ) -> GalResult<bool> {
+        let rejected = self.shader_runtime.as_ref().and_then(|runtime| {
+            match runtime.source_candidate() {
+                crate::render::shaderpack::runtime::TerrainSourceCandidateState::Rejected { reason, .. } => {
+                    Some(reason.clone())
+                }
+                _ => None,
+            }
+        });
+        if let Some(reason) = rejected {
+            self.clear_candidate_source_asset_runtime(gal)?;
+            self.candidate_source_asset_error = Some(reason);
+            return Ok(false);
+        }
         let assets = match self.shader_pack_sources.active() {
             Some(source) => match self
                 .shader_pack_assets
@@ -466,12 +479,7 @@ impl WorldPrimitiveFrontend {
                 GalError::invalid_argument("source color resources require a shader runtime")
             })?
             .stage_terrain_source_color_resources(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         program.require_semantic_resources(merged.availability())?;
         Ok(merged)
     }
@@ -512,12 +520,7 @@ impl WorldPrimitiveFrontend {
                 )
             })?
             .stage_textured_material_source_color_resources(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         // Let the candidate stage producer roles this writer declares even
         // when the dimension's terrain program does not (Nether/End writers
         // can declare a shadow map the terrain program never samples).
@@ -568,12 +571,7 @@ impl WorldPrimitiveFrontend {
                 GalError::invalid_argument("entity source resources require a shader runtime")
             })?
             .stage_terrain_source_color_resources_for_entity(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         // Local `MaterialTexture` is explicitly supplied for each entity draw.
         let without_local_texture = if merged
             .availability()
@@ -634,12 +632,7 @@ impl WorldPrimitiveFrontend {
                 GalError::invalid_argument("hand source resources require a shader runtime")
             })?
             .stage_terrain_source_color_resources_for_hand(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         // The selected hand program samples the copied local item texture per
         // draw. Deliberately remove any broad material role before binding it
         // so a terrain atlas can never alias an item material.
@@ -1129,6 +1122,8 @@ impl WorldPrimitiveFrontend {
                     ),
                     runtime.candidate_source_requires_resource(
                         TerrainSourceResourceRole::ShadowDepthRaw,
+                    ) || runtime.candidate_source_requires_resource(
+                        TerrainSourceResourceRole::ShadowDepthRawSecondary,
                     ),
                     runtime.expected_shader_pack_generation_for_resources(),
                 )

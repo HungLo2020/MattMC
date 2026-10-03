@@ -193,8 +193,8 @@ pub(crate) type SourceUniformPackMemoEntry = (
     (usize, u64),
     TerrainSourceUniformFrame,
     TerrainSourceTextureTransforms,
-    Vec<u8>,
-    Vec<u8>,
+    Arc<[u8]>,
+    Arc<[u8]>,
 );
 
 /// Per-frame fast path for the terrain batch loops. The frame's source

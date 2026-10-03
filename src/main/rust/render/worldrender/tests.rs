@@ -1,4 +1,15 @@
 use crate::render::worldrender::*;
+
+mod builtin_uniforms;
+mod scoped_directives;
+mod direct_dh_composition;
+mod whole_frame_profile;
+mod source_stream_packing;
+mod stage_colors;
+mod pre_terrain;
+mod horizon;
+mod shadow_batch_selection;
+mod sky_dark_disc;
 use crate::render::vulkanic::test_support::{MockBackend, presentation_capabilities, vulkan_capabilities};
 use crate::render::vulkanic::commands::ClearColor;
 use crate::render::guirender::frontend::{GuiFrontend, GuiSpriteRequest};
@@ -38,7 +49,7 @@ use crate::render::shaderpack::source::{
     ShaderPackSource, ShaderSourceFile, RUNTIME_ENVIRONMENT_PATH, RUNTIME_OPTIONS_PATH,
 };
 use crate::render::shaderpack::resources::color_targets::{
-    ShaderPackColorBootstrapClearValues, TerrainSourceColorAttachment,
+    ShaderPackColorClearValues, TerrainSourceColorAttachment,
 };
 use crate::render::shaderpack::contracts::terrain::{
     bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
@@ -784,6 +795,7 @@ fn private_occupancy_materials() -> VoxelMaterialMap {
         operations: vec![TerrainPassOperation::ColoredVoxelLighting],
         required_resources: Default::default(),
         voxel_light_volume_requirements: None,
+        normal_alpha_test: Default::default(),
         translucent_raster_state: None,
         unsupported: Default::default(),
     };
@@ -882,7 +894,7 @@ fn hand_source_targets_preserve_world_color_and_reserve_a_fresh_depth_domain() {
         .stage_source_color_targets(&mut gal, 11, extent)
         .unwrap()
         .expect("prepared hand source requires owned named color targets");
-    let clear_values = ShaderPackColorBootstrapClearValues {
+    let clear_values = ShaderPackColorClearValues {
         fog_color: ClearColor {
             r: 0.1,
             g: 0.2,
@@ -1115,13 +1127,19 @@ fn source_candidate_prepares_and_retires_owned_colored_light_without_selecting_e
     enter_shader_candidate_overworld(&mut frame);
     frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
 
-    // Loading frames may already carry a world/voxel generation but have
-    // no copied terrain semantics yet. They must not allocate the owned
-    // colored-light volume.
+    // Loading frames without a world background allocate no world volume.
+    // Once the background exists, discovery cannot wait for terrain meshes:
+    // the first visible sky/entity frame already belongs to the pack.
+    frame.background.enabled = false;
     assert!(!frontend
         .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
         .unwrap());
     assert!(!frontend.candidate_colored_light_runtime);
+    enter_shader_candidate_overworld(&mut frame);
+    assert!(frontend
+        .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
+        .unwrap());
+    assert!(frontend.candidate_colored_light_runtime);
     let mut assets = shader_mesh_scene_assets(1);
     for asset in &mut assets {
         asset.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
@@ -1136,7 +1154,7 @@ fn source_candidate_prepares_and_retires_owned_colored_light_without_selecting_e
         instance.stratum = WORLD_STRATUM_TERRAIN;
     }
 
-    assert!(frontend
+    assert!(!frontend
         .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
         .unwrap());
     assert!(!frontend
@@ -1533,7 +1551,7 @@ fn textured_material_source_targets_are_distinct_load_only_named_passes() {
             &color_targets,
             depth_texture,
             depth_view,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -1750,6 +1768,7 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
         eye_submersion: 1,
         screen_brightness: 0.75,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         relative_eye_position: [0.25, -0.5, 0.75],
         sky_color: [0.2, 0.4, 0.6],
@@ -2269,7 +2288,7 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
             source_shadow_targets,
             source_main_depth,
             target,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: background_clear_color(&frame.background),
             },
         )
@@ -2988,6 +3007,7 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         eye_submersion: 1,
         screen_brightness: 0.75,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         relative_eye_position: [0.25, -0.5, 0.75],
         sky_color: [0.2, 0.4, 0.6],
@@ -3038,9 +3058,14 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         let mut warmup = frame.clone();
         warmup.frame_id = acquired.frame.0;
         last_warmup_frame_id = Some(warmup.frame_id);
+        // Ordinary unit-test frames do not opt into production source-entry
+        // preparation. This native fixture explicitly exercises that graph
+        // so shadow/main-depth resources exist before selected execution.
         let stats = frontend
-            .submit_whole_frame(&mut gal, 1, target, warmup, Vec::new())
-            .expect("native source warmup must submit the ordinary Rust frame graph");
+            .submit_whole_frame_with_initial_ops(
+                &mut gal, 1, target, warmup, Vec::new(), None, Vec::new(), true,
+            )
+            .expect("native source warmup must submit the Rust source-entry preparation graph");
         gal.present_frame(crate::render::vulkanic::frame::PresentFrameDesc {
             frame: acquired.frame,
             correlation_id: acquired.correlation_id,
@@ -3141,16 +3166,38 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         segment_index: 0,
         order: 0,
     }];
+    // The DH fullscreen contract derives clip planes from an actual
+    // perspective projection; identity is not a valid depth-space fixture.
+    let dh_projection = [
+        1.5, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, -1.006018, -1.0, 0.0, 0.0,
+        -6.018054, 0.0,
+    ];
     frame.lod_render_frame = WorldLodRenderFrame {
         enabled: true,
         flags: WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
-        combined_matrix: matrix4_identity(),
+        combined_matrix: dh_projection,
         model_view_matrix: matrix4_identity(),
-        projection_matrix: matrix4_identity(),
-        projection_inverse_matrix: matrix4_identity(),
+        projection_matrix: dh_projection,
+        projection_inverse_matrix: [
+            0.6666667, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1661667, 0.0,
+            0.0, -1.0, 0.1671667,
+        ],
         micro_offset: 0.01,
         ..WorldLodRenderFrame::default()
     };
+    // The whole-frame coordinator refreshes the real frame's semantic
+    // resource snapshot before entering private selected-source preparation.
+    // Calling that preparation directly must reproduce this prerequisite,
+    // rather than retaining the previous warmup frame's snapshot identity.
+    frontend
+        .ensure_candidate_source_assets_for_frame(
+            &mut gal,
+            frame.voxel_volume.world_generation,
+            frame.frame_id,
+            false,
+            source_frame_includes_distant_horizons(&frame),
+        )
+        .expect("native source conformance must assemble the real frame's resource snapshot");
     // Production arms only after a confirmed normal Rust frame. The
     // exact-frame snapshot below must not clear that admission merely
     // because its resource roles are refreshed for a new frame.
@@ -3359,6 +3406,137 @@ fn source_candidate_preparation_uses_combined_frame_without_creating_source_draw
     assert_eq!(None, frontend.private_terrain_colored_light_ready(5));
     assert!(frontend.source_mesh_resources.is_empty());
     assert!(!frontend.candidate_subset_execution_enabled);
+}
+
+#[test]
+fn source_entry_preparation_keeps_acquired_output_unwritten_and_retires_after_failure() {
+    let mut gal = gal();
+    let target = frame_target(&mut gal, 1, 128, 128);
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.enable_candidate_source_preparation_for_test();
+    let mut scene = frame(Vec::new());
+    scene.viewport_width = 128;
+    scene.viewport_height = 128;
+    scene.background.viewport_width = 128;
+    scene.background.viewport_height = 128;
+    enter_shader_candidate_overworld(&mut scene);
+    scene.voxel_volume.world_generation = 1;
+    // An early sky/material frame can meet the compact Fabulous predicate.
+    // Preparation still needs the normal resource graph, with no final copy
+    // through a frame-target-only transparency shortcut.
+    let mut translucent = material_quad(
+        WORLD_MATERIAL_MODE_TRANSLUCENT, WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+    );
+    translucent.material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+    scene.material_quads.push(translucent);
+    assert!(frontend.frame_has_fabulous_transparency_work(&scene));
+
+    gal.fail_next_submit_for_test();
+    assert!(frontend.prepare_runtime_source_before_presentation(
+        &mut gal, 1, target, &mut scene,
+    ).is_err());
+    assert!(gal.pass_target_depth_attachment(target).unwrap().is_none());
+    assert!(gal.mock_backend().unwrap().presented_frames.is_empty());
+
+    frontend.prepare_runtime_source_before_presentation(
+        &mut gal, 1, target, &mut scene,
+    ).unwrap();
+    assert!(frontend.g_buffer_resources.as_ref().unwrap().screen_targets_initialized);
+    assert!(gal.pass_target_depth_attachment(target).unwrap().is_none());
+    assert!(gal.mock_backend().unwrap().presented_frames.is_empty());
+    let submission = gal.latest_submission_id();
+    gal.mock_backend_mut().unwrap().complete_through(submission);
+    gal.retire_through(submission).unwrap();
+    frontend.reset(&mut gal);
+    gal.destroy(target).unwrap();
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+    assert!(gal.mock_backend().unwrap().live.is_empty());
+}
+
+#[test]
+fn source_entry_rejection_keeps_its_admission_error_without_final_target_correlation() {
+    let mut gal = gal();
+    let target = frame_target(&mut gal, 1, 128, 128);
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.enable_candidate_source_preparation_for_test();
+    let source = complete_bundled_pack_source_for_test();
+    let files = source.files().into_iter().map(|mut file| {
+        file.contents = file.contents.replace("DoLighting(", "UnadmittedLighting(");
+        file
+    }).collect();
+    frontend.apply_shader_pack_source_update(ShaderPackSourceUpdate {
+        pack_name: source.name().into(), generation: source.generation(), files,
+    }).unwrap();
+    frontend.apply_shader_pack_asset_update(copied_source_png_assets(&source)).unwrap();
+    let mut scene = shader_mesh_scene_frame(128, 128, 0);
+    enter_shader_candidate_overworld(&mut scene);
+    scene.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+    scene.mesh_instances.clear();
+    frontend.prepare_runtime_source_before_presentation(
+        &mut gal, 1, target, &mut scene,
+    ).expect("source admission rejection must not become a backend correlation failure");
+    assert!(frontend.candidate_source_resource_snapshot.is_none());
+    let rejection = frontend.candidate_source_asset_error.as_deref().unwrap();
+    assert!(rejection.contains("DoLighting("), "unexpected admission rejection: {rejection}");
+    assert!(!frontend.source_execution_armed);
+    assert!(gal.mock_backend().unwrap().presented_frames.is_empty());
+    assert!(gal.pass_target_depth_attachment(target).unwrap().is_none());
+    gal.retire_through_for_test(gal.latest_submission_id()).unwrap();
+    frontend.reset(&mut gal);
+    gal.destroy(target).unwrap();
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+}
+
+#[test]
+fn source_entry_preparation_initializes_depth_before_any_terrain_mesh() {
+    let mut gal = gal();
+    let target = frame_target(&mut gal, 1, 128, 128);
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.enable_candidate_source_preparation_for_test();
+    let source = complete_bundled_pack_source_for_test();
+    frontend.apply_shader_pack_source_update(ShaderPackSourceUpdate {
+        pack_name: source.name().into(), generation: source.generation(), files: source.files(),
+    }).unwrap();
+    let mut scene = shader_mesh_scene_frame(128, 128, 0);
+    enter_shader_candidate_overworld(&mut scene);
+    scene.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+    scene.mesh_instances.clear();
+    assert!(scene.mesh_instances.is_empty());
+    assert!(scene.lod_instances.is_empty());
+    let owner = passes::oriented_target::OrientedWorldTarget::create(
+        &mut gal, "test.empty-source-preparation",
+        passes::oriented_target::WorldTargetDesc {
+            extent: Extent3d { width: 128, height: 128, depth: 1 },
+            color_format: ColorFormat::Bgra8Unorm,
+            raster_y_direction: RasterYDirection::Up,
+        },
+    ).unwrap();
+    // Exercise the real preparation submission. Source admission is covered
+    // separately; this fixture has no copied DH depth or atlas assets.
+    let stats = frontend.submit_whole_frame_with_initial_ops(
+        &mut gal, 1, owner.target, scene.clone(), Vec::new(), None,
+        vec![CommandOp::Barrier(texture_barrier(
+            owner.color_texture, TextureUsageState::Undefined,
+            TextureUsageState::ColorAttachment,
+        ))], true,
+    ).unwrap();
+    assert!(stats.profile.gal.pass_count >= 8,
+        "empty preparation must execute shadow, terrain and composite passes");
+    assert!(frontend.g_buffer_depth_history.before_translucency_valid,
+        "required={} history_generation={} graph_generation={:?}",
+        frontend.source_main_depth_history_required(),
+        frontend.g_buffer_depth_history.graph_generation,
+        frontend.g_buffer_resources.as_ref().map(|resources| resources.generation));
+    assert_eq!(frontend.g_buffer_depth_history.last_frame_id, Some(scene.frame_id));
+    assert!(gal.pass_target_depth_attachment(target).unwrap().is_none());
+    assert!(gal.mock_backend().unwrap().presented_frames.is_empty());
+    gal.retire_through_for_test(gal.latest_submission_id()).unwrap();
+    frontend.reset(&mut gal);
+    for handle in owner.handles_in_destroy_order() {
+        gal.destroy(handle).unwrap();
+    }
+    gal.destroy(target).unwrap();
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
 }
 
 #[test]
@@ -3834,7 +4012,7 @@ fn segment(depth_policy: u32, color_argb: u32) -> WorldLineSegmentRequest {
     }
 }
 
-fn frame(segments: Vec<WorldLineSegmentRequest>) -> WorldPrimitiveFrame {
+pub(crate) fn frame(segments: Vec<WorldLineSegmentRequest>) -> WorldPrimitiveFrame {
     WorldPrimitiveFrame {
         engine_globals: None,
         frame_id: 1,
@@ -4649,6 +4827,7 @@ fn source_material_staging_requires_explicit_classification_and_preserves_raw_li
         eye_submersion: 1,
         screen_brightness: 0.75,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         relative_eye_position: [0.25, -0.5, 0.75],
         sky_color: [0.2, 0.4, 0.6],
@@ -5308,6 +5487,7 @@ fn source_uniform_frame_copies_only_proven_world_semantics() {
         eye_submersion: 1,
         screen_brightness: 0.75,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         relative_eye_position: [0.25, -0.5, 0.75],
         sky_color: [0.2, 0.4, 0.6],
@@ -5920,6 +6100,7 @@ fn distant_horizons_uniform_alias_does_not_contaminate_near_terrain_uniforms() {
         enabled: true,
         world_generation: 1,
         far_plane: 160.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 512,
         ..WorldShaderEnvironmentFrame::default()
     };
@@ -6869,6 +7050,7 @@ fn owned_source_uniform_preparation_derives_rain_factor_once_per_frame() {
         main_hand_item_light_emission: 3,
         off_hand_item_light_emission: 12,
         far_plane: 128.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         ..WorldShaderEnvironmentFrame::default()
     };
@@ -6991,6 +7173,7 @@ fn owned_source_uniform_preparation_derives_generation_matched_shadow_matrices()
         world_generation: 5,
         time_of_day: 0.0,
         far_plane: 128.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         ..WorldShaderEnvironmentFrame::default()
     };
@@ -8773,7 +8956,7 @@ fn source_entity_local_material_replaces_only_the_entity_texture_role() {
                         clear_color_bits: None,
                     },
                 ],
-                clear_values: ShaderPackColorBootstrapClearValues {
+                clear_values: ShaderPackColorClearValues {
                     fog_color: ClearColor {
                         r: 0.0,
                         g: 0.0,
@@ -8925,8 +9108,9 @@ fn world_decal_transport_cannot_silently_render_as_standard_foil() {
         .contains("world decal requires item foil and matching draw pose"));
 }
 
-fn mesh_instance(mesh_key: u64, generation: u64) -> WorldMeshInstanceRequest {
+pub(crate) fn mesh_instance(mesh_key: u64, generation: u64) -> WorldMeshInstanceRequest {
     WorldMeshInstanceRequest {
+        entity_culling: None,
         model_submission_order: None,
         item_foil: None,
         decal_foil: None,
@@ -14881,6 +15065,33 @@ fn prepared_source_terrain_g_buffer_submission_uses_its_owned_data_and_pack_sets
             &frame.source_uniform_frame().unwrap(),
         )
         .unwrap();
+    assert!(Arc::ptr_eq(
+        &prepared.legacy_texture_transforms,
+        &prepared_second_batch.legacy_texture_transforms,
+    ));
+    assert!(Arc::ptr_eq(&prepared.scalar_uniforms, &prepared_second_batch.scalar_uniforms));
+    assert_ne!(prepared.instance_transforms, prepared_second_batch.instance_transforms);
+    // A changed matrix must own different packed bytes without changing
+    // an earlier draw that still retains the same-frame immutable block.
+    let original_scalar = prepared.scalar_uniforms.to_vec();
+    let mut changed_uniforms = frame.source_uniform_frame().unwrap();
+    changed_uniforms.view_matrix.as_mut().unwrap()[12] = 7.0;
+    let changed = frontend.prepare_source_terrain_frame_for_mesh_range(
+        &program, frame.frame_id, 0x7a1e, 1, u64::from(second_section_offset), 6,
+        &[(matrix4_identity(), u32::MAX)],
+        &TerrainSourceTextureTransforms::canonical_minecraft_terrain(), &changed_uniforms,
+    ).unwrap();
+    assert!(!Arc::ptr_eq(&prepared.scalar_uniforms, &changed.scalar_uniforms));
+    assert_ne!(original_scalar.as_slice(), changed.scalar_uniforms.as_ref());
+    assert_eq!(original_scalar.as_slice(), prepared.scalar_uniforms.as_ref());
+    // Frame turnover drops the memo, even when the packed values are equal.
+    let next = frontend.prepare_source_terrain_frame_for_mesh_range(
+        &program, frame.frame_id + 1, 0x7a1e, 1, u64::from(second_section_offset), 6,
+        &[(matrix4_identity(), u32::MAX)],
+        &TerrainSourceTextureTransforms::canonical_minecraft_terrain(), &frame.source_uniform_frame().unwrap(),
+    ).unwrap();
+    assert!(!Arc::ptr_eq(&prepared.scalar_uniforms, &next.scalar_uniforms));
+    assert_eq!(prepared.scalar_uniforms.as_ref(), next.scalar_uniforms.as_ref());
     let texture = gal
         .create_texture(TextureDesc {
             label: "source-g-buffer-pack.texture".to_string(),
@@ -14995,6 +15206,7 @@ fn prepared_source_terrain_g_buffer_submission_uses_its_owned_data_and_pack_sets
             128,
             ColorFormat::Bgra8Unorm,
             None,
+            Some(TerrainProgramScope::Overworld),
             &mut profile,
         )
         .unwrap();
@@ -15284,7 +15496,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             &staged_targets,
             depth_texture,
             depth_view,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -15306,7 +15518,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             &staged_targets,
             depth_texture,
             depth_view,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -15340,7 +15552,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             &staged_targets,
             depth_texture,
             depth_view,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -15535,7 +15747,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
         .begin_source_color_transaction(
             &mut gal,
             &staged_targets,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -15660,10 +15872,17 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
         .collect::<Vec<_>>();
     assert_eq!(3, source_passes.len());
     assert_eq!(targets.target, source_passes[0].0);
-    assert!(source_passes[0]
-        .1
-        .iter()
-        .any(|attachment| attachment.load_op == AttachmentLoadOp::Clear));
+    assert!(source_passes[0].1.iter().all(|attachment| attachment.load_op == AttachmentLoadOp::Load),
+        "the initial bootstrap already cleared named colors; terrain must load them");
+    assert_eq!(AttachmentLoadOp::Clear, source_passes[0].2.as_ref().unwrap().load_op,
+        "source initialization does not replace the terrain depth clear");
+    for view in source_passes[0].1.iter().map(|attachment| attachment.view) {
+        let clears = operations.iter().filter_map(|op| match op {
+            CommandOp::BeginPass { colors, .. } => Some(colors.iter().filter(|a| a.view == view && a.load_op == AttachmentLoadOp::Clear).count()),
+            _ => None,
+        }).sum::<usize>();
+        assert_eq!(1, clears, "each cold color target must be cleared exactly once before its writers");
+    }
     assert_eq!(targets.target, source_passes[1].0);
     assert!(source_passes[1]
         .1
@@ -15730,7 +15949,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             &staged_targets,
             depth_texture,
             depth_view,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -15761,7 +15980,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             &world_two_colors,
             depth_texture,
             depth_view,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
@@ -16703,6 +16922,7 @@ fn private_dh_material_passes_partition_partial_atlas_segments_without_duplicate
             128,
             ColorFormat::Bgra8Unorm,
             None,
+            Some(TerrainProgramScope::Overworld),
             &mut profile,
         )
         .unwrap();
@@ -24101,6 +24321,7 @@ fn shader_mesh_instance(
         transform[5] = 1.15;
     }
     WorldMeshInstanceRequest {
+        entity_culling: None,
         model_submission_order: None,
         stratum: WORLD_STRATUM_MOVING_MESH,
         item_foil: None,
@@ -24317,6 +24538,7 @@ fn complete_source_material_test_environment() -> WorldShaderEnvironmentFrame {
         eye_submersion: 1,
         screen_brightness: 0.75,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         distant_horizons_render_distance: 256,
         relative_eye_position: [0.25, -0.5, 0.75],
         sky_color: [0.2, 0.4, 0.6],
@@ -26855,16 +27077,83 @@ fn gameplay_attachment_capture_restores_only_presented_final_output_as_color() {
 fn forward_gameplay_attachment_capture_reports_only_real_final_outputs() {
     assert_eq!(
         "forward-final-attachments",
-        gameplay_attachment_capture_scope(false, false)
+        gameplay_attachment_capture_scope(false, false, false)
     );
     assert_eq!(
         "full-attachments",
-        gameplay_attachment_capture_scope(false, true)
+        gameplay_attachment_capture_scope(false, true, false)
     );
     assert_eq!(
         "final-output-only",
-        gameplay_attachment_capture_scope(true, false)
+        gameplay_attachment_capture_scope(true, false, false)
     );
+    assert_eq!(
+        "source-dh-depth-coverage",
+        gameplay_attachment_capture_scope(true, true, true)
+    );
+}
+
+#[test]
+fn source_dh_coverage_readbacks_are_opt_in_restore_depth_and_release_rejected_owners() {
+    let root = std::env::temp_dir().join(format!("mattmc-source-depth-coverage-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join("request.properties");
+    let request = GameplayAttachmentCaptureRequest {
+        frame_id: 1_000_777,
+        correlation_id: 1_000_778,
+        deterministic_rendered_frame_index: 51,
+        source_selected_capture: true,
+        source_selected_pending: false,
+        required_entity_mesh: false,
+    };
+    request.write_atomic(&path).unwrap();
+    let _dir = crate::core::environment::scoped_override("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR", root.to_str().unwrap());
+    let _request = crate::core::environment::scoped_override("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST", path.to_str().unwrap());
+    let _mesh = crate::core::environment::scoped_override("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES", "0");
+    let mut frame = frame(Vec::new());
+    frame.frame_id = request.frame_id;
+    frame.correlation_id = request.correlation_id;
+    let mut capture = GameplayAttachmentCapture::select_source(&frame, 1, 2, test_conventions()).unwrap().unwrap();
+    capture.lod_route_selected = true;
+    let mut gal = gal();
+    let main = Handle::new(HandleKind::Texture, 100, 1).unwrap();
+    let distant = Handle::new(HandleKind::Texture, 101, 1).unwrap();
+    let mut ops = Vec::new();
+    {
+        let _disabled = crate::core::environment::scoped_override("MATTMC_RUST_SOURCE_DH_DEPTH_COVERAGE", "0");
+        capture.append_source_dh_depth_coverage(&mut gal, &mut ops, main, distant).unwrap();
+        assert!(ops.is_empty());
+        assert!(capture.readbacks.is_empty());
+    }
+    let _enabled = crate::core::environment::scoped_override("MATTMC_RUST_SOURCE_DH_DEPTH_COVERAGE", "1");
+    capture.append_source_dh_depth_coverage(&mut gal, &mut ops, main, distant).unwrap();
+    assert_eq!(2, capture.readbacks.len());
+    let copies = ops.iter().filter_map(|op| match op {
+        CommandOp::CopyTextureToBuffer(copy) => Some(copy.texture),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(vec![main, distant], copies, "copy the two supplied opaque snapshots, not live or private preparation targets");
+    for texture in [main, distant] {
+        assert!(ops.iter().any(|op| matches!(op, CommandOp::Barrier(barrier)
+            if barrier.resource == texture && barrier.before == TextureUsageState::TransferSrc && barrier.after == TextureUsageState::ShaderRead)));
+    }
+    assert!(capture.append_source_dh_depth_coverage(&mut gal, &mut ops, main, distant).is_err());
+    capture.discard(&mut gal);
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+    assert!(gal.mock_backend().unwrap().live.is_empty());
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn gameplay_depth_evidence_recognizes_format_and_unquantized_far_samples() {
+    let bytes = [1.0f32, 0.99999f32].into_iter().flat_map(f32::to_le_bytes).collect::<Vec<_>>();
+    let evidence: serde_json::Value = serde_json::from_str(&attachment_evidence_json_for_format(
+        2, 1, "source_dh_opaque_depth", TextureFormat::Depth32Float, &bytes,
+    )).unwrap();
+    assert_eq!("depth", evidence["kind"]);
+    assert_eq!("Depth32Float", evidence["format"]);
+    assert_eq!(1, evidence["less_than_clear"]);
+    assert_eq!(2, evidence["finite_samples"]);
 }
 
 #[test]

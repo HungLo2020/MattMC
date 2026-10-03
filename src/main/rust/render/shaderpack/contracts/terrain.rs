@@ -18,6 +18,11 @@ use crate::render::shaderpack::voxels::light_volume::{
     VoxelLightVolumeReadiness, VoxelLightVolumeRequirements, VoxelLightVolumeUpdatePolicy,
 };
 
+mod single_color;
+mod alpha_test;
+pub use alpha_test::NormalTerrainAlphaTestPolicy;
+pub use single_color::{derive_terrain_contract_for_scope, derive_translucent_terrain_contract_for_scope};
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum TerrainMaterialClass {
     Opaque,
@@ -289,7 +294,8 @@ impl TerrainTranslucentAlphaTest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TerrainTranslucentRasterState {
     pub blend: TerrainTranslucentBlend,
-    pub alpha_test: TerrainTranslucentAlphaTest,
+    /// None explicitly disables the output-zero alpha test (Frozen ALWAYS).
+    pub alpha_test: Option<TerrainTranslucentAlphaTest>,
 }
 
 /// Ordered normal-terrain expressions recovered from the selected program.
@@ -374,6 +380,8 @@ pub struct TerrainPassContract {
     pub operations: Vec<TerrainPassOperation>,
     pub required_resources: BTreeSet<TerrainPassRequiredResource>,
     pub voxel_light_volume_requirements: Option<VoxelLightVolumeRequirements>,
+    /// Selected source alpha override, with independent ordinary/cutout defaults.
+    pub normal_alpha_test: NormalTerrainAlphaTestPolicy,
     /// Present only for the distinct translucent source stage. It is derived
     /// from selected pack configuration and later lowered to ordinary GAL
     /// pipeline state by the Rust runtime.
@@ -637,6 +645,8 @@ pub fn derive_complementary_terrain_contract_for_scope(
         .into_iter()
         .zip(draw_buffer_slots)
         .collect::<BTreeMap<_, _>>();
+    let alpha_defines = terrain_artifact.as_ref().map(|artifact| artifact.defines().to_vec())
+        .unwrap_or_else(|_| property_defines.iter().map(|(k,v)|(k.clone(),v.clone())).collect());
     Ok(TerrainPassContract {
         pass_kind: TerrainSourcePassKind::OpaqueCutout,
         pack_name: source.name().to_string(),
@@ -655,6 +665,7 @@ pub fn derive_complementary_terrain_contract_for_scope(
         operations,
         required_resources,
         voxel_light_volume_requirements,
+        normal_alpha_test: NormalTerrainAlphaTestPolicy::from_source(source, &alpha_defines)?,
         translucent_raster_state: None,
         unsupported: unsupported_features(&terrain, &property_defines),
     })
@@ -797,6 +808,7 @@ pub fn derive_complementary_translucent_terrain_contract_for_scope(
         ],
         required_resources: BTreeSet::new(),
         voxel_light_volume_requirements: None,
+        normal_alpha_test: Default::default(),
         translucent_raster_state,
         unsupported,
     })
@@ -819,7 +831,7 @@ fn derive_translucent_raster_state(
         // This is source-pass policy, not borrowed Iris/OpenGL state.
         (None, Some(alpha_test)) => Ok(Some(TerrainTranslucentRasterState {
             blend: TerrainTranslucentBlend::SourceAlphaOver,
-            alpha_test: parse_translucent_alpha_test(alpha_test)?,
+            alpha_test: Some(parse_translucent_alpha_test(alpha_test)?),
         })),
         (Some(_), None) => Err(GalError::invalid_argument(
             "selected translucent terrain source declares blend.gbuffers_water without alphaTest.gbuffers_water",
@@ -837,7 +849,7 @@ fn derive_translucent_raster_state(
             };
             Ok(Some(TerrainTranslucentRasterState {
                 blend,
-                alpha_test: parse_translucent_alpha_test(alpha_test)?,
+                alpha_test: Some(parse_translucent_alpha_test(alpha_test)?),
             }))
         }
     }

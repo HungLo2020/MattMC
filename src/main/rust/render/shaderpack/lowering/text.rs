@@ -2,6 +2,21 @@
 
 use super::*;
 
+/// Replaces the parsed declaration while preserving surrounding comments,
+/// including a multiline comment's closing delimiter and source directives.
+/// `semantic_line` comes from the byte-preserving comment mask.
+pub(super) fn append_rewritten_declaration_line(
+    output: &mut String, original_line: &str, semantic_line: &str, replacement: &str,
+) {
+    debug_assert_eq!(original_line.len(), semantic_line.len());
+    let start = semantic_line.len() - semantic_line.trim_start().len();
+    let end = semantic_line.trim_end().len();
+    output.push_str(&original_line[..start]);
+    output.push_str(replacement);
+    output.push_str(&original_line[end..]);
+    output.push('\n');
+}
+
 pub(super) fn matching_paren(bytes: &[u8], open: usize) -> Option<usize> {
     let mut depth = 0i32;
     for (index, &byte) in bytes.iter().enumerate().skip(open) {
@@ -135,7 +150,36 @@ pub(super) fn append_clip_depth_convention_finalizer(source: &str) -> GalResult<
     Ok(output)
 }
 
-pub(super) fn main_function_closing_brace(source: &str) -> Option<usize> {
+pub(crate) fn main_function_closing_brace(source: &str) -> Option<usize> {
+    main_function_body_range(source).map(|(_, closing)| closing)
+}
+
+pub(super) fn main_function_body_range(source: &str) -> Option<(usize, usize)> {
+    parsed_main_function(source).map(|main| (main.opening, main.closing))
+}
+
+struct ParsedMainFunction {
+    declaration: usize,
+    name: usize,
+    opening: usize,
+    closing: usize,
+}
+
+pub(crate) fn main_function_declaration_start(source: &str) -> Option<usize> {
+    parsed_main_function(source).map(|main| main.declaration)
+}
+
+/// Rename the actual definition, preserving legal signature trivia and any
+/// prototypes/comments. Post-main policy wrappers must also catch early returns.
+pub(crate) fn rename_glsl_main(source: &str, replacement: &str) -> GalResult<String> {
+    let main = parsed_main_function(source).ok_or_else(||
+        GalError::unsupported_feature("lowered shader source has no brace-balanced void main definition"))?;
+    let mut output = source.to_string();
+    output.replace_range(main.name..main.name + 4, replacement);
+    Ok(output)
+}
+
+fn parsed_main_function(source: &str) -> Option<ParsedMainFunction> {
     let bytes = source.as_bytes();
     let mut cursor = 0;
     while cursor < bytes.len() {
@@ -150,6 +194,7 @@ pub(super) fn main_function_closing_brace(source: &str) -> Option<usize> {
             cursor = after_void;
             continue;
         }
+        let name = after_void;
         let mut signature = skip_glsl_trivia(bytes, after_void + b"main".len())?;
         if bytes.get(signature) != Some(&b'(') {
             cursor = signature;
@@ -176,6 +221,7 @@ pub(super) fn main_function_closing_brace(source: &str) -> Option<usize> {
             cursor = body;
             continue;
         }
+        let opening = body;
         let mut braces = 0u32;
         loop {
             body = skip_glsl_trivia(bytes, body)?;
@@ -184,7 +230,7 @@ pub(super) fn main_function_closing_brace(source: &str) -> Option<usize> {
                 b'}' => {
                     braces = braces.checked_sub(1)?;
                     if braces == 0 {
-                        return Some(body);
+                        return Some(ParsedMainFunction { declaration: cursor, name, opening, closing: body });
                     }
                 }
                 _ => {}

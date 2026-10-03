@@ -1,6 +1,7 @@
 //! Batching of meshes, materials, lines, cracks and borders, and packing of their uniforms and draw streams.
 
 use crate::render::worldrender::*;
+use std::collections::HashSet;
 
 pub(in crate::render::worldrender) fn material_mode_uses_alpha_blending(mode: u32) -> bool {
     matches!(
@@ -31,6 +32,7 @@ pub(in crate::render::worldrender) const WORLD_BORDER_UNIFORM_BYTES: u64 =
     (WORLD_BORDER_HEADER_BYTES + WORLD_MAX_BORDER_QUADS * WORLD_BORDER_QUAD_BYTES) as u64;
 
 pub(in crate::render::worldrender) const WORLD_MATERIAL_HEADER_BYTES: usize = 144;
+pub(in crate::render::worldrender) const WORLD_SKY_MATERIAL_HEADER_BYTES: usize = 160;
 
 // Four copied lightmap coordinate pairs retain the source UV2 semantic for
 // material families such as weather.  Keeping this in the shared explicit
@@ -38,7 +40,7 @@ pub(in crate::render::worldrender) const WORLD_MATERIAL_HEADER_BYTES: usize = 14
 // material programs which declare a lightmap contract to consume it.
 pub(in crate::render::worldrender) const WORLD_MATERIAL_QUAD_BYTES: usize = 192;
 
-pub(in crate::render::worldrender) const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MATERIAL_HEADER_BYTES
+pub(in crate::render::worldrender) const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_SKY_MATERIAL_HEADER_BYTES
     + WORLD_MAX_MATERIAL_QUADS_PER_BATCH * WORLD_MATERIAL_QUAD_BYTES)
     as u64;
 
@@ -292,6 +294,8 @@ pub(in crate::render::worldrender) struct MeshBatchPlanKey {
     /// `instances` so their per-frame churn does not invalidate the plan.
     pub(in crate::render::worldrender) terrain_only: bool,
     pub(in crate::render::worldrender) instances: Vec<MeshBatchInstanceKey>,
+    /// Explicit original frame positions for a policy-selected subset.
+    pub(in crate::render::worldrender) instance_indices: Option<Vec<usize>>,
 }
 
 pub(in crate::render::worldrender) struct MeshBatchPlanCacheEntry {
@@ -934,8 +938,155 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
     g_buffer: bool,
     allow_optical: bool,
     selection: MeshBatchSelection,
-    mut sorted_indices: Option<&mut Vec<u8>>,
+    sorted_indices: Option<&mut Vec<u8>>,
     terrain_only: bool,
+) -> GalResult<Vec<MeshBatch>> {
+    mesh_batches_core_indices(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        allow_optical,
+        selection,
+        sorted_indices,
+        terrain_only,
+        None,
+    )
+}
+
+pub(in crate::render::worldrender) fn mesh_batches_filtered_indices(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    selection: MeshBatchSelection,
+    terrain_only: bool,
+    indices: &[usize],
+) -> GalResult<Vec<MeshBatch>> {
+    if indices
+        .last()
+        .is_some_and(|index| *index >= frame.mesh_instances.len())
+        || indices.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(GalError::invalid_argument(
+            "selected mesh indices must be in bounds and strictly increasing",
+        ));
+    }
+    // Removing the first occurrence of a shared mesh can change its batch's
+    // stable order; removing an intervening translucent draw can coalesce two
+    // previously distinct batches. Retain the established build-then-filter
+    // behavior for repeated mesh keys. Ordinary terrain uses one instance per
+    // mesh, so its independent ranges can be grouped after policy selection.
+    if mesh_batch_selection_has_repeated_mesh(frame, selection, terrain_only) {
+        let mut batches = mesh_batches_core_indices(
+            frame,
+            frontend,
+            color_format,
+            raster_y_direction,
+            g_buffer,
+            false,
+            selection,
+            None,
+            terrain_only,
+            None,
+        )?;
+        for batch in &mut batches {
+            batch
+                .indices
+                .retain(|index| indices.binary_search(index).is_ok());
+        }
+        batches.retain(|batch| !batch.indices.is_empty());
+        return Ok(batches);
+    }
+    mesh_batches_core_indices(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        false,
+        selection,
+        None,
+        terrain_only,
+        Some(indices),
+    )
+}
+
+pub(in crate::render::worldrender) fn mesh_batch_selection_has_repeated_mesh(
+    frame: &WorldPrimitiveFrame,
+    selection: MeshBatchSelection,
+    terrain_only: bool,
+) -> bool {
+    let mut mesh_keys =
+        HashSet::<u64, crate::render::vulkanic::gal::AccessHashBuilder>::with_capacity_and_hasher(
+            frame.mesh_instances.len(),
+            Default::default(),
+        );
+    frame
+        .mesh_instances
+        .iter()
+        .filter(|instance| {
+            selection.includes(instance)
+                && (!terrain_only || is_source_terrain_mesh_stratum(instance.stratum))
+                && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+        })
+        .any(|instance| !mesh_keys.insert(instance.mesh_key))
+}
+
+/// Checks immutable asset references even when a later policy culls the instance.
+pub(in crate::render::worldrender) fn mesh_batch_asset<'a>(
+    frame: &WorldPrimitiveFrame,
+    frontend: &'a WorldPrimitiveFrontend,
+    instance: &WorldMeshInstanceRequest,
+    allow_optical: bool,
+) -> GalResult<&'a MeshAssetStore> {
+    let asset = frontend
+        .mesh_assets
+        .get(&instance.mesh_key)
+        .ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "world mesh instance references unknown mesh key {}",
+                instance.mesh_key
+            ))
+        })?;
+    if asset.sections.iter().any(|section| {
+        matches!(
+            section.material_mode,
+            WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
+        )
+    }) && (!allow_optical || !frame.first_person.enabled)
+    {
+        return Err(GalError::unsupported_feature(
+            "optical stencil mesh sections require the enabled Rust-owned hand target",
+        ));
+    }
+    if instance.mesh_generation != asset_generation_for_key(instance.mesh_key, asset)? {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh instance generation {} does not match mesh {} generation",
+            instance.mesh_generation, instance.mesh_key
+        )));
+    }
+    if instance.mesh_section_index != WORLD_MESH_SECTION_ALL
+        && asset
+            .sections
+            .get(instance.mesh_section_index as usize)
+            .is_none()
+    {
+        return Err(GalError::invalid_argument(
+            "world mesh instance references missing section",
+        ));
+    }
+    Ok(asset)
+}
+
+fn mesh_batches_core_indices(
+    frame: &WorldPrimitiveFrame, frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat, raster_y_direction: RasterYDirection,
+    g_buffer: bool, allow_optical: bool, selection: MeshBatchSelection,
+    mut sorted_indices: Option<&mut Vec<u8>>, terrain_only: bool,
+    instance_indices: Option<&[usize]>,
 ) -> GalResult<Vec<MeshBatch>> {
     // Preserve first-seen batch order for deterministic submission, but use a
     // hash index for membership.  The previous ordered tree made terrain
@@ -943,15 +1094,21 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
     // contain thousands of section instances and many compatible ranges.
     // Ordering is represented by `batches`, so this changes lookup complexity
     // without changing semantic draw order or pipeline grouping.
-    let mut batches: Vec<MeshBatch> = Vec::with_capacity(frame.mesh_instances.len());
+    let capacity = instance_indices.map_or(frame.mesh_instances.len(), |indices| indices.len());
+    let mut batches: Vec<MeshBatch> = Vec::with_capacity(capacity);
     // Keys are Rust-built resource identities (no flooding concern); the
     // default SipHash dominated plan rebuilds with thousands of sections.
     let mut key_to_batch = HashMap::<
         (MeshResourceKey, Option<i32>),
         usize,
         crate::render::vulkanic::gal::AccessHashBuilder,
-    >::with_capacity_and_hasher(frame.mesh_instances.len(), Default::default());
+    >::with_capacity_and_hasher(capacity, Default::default());
+    let mut selected = instance_indices.map(|indices| indices.iter().copied().peekable());
     for (index, instance) in frame.mesh_instances.iter().enumerate() {
+        if let Some(indices) = selected.as_mut() {
+            if indices.peek() != Some(&index) { continue; }
+            indices.next();
+        }
         if !selection.includes(instance) {
             continue;
         }
@@ -964,33 +1121,7 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
             // batch where they would reveal an invisible entity body.
             continue;
         }
-        let asset = frontend
-            .mesh_assets
-            .get(&instance.mesh_key)
-            .ok_or_else(|| {
-                GalError::invalid_argument(format!(
-                    "world mesh instance references unknown mesh key {}",
-                    instance.mesh_key
-                ))
-            })?;
-        if asset.sections.iter().any(|section| {
-            matches!(
-                section.material_mode,
-                WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
-                    | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
-            )
-        }) && (!allow_optical || !frame.first_person.enabled)
-        {
-            return Err(GalError::unsupported_feature(
-                "optical stencil mesh sections require the enabled Rust-owned hand target",
-            ));
-        }
-        if instance.mesh_generation != asset_generation_for_key(instance.mesh_key, asset)? {
-            return Err(GalError::invalid_argument(format!(
-                "world mesh instance generation {} does not match mesh {} generation",
-                instance.mesh_generation, instance.mesh_key
-            )));
-        }
+        let asset = mesh_batch_asset(frame, frontend, instance, allow_optical)?;
         if instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 {
             geometry::translucent_order::append_batches(
                 instance,
@@ -1121,6 +1252,7 @@ pub(in crate::render::worldrender) fn mesh_batch_plan_key(
         allow_optical,
         selection: MeshBatchSelection::All,
         terrain_only: false,
+        instance_indices: None,
         instances: frame
             .mesh_instances
             .iter()
@@ -1643,18 +1775,24 @@ pub(in crate::render::worldrender) fn packed_material_uniforms_for_batch(
         &mut out,
         assets::material_registry::cutout_threshold(batch.key.material_id),
     );
-    // The compact material ABI reserves the fourth header component for the
-    // explicit cloud-only fog range. This preserves the existing header and
-    // makes the source-family boundary visible to the Rust shader without
-    // routing cloud work through generic terrain fog or Java state.
+    // The fourth lane carries only a family's own sky/cloud fog range.
+    // Generic materials keep zero; the typed dark-disc variant appends its
+    // fog color without shifting the ordinary material or compact-box records.
     push_f32(
         &mut out,
         if batch.key.source_program == WORLD_MATERIAL_SOURCE_CLOUDS {
             frame.shader_environment.fog_clouds_end
+        } else if batch.key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
+            frame.shader_environment.fog_sky_end
         } else {
             0.0
         },
     );
+    if batch.key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
+        for value in frame.shader_environment.fog_parameter_color {
+            push_f32(&mut out, value);
+        }
+    }
     for index in &batch.indices {
         let quad = &frame.material_quads[*index];
         for (vertex_index, vertex) in layered_material_vertices(quad).iter().enumerate() {

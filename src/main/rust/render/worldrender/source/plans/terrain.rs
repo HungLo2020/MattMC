@@ -34,12 +34,16 @@ pub(crate) struct PreparedNamedSourceTerrainFramePlan {
     /// different named output schema and this writer must load, never clear,
     /// the opaque/cutout colors and depth.
     pub(in crate::render::worldrender) translucent_targets: Option<TerrainSourceColorPassTargets>,
-    /// Source-defined pre-terrain writers. The sky initializer and textured
+    /// Source-defined begin/prepare and sky writers. The sky initializer and textured
     /// celestial writer are distinct source stages, but share the same
     /// Rust-owned color transaction and must execute before opaque terrain.
     pub(in crate::render::worldrender) pre_terrain_sky: Vec<PreparedNamedSourceFullscreenConsumer>,
     pub(in crate::render::worldrender) color_transaction: ShaderPackSourceColorFrameTransaction,
     pub(in crate::render::worldrender) bootstrap_operations: Vec<CommandOp>,
+}
+
+fn is_begin_source_stage(path: &str) -> bool {
+    path.rsplit('/').next().is_some_and(|name| name.starts_with("begin") && name.ends_with(".fsh"))
 }
 
 impl PreparedNamedSourceTerrainFramePlan {
@@ -81,7 +85,7 @@ impl PreparedNamedSourceTerrainFramePlan {
             && self.hands.as_ref().is_some_and(|hands| hands.copies_world_depth)
             && self.main_depth_history.is_some();
         operations.append(&mut self.bootstrap_operations);
-        for sky in &self.pre_terrain_sky {
+        for sky in self.pre_terrain_sky.iter().filter(|stage| is_begin_source_stage(&stage.program.source_stage_path)) {
             let operation_start = operations.len();
             sky.append(&mut self.color_transaction, operations)?;
             require_source_fullscreen_writer_coverage(
@@ -120,12 +124,38 @@ impl PreparedNamedSourceTerrainFramePlan {
                 "named source terrain draws require an explicit Rust-owned shadow target",
             ));
         }
+        for sky in self.pre_terrain_sky.iter().filter(|stage| !is_begin_source_stage(&stage.program.source_stage_path)) {
+            let operation_start = operations.len();
+            sky.append(&mut self.color_transaction, operations)?;
+            require_source_fullscreen_writer_coverage(
+                "pre-terrain sky",
+                &operations[operation_start..],
+            )?;
+            if let Some(capture) =
+                pre_terrain_sky_capture.filter(|capture| capture.matches_fullscreen_consumer(sky))
+            {
+                capture.append_ops(
+                    // The fullscreen source writer finishes with its named
+                    // outputs in shader-read state.  The diagnostic copy must
+                    // describe that actual state rather than replaying the
+                    // attachment state from before the writer.
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::ShaderRead,
+                    operations,
+                )?;
+            }
+        }
         // Iris + DH (Frozen LevelRenderer): DH draws its opaque LODs from
         // prepareChunkRenders, after the sky and immediately before vanilla
         // opaque terrain, which then paints over DH wherever it draws.
         append_before_opaque_terrain(&mut self.color_transaction, operations)?;
-        // The source terrain pass is the writer of the current opaque depth.
+        // Resolve against writers recorded in this exact transaction, then
+        // publish opaque outputs before any deferred/feedback consumer.
+        self.color_transaction.resolve_terrain_color_clear_policy(&mut self.targets.color_attachments)?;
         runtime.append_terrain_source_color_pass(operations, &self.targets, &draws)?;
+        let bootstrap_output_roles = self.targets.color_attachments.iter()
+            .map(|attachment| attachment.role.clone()).collect::<Vec<_>>();
+        self.color_transaction.record_external_outputs(&bootstrap_output_roles)?;
         if let Some(entities) = self.entities {
             runtime.append_entity_source_color_pass(
                 operations,
@@ -376,14 +406,6 @@ impl PreparedNamedSourceTerrainFramePlan {
             self.color_transaction
                 .record_external_outputs(&hand_output_roles)?;
         }
-        let bootstrap_output_roles = self
-            .targets
-            .color_attachments
-            .iter()
-            .map(|attachment| attachment.role.clone())
-            .collect::<Vec<_>>();
-        self.color_transaction
-            .record_external_outputs(&bootstrap_output_roles)?;
         if let Some((targets, history)) = self.main_depth_history.filter(|_| !hands_before_deferred) {
             // Legacy (DH-combined / stencil-hand) ordering: depthtex2 is copied
             // immediately before the late first-person writer.
@@ -454,8 +476,8 @@ impl WorldPrimitiveFrontend {
         depth_texture: Handle,
         depth_view: Handle,
         shadow_targets: TerrainSourceShadowPassTargets,
-        clear_values: ShaderPackColorBootstrapClearValues,
-        source_sky_initializer: bool,
+        clear_values: ShaderPackColorClearValues,
+        source_color_initializer: bool,
     ) -> GalResult<PreparedNamedSourceTerrainFramePlan> {
         if world_generation == 0 {
             return Err(GalError::invalid_argument(
@@ -514,9 +536,8 @@ impl WorldPrimitiveFrontend {
             }
         }
         let result = (|| -> GalResult<PreparedNamedSourceTerrainFramePlan> {
-            let mut __plan_seg = std::time::Instant::now();
-            let terrain_phase = if source_sky_initializer {
-                TerrainSourceColorPassPhase::BootstrapAfterSky
+            let terrain_phase = if source_color_initializer {
+                TerrainSourceColorPassPhase::BootstrapAfterInitialization
             } else {
                 TerrainSourceColorPassPhase::for_program(&programs.opaque)
             };
@@ -588,9 +609,10 @@ impl WorldPrimitiveFrontend {
                         WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
                     )
             });
+            let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?.ok_or_else(|| GalError::unsupported_feature("source shadow policy requires a dimension scope"))?;
             let shadow_policy = self
                 .shader_pack_sources
-                .active_shadow_policy()
+                .active_shadow_policy_for_scope(scope)?
                 .filter(|policy| policy.generation() == shader_pack_generation)
                 .ok_or_else(|| GalError::invalid_argument("named source shadow policy generation is missing or stale"))?;
             let render_translucent_shadows = shadow_policy.render_translucent();
@@ -600,11 +622,16 @@ impl WorldPrimitiveFrontend {
             {
                 Vec::new()
             } else {
-                let frustum = crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame(
+                let frustum = crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame_with_distances(
                     shadow_policy,
                     frame.shader_environment.time_of_day,
                     frame.projection_matrix,
                     frame.view_matrix,
+                    crate::render::shaderpack::properties::shadow::ShadowCasterFrameDistances {
+                        render_distance_blocks: frame.shader_environment.far_plane,
+                        configured_shadow_distance_chunks: frame.shader_environment.configured_shadow_distance_chunks,
+                    },
+                    crate::render::shaderpack::properties::shadow::ShadowCasterKind::Terrain,
                 )?;
                 shadow_batches
                     .iter()
@@ -627,33 +654,11 @@ impl WorldPrimitiveFrontend {
             // casts; otherwise only the local player when `shadowPlayer`.
             // Block entities follow `shadowBlockEntities`. Casters are cloned
             // onto the ordinary entity stratum for the shared entity stream.
-            let entity_shadow_casters: Vec<WorldMeshInstanceRequest> =
+            let entity_shadow_casters =
                 if terrain_program_scope_for_sky_type(frame.background.sky_type)?
                     == Some(TerrainProgramScope::Overworld)
                 {
-                    let casters = shadow_policy.casters();
-                    frame
-                        .mesh_instances
-                        .iter()
-                        .filter(|instance| match instance.stratum {
-                            WORLD_STRATUM_ENTITY_MESH => {
-                                casters.entities
-                                    && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
-                                    && instance.item_foil.is_none()
-                                    && instance.decal_foil.is_none()
-                                    && (instance.block_entity_id == -1 || casters.block_entities)
-                            }
-                            WORLD_STRATUM_ENTITY_SHADOW_CASTER => {
-                                casters.entities || casters.player
-                            }
-                            _ => false,
-                        })
-                        .map(|instance| {
-                            let mut caster = instance.clone();
-                            caster.stratum = WORLD_STRATUM_ENTITY_MESH;
-                            caster
-                        })
-                        .collect()
+                    select_source_entity_shadow_casters(frame, shadow_policy)?
                 } else {
                     Vec::new()
                 };
@@ -1208,7 +1213,6 @@ impl WorldPrimitiveFrontend {
                     GalError::invalid_argument("shadow-only source stream reservation overflows")
                 })
             })?;
-            whole_frame_phase_trace("source-plan.setup", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let textured_material_stream_bytes = match textured_material_program.as_ref() {
                 Some(program) => source_material_batch_stream_bytes(
                     program,
@@ -1426,7 +1430,6 @@ impl WorldPrimitiveFrontend {
                 })
                 .sum::<u64>();
             self.reserve_source_terrain_multidraw_commands(gal, frame.frame_id, multidraw_commands)?;
-            whole_frame_phase_trace("source-plan.streams", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let mut draws = Vec::new();
             // Batches of one pass share their uniform frame; only the render
             // stage differs by pass, so build each variant once per frame.
@@ -1576,6 +1579,7 @@ impl WorldPrimitiveFrontend {
                         batch.key.material_mode,
                         batch.key.cull_policy,
                         batch.key.winding,
+                        shadow_alpha_cutoff,
                     )?;
                     if terrain_draws.len() != shadow_draws.len() {
                         return Err(GalError::invalid_argument(
@@ -1592,7 +1596,6 @@ impl WorldPrimitiveFrontend {
                 }
                 draws.extend(terrain_draws);
             }
-            whole_frame_phase_trace("source-plan.terrain-camera", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let mut shadow_only_draws = Vec::new();
             for batch in selected_shadow_batches {
                 if batch.key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT
@@ -1634,11 +1637,11 @@ impl WorldPrimitiveFrontend {
                     batch.key.material_mode,
                     batch.key.cull_policy,
                     batch.key.winding,
+                    shadow_alpha_cutoff,
                 )?);
             }
             self.source_terrain_batch_scope = None;
             self.write_selected_source_terrain_transform_receipt(frame, &transform_probes);
-            whole_frame_phase_trace("source-plan.terrain-shadow-only", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let textured_material = match (
                 textured_material_program.as_ref(),
                 textured_material_targets,
@@ -1939,7 +1942,6 @@ impl WorldPrimitiveFrontend {
                     ));
                 }
             };
-            whole_frame_phase_trace("source-plan.materials-weather-clouds-lines", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let entities = match (
                 entity_program.as_ref(),
                 entity_targets,
@@ -2183,7 +2185,6 @@ impl WorldPrimitiveFrontend {
             // their draws. Fold those uploads into the same frame transaction
             // before taking it, preserving upload-before-draw ordering.
             self.absorb_pending_source_material_texture_uploads(frame.frame_id)?;
-            whole_frame_phase_trace("source-plan.entities-hands", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let terrain = match self.take_source_terrain_frame_transaction(frame.frame_id) {
                 Ok(transaction) => PreparedLoweredSourceTerrainFramePlan {
                     frame_id: frame.frame_id,

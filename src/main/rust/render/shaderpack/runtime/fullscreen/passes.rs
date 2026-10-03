@@ -40,7 +40,7 @@ pub(crate) struct FullscreenSourcePassFrame {
     pub texture_transform_before: TextureUsageState,
     pub scalar_uniform_before: Option<TextureUsageState>,
     /// Frame semantic clear values for pack-declared color targets.
-    pub clear_values: ShaderPackColorBootstrapClearValues,
+    pub clear_values: ShaderPackColorClearValues,
     /// Exact lowered GLSL output-location order of the compiled render target.
     pub color_attachment_before: Vec<TextureUsageState>,
     /// Per-target first-use clear decision from the source color frame plan.
@@ -64,7 +64,29 @@ impl PreparedFullscreenSourcePass {
         external_inputs: impl IntoIterator<Item = TerrainSourceOwnedResourceSet>,
     ) -> GalResult<Self> {
         let color_resources = prepare_fullscreen_source_color_resources(gal, program, targets)?;
-        let mut input_sets = external_inputs.into_iter();
+        // Geometry admission snapshots can contain that program's current
+        // color samplers. This stage owns its feedback/mipmap selection and
+        // must not inherit those bindings. Exclude only the explicitly owned
+        // color subset; retain strict conflict checks for every other role.
+        let stage_color_roles = color_resources.resources().availability().resources()
+            .map(|resource| resource.role).collect::<Vec<_>>();
+        let input_sets = external_inputs.into_iter().map(|resources| {
+            if resources.availability().shader_pack_generation() != targets.identity.shader_pack_generation
+                || resources.availability().world_generation() != targets.identity.world_generation
+            {
+                return Err(GalError::invalid_argument(
+                    "fullscreen source snapshot belongs to a different shader-pack or world generation",
+                ));
+            }
+            resources.excluding_roles(stage_color_roles.iter().cloned())
+        }).collect::<GalResult<Vec<_>>>();
+        let mut input_sets = match input_sets {
+            Ok(sets) => sets.into_iter(),
+            Err(error) => {
+                color_resources.destroy(gal);
+                return Err(error);
+            }
+        };
         let Some(mut inputs) = input_sets.next() else {
             color_resources.destroy(gal);
             return Err(GalError::invalid_argument(

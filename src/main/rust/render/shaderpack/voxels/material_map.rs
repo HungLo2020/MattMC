@@ -502,6 +502,7 @@ mod tests {
             operations: vec![TerrainPassOperation::ColoredVoxelLighting],
             required_resources: BTreeSet::new(),
             voxel_light_volume_requirements: None,
+            normal_alpha_test: Default::default(),
             translucent_raster_state: None,
             unsupported: BTreeSet::new(),
         }

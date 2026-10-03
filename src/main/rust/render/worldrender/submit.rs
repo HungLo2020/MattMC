@@ -117,6 +117,29 @@ impl WorldPrimitiveFrontend {
         gui_ops: Vec<CommandOp>,
         owned_world_direction: Option<RasterYDirection>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
+        #[cfg(not(test))]
+        let mut frame = frame;
+        #[cfg(not(test))]
+        {
+            self.disarm_source_route_on_extent_change(&frame);
+            self.prepare_runtime_source_before_presentation(gal, generation, frame_target, &mut frame)?;
+        }
+        self.submit_whole_frame_with_initial_ops(
+            gal, generation, frame_target, frame, gui_ops, owned_world_direction, Vec::new(), false,
+        )
+    }
+
+    pub(super) fn submit_whole_frame_with_initial_ops(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        gui_ops: Vec<CommandOp>,
+        owned_world_direction: Option<RasterYDirection>,
+        mut pre_graph_ops: Vec<CommandOp>,
+        preparing_source_entry: bool,
+    ) -> GalResult<WorldPrimitiveSubmitStats> {
         if owned_world_direction.is_some()
             && (!gal.capabilities().supports(BackendFeature::TextureRowReversal)
                 || self.runtime_source_execution_is_armed())
@@ -130,7 +153,7 @@ impl WorldPrimitiveFrontend {
         self.pending_translucent_capture_written = false;
         self.pending_lod_direct_composition_written = false;
         self.pending_lod_ssao_written = false;
-        self.pending_lod_vanilla_snapshot_written = false;
+        self.pending_lod_vanilla_sample_state_established = false;
         self.pending_entity_outline_targets_written = false;
         self.pending_terrain_external_item_entity_written = false;
         #[cfg(test)]
@@ -151,7 +174,9 @@ impl WorldPrimitiveFrontend {
         #[cfg(not(test))]
         let frame = self.admit_armed_source_frame(frame);
         #[cfg(not(test))]
-        self.report_shader_route_outcome(&frame);
+        if frame_target.kind() == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget) {
+            self.report_shader_route_outcome(&frame);
+        }
         #[cfg(not(test))]
         if self.runtime_source_execution_is_armed() {
             self.write_runtime_source_admission_status(
@@ -171,6 +196,7 @@ impl WorldPrimitiveFrontend {
         }
         if self.frame_has_fabulous_transparency_work(&frame)
             && !self.pending_terrain_fabulous_handoff
+            && !preparing_source_entry
         {
             self.validate_fabulous_material_sources(&frame)?;
             // Admit only complete semantic frames; never drop an unsupported
@@ -243,7 +269,6 @@ impl WorldPrimitiveFrontend {
         // Keep a bounded semantic snapshot only when the private runtime is
         // installed. Normal submissions retain their existing allocation and
         // routing cadence.
-        let mut pre_graph_ops = Vec::new();
         // Persistent attachment state is committed only after the enclosing
         // submission succeeds.  Command construction can still be discarded
         // by a later validation/resource step, so recording it eagerly would
@@ -454,13 +479,14 @@ impl WorldPrimitiveFrontend {
             Some(graph_target_started),
         );
         let graph_started = std::time::Instant::now();
-        let (graph_ops, mut stats) = match self.append_frame_ops_inner(
+        let (graph_ops, mut stats) = match self.append_frame_ops_inner_with_source_preparation(
             gal,
             generation,
             graph_target,
             graph_frame,
             true,
             graph_direction,
+            preparing_source_entry,
         ) {
             Ok(result) => result,
             Err(error) => {
@@ -1115,7 +1141,9 @@ impl WorldPrimitiveFrontend {
         }
         self.pending_terrain_fabulous_handoff = false;
         self.fabulous_attachment_set_initialized = true;
-        gal.commit_frame_target_depth_write(frame_target)?;
+        if frame_target.kind() == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget) {
+            gal.commit_frame_target_depth_write(frame_target)?;
+        }
         if owned_world_target && gameplay_attachment_capture.is_some() {
             eprintln!("[VulkanicGAL] owned-world-output frame={} submission={} raster={:?} rowReverse={} colorCopy=true depthCopy=true presenter=existing-frame-owner",
                 world_frame_id, token.submission.0, graph_direction, graph_direction == RasterYDirection::Down);
@@ -1146,9 +1174,9 @@ impl WorldPrimitiveFrontend {
             self.lod_ssao_initialized = true;
             self.pending_lod_ssao_written = false;
         }
-        if self.pending_lod_vanilla_snapshot_written {
-            self.lod_vanilla_snapshot_initialized = true;
-            self.pending_lod_vanilla_snapshot_written = false;
+        if self.pending_lod_vanilla_sample_state_established {
+            self.lod_vanilla_sample_state_initialized = true;
+            self.pending_lod_vanilla_sample_state_established = false;
         }
         if self.pending_entity_outline_targets_written {
             self.entity_outline_targets_initialized = true;
@@ -1319,10 +1347,10 @@ impl WorldPrimitiveFrontend {
             let reads = gal.completed_host_reads().to_vec();
             capture.write_artifacts(gal, reads, token.submission.0, &stats)?;
         }
-        // The source route can become eligible only after this normal Rust
-        // submission has confirmed its voxel/lightmap work. A later frame
-        // performs its own exact-frame preparation before it is allowed to
-        // execute the selected source graph.
+        // The source route requires confirmation of this normal graph's
+        // voxel/lightmap work. At world entry this graph targets private
+        // attachments, then the same semantic frame rebuilds admission and
+        // executes the selected source graph into the acquired image.
         if let Some(source_frame_for_admission) = source_activation_frame.as_ref() {
             self.arm_runtime_source_execution_if_ready(source_frame_for_admission);
             // Pre-submit status establishes that source resources were staged;
@@ -1497,6 +1525,8 @@ impl WorldPrimitiveFrontend {
         gui_blur_radius: i32,
         gui_tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
+        let creates_before = gal.metrics().resource_creates;
+        let destroys_before = gal.metrics().resource_destroys;
         gal.begin_command_recording()?;
         let result = self.submit_whole_frame_with_tiled_gui_frontend_recorded(
             gal,
@@ -1520,6 +1550,13 @@ impl WorldPrimitiveFrontend {
             finish.map(|()| {
                 stats.profile.gal.gal_command_recording_finish_nanos = finish_nanos;
                 stats.profile.gal.gal_command_recording_deferred_destroys = deferred_destroy_count;
+                // SubmitProfile alone excludes frontend preparation and the
+                // retirement boundary. This embedded profile covers the whole
+                // accepted world/GUI attempt, including both lifecycle phases.
+                stats.profile.gal.resource_creates_delta =
+                    gal.metrics().resource_creates.saturating_sub(creates_before);
+                stats.profile.gal.resource_destroys_delta =
+                    gal.metrics().resource_destroys.saturating_sub(destroys_before);
                 (stats, gui_stats)
             })
         })
@@ -1542,6 +1579,10 @@ impl WorldPrimitiveFrontend {
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
         self.discard_stale_pending_vanilla_lightmap(gal);
         self.disarm_source_route_on_extent_change(&frame);
+        #[cfg(not(test))]
+        let mut frame = frame;
+        #[cfg(not(test))]
+        self.prepare_runtime_source_before_presentation(gal, generation, frame_target, &mut frame)?;
         #[cfg(not(test))]
         let frame = self.admit_armed_source_frame(frame);
         #[cfg(not(test))]

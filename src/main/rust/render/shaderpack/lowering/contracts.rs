@@ -10,9 +10,13 @@ pub struct TerrainSourceUniformContract {
     pub(super) declarations: Vec<String>,
     pub(super) fields: Vec<TerrainSourceUniformField>,
     pub(super) std140_size: u32,
+    pub(super) custom_uniforms: BTreeMap<String, crate::render::shaderpack::properties::custom_uniforms::CustomUniformDefinition>,
 }
 
 impl TerrainSourceUniformContract {
+    pub(crate) fn custom_uniforms(&self) -> &BTreeMap<String, crate::render::shaderpack::properties::custom_uniforms::CustomUniformDefinition> {
+        &self.custom_uniforms
+    }
     pub fn declarations(&self) -> &[String] {
         &self.declarations
     }

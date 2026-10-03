@@ -62,6 +62,8 @@ pub(crate) enum DistantHorizonsSourceCandidateState {
         /// Distant Horizons source mode as the DH writer. This is separate
         /// from the normal-world chain because a pack may branch on
         /// `DISTANT_HORIZONS` while consuming the same named color targets.
+        pre_terrain_preparation: Vec<FullscreenSourceStagePreparation>,
+        pre_terrain_preparation_error: Option<String>,
         post_terrain_preparation: Vec<FullscreenSourceStagePreparation>,
         post_terrain_preparation_error: Option<String>,
     },
@@ -322,7 +324,7 @@ impl ShaderPackRuntimeExecutor {
                 };
                 let source_color_targets: GalResult<_> = (|| -> GalResult<_> {
                     let bindings = TerrainSourceResourceBindings::from_source(source)?;
-                    ShaderPackColorTargetManifest::from_source(source, &bindings)
+                    ShaderPackColorTargetManifest::from_source_for_scope(source, &bindings, scope)
                 })();
                 let source_color_target_count = source_color_targets
                     .as_ref()
@@ -487,6 +489,13 @@ impl ShaderPackRuntimeExecutor {
                             }
                         })
                         .collect();
+                let (pre_terrain_preparation, pre_terrain_preparation_error) =
+                    match derive_pre_terrain_fullscreen_source_chain(source, scope) {
+                        Ok(stages) => (stages.iter().map(|stage|
+                            prepare_fullscreen_source_stage(source, stage, FullscreenSourceMode::DistantHorizons)
+                        ).collect(), None),
+                        Err(error) => (Vec::new(), Some(error.to_string())),
+                    };
                 let (post_terrain_preparation, post_terrain_preparation_error) =
                     match derive_fullscreen_source_chain(source, scope) {
                         Ok(stages) => (
@@ -529,6 +538,8 @@ impl ShaderPackRuntimeExecutor {
                     source_color_target_gal_schema_error,
                     source_color_targets: source_color_targets.ok(),
                     depth_consumer_preparation,
+                    pre_terrain_preparation,
+                    pre_terrain_preparation_error,
                     post_terrain_preparation,
                     post_terrain_preparation_error,
                 }

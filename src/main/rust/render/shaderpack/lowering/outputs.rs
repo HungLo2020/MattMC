@@ -14,6 +14,9 @@ pub enum FullscreenSourceRasterPrimitive {
     /// wedges. This preserves the source program's real geometric depth field
     /// for `gl_FragCoord.z` ray reconstruction.
     VanillaSkyDisc,
+    /// Iris's enclosing octagonal horizon and tiled top/bottom planes, drawn
+    /// before the vanilla disc through the same selected sky source.
+    ShaderPackHorizon,
     /// Vanilla's sun/moon quad geometry, reconstructed from copied sky
     /// semantics and source-pack configuration. It owns both positions and
     /// UVs; no SkyRenderer buffer, Iris vertex format, or native state is
@@ -29,6 +32,7 @@ impl FullscreenSourceRasterPrimitive {
         match self {
             Self::FullscreenTriangle => 3,
             Self::VanillaSkyDisc => 24,
+            Self::ShaderPackHorizon => 2_076,
             Self::VanillaCelestialQuad => 36,
         }
     }
@@ -145,7 +149,7 @@ impl TranslucentTerrainFragmentOutput {
         }
     }
 
-    pub(super) fn semantic_name(self) -> &'static str {
+    pub(crate) fn semantic_name(self) -> &'static str {
         match self {
             Self::LitColor => "out_terrain_lit_color",
             Self::TranslucencyAuxiliary => "out_terrain_translucency_auxiliary",
@@ -163,7 +167,7 @@ impl TerrainFragmentOutput {
         }
     }
 
-    pub(super) fn semantic_name(self) -> &'static str {
+    pub(crate) fn semantic_name(self) -> &'static str {
         match self {
             Self::LitColor => "out_terrain_lit_color",
             Self::MaterialAuxiliary => "out_terrain_material_auxiliary",

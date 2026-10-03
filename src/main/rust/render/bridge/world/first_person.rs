@@ -120,6 +120,8 @@ pub(super) unsafe fn decode_world_first_person_mesh_instances(
             "world first-person mesh viewport height",
         )?;
         instances.push(WorldMeshInstanceRequest {
+            entity_culling: decode_entity_culling(instance, true)?,
+
             model_submission_order: decode_model_submission_order(instance)?,
             item_foil: decode_world_item_foil(instance)?,
             decal_foil: decode_world_decal_foil(instance, true)?,

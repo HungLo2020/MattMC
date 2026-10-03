@@ -670,8 +670,8 @@ impl GameplayAttachmentCapture {
         Self::select_for_frame(frame, generation, resource_generation, conventions, false)
     }
 
-    /// The selected-source graph is admitted a frame after the normal graph
-    /// prepares its exact semantic snapshot. A pending request is deliberately
+    /// The selected-source graph is admitted after private preparation of its
+    /// exact semantic snapshot. A pending request is deliberately
     /// invisible to the normal graph and may only be promoted by this path.
     pub(in crate::render::worldrender) fn select_source(
         frame: &WorldPrimitiveFrame,
@@ -1119,6 +1119,33 @@ impl GameplayAttachmentCapture {
             TextureUsageState::TransferSrc,
             TextureUsageState::ShaderRead,
         )));
+        Ok(())
+    }
+
+    /// Observe the two opaque depth snapshots actually consumed by the source
+    /// graph. Source DH writes shared pack colors, so a normal-route private
+    /// color attachment cannot establish its visible extension. This remains
+    /// opt-in and bounded to the already claimed screenshot submission.
+    pub(in crate::render::worldrender) fn append_source_dh_depth_coverage(
+        &mut self,
+        gal: &mut VulkanicGal,
+        ops: &mut Vec<CommandOp>,
+        main_opaque_depth: Handle,
+        dh_opaque_depth: Handle,
+    ) -> GalResult<()> {
+        if !self.lod_route_selected
+            || crate::core::environment::var("MATTMC_RUST_SOURCE_DH_DEPTH_COVERAGE")
+                .as_deref()
+                != Ok("1")
+        {
+            return Ok(());
+        }
+        for (name, texture) in [
+            ("source_main_opaque_depth", main_opaque_depth),
+            ("source_dh_opaque_depth", dh_opaque_depth),
+        ] {
+            self.append_shader_read_attachment(gal, ops, name, texture, TextureFormat::Depth32Float)?;
+        }
         Ok(())
     }
 
@@ -1570,6 +1597,8 @@ impl GameplayAttachmentCapture {
                 gameplay_attachment_capture_scope(
                     self.final_output_only,
                     self.g_buffer_attachments_available,
+                    self.readbacks.contains_key("source_main_opaque_depth")
+                        && self.readbacks.contains_key("source_dh_opaque_depth"),
                 ),
                 if self.readback_rows_bottom_up {
                     "bottom-left"
@@ -1611,6 +1640,13 @@ impl GameplayAttachmentCapture {
                 ))
             })
         })();
+        self.discard(gal);
+        write_result
+    }
+
+    /// Release frame-local diagnostic owners after completion or rejection of
+    /// an unsubmitted command stream; never destroy an in-flight readback.
+    pub(in crate::render::worldrender) fn discard(mut self, gal: &mut VulkanicGal) {
         for (_, readback) in std::mem::take(&mut self.readbacks) {
             let _ = gal.destroy(readback);
         }
@@ -1623,15 +1659,17 @@ impl GameplayAttachmentCapture {
         for texture in std::mem::take(&mut self.normal_presented_textures) {
             let _ = gal.destroy(texture);
         }
-        write_result
     }
 }
 
 pub(in crate::render::worldrender) fn gameplay_attachment_capture_scope(
     final_output_only: bool,
     g_buffer_attachments_available: bool,
+    source_dh_depth_coverage: bool,
 ) -> &'static str {
-    if final_output_only {
+    if source_dh_depth_coverage {
+        "source-dh-depth-coverage"
+    } else if final_output_only {
         "final-output-only"
     } else if g_buffer_attachments_available {
         "full-attachments"
@@ -1841,11 +1879,11 @@ pub(in crate::render::worldrender) fn parse_capture_request_bool(path: &Path, ke
 pub(in crate::render::worldrender) fn attachment_evidence_json_for_format(
     width: u32,
     height: u32,
-    name: &str,
+    _name: &str,
     format: TextureFormat,
     bytes: &[u8],
 ) -> String {
-    if name == "shadow_depth" || name == "main_depth" {
+    if format == TextureFormat::Depth32Float {
         let mut finite = 0usize;
         let mut less_than_clear = 0usize;
         let mut min_value = 1.0f32;
@@ -1856,13 +1894,13 @@ pub(in crate::render::worldrender) fn attachment_evidence_json_for_format(
                 finite += 1;
                 min_value = min_value.min(value);
                 max_value = max_value.max(value);
-                if value < 0.999 {
+                if value < 1.0 {
                     less_than_clear += 1;
                 }
             }
         }
         return format!(
-            "{{\"kind\":\"depth\",\"width\":{},\"height\":{},\"finite_samples\":{},\"less_than_clear\":{},\"min\":{:.6},\"max\":{:.6}}}",
+            "{{\"kind\":\"depth\",\"format\":\"Depth32Float\",\"clear_depth\":1,\"width\":{},\"height\":{},\"finite_samples\":{},\"less_than_clear\":{},\"min\":{:.6},\"max\":{:.6}}}",
             width, height, finite, less_than_clear, min_value, max_value
         );
     }

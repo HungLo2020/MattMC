@@ -585,6 +585,23 @@ pub fn prepare_lowered_textured_material_source_program(
             "textured material source maps multiple outputs to one semantic named target",
         ));
     }
+    // The shared colored-texture stream includes ordinary particles. Iris
+    // tests their primary output even when the producer uses opaque blending;
+    // alpha-zero texels must preserve the existing scene and depth.
+    let fragment_source = match contract.alpha_cutoff_bits.map(f32::from_bits) {
+        None => lowered.fragment().source().to_string(),
+        Some(cutoff) => {
+            if !cutoff.is_finite() || !(0.0..=1.0).contains(&cutoff) {
+                return Err(GalError::invalid_argument(
+                    "textured material alpha cutoff must be finite and in [0, 1]",
+                ));
+            }
+            let renamed = crate::render::shaderpack::lowering::rename_glsl_main(&lowered.fragment().source(), "vulkanic_source_textured_main")?;
+            format!(
+                "{renamed}\nvoid main() {{\n    vulkanic_source_textured_main();\n    if (!(out_textured_material_lit_color.a > {cutoff:?})) discard;\n}}\n"
+            )
+        }
+    };
     let program = LoweredTexturedMaterialSourceProgram {
         identity: ProgramIdentity::new(format!(
             "vulkanic:shader-pack/{}/textured_material_source_gen{}{}",
@@ -602,7 +619,7 @@ pub fn prepare_lowered_textured_material_source_program(
         fragment: ShaderStageSource {
             stage: ShaderStageKind::Fragment,
             label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
-            source: lowered.fragment().source().to_string(),
+            source: fragment_source,
             entry_point: "main".to_string(),
         },
         execution_interface,
@@ -769,15 +786,8 @@ pub fn prepare_lowered_damaged_block_source_program(
                     "damagedblock alpha cutoff must be finite and in [0, 1]",
                 ));
             }
-            let renamed = lowered
-                .fragment()
-                .source()
-                .replacen("void main()", "void vulkanic_damaged_block_main()", 1);
-            if renamed == lowered.fragment().source() {
-                return Err(GalError::unsupported_feature(
-                    "damagedblock source has no main function for the alpha test",
-                ));
-            }
+            let renamed = crate::render::shaderpack::lowering::rename_glsl_main(
+                lowered.fragment().source(), "vulkanic_damaged_block_main")?;
             format!(
                 "{renamed}\nvoid main() {{\n    vulkanic_damaged_block_main();\n    if (!(out_cloud_lit_color.a > {cutoff:.8})) discard;\n}}\n"
             )

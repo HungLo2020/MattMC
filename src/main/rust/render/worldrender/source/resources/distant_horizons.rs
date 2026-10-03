@@ -487,12 +487,7 @@ impl WorldPrimitiveFrontend {
                 )
             })?
             .stage_distant_horizons_source_color_resources(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         let depth_resources = targets.semantic_resources()?;
         let unique_depth_resources = depth_resources.excluding_roles_already_owned_by(&merged)?;
         let merged = if unique_depth_resources.len() == 0 {

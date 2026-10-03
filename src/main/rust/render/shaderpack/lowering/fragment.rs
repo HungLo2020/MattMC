@@ -286,6 +286,21 @@ pub(super) fn lower_textured_material_fragment_surface_with_contracts(
     varying_contract: &TerrainSourceVaryingContract,
     opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
 ) -> GalResult<LoweredTexturedMaterialFragmentSource> {
+    let slots = crate::render::shaderpack::contracts::terrain::parse_draw_buffers_slots(
+        source.expanded_source(),
+    )?;
+    let required_outputs: &[TexturedMaterialFragmentOutput] = match slots.as_slice() {
+        [_] => &[TexturedMaterialFragmentOutput::LitColor],
+        [0, 6, 3] => &[
+            TexturedMaterialFragmentOutput::LitColor,
+            TexturedMaterialFragmentOutput::MaterialAuxiliary,
+            TexturedMaterialFragmentOutput::TranslucencyAuxiliary,
+        ],
+        _ => return Err(GalError::unsupported_feature(format!(
+            "textured material fragment '{}' has unsupported DRAWBUFFERS schema {slots:?}",
+            source.entry_path(),
+        ))),
+    };
     let mut lowered = upgrade_version(source.expanded_source())?;
     lowered = strip_nonopaque_uniforms(&lowered)?;
     let uses_legacy_fog = lower_legacy_fog(&mut lowered);
@@ -304,11 +319,7 @@ pub(super) fn lower_textured_material_fragment_surface_with_contracts(
     lowered = apply_varying_locations(&lowered, VaryingStorage::In, varying_contract)?;
     lowered = apply_opaque_resource_bindings(&lowered, opaque_resource_contract)?;
     let mut outputs = Vec::new();
-    for output in [
-        TexturedMaterialFragmentOutput::LitColor,
-        TexturedMaterialFragmentOutput::MaterialAuxiliary,
-        TexturedMaterialFragmentOutput::TranslucencyAuxiliary,
-    ] {
+    for &output in required_outputs {
         let (rewritten, occurrences) =
             replace_fragment_output(&lowered, output.legacy_index(), output.semantic_name())?;
         lowered = rewritten;
@@ -322,11 +333,6 @@ pub(super) fn lower_textured_material_fragment_surface_with_contracts(
             source.entry_path()
         )));
     }
-    let required_outputs = [
-        TexturedMaterialFragmentOutput::LitColor,
-        TexturedMaterialFragmentOutput::MaterialAuxiliary,
-        TexturedMaterialFragmentOutput::TranslucencyAuxiliary,
-    ];
     if required_outputs
         .iter()
         .any(|output| !outputs.contains(output))
@@ -527,6 +533,7 @@ pub(super) fn lower_translucent_terrain_fragment_surface_with_contracts(
     varying_contract: &TerrainSourceVaryingContract,
     opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
 ) -> GalResult<LoweredTranslucentTerrainFragmentSource> {
+    let slots = parse_draw_buffers_slots(source.expanded_source())?;
     let mut lowered = upgrade_version(source.expanded_source())?;
     lowered = strip_nonopaque_uniforms(&lowered)?;
     let uses_legacy_fog = lower_legacy_fog(&mut lowered);
@@ -563,11 +570,12 @@ pub(super) fn lower_translucent_terrain_fragment_surface_with_contracts(
             source.entry_path()
         )));
     }
-    if !outputs.contains(&TranslucentTerrainFragmentOutput::LitColor)
-        || !outputs.contains(&TranslucentTerrainFragmentOutput::TranslucencyAuxiliary)
+    if outputs.len() != slots.len()
+        || !outputs.contains(&TranslucentTerrainFragmentOutput::LitColor)
+        || (slots.len() > 1 && !outputs.contains(&TranslucentTerrainFragmentOutput::TranslucencyAuxiliary))
     {
         return Err(GalError::invalid_argument(format!(
-            "translucent terrain fragment '{}' lacks a required named color or translucency output",
+            "translucent terrain fragment '{}' writes outputs inconsistent with its declared color/translucency slots",
             source.entry_path()
         )));
     }
@@ -764,12 +772,13 @@ pub(super) fn lower_world_material_source_target_sampling(
     let mut helpers = String::new();
     let mut uses_uv = false;
     let mut uses_texel = false;
+    let mut uses_texture = false;
     for sampler in &targets {
         for (call, helper, definition) in [
             (
                 format!("texture({sampler},"),
-                format!("vulkanic_source_sample_target_{sampler}("),
-                format!("#define vulkanic_source_sample_target_{sampler}(source_uv) texture({sampler}, vulkanic_source_world_target_uv(source_uv))\n"),
+                format!("vulkanic_source_sample_target_parameter({sampler},"),
+                String::new(),
             ),
             (
                 format!("textureLod({sampler},"),
@@ -793,6 +802,7 @@ pub(super) fn lower_world_material_source_target_sampling(
                 uses_texel = true;
             } else {
                 uses_uv = true;
+                uses_texture |= call.starts_with("texture(");
             }
         }
     }
@@ -802,9 +812,18 @@ pub(super) fn lower_world_material_source_target_sampling(
     if let Some(rewritten) = parameter_rewrite {
         source = rewritten;
         uses_uv = true;
+        uses_texture = true;
         helpers.push_str(
-            "#define vulkanic_source_sample_target_parameter(source_sampler, source_uv) texture(source_sampler, vulkanic_source_world_target_uv(source_uv))\n\
-#define vulkanic_source_sample_target_parameter_lod(source_sampler, source_uv, source_lod) textureLod(source_sampler, vulkanic_source_world_target_uv(source_uv), source_lod)\n",
+            "#define vulkanic_source_sample_target_parameter_lod(source_sampler, source_uv, source_lod) textureLod(source_sampler, vulkanic_source_world_target_uv(source_uv), source_lod)\n",
+        );
+    }
+    if uses_texture {
+        // GLSL overloads retain both ordinary sampling and the fragment LOD
+        // bias overload. Passing the sampler avoids referencing a uniform
+        // before its declaration in this inserted preamble.
+        helpers.push_str(
+            "vec4 vulkanic_source_sample_target_parameter(sampler2D source_sampler, vec2 source_uv) { return texture(source_sampler, vulkanic_source_world_target_uv(source_uv)); }\n\
+vec4 vulkanic_source_sample_target_parameter(sampler2D source_sampler, vec2 source_uv, float source_bias) { return texture(source_sampler, vulkanic_source_world_target_uv(source_uv), source_bias); }\n",
         );
     }
     if !uses_uv && !uses_texel {

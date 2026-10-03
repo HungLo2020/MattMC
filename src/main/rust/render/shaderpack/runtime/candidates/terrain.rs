@@ -152,6 +152,7 @@ pub(crate) enum TerrainSourceCandidateState {
         /// named primary color before terrain rather than consuming terrain
         /// output after it.
         pre_terrain_sky_preparation: Option<FullscreenSourceStagePreparation>,
+        pre_terrain_horizon_preparation: Option<FullscreenSourceStagePreparation>,
         /// Optional source-defined vanilla celestial writer. It remains
         /// separate from the sky disc because it consumes an owned local
         /// texture and emits real quad geometry for the sun/moon path.
@@ -162,6 +163,8 @@ pub(crate) enum TerrainSourceCandidateState {
         /// when no DH geometry is visible. Retaining this independently keeps
         /// eventual shared target allocation from silently deriving feedback
         /// history from only the current DH depth-consumer subset.
+        pre_terrain_preparation: Vec<FullscreenSourceStagePreparation>,
+        pre_terrain_preparation_error: Option<String>,
         post_terrain_preparation: Vec<FullscreenSourceStagePreparation>,
         post_terrain_preparation_error: Option<String>,
         voxel_materials: Option<VoxelMaterialMap>,
@@ -245,7 +248,7 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered_pair) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_source(source)?;
+                                        TerrainSourceResourceBindings::from_source_stage(source, &material_contract.stages.fragment)?;
                                     lowered_pair
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)
@@ -297,7 +300,7 @@ impl ShaderPackRuntimeExecutor {
                     {
                         Ok(lowered_pair) => {
                             let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
-                                let bindings = TerrainSourceResourceBindings::from_source(source)?;
+                                let bindings = TerrainSourceResourceBindings::from_source_stage(source, &entity_contract.stages.fragment)?;
                                 bind_entity_source_resources(&lowered_pair, &bindings)
                             })();
                             match resource_bindings {
@@ -344,7 +347,7 @@ impl ShaderPackRuntimeExecutor {
                     Ok(hand_contract) => match lower_hand_source_pair(source, &hand_contract) {
                         Ok(lowered_pair) => {
                             let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
-                                let bindings = TerrainSourceResourceBindings::from_source(source)?;
+                                let bindings = TerrainSourceResourceBindings::from_source_stage(source, &hand_contract.stages.fragment)?;
                                 bind_hand_source_resources(&lowered_pair, &bindings)
                             })();
                             match resource_bindings {
@@ -381,7 +384,7 @@ impl ShaderPackRuntimeExecutor {
                     Err(error) => (None, Some(error.to_string()), None, None, None, None),
                 };
                 let (translucent_contract, translucent_contract_error) =
-                    match derive_complementary_translucent_terrain_contract_for_scope(source, scope)
+                    match derive_translucent_terrain_contract_for_scope(source, scope)
                     {
                         Ok(contract) => (Some(contract), None),
                         Err(error) => (None, Some(error.to_string())),
@@ -514,7 +517,7 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_source(source)?;
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
                                     let plan = lowered
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)?;
@@ -585,7 +588,7 @@ impl ShaderPackRuntimeExecutor {
                                     );
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_source(source)?;
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
                                     let plan = lowered
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)?;
@@ -664,7 +667,7 @@ impl ShaderPackRuntimeExecutor {
                     .and_then(|stages| preprocess_terrain_sources(source, &stages))
                 {
                     Ok(artifacts) => {
-                        let storage_roles = TerrainSourceResourceBindings::from_source(source);
+                        let storage_roles = TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment);
                         match storage_roles.and_then(|storage_roles| {
                             lower_shadow_source_pair_with_owned_storage(
                                 &artifacts.vertex,
@@ -675,7 +678,7 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let declarations =
-                                        TerrainSourceResourceBindings::from_source(source)?;
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
                                     lowered
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&declarations)
@@ -721,7 +724,9 @@ impl ShaderPackRuntimeExecutor {
                         None,
                     ),
                 };
-                let source_asset_bindings = TerrainShaderPackAssetBindings::from_source(source);
+                let asset_defines = contract.property_defines.iter()
+                    .map(|(key, value)| (key.as_str(), value.as_str())).collect::<Vec<_>>();
+                let source_asset_bindings = TerrainShaderPackAssetBindings::from_source_with_defines(source, &asset_defines);
                 let source_asset_binding_count = source_asset_bindings
                     .as_ref()
                     .ok()
@@ -732,7 +737,7 @@ impl ShaderPackRuntimeExecutor {
                     .map(ToString::to_string);
                 let source_color_targets: GalResult<_> = (|| -> GalResult<_> {
                     let bindings = TerrainSourceResourceBindings::from_source(source)?;
-                    ShaderPackColorTargetManifest::from_source(source, &bindings)
+                    ShaderPackColorTargetManifest::from_source_for_scope(source, &bindings, scope)
                 })();
                 let source_color_target_count = source_color_targets
                     .as_ref()
@@ -745,6 +750,13 @@ impl ShaderPackRuntimeExecutor {
                     .ok()
                     .and_then(|targets| targets.require_gal_schema_formats().err())
                     .map(|error| error.to_string());
+                let (pre_terrain_preparation, pre_terrain_preparation_error) =
+                    match derive_pre_terrain_fullscreen_source_chain(source, scope) {
+                        Ok(stages) => (stages.iter().map(|stage|
+                            prepare_fullscreen_source_stage(source, stage, FullscreenSourceMode::NormalWorld)
+                        ).collect(), None),
+                        Err(error) => (Vec::new(), Some(error.to_string())),
+                    };
                 let (post_terrain_preparation, post_terrain_preparation_error) =
                     match derive_fullscreen_source_chain(source, scope) {
                         Ok(stages) => (
@@ -784,6 +796,15 @@ impl ShaderPackRuntimeExecutor {
                         source_resource_binding_count: None,
                         source_resource_binding_error: None,
                     }),
+                };
+                // Both writers use the selected sky source, but retain
+                // distinct lowered geometry, uniforms and pipeline identity.
+                let pre_terrain_horizon_preparation = match derive_sky_source_stage(source, scope) {
+                    Ok(Some(stage)) => Some(prepare_fullscreen_source_stage_with_raster(
+                        source, &stage, FullscreenSourceMode::NormalWorld,
+                        FullscreenSourceRasterPrimitive::ShaderPackHorizon,
+                    )),
+                    _ => pre_terrain_sky_preparation.clone(),
                 };
                 let pre_terrain_celestial_preparation =
                     match derive_sky_textured_source_stage(source, scope) {
@@ -901,7 +922,10 @@ impl ShaderPackRuntimeExecutor {
                     source_color_target_gal_schema_error,
                     source_color_targets: source_color_targets.ok(),
                     pre_terrain_sky_preparation,
+                    pre_terrain_horizon_preparation,
                     pre_terrain_celestial_preparation,
+                    pre_terrain_preparation,
+                    pre_terrain_preparation_error,
                     post_terrain_preparation,
                     post_terrain_preparation_error,
                     voxel_materials,

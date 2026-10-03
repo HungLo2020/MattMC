@@ -36,6 +36,15 @@ pub(super) fn prepare_fullscreen_source_stage(
     stage: &FullscreenSourceStage,
     mode: FullscreenSourceMode,
 ) -> FullscreenSourceStagePreparation {
+    prepare_fullscreen_source_stage_with_raster(source, stage, mode, fullscreen_stage_raster_primitive(stage.kind))
+}
+
+pub(super) fn prepare_fullscreen_source_stage_with_raster(
+    source: &ShaderPackSource,
+    stage: &FullscreenSourceStage,
+    mode: FullscreenSourceMode,
+    raster: FullscreenSourceRasterPrimitive,
+) -> FullscreenSourceStagePreparation {
     let artifacts = match mode {
         FullscreenSourceMode::NormalWorld => {
             preprocess_source_stage_pair(source, &stage.source_stages)
@@ -47,16 +56,16 @@ pub(super) fn prepare_fullscreen_source_stage(
     match artifacts {
         Ok(artifacts) => {
             let lowering: GalResult<_> = (|| -> GalResult<_> {
-                let declarations = TerrainSourceResourceBindings::from_source(source)?;
+                let declarations = TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
                 lower_fullscreen_source_pair_with_raster_primitive(
                     &artifacts.vertex,
                     &artifacts.fragment,
                     &declarations,
-                    fullscreen_stage_raster_primitive(stage.kind),
+                    raster,
                 )
             })();
             let resource_bindings = lowering.as_ref().ok().map(|lowered| {
-                TerrainSourceResourceBindings::from_source(source).and_then(|declarations| {
+                TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment).and_then(|declarations| {
                     lowered
                         .opaque_resource_contract()
                         .bind_semantic_roles(&declarations)
@@ -167,15 +176,13 @@ pub(super) fn fullscreen_stage_raster_primitive(
         // `gbuffers_skybasic` reconstructs its camera ray from the actual
         // sky-disc depth field. Keep that geometry source-owned instead of
         // approximating it with a fullscreen triangle.
-        // The semantic source sky initializer is a background writer. A
-        // fullscreen triangle avoids coupling its coverage to the vanilla
-        // disc's camera-space radius while preserving the source fragment
-        // shader's exact ray reconstruction and later terrain occlusion.
-        FullscreenSourceStageKind::Sky => FullscreenSourceRasterPrimitive::FullscreenTriangle,
+        FullscreenSourceStageKind::Sky => FullscreenSourceRasterPrimitive::VanillaSkyDisc,
         FullscreenSourceStageKind::SkyTextured => {
             FullscreenSourceRasterPrimitive::VanillaCelestialQuad
         }
-        FullscreenSourceStageKind::Deferred { .. }
+        FullscreenSourceStageKind::Begin { .. }
+        | FullscreenSourceStageKind::Prepare { .. }
+        | FullscreenSourceStageKind::Deferred { .. }
         | FullscreenSourceStageKind::Composite { .. }
         | FullscreenSourceStageKind::Final => FullscreenSourceRasterPrimitive::FullscreenTriangle,
     }
@@ -280,6 +287,57 @@ impl ShaderPackRuntimeExecutor {
         }
     }
 
+    /// Every enabled begin/prepare declaration is mandatory for admission.
+    /// DH frames retain their separately preprocessed source mode.
+    pub(crate) fn prepared_lowered_pre_terrain_fullscreen_programs(
+        &self, distant_horizons: bool,
+    ) -> GalResult<Vec<&LoweredFullscreenSourceProgram>> {
+        let (stages, error) = if distant_horizons {
+            match &self.distant_horizons_source_candidate {
+                DistantHorizonsSourceCandidateState::Discovered {
+                    pre_terrain_preparation, pre_terrain_preparation_error, ..
+                } => (pre_terrain_preparation, pre_terrain_preparation_error),
+                _ => return Err(GalError::unsupported_feature("DH pre-terrain source candidate is unavailable")),
+            }
+        } else {
+            match &self.source_candidate {
+                TerrainSourceCandidateState::Discovered {
+                    pre_terrain_preparation, pre_terrain_preparation_error, ..
+                } => (pre_terrain_preparation, pre_terrain_preparation_error),
+                _ => return Ok(Vec::new()),
+            }
+        };
+        if let Some(error) = error {
+            return Err(GalError::unsupported_feature(format!("pre-terrain fullscreen discovery failed: {error}")));
+        }
+        stages.iter().map(|stage| {
+            stage.source_program.as_ref().ok_or_else(|| {
+                let reason = stage.source_preprocess_error.as_deref()
+                    .or(stage.source_lowering_error.as_deref())
+                    .or(stage.source_program_preparation_error.as_deref())
+                    .or(stage.source_resource_binding_error.as_deref())
+                    .unwrap_or("missing retained owned fullscreen program");
+                GalError::unsupported_feature(format!("pre-terrain fullscreen stage '{}' is not prepared: {reason}", stage.stage_path))
+            })
+        }).collect()
+    }
+
+    pub(crate) fn stage_pre_terrain_fullscreen_execution_plan(
+        &self, gal: &mut VulkanicGal, program: &LoweredFullscreenSourceProgram,
+        targets: &ShaderPackColorTargets, inputs: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<FullscreenSourceExecutionPlan> {
+        let manifest = self.source_color_target_manifest()?.ok_or_else(||
+            GalError::unsupported_feature("pre-terrain fullscreen stage requires named color targets"))?;
+        if manifest.generation() != targets.identity.shader_pack_generation {
+            return Err(GalError::invalid_argument("pre-terrain fullscreen targets have a different generation"));
+        }
+        FullscreenSourceExecutionPlan::stage_cached(
+            gal, program, manifest, targets, std::iter::once(inputs.clone()),
+            targets.identity.extent,
+            Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
+        )
+    }
+
     /// Returns the optional source-derived sky initializer retained for the
     /// selected normal-world contract. This stage runs after named-color
     /// bootstrap and before terrain/DH writers, so it never borrows a Java
@@ -287,6 +345,8 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_pre_terrain_sky_program(
         &self,
     ) -> GalResult<Option<&LoweredFullscreenSourceProgram>> {
+        // The selected route must admit both geometry variants together.
+        self.prepared_lowered_pre_terrain_horizon_program()?;
         match &self.source_candidate {
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -311,6 +371,23 @@ impl ShaderPackRuntimeExecutor {
                 }),
             },
         }
+    }
+
+    pub(crate) fn prepared_lowered_pre_terrain_horizon_program(
+        &self,
+    ) -> GalResult<Option<&LoweredFullscreenSourceProgram>> {
+        let TerrainSourceCandidateState::Discovered { pre_terrain_horizon_preparation, .. } = &self.source_candidate else {
+            return Ok(None);
+        };
+        let Some(prepared) = pre_terrain_horizon_preparation else { return Ok(None); };
+        prepared.source_program.as_ref().map(Some).ok_or_else(|| {
+            let reason = prepared.source_preprocess_error.as_deref()
+                .or(prepared.source_lowering_error.as_deref())
+                .or(prepared.source_program_preparation_error.as_deref())
+                .or(prepared.source_resource_binding_error.as_deref())
+                .unwrap_or("missing retained owned horizon writer");
+            GalError::unsupported_feature(format!("source horizon '{}' is not fully prepared: {reason}", prepared.stage_path))
+        })
     }
 
     /// Returns the optional source-defined celestial writer retained for the
@@ -343,42 +420,6 @@ impl ShaderPackRuntimeExecutor {
                 }),
             },
         }
-    }
-
-    /// Stages the optional source sky initializer against the same named
-    /// color generation that terrain and Distant Horizons will later write.
-    /// A missing sky stage is a supported pack choice; a declared but
-    /// unprepared stage is rejected by `prepared_lowered_pre_terrain_sky_program`.
-    pub(crate) fn stage_pre_terrain_sky_execution_plan(
-        &self,
-        gal: &mut VulkanicGal,
-        targets: &ShaderPackColorTargets,
-        external_inputs: &[TerrainSourceOwnedResourceSet],
-        extent: Extent3d,
-    ) -> GalResult<Option<FullscreenSourceExecutionPlan>> {
-        let Some(program) = self.prepared_lowered_pre_terrain_sky_program()? else {
-            return Ok(None);
-        };
-        let manifest = self.source_color_target_manifest()?.ok_or_else(|| {
-            GalError::unsupported_feature(
-                "source sky initializer requires a selected semantic color-target manifest",
-            )
-        })?;
-        if manifest.generation() != targets.identity.shader_pack_generation {
-            return Err(GalError::invalid_argument(
-                "source sky initializer and named color targets have different shader-pack generations",
-            ));
-        }
-        FullscreenSourceExecutionPlan::stage_cached(
-            gal,
-            program,
-            manifest,
-            targets,
-            external_inputs.iter().cloned(),
-            extent,
-            Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
-        )
-        .map(Some)
     }
 
     /// Stages the optional source-defined textured celestial writer against

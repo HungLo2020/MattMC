@@ -309,6 +309,7 @@ pub struct WorldMeshTextureAssetPayload {
 
 #[derive(Clone, Debug)]
 pub struct WorldMeshInstanceRequest {
+    pub entity_culling: Option<super::entity_culling::WorldEntityCullingInputs>,
     /// Authored model collection order, independent of material and arrival order.
     pub model_submission_order: Option<i32>,
     /// Original-resource standard foil semantics, never a Java texture matrix.
@@ -421,6 +422,9 @@ pub struct WorldShaderEnvironmentFrame {
     /// configuration semantic used by selected pack sources when their shared
     /// `DISTANT_HORIZONS` branch is active; it is not a DH renderer object.
     pub distant_horizons_render_distance: i32,
+    /// Copied user maximum shadow distance in chunks. This is configuration
+    /// data only; all source selection and culler construction stay in Rust.
+    pub configured_shadow_distance_chunks: i32,
     pub relative_eye_position: [f32; 3],
     pub sky_color: [f32; 3],
     pub darkness_light_factor: f32,
@@ -715,6 +719,7 @@ impl WorldPrimitiveFrame {
             sun_angle: environment
                 .enabled
                 .then_some(source_sun_angle(environment.time_of_day)),
+            celestial_time_of_day: Some(self.background.sky.time_of_day),
             rain_strength: environment.enabled.then_some(environment.rain_strength),
             thunder_strength: environment.enabled.then_some(environment.thunder_strength),
             sky_darken: environment.enabled.then_some(environment.sky_darken),
@@ -803,6 +808,13 @@ pub(in crate::render::worldrender) fn source_sky_initializer_requested(frame: &W
             frame.background.sky_type,
             WORLD_BACKGROUND_SKY_OVERWORLD | WORLD_BACKGROUND_SKY_NETHER | WORLD_BACKGROUND_SKY_END
         )
+}
+
+/// Iris draws its horizon during clear, even when fog/blindness hides the
+/// later vanilla disc. Standard End/Nether dimensions have no such horizon;
+/// custom skylit dimensions require their own semantic admission.
+pub(in crate::render::worldrender) fn source_horizon_initializer_requested(frame: &WorldPrimitiveFrame) -> bool {
+    frame.background.enabled && frame.background.sky_type == WORLD_BACKGROUND_SKY_OVERWORLD
 }
 
 /// The selected source uses Iris's documented solar-angle convention. This

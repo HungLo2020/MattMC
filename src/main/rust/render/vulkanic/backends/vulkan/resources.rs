@@ -2272,6 +2272,7 @@ pub(super) fn texture_format(format: TextureFormat) -> vk::Format {
         TextureFormat::R8Uint => vk::Format::R8_UINT,
         TextureFormat::R11fG11fB10f => vk::Format::B10G11R11_UFLOAT_PACK32,
         TextureFormat::R32Float => vk::Format::R32_SFLOAT,
+        TextureFormat::R16Float => vk::Format::R16_SFLOAT,
         TextureFormat::Rgb16Float => vk::Format::R16G16B16_SFLOAT,
         TextureFormat::R8Unorm => vk::Format::R8_UNORM,
         TextureFormat::Rgba8Snorm => vk::Format::R8G8B8A8_SNORM,
@@ -2894,6 +2895,7 @@ mod tests {
     fn shader_pack_color_formats_map_to_exact_vulkan_formats() {
         assert!(vk::Format::B10G11R11_UFLOAT_PACK32 == texture_format(TextureFormat::R11fG11fB10f));
         assert!(vk::Format::R32_SFLOAT == texture_format(TextureFormat::R32Float));
+        assert!(vk::Format::R16_SFLOAT == texture_format(TextureFormat::R16Float));
         assert!(vk::Format::R16G16B16_SFLOAT == texture_format(TextureFormat::Rgb16Float));
         assert!(vk::Format::R8_UNORM == texture_format(TextureFormat::R8Unorm));
         assert!(vk::Format::R8G8B8A8_SNORM == texture_format(TextureFormat::Rgba8Snorm));

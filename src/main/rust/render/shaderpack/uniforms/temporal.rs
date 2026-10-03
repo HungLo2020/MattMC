@@ -6,6 +6,8 @@
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
+mod eye_brightness_smooth;
+
 const RAIN_FACTOR_HALF_LIFE_SECONDS: f32 = 1.5;
 const LN_2: f32 = core::f32::consts::LN_2;
 
@@ -95,6 +97,7 @@ pub struct TerrainSourceTemporalUniforms {
     nether_biomes: Option<NetherBiomeState>,
     camera_history: Option<CameraHistoryState>,
     eye_brightness: Option<EyeBrightnessState>,
+    eye_brightness_smooth: Option<eye_brightness_smooth::State>,
     frame_time_smooth: Option<FrameTimeSmoothState>,
 }
 

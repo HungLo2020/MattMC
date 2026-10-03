@@ -20,15 +20,15 @@ use crate::render::vulkanic::resources::{
     TextureUsage, TextureViewDesc,
 };
 
-use crate::render::shaderpack::source::assets::{
-    ShaderPackAssetSamplerPolicy, ShaderPackAssets, ShaderPackRgbaAsset,
-    TerrainShaderPackAssetBindings,
-};
 use crate::render::shaderpack::lowering::TerrainSourceOpaqueResourceBindingPlan;
 use crate::render::shaderpack::resources::bindings::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailability,
     TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
     TerrainSourceSampledResourceShape,
+};
+use crate::render::shaderpack::source::assets::{
+    ShaderPackAssetSamplerPolicy, ShaderPackAssets, ShaderPackRgbaAsset,
+    TerrainShaderPackAssetBindings,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -39,13 +39,15 @@ struct TextureHandles {
 
 /// Generation-bound sampled resources for supported PNG declarations across
 /// one shader pack's separately lowered source pairs. The mapping is by
-/// semantic sampler name, not a backend binding slot; each program lowering
+/// semantic image role/path, not a pass-local sampler name or binding slot;
+/// separately lowered stages may reuse a sampler name for different images.
+/// Each program lowering
 /// retains its own resource-set layout.
 #[derive(Debug)]
 pub(crate) struct TerrainSourceAssetResources {
     pack_name: String,
     generation: u64,
-    combined_samplers: BTreeMap<String, Handle>,
+    combined_samplers: BTreeMap<TerrainSourceResourceRole, Handle>,
     combined_handles: Vec<Handle>,
     sampler_handles: Vec<Handle>,
     view_handles: Vec<Handle>,
@@ -76,32 +78,21 @@ impl TerrainSourceAssetResources {
         let mut upload_ops = Vec::new();
 
         let result = (|| -> GalResult<()> {
-            for (sampler_name, path) in bindings.samplers() {
-                // Properties may declare images that are unused by the
-                // lowered terrain program. They are not runtime resources
-                // until the source plan gives them a semantic role.
-                let Some(role) = role_for_sampler(active_binding_plans, sampler_name)? else {
-                    continue;
-                };
-                if let Some(expected_path) = role.pack_texture_path() {
-                    if path != expected_path {
-                        return Err(GalError::invalid_argument(format!(
-                            "shader-pack source sampler '{sampler_name}' resolves to '{path}', but its semantic role requires '{expected_path}'"
-                        )));
-                    }
-                }
-                let resolved = bindings.resolve_rgba8_with_sampler_policy(assets, sampler_name)?;
+            for (role, path) in active_png_paths(bindings, active_binding_plans)? {
+                let image = assets.decode_rgba8(&path)?;
+                let sampler_policy = assets.sampler_policy(&path)?;
+                let path = path.as_str();
                 let texture = if let Some(handles) = textures_by_path.get(path).copied() {
                     handles
                 } else {
-                    let handles = create_texture(gal, &resolved.image, &mut upload_buffers)?;
+                    let handles = create_texture(gal, &image, &mut upload_buffers)?;
                     append_upload(
                         &mut upload_ops,
                         handles.texture,
                         upload_buffers.last().copied().ok_or_else(|| {
                             GalError::backend("shader-pack texture upload buffer was not retained")
                         })?,
-                        &resolved.image,
+                        &image,
                     )?;
                     textures_by_path.insert(path.to_string(), handles);
                     texture_handles.push(handles.texture);
@@ -109,17 +100,16 @@ impl TerrainSourceAssetResources {
                     handles
                 };
 
-                let sampler = if let Some(handle) =
-                    samplers_by_policy.get(&resolved.sampler_policy).copied()
+                let sampler = if let Some(handle) = samplers_by_policy.get(&sampler_policy).copied()
                 {
                     handle
                 } else {
                     let handle = gal.create_sampler(sampler_desc(
                         assets.pack_name(),
                         assets.generation(),
-                        resolved.sampler_policy,
+                        sampler_policy,
                     ))?;
-                    samplers_by_policy.insert(resolved.sampler_policy, handle);
+                    samplers_by_policy.insert(sampler_policy, handle);
                     sampler_handles.push(handle);
                     handle
                 };
@@ -128,12 +118,12 @@ impl TerrainSourceAssetResources {
                         "shader-pack.{}.gen{}.{}.combined",
                         assets.pack_name(),
                         assets.generation(),
-                        sampler_name
+                        role.diagnostic_name()
                     ),
                     texture_view: texture.view,
                     sampler,
                 })?;
-                combined_samplers.insert(sampler_name.to_string(), combined);
+                combined_samplers.insert(role, combined);
                 combined_handles.push(combined);
             }
 
@@ -188,8 +178,8 @@ impl TerrainSourceAssetResources {
         self.generation
     }
 
-    pub(crate) fn combined_sampler_for(&self, sampler_name: &str) -> Option<Handle> {
-        self.combined_samplers.get(sampler_name).copied()
+    pub(crate) fn combined_sampler_for(&self, role: TerrainSourceResourceRole) -> Option<Handle> {
+        self.combined_samplers.get(&role).copied()
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -213,15 +203,19 @@ impl TerrainSourceAssetResources {
         }
         let mut availability = Vec::new();
         let mut resources = Vec::new();
-        for (sampler_name, combined_sampler) in &self.combined_samplers {
-            let Some(role) = role_for_sampler(active_binding_plans, sampler_name)? else {
+        for (role, combined_sampler) in &self.combined_samplers {
+            if !active_binding_plans.iter().any(|plan| {
+                plan.bindings()
+                    .iter()
+                    .any(|binding| binding.role() == *role)
+            }) {
                 continue;
-            };
+            }
             if role.expected_sampled_resource_shape()
                 != TerrainSourceSampledResourceShape::Texture2d
             {
                 return Err(GalError::unsupported_feature(format!(
-                    "shader-pack PNG sampler '{sampler_name}' cannot satisfy non-2D semantic role '{}'",
+                    "shader-pack PNG cannot satisfy non-2D semantic role '{}'",
                     role.semantic_name()
                 )));
             }
@@ -231,7 +225,7 @@ impl TerrainSourceAssetResources {
                 resource_generation: self.generation,
             });
             resources.push(TerrainSourceOwnedResource {
-                role,
+                role: role.clone(),
                 combined_sampler: *combined_sampler,
             });
         }
@@ -261,30 +255,38 @@ impl TerrainSourceAssetResources {
     }
 }
 
-/// A pack asset may be referenced by separately lowered terrain and shadow
-/// source pairs. They must agree on its semantic role; accepting whichever
-/// plan happens to be queried first would make a pack-wide asset depend on
-/// pass preparation order.
-fn role_for_sampler(
+/// PackTexture paths are already selected by each stage's preprocessor.
+/// Only protocol noise uses the shared declaration table. Never resolve a
+/// pass-local sampler alias by another stage's declaration or preparation order.
+fn active_png_paths(
+    declarations: &TerrainShaderPackAssetBindings,
     active_binding_plans: &[&TerrainSourceOpaqueResourceBindingPlan],
-    sampler_name: &str,
-) -> GalResult<Option<TerrainSourceResourceRole>> {
-    let mut role = None;
+) -> GalResult<BTreeMap<TerrainSourceResourceRole, String>> {
+    let mut paths = BTreeMap::new();
     for plan in active_binding_plans {
-        let Some(candidate) = plan.role_for(sampler_name) else {
-            continue;
-        };
-        match &role {
-            Some(existing) if existing != &candidate => {
-                return Err(GalError::invalid_argument(format!(
-                    "shader-pack sampler '{sampler_name}' has conflicting semantic roles across lowered source pairs"
-                )));
+        for binding in plan.bindings() {
+            let role = binding.role();
+            let path = match &role {
+                TerrainSourceResourceRole::PackTexture(path) => path.as_str(),
+                TerrainSourceResourceRole::Noise => {
+                    let Some(path) = declarations.sampler_path(binding.resource_name()) else {
+                        continue;
+                    };
+                    path
+                }
+                _ => continue,
+            };
+            let path = path.to_owned();
+            if let Some(previous) = paths.insert(role, path.clone()) {
+                if previous != path {
+                    return Err(GalError::invalid_argument(
+                        "shader-pack image role resolves to conflicting PNG paths",
+                    ));
+                }
             }
-            Some(_) => {}
-            None => role = Some(candidate),
         }
     }
-    Ok(role)
+    Ok(paths)
 }
 
 fn create_texture(

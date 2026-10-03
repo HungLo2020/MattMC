@@ -1063,9 +1063,9 @@ public final class DeterministicCameraCapture {
 			return -1L;
 		}
 		wholeFrameAttachmentCaptureDeterministicFrame = currentInProgressRenderedFrameIndex();
-		MODEL_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+		MODEL_CAPTURE_HISTORY.stage(wholeFrameAttachmentCaptureDeterministicFrame,
 			RustGalWorldPrimitiveRenderer.modelMeshDiagnostics());
-		MODEL_ROUTE_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+		MODEL_ROUTE_CAPTURE_HISTORY.stage(wholeFrameAttachmentCaptureDeterministicFrame,
 			RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions());
 		captureSurfaceObservations();
 		wholeFrameGuiFoilTiming = GraphicsAuditGuiFoilTiming.snapshot();
@@ -1242,6 +1242,8 @@ public final class DeterministicCameraCapture {
 	 * external desktop capture against later swapchain presentations.
 	 */
 	private static boolean captureWholeFrameFinalOutput() {
+		MODEL_CAPTURE_HISTORY.commit(wholeFrameAttachmentCaptureDeterministicFrame);
+		MODEL_ROUTE_CAPTURE_HISTORY.commit(wholeFrameAttachmentCaptureDeterministicFrame);
 		MODEL_EXECUTION_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
 			RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics());
 		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustFinalOutputCaptureCoverage(
@@ -6329,8 +6331,16 @@ public final class DeterministicCameraCapture {
 		if (REQUIRED_RUST_SOURCE_EXECUTION_DIR.isEmpty()) {
 			return true;
 		}
-		Path directory = Path.of(REQUIRED_RUST_SOURCE_EXECUTION_DIR);
+		return hasSourceExecutionReceiptForFrame(Path.of(REQUIRED_RUST_SOURCE_EXECUTION_DIR), gameplayFrameId);
+	}
+
+	static boolean hasSourceExecutionReceiptForFrame(Path directory, long gameplayFrameId) {
+		// Per-frame files record activations, not every steady-state frame.
+		// The bounded latest receipt still has to match this exact gameplay id.
 		return sourceExecutionReceiptMatchesGameplayFrame(
+			directory.resolve("selected-source-execution-latest.json"),
+			gameplayFrameId
+		) || sourceExecutionReceiptMatchesGameplayFrame(
 			directory.resolve("selected-source-execution-frame-" + gameplayFrameId + ".json"),
 			gameplayFrameId
 		) || sourceExecutionReceiptMatchesGameplayFrame(

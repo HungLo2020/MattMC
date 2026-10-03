@@ -7,8 +7,13 @@ use std::mem::offset_of;
 pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
     macro_rules! layout {
         ($id:expr, $ty:ty, [$($field:tt),* $(,)?]) => {{
-            let mut offsets = [0_u32; 64];
-            let fields = [$(offset_of!($ty, $field) as u32),*];
+            const FIELDS: &[u32] = &[$(offset_of!($ty, $field) as u32),*];
+            const {
+                assert!(FIELDS.len() <= FFI_MAX_STRUCT_LAYOUT_FIELDS,
+                    "ABI record exceeds the mirrored layout-query capacity");
+            }
+            let mut offsets = [0_u32; FFI_MAX_STRUCT_LAYOUT_FIELDS];
+            let fields = FIELDS;
             offsets[..fields.len()].copy_from_slice(&fields);
             FfiStructLayout {
                 header: FfiHeader {
@@ -1178,7 +1183,12 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 decal_normal_pose,
                 model_submission_order_mode,
                 model_submission_order,
-                packed_light
+                packed_light,
+                entity_culling_mode,
+                entity_culling_flags,
+                entity_culling_bounds,
+                entity_culling_leash_bounds,
+                entity_culling_camera
             ]
         ),
         70 => layout!(
@@ -1446,7 +1456,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 fog_render_distance_end,
                 distant_horizons_render_distance,
                 fog_sky_end,
-                fog_clouds_end
+                fog_clouds_end,
+                configured_shadow_distance_chunks
             ]
         ),
         98 => layout!(
@@ -1588,7 +1599,13 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 entity_transform,
                 camera_orientation,
                 entity_id,
-                reserved0
+                reserved0,
+                entity_culling_mode,
+                entity_culling_flags,
+                entity_culling_bounds,
+                entity_culling_leash_bounds,
+                shadow_only,
+                entity_culling_camera
             ]
         ),
         111 => layout!(

@@ -9,7 +9,8 @@ properties/  pack properties: entity/item ids, custom uniforms, held light, wetn
 contracts/   per-family semantic contracts (terrain, entity, hand, material, weather,
              cloud, line, damaged block, DH, fullscreen, vertex interface)
 lowering/    source -> explicit GLSL: stages, pairs, fragment/vertex/fullscreen surfaces,
-             varyings, opaque resources, uniforms, text utilities, diagnostic probes
+             fullscreen_vertex/celestial owned geometry and transforms, varyings,
+             opaque resources, uniforms, text utilities, diagnostic probes
 programs/    model/ (identity, stages, material programs), lowered/ (per family),
              builtin/ (MattMC's own programs; GLSL in builtin/glsl/)
 uniforms/    terrain lighting environment, source uniform catalog, temporal values

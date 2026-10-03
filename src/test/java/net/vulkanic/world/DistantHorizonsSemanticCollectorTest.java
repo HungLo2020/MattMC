@@ -4,6 +4,7 @@ import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodQuadBuilder;
+import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodBufferContainer;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
@@ -28,6 +29,129 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DistantHorizonsSemanticCollectorTest {
+	@Test
+	void identicalContainerReplacementKeepsItsSharedGenerationUntilTheLastOwnerCloses() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		LodBufferContainer first = buildSemanticContainer(77L, 0xff557733);
+		publishPendingForTest();
+		long generation = DistantHorizonsSemanticCollector.snapshotForTest(77L).generation();
+		LodBufferContainer replacement = buildSemanticContainer(77L, 0xff557733);
+		assertEquals(generation, DistantHorizonsSemanticCollector.snapshotForTest(77L).generation());
+
+		first.close();
+		first.close();
+		assertTrue(replacement.rustSemanticBuildLifecycleCurrent(),
+			"closing the previous container must not retire the replacement's reused generation");
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		replacement.close();
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(77L, generation));
+		var retirement = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertEquals(generation, retirement.retirements().getFirst().columnGeneration());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(retirement);
+		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(77L));
+	}
+
+	private static LodBufferContainer buildSemanticContainer(long key, int color) {
+		LodQuadBuilder builder = new LodQuadBuilder(false, null);
+		builder.addQuadUp((short) 0, (short) 1, (short) 0, (short) 1, (short) 1,
+			color, (byte) 1, (byte) 15, (byte) 0);
+		LodBufferContainer container = new LodBufferContainer(key, new DhBlockPos(0, 64, 0));
+		assertEquals(container, container.makeAndUploadBuffersAsync(builder).join());
+		assertTrue(container.renderDataReady());
+		return container;
+	}
+
+	@Test
+	void closingTheNewestIdenticalContainerFirstKeepsOtherOwnersAlive() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		LodBufferContainer first = buildSemanticContainer(78L, 0xff557733);
+		LodBufferContainer second = buildSemanticContainer(78L, 0xff557733);
+		LodBufferContainer third = buildSemanticContainer(78L, 0xff557733);
+		publishPendingForTest();
+		third.close();
+		second.close();
+		second.close();
+		assertTrue(first.rustSemanticBuildLifecycleCurrent());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		first.close();
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(78L));
+		assertEquals(1, DistantHorizonsSemanticCollector.pendingUpdateForTest().retirements().size());
+	}
+
+	@Test
+	void lateContainerCloseCannotRetireChangedOrReloadedGenerations() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		LodBufferContainer first = buildSemanticContainer(79L, 0xff557733);
+		publishPendingForTest();
+		LodBufferContainer changed = buildSemanticContainer(79L, 0xff885533);
+		publishPendingForTest();
+		first.close();
+		assertTrue(changed.rustSemanticBuildLifecycleCurrent());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		DistantHorizonsSemanticCollector.invalidateForResourceReload();
+		assertFalse(changed.rustSemanticBuildLifecycleCurrent());
+		LodBufferContainer reloaded = buildSemanticContainer(79L, 0xff885533);
+		publishPendingForTest();
+		changed.close();
+		assertTrue(reloaded.rustSemanticBuildLifecycleCurrent());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		reloaded.close();
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(79L));
+	}
+
+	@Test
+	void containerRetirementWorksAfterNativeAcknowledgementReleasesCopiedGeometry() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		LodBufferContainer container = buildSemanticContainer(80L, 0xff557733);
+		var update = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		System.clearProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY);
+		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
+		assertNull(DistantHorizonsSemanticCollector.snapshotForTest(80L));
+		assertTrue(container.rustSemanticBuildLifecycleCurrent());
+		container.close();
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(80L));
+		DistantHorizonsSemanticCollector.acknowledgeForTest(
+			DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(80L));
+	}
+
+	@Test
+	void snapshotCachePressureCannotRetireColumnsStillOwnedByTheQuadtree() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		LodBufferContainer first = buildSemanticContainer(81L, 0xff557733);
+		LodBufferContainer second = buildSemanticContainer(82L, 0xff557733);
+		publishPendingForTest();
+		// Neither column is in the current visible list: live siblings and parents
+		// still need to remain ready for the next quadtree transition.
+		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(1, 1);
+		assertTrue(first.rustSemanticBuildLifecycleCurrent());
+		assertTrue(second.rustSemanticBuildLifecycleCurrent());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		first.close();
+		second.close();
+		var retirement = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertEquals(2, retirement.retirements().size());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(retirement);
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(81L));
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(82L));
+	}
+
+	@Test
+	void repeatedCloseOfAnEmptyContainerCannotRetireALaterNonEmptyBuild() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		LodBufferContainer empty = new LodBufferContainer(83L, new DhBlockPos(0, 64, 0));
+		empty.makeAndUploadBuffersAsync(new LodQuadBuilder(false, null)).join();
+		assertTrue(empty.rustSemanticBuildHasNoDrawableGeometry());
+		LodBufferContainer nonEmpty = buildSemanticContainer(83L, 0xff557733);
+		publishPendingForTest();
+		empty.close();
+		empty.close();
+		assertTrue(nonEmpty.rustSemanticBuildLifecycleCurrent());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		nonEmpty.close();
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(83L));
+	}
+
 	@Test
 	void quadtreeRenderabilityWaitsForAcknowledgedRustAssetPublication() throws Exception {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
@@ -1256,10 +1380,13 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of(quadBuffer(4, 5, 6, 0xC8, 21, 22, 23, 255, 25, 26)),
 			List.of(), List.of(), List.of()
 		);
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(101L).opaqueSegments(),
 			"a newer build must not create an empty frame while generation one is still acknowledged");
 		assertFalse(DistantHorizonsSemanticCollector.hasUnpublishedVisibleColumns());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
+		assertEquals(1L, DistantHorizonsSemanticCollector.consumeVisibleSegments().getFirst().columnGeneration());
 
 		publishPendingForTest();
 		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
@@ -1268,6 +1395,75 @@ class DistantHorizonsSemanticCollectorTest {
 		List<net.vulkanic.bridge.VulkanicGalBridge.WorldLodColumnInstanceRecord> visible =
 			DistantHorizonsSemanticCollector.consumeVisibleSegments();
 		assertEquals(2L, visible.getFirst().columnGeneration());
+	}
+
+	@Test
+	void selectedReplacementKeepsCoverageUntilTheVisibleFrameHasBeenConsumed() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.recordBuiltColumn(213L, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
+			List.of(), List.of(), List.of());
+		publishPendingForTest();
+		long selectedGeneration = DistantHorizonsSemanticCollector.snapshotForTest(213L).generation();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(213L);
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
+
+		// This replacement changes stream topology as well as generation. Merely
+		// changing a generation on the old segment indices would be incorrect.
+		DistantHorizonsSemanticCollector.recordBuiltColumn(213L, new DhBlockPos(0, 64, 0),
+			List.of(), List.of(quadBuffer(4, 5, 6, 0xC8, 21, 22, 23, 255, 25, 26)),
+			List.of(), List.of(quadBuffer(7, 8, 9, 0xD9, 31, 32, 33, 255, 35, 36)));
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest(),
+			"preflight must not replace an asset already selected for this frame");
+		var frozen = DistantHorizonsSemanticCollector.consumeVisibleFrame();
+		assertEquals(1, frozen.visibleSegments().size());
+		assertEquals(selectedGeneration, frozen.visibleSegments().getFirst().columnGeneration());
+		assertEquals(1, frozen.visibleSegments().getFirst().layer());
+		assertNotEquals(0, frozen.renderFrame().flags()
+			& DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED);
+
+		// The coordinator flushes again only after presenting the frozen frame.
+		publishPendingForTest();
+		long replacementGeneration = DistantHorizonsSemanticCollector.snapshotForTest(213L).generation();
+		assertNotEquals(selectedGeneration, replacementGeneration);
+		assertEquals(selectedGeneration, frozen.visibleSegments().getFirst().columnGeneration());
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		var counts = DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(213L);
+		assertEquals(0, counts.opaqueSegments());
+		assertEquals(1, counts.transparentSegments());
+		assertEquals(1, counts.waterSegments());
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
+		var next = DistantHorizonsSemanticCollector.consumeVisibleFrame();
+		assertEquals(List.of(2, 4), next.visibleSegments().stream().map(i -> i.layer()).toList());
+		assertEquals(List.of(0, 1), next.visibleSegments().stream().map(i -> i.segmentIndex()).toList());
+		assertTrue(next.visibleSegments().stream().allMatch(i -> i.columnGeneration() == replacementGeneration));
+	}
+
+	@Test
+	void protectingASelectedColumnStillAdmitsUnrelatedColumnsAndKeepsTheLatestRebuild() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		buildSemanticContainer(214L, 0xff557733);
+		publishPendingForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(214L);
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
+		buildSemanticContainer(214L, 0xff885533);
+		buildSemanticContainer(215L, 0xff337755);
+		var independent = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertNotNull(independent);
+		assertEquals(List.of(215L), independent.assets().stream().map(a -> a.columnKey()).toList(),
+			"a protected rebuild must not block unrelated publication");
+		DistantHorizonsSemanticCollector.acknowledgeForTest(independent);
+		buildSemanticContainer(214L, 0xff776622);
+		long latestGeneration = DistantHorizonsSemanticCollector.snapshotForTest(214L).generation();
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		assertEquals(1, DistantHorizonsSemanticCollector.consumeVisibleFrame().visibleSegments().size());
+		var latest = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertNotNull(latest);
+		assertEquals(List.of(latestGeneration), latest.assets().stream().map(a -> a.columnGeneration()).toList());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(latest);
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
 	}
 
 	@Test
@@ -1280,17 +1476,19 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of(), List.of(), List.of()
 		);
 		publishPendingForTest();
-		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
-		DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(211L);
-		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
-
 		DistantHorizonsSemanticCollector.recordBuiltColumn(
 			211L,
 			new DhBlockPos(0, 64, 0),
 			List.of(quadBuffer(4, 5, 6, 0xC8, 21, 22, 23, 255, 25, 26)),
 			List.of(), List.of(), List.of()
 		);
-		publishPendingForTest();
+		// Exercise the defensive late-ack path separately: this update was
+		// already selected before a visibility traversal referenced the old asset.
+		var inFlight = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(211L);
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
+		DistantHorizonsSemanticCollector.acknowledgeForTest(inFlight);
 
 		assertEquals(List.of(), DistantHorizonsSemanticCollector.consumeVisibleSegments());
 		assertEquals(0, DistantHorizonsSemanticCollector.consumeRenderFrame().flags()

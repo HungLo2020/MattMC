@@ -259,6 +259,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED = 0x54435554;
 	public static final int MATERIAL_ID_ENTITY_SHADOW = 0x5348444D;
 	public static final int MATERIAL_ID_SKY_STARS = 0x53544152;
+	public static final int MATERIAL_ID_SKY_DARK_DISC = 0x534B5944;
 	public static final int MATERIAL_ID_CELESTIAL = 0x43454C45;
 	public static final int MATERIAL_ID_GLINT_TEXTURED = 0x71E6A9B4;
 	/** Vanilla energy-swirl cutout with additive, emissive composition. */
@@ -2125,6 +2126,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
 			pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 			pendingFeatureCoverage = VulkanicGalBridge.WorldFeatureCoverageRecord.empty();
+			pendingUnsupportedShadowGeometry = 0;
+			shadowCasterCaptureInstanceMark = -1;
+			shadowCasterCaptureProducerMark = -1;
+			shadowOnlyStreamCheckpoint = null;
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin.reset-state");
 			// A shader-enabled render can enter the shell through a timing window
 			// where the caller's copied level/camera arguments are still null even
@@ -2205,7 +2210,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			int leashSubmits = 0;
 			pendingFeatureCoverage = new VulkanicGalBridge.WorldFeatureCoverageRecord(
 				modelSubmits, modelPartSubmits, blockModelSubmits,
-				ordinaryBlockSubmits, itemSubmits, coverage.customGeometrySubmits(),
+				ordinaryBlockSubmits, itemSubmits, Math.addExact(coverage.customGeometrySubmits(), pendingUnsupportedShadowGeometry),
 				shadowSubmits, flameSubmits, nameTagSubmits,
 				textSubmits, hitboxSubmits, leashSubmits, coverage.particleGroupSubmits()
 			);
@@ -2762,7 +2767,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			fogParameters.renderEnd(),
 			shaderPackDistantHorizonsRenderDistance(),
 			rustFogParameters.skyEnd(),
-			rustFogParameters.cloudEnd()
+			rustFogParameters.cloudEnd(),
+			net.irisshaders.iris.gui.option.IrisVideoSettings.shadowDistance
 		);
 	}
 
@@ -3398,27 +3404,24 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Copies SkyRenderer's below-horizon eight-segment dark disc fan. */
 	private static void enqueueVanillaDarkDiscLocked(Camera camera) {
-		// Frozen pushes the already-installed camera ModelView matrix and then
-		// applies only this local offset. The Rust frame's view matrix owns that
-		// camera transform, so baking camera position/rotation into vertices here
-		// applies it a second time and turns the below-horizon fan into wedges.
-		Matrix4f transform = new Matrix4f()
-			.translate(0.0F, 12.0F, 0.0F);
+		// Copy Frozen's local bottom fan. Rust owns its camera-relative draw
+		// transform and sky fog; those distances use these untranslated vertices.
+		Matrix4f transform = new Matrix4f();
 		for (int index = 0; index < 8; index++) {
 			float angle0 = (-180.0F + index * 45.0F) * Mth.DEG_TO_RAD;
 			float angle1 = (-180.0F + (index + 1) * 45.0F) * Mth.DEG_TO_RAD;
 			float[] vertices = new float[12];
 			transformMaterialVertex(transform, 0.0F, -16.0F, 0.0F, vertices, 0);
-			transformMaterialVertex(transform, 512.0F * Mth.cos(angle0), -16.0F, 512.0F * Mth.sin(angle0), vertices, 3);
-			transformMaterialVertex(transform, 512.0F * Mth.cos(angle1), -16.0F, 512.0F * Mth.sin(angle1), vertices, 6);
+			transformMaterialVertex(transform, -512.0F * Mth.cos(angle0), -16.0F, 512.0F * Mth.sin(angle0), vertices, 3);
+			transformMaterialVertex(transform, -512.0F * Mth.cos(angle1), -16.0F, 512.0F * Mth.sin(angle1), vertices, 6);
 			transformMaterialVertex(transform, 0.0F, -16.0F, 0.0F, vertices, 9);
 			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 				STRATUM_WORLD_MATERIAL,
-				MATERIAL_ID_OPAQUE_TEXTURED,
+				MATERIAL_ID_SKY_DARK_DISC,
 				MATERIAL_TEXTURE_GENERATED_WHITE,
 				MATERIAL_MODE_OPAQUE,
-				DEPTH_POLICY_DISABLED,
-				CULL_NONE,
+				DEPTH_POLICY_TEST_NO_WRITE,
+				CULL_BACK,
 				WORLD_TOPOLOGY_TRIANGLES,
 				WORLD_WINDING_CCW,
 				0xFF000000,
@@ -3672,11 +3675,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			var instance = ORB_SEMANTICS.enqueue(state.icon, red, blue, state.lightCoords,
 				entityPose.pose().get(new float[16]),
 				new float[] {cameraOrientation.x, cameraOrientation.y, cameraOrientation.z, cameraOrientation.w},
-				state.entityId, PENDING_MESH_INSTANCES.size());
+				state.entityId, PENDING_MESH_INSTANCES.size(),
+                VulkanicGalBridge.activeSemanticEntityCulling(),shadowCasterCaptureInstanceMark >= 0);
 			if (WORLD_MESH_ASSETS.containsKey(instance.meshKey()) || STATIC_TERRAIN_MESH_RESIDENCY.containsKey(instance.meshKey()))
 				throw new IllegalStateException("native orb resource identity collision");
-			DeterministicCameraCapture.recordSubmittedWorkIdentity("experience-orb", "rust-vulkan-whole-frame:typed-orb");
-			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			if (!instance.shadowOnly()) DeterministicCameraCapture.recordSubmittedWorkIdentity("experience-orb", "rust-vulkan-whole-frame:typed-orb");
+			if (!instance.shadowOnly() && Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 				// Capture bounds only. These vertices never enter a rendering request.
 				Matrix4f diagnosticPose = new Matrix4f(entityPose.pose()).translate(0,0.1F,0).rotate(cameraOrientation).scale(0.3F);
 				float[] corners = new float[12];
@@ -3838,6 +3842,17 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private static int shadowCasterCaptureInstanceMark = -1;
 	private static int shadowCasterCaptureProducerMark = -1;
+	private static ShadowOnlyStreamCheckpoint shadowOnlyStreamCheckpoint;
+	private static int pendingUnsupportedShadowGeometry;
+
+	private record ShadowOnlyStreamCheckpoint(int material, int particle, int text, int segment, int crack, int border) {}
+
+	private static boolean removeShadowOnlySuffix(List<?> stream, int mark) {
+		if (mark < 0 || mark > stream.size()) throw new IllegalStateException("shadow-only stream checkpoint is outside the frame");
+		boolean removed = stream.size() > mark;
+		stream.subList(mark, stream.size()).clear();
+		return removed;
+	}
 
 	/**
 	 * Starts capturing the next ordinary entity submission as shadow-only
@@ -3855,6 +3870,9 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			shadowCasterCaptureInstanceMark = PENDING_MESH_INSTANCES.size();
 			shadowCasterCaptureProducerMark = PENDING_MESH_PRODUCERS.size();
+			shadowOnlyStreamCheckpoint = new ShadowOnlyStreamCheckpoint(PENDING_MATERIAL_QUADS.size(),
+				PENDING_PARTICLE_QUADS.size(), PENDING_TEXT_QUADS.size(), PENDING_SEGMENTS.size(),
+				PENDING_CRACK_QUADS.size(), PENDING_BORDER_QUADS.size());
 		}
 	}
 
@@ -3863,9 +3881,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		synchronized (LOCK) {
 			int instanceMark = shadowCasterCaptureInstanceMark;
 			int producerMark = shadowCasterCaptureProducerMark;
+			var streams = shadowOnlyStreamCheckpoint;
+			shadowOnlyStreamCheckpoint = null;
 			shadowCasterCaptureInstanceMark = -1;
 			shadowCasterCaptureProducerMark = -1;
-			if (instanceMark < 0 || instanceMark > PENDING_MESH_INSTANCES.size()
+			if (streams == null || instanceMark < 0 || instanceMark > PENDING_MESH_INSTANCES.size()
 				|| producerMark < 0 || producerMark > PENDING_MESH_PRODUCERS.size()) {
 				throw new IllegalStateException("shadow-only entity capture was not active for this frame");
 			}
@@ -3874,15 +3894,34 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MESH_INSTANCES.subList(instanceMark, PENDING_MESH_INSTANCES.size()).clear();
 			// Camera-producer receipts must not include shadow-only work.
 			PENDING_MESH_PRODUCERS.subList(producerMark, PENDING_MESH_PRODUCERS.size()).clear();
+			// Every ordinary stream is camera-owned. Remove unported shadow
+			// geometry from it and retain an explicit ownership gap for admission.
+			boolean unsupported = removeShadowOnlySuffix(PENDING_MATERIAL_QUADS, streams.material());
+			unsupported |= removeShadowOnlySuffix(PENDING_PARTICLE_QUADS, streams.particle());
+			unsupported |= removeShadowOnlySuffix(PENDING_TEXT_QUADS, streams.text());
+			unsupported |= removeShadowOnlySuffix(PENDING_SEGMENTS, streams.segment());
+			unsupported |= removeShadowOnlySuffix(PENDING_CRACK_QUADS, streams.crack());
+			unsupported |= removeShadowOnlySuffix(PENDING_BORDER_QUADS, streams.border());
 			int casters = 0;
-			for (VulkanicGalBridge.WorldMeshInstanceRecord record : captured) {
-				if (record.stratum() != STRATUM_WORLD_ENTITY_MESH || record.itemFoil() != null
-					|| record.decalFoil() != null || record.blockEntityId() != -1
-					|| (record.flags() & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY) != 0) {
+			int[] keptPrefix = new int[captured.size()+1];
+			for (int i=0;i<captured.size();i++) {
+				var record = captured.get(i);
+				keptPrefix[i+1] = casters;
+				if (record.itemFoil() != null || record.decalFoil() != null
+					|| (record.flags() & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY) != 0) continue;
+				if (record.stratum() != STRATUM_WORLD_ENTITY_MESH || record.blockEntityId() != -1) {
+					unsupported = true;
 					continue;
 				}
 				PENDING_MESH_INSTANCES.add(record.asShadowOnlyEntityCaster());
 				casters++;
+				keptPrefix[i+1] = casters;
+			}
+			if (casters != captured.size()) ORB_SEMANTICS.remapCollectedMeshSuffix(instanceMark,keptPrefix);
+			if (unsupported) {
+				if (pendingUnsupportedShadowGeometry == 0)
+					auditMessage("Rust shadow-only entity geometry requires an owned shadow stream; camera streams preserved");
+				pendingUnsupportedShadowGeometry = Math.min(4096, pendingUnsupportedShadowGeometry + 1);
 			}
 			return casters;
 		}
@@ -17696,6 +17735,10 @@ public final class RustGalWorldPrimitiveRenderer {
 					pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
 					pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 					pendingFeatureCoverage = VulkanicGalBridge.WorldFeatureCoverageRecord.empty();
+			pendingUnsupportedShadowGeometry = 0;
+			shadowCasterCaptureInstanceMark = -1;
+			shadowCasterCaptureProducerMark = -1;
+			shadowOnlyStreamCheckpoint = null;
 					return frame;
 			}
 		}
@@ -17830,7 +17873,8 @@ public final class RustGalWorldPrimitiveRenderer {
                 instance.itemFoil(),
                 instance.decalFoil(),
                 instance.modelSubmissionOrder(),
-                instance.packedLight()
+                instance.packedLight(),
+                instance.entityCulling()
 			));
 		}
 		List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances = new ArrayList<>(frame.firstPersonMeshInstances().size());
@@ -17856,7 +17900,8 @@ public final class RustGalWorldPrimitiveRenderer {
                 instance.itemFoil(),
                 instance.decalFoil(),
                 instance.modelSubmissionOrder(),
-                instance.packedLight()
+                instance.packedLight(),
+                instance.entityCulling()
 			));
 		}
 		VulkanicGalBridge.WorldBackgroundRecord background = frame.background();

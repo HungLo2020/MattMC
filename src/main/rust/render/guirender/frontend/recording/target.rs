@@ -233,6 +233,28 @@ impl GuiFrontend {
         // whose submission has completed, so animated semantic meshes cannot
         // exhaust permanent residency or overwrite in-flight vertices.
         self.reclaim_completed_mesh_geometry(gal.poll_completed());
+        // Eviction uses the complete ordered frame. Recording one mesh item
+        // at a time must not evict the other items needed later in that frame.
+        let mut needed_targets = Vec::new();
+        for entry in &ordered {
+            if let GuiFrameRequest::Mesh(item) = entry {
+                for batch in &item.layers {
+                    let (extent, _, _) = resolve_gui_mesh_item_raster(batch)?;
+                    needed_targets.push((
+                        batch.item_cache.map_or(0, |cache| cache.identity),
+                        Extent3d { width: extent[0], height: extent[1], depth: 1 },
+                    ));
+                }
+            }
+        }
+        if self.mesh_targets.has_obsolete_items(generation, &needed_targets) {
+            // Composite programs may be shared: release borrowers before owners.
+            let mut composites: Vec<_> = std::mem::take(&mut self.mesh_composites)
+                .into_values().collect();
+            composites.sort_by_key(|resources| resources.owns_shared_resources());
+            for resources in composites { resources.destroy(gal); }
+            self.mesh_targets.retain_items(gal, generation, &needed_targets);
+        }
         let color_format = gal.pass_target_color_format(render_target)?;
         let frame_pass = match render_pass {
             Some(pass) => pass,

@@ -24,7 +24,16 @@ pub(super) fn derive_source_uniform_contract(
     transforms: SourceTransformSemantics,
 ) -> GalResult<TerrainSourceUniformContract> {
     let mut declarations = BTreeMap::new();
+    let mut custom_uniforms = BTreeMap::new();
     for source in [vertex, fragment] {
+        for (name, definition) in source.custom_uniforms() {
+            if custom_uniforms.get(name).is_some_and(|existing| existing != definition) {
+                return Err(GalError::invalid_argument(format!(
+                    "paired sources have incompatible custom uniform property '{name}'"
+                )));
+            }
+            custom_uniforms.insert(name.clone(), definition.clone());
+        }
         for uniform in collect_nonopaque_uniforms(source.expanded_source(), transforms)? {
             match declarations.get(&uniform.name) {
                 Some(existing) if existing != &uniform.declaration => {
@@ -98,11 +107,12 @@ pub(super) fn derive_source_uniform_contract(
         declarations,
         fields,
         std140_size,
+        custom_uniforms,
     })
 }
 
 /// Fullscreen source stages usually have no camera geometry. The owned vanilla
-/// sky disc is the one explicit exception: its legacy source program receives
+/// sky disc and celestial quads are exceptions: their legacy programs receive
 /// a real model-view/projection transform and reconstructs rays from the
 /// resulting fragment depth. Keep those two fields in the same semantic UBO
 /// contract rather than sourcing them from Java/Iris state.
@@ -122,6 +132,7 @@ pub(super) fn derive_fullscreen_source_uniform_contract(
     if !matches!(
         raster_primitive,
         FullscreenSourceRasterPrimitive::VanillaSkyDisc
+            | FullscreenSourceRasterPrimitive::ShaderPackHorizon
             | FullscreenSourceRasterPrimitive::VanillaCelestialQuad
     ) {
         return Ok(contract);
@@ -132,9 +143,16 @@ pub(super) fn derive_fullscreen_source_uniform_contract(
     ] {
         ensure_fullscreen_uniform(&mut contract, name, declaration)?;
     }
+    if raster_primitive == FullscreenSourceRasterPrimitive::VanillaSkyDisc {
+        ensure_fullscreen_uniform(&mut contract, "skyColor", "vec3 skyColor;")?;
+    }
+    if raster_primitive == FullscreenSourceRasterPrimitive::ShaderPackHorizon {
+        ensure_fullscreen_uniform(&mut contract, "fogColor", "vec3 fogColor;")?;
+        ensure_fullscreen_uniform(&mut contract, "far", "float far;")?;
+    }
     if raster_primitive == FullscreenSourceRasterPrimitive::VanillaCelestialQuad {
         for (name, declaration) in [
-            ("sunAngle", "float sunAngle;"),
+            ("vulkanic_source_celestial_time_of_day", "float vulkanic_source_celestial_time_of_day;"),
             ("moonPhase", "int moonPhase;"),
             (
                 "vulkanic_source_celestial_is_moon",
@@ -291,9 +309,10 @@ pub(super) fn align_up_std140(value: u32, alignment: u32) -> GalResult<u32> {
 /// been captured. Samplers/images remain source-declared named resources for
 /// a later binding contract.
 pub(super) fn strip_nonopaque_uniforms(source: &str) -> GalResult<String> {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
     let mut output = String::with_capacity(source.len());
-    for line in source.lines() {
-        let trimmed = line.trim();
+    for (line, semantic_line) in source.lines().zip(stripped.lines()) {
+        let trimmed = semantic_line.trim();
         let Some(declaration) = trimmed.strip_prefix("uniform ") else {
             output.push_str(line);
             output.push('\n');
@@ -309,6 +328,7 @@ pub(super) fn strip_nonopaque_uniforms(source: &str) -> GalResult<String> {
             continue;
         }
         validate_nonopaque_uniform_declaration(declaration)?;
+        append_rewritten_declaration_line(&mut output, line, semantic_line, "");
     }
     Ok(output)
 }
@@ -317,6 +337,8 @@ pub(super) fn collect_nonopaque_uniforms(
     source: &str,
     transforms: SourceTransformSemantics,
 ) -> GalResult<Vec<SourceUniformDeclaration>> {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
+    let source = stripped.as_str();
     // Expanded packs commonly include a broad global uniform header. Only a
     // source-stage reference belongs in this program's explicit ABI; merely
     // declaring a value in an inactive terrain path must not create a fake
@@ -371,7 +393,8 @@ pub(super) fn required_legacy_transform_uniforms(
     }
     let referenced = glsl_identifiers(source);
     let mut requirements = Vec::with_capacity(2);
-    if referenced.contains("gl_ModelViewMatrix")
+    if referenced.contains("gl_ModelViewProjectionMatrix")
+        || referenced.contains("gl_ModelViewMatrix")
         || referenced.contains("gl_NormalMatrix")
         || referenced.contains("ftransform")
     {
@@ -396,7 +419,8 @@ pub(super) fn required_legacy_transform_uniforms(
     // Iris still exposes the world gbufferProjection to source uniforms, so
     // a legacy built-in must not inject a second scalar declaration here.
     if transforms != SourceTransformSemantics::Hand
-        && (referenced.contains("gl_ProjectionMatrix") || referenced.contains("ftransform"))
+        && (referenced.contains("gl_ModelViewProjectionMatrix")
+            || referenced.contains("gl_ProjectionMatrix") || referenced.contains("ftransform"))
     {
         requirements.push((
             transforms.projection_uniform(),

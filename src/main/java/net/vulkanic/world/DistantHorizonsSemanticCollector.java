@@ -120,6 +120,8 @@ public final class DistantHorizonsSemanticCollector {
 	 * semantic snapshot map remains the sole data owner; this prevents a Long
 	 * allocation for every recursive {@code LodRenderSection.canRender} probe. */
 	private static final LongOpenHashSet COLUMN_KEYS = new LongOpenHashSet();
+	/** CPU container ownership only; at most one current lease group per section. */
+	private static final Map<Long, SemanticColumnOwnership> COLUMN_OWNERS = new LinkedHashMap<>();
 	/** Last acknowledged immutable asset per live column, retained only when an
 	 * explicit source/capture consumer needs its full CPU geometry. Ordinary
 	 * whole-frame rendering retains the compact draw descriptor below instead. */
@@ -164,6 +166,10 @@ public final class DistantHorizonsSemanticCollector {
 	 * evicting a still-visible column between its build and next preflight. */
 	private static final Set<Long> VISIBLE_CANDIDATE_COLUMN_KEYS = new LinkedHashSet<>();
 	private static int publicationTraceEvents;
+	private static int executionTraceEvents;
+	private static long lastExecutionTraceNanos;
+	private static int rejectionTraceEvents;
+	private static long lastRejectionTraceNanos;
 	/** Assets handed to the combined coordinator but not yet acknowledged. A
 	 * column remains reserved until acknowledgement so replacement builds cannot
 	 * starve its last coherent published generation. */
@@ -585,8 +591,9 @@ public final class DistantHorizonsSemanticCollector {
 				return true;
 			}
 			PublishedColumnDrawMetadata published = publishedDrawMetadataLocked(columnKey);
-			return published != null && published.generation() == columnGeneration
+			boolean current = published != null && published.generation() == columnGeneration
 				&& !Objects.equals(PENDING_RETIREMENTS.get(columnKey), columnGeneration);
+			return current;
 		}
 	}
 
@@ -1470,7 +1477,39 @@ public final class DistantHorizonsSemanticCollector {
 		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
 		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp
 	) {
-		if (!enabled()) return 0L;
+		return recordRustSemanticColumn(columnKey, origin, semanticMaterials, inputCoverage, outputCoverage,
+			opaque, transparentSide, transparentUp, transparentWaterUp, false).generation();
+	}
+
+	/** Publishes and acquires CPU ownership atomically, including generation reuse. */
+	public static SemanticColumnLease recordOwnedRustSemanticBuiltColumn(
+		long columnKey,
+		DhBlockPos origin,
+		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
+		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
+		LodQuadBuilder.SemanticQuadCoverage outputCoverage,
+		LodQuadBuilder.SemanticVertexBufferBuild opaque,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentSide,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp
+	) {
+		return recordRustSemanticColumn(columnKey, origin, semanticMaterials, inputCoverage, outputCoverage,
+			opaque, transparentSide, transparentUp, transparentWaterUp, true);
+	}
+
+	private static SemanticColumnLease recordRustSemanticColumn(
+		long columnKey,
+		DhBlockPos origin,
+		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
+		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
+		LodQuadBuilder.SemanticQuadCoverage outputCoverage,
+		LodQuadBuilder.SemanticVertexBufferBuild opaque,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentSide,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp,
+		boolean retainOwner
+	) {
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, null);
 		Objects.requireNonNull(semanticMaterials, "semanticMaterials");
 		recordPackedWaterColorSamples(opaque.packedVertexBuffers(), "opaque");
 		recordPackedWaterColorSamples(transparentSide.packedVertexBuffers(), "transparent-side");
@@ -1487,7 +1526,7 @@ public final class DistantHorizonsSemanticCollector {
 			: null;
 		return recordOwnedPackedColumnSnapshot(
 			columnKey, origin, opaque.packedVertexBuffers(), transparentSide.packedVertexBuffers(),
-			transparentUp.packedVertexBuffers(), transparentWaterUp.packedVertexBuffers(), provenance
+			transparentUp.packedVertexBuffers(), transparentWaterUp.packedVertexBuffers(), provenance, retainOwner
 		);
 	}
 
@@ -1524,16 +1563,17 @@ public final class DistantHorizonsSemanticCollector {
 		return build.semanticMaterialIds();
 	}
 
-	private static long recordOwnedPackedColumnSnapshot(
+	private static SemanticColumnLease recordOwnedPackedColumnSnapshot(
 		long columnKey,
 		DhBlockPos origin,
 		List<byte[]> opaque,
 		List<byte[]> transparentSide,
 		List<byte[]> transparentUp,
 		List<byte[]> transparentWaterUp,
-		LodMaterialProvenanceSnapshot provenance
+		LodMaterialProvenanceSnapshot provenance,
+		boolean retainOwner
 	) {
-		if (!enabled()) return 0L;
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, null);
 		Objects.requireNonNull(origin, "origin");
 		LodColumnSnapshot snapshot = new LodColumnSnapshot(
 			columnKey, NEXT_GENERATION.getAndIncrement(), origin.getX(), origin.getY(), origin.getZ(),
@@ -1541,7 +1581,54 @@ public final class DistantHorizonsSemanticCollector {
 			ownedPackedBuffers(transparentUp), ownedPackedBuffers(transparentWaterUp)
 		);
 		synchronized (COLUMNS) {
-			return recordBuiltSnapshotLocked(columnKey, snapshot, provenance);
+			long generation = recordBuiltSnapshotLocked(columnKey, snapshot, provenance);
+			SemanticColumnOwnership ownership = null;
+			if (retainOwner && generation != 0L && hasColumn(columnKey, generation)) {
+				ownership = COLUMN_OWNERS.get(columnKey);
+				if (ownership == null || ownership.generation != generation) {
+					ownership = new SemanticColumnOwnership(generation);
+					COLUMN_OWNERS.put(columnKey, ownership);
+				}
+				ownership.owners = Math.incrementExact(ownership.owners);
+			}
+			return new SemanticColumnLease(columnKey, generation, ownership);
+		}
+	}
+
+	private static final class SemanticColumnOwnership {
+		final long generation;
+		int owners;
+		SemanticColumnOwnership(long generation) { this.generation = generation; }
+	}
+
+	/** An idempotent CPU lifetime token, never a native resource or GPU handle. */
+	public static final class SemanticColumnLease implements AutoCloseable {
+		private final long columnKey;
+		private final long generation;
+		private final SemanticColumnOwnership ownership;
+		private boolean closed;
+
+		private SemanticColumnLease(long columnKey, long generation, SemanticColumnOwnership ownership) {
+			this.columnKey = columnKey;
+			this.generation = generation;
+			this.ownership = ownership;
+		}
+
+		public long generation() { return this.generation; }
+
+		@Override
+		public void close() {
+			synchronized (COLUMNS) {
+				if (this.closed) return;
+				this.closed = true;
+				// Replacement and reset invalidate the old group by identity. Late
+				// closes cannot decrement a newer group's owners, even for the same key.
+				if (this.ownership == null || COLUMN_OWNERS.get(this.columnKey) != this.ownership) return;
+				if (--this.ownership.owners == 0) {
+					COLUMN_OWNERS.remove(this.columnKey);
+					removeColumn(this.columnKey, this.generation);
+				}
+			}
 		}
 	}
 
@@ -2423,6 +2510,17 @@ public final class DistantHorizonsSemanticCollector {
 			routeOpaqueSegments = opaqueSegments;
 			routeTransparentSegments = transparentSegments;
 			routeWaterSegments = waterSegments;
+			if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.traceExecution")
+				&& rejectionTraceEvents < 240) {
+				long now = System.nanoTime();
+				if (rejectionTraceEvents == 0 || now - lastRejectionTraceNanos >= 1_000_000_000L) {
+					lastRejectionTraceNanos = now;
+					rejectionTraceEvents++;
+					System.out.println("[MattMC DH] rejected reason=" + reason
+						+ " opaque=" + opaqueSegments + " transparent=" + transparentSegments
+						+ " water=" + waterSegments + " wall_ms=" + System.currentTimeMillis());
+				}
+			}
 			routeSelected = false;
 			PENDING_VISIBLE_SEGMENTS.clear();
 			PENDING_RENDER_FRAME = withFlags(
@@ -2490,6 +2588,20 @@ public final class DistantHorizonsSemanticCollector {
 			lastExecutedWaterInstances = waterInstances;
 			lastExecutedFrameSemanticsEnabled = true;
 			routeExecutionCount++;
+			if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.traceExecution")
+				&& executionTraceEvents < 240) {
+				long now = System.nanoTime();
+				if (executionTraceEvents == 0 || now - lastExecutionTraceNanos >= 1_000_000_000L) {
+					lastExecutionTraceNanos = now;
+					executionTraceEvents++;
+					// Successful native submission carrying these immutable DH segments.
+					// No geometry snapshots, GPU state or alternate execution path.
+					System.out.println("[MattMC DH] submitted world_frame=" + worldFrame
+						+ " submission=" + submission + " instances=" + instances
+						+ " opaque=" + opaqueInstances + " transparent=" + transparentInstances
+						+ " water=" + waterInstances + " wall_ms=" + System.currentTimeMillis());
+				}
+			}
 			if (exactAtlasCoverageRequested()) {
 				long signature = 17L;
 				signature = 31L * signature + routeExactAtlasOutputKnownQuads;
@@ -2761,6 +2873,7 @@ public final class DistantHorizonsSemanticCollector {
 				PENDING_RETIREMENTS.put(published.getKey(), published.getValue());
 			}
 			COLUMNS.clear();
+			COLUMN_OWNERS.clear();
 			COLUMN_KEYS.clear();
 			PUBLISHED_COLUMNS.clear();
 			PUBLISHED_DRAW_METADATA.clear();
@@ -3049,7 +3162,18 @@ public final class DistantHorizonsSemanticCollector {
 		} else if (PENDING_VISIBLE_COLUMN_KEYS.isEmpty()) {
 			ordered.addAll(PENDING_COLUMNS.values());
 		}
+		// Preflight runs after DH selects this frame's visible generations. A
+		// replacement must not retire those Rust assets before submission: pruning
+		// their old references would present a one-frame terrain hole. The
+		// coordinator flushes again after presentation, when consumeVisibleFrame
+		// has cleared this pending list, so rebuilds advance at that boundary.
+		LongOpenHashSet selectedColumnKeys = null;
+		if (!PENDING_VISIBLE_SEGMENTS.isEmpty()) {
+			selectedColumnKeys = new LongOpenHashSet(PENDING_VISIBLE_SEGMENTS.size());
+			for (var instance : PENDING_VISIBLE_SEGMENTS) selectedColumnKeys.add(instance.columnKey());
+		}
 		for (LodColumnSnapshot snapshot : ordered) {
+			if (selectedColumnKeys != null && selectedColumnKeys.contains(snapshot.columnKey())) continue;
 			// The coordinator may be re-entered while native code owns the copied
 			// payload. Do not let a small source-side rebuild replace that live
 			// submission with another update for the same column. Once the first
@@ -3328,6 +3452,7 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static void removeColumnLocked(long columnKey) {
+		COLUMN_OWNERS.remove(columnKey);
 		LodColumnSnapshot removed = COLUMNS.remove(columnKey);
 		COLUMN_KEYS.remove(columnKey);
 		removeMaterialProvenanceLocked(columnKey);
@@ -3451,6 +3576,12 @@ public final class DistantHorizonsSemanticCollector {
 
 	private static Long eldestUnprotectedColumnKeyLocked() {
 		for (long columnKey : COLUMNS.keySet()) {
+			// A live quadtree container owns readiness even when it is currently
+			// outside the visible list (for example a transition sibling or parent).
+			// Retiring it here makes DH rebuild it on the next traversal, and the
+			// resulting cache pressure evicts another live section in turn. Its CPU
+			// lease is bounded by the quadtree lifetime and close/reset retires it.
+			if (COLUMN_OWNERS.containsKey(columnKey)) continue;
 			if (VISIBLE_CANDIDATE_COLUMN_KEYS.contains(columnKey)) continue;
 			if (PENDING_VISIBLE_COLUMN_KEYS.contains(columnKey)) continue;
 			boolean consumedVisible = false;
@@ -4974,6 +5105,7 @@ public final class DistantHorizonsSemanticCollector {
 		synchronized (COLUMNS) {
 			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
 			COLUMNS.clear();
+			COLUMN_OWNERS.clear();
 			COLUMN_KEYS.clear();
 			PUBLISHED_COLUMNS.clear();
 			PUBLISHED_DRAW_METADATA.clear();
@@ -4990,6 +5122,10 @@ public final class DistantHorizonsSemanticCollector {
 			PENDING_VISIBLE_COLUMN_KEYS.clear();
 			VISIBLE_CANDIDATE_COLUMN_KEYS.clear();
 			publicationTraceEvents = 0;
+			executionTraceEvents = 0;
+			lastExecutionTraceNanos = 0L;
+			rejectionTraceEvents = 0;
+			lastRejectionTraceNanos = 0L;
 			IN_FLIGHT_ASSET_GENERATIONS.clear();
 			INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.clear();
 			LAST_LIFECYCLE_RETIREMENTS.clear();
