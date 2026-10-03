@@ -53,7 +53,7 @@ When vertical velocity is zero or downward, Slow Falling caps ordinary effective
 
 Brew Awkward Potion with **Phantom Membrane** for **1 minute 30 seconds**, or extend the result with Redstone to **4 minutes**. There is no registered Glowstone-strengthened Slow Falling mixture. [Registered recipes][brew-fall] · [Durations][potion-fall] · [Complete brewing list][brew-all]
 
-An owned, tame **[Sugar Glider](../mobs/SugarGlider.md)** riding its player owner refreshes Slow Falling I for **100 ticks**, or **5 seconds**, while that riding state continues. To pick up an already-tamed one, the owner can Sneak-interact with an empty hand while carrying no other passengers. Its riding callback allows dismounting when the pickup cooldown has elapsed and the owner is sneaking. This is a specific pet interaction, not an effect from merely standing nearby. [Owner pickup][sugar-pickup] · [Riding refresh and dismount][sugar-ride]
+The **[Sugar Glider](../mobs/SugarGlider.md)** riding callback would refresh Slow Falling I for **100 ticks**, or **5 seconds**, on the player owner while a tame glider is already riding them. **The current owner pickup route cannot establish that ride on the server:** Sneak-interacting with an empty hand while carrying no other passengers attempts pickup, but the shared server riding check rejects a player as the vehicle. The refresh and cooldown-based sneak-dismount branches therefore do not establish an available pet-based Slow Falling source in this snapshot. Merely standing nearby does not apply it. [Owner pickup][sugar-pickup] · [Conditional refresh and dismount][sugar-ride] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save]
 
 ## Levitation
 
@@ -105,7 +105,7 @@ The same effect does **not** add its levels or durations together. A stronger ap
 
 Drink **[Milk](../items/MilkBucket.md)** to clear these effects, including beneficial ones and any hidden continuation of the same effect. A **Honey Bottle removes Poison only**, so it is not a substitute for removing Slowness or Levitation. Successful ordinary [Totem of Undying](../items/TotemOfUndying.md) protection also clears current effects before applying its own replacement effects. Clearing Slow Falling or Levitation in midair removes their ongoing fall-distance reset, so secure a landing before treating Milk as a rescue plan. [Milk registration][milk-item] · [Milk consumption][milk-consumable] · [Clear-all call][milk-clear] · [Removal][clear-all] · [Honey specificity][honey] · [Totem activation][totem-caller] · [Replacement effects][totem-effects] · [Fall reset][fall-reset]
 
-Clearing an effect does not disable its source. A Beacon, accompanying Dolphin, or Sugar Glider riding its owner can apply the effect again; leave the relevant refresh condition if you want it to stay cleared. [Beacon refresh][beacon-pulse] · [Dolphin refresh][dolphin-grace] · [Sugar Glider refresh][sugar-ride]
+Clearing an effect does not disable its source. A Beacon or accompanying Dolphin can apply the effect again; leave the relevant refresh condition if you want it to stay cleared. [Beacon refresh][beacon-pulse] · [Dolphin refresh][dolphin-grace]
 
 With **command permission level 2**, `/effect give @s minecraft:slow_falling 30 0` requests Slow Falling I for 30 seconds, and `/effect clear @s minecraft:slowness` removes only Slowness. Finite command durations accept **1–1,000,000 seconds**; `infinite` is a separate supported choice. Amplifiers accept **0–255**, but higher numbers do not strengthen presence-only rules such as Slow Falling or Dolphin's Grace. These are source-checked examples, not executed commands. [Permission and clear syntax][command-gate] · [Finite bounds][command-finite] · [Infinite syntax][command-infinite] · [Seconds conversion][command-convert] · [Targeted clearing][command-clear]
 
@@ -124,7 +124,7 @@ Ordinary application still passes through the recipient's effect checks. The bas
 
 ## Sources and verification
 
-Source-reviewed at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6` on 2026-10-02. Checked effect/potion registration, level-scaled attributes and active player movement/fall consumers, brewing and delivery, selected mob/food/Beacon sources, reapplication, clearing, and immunity. No game, movement-speed, jump-height, fall, brewing, command, pet, projectile, or timing test was run. Numbers describe checked source contributions and durations, not measured movement performance. The acquisition examples are not an exhaustive loot-location or equipment catalog; modified resources, item components, attributes, or entity code can change them.
+Source-reviewed at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6` on 2026-10-02. Checked effect/potion registration, level-scaled attributes and active player movement/fall consumers, brewing and delivery, selected mob/food/Beacon sources, reapplication, clearing, and immunity. No game, movement-speed, jump-height, fall, brewing, command, pet, projectile, or timing test was run. Numbers describe checked source contributions and durations, not measured movement performance. The acquisition examples are not an exhaustive loot-location or equipment catalog; modified resources, item components, attributes, or entity code can change them. The Sugar Glider pickup limitation was separately source-reviewed on **2026-10-03** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`; no in-game pickup or effect test was run.
 
 [registry]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/core/registries/BuiltInRegistries.java#L163-L170
 [gravity]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/LivingEntity.java#L2247-L2265
@@ -231,3 +231,7 @@ Source-reviewed at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6` on 2026-10-02. Che
 [effect-immunity]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/LivingEntity.java#L1003-L1013
 [dragon-immune]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/boss/enderdragon/EnderDragon.java#L818-L821
 [wither-immune]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/boss/wither/WitherBoss.java#L488-L491
+
+[mount-check]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/Entity.java#L2291-L2325
+[player-type]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/EntityType.java#L1596-L1606
+[no-save]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/EntityType.java#L2142-L2145

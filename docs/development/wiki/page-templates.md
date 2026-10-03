@@ -13,6 +13,9 @@ These are authoring templates, not claims about unfinished content. Follow [docu
 7. Every new directory gets one `index.md`; preserve existing indexes such as `Items.md`, `Mobs.md`, and `Gameplay.md`. Link every immediate page and child index.
 8. For network-backed behavior, trace the client sender, active codec/admission gates, live server context and final handler. Catalog visibility and a permissive handler alone do not prove server-accepted acquisition. Use the current [inventory-browser mode boundary](../../gameplay/mechanics/InventoryBrowser.md#mode-and-permission-limits), including integrated-server transport; do not regenerate the superseded Survival-insertion assumption.
 
+9. Trace the active shared dispatcher and current method signature before describing an entity or item callback. A subclass method or goal does not prove that server, interaction, damage, riding, or data-loading gates allow that behavior.
+10. Preserve existing heading IDs when rewriting a page. Retain the heading or provide a compatibility anchor, and compare rendered IDs against the published baseline.
+
 Use explicit `[label][source-id]` or collapsed `[source-id][]` source references. Adjacent bare shortcuts such as `[first-source] [second-source]` can silently render the first label as a link to the second source. Check the actual rendered destinations as well as the definitions and line ranges.
 
 ## Mob article

@@ -36,7 +36,7 @@ With the crow's beak empty, its owner can interact empty-handed to cycle:
 
 If it is already carrying something, interaction first makes it drop that item instead. That item-return branch is not restricted to the owner. Giving an eligible edible item directly to an empty-beaked owned crow also advances its command, so use an empty hand when you only want to change orders.
 
-In follow mode, it flies around its owner and can settle onto a shoulder; the goal allows up to **two riding crows**. It can try to teleport closer when far behind. Sneaking once its boarding cooldown has expired, beginning elytra flight, or acquiring a combat target makes it dismount. Taking damage also makes it dismount and can knock the carried item out of its beak.
+In follow mode, it flies around its owner and can try to teleport closer when far behind. **Shoulder boarding through this goal is blocked on the server.** The goal attempts to mount its player owner, but the shared server riding check rejects players as vehicles, including forced mount attempts. The two-crow limit and the sneaking, elytra-flight, combat-target and damage dismount branches describe conditional passenger behavior; they do not establish a working shoulder ride. Successful damage can still knock a carried item out of its beak. [Follow attempt][follow-mount] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save] · [Conditional passenger and damage behavior][crow-passenger]
 
 ## Gathering into containers
 
@@ -73,7 +73,7 @@ No dedicated Crow death-loot table or unique Crow resource item was found. Carri
 
 Source-reviewed on **2026-10-01** at `b81c01943c9f3254e713c365a1dd633392929cb2`. No in-game spawning, taming, breeding, riding, gathering, combat, or persistence test was run.
 
-The breeding interaction description includes the correction for [issue #784](https://github.com/HungLo2020/MattMC/issues/784) on `fix/issue-784-crow-feeding`. Focused automated interaction tests are provided; a live gameplay round trip is still needed. Other behavior remains from the baseline audit.
+The breeding interaction description includes the correction for [issue #784](https://github.com/HungLo2020/MattMC/issues/784) on `fix/issue-784-crow-feeding`. Focused automated interaction tests are provided; a live gameplay round trip is still needed. The shoulder-riding limitation was separately source-reviewed on **2026-10-03** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`; no in-game riding test was run. Other behavior remains from the baseline audit.
 
 ## Related pages
 
@@ -113,3 +113,9 @@ The breeding interaction description includes the correction for [issue #784](ht
 - [Biome spawn data](https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/biome)
 - [Biome-building code](https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/biome)
 - [Entity loot tables](https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/entities)
+
+[follow-mount]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/alexsmobs/entity/ai/CrowAIFollowOwner.java#L93-L126
+[mount-check]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/Entity.java#L2291-L2325
+[player-type]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/EntityType.java#L1596-L1606
+[no-save]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/EntityType.java#L2142-L2145
+[crow-passenger]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/alexsmobs/entity/EntityCrow.java#L153-L213

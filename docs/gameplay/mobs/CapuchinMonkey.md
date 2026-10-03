@@ -1,6 +1,6 @@
 # Capuchin Monkey
 
-The **Capuchin Monkey** is a small animal with four appearance variants, retaliation behavior, and owner controls for following, sitting, and riding on a player's head. **The bundled data does not define its taming, breeding, or feeding items**, so these pet features do not yet have a verified food-based Survival route. [Food and interaction code][interactions] · [Variants][variants] · [Tag definitions][tags] · [Bundled item tags][item-tags]
+The **Capuchin Monkey** is a small animal with four appearance variants, retaliation behavior, and owner controls for following and sitting. Its head-riding pickup route is blocked by the current server riding check. **The bundled data does not define its taming, breeding, or feeding items**, so these pet features do not yet have a verified food-based Survival route. [Food and interaction code][interactions] · [Variants][variants] · [Tag definitions][tags] · [Bundled item tags][item-tags]
 
 ## At a glance
 
@@ -34,10 +34,10 @@ These describe conditional code paths, not foods available in the bundled data. 
 For a monkey that is already tamed and owned by you, use an empty hand to avoid food and item interactions taking priority:
 
 - Interact normally to cycle **wander → follow → sit**
-- Sneak-interact while you have no other passenger to let the monkey ride on your head
-- After the short mount cooldown, sneak again to make it dismount
 
-The mount cooldown is 20 ticking game ticks, about one second at normal tick speed. Owner-defense and retaliation goals are registered, and retaliation can alert other nearby monkeys. Avoid provoking a group. [Controls][interactions] · [Riding][riding] · [Goals][goals]
+**Head riding is blocked in this snapshot.** Sneak-interacting while you have no other passenger attempts pickup, but the shared server riding check rejects a player as the vehicle. The pickup handler still reports interaction success without creating a server passenger relationship. The head-positioning routine and 20-tick sneak-dismount cooldown require an existing ride, so they are conditional code paths rather than usable pickup instructions. [Pickup attempt][pickup-attempt] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save] · [Conditional riding behavior][riding]
+
+Owner-defense and retaliation goals are registered, and retaliation can alert other nearby monkeys. Avoid provoking a group. [Controls][interactions] · [Goals][goals]
 
 ## Combat, equipment, and drops
 
@@ -49,7 +49,7 @@ No dedicated capuchin monkey death-loot table was found in the bundled entity lo
 
 ## Verification scope
 
-Source-reviewed on **2026-10-01** against MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2`. Taming, breeding, riding, combat, and spawning were not tested in-game. Added data packs can change the missing-tag and loot limitations described above.
+Source-reviewed on **2026-10-01** against MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2`. Taming, breeding, riding, combat, and spawning were not tested in-game. Added data packs can change the missing-tag and loot limitations described above. The head-riding limitation was separately source-reviewed on **2026-10-03** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`; no in-game riding test was run.
 
 ## Related pages
 
@@ -77,3 +77,8 @@ Source-reviewed on **2026-10-01** against MattMC commit `b81c01943c9f3254e713c36
 [projectile]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityTossedItem.java#L98-L128
 [equipment]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityCapuchinMonkey.java#L256-L262
 [loot]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/entities
+
+[pickup-attempt]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/alexsmobs/entity/EntityCapuchinMonkey.java#L428-L459
+[mount-check]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/Entity.java#L2291-L2325
+[player-type]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/EntityType.java#L1596-L1606
+[no-save]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/EntityType.java#L2142-L2145
