@@ -22,7 +22,9 @@ The coating breaks instantly and has no entity collision or correct-tool require
 
 During an active spray attempt, nearby living entities in the spray path, except skunks, receive **300 ticks of [Nausea](../effects/VisibilityEffects.md#nausea)** and copies of the skunk's current status effects. Nausea is applied by the mob's attack code; the placed block has no contact-damage or contact-effect handler. Walking across a remaining stain is not an implemented way to reapply those effects. [Active effects][spray] · [Complete coating class][block]
 
-At the end of the spray, a skunk with active status effects also creates a shrinking area-effect cloud containing copies of those effects. A skunk with no active effects skips that cloud. The coating does not store potion effects for later use. The spray advancement call is a no-op in the checked trigger registry, so it does not establish a working advancement reward. [Conditional cloud][cloud] · [Advancement stub][advancement]
+At the end of the spray, a skunk with active status effects creates an area-effect cloud containing copies of them; a skunk with no effects skips it. **That cloud does not reach its effect-application phase in the checked code:** the skunk halves the cloud's current default duration of −1 to 0, and the server removes it at the 20-tick wait boundary before applying effects. The active spray above still copies effects independently. This is a source finding, not an in-game test. The coating does not store potion effects for later use. [Cloud setup][cloud-current] · [Current cloud defaults][cloud-default-current] · [Duration assignment][cloud-duration-current] · [Removal before application][cloud-tick-current]
+
+The spray advancement call is a no-op in the checked trigger registry, so it does not establish a working advancement reward. [Advancement stub][advancement]
 
 ## Collecting and clearing spray
 
@@ -41,7 +43,7 @@ Alternatively, break the coating, remove its support, or let it age away. Random
 
 ## Sources and verification
 
-Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02. Traced the mob's trigger, placement/effect branches, all spray-block callbacks, inherited face support/water states, bottling, item registration, and category lists. Searched bundled recipes, loot, tags, and world-generation references. No in-game spraying, collection, decay-timing, water, or multiplayer test was run; the timings and gates above describe checked code rather than measured play.
+Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02. Traced the mob's trigger, placement/effect branches, all spray-block callbacks, inherited face support/water states, bottling, item registration, and category lists. Searched bundled recipes, loot, tags, and world-generation references. No in-game spraying, collection, decay-timing, water, or multiplayer test was run; the timings and gates above describe checked code rather than measured play. The cloud-lifetime paragraph was separately rechecked at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716` on 2026-10-03 through creation, duration assignment and server-tick removal ordering; no runtime cloud test was run.
 
 [registration]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/level/block/Blocks.java#L2404-L2415
 [goals]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/alexsmobs/entity/EntitySkunk.java#L73-L105
@@ -69,3 +71,8 @@ Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02. Tra
 [loot]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L269-L277
 [missing-loot]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/server/ReloadableServerRegistries.java#L115-L120
 [data]: https://github.com/HungLo2020/MattMC/tree/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/resources/data/minecraft
+
+[cloud-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/alexsmobs/entity/EntitySkunk.java#L184-L202
+[cloud-default-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/AreaEffectCloud.java#L50-L69
+[cloud-duration-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/AreaEffectCloud.java#L137-L153
+[cloud-tick-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/AreaEffectCloud.java#L191-L238
