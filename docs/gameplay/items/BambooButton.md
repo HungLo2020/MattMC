@@ -1,17 +1,32 @@
 # Bamboo Button
 
+**Bamboo Button** (`minecraft:bamboo_button`) is a wooden redstone button with a **30-game-tick** ordinary press. Its exact material entry is in [Buttons](../blocks/Buttons.md#bamboo-button). [Item registration][item]
+
 ## Obtaining
 
-Bamboo Button can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Put **1 [Bamboo Planks](BambooPlanks.md) in any crafting slot → 1 Bamboo Button**. This shapeless recipe fits the inventory grid. Raw Bamboo and Bamboo Mosaic do not substitute. [Recipe][recipe]
+
+Mining the placed button normally returns **1 Bamboo Button**, including by hand. An unbroken axe is efficient; see [button mining rules](../blocks/Buttons.md#mining-water-and-pistons). [Loot][loot]
 
 ## Usage
 
-Bamboo Button is a redstone input block. Place it on a surface and press it to emit a short redstone pulse.
+Attach it to a **sturdy floor, wall, or ceiling face**, then use the unpressed button. Losing valid support breaks it. It has no movement-blocking collision; see [placement and operation](../blocks/Buttons.md#placement-and-operation). [Support checks][button-support]
 
 ## Behavior
 
-As a wooden button, it releases automatically after a brief delay and can also be triggered by projectiles.
+A press supplies **signal 15**, including direct power toward the supporting block. The ordinary pulse lasts **30 game ticks**, or **1.5 seconds at 20 game ticks per second**. Pressing an already powered button does not restart the timer. [Press, output, and release checks][button-use]
+
+An eligible arrow overlapping the button's detection box can press it or keep it powered. While an arrow remains, the button checks again every 30 ticks; after it leaves, release happens at the next scheduled empty check. This does not apply to every projectile. See [Buttons: arrow detail](../blocks/Buttons.md#arrow-detail) for ordinary/spectral arrows, thrown tridents, and the separate Wind Charge route. [Arrow-enabled material][sets] · [Detection and rescheduling][button-use]
 
 ## Notes
 
-* This item is the item form of the `minecraft:bamboo_button` block.
+Related: [Buttons](../blocks/Buttons.md) · [Pressure plates](../blocks/PressurePlates.md) · [Items](Items.md)
+
+Source-reviewed on **2026-10-03** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`. No in-game crafting, mining, placement, or circuit test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/item/Items.java#L1049
+[recipe]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/recipe/crafting/bamboo_button.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/loot_table/blocks/bamboo_button.json
+[button-support]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/FaceAttachedHorizontalDirectionalBlock.java#L27-L82
+[button-use]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/ButtonBlock.java#L86-L181
+[sets]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/state/properties/BlockSetType.java#L119-L219
