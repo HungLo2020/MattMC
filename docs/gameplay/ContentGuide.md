@@ -208,6 +208,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ## Alex's Mobs additions
 
+- [Rain Frog](mobs/RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
 - [Comb Jelly](mobs/CombJelly.md), [Frilled Shark](mobs/FrilledShark.md), and [Bucket of Frilled Shark](items/BucketOfFrilledShark.md): actual acquisition, water care, prey and pressure behavior, with separate capture/release limits
 
 - **Airborne encounters:** [Spectre](mobs/Spectre.md), [Cosmaw](mobs/Cosmaw.md), and [Cosmic Cod](mobs/CosmicCod.md): Soul Heart attraction, hunting, bucket handling and current feeding/transport limits

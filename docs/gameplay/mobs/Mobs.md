@@ -6,6 +6,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Rain Frog care:** [Rain Frog](RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
 - **Comb Jelly and Frilled Shark:** [Comb Jelly](CombJelly.md), [Frilled Shark](FrilledShark.md), and [Bucket of Frilled Shark](../items/BucketOfFrilledShark.md): aquatic care, predation, pressure appearance and distinct bucket-release limits
 
 - **Small mobs and night encounters:** [Bat](Bat.md), [Phantom](Phantom.md), [Silverfish](Silverfish.md), and [Endermite](Endermite.md): cave wildlife, default-off insomnia, infestation and Pearl-spawn lifetimes

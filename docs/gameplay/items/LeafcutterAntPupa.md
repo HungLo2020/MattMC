@@ -15,7 +15,7 @@ Using the Pupa on a Chamber or an unrelated block does not activate this action.
 ## Notes
 
 * This item is registered as `minecraft:leafcutter_ant_pupa`.
-* It is also included in the bundled insect-item tag; that tag does not supply a recipe or drop. [Insect-item tag][insects]
+* The bundled insect-item tag names Pupa, but also requires unregistered Maggot and Mosquito Larva items. The loader rejects that whole tag in these defaults, so the entry does not establish active insect-food membership. It supplies no recipe or drop. [Insect-item tag][insects-current] · [Item registrations][insect-items-current] · [Required entries][insect-required-current] · [Whole-tag rejection][insect-loader-current]
 * Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02; no in-game spawning or inventory-consumption test was run.
 
 [item]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/item/Items.java#L1900-L1901
@@ -25,3 +25,8 @@ Using the Pupa on a Chamber or an unrelated block does not activate this action.
 [nest]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/alexsmobs/tileentity/TileEntityLeafcutterAnthill.java#L12-L60
 [insects]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/resources/data/minecraft/tags/item/insect_items.json#L1-L8
 [data]: https://github.com/HungLo2020/MattMC/tree/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/resources/data/minecraft
+
+[insects-current]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/resources/data/minecraft/tags/item/insect_items.json
+[insect-items-current]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/item/Items.java
+[insect-required-current]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/tags/TagEntry.java#L13-L79
+[insect-loader-current]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/tags/TagLoader.java#L94-L135
