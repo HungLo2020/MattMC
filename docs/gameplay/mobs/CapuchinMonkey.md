@@ -35,7 +35,7 @@ For a monkey that is already tamed and owned by you, use an empty hand to avoid 
 
 - Interact normally to cycle **wander → follow → sit**
 
-**Head riding is blocked in this snapshot.** Sneak-interacting while you have no other passenger attempts pickup, but the shared server riding check rejects a player as the vehicle. The pickup handler still reports interaction success without creating a server passenger relationship. The head-positioning routine and 20-tick sneak-dismount cooldown require an existing ride, so they are conditional code paths rather than usable pickup instructions. [Pickup attempt][pickup-attempt] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save] · [Conditional riding behavior][riding]
+**Head riding is blocked in this snapshot.** Sneak-interacting while you have no other passenger attempts pickup, but the shared server riding check rejects a player as the vehicle. The pickup handler still reports interaction success without creating a server passenger relationship. The head-positioning routine and 20-tick sneak-dismount cooldown require an existing ride, so they are conditional code paths rather than usable pickup instructions. [Pickup attempt][pickup-attempt] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save] · [Conditional riding behavior][riding] The rejected player-carry route is tracked in [issue #805](https://github.com/HungLo2020/MattMC/issues/805).
 
 Owner-defense and retaliation goals are registered, and retaliation can alert other nearby monkeys. Avoid provoking a group. [Controls][interactions] · [Goals][goals]
 

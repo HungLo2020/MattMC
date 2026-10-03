@@ -36,7 +36,7 @@ With the crow's beak empty, its owner can interact empty-handed to cycle:
 
 If it is already carrying something, interaction first makes it drop that item instead. That item-return branch is not restricted to the owner. Giving an eligible edible item directly to an empty-beaked owned crow also advances its command, so use an empty hand when you only want to change orders.
 
-In follow mode, it flies around its owner and can try to teleport closer when far behind. **Shoulder boarding through this goal is blocked on the server.** The goal attempts to mount its player owner, but the shared server riding check rejects players as vehicles, including forced mount attempts. The two-crow limit and the sneaking, elytra-flight, combat-target and damage dismount branches describe conditional passenger behavior; they do not establish a working shoulder ride. Successful damage can still knock a carried item out of its beak. [Follow attempt][follow-mount] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save] · [Conditional passenger and damage behavior][crow-passenger]
+In follow mode, it flies around its owner and can try to teleport closer when far behind. **Shoulder boarding through this goal is blocked on the server.** The goal attempts to mount its player owner, but the shared server riding check rejects players as vehicles, including forced mount attempts. The two-crow limit and the sneaking, elytra-flight, combat-target and damage dismount branches describe conditional passenger behavior; they do not establish a working shoulder ride. Successful damage can still knock a carried item out of its beak. [Follow attempt][follow-mount] · [Shared mount check][mount-check] · [Player registration][player-type] · [Serialization flag][no-save] · [Conditional passenger and damage behavior][crow-passenger] The rejected player-carry route is tracked in [issue #805](https://github.com/HungLo2020/MattMC/issues/805).
 
 ## Gathering into containers
 
@@ -84,7 +84,7 @@ The breeding interaction description includes the correction for [issue #784](ht
 
 ## Sources
 
-- [Corrected feeding dispatch](https://github.com/HungLo2020/MattMC/blob/fix/issue-784-crow-feeding/src/main/java/net/alexsmobs/entity/EntityCrow.java#L219-L257)
+- [Corrected feeding dispatch](https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/alexsmobs/entity/EntityCrow.java#L219-L257)
 
 - [Stats, goals, damage, interactions, feeding, perch, saves, and offspring](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityCrow.java#L94-L480)
 - [Food selection and dropped-item ownership](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityCrow.java#L575-L601)
