@@ -20,7 +20,7 @@ The coating breaks instantly and has no entity collision or correct-tool require
 
 ## Effects: active spray versus coating
 
-During an active spray attempt, nearby living entities in the spray path, except skunks, receive **300 ticks of Nausea** and copies of the skunk's current status effects. Nausea is applied by the mob's attack code; the placed block has no contact-damage or contact-effect handler. Walking across a remaining stain is not an implemented way to reapply those effects. [Active effects][spray] · [Complete coating class][block]
+During an active spray attempt, nearby living entities in the spray path, except skunks, receive **300 ticks of [Nausea](../effects/VisibilityEffects.md#nausea)** and copies of the skunk's current status effects. Nausea is applied by the mob's attack code; the placed block has no contact-damage or contact-effect handler. Walking across a remaining stain is not an implemented way to reapply those effects. [Active effects][spray] · [Complete coating class][block]
 
 At the end of the spray, a skunk with active status effects also creates a shrinking area-effect cloud containing copies of those effects. A skunk with no active effects skips that cloud. The coating does not store potion effects for later use. The spray advancement call is a no-op in the checked trigger registry, so it does not establish a working advancement reward. [Conditional cloud][cloud] · [Advancement stub][advancement]
 

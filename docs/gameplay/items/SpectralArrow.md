@@ -10,7 +10,7 @@ Spectral Arrow is ammunition for bows, crossbows, dispensers, and other arrow-fi
 
 ## Behavior
 
-Fired arrows can damage entities and follow their configured projectile behavior.
+Fired arrows can damage entities and follow their configured projectile behavior. See [Glowing sources](../effects/VisibilityEffects.md#glowing-sources) for the Spectral Arrow recipe, effect duration, and accepted-hit limitation.
 
 ## Notes
 

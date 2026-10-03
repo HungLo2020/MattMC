@@ -12,14 +12,17 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Debilitating Sting](../mobs/TarantulaHawk.md#sting-and-prey): sting duration, arthropod gates, and player-motion limits
 - [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
 - [Fire Resistance](WaterAndFireEffects.md#fire-resistance): fire-tagged damage rejection and lava-fog behavior
+- [Glowing](VisibilityEffects.md#glowing): team-colored outlines, Spectral Arrows, and native rendering limits
 - [Haste](MiningEffects.md#haste): mining-speed bonus, attack recharge, and Conduit interaction
 - [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
 - [Hunger](HungerAndSaturation.md#hunger): player exhaustion, food sources, and Husk-hit conditions
 - [Instant Damage](InstantEffects.md#instant-damage): instant magic damage, inverted healing, and delivery limits
 - [Instant Health](InstantEffects.md#instant-health): immediate healing, inverted damage, and delivery limits
+- [Invisibility](VisibilityEffects.md#invisibility): AI detection, armor coverage, and selected body rendering
 - [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
 - [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
 - [Mining Fatigue](MiningEffects.md#mining-fatigue): level-specific mining penalties, attack recharge, and removal
+- [Nausea](VisibilityEffects.md#nausea): food and mob sources, overlay settings, and the current distortion limitation
 - [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
 - [Orca's Might](../mobs/Orca.md#swimming-together-and-orcas-might): companion-granted attack speed and refresh rules
 - [Poison](Poison.md): periodic damage with a low-health cutoff
@@ -44,6 +47,8 @@ The [combat effects reference](CombatEffects.md) compares attack modifiers, dama
 The [water and fire effects reference](WaterAndFireEffects.md) compares fire damage, breathing, Conduit benefits, and the Nautilus effect limitation.
 
 The [vision effects reference](VisionEffects.md) compares Night Vision, Blindness, Darkness, and their rendering and player-action limits.
+
+The [Invisibility, Glowing, and Nausea reference](VisibilityEffects.md) compares detection, selected body rendering, outlines, and the current Nausea presentation limitation.
 
 The [instant effects reference](InstantEffects.md) compares Healing and Harming, recipient inversion, and drinking, splash, cloud, and arrow delivery.
 
