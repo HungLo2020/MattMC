@@ -6,8 +6,10 @@ don't change it.
 
 ## 1. Tests
 
+Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.
+
 ```sh
-cd src/main/rust && cargo test --release     # Rust, including boundary tests
+(cd src/main/rust && cargo test --release)   # Rust, including boundary tests
 ./gradlew test                               # Java
 ```
 

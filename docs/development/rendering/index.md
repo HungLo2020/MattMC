@@ -4,6 +4,7 @@ How the native (Rust) renderer is organized and how to change it safely. The
 renderer lives in [`src/main/rust/render/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render);
 each module there has a short README with its own file map.
 
+- [Goal 5 rendering checkpoint](GOAL-5-STATUS.md): current source scope, bounded evidence, open tracker work and remaining parity/performance limits.
 - [Render Architecture](RENDER-ARCHITECTURE.md): the layers, what each may
   depend on, and where new code belongs.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:

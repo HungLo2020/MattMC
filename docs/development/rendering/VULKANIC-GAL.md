@@ -124,7 +124,7 @@ Swapchain acquisition metrics describe receipts held by the CPU, not GPU
 completion. For overlap diagnosis, `MATTMC_TRACE_GPU_OVERLAP=1` logs a freshly
 queried timeline and counts incomplete present images separately from resource
 updates. It performs no wait or retirement. See the
-[gameplay verification procedure](RENDER-VERIFICATION.md#4-performance-ab).
+[gameplay verification procedure](RENDER-VERIFICATION.md#3-real-config-session).
 
 | Error | Usual cause |
 | --- | --- |

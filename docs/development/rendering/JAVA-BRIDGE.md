@@ -1,12 +1,14 @@
 # Java bridge
 
-Java drives the native renderer through a C ABI: the exported
+In the current migration, Java drives the native renderer through a C ABI: the exported
 `mattmc_vulkanic_gal_*` functions, which
 [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java)
 binds by name with FFM downcalls. The Rust side is
 [`render/bridge/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge) (see its README for the file map). It decodes
 and copies what Java sends, calls the GAL or a renderer, and writes a status
 back. It makes no rendering decisions.
+
+This is a current compatibility boundary. The [completed runtime target](../PROJECT-ARCHITECTURE.md) has no Java dependency; [Goal 5 status](GOAL-5-STATUS.md) keeps current ownership and verified progress distinct.
 
 ## How the ABI stays in sync
 
@@ -80,8 +82,10 @@ See [the semantic collector](https://github.com/HungLo2020/MattMC/blob/master/sr
 
 ## Verifying an ABI change
 
+Run from the repository root; the subshell leaves the Gradle command there.
+
 ```sh
-cd src/main/rust && cargo test --release render::bridge
+(cd src/main/rust && cargo test --release render::bridge)
 ./gradlew test --tests net.vulkanic.bridge.VulkanicGalBridgeAbiTest
 ```
 

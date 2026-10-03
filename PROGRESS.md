@@ -5,8 +5,8 @@ Complete realistic end-to-end parity for vanilla, DH, Iris, and Iris+DH against
 Frozen Java OpenGL. Root-cause terrain flicker across all routes; ensure the
 first presented shader-enabled world frame already uses the selected pack.
 Profile before optimizing; demonstrate real-world gains and bounded resources.
-Leave all work **uncommitted in the worktree; no commits or pushes**.
-This goal is **not complete**; no publication is authorized.
+This checkpoint records work committed in `2fff1ef19106350f806ddedd4fb3c3b4fbc44716` on 2026-10-03.
+Goal 5 remains **incomplete**; the scoped results below are author-recorded evidence, not broad acceptance.
 ## Current work (2026-10-03)
 
 - Base `c87803e75`; static RGB MAE 0.236/0.430/0.466 (`goal5/baseline-vanilla-warm`); narrow.
@@ -32,7 +32,7 @@ This goal is **not complete**; no publication is authorized.
 - DH ordinary movement: shared v2 DB/radius32/DOUBLE_PASS, 480 samples/direction;
   actual X9→3→9 verified both. Current return has transient rectangular terrain loss:
   lag1/2 max133 tiles, lag4 115; Frozen all six analyses max0. Current repeat reproduces
-  max32 tiles; bounded/reaped/validation clean, peak3.95/4.22 GiB. CPU/GAL cause open.
+  max32 tiles; bounded/reaped/validation clean, peak3.95/4.22 GiB. Cause initially open; repair follows.
   `goal5/terrain-translation-dh-source/ordinary-pair-verification.json`; ROI900×350.
   Fade NONE also reproduces (max53 tiles); buffered trace reproduces (max64), 59 Java tests pass.
   Explicit trace links one-frame missing column to asset-ack pruning (365→362→365).
@@ -169,7 +169,7 @@ This goal is **not complete**; no publication is authorized.
 | Entities, items/hands, particles, sky/weather | Motion, day/night/rain gameplay pending |
 | GUI, HUD, text, post-processing | Real screens and effect pairs pending |
 | Resource packs | Equivalent non-default packs and real reloads pending |
-| DH opaque, translucent, water, LOD | Ordinary shared-DB movement reproduces loss; cause/fix and broad pairs pending |
+| DH opaque, translucent, water, LOD | Selected-column asset-ack loss fixed in bounded shared-DB repeats; broad water/LOD, transition and resource-bound evidence pending |
 | Iris packs | Cutout rule implemented; multiple packs, broad and animated parity pending |
 | Iris+DH | Shared DB, shader/DH water and terrain pairs pending |
 | Terrain flicker | Reproduce, isolate cause, fix, verify all four routes |

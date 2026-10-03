@@ -4,6 +4,8 @@ The native renderer is split into layers with one-way dependencies. Java hands
 semantic frames to the bridge; renderers turn them into GAL command lists; the
 GAL validates and executes them on a private backend.
 
+This Java/Rust split describes the current migration. The final runtime target is defined in [Project Architecture](../PROJECT-ARCHITECTURE.md); use the [Goal 5 checkpoint](GOAL-5-STATUS.md) for implemented scope, acceptance evidence and remaining work.
+
 ```text
 render/
 ├── bridge/       Java C ABI: wire records, decoding, context registry (composition root)
