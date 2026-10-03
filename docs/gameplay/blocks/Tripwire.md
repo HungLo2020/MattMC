@@ -34,7 +34,9 @@ Hook state changes caused by an affected wire segment also schedule a ten-game-t
 
 Breaking an **armed, attached** segment ordinarily reports that segment as powered during removal. This can briefly activate the connected hooks before their recheck notices the gap. Breaking a wire is therefore not equivalent to quietly turning the detector off.
 
-To suppress that removal-triggered pulse, hold **usable Shears in the main hand** and mine a wire segment. The server marks it disarmed before removal, so the hook calculation does not treat the cut segment as an armed trigger. This is a break action, not a use/right-click action. MattMC blocks mining with a fully broken held tool.
+To suppress that removal-triggered pulse, hold **Shears in the main hand** and mine a wire segment. The server marks it disarmed before removal, so the hook calculation does not treat the cut segment as an armed trigger. This is a break action, not a use/right-click action. [Disarming callback][disarming-current] · [Hook calculation][hook-current] · [Server removal order][mining-current]
+
+**Retained broken Shears also reach this disarming path.** The current client and server allow block destruction with a broken held stack, and the wire handler tests Shears identity without a broken-item check. A broken tool loses its special mining speed and fails correct-tool drop checks on blocks that require them; those limits do not prohibit breaking Tripwire, whose ordinary loot has no tool requirement. This is source-reviewed behavior, not an in-game broken-tool test. [Client destruction][client-current] · [Broken-stack permission][broken-current] · [Speed/drop guards][guards-current] · [Player drop gate][drop-gate-current] · [Wire loot][wire-loot-current]
 
 Disarming does not promise that every attached machine remains motionless: an already powered output can turn off, and circuits can react to detachment or other nearby changes. Removing Hook support also breaks the Hook and alters the line. Replacing the missing String can form a fresh attached line again.
 
@@ -59,7 +61,7 @@ If it does not work, check Hook facing and wall support, every String position, 
 
 ## Sources and verification
 
-Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Registration, recipes, loot, wall support, line-length scan, current contact/removal callbacks, the actual shears-before-removal path, and scheduled-tick dispatch were checked. No in-game attachment, crossing, disarming, or timing test was run. Active data packs and connected circuits can affect the result.
+The disarming and broken-tool statements were rechecked at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716` on **2026-10-03**, including client/server destruction permission, pre-removal order, tool speed and harvest eligibility. The remaining guide was source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Registration, recipes, loot, wall support, line-length scan, current contact/removal callbacks, the actual shears-before-removal path, and scheduled-tick dispatch were checked. No in-game attachment, crossing, disarming, or timing test was run. Active data packs and connected circuits can affect the result.
 
 - [Hook and wire registration](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java)
 - [Hook item and String block-item mapping](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
@@ -70,11 +72,20 @@ Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Reg
 - [Wall support, facing, attachment scan, output, and rechecks](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/TripWireHookBlock.java)
 - [Contact, line updates, break-trigger behavior, and disarming](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/TripWireBlock.java)
 - [Server mining and pre-removal hook](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java)
-- [Removal-side effects before block replacement](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java)
-- [Broken held-tool mining gate](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/ItemStack.java)
+- [Removed-state side effects during block replacement](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java)
+- [Held-tool block-destruction permission](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/ItemStack.java)
 - [Entity contact dispatch](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/Entity.java)
 - [Spectator movement state](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/player/Player.java)
 - [Recheck entity-query filter](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/EntityGetter.java)
 - [Game-time scheduling](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/LevelAccessor.java)
 - [Scheduled tick dispatch](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/server/level/ServerLevel.java)
 - [Lamp timing](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/RedstoneLampBlock.java)
+
+[disarming-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/TripWireBlock.java#L109-L123
+[hook-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/TripWireHookBlock.java#L109-L151
+[mining-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L256-L295
+[client-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/client/multiplayer/MultiPlayerGameMode.java#L115-L195
+[broken-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/item/ItemStack.java#L1111-L1116
+[guards-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/item/ItemStack.java#L354-L604
+[drop-gate-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/entity/player/Player.java#L655-L657
+[wire-loot-current]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/loot_table/blocks/tripwire.json
