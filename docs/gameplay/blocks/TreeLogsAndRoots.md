@@ -8,15 +8,15 @@ Each row lists four distinct registered blocks. All IDs below use the `minecraft
 
 | Family | Log or stem | Stripped log or stem | Wood or hyphae | Stripped wood or hyphae |
 | --- | --- | --- | --- | --- |
-| <span id="oak-timber">Oak</span> | `oak_log` | `stripped_oak_log` | `oak_wood` | `stripped_oak_wood` |
-| <span id="spruce-timber">Spruce</span> | `spruce_log` | `stripped_spruce_log` | `spruce_wood` | `stripped_spruce_wood` |
-| <span id="birch-timber">Birch</span> | `birch_log` | `stripped_birch_log` | `birch_wood` | `stripped_birch_wood` |
-| <span id="jungle-timber">Jungle</span> | `jungle_log` | `stripped_jungle_log` | `jungle_wood` | `stripped_jungle_wood` |
-| <span id="acacia-timber">Acacia</span> | `acacia_log` | `stripped_acacia_log` | `acacia_wood` | `stripped_acacia_wood` |
-| <span id="cherry-timber">Cherry</span> | `cherry_log` | `stripped_cherry_log` | `cherry_wood` | `stripped_cherry_wood` |
-| <span id="dark_oak-timber">Dark Oak</span> | `dark_oak_log` | `stripped_dark_oak_log` | `dark_oak_wood` | `stripped_dark_oak_wood` |
-| <span id="pale_oak-timber">Pale Oak</span> | `pale_oak_log` | `stripped_pale_oak_log` | `pale_oak_wood` | `stripped_pale_oak_wood` |
-| <span id="mangrove-timber">Mangrove</span> | `mangrove_log` | `stripped_mangrove_log` | `mangrove_wood` | `stripped_mangrove_wood` |
+| <span id="oak-timber">Oak</span> | `oak_log` | `stripped_oak_log` | `oak_wood` | [`stripped_oak_wood`](../items/StrippedOakWood.md) |
+| <span id="spruce-timber">Spruce</span> | `spruce_log` | `stripped_spruce_log` | `spruce_wood` | [`stripped_spruce_wood`](../items/StrippedSpruceWood.md) |
+| <span id="birch-timber">Birch</span> | `birch_log` | `stripped_birch_log` | `birch_wood` | [`stripped_birch_wood`](../items/StrippedBirchWood.md) |
+| <span id="jungle-timber">Jungle</span> | `jungle_log` | `stripped_jungle_log` | `jungle_wood` | [`stripped_jungle_wood`](../items/StrippedJungleWood.md) |
+| <span id="acacia-timber">Acacia</span> | `acacia_log` | `stripped_acacia_log` | `acacia_wood` | [`stripped_acacia_wood`](../items/StrippedAcaciaWood.md) |
+| <span id="cherry-timber">Cherry</span> | `cherry_log` | `stripped_cherry_log` | `cherry_wood` | [`stripped_cherry_wood`](../items/StrippedCherryWood.md) |
+| <span id="dark_oak-timber">Dark Oak</span> | `dark_oak_log` | `stripped_dark_oak_log` | `dark_oak_wood` | [`stripped_dark_oak_wood`](../items/StrippedDarkOakWood.md) |
+| <span id="pale_oak-timber">Pale Oak</span> | `pale_oak_log` | `stripped_pale_oak_log` | `pale_oak_wood` | [`stripped_pale_oak_wood`](../items/StrippedPaleOakWood.md) |
+| <span id="mangrove-timber">Mangrove</span> | `mangrove_log` | `stripped_mangrove_log` | `mangrove_wood` | [`stripped_mangrove_wood`](../items/StrippedMangroveWood.md) |
 | <span id="crimson-timber">Crimson</span> | [`crimson_stem`](../items/CrimsonStem.md) | [`stripped_crimson_stem`](../items/StrippedCrimsonStem.md) | [`crimson_hyphae`](../items/CrimsonHyphae.md) | [`stripped_crimson_hyphae`](../items/StrippedCrimsonHyphae.md) |
 | <span id="warped-timber">Warped</span> | [`warped_stem`](../items/WarpedStem.md) | [`stripped_warped_stem`](../items/StrippedWarpedStem.md) | [`warped_hyphae`](../items/WarpedHyphae.md) | [`stripped_warped_hyphae`](../items/StrippedWarpedHyphae.md) |
 
