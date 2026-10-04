@@ -7,20 +7,20 @@ import it.unimi.dsi.fastutil.longs.LongList;
 import java.util.function.LongPredicate;
 import net.minecraft.util.Mth;
 
-public abstract class DynamicGraphMinFixedPoint {
+public abstract class JavaDynamicGraphMinFixedPoint {
 	public static final long SOURCE = Long.MAX_VALUE;
 	private static final int NO_COMPUTED_LEVEL = 255;
 	protected final int levelCount;
-	private final LeveledPriorityQueue priorityQueue;
+	private final JavaLeveledPriorityQueue priorityQueue;
 	private final Long2ByteMap computedLevels;
 	private volatile boolean hasWork;
 
-	protected DynamicGraphMinFixedPoint(int i, int j, int k) {
+	protected JavaDynamicGraphMinFixedPoint(int i, int j, int k) {
 		if (i >= 254) {
 			throw new IllegalArgumentException("Level count must be < 254.");
 		} else {
 			this.levelCount = i;
-			this.priorityQueue = new LeveledPriorityQueue(i, j);
+			this.priorityQueue = new JavaLeveledPriorityQueue(i, j);
 			this.computedLevels = new Long2ByteOpenHashMap(k, 0.5F) {
 				@Override
 				protected void rehash(int i) {
@@ -34,16 +34,12 @@ public abstract class DynamicGraphMinFixedPoint {
 	}
 
 	protected void removeFromQueue(long l) {
-		boolean acquired = this.priorityQueue.beginAccess();
-		try {
-			int i = this.computedLevels.remove(l) & 255;
-			if (i != 255) {
-				int j = this.getLevel(l);
-				this.priorityQueue.cancelComputed(l, j, i);
-				this.hasWork = !this.priorityQueue.isEmpty();
-			}
-		} finally {
-			this.priorityQueue.endAccess(acquired);
+		int i = this.computedLevels.remove(l) & 255;
+		if (i != 255) {
+			int j = this.getLevel(l);
+			int k = this.calculatePriority(j, i);
+			this.priorityQueue.dequeue(l, k, this.levelCount);
+			this.hasWork = !this.priorityQueue.isEmpty();
 		}
 	}
 
@@ -57,18 +53,17 @@ public abstract class DynamicGraphMinFixedPoint {
 		longList.forEach(this::removeFromQueue);
 	}
 
+	private int calculatePriority(int i, int j) {
+		return Math.min(Math.min(i, j), this.levelCount - 1);
+	}
+
 	protected void checkNode(long l) {
 		this.checkEdge(l, l, this.levelCount - 1, false);
 	}
 
 	protected void checkEdge(long l, long m, int i, boolean bl) {
-		boolean acquired = this.priorityQueue.beginAccess();
-		try {
-			this.checkEdge(l, m, i, this.getLevel(m), this.computedLevels.get(m) & 255, bl);
-			this.hasWork = !this.priorityQueue.isEmpty();
-		} finally {
-			this.priorityQueue.endAccess(acquired);
-		}
+		this.checkEdge(l, m, i, this.getLevel(m), this.computedLevels.get(m) & 255, bl);
+		this.hasWork = !this.priorityQueue.isEmpty();
 	}
 
 	private void checkEdge(long l, long m, int i, int j, int k, boolean bl) {
@@ -87,15 +82,17 @@ public abstract class DynamicGraphMinFixedPoint {
 				n = Mth.clamp(this.getComputedLevel(m, l, i), 0, this.levelCount - 1);
 			}
 
+			int o = this.calculatePriority(j, k);
 			if (j != n) {
-				this.priorityQueue.reschedule(m, j, bl2 ? NO_COMPUTED_LEVEL : k, n);
-				// Queue work is immediate; avoid rewriting an already identical pending value.
-				// Compare unsigned bytes to the clamped int: absence (255) never equals n.
-				if (k != n || (this.computedLevels.get(m) & 255) != n) {
-					this.computedLevels.put(m, (byte)n);
+				int p = this.calculatePriority(j, n);
+				if (o != p && !bl2) {
+					this.priorityQueue.dequeue(m, o, p);
 				}
+
+				this.priorityQueue.enqueue(m, p);
+				this.computedLevels.put(m, (byte)n);
 			} else if (!bl2) {
-				this.priorityQueue.cancelComputed(m, j, k);
+				this.priorityQueue.dequeue(m, o, this.levelCount);
 				this.computedLevels.remove(m);
 			}
 		}
@@ -126,35 +123,30 @@ public abstract class DynamicGraphMinFixedPoint {
 	}
 
 	protected final int runUpdates(int i) {
-		boolean acquired = this.priorityQueue.beginAccess();
-		try {
-			if (this.priorityQueue.isEmpty()) {
-				return i;
-			} else {
-				while (!this.priorityQueue.isEmpty() && i > 0) {
-					i--;
-					long l = this.priorityQueue.removeFirstLong();
-					int j = Mth.clamp(this.getLevel(l), 0, this.levelCount - 1);
-					int k = this.computedLevels.remove(l) & 255;
-					if (k < j) {
-						this.setLevel(l, k);
-						this.checkNeighborsAfterUpdate(l, k, true);
-					} else if (k > j) {
-						this.setLevel(l, this.levelCount - 1);
-						if (k != this.levelCount - 1) {
-							this.priorityQueue.enqueueComputed(l, this.levelCount - 1, k);
-							this.computedLevels.put(l, (byte)k);
-						}
-
-						this.checkNeighborsAfterUpdate(l, j, false);
+		if (this.priorityQueue.isEmpty()) {
+			return i;
+		} else {
+			while (!this.priorityQueue.isEmpty() && i > 0) {
+				i--;
+				long l = this.priorityQueue.removeFirstLong();
+				int j = Mth.clamp(this.getLevel(l), 0, this.levelCount - 1);
+				int k = this.computedLevels.remove(l) & 255;
+				if (k < j) {
+					this.setLevel(l, k);
+					this.checkNeighborsAfterUpdate(l, k, true);
+				} else if (k > j) {
+					this.setLevel(l, this.levelCount - 1);
+					if (k != this.levelCount - 1) {
+						this.priorityQueue.enqueue(l, this.calculatePriority(this.levelCount - 1, k));
+						this.computedLevels.put(l, (byte)k);
 					}
-				}
 
-				this.hasWork = !this.priorityQueue.isEmpty();
-				return i;
+					this.checkNeighborsAfterUpdate(l, j, false);
+				}
 			}
-		} finally {
-			this.priorityQueue.endAccess(acquired);
+
+			this.hasWork = !this.priorityQueue.isEmpty();
+			return i;
 		}
 	}
 

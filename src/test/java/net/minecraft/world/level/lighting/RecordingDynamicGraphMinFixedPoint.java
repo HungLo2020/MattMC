@@ -7,20 +7,20 @@ import it.unimi.dsi.fastutil.longs.LongList;
 import java.util.function.LongPredicate;
 import net.minecraft.util.Mth;
 
-public abstract class DynamicGraphMinFixedPoint {
+public abstract class RecordingDynamicGraphMinFixedPoint {
 	public static final long SOURCE = Long.MAX_VALUE;
 	private static final int NO_COMPUTED_LEVEL = 255;
 	protected final int levelCount;
-	private final LeveledPriorityQueue priorityQueue;
+	private final QueueTranscript.RecordingQueue priorityQueue;
 	private final Long2ByteMap computedLevels;
 	private volatile boolean hasWork;
 
-	protected DynamicGraphMinFixedPoint(int i, int j, int k) {
+	protected RecordingDynamicGraphMinFixedPoint(int i, int j, int k) {
 		if (i >= 254) {
 			throw new IllegalArgumentException("Level count must be < 254.");
 		} else {
 			this.levelCount = i;
-			this.priorityQueue = new LeveledPriorityQueue(i, j);
+			this.priorityQueue = new QueueTranscript.RecordingQueue(i, j);
 			this.computedLevels = new Long2ByteOpenHashMap(k, 0.5F) {
 				@Override
 				protected void rehash(int i) {
