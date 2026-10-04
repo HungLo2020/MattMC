@@ -8,11 +8,11 @@ Each block has its own matching inventory item. None of these five registrations
 
 | Block ID | Ordinary Survival recovery | Bone Meal effect |
 | --- | --- | --- |
-| `minecraft:moss_block` | 1 Moss Block, including by hand [loot][loot-moss_block] | Attempts a green moss patch |
-| `minecraft:moss_carpet` | 1 Moss Carpet, including by hand [loot][loot-moss_carpet] | No carpet growth callback |
-| `minecraft:pale_moss_block` | 1 Pale Moss Block, including by hand [loot][loot-pale_moss_block] | Attempts a pale moss patch |
-| `minecraft:pale_moss_carpet` | 1 Pale Moss Carpet from the bottom piece; **nothing from its upper wall extension** [loot][loot-pale_moss_carpet] | Extends eligible wall covering above the bottom piece |
-| `minecraft:pale_hanging_moss` | 1 per harvested segment with **Shears or Silk Touch**; otherwise nothing [loot][loot-pale_hanging_moss] | Extends the connected strand downward by one block |
+| [Moss Block](../items/MossBlock.md), `minecraft:moss_block` | 1 Moss Block, including by hand [loot][loot-moss_block] | Attempts a green moss patch |
+| [Moss Carpet](../items/MossCarpet.md), `minecraft:moss_carpet` | 1 Moss Carpet, including by hand [loot][loot-moss_carpet] | No carpet growth callback |
+| [Pale Moss Block](../items/PaleMossBlock.md), `minecraft:pale_moss_block` | 1 Pale Moss Block, including by hand [loot][loot-pale_moss_block] | Attempts a pale moss patch |
+| [Pale Moss Carpet](../items/PaleMossCarpet.md), `minecraft:pale_moss_carpet` | 1 Pale Moss Carpet from the bottom piece; **nothing from its upper wall extension** [loot][loot-pale_moss_carpet] | Extends eligible wall covering above the bottom piece |
+| [Pale Hanging Moss](../items/PaleHangingMoss.md), `minecraft:pale_hanging_moss` | 1 per harvested segment with **Shears or Silk Touch**; otherwise nothing [loot][loot-pale_hanging_moss] | Extends the connected strand downward by one block |
 
 Silk Touch is unnecessary for the two full blocks and two carpets; Fortune does not increase any of these listed yields. Breaking a support or washing a plant away supplies no harvesting tool, so it cannot collect Pale Hanging Moss. Normal item drops also follow `doTileDrops`, with the loot tables' separate explosion handling where present. [Mining dispatch][break] · [Tool-free drops and game rule][drop] · [Support loss][support-drop]
 
