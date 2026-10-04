@@ -1,31 +1,44 @@
 # Acacia Boat with Chest
 
+**Acacia Boat with Chest** (`minecraft:acacia_chest_boat`) carries **one rider and 27 storage slots**. The item stacks to **one**. [Item registration][item] · [Capacity][chest]
+
 ## Obtaining
 
-The Acacia Boat with Chest is crafted by combining an Acacia Boat with a Chest. It can also be obtained from MattMC's JEI-style combined creative menu.
+Combine **1 [Acacia Boat](AcaciaBoat.md) and 1 [Chest](../blocks/Chest.md)** to make **1 Acacia Boat with Chest**. This shapeless recipe fits the inventory crafting grid; the ingredients can occupy either position. It requires the Acacia Boat specifically, rather than any boat or raft. [Recipe][recipe]
 
-In Survival with entity drops enabled, breaking an Acacia Boat with Chest returns its matching boat-with-chest item and spills its cargo as separate item entities. **The dropped boat item does not preserve its stored contents.** [Chest-boat destruction](https://github.com/HungLo2020/MattMC/blob/d1bff20a6235d5a7052eff0e7e2191da8fbb00c4/src/main/java/net/minecraft/world/entity/vehicle/AbstractChestBoat.java#L64-L75) · [Fresh vehicle-item drop](https://github.com/HungLo2020/MattMC/blob/d1bff20a6235d5a7052eff0e7e2191da8fbb00c4/src/main/java/net/minecraft/world/entity/vehicle/VehicleEntity.java#L68-L74)
+This item has a [Creative inventory entry][creative].
 
 ## Usage
 
-The Acacia Boat with Chest is used for travel while carrying extra items. Place it, ride it like a normal boat, and open its storage while near it.
+Place the vehicle in clear space, board without Sneak/Crouch, and row with your movement controls. Use **Sneak/Crouch + interact** to open storage from outside, or your **inventory control while riding**. Follow the shared [chest-boat storage guide](OakBoat.md#chest-boat-storage) for access and persistence, and [rowing guide](OakBoat.md#placing-and-rowing) for movement. [Placement][placement]
 
-The chest occupies the boat's passenger seat, so the boat can carry only one entity instead of the two entities a regular boat can carry.
-
-An Acacia Boat with Chest can also be used as furnace fuel, lasting 60 seconds and smelting up to 6 items.
+Choose the ordinary [Acacia Boat](AcaciaBoat.md) when you need a second passenger; the chest version has only one seat. [Seat limit][chest]
 
 ## Behavior
 
-It behaves like an Acacia Boat with attached container storage. The inventory has the same number of slots as a single chest.
+Damaging the placed boat until it breaks returns a fresh matching item when **`doEntityDrops` is enabled**. Creative attacks discard the vehicle instead. **Cargo drops separately; it is not packed inside the recovered item.** Unload valuable supplies before breaking the vehicle. [Damage and item drop][damage] · [Cargo removal][cargo]
 
-The storage can be accessed by sneaking and interacting with the boat, by interacting with the chest portion when another entity is riding it, or by opening the player's inventory while riding it.
+This item supplies **1,200 default furnace burn ticks** through the chest-boat tag nested inside the boat fuel tag. Burning it consumes the item. [Fuel table][fuel] · [Boat tag][boats-tag] · [Chest-boat tag][chest-tag]
 
-Hoppers can insert into or extract from a boat with chest. Because of the entity's size, one can interact with multiple hoppers at once when positioned over them.
-
-Opening or breaking a boat with chest can anger nearby piglins, as with other chest containers.
+Its [Dispenser](Dispenser.md) placement is registered. Follow the shared [water and fallback conditions](OakBoat.md#recovering-and-dispensing). [Dispenser registration][dispenser]
 
 ## Notes
 
-* This item is registered as `minecraft:acacia_chest_boat`.
-* In MattMC, the creative tab menu has been replaced with a JEI-style combined menu.
-* It shares most movement and damage behavior with regular boats.
+The placed boat is registered separately from its inventory item and returns the matching `acacia_chest_boat` item. [Entity registration][entity]
+
+Related: [Acacia Boat](AcaciaBoat.md) · [Oak Boat](OakBoat.md) · [Oak Boat with Chest](OakBoatWithChest.md) · [Transport](../mechanics/Transport.md#choosing-a-vehicle) · [Items](Items.md)
+
+Source-reviewed on **2026-10-04** at `f5473e41dc4af8ced756db517fada27288df07a3`. Registrations, recipes and their loader, fuel tags, and shared vehicle callbacks were checked. No in-game crafting, placement, rowing, cargo, recovery, dispenser, or appearance test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/Items.java#L1234-L1236
+[entity]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/EntityType.java#L216-L223
+[creative]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1522
+[recipe]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/acacia_chest_boat.json
+[chest]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/vehicle/AbstractChestBoat.java#L30-L49
+[placement]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/BoatItem.java#L30-L87
+[damage]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/vehicle/VehicleEntity.java#L34-L75
+[cargo]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/vehicle/AbstractChestBoat.java#L63-L76
+[fuel]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/entity/FuelValues.java#L38-L108
+[boats-tag]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/tags/item/boats.json
+[chest-tag]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/tags/item/chest_boats.json
+[dispenser]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/core/dispenser/DispenseItemBehavior.java#L145-L164
