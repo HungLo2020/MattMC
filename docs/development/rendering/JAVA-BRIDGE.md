@@ -96,6 +96,31 @@ the release library before and after:
 nm -D --defined-only src/main/rust/target/release/libmattmc_rust.so | awk '{print $3}' | sort > symbols.txt
 ```
 
+## Held-item light input
+
+`RustGalWorldPrimitiveRenderer` applies each held stack's `BLOCK_STATE`
+component to its block's default state before copying light emission into the
+semantic frame. This matters for stateful items such as Light blocks and lit
+Redstone Lamps. Empty and non-block stacks supply zero; each native-bound value
+is clamped to 0–15. The retained `IrisItemLightProvider` applies the same component
+without changing its existing return-value contract.
+
+Java copies the two hands independently on each frame. Rust's active shader-pack
+policy owns `oldHandLight`: its default/true value raises the main-hand value to
+the stronger hand, while false preserves separate values. Do not apply this
+composition in Java or cache emission by item type. Hand changes, component
+changes, and shader-pack reloads must use current inputs.
+
+Focused regression checks:
+
+```sh
+./gradlew test --tests net.vulkanic.world.HeldItemBlockStateLightTest
+cd src/main/rust && cargo test --release held_light
+```
+
+These checks cover semantic values and native uniform preparation. They do not
+replace the live shader-pack and image checks in [Render Verification](RENDER-VERIFICATION.md).
+
 ## Request memory budget
 
 Checked FFI readers charge all nested reads against a 512 MiB budget per bridge
