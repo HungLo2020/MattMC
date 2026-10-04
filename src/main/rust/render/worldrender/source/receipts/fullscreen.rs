@@ -329,24 +329,73 @@ impl WorldPrimitiveFrontend {
         program: &LoweredFullscreenSourceProgram,
         bytes: &[u8],
     ) {
-        if !matches!(
-            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_UNIFORM_RECEIPT")
-                .as_deref()
-                .map(str::trim),
-            Ok("1") | Ok("true") | Ok("TRUE")
-        ) || !self.source_execution_enabled()
-            || !matches!(
-                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
-                    .as_deref()
-                    .map(str::trim),
-                Ok("1") | Ok("true") | Ok("TRUE")
-            )
-        {
+        if !self.fullscreen_uniform_receipts_enabled() {
             return;
         }
         let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
+        let (stage_name, document) = Self::fullscreen_uniform_receipt_data(frame_id, program, bytes);
+        if std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::write(
+                Path::new(&dir).join(format!("selected-source-{stage_name}-uniform-receipt.json")),
+                &document,
+            );
+            // Keep the established deferred1 filename for existing harness consumers.
+            if program.source_stage_path.ends_with("world0/deferred1.fsh") {
+                let _ = std::fs::write(
+                    Path::new(&dir).join("selected-source-deferred1-uniform-receipt.json"),
+                    document,
+                );
+            }
+        }
+    }
+
+    /// Keep the immutable CPU blocks belonging to this selected capture until
+    /// its submission completes. Later frames may overwrite the latest receipts.
+    pub(crate) fn retain_captured_fullscreen_uniform_receipts<'a>(
+        &self,
+        frame: &WorldPrimitiveFrame,
+        capture: &mut GameplayAttachmentCapture,
+        inputs: impl IntoIterator<Item = (&'a LoweredFullscreenSourceProgram, &'a [u8])>,
+    ) {
+        if !Self::fullscreen_uniform_receipt_audit_enabled()
+            || !capture.source_selected
+            || capture.frame_id != frame.frame_id
+            || capture.correlation_id != frame.correlation_id
+        {
+            return;
+        }
+        capture.fullscreen_uniform_receipts = inputs
+            .into_iter()
+            .map(|(program, bytes)| Self::fullscreen_uniform_receipt_data(frame.frame_id, program, bytes))
+            .collect();
+    }
+
+    fn fullscreen_uniform_receipts_enabled(&self) -> bool {
+        self.source_execution_enabled() && Self::fullscreen_uniform_receipt_audit_enabled()
+    }
+
+    fn fullscreen_uniform_receipt_audit_enabled() -> bool {
+        matches!(
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_UNIFORM_RECEIPT")
+                .as_deref()
+                .map(str::trim),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        )
+            && matches!(
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
+                    .as_deref()
+                    .map(str::trim),
+                Ok("1") | Ok("true") | Ok("TRUE")
+            )
+    }
+
+    fn fullscreen_uniform_receipt_data(
+        frame_id: u64,
+        program: &LoweredFullscreenSourceProgram,
+        bytes: &[u8],
+    ) -> (String, String) {
         let fields = program
             .execution_interface
             .scalar_uniform_fields
@@ -373,40 +422,27 @@ impl WorldPrimitiveFrontend {
                 )
             })
             .collect::<Vec<_>>();
-        if std::fs::create_dir_all(&dir).is_ok() {
-            let document = format!(
-                "{{\"frame_id\":{},\"program\":\"{}\",\"source_stage_path\":\"{}\",\"byte_len\":{},\"fields\":[{}]}}",
-                frame_id,
-                json_escape(program.identity.as_str()),
-                json_escape(&program.source_stage_path),
-                bytes.len(),
-                fields.join(","),
-            );
-            let stage_name = program
-                .source_stage_path
-                .trim_end_matches(".fsh")
-                .chars()
-                .map(|character| {
-                    if character.is_ascii_alphanumeric() {
-                        character
-                    } else {
-                        '-'
-                    }
-                })
-                .collect::<String>();
-            let _ = std::fs::write(
-                Path::new(&dir).join(format!("selected-source-{stage_name}-uniform-receipt.json")),
-                &document,
-            );
-            // Keep the established deferred1 filename for existing harness
-            // consumers while the stage-qualified receipt expands coverage.
-            if program.source_stage_path.ends_with("world0/deferred1.fsh") {
-                let _ = std::fs::write(
-                    Path::new(&dir).join("selected-source-deferred1-uniform-receipt.json"),
-                    document,
-                );
-            }
-        }
+        let document = format!(
+            "{{\"frame_id\":{},\"program\":\"{}\",\"source_stage_path\":\"{}\",\"byte_len\":{},\"fields\":[{}]}}",
+            frame_id,
+            json_escape(program.identity.as_str()),
+            json_escape(&program.source_stage_path),
+            bytes.len(),
+            fields.join(","),
+        );
+        let stage_name = program
+            .source_stage_path
+            .trim_end_matches(".fsh")
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() {
+                    character
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>();
+        (stage_name, document)
     }
 
     /// Retains the lowered deferred source only for an explicit audit run.

@@ -62,6 +62,7 @@ pub(super) fn lower_fullscreen_source_vertex_with_contracts(
     uniform_contract: &TerrainSourceUniformContract,
     varying_contract: &TerrainSourceVaryingContract,
     opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
+    bindings: &TerrainSourceResourceBindings,
     raster_primitive: FullscreenSourceRasterPrimitive,
 ) -> GalResult<LoweredFullscreenSourceVertex> {
     let mut lowered = upgrade_version(source.expanded_source())?;
@@ -138,6 +139,9 @@ pub(super) fn lower_fullscreen_source_vertex_with_contracts(
     // consume them. `insert_after_version` prepends each insertion, so stage
     // helpers are inserted first and the semantic scalar block last.
     lowered = lower_fullscreen_source_history_corner(lowered, uniform_contract)?;
+    if raster_primitive == FullscreenSourceRasterPrimitive::FullscreenTriangle {
+        lowered = lower_fullscreen_authored_texels(lowered, varying_contract, bindings)?;
+    }
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     // Fullscreen source stages are authored with the same OpenGL clip-depth
     // convention as terrain sources. Their procedural coverage must receive
@@ -274,6 +278,9 @@ pub(super) fn lower_fullscreen_source_fragment_with_contracts(
             lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?,
     };
     lowered = lower_fullscreen_source_history_corner(lowered, uniform_contract)?;
+    if raster_primitive == FullscreenSourceRasterPrimitive::FullscreenTriangle {
+        lowered = lower_fullscreen_authored_texels(lowered, varying_contract, bindings)?;
+    }
     // Fullscreen shader-pack stages commonly reconstruct view space from a
     // sampled depth value using the legacy OpenGL clip-depth mapping.  The
     // Vulkan depth attachment is zero-to-one, so normalize these source

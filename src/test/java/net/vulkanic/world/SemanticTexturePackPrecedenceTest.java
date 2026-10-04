@@ -3,6 +3,7 @@ package net.vulkanic.world;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Proxy;
 import javax.imageio.ImageIO;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackResources;
@@ -11,7 +12,6 @@ import net.minecraft.server.packs.resources.FallbackResourceManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class SemanticTexturePackPrecedenceTest {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/item/apple.png");
@@ -27,11 +27,14 @@ class SemanticTexturePackPrecedenceTest {
         var encoded = new ByteArrayOutputStream();
         assertTrue(ImageIO.write(image, "png", encoded));
         byte[] bytes = encoded.toByteArray();
-        var pack = mock(PackResources.class);
-        when(pack.packId()).thenReturn(name);
-        when(pack.getResource(PackType.CLIENT_RESOURCES, TEXTURE))
-            .thenReturn(() -> new ByteArrayInputStream(bytes));
-        return pack;
+        return (PackResources) Proxy.newProxyInstance(PackResources.class.getClassLoader(),
+            new Class<?>[]{PackResources.class}, (proxy, method, args) -> switch (method.getName()) {
+                case "packId" -> name;
+                case "getResource" -> args[0] == PackType.CLIENT_RESOURCES && TEXTURE.equals(args[1])
+                    ? (net.minecraft.server.packs.resources.IoSupplier<java.io.InputStream>) () -> new ByteArrayInputStream(bytes)
+                    : null;
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
     }
 
     @Test void copiedTextureMatchesActualManagerWinnerAcrossPriorityAndReloadChanges() throws Exception {

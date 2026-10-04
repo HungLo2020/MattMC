@@ -6,6 +6,7 @@ import ctypes.util
 from pathlib import Path
 import sys
 import time
+from collections.abc import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "Common"))
 from capture_runner import find_linux_client_window_id, window_capture_provenance
@@ -116,9 +117,23 @@ class GameInput:
         self.key(name, False)
         time.sleep(.025)
 
-    def command(self, text: str) -> None:
+    def look_relative(self, dx: int, dy: int) -> None:
+        """Send bounded ordinary mouse motion only while this isolated game owns focus."""
+        if type(dx) is not int or type(dy) is not int or max(abs(dx), abs(dy)) > 200:
+            raise ValueError("look motion must be integer pixels within +/-200")
+        self.check()
+        if not hasattr(self, "xtest"):
+            self.xtest = C.CDLL(ctypes.util.find_library("Xtst"))
+            self.xtest.XTestFakeRelativeMotionEvent.argtypes = [C.c_void_p, C.c_int, C.c_int, C.c_ulong]
+            self.xtest.XTestFakeRelativeMotionEvent.restype = C.c_int
+        if not self.xtest.XTestFakeRelativeMotionEvent(self.display, dx, dy, 0):
+            raise RuntimeError("X11 rejected ordinary look input")
+        self.flush()
+        self.check()
+
+    def command(self, text: str, before_submit: Callable[[], None] | None = None) -> None:
         # Only the normal singleplayer setup commands used by this diagnostic.
-        if text not in ("gamemode spectator", "tp @s 150.5 125 530.5 105 15", "tp @s 167.5 38 553.5 0 0", "tp @s 150.5 95 530.5 285 25", "time set 6000", "gamerule doDaylightCycle false",
+        if text not in ("gamemode spectator", "tp @s 150.5 125 530.5 105 15", "tp @s 167.5 38 553.5 0 0", "tp @s 150.5 95 530.5 285 25", "tp @s 150.5 95 530.5 105 25", "time set 6000", "gamerule doDaylightCycle false",
                         "gamerule doWeatherCycle false", "weather clear"):
             raise ValueError("command is outside the flight fixture setup")
         self.tap("slash")
@@ -127,6 +142,8 @@ class GameInput:
         time.sleep(2)
         for char in text:
             self.tap("space" if char == " " else "period" if char == "." else "at" if char == "@" else char)
+        if before_submit is not None:
+            before_submit()
         self.tap("Return")
         time.sleep(.8)
 

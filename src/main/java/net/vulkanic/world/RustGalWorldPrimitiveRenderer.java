@@ -651,6 +651,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final long MAX_WORLD_MESH_UPLOAD_BYTES = 4L * 1024L * 1024L;
 	/** Must match Rust's FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES bound. */
 	private static final int MAX_WORLD_MESH_TEXTURE_PNG_BYTES = 4 * 1024 * 1024;
+	private static final StandardFoilTextureCache STANDARD_FOIL_TEXTURES = new StandardFoilTextureCache(MAX_WORLD_MESH_TEXTURE_PNG_BYTES);
 	/** Conservative Java-side aggregate budget before Rust's decoded-texture check. */
 	private static final long MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL = 256L * 1024L * 1024L;
 	/** Must match Rust's FFI_MAX_WORLD_BORDER_ASSET_BYTES bound. */
@@ -1310,6 +1311,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		WorldCrackAssetResolution crackResolution = resolveWorldCrackAssets(resourceManager);
 		WorldMaterialAssetResolution materialResolution = resolveWorldMaterialAssets(resourceManager);
 		synchronized (LOCK) {
+			STANDARD_FOIL_TEXTURES.clear();
 			if (resolution.preserveLastValid()) {
 				worldBorderAssetUpdateFailures++;
 				auditMessage(
@@ -11418,10 +11420,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		// metadata with an unspecified descriptor later in the same frame.
 		VulkanicGalBridge.WorldMeshTextureAssetRecord semanticFoilTexture = null;
 		if (glint) {
-			Resource resource = Minecraft.getInstance().getResourceManager().getResource(ItemRenderer.ENCHANTED_GLINT_ITEM)
-				.orElseThrow(() -> new IllegalStateException("missing semantic standard foil resource"));
 			try {
-				semanticFoilTexture = copyStandardItemFoilTexture(stableTextureId(ItemRenderer.ENCHANTED_GLINT_ITEM), resource);
+				semanticFoilTexture = cachedStandardItemFoilTexture(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			} catch (IOException error) {
 				throw new IllegalStateException("cannot copy semantic standard foil resource", error);
 			}
@@ -11726,10 +11726,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		ResourceLocation effectiveTexture = glint ? foilTexture : textureIdentity;
 		VulkanicGalBridge.WorldMeshTextureAssetRecord semanticFoilTexture = null;
 		if (glint) {
-			Resource resource = Minecraft.getInstance().getResourceManager().getResource(effectiveTexture)
-				.orElseThrow(() -> new IllegalStateException("missing semantic model foil resource"));
 			try {
-				semanticFoilTexture = copyStandardItemFoilTexture(stableTextureId(effectiveTexture), resource);
+				semanticFoilTexture = cachedStandardItemFoilTexture(effectiveTexture);
 			} catch (IOException error) {
 				throw new IllegalStateException("cannot copy semantic model foil resource", error);
 			}
@@ -12531,12 +12529,12 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	static VulkanicGalBridge.WorldMeshTextureAssetRecord copyStandardItemFoilTexture(int textureId, Resource resource) throws IOException {
-		try (InputStream input = resource.open()) {
-			byte[] payload = readBoundedResourceBytes(input, MAX_WORLD_MESH_TEXTURE_PNG_BYTES, "standard item foil texture");
-			var metadata = resource.metadata().getSection(net.minecraft.client.resources.metadata.texture.TextureMetadataSection.TYPE);
-			return new VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId, payload).withTextureMetadata(
-				metadata.map(net.minecraft.client.resources.metadata.texture.TextureMetadataSection::blur).orElse(false),
-				metadata.map(net.minecraft.client.resources.metadata.texture.TextureMetadataSection::clamp).orElse(false)).withMipLevels(1);
+		return StandardFoilTextureCache.copy(textureId, resource, MAX_WORLD_MESH_TEXTURE_PNG_BYTES);
+	}
+
+	private static VulkanicGalBridge.WorldMeshTextureAssetRecord cachedStandardItemFoilTexture(ResourceLocation identity) throws IOException {
+		synchronized (LOCK) {
+			return STANDARD_FOIL_TEXTURES.get(Minecraft.getInstance().getResourceManager(), identity, stableTextureId(identity));
 		}
 	}
 

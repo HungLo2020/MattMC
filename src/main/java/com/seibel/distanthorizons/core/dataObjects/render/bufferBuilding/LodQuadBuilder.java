@@ -715,19 +715,11 @@ public class LodQuadBuilder
 	}
 	private boolean shouldUseTransparentBuffer(int color, byte irisBlockMaterialId)
 	{
+		// Reduced-color opacity selects the DH program. Opaque leaves belong
+		// to dh_terrain; forcing them into dh_water changes their lighting and
+		// fog. Water alone keeps its transparent layer at packed alpha 255.
 		return this.doTransparency
-			&& (ColorUtil.getAlpha(color) < 255 || isTransparentMaterial(irisBlockMaterialId));
-	}
-	/**
-	 * The column builder has already classified these DH material categories as
-	 * transparent. Preserve that semantic classification when the quad stream is
-	 * split; alpha alone is insufficient for foliage because its packed LOD
-	 * color is commonly opaque.
-	 */
-	private static boolean isTransparentMaterial(byte materialId)
-	{
-		return materialId == EDhApiBlockMaterial.WATER.index
-			|| materialId == EDhApiBlockMaterial.LEAVES.index;
+			&& (ColorUtil.getAlpha(color) < 255 || irisBlockMaterialId == EDhApiBlockMaterial.WATER.index);
 	}
 	private void putQuad(ByteBuffer bb, BufferQuad quad)
 	{

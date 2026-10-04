@@ -416,7 +416,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
         if has_fluid && (emit_all_passes || state.fluid_pass_id == pass_id) {
             let scan_fluid_started = profile_start(profile_scan_substages);
             if native_fluid_diag_enabled() {
-                eprintln!(
+                crate::core::console::stderr(format_args!(
                     "MATTMC_NATIVE_FLUID_DIAG scan-fluid pass={} pos={},{},{} local={},{},{} state={} fluid_pass={} analyzer={} store_raw={}",
                     pass_id,
                     record.absolute_x,
@@ -429,7 +429,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
                     state.fluid_pass_id,
                     analyzer.is_some(),
                     store_raw_quads
-                );
+                ));
             }
             builder.profile.add_count(PROFILE_COUNT_FLUID_BLOCKS, 1);
             let fluid_face_count = emit_native_section_fluid_faces(

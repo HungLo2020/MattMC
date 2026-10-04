@@ -19,6 +19,8 @@ mod residency;
 mod source;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod skylight_tests;
 mod uniforms;
 
 
@@ -116,4 +118,3 @@ pub(crate) const WORLD_LOD_GPU_VERTEX_BYTES: usize = 16;
 pub(crate) const WORLD_LOD_TEXTURED_GPU_VERTEX_LAYOUT_V2: u32 = 2;
 pub(crate) const WORLD_LOD_TEXTURED_GPU_VERTEX_BYTES: usize = 56;
 pub(crate) const WORLD_LOD_TERRAIN_ATLAS_IDENTITY: &str = "minecraft:textures/atlas/blocks.png";
-

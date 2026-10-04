@@ -49,6 +49,10 @@ Further rules:
   Renderer-specific profiling lives in the renderers (`WholeFrameProfile` in
   `worldrender` embeds the GAL's `SubmitProfile`).
 
+Console I/O uses the std-only `core::console` helpers from any layer, keeping
+diagnostic failures outside submission and resource state. This adds no renderer
+or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe check.
+
 ## Where new code goes
 
 | You are adding | Put it in |
@@ -67,12 +71,39 @@ than checking the backend.
 
 ## Resource ownership and retries
 
+The independent CPU terrain source shares its bounded meshing workers between
+camera portal traversal and shader shadow casters. Dispatch resident block/light
+replacements first. Give one of every four ordinary dispatch choices to the
+nearest unbuilt section in any direction and three to the nearest current portal
+frontier. Use three-dimensional camera distance and prefer current portals on
+ties. The portal domain is rebuilt after camera turns. FIFO queues delay
+newly visible terrain behind the shadow sweep; absolute portal priority can also
+leave close surfaces behind the player waiting for distant current-view sections.
+Distance-only prefetch can also delay visible water behind closer buried sections.
+The reserved nearest slot prepares nearby terrain in every direction while the
+foreground slots keep visible surfaces advancing.
+Keep the existing worker and publication bounds, portal/frustum
+culling, immutable mesh ownership and background work. See
+[`RustGalWholeFrameTerrainSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java)
+and its `TerrainBuildPriorityTest` regression cases.
+
+Install all-open portal connectivity immediately for a packet-backed section
+whose real chunk data reports only air, as Frozen does. Queueing air behind mesh
+work limits a newly turned visibility search to a few waves per frame and hides
+already-built terrain. Air has no mesh payload; keep normal height/window/frustum
+checks and never infer air from an unloaded chunk or supersede an in-flight build.
+`TerrainAirFrontierTest` covers connectivity, queued-work cancellation and running
+build/invalidation ownership.
+
 Source shadow terrain applies its existing dimension, distance and light-frustum
 policy before constructing batches. Validate every shadow candidate's asset
 generation, section and sorted topology even when it is culled. Selected batches
-retain original frame indices; their four-entry cache includes those positions
-and identities. Repeated mesh keys use the existing build-then-filter ordering
-and bypass the selected cache, since culled draws can affect grouping order.
+retain original frame indices; their cache includes those positions and
+identities. Repeated mesh keys cache the complete plan with all ordered instance
+identities, including culled draws, then filter a copy. This preserves first-seen
+ordering and translucent boundaries without rebuilding unchanged topology.
+Camera-dependent complete selections remain uncached. All plans share the
+existing four-entry CPU cache and mesh/texture invalidation rules.
 The source plan retains its final frustum check. See
 [`geometry/batching.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/geometry/batching.rs)
 and
@@ -116,6 +147,14 @@ through command preparation and submission; frame-local reservations must be
 released when preparation fails. Shader reloads retire bindings and pipelines
 only after the replacement source generation is accepted.
 
+Item and armor foil extraction reuse bounded immutable CPU texture copies in
+[`StandardFoilTextureCache`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/StandardFoilTextureCache.java).
+It retains at most two encoded assets (four MiB each), including the selected
+resource's blur/clamp metadata and single mip level. World asset reload clears
+the cache so changed pixels, metadata or missing resources are read again.
+Copies hold no resource-manager, pack, stream or GPU objects. Native texture
+publication and acceptance still follow the world asset generation.
+
 DH containers acquire a CPU lifetime lease atomically with semantic publication.
 Identical replacements can share a generation: closing one container retires it
 only when the last owner closes. Changed generations and world/resource resets
@@ -126,6 +165,17 @@ and parents still need readiness. Their working set follows the DH quadtree
 lifetime. Check memory during large-radius streaming and repeated transitions;
 the cache targets are not a hard cap on live geometry. These leases own CPU
 lifetime only; Rust and the GAL retain all native resource ownership.
+
+DH quad layers follow reduced-color opacity. Fully opaque leaf colors stay in
+the opaque stream; water keeps its translucent layer even at packed alpha 255.
+Preserve this rule in the CPU builder and its semantic packets: moving opaque
+foliage into the late `dh_water` writer changes pack lighting and fog, even when
+the copied geometry and material category are otherwise correct.
+
+Built-in DH materials sample the copied skylight coordinate at its original
+lightmap texel center, including dark rows for covered or submerged geometry.
+Frozen OpenGL is the semantic baseline. Its Java Vulkan-only brightness fold
+must not be copied into Rust reduced-color or exact-atlas vertex lighting.
 
 GUI item-target eviction uses every item identity and extent in the ordered
 frame, before recording individual items. Evicting against one item at a time
@@ -202,6 +252,16 @@ Opaque particle blending still requires this discard: writing alpha zero does
 not preserve the scene or its depth. Keep this source policy in
 [`contracts/material.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/contracts/material.rs)
 and the prepared shader, outside the game-neutral GAL.
+
+Named-source terrain packs one immutable CPU uniform block per used material
+pass and one for shadows in each frame. The block borrows its exact Rust source
+program, keeping the ABI immutable, and rejects use with another program or
+frame. Batches retain independent model transforms and colors. Packing remains
+lazy, so an empty world frame does not require unused terrain/shadow uniforms.
+These blocks carry no GAL handles or frame-slot identity; stream allocation and
+completion still belong to the existing frame transaction. General preparation
+helpers continue checking semantic values when callers vary uniforms per batch.
+See [terrain frame preparation](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/source/frames/terrain.rs).
 
 Single-color opaque/translucent terrain, textured material, entity and hand sources retain their
 declared pack color slot and original GLSL lighting. Discovery must not require
@@ -304,6 +364,14 @@ varyings already address native target rows. Convert those varyings back to
 source screen coordinates only at inverse projection; use the declared `vec2`
 interface rather than assuming a spelling such as `texCoord`. Reconstruction
 requires this conversion even when the fragment never reads `gl_FragCoord`.
+Absolute and viewport-derived integer texel addresses use source rows too,
+including aliases in vertex and fragment stages. Convert them at reads of
+explicitly bound main/DH depth and named-color targets, using the sampled mip
+size. Native fragment texels and image varyings retain their addressing; copied
+PNG overrides retain their authored rows. Coordinate/LOD expressions evaluate
+once. Keep this policy in
+[integer-address lowering](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/lowering/fullscreen_texels.rs);
+it adds no frame uniforms or backend resources.
 See [coordinate lowering](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/lowering/fullscreen_coordinates.rs).
 
 Each writer selects its own color sampler bindings from the owned targets.
@@ -355,8 +423,21 @@ Conventional packs without a MattMC binding manifest use a bounded Rust table of
 supported Iris sampler aliases. Geometry samples color targets from slot four;
 fullscreen `tex` refers to the first scene color. Resolve conditional custom PNGs
 from the selected stage's final defines, keeping sampled assets separate from
-color output identities. An explicit manifest remains authoritative. See
+color output identities. Geometry and shadow passes share the
+`texture.gbuffers.*` group, as Frozen's `GBUFFERS_AND_SHADOW` stage does;
+retain each actual shader's defines when selecting conditional properties.
+An explicit manifest remains authoritative. See
 [protocol bindings](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/resources/bindings/legacy.rs).
+Selected `image.` properties can name the existing Rust-owned voxel occupancy,
+current/previous voxel light and puddle fields. Resolve both sampler and image
+aliases from the actual stage's property branch, including weather, clouds,
+entity shadows, glint, outlines, damaged blocks and DH consumers. Validate
+format, clearing rules and absolute matching dimensions;
+duplicate properties keep only their final value. Unknown image identities and
+sampler names alone grant no resource. Resource admission still requires the
+owned field; discovery does not create an image or enable a route. `depthtex2`
+uses the separate pre-hand depth snapshot. See
+[owned image declarations](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/resources/bindings/legacy/images.rs).
 The normal pre- and post-terrain chains participate in the asset/admission requirement
 closure, alongside terrain and shadow plans. Copied PNG residency uses semantic
 role/path identities: the same sampler name in different stages may select
@@ -369,6 +450,14 @@ only primary color; do not invent a second output. Legacy combined matrices use
 the current draw family's transforms, and fog coordinates retain pack writes
 through an explicit interpolated float with Frozen's zero initialization.
 
+Empty selected-source frames still clear owned shadow depth/colors and snapshot
+opaque depth before fullscreen consumers. Preparation carries that same opaque
+texture and extent; caster geometry controls draw preparation separately.
+On source-color rollback, release frontend descriptors and cached pass targets
+before the runtime retires sampler wrappers and images. Teardown and runtime
+generation replacement follow that order too. GAL retains physical resources
+needed by accepted submissions.
+
 Color targets and shadow camera directives use the same bounded, selected
 fragment-program traversal as built-in uniforms. Apply declarations in Frozen
 ProgramSet order, retaining the last accepted value and protocol defaults for
@@ -376,6 +465,16 @@ absent directives. An empty dimension override must not import base libraries.
 Compact transported snapshots retain their explicit metadata path; missing
 executable includes still prevent admission. See
 [directive traversal](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/properties/directives.rs).
+
+Terrain shadows must retain baked faces removed from the camera color ranges.
+Turning off GPU face culling cannot restore a CPU-omitted range. Off-camera
+source casters use all facings; camera-visible terrain contributes only its
+missing ranges to the separate typed shadow stream. The ordinary camera draws
+keep their face selection, and their existing shadow faces are not duplicated.
+Camera-sorted translucent streams already carry their complete primitive domain.
+Keep these decisions in Rust's
+[mesh batching](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/geometry/batching.rs)
+and source plan; Java supplies the immutable mesh and placement semantics.
 
 Keep each dimension's shadow resolution, matrices, caster properties and cutout
 rule together. Cache four immutable shadow policies per source generation;

@@ -1545,6 +1545,8 @@ pub(in crate::render::worldrender) fn terrain_runtime_targets(
 ) -> TerrainRuntimeTargets {
     TerrainRuntimeTargets {
         shadow_depth_texture: resources.shadow_depth_texture,
+        shadow_depth_opaque_texture: resources.shadow_depth_opaque_texture,
+        shadow_extent: resources.shadow_extent,
         shadow_depth_view: resources.shadow_depth_view,
         shadow_color_texture: resources.shadow_color_texture,
         shadow_color_view: resources.shadow_color_view,

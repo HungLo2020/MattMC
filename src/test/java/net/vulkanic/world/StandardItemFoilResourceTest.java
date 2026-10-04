@@ -87,7 +87,7 @@ class StandardItemFoilResourceTest {
         assertTrue(start >= 0 && end > start);
         var extraction = source.substring(start, end);
         assertTrue(extraction.contains("if (glint) {"));
-        assertTrue(extraction.contains("semanticFoilTexture = copyStandardItemFoilTexture("));
+        assertTrue(extraction.contains("semanticFoilTexture = cachedStandardItemFoilTexture("));
         assertTrue(extraction.contains("textures.add(semanticFoilTexture)"));
         assertFalse(extraction.contains("if (nativeStandardFoil)"),
             "shared resource identity must not alternate explicit and unspecified sampling between producers");

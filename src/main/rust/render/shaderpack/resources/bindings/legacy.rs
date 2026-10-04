@@ -6,6 +6,8 @@ use crate::render::shaderpack::source::preprocess::{
     preprocess_artifact_with_runtime_options, PreprocessedShaderSource,
 };
 
+mod images;
+
 const COLOR_NAMES: [&str; 8] = [
     "primary",
     "secondary",
@@ -59,6 +61,7 @@ impl TerrainSourceResourceBindings {
             ),
             ("depthtex0", TerrainSourceResourceRole::MainDepth),
             ("gdepthtex", TerrainSourceResourceRole::MainDepth),
+            ("depthtex2", TerrainSourceResourceRole::MainDepthPrevious),
             (
                 "depthtex1",
                 TerrainSourceResourceRole::MainDepthBeforeTranslucency,
@@ -188,7 +191,13 @@ impl TerrainSourceResourceBindings {
                 .collect::<Vec<_>>();
             let properties =
                 preprocess_artifact_with_runtime_options(source, "shaders.properties", &defines)?;
-            let prefix = format!("texture.{phase}.");
+            if !result.color_outputs.is_empty() {
+                images::bind_owned_images(&mut result, properties.expanded_source())?;
+            }
+            // Frozen's GBUFFERS_AND_SHADOW texture group includes shadow
+            // passes. Their actual defines still choose the property branch.
+            let texture_phase = if phase == "shadow" { "gbuffers" } else { phase };
+            let prefix = format!("texture.{texture_phase}.");
             for line in properties.expanded_source().lines() {
                 let Some((key, value)) = line.trim().split_once('=') else {
                     continue;

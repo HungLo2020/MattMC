@@ -248,7 +248,10 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered_pair) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_source_stage(source, &material_contract.stages.fragment)?;
+                                        TerrainSourceResourceBindings::from_source_stage(
+                                            source,
+                                            &material_contract.stages.fragment,
+                                        )?;
                                     lowered_pair
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)
@@ -300,7 +303,10 @@ impl ShaderPackRuntimeExecutor {
                     {
                         Ok(lowered_pair) => {
                             let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
-                                let bindings = TerrainSourceResourceBindings::from_source_stage(source, &entity_contract.stages.fragment)?;
+                                let bindings = TerrainSourceResourceBindings::from_source_stage(
+                                    source,
+                                    &entity_contract.stages.fragment,
+                                )?;
                                 bind_entity_source_resources(&lowered_pair, &bindings)
                             })();
                             match resource_bindings {
@@ -347,7 +353,10 @@ impl ShaderPackRuntimeExecutor {
                     Ok(hand_contract) => match lower_hand_source_pair(source, &hand_contract) {
                         Ok(lowered_pair) => {
                             let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
-                                let bindings = TerrainSourceResourceBindings::from_source_stage(source, &hand_contract.stages.fragment)?;
+                                let bindings = TerrainSourceResourceBindings::from_source_stage(
+                                    source,
+                                    &hand_contract.stages.fragment,
+                                )?;
                                 bind_hand_source_resources(&lowered_pair, &bindings)
                             })();
                             match resource_bindings {
@@ -402,7 +411,10 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered_pair) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_source(source)?;
+                                        TerrainSourceResourceBindings::from_source_stage(source, &crate::render::shaderpack::contracts::terrain::TerrainSourceStage {
+                                            path: weather_contract.source_summary.fragment_entry.clone(),
+                                            defines: BTreeMap::new(),
+                                        })?;
                                     lowered_pair
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)
@@ -459,7 +471,10 @@ impl ShaderPackRuntimeExecutor {
                     Ok(cloud_contract) => match lower_cloud_source_pair(source, &cloud_contract) {
                         Ok(lowered_pair) => {
                             let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
-                                let bindings = TerrainSourceResourceBindings::from_source(source)?;
+                                let bindings = TerrainSourceResourceBindings::from_source_stage(source, &crate::render::shaderpack::contracts::terrain::TerrainSourceStage {
+                                    path: cloud_contract.source_summary.fragment_entry.clone(),
+                                    defines: BTreeMap::new(),
+                                })?;
                                 lowered_pair
                                     .opaque_resource_contract()
                                     .bind_semantic_roles(&bindings)
@@ -517,7 +532,10 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(
+                                            source,
+                                            &artifacts.fragment,
+                                        )?;
                                     let plan = lowered
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)?;
@@ -588,7 +606,10 @@ impl ShaderPackRuntimeExecutor {
                                     );
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let bindings =
-                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(
+                                            source,
+                                            &artifacts.fragment,
+                                        )?;
                                     let plan = lowered
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&bindings)?;
@@ -667,7 +688,10 @@ impl ShaderPackRuntimeExecutor {
                     .and_then(|stages| preprocess_terrain_sources(source, &stages))
                 {
                     Ok(artifacts) => {
-                        let storage_roles = TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment);
+                        let storage_roles = TerrainSourceResourceBindings::from_preprocessed_stage(
+                            source,
+                            &artifacts.fragment,
+                        );
                         match storage_roles.and_then(|storage_roles| {
                             lower_shadow_source_pair_with_owned_storage(
                                 &artifacts.vertex,
@@ -678,7 +702,10 @@ impl ShaderPackRuntimeExecutor {
                             Ok(lowered) => {
                                 let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
                                     let declarations =
-                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(
+                                            source,
+                                            &artifacts.fragment,
+                                        )?;
                                     lowered
                                         .opaque_resource_contract()
                                         .bind_semantic_roles(&declarations)
@@ -724,9 +751,16 @@ impl ShaderPackRuntimeExecutor {
                         None,
                     ),
                 };
-                let asset_defines = contract.property_defines.iter()
-                    .map(|(key, value)| (key.as_str(), value.as_str())).collect::<Vec<_>>();
-                let source_asset_bindings = TerrainShaderPackAssetBindings::from_source_with_defines(source, &asset_defines);
+                let asset_defines = contract
+                    .property_defines
+                    .iter()
+                    .map(|(key, value)| (key.as_str(), value.as_str()))
+                    .collect::<Vec<_>>();
+                let source_asset_bindings =
+                    TerrainShaderPackAssetBindings::from_source_with_defines(
+                        source,
+                        &asset_defines,
+                    );
                 let source_asset_binding_count = source_asset_bindings
                     .as_ref()
                     .ok()
@@ -752,9 +786,19 @@ impl ShaderPackRuntimeExecutor {
                     .map(|error| error.to_string());
                 let (pre_terrain_preparation, pre_terrain_preparation_error) =
                     match derive_pre_terrain_fullscreen_source_chain(source, scope) {
-                        Ok(stages) => (stages.iter().map(|stage|
-                            prepare_fullscreen_source_stage(source, stage, FullscreenSourceMode::NormalWorld)
-                        ).collect(), None),
+                        Ok(stages) => (
+                            stages
+                                .iter()
+                                .map(|stage| {
+                                    prepare_fullscreen_source_stage(
+                                        source,
+                                        stage,
+                                        FullscreenSourceMode::NormalWorld,
+                                    )
+                                })
+                                .collect(),
+                            None,
+                        ),
                         Err(error) => (Vec::new(), Some(error.to_string())),
                     };
                 let (post_terrain_preparation, post_terrain_preparation_error) =

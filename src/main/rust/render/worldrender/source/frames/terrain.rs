@@ -45,6 +45,25 @@ pub(crate) fn source_shadow_section_within_vanilla_distance(origin: [f32; 3], li
         && closest[1].abs() < limit
 }
 
+/// Immutable CPU uniform blocks for one exact source program and render frame.
+/// Borrowing the program keeps its ABI immutable while batches reuse the blocks;
+/// no resource, GPU handle, or frame-slot identity is carried here.
+pub(crate) struct PreparedSourceTerrainUniforms<'program> {
+    program: &'program LoweredTerrainSourceProgram,
+    frame_id: u64,
+    legacy_texture_transforms: Arc<[u8]>,
+    scalar_uniforms: Arc<[u8]>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum SourceTerrainFrameUniforms<'a> {
+    Semantic {
+        texture_transforms: &'a TerrainSourceTextureTransforms,
+        frame: &'a TerrainSourceUniformFrame,
+    },
+    Packed(&'a PreparedSourceTerrainUniforms<'a>),
+}
+
 /// Immutable, caller-independent data needed to bind one source-derived
 /// terrain mesh for a frame. It is still CPU preparation only: no GAL
 /// handles, shader route selection, or backend state is present here.
@@ -202,6 +221,27 @@ impl SourceTerrainFrameTransaction {
 }
 
 impl WorldPrimitiveFrontend {
+    /// Pack a pass's immutable semantic uniforms once, before its mesh loop.
+    pub(crate) fn prepare_source_terrain_uniforms<'program>(
+        &self,
+        program: &'program LoweredTerrainSourceProgram,
+        frame_id: u64,
+        texture_transforms: &TerrainSourceTextureTransforms,
+        uniform_frame: &TerrainSourceUniformFrame,
+    ) -> GalResult<PreparedSourceTerrainUniforms<'program>> {
+        if !self.source_program_prevalidated(frame_id, program) {
+            program.execution_interface.validate()?;
+        }
+        let legacy_texture_transforms = program.pack_legacy_texture_transforms(texture_transforms)?.into();
+        let scalar_uniforms = program.pack_scalar_uniforms(uniform_frame)?.into();
+        Ok(PreparedSourceTerrainUniforms {
+            program,
+            frame_id,
+            legacy_texture_transforms,
+            scalar_uniforms,
+        })
+    }
+
     /// Selects shadow-only terrain in original frame order before grouping.
     /// References and sorted geometry remain validated even outside the frustum.
     pub(crate) fn source_shadow_terrain_instance_indices(
@@ -256,6 +296,33 @@ impl WorldPrimitiveFrontend {
             }
         }
         Ok(selected)
+    }
+
+    /// Add only camera ranges omitted by the CPU face mask. Existing camera
+    /// draws already cast their selected faces; resident off-camera sections
+    /// keep the separate light-frustum admission above.
+    pub(crate) fn source_shadow_supplement_instance_indices(
+        &self,
+        frame: &WorldPrimitiveFrame,
+        shader_pack_generation: u64,
+    ) -> GalResult<Vec<usize>> {
+        let selected = self.source_shadow_terrain_instance_indices(frame, shader_pack_generation)?;
+        if terrain_program_scope_for_sky_type(frame.background.sky_type)? != Some(TerrainProgramScope::Overworld) {
+            return Ok(selected);
+        }
+        let mut off_camera = selected.into_iter().peekable();
+        Ok(frame.mesh_instances.iter().enumerate().filter_map(|(index, instance)| {
+            if off_camera.peek() == Some(&index) {
+                off_camera.next();
+                return Some(index);
+            }
+            (is_source_terrain_mesh_stratum(instance.stratum)
+                && instance.flags & (WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY
+                    | WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS) == 0
+                && instance.mesh_section_index == WORLD_MESH_SECTION_ALL
+                && instance.terrain_visible_facing_mask != 0x7f)
+                .then_some(index)
+        }).collect())
     }
 
     /// The selected source route consumes its own lowered geometry and never
@@ -465,6 +532,27 @@ impl WorldPrimitiveFrontend {
         texture_transforms: &TerrainSourceTextureTransforms,
         uniform_frame: &TerrainSourceUniformFrame,
     ) -> GalResult<PreparedSourceTerrainFrame> {
+        self.prepare_source_terrain_frame_with_instances_using_uniforms(
+            program,
+            frame_id,
+            mesh_key,
+            mesh_generation,
+            section_indices,
+            instances,
+            SourceTerrainFrameUniforms::Semantic { texture_transforms, frame: uniform_frame },
+        )
+    }
+
+    pub(crate) fn prepare_source_terrain_frame_with_instances_using_uniforms(
+        &mut self,
+        program: &LoweredTerrainSourceProgram,
+        frame_id: u64,
+        mesh_key: u64,
+        mesh_generation: u64,
+        section_indices: &[u32],
+        instances: &[SourceTerrainInstance],
+        uniforms: SourceTerrainFrameUniforms<'_>,
+    ) -> GalResult<PreparedSourceTerrainFrame> {
         if !self.source_program_prevalidated(frame_id, program) {
             program.execution_interface.validate()?;
         }
@@ -511,8 +599,7 @@ impl WorldPrimitiveFrontend {
             mesh,
             section_indices.to_vec(),
             instances,
-            texture_transforms,
-            uniform_frame,
+            uniforms,
         )
     }
 
@@ -525,47 +612,59 @@ impl WorldPrimitiveFrontend {
         mesh: Arc<SourceTerrainMeshAsset>,
         section_indices: Vec<u32>,
         instances: &[SourceTerrainInstance],
-        texture_transforms: &TerrainSourceTextureTransforms,
-        uniform_frame: &TerrainSourceUniformFrame,
+        uniforms: SourceTerrainFrameUniforms<'_>,
     ) -> GalResult<PreparedSourceTerrainFrame> {
-        // Batches of one program in a frame almost always share an identical
-        // uniform frame (only the render stage varies by pass), so reuse the
-        // packed bytes for an equal (program, uniform frame, transforms).
-        let program_key = (
-            program as *const LoweredTerrainSourceProgram as usize,
-            program.shader_pack_generation,
-        );
-        if self
-            .source_uniform_pack_memo
-            .as_ref()
-            .is_none_or(|(memo_frame, _)| *memo_frame != frame_id)
-        {
-            self.source_uniform_pack_memo = Some((frame_id, Vec::new()));
-        }
-        let cached = self.source_uniform_pack_memo.as_ref().and_then(|(_, memo)| {
-            memo.iter()
-                .find(|entry| {
-                    entry.0 == program_key && &entry.1 == uniform_frame && &entry.2 == texture_transforms
-                })
-                .map(|entry| (entry.3.clone(), entry.4.clone()))
-        });
-        let (legacy_texture_transforms, scalar_uniforms) = match cached {
-            Some(packed) => packed,
-            None => {
-                let legacy: Arc<[u8]> = program.pack_legacy_texture_transforms(texture_transforms)?.into();
-                let scalar: Arc<[u8]> = program.pack_scalar_uniforms(uniform_frame)?.into();
-                if let Some((_, memo)) = self.source_uniform_pack_memo.as_mut() {
-                    if memo.len() < 64 {
-                        memo.push((
-                            program_key,
-                            uniform_frame.clone(),
-                            texture_transforms.clone(),
-                            legacy.clone(),
-                            scalar.clone(),
-                        ));
-                    }
+        let (legacy_texture_transforms, scalar_uniforms) = match uniforms {
+            SourceTerrainFrameUniforms::Packed(packed) => {
+                if packed.frame_id != frame_id || !std::ptr::eq(packed.program, program) {
+                    return Err(GalError::invalid_argument(
+                        "packed source terrain uniforms belong to another program or frame",
+                    ));
                 }
-                (legacy, scalar)
+                (Arc::clone(&packed.legacy_texture_transforms), Arc::clone(&packed.scalar_uniforms))
+            }
+            SourceTerrainFrameUniforms::Semantic { texture_transforms, frame: uniform_frame } => {
+                // Batches of one program in a frame almost always share an identical
+                // uniform frame (only the render stage varies by pass), so reuse the
+                // packed bytes for an equal (program, uniform frame, transforms).
+                let program_key = (
+                    program as *const LoweredTerrainSourceProgram as usize,
+                    program.shader_pack_generation,
+                );
+                if self
+                    .source_uniform_pack_memo
+                    .as_ref()
+                    .is_none_or(|(memo_frame, _)| *memo_frame != frame_id)
+                {
+                    self.source_uniform_pack_memo = Some((frame_id, Vec::new()));
+                }
+                let cached = self.source_uniform_pack_memo.as_ref().and_then(|(_, memo)| {
+                    memo.iter()
+                        .find(|entry| {
+                            entry.0 == program_key && &entry.1 == uniform_frame && &entry.2 == texture_transforms
+                        })
+                        .map(|entry| (entry.3.clone(), entry.4.clone()))
+                });
+                let packed = match cached {
+                    Some(packed) => packed,
+                    None => {
+                        let legacy: Arc<[u8]> = program.pack_legacy_texture_transforms(texture_transforms)?.into();
+                        let scalar: Arc<[u8]> = program.pack_scalar_uniforms(uniform_frame)?.into();
+                        if let Some((_, memo)) = self.source_uniform_pack_memo.as_mut() {
+                            if memo.len() < 64 {
+                                memo.push((
+                                    program_key,
+                                    uniform_frame.clone(),
+                                    texture_transforms.clone(),
+                                    legacy.clone(),
+                                    scalar.clone(),
+                                ));
+                            }
+                        }
+                        (legacy, scalar)
+                    }
+                };
+                packed
             }
         };
         if self
@@ -611,6 +710,29 @@ impl WorldPrimitiveFrontend {
         texture_transforms: &TerrainSourceTextureTransforms,
         uniform_frame: &TerrainSourceUniformFrame,
     ) -> GalResult<PreparedSourceTerrainFrame> {
+        self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+            program,
+            frame_id,
+            mesh_key,
+            mesh_generation,
+            index_offset,
+            index_count,
+            instances,
+            SourceTerrainFrameUniforms::Semantic { texture_transforms, frame: uniform_frame },
+        )
+    }
+
+    pub(crate) fn prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+        &mut self,
+        program: &LoweredTerrainSourceProgram,
+        frame_id: u64,
+        mesh_key: u64,
+        mesh_generation: u64,
+        index_offset: u64,
+        index_count: u32,
+        instances: &[SourceTerrainInstance],
+        uniforms: SourceTerrainFrameUniforms<'_>,
+    ) -> GalResult<PreparedSourceTerrainFrame> {
         let range_key = SourceTerrainRangeKey {
             mesh_key,
             mesh_generation,
@@ -644,8 +766,7 @@ impl WorldPrimitiveFrontend {
                 selection.mesh,
                 selection.section_indices,
                 instances,
-                texture_transforms,
-                uniform_frame,
+                uniforms,
             )?;
             prepared.index_subrange = selection.index_subrange;
             return Ok(prepared);
@@ -746,15 +867,14 @@ impl WorldPrimitiveFrontend {
                 }
             }
         }
-        let mut prepared = self.prepare_source_terrain_frame_with_instances(
+        let mut prepared = self.prepare_source_terrain_frame_with_instances_using_uniforms(
             program,
             frame_id,
             mesh_key,
             mesh_generation,
             &section_indices,
             instances,
-            texture_transforms,
-            uniform_frame,
+            uniforms,
         )?;
         prepared.index_subrange = index_subrange;
         // Only slim meshes (geometry resident) are memoized, so the memo never

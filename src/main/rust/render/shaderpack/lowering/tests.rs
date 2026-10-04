@@ -6,6 +6,7 @@ use crate::render::shaderpack::source::{ShaderPackSource, ShaderSourceFile};
 
 mod legacy_inputs;
 mod fullscreen_coordinates;
+mod fullscreen_texels;
 mod main_function;
 
 fn fullscreen_probe_test_lock() -> &'static Mutex<()> {

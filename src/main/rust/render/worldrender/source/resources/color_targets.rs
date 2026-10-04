@@ -3,6 +3,35 @@
 use super::*;
 
 impl WorldPrimitiveFrontend {
+    /// Release frontend consumers before the runtime retires their named
+    /// color views. GAL retains physical resources for accepted submissions.
+    pub(crate) fn release_source_color_consumers(&mut self, gal: &mut VulkanicGal) {
+        self.release_role_dependent_source_pack_resources(gal, |role| {
+            matches!(role, TerrainSourceResourceRole::ShaderPackColor(_))
+        });
+        self.source_final_output_cache.destroy(gal);
+        let targets = std::mem::take(&mut self.source_terrain_color_pass_targets);
+        for (_, resources) in targets {
+            let _ = gal.destroy(resources.targets.pass);
+            let _ = gal.destroy(resources.targets.target);
+        }
+    }
+
+    pub(crate) fn discard_source_color_submission(&mut self, gal: &mut VulkanicGal) {
+        if self.shader_runtime.as_ref().is_some_and(|runtime| runtime.has_pending_source_color_targets()) {
+            self.release_source_color_consumers(gal);
+        } else {
+            // Even a failed frame over active images can stage new sampler
+            // wrappers. Their descriptors must go before wrapper retirement.
+            self.release_role_dependent_source_pack_resources(gal, |role| {
+                matches!(role, TerrainSourceResourceRole::ShaderPackColor(_))
+            });
+        }
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            runtime.discard_source_color_targets_submission(gal);
+        }
+    }
+
     /// Releases the frame-local state staged for a source frame whose
     /// recording failed after its plan was consumed.
     pub(crate) fn discard_unrecorded_source_frame(&mut self, gal: &mut VulkanicGal, frame_id: u64) {
@@ -14,8 +43,8 @@ impl WorldPrimitiveFrontend {
             self.lod_gpu_residency.discard_submission(gal);
             self.lod_textured_gpu_residency.discard_submission(gal);
         }
+        self.discard_source_color_submission(gal);
         if let Some(runtime) = self.shader_runtime.as_mut() {
-            runtime.discard_source_color_targets_submission(gal);
             runtime.discard_private_terrain_occupancy_submission();
         }
     }

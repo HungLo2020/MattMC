@@ -184,7 +184,9 @@ pub fn prepare_hand_glint_source_program(
 ) -> GalResult<crate::render::shaderpack::programs::LoweredHandSourceProgram> {
     let contract = derive_hand_glint_contract(source, scope)?;
     let lowered = lower_hand_source_pair(source, &contract)?;
-    let declarations = TerrainSourceResourceBindings::from_source(source)?;
+    let declarations = TerrainSourceResourceBindings::from_source_stage(
+        source, &contract.stages.fragment,
+    )?;
     let bindings = bind_hand_source_resources(&lowered, &declarations)?;
     let mut program =
         crate::render::shaderpack::programs::prepare_lowered_hand_source_program(&contract, &lowered, &bindings)?;

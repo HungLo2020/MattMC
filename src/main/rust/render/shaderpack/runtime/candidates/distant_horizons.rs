@@ -217,8 +217,8 @@ impl ShaderPackRuntimeExecutor {
                                         let resource_bindings: GalResult<_> =
                                             (|| -> GalResult<_> {
                                                 let bindings =
-                                                    TerrainSourceResourceBindings::from_source(
-                                                        source,
+                                                    TerrainSourceResourceBindings::from_preprocessed_stage(
+                                                        source, &artifacts.fragment,
                                                     )?;
                                                 lowered
                                                     .opaque_resource_contract()
@@ -275,7 +275,11 @@ impl ShaderPackRuntimeExecutor {
                                     lowered.uniform_contract(),
                                 );
                             let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
-                                let bindings = TerrainSourceResourceBindings::from_source(source)?;
+                                let bindings =
+                                    TerrainSourceResourceBindings::from_preprocessed_stage(
+                                        source,
+                                        &artifacts.fragment,
+                                    )?;
                                 lowered
                                     .opaque_resource_contract()
                                     .bind_semantic_roles(&bindings)
@@ -348,7 +352,7 @@ impl ShaderPackRuntimeExecutor {
                                 Ok(artifacts) => {
                                     let lowering: GalResult<_> = (|| -> GalResult<_> {
                                         let declarations =
-                                            TerrainSourceResourceBindings::from_source(source)?;
+                                            TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment)?;
                                         lower_fullscreen_source_pair(
                                             &artifacts.vertex,
                                             &artifacts.fragment,
@@ -356,7 +360,7 @@ impl ShaderPackRuntimeExecutor {
                                         )
                                     })();
                                     let resource_bindings = lowering.as_ref().ok().map(|lowered| {
-                                        TerrainSourceResourceBindings::from_source(source).and_then(
+                                        TerrainSourceResourceBindings::from_preprocessed_stage(source, &artifacts.fragment).and_then(
                                             |declarations| {
                                                 lowered
                                                     .opaque_resource_contract()
@@ -491,9 +495,19 @@ impl ShaderPackRuntimeExecutor {
                         .collect();
                 let (pre_terrain_preparation, pre_terrain_preparation_error) =
                     match derive_pre_terrain_fullscreen_source_chain(source, scope) {
-                        Ok(stages) => (stages.iter().map(|stage|
-                            prepare_fullscreen_source_stage(source, stage, FullscreenSourceMode::DistantHorizons)
-                        ).collect(), None),
+                        Ok(stages) => (
+                            stages
+                                .iter()
+                                .map(|stage| {
+                                    prepare_fullscreen_source_stage(
+                                        source,
+                                        stage,
+                                        FullscreenSourceMode::DistantHorizons,
+                                    )
+                                })
+                                .collect(),
+                            None,
+                        ),
                         Err(error) => (Vec::new(), Some(error.to_string())),
                     };
                 let (post_terrain_preparation, post_terrain_preparation_error) =

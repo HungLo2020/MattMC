@@ -687,4 +687,8 @@ impl ShaderPackRuntimeExecutor {
         self.source_color_resources.discard_submission(gal);
         self.source_color_targets.discard_submission(gal);
     }
+
+    pub(crate) fn has_pending_source_color_targets(&self) -> bool {
+        self.source_color_targets.has_pending_targets()
+    }
 }

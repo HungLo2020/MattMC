@@ -2544,8 +2544,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 		ensureWorldMeshInstanceStagingCapacity(count);
 		for (int index = 0; index < count; index++) {
-			WorldMeshInstanceRecord instance = Objects.requireNonNull(
-				instances.get(index), "worldMeshInstances[" + index + "]");
+			WorldMeshInstanceRecord instance = instances.get(index);
+			if (instance == null) {
+				throw new NullPointerException("worldMeshInstances[" + index + "]");
+			}
 			MemorySegment item = Abi.item(
 				persistentWorldMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, index);
 			if (persistentWorldMeshInstanceIdentities[index] == instance) {

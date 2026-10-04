@@ -68,6 +68,78 @@ fn assert_batches_equal(a: &[MeshBatch], b: &[MeshBatch]) {
 }
 
 #[test]
+fn shadow_batch_selection_unique_sparse_faces_preserves_reference_ranges_and_order() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let assets = (1..=12).map(|key| {
+        let mut asset = mesh_asset(key, 1, IndexType::U16);
+        let indices = asset.index_bytes.clone();
+        let section = asset.sections[0].clone();
+        asset.index_bytes.clear();
+        asset.sections.clear();
+        for facing in 0..7 {
+            let mut section = section.clone();
+            section.source_facing = facing;
+            section.index_offset = asset.index_bytes.len() as u32;
+            section.material_mode = match key % 3 {
+                0 => WORLD_MATERIAL_MODE_TRANSLUCENT,
+                1 => WORLD_MATERIAL_MODE_CUTOUT,
+                _ => WORLD_MATERIAL_MODE_OPAQUE,
+            };
+            section.material_id = match key % 3 {
+                0 => WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+                1 => WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
+                _ => WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            };
+            asset.sections.push(section);
+            asset.index_bytes.extend_from_slice(&indices);
+        }
+        asset
+    }).collect();
+    frontend.apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new()).unwrap();
+    let mut scene = frame(Vec::new());
+    scene.mesh_instances = (1..=12).map(|key| {
+        let mut instance = caster(key, [key as f32, 0.0, 0.0]);
+        instance.terrain_visible_facing_mask = (1 << (key % 6)) | (1 << 6);
+        instance
+    }).collect();
+    let selected = [0, 3, 5, 7, 9, 11];
+    for selection in [MeshBatchSelection::ShadowOnly, MeshBatchSelection::ShadowSupplement] {
+        if selection == MeshBatchSelection::ShadowSupplement {
+            for instance in &mut scene.mesh_instances {
+                instance.flags = 0;
+            }
+        }
+        let mut reference = mesh_batches_filtered(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true, selection, true).unwrap();
+        for batch in &mut reference {
+            batch.indices.retain(|index| selected.contains(index));
+        }
+        reference.retain(|batch| !batch.indices.is_empty());
+        let actual = mesh_batches_filtered_indices(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true, selection, true, &selected).unwrap();
+        assert_batches_equal(&reference, &actual);
+        assert!(!actual.is_empty());
+
+        // Explicit section selection exercises the other unique-range path.
+        for instance in &mut scene.mesh_instances {
+            instance.mesh_section_index = 3;
+        }
+        let mut reference = mesh_batches_filtered(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true, selection, true).unwrap();
+        reference.retain(|batch| selected.contains(&batch.indices[0]));
+        let actual = mesh_batches_filtered_indices(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true, selection, true, &selected).unwrap();
+        assert_batches_equal(&reference, &actual);
+        for instance in &mut scene.mesh_instances {
+            instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
+        }
+    }
+    frontend.reset(&mut gal);
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+}
+
+#[test]
 fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
     let mut gal = gal();
     let mut frontend = WorldPrimitiveFrontend::default();
@@ -238,7 +310,7 @@ fn shadow_batch_selection_rebuilds_when_culled_instances_change_shared_mesh_orde
             .collect::<Vec<_>>(),
         [1, 2]
     );
-    assert!(frontend.mesh_batch_plan_cache.is_empty());
+    assert_eq!(frontend.mesh_batch_plan_cache.len(), 1);
     // The selected identities and original positions remain equal. Changing
     // the earlier culled record still changes the full plan's first-seen order.
     scene.mesh_instances[0].mesh_key = 3;
@@ -251,6 +323,51 @@ fn shadow_batch_selection_rebuilds_when_culled_instances_change_shared_mesh_orde
         [2, 1]
     );
     assert!(!Arc::ptr_eq(&first, &second));
+}
+
+#[test]
+fn shadow_batch_selection_reuses_full_repeated_plan_without_losing_culled_order() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.apply_world_mesh_asset_update(&mut gal, 1,
+        vec![mesh_asset(1, 1, IndexType::U16), mesh_asset(2, 1, IndexType::U16)],
+        Vec::new()).unwrap();
+    let mut scene = frame(Vec::new());
+    scene.mesh_instances = vec![
+        caster(1, [200.0; 3]), caster(2, [-8.0; 3]), caster(1, [-8.0; 3]),
+    ];
+    selected_plan(&mut frontend, &scene, &[1, 2]);
+    assert_eq!(frontend.mesh_batch_plan_cache.len(), 1);
+    let full = Arc::clone(&frontend.mesh_batch_plan_cache[0].batches);
+    assert_eq!(full[0].indices.as_slice(), &[0, 2]);
+    for selected in [vec![0, 2], vec![1, 2], vec![2], vec![]] {
+        // A transform change changes frustum admission, not batch topology.
+        scene.mesh_instances[0].transform[12] += 1.0;
+        let actual = selected_plan(&mut frontend, &scene, &selected);
+        let mut reference = mesh_batches_filtered(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true,
+            MeshBatchSelection::ShadowOnly, true).unwrap();
+        for batch in &mut reference { batch.indices.retain(|index| selected.contains(index)); }
+        reference.retain(|batch| !batch.indices.is_empty());
+        assert_batches_equal(&actual, &reference);
+        assert!(Arc::ptr_eq(&full, &frontend.mesh_batch_plan_cache[0].batches));
+        assert_eq!(full[0].indices.as_slice(), &[0, 2]); // Filtering never mutates the cached plan.
+    }
+    // The full key must still validate an invalid culled generation.
+    scene.mesh_instances[0].mesh_generation = 999;
+    let identities = [mesh_batch_instance_key(&scene.mesh_instances[2])];
+    assert!(frontend.cached_mesh_batch_plan_selected(&scene,
+        ColorFormat::Rgba8Unorm, RasterYDirection::Up, true,
+        MeshBatchSelection::ShadowOnly, &identities, true, Some(&[2])).is_err());
+    scene.mesh_instances[0].mesh_generation = 1;
+    frontend.apply_world_mesh_asset_update(&mut gal, 2,
+        vec![mesh_asset(2, 2, IndexType::U16)], Vec::new()).unwrap();
+    assert!(frontend.mesh_batch_plan_cache.is_empty());
+    scene.mesh_instances[1].mesh_generation = 2;
+    selected_plan(&mut frontend, &scene, &[2]);
+    assert!(!Arc::ptr_eq(&full, &frontend.mesh_batch_plan_cache[0].batches));
+    frontend.reset(&mut gal);
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
 }
 
 #[test]

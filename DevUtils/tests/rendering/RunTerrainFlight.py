@@ -19,6 +19,9 @@ import subprocess
 import sys
 import time
 import tomllib
+import shutil
+import numpy as np
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "Common"))
 import artifact_retention
@@ -28,13 +31,14 @@ from CaptureWindowVideo import process_start
 from capture_runner import capture_linux_x11_window, find_linux_client_window_id, window_capture_provenance
 
 
-def flight_disk_preflight(output: Path) -> dict:
+def flight_disk_preflight(output: Path, diagnostic_attachments: bool = False) -> dict:
     # Preserve observations while retaining the shared eight-GiB reserve and
     # one-GiB estimate used for extended captures. Preserve mode alone has a
     # zero estimate; it must not waive the space needed by this bounded run.
     policy = artifact_retention.policy_for("extended", output, preserve=True)
     return artifact_retention.preflight_disk_budget(
-        policy, artifact_retention.estimated_run_bytes("extended"))
+        policy, artifact_retention.estimated_run_bytes("extended")
+        + (1024 ** 3 if diagnostic_attachments else 0))
 
 
 def client_pid(root: Path) -> tuple[int, Path] | None:
@@ -118,6 +122,56 @@ def command_acknowledgment(log: Path, offset: int, tokens: tuple[str, ...]) -> s
     return next((line for line in text.splitlines() if all(token in line for token in tokens)), None)
 
 
+def debug_world_text(text: str) -> bool:
+    # Only a real F3 world view has both fields; a joined server/window title
+    # still allows LevelLoadingScreen, which ignores ordinary look input.
+    return bool(re.search(r"section[- ]relative", text, re.IGNORECASE)
+                and re.search(r"facing\s*:", text, re.IGNORECASE))
+
+
+def read_world_debug_text(screenshot: Path, mask: Path) -> str:
+    with Image.open(screenshot) as image:
+        pixels = np.asarray(image.convert("RGB"))[:425, :650]
+    monochrome = (pixels.max(2) - pixels.min(2) < 3) & (pixels[:, :, 0] > 180)
+    Image.fromarray(np.where(monochrome, 0, 255).astype("uint8")).save(mask)
+    return subprocess.run(["tesseract", str(mask), "stdout", "--psm", "6"],
+                          capture_output=True, text=True, check=True, timeout=5).stdout
+
+
+def wait_for_first_world_view(controller: GameInput, output: Path) -> dict:
+    if not shutil.which("tesseract"):
+        raise RuntimeError("first-turn readiness requires tesseract for the actual F3 world view")
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        controller.tap("F3")
+        time.sleep(.5)
+        controller.check()
+        screenshot = output / "start-f3.png"
+        if not capture_linux_x11_window(controller.target, screenshot):
+            raise RuntimeError("first-turn readiness screenshot failed")
+        mask = output / "start-f3-text.png"
+        text = read_world_debug_text(screenshot, mask)
+        controller.check()
+        if debug_world_text(text):
+            return {"screenshot": screenshot.name, "wall_ns": time.time_ns(),
+                    "readiness": "actual F3 world view", "ocr": text}
+    raise RuntimeError("first-turn could not verify the actual world view within 45 seconds")
+
+
+def wait_for_debug_hidden(controller: GameInput, output: Path) -> dict:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        time.sleep(.2)
+        controller.check()
+        screenshot = output / "ready-world.png"
+        if not capture_linux_x11_window(controller.target, screenshot):
+            raise RuntimeError("debug-hidden readiness screenshot failed")
+        text = read_world_debug_text(screenshot, output / "ready-world-text.png")
+        if not debug_world_text(text):
+            return {"screenshot": screenshot.name, "wall_ns": time.time_ns(), "readiness": "F3 hidden before look"}
+    raise RuntimeError("F3 overlay did not hide before first look")
+
+
 def runtime_outcome(capture: Path, engine_exit_code: int) -> dict:
     metadata = list(capture.glob("meta_*.txt"))
     if len(metadata) != 1:
@@ -129,6 +183,8 @@ def runtime_outcome(capture: Path, engine_exit_code: int) -> dict:
         raise RuntimeError("unexpected client exit code: " + values.get("exit_code", "missing"))
     if values.get("memory_guard_triggered") == "true":
         raise RuntimeError("capture engine memory guard triggered")
+    if values.get("cleanup_client_core_dumping") == "true":
+        raise RuntimeError("isolated client began a native core dump during termination")
     for pattern in ("hs_err_*.txt", "crash_reports_*.txt"):
         for path in capture.glob(pattern):
             if path.read_text().strip():
@@ -213,14 +269,24 @@ def dh_submissions_for_video(samples: list[dict], video: dict) -> list[dict]:
 
 
 
-def verify_shader_configuration(directory: Path, shaders: str) -> dict:
+def verify_shader_configuration(directory: Path, shaders: str, expected_archive_sha256: str | None = None) -> dict:
     path = directory / "config/iris.properties"
     values = dict(line.split("=", 1) for line in path.read_text().splitlines()
                   if "=" in line and not line.startswith("#"))
     expected = str(shaders == "on").lower()
     if values.get("enableShaders") != expected:
         raise RuntimeError("runtime Iris configuration does not match requested shader mode")
-    return {"iris_enable_shaders": values["enableShaders"], "shader_pack": values.get("shaderPack")}
+    result = {"iris_enable_shaders": values["enableShaders"], "shader_pack": values.get("shaderPack")}
+    if shaders == "on" and expected_archive_sha256 is not None:
+        archive = directory / "shaderpacks" / values.get("shaderPack", "")
+        if not archive.is_file():
+            raise RuntimeError("runtime shader archive is missing")
+        with archive.open("rb") as stream:
+            actual = hashlib.file_digest(stream, "sha256").hexdigest()
+        result["shader_pack_sha256"] = actual
+        if actual != expected_archive_sha256:
+            raise RuntimeError("runtime shader archive differs from the copied source: " + actual)
+    return result
 
 def launch_command(repo: Path, output: Path, backend: str, shaders: str, world: str) -> tuple[Path, list[str]]:
     engine = repo / "DevUtils/Common/capture_runner.py"
@@ -265,19 +331,45 @@ def main() -> int:
     parser.add_argument("--dh", choices=("on", "off"), default="off")
     parser.add_argument("--world", default="Origin")
     parser.add_argument("--pose", choices=("coast", "buried", "forest"), default="coast")
+    parser.add_argument("--motion", choices=("translate", "turn", "travel-turn", "first-turn"), default="translate",
+                        help="ordinary travel, stationary turns, or mouse turns during travel")
     parser.add_argument("--seconds", type=int, default=8, choices=range(1, 11))
+    parser.add_argument("--first-turn-idle-seconds", type=int, default=0, choices=range(0, 21),
+                        help="stand still before the first mouse turn; default preserves cold-entry observation")
+    parser.add_argument("--diagnostic-attachments", action="store_true",
+                        help="enable correlated Rust attachment observations; adds audit/readback overhead")
     args = parser.parse_args()
+    if args.diagnostic_attachments and (args.backend != "rust-vulkan" or args.shaders != "on"
+                                        or args.motion != "first-turn"):
+        parser.error("diagnostic attachments require a Rust shader-enabled first-turn observation")
+    if args.first_turn_idle_seconds and args.motion != "first-turn":
+        parser.error("first-turn idle applies only to first-turn observations")
+    if args.motion != "translate" and args.pose != "forest":
+        parser.error("turn observations require the forest pose")
+    if args.motion in ("travel-turn", "first-turn") and args.seconds < 8:
+        parser.error("mouse-turn observations require at least eight seconds")
     args.repo = args.repo.resolve(strict=True)
     args.run_source = args.run_source.resolve(strict=True)
+    if args.motion == "first-turn" and not (args.run_source / ".terrain-turn-fixture-owned").is_file():
+        parser.error("first-turn requires a saved camera from PrepareTerrainTurnFixture.java")
     args.output = args.output.resolve()
     if Path(args.world).name != args.world or not (args.run_source / "saves" / args.world).is_dir():
         parser.error("world must name one existing source save")
     dh_source = verify_dh_source(args.run_source, args.world) if args.dh == "on" else None
+    expected_archive_sha256 = None
+    if args.shaders == "on":
+        properties = dict(line.split("=", 1) for line in (args.run_source / "config/iris.properties").read_text().splitlines()
+                          if "=" in line and not line.startswith("#"))
+        archive = args.run_source / "shaderpacks" / properties.get("shaderPack", "")
+        if not archive.is_file():
+            parser.error("shader observations require a configured archive in the copied source")
+        with archive.open("rb") as stream:
+            expected_archive_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
     current = Path(__file__).resolve().parents[3]
     if not args.output.is_relative_to(current / "artifacts/graphics-captures"):
         parser.error("output must be inside Current's ignored graphics artifact tree")
     args.output.mkdir(parents=True, exist_ok=False)
-    disk_preflight = flight_disk_preflight(args.output)
+    disk_preflight = flight_disk_preflight(args.output, args.diagnostic_attachments)
     engine, command = launch_command(args.repo, args.output, args.backend, args.shaders, args.world)
     env = os.environ.copy()
     env.update(MATTMC_GRAPHICS_TOOL_INTERNAL="1", MATTMC_CAPTURE_RUN_SOURCE=str(args.run_source),
@@ -286,15 +378,32 @@ def main() -> int:
                MATTMC_CAPTURE_DISABLE_DH_FOR_PERF=str(args.dh == "off").lower(),
                MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE=str(args.dh == "off").lower(), MATTMC_GRAPHICS_AUDIT="false",
                MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK="false")
+    attachment_paths = None
+    if args.diagnostic_attachments:
+        attachment_paths = {"attachments": str(args.output / "frame-attachments"),
+                            "request": str(args.output / "frame-attachment-request.properties"),
+                            "source": str(args.output / "source-pass-diagnostics")}
+        env.update(MATTMC_GRAPHICS_AUDIT="true", MATTMC_RUST_SELECTED_SOURCE_EXECUTION="1",
+                   MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR=attachment_paths["attachments"],
+                   MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST=attachment_paths["request"],
+                   MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR=attachment_paths["source"],
+                   MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY="0",
+                   MATTMC_RUST_SOURCE_DH_DEPTH_COVERAGE="1",
+                   MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE="shader-pack-trace",
+                   MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_UNIFORM_RECEIPT="1")
     if args.backend == "rust-vulkan":
         env["MATTMC_TRACE_GPU_OVERLAP"] = "1"
     env["JAVA_TOOL_OPTIONS"] = (env.get("JAVA_TOOL_OPTIONS", "")
         + " -Dmattmc.dev.graphicsFrameBenchmark=false -Dmattmc.dev.deterministicCameraCapture=false")
+    if args.diagnostic_attachments:
+        env["JAVA_TOOL_OPTIONS"] += " -Dmattmc.dev.graphicsAuditSliceMetrics=true"
     if args.dh == "on" and args.backend == "rust-vulkan":
         env["JAVA_TOOL_OPTIONS"] += " -Dmattmc.dev.rustGalDistantHorizons.traceExecution=true"
     receipt = {"schema": "terrain-flight-observation-v1", "status": "starting", "backend": args.backend,
-               "shaders": args.shaders, "dh": args.dh, "dh_source": dh_source,
-               "pose": args.pose, "source_run": str(args.run_source), "command": command, "disk_preflight": disk_preflight,
+               "shaders": args.shaders, "shader_pack_sha256_requested": expected_archive_sha256, "dh": args.dh, "dh_source": dh_source,
+               "pose": args.pose, "motion": args.motion, "first_turn_idle_seconds": args.first_turn_idle_seconds,
+               "diagnostic_attachment_paths": attachment_paths,
+               "source_run": str(args.run_source), "command": command, "disk_preflight": disk_preflight,
                "limitations": "Normal input and unregistered window video; inspect actual F3 positions, chunk work and capture logs. No FPS, registered pixel parity or flicker-absence acceptance.",
                "events": []}
     path = args.output / "flight.json"
@@ -324,10 +433,11 @@ def main() -> int:
                 time.sleep(.2)
             else:
                 raise RuntimeError("isolated client did not become ready for ordinary input within 95 seconds")
-            time.sleep(5)
+            if args.motion != "first-turn":
+                time.sleep(5)
             pid, directory = client
             receipt["effective_configuration"] = {**(verify_dh_enabled(directory) if args.dh == "on" else verify_dh_disabled(directory)),
-                                                    **verify_shader_configuration(directory, args.shaders)}
+                                                    **verify_shader_configuration(directory, args.shaders, expected_archive_sha256)}
             controller = GameInput(pid)
             receipt.update(pid=pid, game_dir=str(directory), process_start_ticks=process_start(pid),
                            window=controller.target, provenance=window_capture_provenance("linux", controller.target, pid))
@@ -344,7 +454,7 @@ def main() -> int:
                 ("weather clear", ("Set the weather to clear",)),
                 ("time set 6000", ("Set the time to 6000",)),
             )
-            for text, tokens in setup:
+            for text, tokens in (() if args.motion == "first-turn" else setup):
                 offset = len(game_log.read_text(errors="replace"))
                 controller.command(text)
                 deadline = time.monotonic() + 4
@@ -359,8 +469,9 @@ def main() -> int:
                 receipt["events"].append({"command": text, "wall_ns": time.time_ns(),
                                            "acknowledgment": acknowledgment})
                 write()
-            time.sleep(12)  # Let chat fade without hiding ordinary chunk rendering.
-            if args.dh == "on" and args.backend == "rust-vulkan":
+            if args.motion != "first-turn":
+                time.sleep(12)  # Let chat fade without hiding ordinary chunk rendering.
+            if args.dh == "on" and args.backend == "rust-vulkan" and args.motion != "first-turn":
                 # The saved camera may face only near terrain. Position it first;
                 # require DH submissions at the actual observation pose.
                 deadline = time.monotonic() + 30
@@ -376,8 +487,9 @@ def main() -> int:
                     time.sleep(.2)
                 else:
                     raise RuntimeError("no successful native DH segment submission at the observation pose")
-            controller.tap("F3")
-            time.sleep(1)
+            if args.motion != "first-turn":
+                controller.tap("F3")
+                time.sleep(1)
             def screenshot(name):
                 controller.check()
                 target = args.output / f"{name}.png"
@@ -385,26 +497,95 @@ def main() -> int:
                     raise RuntimeError("exact game-window screenshot failed")
                 receipt["events"].append({"screenshot": target.name, "wall_ns": time.time_ns()})
                 write()
-            screenshot("start-f3")
+            if args.motion == "first-turn":
+                if args.first_turn_idle_seconds:
+                    idle_start = time.time_ns()
+                    idle_end = time.monotonic() + args.first_turn_idle_seconds
+                    while time.monotonic() < idle_end:
+                        controller.check()
+                        time.sleep(.05)
+                    receipt["events"].append({"first_turn_idle_seconds": args.first_turn_idle_seconds,
+                                              "wall_start_ns": idle_start, "wall_ns": time.time_ns()})
+                    write()
+                receipt["events"].append(wait_for_first_world_view(controller, args.output))
+                controller.look_relative(1, 0)
+                receipt["events"].append({"mouse_prime_dx": 1, "wall_ns": time.time_ns()})
+                write()
+            else:
+                screenshot("start-f3")
             controller.tap("F3")
-            time.sleep(1)
-            for direction, key in (("forward", "w"), ("back", "s")):
+            if args.motion == "first-turn":
+                receipt["events"].append(wait_for_debug_hidden(controller, args.output))
+                write()
+            else:
+                time.sleep(1)
+            observations = (("forward", "w"), ("back", "s"), ("revisit", "w")) if args.motion == "first-turn" else (("forward", "w"), ("back", "s"))
+            receipt["observation_names"] = [name for name, _ in observations]
+            for direction, key in observations:
                 video = [sys.executable, str(Path(__file__).with_name("CaptureWindowVideo.py")),
-                         "--pid", str(pid), "--output", str(args.output / direction), "--fps", "60",
-                         "--seconds", str(args.seconds), "--region", "0,260,900,350"]
+                         "--pid", str(pid), "--output", str(args.output / direction), "--fps", "60" if args.motion == "translate" else "30",
+                         "--seconds", str(args.seconds), "--region", "0,260,900,350" if args.motion == "translate" else "0,0,1280,720"]
                 with (args.output / f"{direction}-observer.log").open("w") as observer_log:
-                    observer = subprocess.Popen(video, stdout=observer_log, stderr=subprocess.STDOUT,
-                                                start_new_session=True)
-                    controller.key(key, True)
-                    receipt["events"].append({"key_down": key, "wall_ns": time.time_ns()})
+                    def start_observer():
+                        nonlocal observer
+                        observer = subprocess.Popen(video, stdout=observer_log, stderr=subprocess.STDOUT,
+                                                    start_new_session=True)
+                    if args.motion == "first-turn":
+                        start_observer()
+                        time.sleep(1)
+                        turn_start = time.time_ns()
+                        dx = -100 if direction == "back" else 100
+                        for _ in range(12):
+                            controller.look_relative(dx, 0)
+                            time.sleep(.025)
+                        receipt["events"].append({"mouse_dx": dx * 12, "mouse_dy": 0,
+                                                  "wall_start_ns": turn_start, "wall_ns": time.time_ns()})
+                        write()
+                    elif args.motion == "turn":
+                        turn = f"tp @s 150.5 95 530.5 {105 if direction == 'forward' else 285} 25"
+                        offset = len(game_log.read_text(errors="replace"))
+                        def before_submit():
+                            start_observer()
+                            time.sleep(1)
+                            receipt["events"].append({"turn": turn, "submit_start_wall_ns": time.time_ns()})
+                            write()
+                        controller.command(turn, before_submit=before_submit)
+                        deadline = time.monotonic() + 4
+                        acknowledgment = None
+                        while time.monotonic() < deadline:
+                            acknowledgment = command_acknowledgment(game_log, offset, teleport[1])
+                            if acknowledgment:
+                                break
+                            controller.check()
+                            time.sleep(.1)
+                        if not acknowledgment:
+                            raise RuntimeError("turn command acknowledgment missing")
+                        receipt["events"][-1].update(acknowledgment=acknowledgment, wall_ns=time.time_ns())
+                    else:
+                        start_observer()
+                        controller.key(key, True)
+                        receipt["events"].append({"key_down": key, "wall_ns": time.time_ns()})
                     hold_end = time.monotonic() + args.seconds + 1
+                    next_turn = time.monotonic() + 2
+                    last_turn = hold_end - 2
                     try:
                         while time.monotonic() < hold_end:
                             controller.check()
+                            if args.motion == "travel-turn" and next_turn <= time.monotonic() < last_turn:
+                                turn_start = time.time_ns()
+                                for _ in range(12):
+                                    controller.look_relative(100, 0)
+                                    time.sleep(.025)
+                                receipt["events"].append({"mouse_dx": 1200, "mouse_dy": 0,
+                                                          "wall_start_ns": turn_start, "wall_ns": time.time_ns()})
+                                write()
+                                next_turn += 2
                             time.sleep(.05)
                     finally:
-                        controller.key(key, False)
-                    receipt["events"].append({"key_up": key, "wall_ns": time.time_ns()})
+                        if args.motion not in ("turn", "first-turn"):
+                            controller.key(key, False)
+                    if args.motion not in ("turn", "first-turn"):
+                        receipt["events"].append({"key_up": key, "wall_ns": time.time_ns()})
                     if observer.wait(timeout=25):
                         raise RuntimeError("flight video observer failed")
                     observer = None
@@ -461,7 +642,7 @@ def main() -> int:
                     samples = dh_execution_samples(logs[0].read_text(errors="replace"))
                     receipt["dh_submission_samples"] = samples
                     receipt["dh_submission_samples_per_video"] = {}
-                    for direction in ("forward", "back") if receipt["status"] == "observation_complete_requires_position_review" else ():
+                    for direction in receipt.get("observation_names", []) if receipt["status"] == "observation_complete_requires_position_review" else ():
                         video = json.loads((args.output / direction / "video.json").read_text())
                         receipt["dh_submission_samples_per_video"][direction] = dh_submissions_for_video(samples, video)
             except Exception as error:

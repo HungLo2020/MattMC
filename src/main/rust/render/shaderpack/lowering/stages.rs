@@ -741,6 +741,7 @@ pub fn lower_fullscreen_source_pair_with_raster_primitive(
             &uniform_contract,
             &varying_contract,
             &opaque_resource_contract,
+            bindings,
             raster_primitive,
         )?,
         fragment: lower_fullscreen_source_fragment_with_contracts(

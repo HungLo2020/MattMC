@@ -10,6 +10,7 @@ contracts/   per-family semantic contracts (terrain, entity, hand, material, wea
              cloud, line, damaged block, DH, fullscreen, vertex interface)
 lowering/    source -> explicit GLSL: stages, pairs, fragment/vertex/fullscreen surfaces,
              fullscreen_vertex/celestial owned geometry and transforms, varyings,
+             fullscreen_texels source/native/PNG integer addressing,
              opaque resources, uniforms, text utilities, diagnostic probes
 programs/    model/ (identity, stages, material programs), lowered/ (per family),
              builtin/ (MattMC's own programs; GLSL in builtin/glsl/)

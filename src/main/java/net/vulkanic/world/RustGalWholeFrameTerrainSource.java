@@ -138,6 +138,8 @@ public final class RustGalWholeFrameTerrainSource {
 	private int[] visibilityBatchIncoming = new int[256];
 	private int[] visibilityBatchOutgoing = new int[256];
 	private int completedBuildsConsumedThisFrame;
+	/** One nearest-prefetch slot followed by three current portal-frontier slots. */
+	private int terrainBuildDispatchCursor;
 	private boolean workerSeparateAo;
 	/** Distance-ordered (dx, dz) column offsets for the shadow-caster build sweep. */
 	private int[] shadowSweepOffsets = new int[0];
@@ -162,6 +164,7 @@ public final class RustGalWholeFrameTerrainSource {
             return;
         }
         this.destroy();
+		this.terrainBuildDispatchCursor = 0;
         this.level = level;
         if (level != null) {
             this.sectionCache = new ClonedChunkSectionCache(level);
@@ -882,10 +885,32 @@ public final class RustGalWholeFrameTerrainSource {
 			}
 			return;
 		}
-		if (!this.inFlight.contains(key) && this.queued.add(key)) {
-			this.pending.addLast(SectionPos.of(sectionX, sectionY, sectionZ));
-			this.recordPortalBuildLifecycle(key, "enqueued");
+		if (!this.inFlight.contains(key)) {
+			var chunkSections = this.level.getChunk(sectionX, sectionZ).getSections();
+			int index = this.level.getSectionIndexFromSectionY(sectionY);
+			if (index >= 0 && index < chunkSections.length && chunkSections[index] != null
+					&& chunkSections[index].hasOnlyAir()) {
+				// Frozen installs EMPTY connectivity as soon as a loaded section is
+				// known to be air. Waiting for scheduleBuild made a cold camera turn
+				// advance at most two air waves per frame, hiding already-built terrain.
+				this.admitLoadedEmptySection(SectionPos.of(sectionX, sectionY, sectionZ));
+				return;
+			}
+			if (this.queued.add(key)) {
+				this.pending.addLast(SectionPos.of(sectionX, sectionY, sectionZ));
+				this.recordPortalBuildLifecycle(key, "enqueued");
+			}
 		}
+	}
+
+	/** The caller has verified packet-backed air; never supersede a running mesh. */
+	private boolean admitLoadedEmptySection(SectionPos section) {
+		long key = section.asLong();
+		if (this.inFlight.contains(key)) return false;
+		this.queued.remove(key);
+		this.pending.removeFirstOccurrence(section);
+		this.completeEmptyBuild(section);
+		return true;
 	}
 
 	private boolean isChunkLoaded(int chunkX, int chunkZ) {
@@ -1353,28 +1378,51 @@ public final class RustGalWholeFrameTerrainSource {
 		if (this.pending.isEmpty() || this.lastCameraSection == Long.MIN_VALUE) {
 			return this.pending.pollFirst();
 		}
-		// Once the near-field bootstrap has a substantial resident set, preserve
-		// FIFO portal order. Empty outer sections then drain synchronously instead
-		// of paying a full pending-queue scan for work the player cannot see.
-		if (this.sections.size() >= 256) {
-			return this.pending.pollFirst();
-		}
+		// Keep nearby prefetch advancing in every direction, but do not let a
+		// volume of closer buried shadow sections delay the visible surface.
+		// Every fourth ordinary dispatch takes the nearest section; the other
+		// three prefer the nearest current portal frontier. Portal keys are
+		// rebuilt on camera changes and already obey the visibility predicate.
+		// Resident replacements retain their urgent admission order.
 		int cameraX = SectionPos.x(this.lastCameraSection);
 		int cameraY = SectionPos.y(this.lastCameraSection);
 		int cameraZ = SectionPos.z(this.lastCameraSection);
 		SectionPos nearest = null;
+		SectionPos nearestPortalSection = null;
+		long nearestPortalDistance = Long.MAX_VALUE;
 		long nearestDistance = Long.MAX_VALUE;
+		boolean nearestPortal = false;
+		boolean urgentReplacement = false;
 		for (SectionPos candidate : this.pending) {
+			long key = candidate.asLong();
+			if (this.sections.containsKey(key)) {
+				nearest = candidate;
+				urgentReplacement = true;
+				break;
+			}
+			boolean portal = this.incomingDirections.containsKey(key);
 			long dx = candidate.getX() - cameraX;
 			long dy = candidate.getY() - cameraY;
 			long dz = candidate.getZ() - cameraZ;
 			long distance = dx * dx + dy * dy + dz * dz;
-			if (distance < nearestDistance) {
+			if (portal && distance < nearestPortalDistance) {
+				nearestPortalSection = candidate;
+				nearestPortalDistance = distance;
+			}
+			if (distance < nearestDistance || (distance == nearestDistance && portal && !nearestPortal)) {
 				nearest = candidate;
 				nearestDistance = distance;
+				nearestPortal = portal;
 			}
 		}
-		if (nearest != null) this.pending.removeFirstOccurrence(nearest);
+		if (nearest == null) return this.pending.pollFirst();
+		if (!urgentReplacement) {
+			if (this.terrainBuildDispatchCursor != 0 && nearestPortalSection != null) {
+				nearest = nearestPortalSection;
+			}
+			this.terrainBuildDispatchCursor = (this.terrainBuildDispatchCursor + 1) & 3;
+		}
+		this.pending.removeFirstOccurrence(nearest);
 		return nearest;
 	}
 

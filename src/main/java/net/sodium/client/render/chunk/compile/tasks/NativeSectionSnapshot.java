@@ -1,5 +1,6 @@
 package net.sodium.client.render.chunk.compile.tasks;
 
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
 import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 import net.sodium.client.render.chunk.compile.pipeline.BlockOcclusionCache;
@@ -11,6 +12,7 @@ import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.services.PlatformBlockAccess;
 import net.sodium.client.world.LevelSlice;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -59,6 +61,11 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private static final int TINT_LATTICE_DIMENSION = TINT_LATTICE_MAX_OFFSET - TINT_LATTICE_MIN_OFFSET + 1;
     private static final int TINT_LATTICE_SAMPLE_COUNT = TINT_LATTICE_DIMENSION * TINT_LATTICE_DIMENSION * TINT_LATTICE_DIMENSION;
     private static final int SEMANTIC_CULL_MASK_SHIFT = 8;
+    private static final int TINT_PROVIDER = 0;
+    private static final int TINT_GRASS = 1;
+    private static final int TINT_FOLIAGE = 2;
+    private static final int TINT_DRY_FOLIAGE = 3;
+    private static final int TINT_REDSTONE = 4;
 
     private final ChunkBuildBuffers buffers;
     private final int sectionIndex;
@@ -243,12 +250,42 @@ final class NativeSectionSnapshot implements AutoCloseable {
      */
     private void writeTintLattice(int localBlockIndex, LevelSlice slice, BlockState state, BlockPos pos) {
         long base = this.tintLatticesAddress + (long) localBlockIndex * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES;
+        writeTintLattice(base, slice, state, pos);
+    }
+
+    static void writeTintLattice(long base, net.minecraft.world.level.BlockAndTintGetter slice,
+            BlockState state, BlockPos pos) {
+        int kind = tintKind(state.getBlock());
+        BlockColors colors = kind == TINT_PROVIDER && !NativeMeshingDiagnostics.forceWhiteTint()
+                ? Minecraft.getInstance().getBlockColors() : null;
+        writeTintLattice(base, slice, state, pos, kind, colors);
+    }
+
+    static void writeTintLattice(long base, net.minecraft.world.level.BlockAndTintGetter slice,
+            BlockState state, BlockPos pos, BlockColors colors) {
+        writeTintLattice(base, slice, state, pos, tintKind(state.getBlock()), colors);
+    }
+
+    private static void writeTintLattice(long base, net.minecraft.world.level.BlockAndTintGetter slice,
+            BlockState state, BlockPos pos, int kind, BlockColors colors) {
+        // Absence of a provider proves every sample is -1. A provider returning
+        // -1 at the block origin does not: custom colors may vary at neighbors.
+        // The built-in biome paths keep their existing independent semantics.
+        if (NativeMeshingDiagnostics.forceWhiteTint()
+                || (kind == TINT_PROVIDER && !colors.hasColorProvider(state.getBlock()))) {
+            MemoryUtil.memSet(base, 0xFF, (long) TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES);
+            return;
+        }
+        // Color providers consume the coordinate synchronously. Keep every
+        // authored sample, including extended resource-pack model vertices,
+        // without allocating an immutable position for each of the 64 queries.
+        BlockPos.MutableBlockPos samplePos = new BlockPos.MutableBlockPos();
         int sample = 0;
         for (int y = TINT_LATTICE_MIN_OFFSET; y <= TINT_LATTICE_MAX_OFFSET; y++) {
             for (int z = TINT_LATTICE_MIN_OFFSET; z <= TINT_LATTICE_MAX_OFFSET; z++) {
                 for (int x = TINT_LATTICE_MIN_OFFSET; x <= TINT_LATTICE_MAX_OFFSET; x++) {
                     MemoryUtil.memPutInt(base + (long) sample++ * Integer.BYTES,
-                            blockTint(slice, state, pos.offset(x, y, z)));
+                            blockTint(slice, state, samplePos.set(pos.getX() + x, pos.getY() + y, pos.getZ() + z), kind, colors));
                 }
             }
         }
@@ -274,6 +311,12 @@ final class NativeSectionSnapshot implements AutoCloseable {
     }
 
     private void populatePaddedGrids(LevelSlice slice) {
+        // Resolve and register each state through the synchronized registry on
+        // first use, then reuse its immutable id within this extraction only.
+        // At most PADDED_BLOCK_COUNT entries; nothing survives into a later
+        // snapshot or model reload. flushAll still rejects stale generations.
+        var stateIds = new Reference2IntOpenHashMap<BlockState>();
+        stateIds.defaultReturnValue(-1);
         for (int py = 0; py < PADDED_LENGTH; py++) {
             int y = this.minY + py - 1;
             for (int pz = 0; pz < PADDED_LENGTH; pz++) {
@@ -282,8 +325,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
                     int x = this.minX + px - 1;
                     int index = paddedIndex(px, py, pz);
                     BlockState state = slice.getBlockState(x, y, z);
+                    int stateId = stateIds.getInt(state);
+                    if (stateId == -1) {
+                        stateId = NativeStaticBlockModelRegistry.getStateId(state);
+                        stateIds.put(state, stateId);
+                    }
                     MemoryUtil.memPutInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES,
-                            NativeStaticBlockModelRegistry.getStateId(state));
+                            stateId);
                     MemoryUtil.memPutInt(this.paddedLightWordsAddress + (long) index * Integer.BYTES,
                             computeLightWord(slice, state, x, y, z));
                 }
@@ -353,14 +401,16 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 | ((opaque ? 1 : 0) << 29)
                 | ((fullOpaque ? 1 : 0) << 30)
                 | ((fullCube ? 1 : 0) << 31);
-        StaticTerrainParityDiagnostics.recordAppearanceLightInput(
+        if (StaticTerrainParityDiagnostics.isEnabled()) {
+            StaticTerrainParityDiagnostics.recordAppearanceLightInput(
                 "native-section-snapshot",
                 x,
                 y,
                 z,
                 String.valueOf(state.getBlock()),
                 lightWord
-        );
+            );
+        }
         return lightWord;
     }
 
@@ -368,25 +418,39 @@ final class NativeSectionSnapshot implements AutoCloseable {
         if (NativeMeshingDiagnostics.forceWhiteTint()) {
             return 0xFFFFFFFF;
         }
-        Block block = state.getBlock();
+        return blockTint(slice, state, pos, tintKind(state.getBlock()), null);
+    }
+
+    private static int tintKind(Block block) {
         if (block == Blocks.GRASS_BLOCK || block == Blocks.FERN || block == Blocks.SHORT_GRASS
                 || block == Blocks.POTTED_FERN || block == Blocks.BUSH || block == Blocks.SUGAR_CANE
                 || block == Blocks.PINK_PETALS || block == Blocks.WILDFLOWERS
                 || block == Blocks.LARGE_FERN || block == Blocks.TALL_GRASS) {
-            return BiomeColors.getAverageGrassColor(slice, pos) | 0xFF000000;
+            return TINT_GRASS;
         }
         if (block == Blocks.OAK_LEAVES || block == Blocks.JUNGLE_LEAVES || block == Blocks.ACACIA_LEAVES
                 || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES) {
-            return BiomeColors.getAverageFoliageColor(slice, pos) | 0xFF000000;
+            return TINT_FOLIAGE;
         }
         if (block == Blocks.LEAF_LITTER) {
-            return BiomeColors.getAverageDryFoliageColor(slice, pos) | 0xFF000000;
+            return TINT_DRY_FOLIAGE;
         }
         if (block == Blocks.REDSTONE_WIRE) {
-            return RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
+            return TINT_REDSTONE;
         }
-        int color = Minecraft.getInstance().getBlockColors().getColor(state, slice, pos, 0);
-        return normalizeBlockTintColor(color);
+        return TINT_PROVIDER;
+    }
+
+    private static int blockTint(net.minecraft.world.level.BlockAndTintGetter slice, BlockState state,
+            BlockPos pos, int kind, BlockColors colors) {
+        return switch (kind) {
+            case TINT_GRASS -> BiomeColors.getAverageGrassColor(slice, pos) | 0xFF000000;
+            case TINT_FOLIAGE -> BiomeColors.getAverageFoliageColor(slice, pos) | 0xFF000000;
+            case TINT_DRY_FOLIAGE -> BiomeColors.getAverageDryFoliageColor(slice, pos) | 0xFF000000;
+            case TINT_REDSTONE -> RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
+            default -> normalizeBlockTintColor((colors != null ? colors : Minecraft.getInstance().getBlockColors())
+                    .getColor(state, slice, pos, 0));
+        };
     }
 
     static int normalizeBlockTintColor(int color) {

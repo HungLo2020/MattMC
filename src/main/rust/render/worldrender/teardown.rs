@@ -106,7 +106,7 @@ impl WorldPrimitiveFrontend {
         self.lod_source_targets.destroy(gal);
         self.pending_distant_horizons_source_targets = None;
         self.pending_candidate_source_distant_depth = None;
-        self.source_final_output_cache.destroy(gal);
+        self.release_source_color_consumers(gal);
         self.destroy_source_terrain_color_pass_targets(gal);
         self.lod_gpu_residency.destroy(gal);
         self.lod_textured_gpu_residency.destroy(gal);

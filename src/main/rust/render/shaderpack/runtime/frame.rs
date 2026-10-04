@@ -231,6 +231,9 @@ pub(crate) struct TerrainTranslucentCaptureTargets {
 #[derive(Clone, Copy)]
 pub(crate) struct TerrainRuntimeTargets {
     pub shadow_depth_texture: Handle,
+    /// Opaque/cutout snapshot, initialized even when no shadow casters draw.
+    pub shadow_depth_opaque_texture: Handle,
+    pub shadow_extent: Extent3d,
     pub shadow_depth_view: Handle,
     pub shadow_color_texture: Handle,
     pub shadow_color_view: Handle,
@@ -313,8 +316,8 @@ impl From<TerrainRuntimeTargets> for TerrainSourceShadowPassTargets {
     fn from(targets: TerrainRuntimeTargets) -> Self {
         Self {
             shadow_depth_texture: targets.shadow_depth_texture,
-            shadow_depth_opaque_texture: Handle::NULL,
-            shadow_extent: Extent3d { width: 0, height: 0, depth: 1 },
+            shadow_depth_opaque_texture: targets.shadow_depth_opaque_texture,
+            shadow_extent: targets.shadow_extent,
             shadow_depth_view: targets.shadow_depth_view,
             shadow_color_texture: targets.shadow_color_texture,
             shadow_color_view: targets.shadow_color_view,

@@ -500,10 +500,7 @@ impl WorldPrimitiveFrontend {
                 )
             })?;
         if color_targets.identity.shader_pack_generation != shader_pack_generation {
-            self.shader_runtime
-                .as_mut()
-                .expect("shader runtime remains installed while rolling back named source targets")
-                .discard_source_color_targets_submission(gal);
+            self.discard_source_color_submission(gal);
             return Err(GalError::invalid_argument(
                 "named source terrain color targets do not match the lowered program generation",
             ));
@@ -639,7 +636,7 @@ impl WorldPrimitiveFrontend {
                         let mut selected = batch.clone();
                         selected.indices.retain(|index| {
                             let instance = &frame.mesh_instances[*index];
-                            source_shadow_instance_intersects(
+                            instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY == 0 || source_shadow_instance_intersects(
                                 &frustum,
                                 instance,
                                 Some(frame.shader_environment.far_plane),
@@ -1431,11 +1428,12 @@ impl WorldPrimitiveFrontend {
                 .sum::<u64>();
             self.reserve_source_terrain_multidraw_commands(gal, frame.frame_id, multidraw_commands)?;
             let mut draws = Vec::new();
-            // Batches of one pass share their uniform frame; only the render
-            // stage differs by pass, so build each variant once per frame.
+            // Each pass packs one immutable uniform block for this frame.
+            // Batches keep independent model/color records while sharing it.
             let mut shadow_uniform_frame = base_uniform_frame.clone();
             shadow_uniform_frame.render_stage = Some(self.source_shadow_render_stage()?);
-            let mut camera_uniform_frames: Vec<(u32, TerrainSourceUniformFrame)> = Vec::new();
+            let mut camera_uniforms: Vec<(u32, PreparedSourceTerrainUniforms<'_>)> = Vec::new();
+            let mut shadow_uniforms = None;
             let mut scope_programs = vec![&programs.opaque, &programs.cutout, &programs.shadow];
             scope_programs.extend(translucent_program.as_ref());
             self.open_source_terrain_batch_scope(frame.frame_id, &scope_programs)?;
@@ -1482,7 +1480,7 @@ impl WorldPrimitiveFrontend {
                 }
             };
                 if source_draw_trace {
-                    eprintln!(
+                    crate::core::console::stderr(format_args!(
                         "[MattMC source-draw-trace] frame={} stratum={} material_mode={} program={} instances={} indices={} color_formats={:?}",
                         frame.frame_id,
                         batch.key.stratum,
@@ -1491,7 +1489,7 @@ impl WorldPrimitiveFrontend {
                         batch.indices.len(),
                         batch.index_count,
                         color_formats,
-                    );
+                    ));
                 }
                 let instances = batch
                     .indices
@@ -1506,21 +1504,24 @@ impl WorldPrimitiveFrontend {
                         )
                     })
                     .collect::<GalResult<Vec<_>>>()?;
-                let uniform_frame = match camera_uniform_frames
+                let uniforms = match camera_uniforms
                     .iter()
                     .find(|(mode, _)| *mode == batch.key.material_mode)
                 {
-                    Some((_, uniform_frame)) => uniform_frame,
+                    Some((_, packed)) => packed,
                     None => {
                         let mut uniform_frame = base_uniform_frame.clone();
                         uniform_frame.render_stage = Some(
                             self.source_render_stage_for_material_mode(batch.key.material_mode)?,
                         );
-                        camera_uniform_frames.push((batch.key.material_mode, uniform_frame));
-                        &camera_uniform_frames.last().expect("just pushed").1
+                        let packed = self.prepare_source_terrain_uniforms(
+                            program, frame.frame_id, &texture_transforms, &uniform_frame,
+                        )?;
+                        camera_uniforms.push((batch.key.material_mode, packed));
+                        &camera_uniforms.last().expect("just pushed").1
                     }
                 };
-                let prepared = self.prepare_source_terrain_frame_for_mesh_range(
+                let prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
                     program,
                     frame.frame_id,
                     batch.key.mesh_key,
@@ -1528,8 +1529,7 @@ impl WorldPrimitiveFrontend {
                     batch.index_offset,
                     batch.index_count,
                     &instances,
-                    &texture_transforms,
-                    uniform_frame,
+                    SourceTerrainFrameUniforms::Packed(uniforms),
                 )?;
                 collect_selected_source_terrain_transform_probes(
                     &mut transform_probes,
@@ -1556,7 +1556,12 @@ impl WorldPrimitiveFrontend {
                     terrain_draw.stratum = batch.key.stratum;
                 }
                 if shadow_required {
-                let shadow_prepared = self.prepare_source_terrain_frame_for_mesh_range(
+                    if shadow_uniforms.is_none() {
+                        shadow_uniforms = Some(self.prepare_source_terrain_uniforms(
+                            &programs.shadow, frame.frame_id, &texture_transforms, &shadow_uniform_frame,
+                        )?);
+                    }
+                    let shadow_prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
                         &programs.shadow,
                         frame.frame_id,
                         batch.key.mesh_key,
@@ -1564,10 +1569,9 @@ impl WorldPrimitiveFrontend {
                         batch.index_offset,
                         batch.index_count,
                         &instances,
-                        &texture_transforms,
-                        &shadow_uniform_frame,
+                        SourceTerrainFrameUniforms::Packed(shadow_uniforms.as_ref().expect("shadow uniforms prepared")),
                     )?;
-                let shadow_draws = self.prepare_lowered_source_shadow_draws(
+                    let shadow_draws = self.prepare_lowered_source_shadow_draws(
                         gal,
                         &programs.shadow,
                         &shadow_prepared,
@@ -1616,7 +1620,12 @@ impl WorldPrimitiveFrontend {
                         })
                     })
                     .collect::<GalResult<Vec<_>>>()?;
-                let prepared = self.prepare_source_terrain_frame_for_mesh_range(
+                if shadow_uniforms.is_none() {
+                    shadow_uniforms = Some(self.prepare_source_terrain_uniforms(
+                        &programs.shadow, frame.frame_id, &texture_transforms, &shadow_uniform_frame,
+                    )?);
+                }
+                let prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
                     &programs.shadow,
                     frame.frame_id,
                     batch.key.mesh_key,
@@ -1624,8 +1633,7 @@ impl WorldPrimitiveFrontend {
                     batch.index_offset,
                     batch.index_count,
                     &instances,
-                    &texture_transforms,
-                    &shadow_uniform_frame,
+                    SourceTerrainFrameUniforms::Packed(shadow_uniforms.as_ref().expect("shadow uniforms prepared")),
                 )?;
                 shadow_only_draws.extend(self.prepare_lowered_source_shadow_only_draws(
                     gal,
@@ -2223,7 +2231,10 @@ impl WorldPrimitiveFrontend {
                 entity_glint,
                 hand_glint,
                 color_targets,
-                shadow_targets: has_shadow_casters.then_some(shadow_targets),
+                // Empty world frames still run source consumers of shadow
+                // depth/colors. Clear and snapshot the owned targets before
+                // those consumers; only caster preparation is conditional.
+                shadow_targets: Some(shadow_targets),
                 main_depth_history: None,
                 targets: terrain_targets,
                 translucent_targets,
@@ -2235,12 +2246,7 @@ impl WorldPrimitiveFrontend {
         self.source_terrain_batch_scope = None;
         if result.is_err() {
             self.discard_source_terrain_frame_transaction(gal, frame.frame_id);
-            self.shader_runtime
-                .as_mut()
-                .expect(
-                    "shader runtime remains installed while discarding named source transaction",
-                )
-                .discard_source_color_targets_submission(gal);
+            self.discard_source_color_submission(gal);
         }
         result
     }

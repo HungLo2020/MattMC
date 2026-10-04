@@ -1409,11 +1409,11 @@ impl WorldPrimitiveFrontend {
                     })
                     .is_ok()
                 {
-                    eprintln!("atlas-sampling-observation texture={} width={} height={} mip_levels={} min={:?} mag={:?} mip={:?} address_u={:?} address_v={:?} explicit_gal_descriptor_not_gpu_readback=true",
+                    crate::core::console::stderr(format_args!("atlas-sampling-observation texture={} width={} height={} mip_levels={} min={:?} mag={:?} mip={:?} address_u={:?} address_v={:?} explicit_gal_descriptor_not_gpu_readback=true",
                         texture_id, texture_width, texture_height, mip_levels,
                         sampler_descriptor.min_filter, sampler_descriptor.mag_filter,
                         sampler_descriptor.mip_filter, sampler_descriptor.address_u,
-                        sampler_descriptor.address_v);
+                        sampler_descriptor.address_v));
                 }
             }
             let sampler = gal.create_sampler(sampler_descriptor)?;

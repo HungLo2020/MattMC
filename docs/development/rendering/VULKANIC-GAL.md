@@ -46,6 +46,22 @@ Presentation follows its own cycle: `configure_frame_surface`, then per frame
 and `present_frame` (or `cancel_frame`). Check `AcquiredFrame::status`:
 `Resized` and `Minimized` mean there is no image to render this time.
 
+Renderer console diagnostics use the std-only helpers in
+[`core/console.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/core/console.rs)
+with `format_args!`; the Vulkan backend reexports them privately through
+`trace::stdout` and `trace::stderr`. Keep their existing enablement gates
+before constructing messages. These writes preserve the stream and newline,
+but ignore console I/O errors: a launcher closing its pipe must not abort a
+submission or affect resource retirement. Rust's ordinary
+[`println!`](https://doc.rust-lang.org/std/macro.println.html) and
+[`eprintln!`](https://doc.rust-lang.org/std/macro.eprintln.html) panic on write
+failure, so do not use them for production renderer diagnostics. Actual backend errors
+still return through `GalResult`; logging is not an error-handling substitute.
+Run `cargo test --release diagnostic_stdio_does_not_abort_on_closed_pipe --
+--test-threads=1` from `src/main/rust` after changing this path. Its bounded child
+checks open and closed stdout/stderr and exact line bytes without a GPU; it does
+not establish gameplay shutdown correctness.
+
 Resource bindings describe state; draws and dispatches consume them. Hazard
 tracking must record each use even when the resource set was not rebound after
 a barrier. Pass fusion may combine attachment load/store passes, but must

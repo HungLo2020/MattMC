@@ -426,6 +426,10 @@ pub(crate) struct ShaderPackColorTargetCache {
 }
 
 impl ShaderPackColorTargetCache {
+    pub(crate) fn has_pending_targets(&self) -> bool {
+        self.pending.is_some()
+    }
+
     pub(crate) fn stage(
         &mut self,
         gal: &mut VulkanicGal,

@@ -283,7 +283,7 @@ impl WorldPrimitiveFrontend {
                 )
             })
             .unwrap_or((false, false));
-        eprintln!(
+        crate::core::console::stderr(format_args!(
             "Rust VulkanicGAL selected-source execution admitted frame={} submission={} world_generation={} mesh_instances={} lod_instances={} lod_opaque_instances={} lod_transparent_instances={} lod_water_instances={}",
             frame.frame_id,
             stats.submission_id,
@@ -293,7 +293,7 @@ impl WorldPrimitiveFrontend {
             lod_opaque_instances,
             lod_transparent_instances,
             lod_water_instances,
-        );
+        ));
         // Diagnostic-only receipt for the exact Rust-derived shadow transform.
         // Do not rebuild the temporal source-uniform block after submit: this
         // reads only the immutable source policy and copied frame semantics.

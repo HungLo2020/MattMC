@@ -248,7 +248,9 @@ fn minimal_distant_horizons_streams_follow_horizontal_compact_micro_contract() {
             source.contains("float(vertex.data.w & 0x0fu)")
                 || source.contains("float(vertex.light_normal_pad & 0x0fu)")
         );
-        assert!(source.contains("light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);"));
+        // Frozen OpenGL keeps low skylight in the dark lightmap rows. The
+        // Java Vulkan-only fold would brighten submerged and covered faces.
+        assert!(!source.contains("light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);"));
     }
     assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
         .contains("float((vertex.data.w >> 8u) & 0x0fu)"));

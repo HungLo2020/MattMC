@@ -231,10 +231,10 @@ impl WorldPrimitiveFrontend {
                     crate::core::environment::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
                     Ok("1" | "true" | "TRUE")
                 ) {
-                    println!(
+                    crate::core::console::stdout(format_args!(
                         "world-lod.asset-phase generation={generation} columns={asset_count} inner_nanos={inner_nanos} reconcile_nanos={}",
                         elapsed_nanos_u64(reconcile_started),
-                    );
+                    ));
                 }
                 Ok(())
             }
@@ -443,10 +443,10 @@ impl WorldPrimitiveFrontend {
             crate::core::environment::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
             Ok("1" | "true" | "TRUE")
         ) {
-            println!(
+            crate::core::console::stdout(format_args!(
                 "world-lod.asset-inner generation={generation} columns={asset_count} validate_nanos={validate_nanos} provenance_nanos={provenance_nanos} prepare_nanos={prepare_nanos} expand_nanos={expand_nanos} pack_nanos={pack_nanos} commit_nanos={}",
                 elapsed_nanos_u64(commit_started),
-            );
+            ));
         }
         Ok(())
     }

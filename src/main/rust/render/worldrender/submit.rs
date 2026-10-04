@@ -410,7 +410,7 @@ impl WorldPrimitiveFrontend {
         )?;
         if gameplay_attachment_capture.is_some() {
             for observation in &self.latest_atlas_animation_observations {
-                eprintln!("{observation}");
+                crate::core::console::stderr(format_args!("{observation}"));
             }
         }
         let deferred_handoff_text_quads = if self.pending_terrain_fabulous_handoff {
@@ -1193,8 +1193,8 @@ impl WorldPrimitiveFrontend {
             gal.commit_frame_target_depth_write(frame_target)?;
         }
         if owned_world_target && gameplay_attachment_capture.is_some() {
-            eprintln!("[VulkanicGAL] owned-world-output frame={} submission={} raster={:?} rowReverse={} colorCopy=true depthCopy=true presenter=existing-frame-owner",
-                world_frame_id, token.submission.0, graph_direction, graph_direction == RasterYDirection::Down);
+            crate::core::console::stderr(format_args!("[VulkanicGAL] owned-world-output frame={} submission={} raster={:?} rowReverse={} colorCopy=true depthCopy=true presenter=existing-frame-owner",
+                world_frame_id, token.submission.0, graph_direction, graph_direction == RasterYDirection::Down));
         }
         self.world_text.confirm_submission();
         // The submission has now validated and marked every handle used by

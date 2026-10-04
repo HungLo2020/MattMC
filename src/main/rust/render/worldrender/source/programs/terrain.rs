@@ -717,7 +717,7 @@ impl WorldPrimitiveFrontend {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] pipeline program={} material_mode={} vertex_label={} clip_finalizer={} depth_compare=LessOrEqual depth_write={} depth_format=Depth32Float color_formats={:?}",
                 program.identity.as_str(),
                 material_mode,
@@ -728,7 +728,7 @@ impl WorldPrimitiveFrontend {
                     .contains("gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5"),
                 depth_write,
                 color_formats,
-            );
+            ));
         }
         if color_formats.is_empty() {
             return Err(GalError::invalid_argument(

@@ -76,7 +76,7 @@ fn trace_glibc_allocator_checkpoint(resource_label: &str) {
     #[cfg(target_os = "linux")]
     {
         let info = unsafe { libc::mallinfo2() };
-        eprintln!(
+        trace::stderr(format_args!(
             "vulkan.glibc-allocator sequence={} resource={} arena_bytes={} allocated_bytes={} free_bytes={} mmap_blocks={} mmap_bytes={}",
             sequence,
             resource_label,
@@ -85,7 +85,7 @@ fn trace_glibc_allocator_checkpoint(resource_label: &str) {
             info.fordblks,
             info.hblks,
             info.hblkhd,
-        );
+        ));
     }
 }
 
@@ -94,13 +94,13 @@ fn trace_native_graphics_pipeline_cache(hit: bool, resource_label: &str, key_cou
         return;
     }
     let sequence = NATIVE_GRAPHICS_PIPELINE_CACHE_TRACE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    eprintln!(
+    trace::stderr(format_args!(
         "vulkan.graphics-pipeline.cache sequence={} result={} keys={} resource={}",
         sequence,
         if hit { "hit" } else { "miss" },
         key_count,
         resource_label,
-    );
+    ));
 }
 
 fn runtime_native_allocator_trim_enabled() -> bool {
@@ -490,7 +490,7 @@ impl DeviceMemoryAllocator {
             size: requirements.size,
         };
         if std::env::var_os("MATTMC_TRACE_VULKAN_BUFFER_PAGES").is_some() {
-            eprintln!(
+            trace::stderr(format_args!(
                 "vulkan.buffer-page.create id={} memory_type_index={} memory_property_bits={} host_visible={} page_bytes={} request_bytes={} alignment={}",
                 block.id,
                 memory_type_index,
@@ -499,7 +499,7 @@ impl DeviceMemoryAllocator {
                 allocation_size,
                 requirements.size,
                 requirements.alignment,
-            );
+            ));
         }
         self.blocks.push(block);
         Ok(allocation)
@@ -812,10 +812,10 @@ impl VulkanObjects {
             ) {
                 let released = unsafe { libc::malloc_trim(0) } != 0;
                 if std::env::var_os("MATTMC_TRACE_GLIBC_ALLOCATOR").is_some() {
-                    eprintln!(
+                    trace::stderr(format_args!(
                         "vulkan.glibc-allocator-trim retired={} free_bytes={} released={}",
                         self.native_objects_retired_since_allocator_trim, info.fordblks, released,
-                    );
+                    ));
                 }
                 self.native_objects_retired_since_allocator_trim = 0;
             }
@@ -968,7 +968,7 @@ impl VulkanObjects {
         {
             return;
         }
-        eprintln!(
+        trace::stderr(format_args!(
             "vulkan.residency label={} buffer_reserved_bytes={} buffer_allocated_bytes={} buffer_pages={} texture_reserved_bytes={} texture_allocated_bytes={} texture_pages={} logical_objects={}",
             event,
             self.buffer_memory.reserved_bytes(),
@@ -978,7 +978,7 @@ impl VulkanObjects {
             self.texture_memory.allocated_bytes(),
             self.texture_memory.blocks.len(),
             self.objects.len(),
-        );
+        ));
     }
 
     fn create_buffer(
@@ -1001,10 +1001,10 @@ impl VulkanObjects {
             })?;
         let requirements = unsafe { self.context.device.get_buffer_memory_requirements(buffer) };
         if std::env::var_os("MATTMC_TRACE_VULKAN_BUFFER_OBJECTS").is_some() {
-            eprintln!(
+            trace::stderr(format_args!(
                 "vulkan.buffer.create label={} requested_bytes={} requirement_bytes={} alignment={} memory={:?}",
                 desc.label, desc.size, requirements.size, requirements.alignment, desc.memory,
-            );
+            ));
         }
         let allocation = match self.buffer_memory.allocate(
             requirements,
@@ -1120,7 +1120,7 @@ impl VulkanObjects {
             })?;
         let requirements = unsafe { self.context.device.get_image_memory_requirements(image) };
         if std::env::var_os("MATTMC_TRACE_VULKAN_IMAGE_ALLOCATIONS").is_some() {
-            eprintln!(
+            trace::stderr(format_args!(
                 "vulkan.image.allocate label={} dimension={:?} format={:?} extent={}x{}x{} mip_levels={} array_layers={} bytes={} alignment={}",
                 desc.label,
                 desc.dimension,
@@ -1132,7 +1132,7 @@ impl VulkanObjects {
                 desc.array_layers,
                 requirements.size,
                 requirements.alignment,
-            );
+            ));
         }
         let allocation = match self.texture_memory.allocate(
             requirements,
@@ -1343,17 +1343,17 @@ impl VulkanObjects {
             };
             if let Some(cached) = self.compiled_shader_cache.get(&cache_key) {
                 if std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some() {
-                    println!("vulkan.shader.compile.cache_hit label={}", desc.label);
+                    trace::stdout(format_args!("vulkan.shader.compile.cache_hit label={}", desc.label));
                 }
                 cached.clone()
             } else {
                 if std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some() {
-                    println!(
+                    trace::stdout(format_args!(
                         "vulkan.shader.compile.begin label={} stage={:?} bytes={}",
                         desc.label,
                         desc.stage,
                         source.len()
-                    );
+                    ));
                 }
                 let compiled = compile_glsl_for_backend(
                     shaderc_kind(desc.stage)?,
@@ -1380,7 +1380,7 @@ impl VulkanObjects {
         if desc.code_format == ShaderCodeFormat::Glsl
             && std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some()
         {
-            println!("vulkan.shader.compile.end label={}", desc.label);
+            trace::stdout(format_args!("vulkan.shader.compile.end label={}", desc.label));
         }
         if desc.code_format != ShaderCodeFormat::Spirv && desc.code_format != ShaderCodeFormat::Glsl
             || code.len() % 4 != 0
@@ -1601,7 +1601,7 @@ impl VulkanObjects {
                     let info_index = image_infos.len();
                     let sampled_layout = sampled_image_layout_for_aspect(view.aspect);
                     if std::env::var_os("MATTMC_TRACE_DESCRIPTOR_REALIZATION").is_some() {
-                        eprintln!(
+                        trace::stderr(format_args!(
                             "vulkan.descriptor.combined resource={:?} texture_view={:?} texture={:?} label={} image_view={:?} sampler={:?} layout={}",
                             binding.resource,
                             combined.texture_view,
@@ -1610,7 +1610,7 @@ impl VulkanObjects {
                             view.view,
                             sampler,
                             sampled_layout.as_raw(),
-                        );
+                        ));
                     }
                     image_infos.push(vk::DescriptorImageInfo {
                         sampler,

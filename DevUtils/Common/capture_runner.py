@@ -26,6 +26,7 @@ from shield_animation_scenarios import SHIELD_ANIMATION_SCENARIOS, SHIELD_ANIMAT
 
 import artifact_retention
 from capture_window import capture_window_size
+from client_memory import start_ticks as process_start_ticks
 
 
 SHADER_EVENT_PATTERN = (
@@ -2444,6 +2445,12 @@ class CaptureRunner:
                 safe_kill(self.gradle_process.pid, signal.SIGKILL)
                 self.run_client_active = False
                 return
+            client_start_ticks = None
+            if self.platform_name == "linux" and client_pid:
+                try:
+                    client_start_ticks = process_start_ticks((Path("/proc") / str(client_pid) / "stat").read_text())
+                except (OSError, ValueError, IndexError):
+                    pass
             if client_pid:
                 safe_kill(client_pid, signal.SIGTERM)
             try:
@@ -2451,7 +2458,20 @@ class CaptureRunner:
             except OSError:
                 pass
             safe_kill(self.gradle_process.pid, signal.SIGTERM)
-            time.sleep(5)
+            # A native abort can start after SIGTERM has closed the wrapper's
+            # output pipes. It may leave no hs_err, and the wrapper exit code
+            # still reports 143. Retain the kernel's signal/core evidence before
+            # forced cleanup can truncate the dump; do not extend the grace.
+            if client_start_ticks is None:
+                time.sleep(5)
+            else:
+                deadline = time.monotonic() + 5
+                observed_core = False
+                while time.monotonic() < deadline:
+                    if not observed_core and linux_core_dump_in_progress(client_pid, client_start_ticks):
+                        self.append_meta("cleanup_client_core_dumping=true")
+                        observed_core = True
+                    time.sleep(min(.25, max(0, deadline - time.monotonic())))
             if client_pid and process_exists(client_pid, self.platform_name):
                 self.append_meta("cleanup_client_kill=true")
                 safe_kill(client_pid, signal.SIGKILL)
@@ -4468,6 +4488,18 @@ def process_exists(pid: int, platform_name: str) -> bool:
         os.kill(pid, 0)
         return True
     except OSError:
+        return False
+
+
+def linux_core_dump_in_progress(pid: int, expected_start_ticks: int, *, proc_root: Path = Path("/proc")) -> bool:
+    process = proc_root / str(pid)
+    try:
+        before = process_start_ticks((process / "stat").read_text())
+        status = (process / "status").read_text()
+        return (before == expected_start_ticks
+                and re.search(r"(?m)^CoreDumping:\s+1\s*$", status) is not None
+                and process_start_ticks((process / "stat").read_text()) == before)
+    except (OSError, ValueError, IndexError):
         return False
 
 

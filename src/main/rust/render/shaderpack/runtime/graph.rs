@@ -97,12 +97,12 @@ impl ShaderPackRuntimeExecutor {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] history-copy main_texture=0x{:016x} before_texture=0x{:016x} previous_texture=0x{:016x}",
                 targets.main_depth_texture.raw(),
                 targets.before_translucency_texture.raw(),
                 targets.previous_texture.raw(),
-            );
+            ));
         }
         if history.extent.width == 0 || history.extent.height == 0 || history.extent.depth != 1 {
             return Err(GalError::invalid_argument(

@@ -237,9 +237,7 @@ impl WorldPrimitiveFrontend {
         ) {
             Ok(()) => Ok(()),
             Err(error) => {
-                if let Some(runtime) = self.shader_runtime.as_mut() {
-                    runtime.discard_source_color_targets_submission(gal);
-                }
+                self.discard_source_color_submission(gal);
                 self.candidate_source_asset_error =
                     Some(format!("source color target preparation failed: {error}"));
                 Ok(())
@@ -1292,12 +1290,12 @@ impl WorldPrimitiveFrontend {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] semantic main=0x{:016x} before={:?} previous={:?}",
                 input.main_depth_view.raw(),
                 input.before_translucency_view.map(Handle::raw),
                 input.previous_view.map(Handle::raw),
-            );
+            ));
         }
         self.shader_runtime
             .as_mut()

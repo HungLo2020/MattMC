@@ -156,7 +156,7 @@ impl WorldPrimitiveFrontend {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] fullscreen main-depth sampler={:?} available={:?} exact_resources={:?}",
                 accumulated
                     .combined_sampler_for(TerrainSourceResourceRole::MainDepth)
@@ -165,7 +165,7 @@ impl WorldPrimitiveFrontend {
                     .availability()
                     .resource_for(TerrainSourceResourceRole::MainDepth),
                 exact_main_depth_availability,
-            );
+            ));
         }
 
         let source_uses_distant_horizons = distant_horizons.is_some();

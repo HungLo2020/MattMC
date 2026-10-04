@@ -29158,6 +29158,7 @@ def normalize_capture_artifact(
     error_counts = {name: count_pattern(log_paths, pattern) for name, pattern in ERROR_PATTERNS.items()}
     error_counts["crash"] += listed_failure_file_count(files["crash_reports"])
     error_counts["crash"] += listed_failure_file_count(files["hs_err"])
+    error_counts["crash"] += int(meta.get("cleanup_client_core_dumping", "false").lower() == "true")
     memory_guard_triggered = meta.get("memory_guard_triggered", "false").lower() == "true" or error_counts["rss_guard"] > 0
     requires_frame_benchmark = tool_kind == "gameplay" if require_frame_benchmark is None else require_frame_benchmark
     frame_sample_window_complete = not requires_frame_benchmark or (
@@ -36918,10 +36919,14 @@ def build_capture_command(
         # callers may still provide a smaller or larger diagnostic override.
         env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "10")
         env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "12")
-        # DH fog is part of the copied material/composition contract. Keep it
-        # enabled for Current so Rust receives the same semantic fog block
-        # that Frozen's OpenGL baseline applies in its DH fog stage.
-        env["MATTMC_CAPTURE_DH_KEEP_FOG"] = "true"
+        # DH fog is part of the copied material/composition contract. Preserve
+        # it by default, but an explicit no-fog isolation must reach both
+        # launchers. Frozen's shell launcher applies KEEP_FOG after DISABLE_FOG;
+        # setting both true would silently re-enable fog only in Frozen.
+        env["MATTMC_CAPTURE_DH_KEEP_FOG"] = (
+            "false" if env.get("MATTMC_CAPTURE_DH_DISABLE_FOG", "false").strip().lower() == "true"
+            else "true"
+        )
         if kind == "shell" and shell_settled_static_capture:
             # Frozen's shell launcher can carry the readiness properties above,
             # but older copied baselines may not implement the settled-family

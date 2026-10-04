@@ -5,13 +5,32 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ObserveRenderDocCapture import CONFIG_ENV, SCRIPT_PATH, isolated_pid
+from ObserveRenderDocCapture import CONFIG_ENV, SCRIPT_PATH, isolated_pid, producer_ready
 
 
 CLIENT = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
 
 
 class RenderDocObserverIdentityTest(unittest.TestCase):
+    def test_world_observation_requires_actual_opengl_world_entry(self):
+        status = {'backend': 'opengl', 'worldMenuFixture': {'worldPresent': True}}
+        self.assertTrue(producer_ready(status, 'world'))
+        self.assertFalse(producer_ready(status, 'particle'))
+        status['backend'] = 'rust-vulkan'
+        self.assertFalse(producer_ready(status, 'world'))
+        status['backend'] = 'opengl'
+        status['worldMenuFixture']['worldPresent'] = False
+        self.assertFalse(producer_ready(status, 'world'))
+
+    def test_particle_observation_still_requires_complete_visible_fixture(self):
+        status = {'backend': 'opengl', 'worldMenuFixture': {'worldPresent': True},
+                  'terrainParticleFixture': {'complete': True, 'hidden': False}}
+        self.assertTrue(producer_ready(status, 'particle'))
+        status['terrainParticleFixture']['hidden'] = True
+        self.assertFalse(producer_ready(status, 'particle'))
+        status['terrainParticleFixture'] = {'complete': False, 'hidden': False}
+        self.assertFalse(producer_ready(status, 'particle'))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

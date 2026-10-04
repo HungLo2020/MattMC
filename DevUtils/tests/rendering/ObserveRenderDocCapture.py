@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Capture up to three live Frozen OpenGL particle frames through RenderDoc.
+"""Capture up to three live Frozen OpenGL world frames through RenderDoc.
 
 Run beside a fresh Capture.py invocation with --renderdoc-capture and a visible
-terrain-particle fixture. Only the exact isolated KnotClient PID is captured.
+terrain-particle fixture, or select the ordinary world producer. Only the exact
+isolated KnotClient PID is captured.
 Replay is a separate step after the authoritative harness has terminated.
 """
 from __future__ import annotations
@@ -56,6 +57,17 @@ def isolated_pid(game_dir: Path, proc_root: Path = Path('/proc')) -> tuple[int, 
     return matches[0] if matches else None
 
 
+def producer_ready(status: dict, producer: str) -> bool:
+    if status.get('backend') != 'opengl' or not (status.get('worldMenuFixture') or {}).get('worldPresent'):
+        return False
+    if producer == 'world':
+        # This only establishes world entry. Replay must independently prove
+        # the intended DH/material draws in the retained frame.
+        return True
+    fixture = status.get('terrainParticleFixture') or {}
+    return bool(fixture.get('complete') and not fixture.get('hidden', True))
+
+
 def observe(config: dict) -> None:
     import renderdoc as rd
 
@@ -90,18 +102,15 @@ def observe(config: dict) -> None:
                 report['last_producer_status'] = producer
                 if status.get('status') in ('complete', 'failed'):
                     raise RuntimeError('client terminated capture before observation')
-                fixture = status.get('terrainParticleFixture') or {}
-                world = status.get('worldMenuFixture') or {}
                 directories = list(status_path.parent.glob('game_dir_*'))
-                if (fixture.get('complete') and not fixture.get('hidden', True)
-                        and world.get('worldPresent')
+                if (producer_ready(status, config.get('producer', 'particle'))
                         and len(directories) == 1):
                     identity = isolated_pid(directories[0])
                     if identity:
                         break
             time.sleep(.1)
         if not identity:
-            raise RuntimeError('visible particle producer did not become ready')
+            raise RuntimeError('selected world producer did not become ready')
         report.update(client_pid=identity[0], process_start_ticks=identity[1],
                       producer_status=producer, status_path=str(status_path))
         while time.monotonic() < deadline and target is None:
@@ -135,7 +144,7 @@ def observe(config: dict) -> None:
         # Frozen writes its running receipt at setup, then at capture completion;
         # renderedFrameIndex is not a live counter. Let the real world render
         # after producer setup, without modifying Frozen or its readiness gate.
-        dwell_end = min(deadline, time.monotonic() + 2)
+        dwell_end = min(deadline, time.monotonic() + config.get('dwell_seconds', 2))
         while time.monotonic() < dwell_end:
             if isolated_pid(directories[0]) != identity:
                 raise RuntimeError('client changed during producer dwell')
@@ -156,7 +165,7 @@ def observe(config: dict) -> None:
                                            'capture_frame': capture.frameNumber,
                                            'captured_ns': time.time_ns()})
                 print('Captured exact Frozen client frame: ' + str(path), flush=True)
-                if len(report['captures']) == 3:
+                if len(report['captures']) == config.get('capture_count', 3):
                     report['status'] = 'complete'
                     return
                 # Sample later world frames too; the running producer receipt
@@ -185,6 +194,9 @@ def main() -> int:
     parser.add_argument('--mode', choices=['frozen-opengl-shaders-on', 'frozen-opengl-shaders-off'],
                         default='frozen-opengl-shaders-on')
     parser.add_argument('--timeout', type=int, default=300)
+    parser.add_argument('--producer', choices=['particle', 'world'], default='particle')
+    parser.add_argument('--capture-count', type=int, choices=range(1, 4), default=3)
+    parser.add_argument('--dwell-seconds', type=int, choices=range(2, 31), default=2)
     parser.add_argument('--qrenderdoc', type=Path,
                         default=Path(__file__).resolve().parents[2] / '.cache/tools/renderdoc/bin/qrenderdoc')
     args = parser.parse_args()
@@ -194,7 +206,9 @@ def main() -> int:
     output = root / 'renderdoc-observation'
     output.mkdir(parents=True, exist_ok=False)
     config = {'root': str(root), 'mode': args.mode, 'timeout': args.timeout,
-              'output': str(output), 'script_path': str(SCRIPT_PATH)}
+              'output': str(output), 'script_path': str(SCRIPT_PATH),
+              'producer': args.producer, 'capture_count': args.capture_count,
+              'dwell_seconds': args.dwell_seconds}
     env = dict(os.environ, **{CONFIG_ENV: json.dumps(config)})
     # Official Linux builds embed their matching Python and RenderDoc module.
     return subprocess.run([str(args.qrenderdoc.resolve()), '--python', str(Path(__file__).resolve())],

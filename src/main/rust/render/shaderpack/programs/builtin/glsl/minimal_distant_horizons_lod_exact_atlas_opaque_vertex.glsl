@@ -76,9 +76,9 @@ void main() {
     // Frozen's standard.vert.
     float light_sky = float(vertex.light_normal_pad & 0x0fu);
     float light_sky_uv = (light_sky + 0.5) / 16.0;
-    // Keep exact-atlas replacements on the same source DH Vulkan lightmap
-    // convention as the reduced-color fallback they replace.
-    light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);
+    // Keep the original Frozen OpenGL sky coordinate, consistently with the
+    // reduced-color fallback. A Java Vulkan-only brightness fold would make
+    // shaded or submerged atlas replacements brighter than their source.
     vec2 light_uv = vec2(
         // Exact-atlas vertices use the same byte-separated sky/block ABI as
         // the reduced stream.

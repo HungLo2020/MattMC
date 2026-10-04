@@ -374,7 +374,9 @@ pub fn prepare_entity_glint_source_program(
 ) -> GalResult<crate::render::shaderpack::programs::LoweredEntitySourceProgram> {
     let contract = derive_entity_glint_contract(source, scope)?;
     let lowered = lower_entity_source_pair(source, &contract)?;
-    let declarations = TerrainSourceResourceBindings::from_source(source)?;
+    let declarations = TerrainSourceResourceBindings::from_source_stage(
+        source, &contract.stages.fragment,
+    )?;
     let bindings = bind_entity_source_resources(&lowered, &declarations)?;
     let mut program =
         crate::render::shaderpack::programs::prepare_lowered_entity_source_program(&contract, &lowered, &bindings)?;
@@ -454,7 +456,9 @@ pub fn prepare_entity_shadow_source_program(
 ) -> GalResult<crate::render::shaderpack::programs::LoweredEntitySourceProgram> {
     let contract = derive_entity_shadow_contract(source, scope)?;
     let lowered = lower_entity_shadow_source_pair(source, &contract)?;
-    let declarations = crate::render::shaderpack::resources::bindings::TerrainSourceResourceBindings::from_source(source)?;
+    let declarations = crate::render::shaderpack::resources::bindings::TerrainSourceResourceBindings::from_source_stage(
+        source, &contract.stages.fragment,
+    )?;
     let bindings = bind_entity_source_resources(&lowered, &declarations)?;
     crate::render::shaderpack::programs::prepare_lowered_entity_shadow_source_program(&contract, &lowered, &bindings)
 }

@@ -804,6 +804,8 @@ pub(in crate::render::worldrender) enum MeshBatchSelection {
     Static,
     CameraSorted,
     ShadowOnly,
+    /// Missing camera-facing ranges plus complete off-camera shadow candidates.
+    ShadowSupplement,
 }
 
 impl MeshBatchSelection {
@@ -821,6 +823,8 @@ impl MeshBatchSelection {
             Self::Static => !camera_sorted && !shadow_only,
             Self::CameraSorted => camera_sorted && !shadow_only,
             Self::ShadowOnly => shadow_only,
+            Self::ShadowSupplement => is_source_terrain_mesh_stratum(instance.stratum)
+                && (shadow_only || !camera_sorted),
         }
     }
 }
@@ -1122,6 +1126,17 @@ fn mesh_batches_core_indices(
             continue;
         }
         let asset = mesh_batch_asset(frame, frontend, instance, allow_optical)?;
+        // Shadow raster culling cannot restore baked faces removed here.
+        // Off-camera casters need every facing; camera casters supplement
+        // only ranges absent from their existing color/shadow batches.
+        let mut shadow_instance;
+        let instance = if matches!(selection, MeshBatchSelection::ShadowOnly | MeshBatchSelection::ShadowSupplement) {
+            shadow_instance = instance.clone();
+            shadow_instance.terrain_visible_facing_mask = if selection == MeshBatchSelection::ShadowOnly
+                || instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY != 0
+            { 0x7f } else { !instance.terrain_visible_facing_mask & 0x7f };
+            &shadow_instance
+        } else { instance };
         if instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 {
             geometry::translucent_order::append_batches(
                 instance,

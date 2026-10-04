@@ -4,6 +4,17 @@ What to run before calling a rendering change done. Frozen, the unmodified
 Java reference checkout, is the correctness baseline: compare against it,
 don't change it.
 
+On Linux, `cleanup_client_core_dumping=true` is native crash evidence, even if
+the wrapper exits 143 and no `hs_err` is retained. The capture runner observes
+the same process start identity during its existing termination grace; flight
+and normalized artifacts reject this flag. For older runs, match system core
+records to the isolated PID, executable/main class, copied working directory
+and launch interval. A completed recording can still belong to a failed session.
+Private Vulkan diagnostics use [best-effort console writes](VULKANIC-GAL.md)
+so a closed launcher pipe cannot turn an otherwise valid submission into a
+logging panic. Keep the overlap trace enabled when checking that failure;
+turning it off would remove the triggering write.
+
 ## 1. Tests
 
 Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.
@@ -69,6 +80,20 @@ readiness requirement intact; repeated DH builds in a stationary scene can
 indicate premature retirement rather than ordinary streaming. Unit tests alone
 do not prove temporal parity or memory stability.
 
+For DH quad-layer changes, run the real builder regression:
+
+```sh
+./gradlew -PmattmcRustProfile=release test -x testRustNative -x buildRustNative \
+  --tests com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodQuadBuilderLayerTest
+```
+
+Use the already verified release native library for these Java-only changes.
+The checks cover all six faces, opaque and translucent leaf colors, water at
+alpha 255, disabled transparency, and preserved semantic vertex/material bytes.
+Then compare real distant foliage using the original pack and shared DH source
+database. A low whole-image error can hide missing tree crowns; inspect the
+distant regions and the exact screenshot/depth-mask correlation too.
+
 Run `cargo test ... direct_dh_composition` for vanilla/DH snapshot dependencies:
 first and repeated frames, no-fade to double-pass changes, resize, rejected
 submission, and the opaque/translucent fade boundaries. Use actual terrain
@@ -111,6 +136,16 @@ must use source-entry preparation, then refresh the next frame's exact resource
 snapshot before selected execution. Its DH input needs a perspective projection
 and matching inverse; an identity placeholder cannot provide valid clip planes.
 This test covers source-chain submission/presentation, not Frozen image parity.
+
+Run `cargo test --release source_empty_shadows -- --test-threads=1` after changing
+empty-frame or source rollback ordering. It exercises the real preparation and
+named terrain-plan builders, plus native shader sampling of both owned shadow
+depths. Empty geometry must still produce a full-size opaque snapshot, and both
+sampled depths must equal the clear value 1. Repeated unsubmitted plan discards
+must reclaim their color targets without advancing confirmed shadow state;
+replacing the runtime must retire its pending generation without losing images.
+These checks supplement real world entry/exit and rejected-frame validation;
+they do not establish gameplay parity or long-run memory bounds.
 
 For single-color source changes, `cargo test ... single_color` covers paired
 discovery, output-slot preservation, particle alpha testing, explicit legacy
@@ -391,7 +426,10 @@ depth is exactly clear 1. It verifies float readback hashes, frame/submission
 identity, extent and row origin against the screenshot acknowledgement.
 An 8-bit depth preview cannot distinguish distant geometry from clear depth;
 missing, stale or resized attachments must fail proof rather than be guessed.
-Ordinary DH full captures use their private alpha and float main depth.
+Ordinary DH full captures use their private alpha and float main depth. Request
+`--rust-full-gameplay-attachments` for shaders-off DH comparisons: the default
+final-output-only dump cannot prove DH coverage, even if both clients and the
+whole-image comparison succeed.
 Run the evidence regression checks with:
 
 ```sh
@@ -590,6 +628,9 @@ does not prove correctness of the unobserved part of a larger framebuffer.
 
 ## 4. Performance A/B
 
+For the current original-pack moving workload, batching probes and rejected
+optimization evidence, see [shader terrain profiling](SHADER-TERRAIN-PROFILING.md).
+
 Measure with the moving-camera frame benchmark, enabled through JVM properties,
 and always with the release native profile:
 
@@ -622,6 +663,211 @@ capture runner, `MATTMC_CAPTURE_MAX_FPS=260` selects the unlimited slider value;
 out-of-range values such as 1000 decode to the default 120. Validation and
 graphics diagnostic runs are overhead probes, not performance acceptance.
 
+For named-source terrain uniform changes, run `cargo test ... packed_source_uniforms
+-- --test-threads=1`. These checks compare packed bytes with semantic preparation,
+reject another frame or program, preserve earlier snapshots when matrices change,
+and retain missing-value/non-finite-instance validation. Follow with real moving
+gameplay and static image comparisons; CPU checks alone establish neither parity
+nor a speedup.
+
+Pin `MATTMC_CAPTURE_SHADER_PACK_SOURCE=/absolute/path/pack.zip` for a paired
+shader run and inspect both canonical pack hashes. A single Current row and a
+Current/Frozen pair can choose different default pack sources. The Oct 3 source
+preparation diagnostic used `cb434…`; the first unpinned pair selected `4420…`,
+which lacks the transported resource manifest and crashed Current on unresolved
+flood-fill sampler roles. That failure remains separate from performance evidence
+under `goal5/source-draw-preparation-profile/`. The corrected shared-pack control
+completed 1,800 measured frames per side (Current/Frozen 40.2/302.1 FPS).
+Two clean packed-uniform candidates reduced preparation from 5.87 to 4.83/4.78 ms
+(about 18%). Current FPS 38.4/41.6 and Frozen 313.5/302.0 do not establish an
+overall FPS gain. Native workload samples cover only a 128-frame prefix; readiness
+restarts and measurement onset differ. The fresh static pair passes RGB MAE
+2.335/1.908/2.196 at the unchanged tolerance 6, with exercised standard Vulkan
+validation clean and both clients reaped. This is one shader-only pose; terrain
+flicker, other packs, transitions and long-run bounds remain separate checks.
+
+For manifest-free image discovery, run `cargo test ... legacy_owned_image_aliases
+-- --test-threads=1`. The checks cover selected property branches, distinct light
+history, incompatible shapes/flags, alias conflicts, final duplicate values and
+explicit-manifest precedence. Real bundled source checks also prepare weather,
+clouds, the full composite chain, late draw families and DH depth consumers
+without the optional manifest. The entity-shadow and outline helpers reproduced
+the later live failure even after composite preparation passed. Follow with the
+original archive in the paired runtime command above;
+source preparation alone does not establish gameplay or pixel parity.
+Check the resolved roles too: a second live retry reached program preparation
+but incorrectly treated shadow `gaux4` as scene color. Two before-failing checks
+now require the shared gbuffers/shadow PNG override and actual shadow defines.
+
+The corrected Oct 3 original-archive (`4420…`) shader-only pair completed both
+clients with Current's standard Vulkan validation exercised and clean. RGB MAE
+2.356/1.924/2.212 passes the unchanged tolerance 6; both images were reviewed.
+Evidence: `goal5/original-pack-image-bindings/`, including failed runs and their
+exact source/native snapshots. Source activation was frame 101, while the image
+was frame 385; this is a settled pose, not exact first-world-frame proof. The
+original-archive Iris+DH follow-up also completed both clients cleanly, exercising
+opaque, transparent and water LOD source draws. Its whole-image RGB MAE
+13.459/11.926/13.921 fails tolerance 6: Current's hillside/sky are paler and
+distant silhouettes differ. Recorded client peak RSS was about 8.78/9.05 GiB
+(Current/Frozen); diagnostic duration and different readiness intervals are not
+FPS measurements or long-run resource bounds. Animation and flicker remain
+unverified in these pairs. Failed runs also exposed undefined opaque shadow depth
+during rejected-frame cleanup. Both empty-frame producers now retain the opaque
+snapshot and initialize it even without caster draws; the native regression
+sampled depth 0 before and 1 after. Repeated plan discards also exposed four lost
+color resources, fixed by retiring frontend consumers before runtime images.
+Evidence: `goal5/rejected-source-shadow-depth/`. The fresh shader-only pair passes
+RGB MAE 2.356/1.924/2.214 with clean standard validation, including normal empty
+world exit. This does not reproduce the original rejected-first-frame sequence
+or establish repeated-transition and long-run resource bounds.
+The latest original-pack Iris+DH regression also passes whole-image RGB MAE
+3.701/4.194/3.889 and DH-region 4.929/5.236/4.849, with clean standard validation.
+Its screenshot and depth mask join gameplay frame 666/submission 1244;
+normal empty world-exit frame 672 also completed cleanly. Distant tree silhouettes
+differed in that revision, despite the passing average errors. A subsequent
+quad-layer correction restored the opaque leaf colors to `dh_terrain`, matching
+Frozen; six real-builder cases failed before, then all 138 DH checks passed.
+The fresh original-pack pair restores the distant crowns, with RGB MAE
+3.721/4.249/3.882 and DH-region 4.955/5.390/4.733. Inspect the region images:
+the whole-image average did not improve and had hidden the missing crowns.
+Evidence: `goal5/dh-tree-silhouette-routing/`. This is still one settled coast
+pose, not broad parity, motion or memory acceptance.
+The shaders-off follow-up completed both clients with clean API checks. Its
+full attachment readbacks join screenshot frame 185/submission 361, but the
+DH-region RGB MAE 8.249/7.553/6.378 fails unchanged tolerance 6; far water is more
+transparent in Current. The whole-image error 3.319/3.493/3.151 hides this too.
+The pre-leaf-change control reproduces the same regional error and the same
+163,576-pixel depth mask. Frozen's masked pixels are identical; Current differs
+by one red-channel unit at one pixel. This water mismatch predates the leaf fix.
+The fixed source and compiled class were restored, and all 138 DH Java checks
+passed again. Both control clients completed with clean API checks; Frozen's
+full recorded worktree state stayed unchanged. Current's private color already
+shows the pale seabed before fog resolve, but a Frozen intermediate comparison
+is needed to distinguish material, blending and coverage causes. This shaders-off
+result does not establish the cause of shader-enabled haze. Evidence:
+`goal5/dh-tree-silhouette-routing/water-control-verification.json`.
+The earlier final-only attempt had no DH depth proof and is not an accepted
+comparison.
+
+When investigating haze, compare camera/projection and copied fog inputs before
+changing pack settings. Matching vanilla fog does not establish matching
+shader-pack atmospheric fog: the pack may reconstruct distance from main or DH
+depth and use separate altitude, weather and lighting uniforms. A diagnostic
+pack copy that bypasses one fog function, used identically in both isolated
+clients, can separate that contribution from bloom or volumetric lighting.
+Retain the original and diagnostic archive hashes and the one changed entry;
+keep the production pack intact and report this as a causal experiment, not a
+parity fix. Fullscreen uniform receipts named `latest` or overwritten per stage
+can contain menu-frame identity matrices after world exit. Retain live receipts
+and join their gameplay frame to the screenshot acknowledgement before using
+them to explain captured pixels.
+
+For a shader-disabled DH fog experiment, set
+`MATTMC_CAPTURE_DH_DISABLE_FOG=true` on the paired capture command. Dedicated DH
+rows must also emit `MATTMC_CAPTURE_DH_KEEP_FOG=false`: Frozen's shell launcher
+applies the keep setting last, so contradictory flags invalidate the pair.
+Check `enableDhFog=false` in both captured configurations before interpreting
+the images. Run `python3 -m unittest discover -s DevUtils/tests/rendering -p
+test_dh_capture_fog.py` for the launcher-environment regression. Disabling fog is
+a diagnostic input, not a rendering fix or production parity result.
+The Oct 3 shader-disabled coast experiment verified fog disabled in both
+captured configs and clean API checks. The pale water/seabed difference remains;
+DH-region RGB MAE rises to 12.311/11.190/9.548, so DH fog alone does not explain
+it. Evidence: `goal5/dh-tree-silhouette-routing/fog-isolation-verification.json`.
+The initial experiment was stopped after discovering contradictory fog flags
+and is excluded. Four before-failing launcher subcases pass after the override
+correction; the broader seven capture tests pass. Production fog stays enabled.
+
+For built-in DH lighting changes, run
+`cargo test --release ordinary_dh_native_skylight -- --test-threads=1` from
+`src/main/rust`. The GAL readback checks low and high skylight rows in opaque
+and inherited-transparent water draws. It failed before the correction: sky
+zero selected the bright green row instead of the intended dark red row.
+Preserving the original coordinate passes all four combinations. Frozen's
+actual low-skylight post-vertex output is retained under
+`goal5/dh-water-source-observation/`; see [RenderDoc observations](RENDERDOC-INPUTS.md).
+The exact-atlas built-in vertex uses the same coordinate rule. The reduced-color
+GPU fixture does not establish exact-atlas runtime parity. Rebuild release before
+the real Current/Frozen water comparison; the fixture alone is not acceptance.
+
+The corrected release passed the full Rust suite (2,150 tests, three ignored)
+and the normal-fog, shader-disabled coast comparison. Whole-image RGB MAE is
+0.943/1.205/1.420; DH-region error fell from 8.249/7.553/6.378 to
+2.043/1.587/1.473, within unchanged tolerance 6. The same 163,576-pixel DH mask
+was used. The pale submerged patches disappeared in visual review. Both clients
+completed with clean API checks; the shared DB, camera, fog and full Frozen
+source state were preserved. The Current process mapped the corrected release
+library. Retained evidence: `goal5/dh-water-source-observation/runtime-verification.json`.
+This proves the lighting correction at one settled coast pose, not motion,
+terrain-flicker, broad DH parity, performance or long-run memory stability.
+
+The Oct 3 16:30 haze observation was followed by an isolated atmospheric-fog
+bypass pair (`goal5/original-pack-fog-isolation`). Both clients completed cleanly
+and the harness found equivalent inputs, but RGB MAE 15.402/14.300/17.609 still
+fails tolerance 6; the nearby hillside remains washed out. This does not identify
+the cause. Live deferred/composite uniforms were retained for the actual captured
+gameplay frame 657, avoiding the later identity-matrix overwrite. The production
+native and Frozen tracked state stayed unchanged.
+A second isolated pair bypassed only `GetVolumetricLight`, preserving atmospheric
+fog (`goal5/original-pack-volumetric-isolation`). RGB MAE 3.706/4.211/3.890 and
+the DH-covered region 4.910/5.220/4.874 pass tolerance 6, with clean API checks.
+This implicates the light-shaft path in the washout; disabling it is not a fix.
+The sky-check loop used an authored lower-left integer depth address without
+converting it to Vulkan target rows. A native regression failed before the fix:
+the intended five sky samples instead returned zero, driving excess volumetric
+light. The lowering now converts source-derived integer addresses at reads of
+bound targets and preserves native fragment/history addresses and PNG overrides.
+
+From `src/main/rust`, run
+`cargo test --release fullscreen_authored_texels -- --test-threads=1` for the
+integer-address regression: a real GAL render writes a known top/bottom gradient
+and samples the pack's viewport-relative sky-check pattern while retaining native
+per-fragment addressing. Before the correction, its sky count was zero instead
+of five. Source checks cover the actual bundled loop, aliases, comments, PNG
+overrides, vertex reads, sampled mip dimensions and ambiguous reassignment.
+Reprojection returns already converted into image UVs remain native, including
+integer history reads without a direct varying dependency; the GPU test checks
+this independently of the sky-count channel.
+Follow with the original archive and normal light-shaft path in the real paired
+command; the diagnostic bypass and gradient test do not establish live parity.
+
+The corrected original-pack Iris+DH pair at the same coast pose passes whole-image
+RGB MAE 3.712/4.221/3.895 and DH-covered-region 4.915/5.225/4.842, within unchanged
+tolerance 6. Both clients completed; Current's standard Vulkan validation was
+exercised and clean. The screenshot's gameplay frame 645 admitted 150 opaque,
+163 transparent and 111 water LOD instances, with live deferred/composite uniforms
+retained for that frame. A separate shader-only regression passes RGB MAE
+2.342/1.918/2.197. Both comparisons were visually reviewed. Original pack, light
+shafts, fog, shared source database and Frozen state stayed intact. Evidence:
+`goal5/fullscreen-authored-texel-rows/`, including failing regressions, exact
+source/native snapshots, full 2,146-test result and the two runtime comparisons.
+These settled poses establish the scoped haze correction, not broad parity,
+motion/flicker, first-world-frame, performance or long-run resource acceptance.
+Underground original-pack lighting remains a separate failed comparison. See
+[Underground shader lighting checks](UNDERGROUND-SHADER-CHECKS.md) for saved-pose
+controls, exact submission-linked uniforms, full shadow-map observations and
+archived fog/volumetric isolation. The settled fog inputs now agree; Frozen's
+volumetric shadow-depth samplers remain unbound. Diagnostic agreement does not
+establish original-pack acceptance or extend the user's existing haze exception.
+
+The fresh original Iris+DH coast check after the shadow-facing fix has equivalent
+inputs and RGB 3.698/4.237/3.873 within threshold 6, but its aggregate fails
+validation. At capture frame 660/submission 1243, the full dump reads compatibility
+translucent snapshots that the selected source route never produced, causing
+`VUID-vkCmdDraw-None-09600` for their undefined layouts. The before-failing
+availability regression now excludes those readbacks and records explicit
+unavailability, while admitting prior submitted and same-submission producers.
+Six source checks, 34 capture checks and the release build pass. The fresh
+original-pack pair then passes with clean applicable validation, VUID/GL error
+counts zero and both actual clients exiting 0. Whole RGB is
+3.671/4.177/3.852; the 178,766-pixel DH extension is 4.951/5.389/4.726, both
+within threshold 6. Frame 657/submission 1234 has eight owner-linked uniform
+blocks and explicit unavailability for the two unused snapshots, with no
+PNG/raw files for them. The pair was visually reviewed. Peak diagnostic RSS is
+8.49 GiB Current/9.10 GiB Frozen; this is no performance or long-run bound claim.
+Both failing and fixed runs are retained in
+`goal5/shadow-facing-coast-regression/{before,after}-runtime-verification.json`.
+
 Profile ordinary gameplay separately when investigating work the benchmark
 suppresses. Attach JDK 25's `jcmd CLIENT_PID JFR.start name=render settings=profile
 duration=60s filename=/absolute/path/render.jfr` to the verified game process.
@@ -629,6 +875,19 @@ Use `jfr view hot-methods`, `allocation-by-site` and `native-methods` on that
 recording; separate render-thread stacks from chunk-worker costs. Native samples
 include both execution and waiting. Keep the recording and compact aggregates;
 expanded JSON repeats class-loader metadata and can be much larger.
+
+For selected render-thread methods, stream compact sample counts and allocation
+weights directly from the recording:
+
+```sh
+java DevUtils/tests/rendering/SummarizeRenderJfr.java /absolute/path/render.jfr \
+  net.vulkanic.world.RustGalWorldPrimitiveRenderer.copyStandardItemFoilTexture \
+  net.vulkanic.world.StandardFoilTextureCache.copy
+```
+
+The tool reads allocation `eventThread` and execution/native `sampledThread`
+fields. Weights estimate sampled allocations; they are not exact byte counts or
+an FPS measurement. Compare equivalent workloads and recording settings.
 
 The frame coordinator formats its automatic audit line only when
 `mattmc.dev.graphicsAuditSliceMetrics=true`, outside measured benchmark frames.

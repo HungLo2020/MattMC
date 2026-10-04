@@ -805,7 +805,7 @@ impl VulkanicGal {
             if std::env::var_os("MATTMC_TRACE_PIPELINE_PASS_COMPAT").is_some() {
                 let pipeline_record = self.graphics_pipelines.get(pipeline)?;
                 let pass_record = self.render_passes.get(pass)?;
-                eprintln!(
+                crate::core::console::stderr(format_args!(
                     "vulkan.pipeline-pass-mismatch pipeline={:?} label={} colors={:?} depth={:?} pass={:?} label={} colors={:?} depth={:?}",
                     pipeline,
                     pipeline_record.desc.label,
@@ -815,7 +815,7 @@ impl VulkanicGal {
                     pass_record.desc.label,
                     pass_record.desc.color_formats,
                     pass_record.desc.depth_format,
-                );
+                ));
             }
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,

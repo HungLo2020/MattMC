@@ -95,7 +95,7 @@ fn trace_cull_decision(
             value.skip_mask,
         )
     });
-    eprintln!(
+    crate::core::console::stderr(format_args!(
         "MATTMC_NATIVE_CULL_TRACE sectionKey={section_key} pos={},{},{} localY={} stateId={} blockId={} face={} normalFace={} passId={} decision={} reason={} neighborStateId={} neighborBlockId={} stateFlags={} neighborFlags={} skipGroup={} skipMask={} neighborSkipGroup={} neighborSkipMask={}",
         record.absolute_x,
         record.absolute_y,
@@ -116,7 +116,7 @@ fn trace_cull_decision(
         state.skip_mask,
         neighbor_skip_group,
         neighbor_skip_mask,
-    );
+    ));
 }
 
 #[inline(always)]

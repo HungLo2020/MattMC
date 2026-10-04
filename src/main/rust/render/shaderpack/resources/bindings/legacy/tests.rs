@@ -177,3 +177,5 @@ fn legacy_sampler_explicit_manifest_remains_authoritative_and_assets_fail_closed
         assert!(TerrainSourceResourceBindings::from_source_stage(&invalid, &stage).is_err());
     }
 }
+
+mod owned_images;

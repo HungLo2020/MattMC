@@ -19,6 +19,7 @@ use std::path::PathBuf;
 mod source_pack_probe;
 mod pre_terrain;
 mod legacy_samplers;
+mod legacy_images;
 
 fn gal() -> VulkanicGal {
     crate::render::vulkanic::test_support::mock_gal_with_capabilities(presentation_capabilities(

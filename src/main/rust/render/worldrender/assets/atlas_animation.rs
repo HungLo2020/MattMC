@@ -225,7 +225,7 @@ impl WorldPrimitiveFrontend {
             return;
         }
         let submission = submission.map_or_else(|| "none".to_string(), |id| id.0.to_string());
-        eprintln!(
+        crate::core::console::stderr(format_args!(
             "rust_gal_atlas_animation_upload texture={} generation={} tick={} patches={} bytes={} submission={} empty={} cumulative_uploads={} cumulative_bytes={} cumulative_empty_ticks={}",
             texture_id,
             generation,
@@ -237,7 +237,7 @@ impl WorldPrimitiveFrontend {
             self.atlas_animation_patch_uploads,
             self.atlas_animation_patch_bytes,
             self.atlas_animation_empty_ticks,
-        );
+        ));
     }
 
     /// Bounded, opt-in observation of accepted owned state; never drives uploads.
@@ -288,7 +288,7 @@ impl WorldPrimitiveFrontend {
             {
                 break;
             }
-            eprintln!("{observation}");
+            crate::core::console::stderr(format_args!("{observation}"));
         }
     }
 
@@ -417,7 +417,7 @@ impl WorldPrimitiveFrontend {
                     .sprites
                     .first()
                     .map(|sprite| sprite.clock.diagnostic_state());
-                eprintln!(
+                crate::core::console::stderr(format_args!(
                     "atlas-animation.prepare-rejected texture={} generation={} tick={} atlas={}x{} mips={} sprites={} first_clock={clock:?} error={error}",
                     animation.texture_id,
                     animation.generation,
@@ -426,7 +426,7 @@ impl WorldPrimitiveFrontend {
                     atlas.height,
                     mip_count,
                     animation.sprites.len(),
-                );
+                ));
                 error
             })?;
         self.pending_atlas_animation = Some(prepared);

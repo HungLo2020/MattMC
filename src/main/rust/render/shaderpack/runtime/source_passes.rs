@@ -18,24 +18,24 @@ impl ShaderPackRuntimeExecutor {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] source-pass phase={:?} depth_texture=0x{:016x} depth_view=0x{:016x} draws={}",
                 targets.phase,
                 targets.depth_texture.raw(),
                 targets.depth_view.raw(),
                 draws.len(),
-            );
+            ));
         }
         if matches!(
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] terrain depth_texture=0x{:016x} depth_view=0x{:016x} phase={:?}",
                 targets.depth_texture.raw(),
                 targets.depth_view.raw(),
                 targets.phase,
-            );
+            ));
         }
         if targets.color_attachments.is_empty() {
             return Err(GalError::invalid_argument(
@@ -100,7 +100,7 @@ impl ShaderPackRuntimeExecutor {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] source-pass phase={:?} accepted_draws={} attachments={:?}",
                 targets.phase,
                 accepted_draws.len(),
@@ -112,7 +112,7 @@ impl ShaderPackRuntimeExecutor {
                         attachment.source_slot,
                     ))
                     .collect::<Vec<_>>(),
-            );
+            ));
         }
         let mut draw_state = IndexedDrawState::default();
         for draw in accepted_draws {
@@ -312,10 +312,10 @@ impl ShaderPackRuntimeExecutor {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] indexed-pass writer={} phase={:?} depth_texture=0x{:016x} depth_view=0x{:016x} draws={}",
                 writer, targets.phase, targets.depth_texture.raw(), targets.depth_view.raw(), draws.len(),
-            );
+            ));
         }
         if targets.phase != expected_phase {
             return Err(GalError::invalid_argument(format!(
@@ -423,10 +423,10 @@ impl ShaderPackRuntimeExecutor {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] material-pass phase={:?} depth_texture=0x{:016x} depth_view=0x{:016x} draws={}",
                 targets.phase, targets.depth_texture.raw(), targets.depth_view.raw(), draws.len(),
-            );
+            ));
         }
         if targets.phase != expected_phase {
             return Err(GalError::invalid_argument(format!(

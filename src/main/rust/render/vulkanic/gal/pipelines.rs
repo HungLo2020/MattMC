@@ -265,10 +265,10 @@ impl VulkanicGal {
     /// it will render to.
     pub fn create_graphics_pipeline(&mut self, desc: GraphicsPipelineDesc) -> GalResult<Handle> {
         if trace_label_matches("MATTMC_GAL_TRACE_PIPELINE_LABEL", &desc.label) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC pipeline-depth-trace] label={} depth_format={:?} depth_compare={:?} depth_write={} colors={:?}",
                 desc.label, desc.depth_format, desc.depth_compare, desc.depth_write, desc.color_formats
-            );
+            ));
         }
         self.pipeline_layouts.get(desc.layout)?;
         self.require_shader_stage(desc.vertex_shader, ShaderStage::Vertex)?;

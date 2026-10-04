@@ -1614,13 +1614,33 @@ impl WorldPrimitiveFrontend {
                 .any(|&index| depends_on_camera(&frame.mesh_instances[index])),
             None => frame.mesh_instances.iter().any(depends_on_camera),
         };
-        // Repeated meshes retain build-then-filter ordering. Culled instances
-        // can affect that ordering, so the selected-only identity is not a
-        // sufficient cache key for this uncommon path.
+        // Culled repetitions affect first-seen ordering and translucent batch
+        // boundaries. Cache their complete topology, then filter a copy; the
+        // selected-only identity cannot describe that ordering.
         let repeated_mesh = indices.is_some()
             && mesh_batch_selection_has_repeated_mesh(frame, selection, terrain_only);
-        if camera_dependent || repeated_mesh {
+        if camera_dependent {
             return Ok(Arc::new(build(self)?));
+        }
+        if repeated_mesh {
+            let full_identities = frame.mesh_instances.iter().map(|instance| {
+                if terrain_only {
+                    terrain_batch_instance_key(instance)
+                } else {
+                    mesh_batch_instance_key(instance)
+                }
+            }).collect::<Vec<_>>();
+            let full_batches = self.cached_mesh_batch_plan(
+                frame, color_format, raster_y_direction, g_buffer, selection,
+                &full_identities, terrain_only,
+            )?;
+            let mut batches = full_batches.as_ref().clone();
+            let indices = indices.expect("repeated selected plan has instance indices");
+            for batch in &mut batches {
+                batch.indices.retain(|index| indices.binary_search(index).is_ok());
+            }
+            batches.retain(|batch| !batch.indices.is_empty());
+            return Ok(Arc::new(batches));
         }
         if let Some(entry) = self.mesh_batch_plan_cache.iter().find(|entry| {
             entry.key.color_format == color_format

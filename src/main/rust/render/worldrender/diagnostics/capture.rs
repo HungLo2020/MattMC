@@ -631,9 +631,12 @@ pub(in crate::render::worldrender) struct GameplayAttachmentCapture {
     pub(in crate::render::worldrender) extent: Extent3d,
     pub(in crate::render::worldrender) readback_rows_bottom_up: bool,
     pub(in crate::render::worldrender) final_output_only: bool,
+    pub(in crate::render::worldrender) source_selected: bool,
     pub(in crate::render::worldrender) workload_fingerprint: String,
     /// Immutable sky/fog inputs consumed by this exact selected submission.
     pub(in crate::render::worldrender) sky_fog_receipt: String,
+    /// Exact prepared CPU uniform blocks; published with this completed capture.
+    pub(in crate::render::worldrender) fullscreen_uniform_receipts: BTreeMap<String, String>,
     /// SSAO inputs and pass admission for this exact Rust-owned DH frame.
     /// This is a bounded diagnostic receipt; it contains no backend handles.
     pub(in crate::render::worldrender) ssao_parameters: [f32; 8],
@@ -648,6 +651,10 @@ pub(in crate::render::worldrender) struct GameplayAttachmentCapture {
     pub(in crate::render::worldrender) wolf_inputs: serde_json::Value,
     pub(in crate::render::worldrender) readbacks: BTreeMap<String, Handle>,
     pub(in crate::render::worldrender) readback_formats: BTreeMap<String, TextureFormat>,
+    /// Pack shadow maps can have a different extent from the screen attachments.
+    pub(in crate::render::worldrender) readback_extents: BTreeMap<String, Extent3d>,
+    /// Unproduced optional attachments have no bytes or implicit image state.
+    pub(in crate::render::worldrender) unavailable_attachments: BTreeMap<String, &'static str>,
     pub(in crate::render::worldrender) source_presented_capture: Option<SourceFinalPresentationCapture>,
     /// Frame-local copies used exclusively by the normal-route attachment
     /// diagnostic. They are retained through completion, then destroyed with
@@ -788,6 +795,7 @@ impl GameplayAttachmentCapture {
             // later poses need only the exact renderer-owned final image.
             final_output_only: crate::core::environment::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY")
                 .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE")),
+            source_selected,
             workload_fingerprint: format!(
                 "segments={} crack_quads={} border_quads={} material_quads={} mesh_instances={} lod_instances={} lod_route_selected={} background_enabled={}",
                 frame.segments.len(),
@@ -800,6 +808,7 @@ impl GameplayAttachmentCapture {
                 frame.background.enabled
             ),
             sky_fog_receipt: sky_fog_receipt_json(frame)?,
+            fullscreen_uniform_receipts: BTreeMap::new(),
             ssao_parameters: frame.lod_render_frame.ssao_parameters,
             ssao_pass_appended: false,
             lod_fade_flags: frame.lod_render_frame.flags
@@ -816,6 +825,8 @@ impl GameplayAttachmentCapture {
                 "gpu_readback":false,"capability_admitted":false,"reason":"command observation unavailable"}),
             readbacks: BTreeMap::new(),
             readback_formats: BTreeMap::new(),
+            readback_extents: BTreeMap::new(),
+            unavailable_attachments: BTreeMap::new(),
             source_presented_capture: None,
             normal_presented_textures: Vec::new(),
             transient_gui_passes: Vec::new(),
@@ -975,14 +986,30 @@ impl GameplayAttachmentCapture {
             }
             attachments
         };
+        // Named source stages need not use the compatibility translucency
+        // snapshot. Read it only after a submitted producer or a producer in
+        // this same command stream; initialization commits after submission.
+        let translucent_capture_available = g_buffer.translucent_capture_initialized
+            || ops.iter().any(|op| matches!(op, CommandOp::BeginPass { target, .. }
+                if *target == g_buffer.translucent_capture_target));
         for (name, texture, format) in attachments {
+            if matches!(name, "translucent_capture" | "translucent_capture_depth")
+                && !translucent_capture_available
+            {
+                self.unavailable_attachments.insert(
+                    name.to_string(),
+                    "compatibility translucent snapshot has no submitted or current-frame producer",
+                );
+                continue;
+            }
+            let extent = if name == "shadow_depth" { g_buffer.shadow_extent } else { self.extent };
             let bytes_per_texel = format.copy_bytes_per_texel().ok_or_else(|| {
                 GalError::unsupported_feature(format!(
                     "gameplay attachment {name} uses {format:?}, which has no host-copy contract"
                 ))
             })?;
-            let byte_count = u64::from(self.extent.width)
-                .checked_mul(u64::from(self.extent.height))
+            let byte_count = u64::from(extent.width)
+                .checked_mul(u64::from(extent.height))
                 .and_then(|texels| texels.checked_mul(u64::from(bytes_per_texel)))
                 .ok_or_else(|| {
                     GalError::invalid_argument("gameplay attachment readback size overflows")
@@ -998,6 +1025,7 @@ impl GameplayAttachmentCapture {
             })?;
             self.readbacks.insert(name.to_string(), readback);
             self.readback_formats.insert(name.to_string(), format);
+            self.readback_extents.insert(name.to_string(), extent);
             ops.push(CommandOp::Barrier(texture_barrier(
                 texture,
                 if name == "final_output" {
@@ -1010,13 +1038,13 @@ impl GameplayAttachmentCapture {
             ops.push(CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
                 buffer: readback,
                 buffer_offset: 0,
-                bytes_per_row: self.extent.width * bytes_per_texel,
-                rows_per_image: self.extent.height,
+                bytes_per_row: extent.width * bytes_per_texel,
+                rows_per_image: extent.height,
                 texture,
                 texture_mip: 0,
                 texture_layer: 0,
                 texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                extent: self.extent,
+                extent,
             }));
             ops.push(CommandOp::Barrier(buffer_barrier(
                 readback,
@@ -1412,6 +1440,12 @@ impl GameplayAttachmentCapture {
             })?;
             let mut hashes = Vec::new();
             let mut evidence = Vec::new();
+            for (name, reason) in &self.unavailable_attachments {
+                evidence.push(format!(
+                    "\"{}\":{{\"kind\":\"unavailable\",\"captured\":false,\"reason\":\"{}\"}}",
+                    json_escape(name), json_escape(reason),
+                ));
+            }
             for (name, &buffer) in &self.readbacks {
                 let Some(read) = reads.iter().rev().find(|read| read.buffer == buffer) else {
                     return Err(GalError::backend(format!(
@@ -1419,6 +1453,7 @@ impl GameplayAttachmentCapture {
                     )));
                 };
                 let bytes = &read.bytes;
+                let extent = self.readback_extents.get(name).copied().unwrap_or(self.extent);
                 let format = self.readback_formats.get(name).copied().ok_or_else(|| {
                     GalError::backend(format!(
                         "gameplay attachment dump lost format metadata for {name}"
@@ -1429,8 +1464,8 @@ impl GameplayAttachmentCapture {
                 evidence.push(format!(
                     "\"{name}\":{}",
                     attachment_evidence_json_for_format(
-                        self.extent.width,
-                        self.extent.height,
+                        extent.width,
+                        extent.height,
                         &name,
                         format,
                         bytes,
@@ -1445,12 +1480,12 @@ impl GameplayAttachmentCapture {
                         })?;
                     let mut rgba = depth_attachment_to_grayscale_rgba(bytes);
                     if self.readback_rows_bottom_up {
-                        flip_rgba_rows_in_place(&mut rgba, self.extent.width, self.extent.height)?;
+                        flip_rgba_rows_in_place(&mut rgba, extent.width, extent.height)?;
                     }
                     write_rgba_png(
                         &self.dir.join(format!("attachment-{name}.png")),
-                        self.extent.width,
-                        self.extent.height,
+                        extent.width,
+                        extent.height,
                         &rgba,
                     )?;
                 } else {
@@ -1464,12 +1499,12 @@ impl GameplayAttachmentCapture {
                     }
                     let mut rgba = selected_source_preview_rgba(format, bytes);
                     if self.readback_rows_bottom_up {
-                        flip_rgba_rows_in_place(&mut rgba, self.extent.width, self.extent.height)?;
+                        flip_rgba_rows_in_place(&mut rgba, extent.width, extent.height)?;
                     }
                     write_rgba_png(
                         &self.dir.join(format!("attachment-{name}.png")),
-                        self.extent.width,
-                        self.extent.height,
+                        extent.width,
+                        extent.height,
                         &rgba,
                     )?;
                 }
@@ -1592,8 +1627,27 @@ impl GameplayAttachmentCapture {
                     ))
                 },
             )?;
+            let mut uniform_receipt_files = Vec::new();
+            if !self.fullscreen_uniform_receipts.is_empty() {
+                let relative_dir = format!("source-uniforms-frame-{}", self.frame_id);
+                std::fs::create_dir_all(self.dir.join(&relative_dir)).map_err(|error| {
+                    GalError::backend(format!("failed to create captured uniform receipt dir: {error}"))
+                })?;
+                for (stage, document) in &self.fullscreen_uniform_receipts {
+                    let mut receipt: serde_json::Value = serde_json::from_str(document).map_err(|error| {
+                        GalError::backend(format!("invalid captured uniform receipt: {error}"))
+                    })?;
+                    receipt["correlation_id"] = self.correlation_id.into();
+                    receipt["gal_submission_id"] = submission_id.into();
+                    let relative = format!("{relative_dir}/selected-source-{stage}-uniform-receipt.json");
+                    std::fs::write(self.dir.join(&relative), receipt.to_string()).map_err(|error| {
+                        GalError::backend(format!("failed to write captured uniform receipt: {error}"))
+                    })?;
+                    uniform_receipt_files.push(format!("\"{}\"", json_escape(&relative)));
+                }
+            }
             let manifest = format!(
-                "{{\n  \"artifact_class\":\"rust_vulkan_whole_frame_gameplay_attachments\",\n  \"source\":\"real-gameplay-whole-frame-submit\",\n  \"capture_scope\":\"{}\",\n  \"png_row_origin\":\"top-left\",\n  \"readback_row_origin\":\"{}\",\n  \"synthetic_shader_scene\":false,\n  \"java_iris_participation\":false,\n  \"gameplay_frame_id\":{},\n  \"correlation_id\":{},\n  \"deterministic_rendered_frame_index\":{},\n  \"gal_submission_id\":{},\n  \"vulkan_submission_timeline_value\":{},\n  \"pass_graph_generation\":3,\n  \"shader_resource_generation\":{},\n  \"frame_generation\":{},\n  \"extent\":{{\"width\":{},\"height\":{}}},\n  \"producer_workload_fingerprint\":\"{}\",\n  \"world_mesh_instances\":{},\n  \"world_mesh_batches\":{},\n  \"world_mesh_draws\":{},\n  \"world_lod_instances\":{},\n  \"world_lod_route_selected\":{},\n  \"world_material_quads\":{},\n  \"world_crack_quads\":{},\n  \"world_border_quads\":{},\n  \"final_output_source\":\"selected-source frames mirror the exact Rust-owned final present copy into a frame-local diagnostic target after the acquired-target copy has been recorded; other frames read composite_1\",\n  \"sky_fog_receipt\":\"{}\",\n  \"attachment_hashes\":{{{}}},\n  \"attachment_evidence\":{{{}}},\n  \"attachment_files\":[{}]\n}}\n",
+                "{{\n  \"artifact_class\":\"rust_vulkan_whole_frame_gameplay_attachments\",\n  \"source\":\"real-gameplay-whole-frame-submit\",\n  \"capture_scope\":\"{}\",\n  \"png_row_origin\":\"top-left\",\n  \"readback_row_origin\":\"{}\",\n  \"synthetic_shader_scene\":false,\n  \"java_iris_participation\":false,\n  \"gameplay_frame_id\":{},\n  \"correlation_id\":{},\n  \"deterministic_rendered_frame_index\":{},\n  \"gal_submission_id\":{},\n  \"vulkan_submission_timeline_value\":{},\n  \"pass_graph_generation\":3,\n  \"shader_resource_generation\":{},\n  \"frame_generation\":{},\n  \"extent\":{{\"width\":{},\"height\":{}}},\n  \"producer_workload_fingerprint\":\"{}\",\n  \"world_mesh_instances\":{},\n  \"world_mesh_batches\":{},\n  \"world_mesh_draws\":{},\n  \"world_lod_instances\":{},\n  \"world_lod_route_selected\":{},\n  \"world_material_quads\":{},\n  \"world_crack_quads\":{},\n  \"world_border_quads\":{},\n  \"final_output_source\":\"selected-source frames mirror the exact Rust-owned final present copy into a frame-local diagnostic target after the acquired-target copy has been recorded; other frames read composite_1\",\n  \"sky_fog_receipt\":\"{}\",\n  \"source_uniform_receipts\":[{}],\n  \"attachment_hashes\":{{{}}},\n  \"attachment_evidence\":{{{}}},\n  \"attachment_files\":[{}]\n}}\n",
                 gameplay_attachment_capture_scope(
                     self.final_output_only,
                     self.g_buffer_attachments_available,
@@ -1624,6 +1678,7 @@ impl GameplayAttachmentCapture {
                 stats.crack_quad_count,
                 stats.border_quad_count,
                 sky_fog_receipt_name,
+                uniform_receipt_files.join(","),
                 hashes.join(","),
                 evidence.join(","),
                 attachment_files

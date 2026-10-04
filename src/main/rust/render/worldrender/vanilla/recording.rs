@@ -2899,9 +2899,9 @@ impl WorldPrimitiveFrontend {
             static TRACES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             if TRACES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 4 {
                 for instance in &hand_instances {
-                    eprintln!("standard-foil.hand-input frame={} mesh={} foil={:?} model={:?} view={:?} projection={:?}",
+                    crate::core::console::stderr(format_args!("standard-foil.hand-input frame={} mesh={} foil={:?} model={:?} view={:?} projection={:?}",
                         parent_frame.frame_id, instance.mesh_key, instance.item_foil, instance.transform,
-                        hand.model_view_matrix, hand.projection_matrix);
+                        hand.model_view_matrix, hand.projection_matrix));
                 }
             }
         }

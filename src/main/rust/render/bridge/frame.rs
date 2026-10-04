@@ -226,10 +226,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
             // the frame that was just queued for presentation.
             context.gal.retire_completed()?;
             if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
-                println!(
+                crate::core::console::stdout(format_args!(
                     "vulkan.submission.present-retire frame={} waited={} retired_through={}",
                     presented.frame.0, request.wait_submission_id, presented.completed_submission.0,
-                );
+                ));
             }
             Ok(FfiFramePresentResult {
                 status: StatusCode::Ok as i32,

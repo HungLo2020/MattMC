@@ -13,8 +13,12 @@ each module there has a short README with its own file map.
   without breaking Java.
 - [Render Verification](RENDER-VERIFICATION.md): tests, Frozen image
   comparisons, real-config sessions and A/B performance checks.
+- [Shader terrain profiling](SHADER-TERRAIN-PROFILING.md): compare moving shader
+  workloads and isolate batching and Java allocation costs.
 - [RenderDoc input observations](RENDERDOC-INPUTS.md): capture Frozen's actual
   OpenGL vertex inputs without changing its renderer or source files.
+- [Underground shader lighting checks](UNDERGROUND-SHADER-CHECKS.md): prepare
+  equivalent cave captures and distinguish fog, shadow and volumetric inputs.
 - [Entity shadow ordering checks](ENTITY-SHADOW-CHECKS.md): exercise typed orb
   placement boundaries through CPU capture and copied-world shader sessions.
 - [Terrain movement checks](TERRAIN-MOVEMENT-CHECKS.md): use ordinary isolated

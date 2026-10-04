@@ -4,7 +4,7 @@ use super::*;
 
 pub(super) fn submission_trace(message: &str) {
     if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
-        eprintln!("{message}");
+        crate::core::console::stderr(format_args!("{message}"));
     }
 }
 

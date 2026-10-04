@@ -142,6 +142,7 @@ impl WorldPrimitiveFrontend {
             return Ok(());
         }
         if let Some(previous) = self.shader_runtime.take() {
+            self.release_source_color_consumers(gal);
             // The LOD pass caches resource sets that reference the runtime's
             // lightmap view. Runtime replacement owns that view's retirement,
             // so remove its consumers before destroying the previous runtime.
@@ -1604,13 +1605,13 @@ impl WorldPrimitiveFrontend {
             return;
         }
         match &outcome {
-            Some(text) => eprintln!(
+            Some(text) => crate::core::console::stderr(format_args!(
                 "[MattMC shaders] frame {} shader route {}",
                 frame.frame_id,
                 text
-            ),
+            )),
             None if self.last_reported_shader_route_outcome.is_some() => {
-                eprintln!("[MattMC shaders] frame {} shader route off", frame.frame_id)
+                crate::core::console::stderr(format_args!("[MattMC shaders] frame {} shader route off", frame.frame_id))
             }
             None => {}
         }

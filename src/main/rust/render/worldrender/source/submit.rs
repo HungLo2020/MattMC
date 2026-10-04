@@ -861,13 +861,13 @@ impl WorldPrimitiveFrontend {
             &mesh_identities,
             true,
         );
-        let shadow_indices = self.source_shadow_terrain_instance_indices(
+        let shadow_indices = self.source_shadow_supplement_instance_indices(
             &frame, programs.opaque.shader_pack_generation,
         )?;
         let shadow_identities = shadow_indices.iter().map(|&index| mesh_identities[index].clone()).collect::<Vec<_>>();
         let shadow_batches = self.cached_mesh_batch_plan_selected(
             &frame, color_format, RasterYDirection::Up, true,
-            MeshBatchSelection::ShadowOnly, &shadow_identities, true, Some(&shadow_indices),
+            MeshBatchSelection::ShadowSupplement, &shadow_identities, true, Some(&shadow_indices),
         );
         self.mesh_batch_identity_scratch = mesh_identities;
         let (static_batches, shadow_batches) = (static_batches?, shadow_batches?);
@@ -1175,9 +1175,16 @@ impl WorldPrimitiveFrontend {
                 distant_horizons.depth_targets.distant_depth_before_translucency_texture,
             )
         });
-        if gameplay_attachment_capture.is_some() {
+        if let Some(capture) = gameplay_attachment_capture.as_mut() {
+            self.retain_captured_fullscreen_uniform_receipts(
+                &frame,
+                capture,
+                plan.fullscreen_consumers.iter().map(|consumer| {
+                    (consumer.program.as_ref(), consumer.frame.scalar_uniforms.as_slice())
+                }),
+            );
             for observation in &self.latest_atlas_animation_observations {
-                eprintln!("{observation}");
+                crate::core::console::stderr(format_args!("{observation}"));
             }
         }
         let terrain_primary = plan

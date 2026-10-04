@@ -198,8 +198,8 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         world_stats.profile.gal.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::FINAL_OUTPUT)],
                     ));
                     if let Some((parents, children)) = tiled_receipt {
-                        eprintln!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",
-                            world_frame_id, parents, children);
+                        crate::core::console::stderr(format_args!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",
+                            world_frame_id, parents, children));
                     }
                     world_stats.profile.ffi_decode_nanos = ffi_decode_nanos;
                     world_stats.profile.whole_frame_native_total_nanos = frontend_elapsed_nanos;
@@ -248,7 +248,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
 /// work from stale-target retirement without changing rendering behavior.
 fn whole_frame_trace(message: &str) {
     if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
-        eprintln!("{message}");
+        crate::core::console::stderr(format_args!("{message}"));
     }
 }
 

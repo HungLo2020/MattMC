@@ -240,8 +240,8 @@ pub(super) fn trace_prepared_item_vertices(
             ]
         })
         .collect();
-    eprintln!("[gui.mesh.vertex-trace] {{\"layer\":{},\"material\":\"{:?}\",\"bounds\":{:?},\"extent\":{:?},\"matrix\":{:?},\"vertices\":{:?}}}",
-        batch.layer_index,batch.material_mode,batch.bounds,extent,matrix,copied);
+    crate::core::console::stderr(format_args!("[gui.mesh.vertex-trace] {{\"layer\":{},\"material\":\"{:?}\",\"bounds\":{:?},\"extent\":{:?},\"matrix\":{:?},\"vertices\":{:?}}}",
+        batch.layer_index,batch.material_mode,batch.bounds,extent,matrix,copied));
 }
 
 pub(super) fn parse_vertex_trace_selector(text: &str) -> Option<[i32; 2]> {

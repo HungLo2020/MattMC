@@ -233,11 +233,11 @@ impl SubmissionLowerer {
     ) -> GalResult<()> {
         let trace_submissions = trace_submissions_enabled();
         if trace_submissions {
-            println!(
+            trace::stdout(format_args!(
                 "vulkan.encode.batch label={} lists={}",
                 sanitize_label(&batch.label),
                 batch.command_lists.len()
-            );
+            ));
         }
         let alloc_started = std::time::Instant::now();
         let timestamp_set = self.allocate_timestamp_set();
@@ -339,11 +339,11 @@ impl SubmissionLowerer {
                 }
                 if let Some(list) = batch.command_lists.get(index) {
                     if trace_submissions {
-                        println!(
+                        trace::stdout(format_args!(
                             "vulkan.encode.list label={} ops={}",
                             sanitize_label(&list.label),
                             list.operations.len()
-                        );
+                        ));
                     }
                     unsafe {
                         self.context.begin_label(
@@ -398,11 +398,11 @@ impl SubmissionLowerer {
                             list.operations.get(op_index + 1),
                         );
                         if trace_submissions {
-                            println!(
+                            trace::stdout(format_args!(
                                 "vulkan.encode.begin cb=0x{:016x} op={}",
                                 command_buffer.as_raw(),
                                 command_op_kind(op)
-                            );
+                            ));
                         }
                         self.encode_op(
                             objects,
@@ -412,11 +412,11 @@ impl SubmissionLowerer {
                             following_publication_barrier,
                         )?;
                         if trace_submissions {
-                            println!(
+                            trace::stdout(format_args!(
                                 "vulkan.encode.end cb=0x{:016x} op={}",
                                 command_buffer.as_raw(),
                                 command_op_kind(op)
-                            );
+                            ));
                         }
                         op_index += 1;
                     }
@@ -610,7 +610,7 @@ impl SubmissionLowerer {
                 Err(error) => format!("gpu_sample=error gpu_error={error:?} gpu_incomplete_images=unknown"),
             };
             let sample_wall_end_ns = timeline::wall_time_ns();
-            println!(
+            trace::stdout(format_args!(
                 "vulkan.submission.ownership id={} pending={} in_flight={} live_command_buffers={} allocated={} freed={} {} gpu_sample_wall_start_ns={} gpu_sample_wall_end_ns={}",
                 id.0,
                 self.pending.len(),
@@ -621,7 +621,7 @@ impl SubmissionLowerer {
                 gpu_sample,
                 sample_wall_start_ns,
                 sample_wall_end_ns,
-            );
+            ));
         }
         Ok(())
     }
@@ -1143,7 +1143,7 @@ impl SubmissionLowerer {
                 if trace_barrier_label_filter()
                     .is_some_and(|filter| texture.label.contains(filter))
                 {
-                    println!(
+                    trace::stdout(format_args!(
                         "vulkan.barrier resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
                         barrier.resource.raw(),
                         texture_handle.raw(),
@@ -1154,7 +1154,7 @@ impl SubmissionLowerer {
                         range.mip_count,
                         range.base_layer,
                         range.layer_count,
-                    );
+                    ));
                 }
                 image_barriers.push(
                     vk::ImageMemoryBarrier2::default()
@@ -1234,12 +1234,12 @@ impl SubmissionLowerer {
                     depth_stencil,
                 } => {
                     if trace_submissions_enabled() {
-                        println!(
+                        trace::stdout(format_args!(
                             "vulkan.begin-pass target=0x{:016x} colors={} depth={}",
                             target.raw(),
                             colors.len(),
                             depth_stencil.is_some()
-                        );
+                        ));
                     }
                     let pass_object = objects.render_pass(*pass)?;
                     let timestamp_pass = TimingSpan::from_tag(pass_object.profile_tag);
@@ -1563,13 +1563,13 @@ impl SubmissionLowerer {
                     dynamic_offsets,
                 } => {
                     if trace_resource_binding_ops_enabled() {
-                        eprintln!(
+                        trace::stderr(format_args!(
                             "vulkan.bind-resource-set layout={:?} set_index={} set={:?} dynamic_offsets={:?}",
                             pipeline_layout,
                             set_index,
                             set,
                             dynamic_offsets,
-                        );
+                        ));
                     }
                     let layout = objects.pipeline_layout(*pipeline_layout)?;
                     let set = objects.resource_set(*set)?;
@@ -1750,7 +1750,7 @@ impl SubmissionLowerer {
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
                     if trace_resource_binding_ops_enabled() {
-                        eprintln!(
+                        trace::stderr(format_args!(
                             "vulkan.copy-buffer-to-texture buffer={:?} texture={:?} label={} offset={} row={} rows={} extent={}x{}x{}",
                             region.buffer,
                             region.texture,
@@ -1761,7 +1761,7 @@ impl SubmissionLowerer {
                             region.extent.width,
                             region.extent.height,
                             region.extent.depth,
-                        );
+                        ));
                     }
                     let copy =
                         buffer_image_copy(region, texture.aspect, texture.copy_bytes_per_texel);
@@ -2304,13 +2304,13 @@ impl SubmissionLowerer {
                 std::env::var("MATTMC_RUST_VULKAN_SCOPE_TIMESTAMPS").as_deref(),
                 Ok("1" | "true" | "TRUE")
             ) {
-                println!(
+                trace::stdout(format_args!(
                     "vulkan.scope-timestamps submission={} scope_nanos={:?} frame_total_nanos={} timestamp_period={} values={values:?} ready={ready:?}",
                     complete.id.0,
                     result.scope_nanos,
                     result.frame_total_nanos,
                     self.context.timestamp_period,
-                );
+                ));
             }
         }
         self.apply_gpu_timestamp_result(result);
@@ -2344,7 +2344,7 @@ impl SubmissionLowerer {
                         *total = total.saturating_add(value);
                     }
                 }
-                Ok(values) => println!(
+                Ok(values) => trace::stdout(format_args!(
                     "vulkan.pipeline-pass-stats submission={} pass={} input_vertices={} input_primitives={} vertex_invocations={} clipping_invocations={} clipping_primitives={} fragment_invocations={} compute_invocations={}",
                     complete.id.0,
                     kind,
@@ -2355,17 +2355,17 @@ impl SubmissionLowerer {
                     values.values[4],
                     values.values[5],
                     values.values[6],
-                ),
+                )),
                 Err(vk::Result::NOT_READY) => totals_ready = false,
-                Err(error) => eprintln!(
+                Err(error) => trace::stderr(format_args!(
                     "vulkan.pipeline-pass-stats read failed submission={} pass={} error={error:?}",
                     complete.id.0,
                     kind,
-                ),
+                )),
             }
         }
         if aggregate && totals_ready {
-            println!(
+            trace::stdout(format_args!(
                 "vulkan.pipeline-stats submission={} input_vertices={} input_primitives={} vertex_invocations={} clipping_invocations={} clipping_primitives={} fragment_invocations={} compute_invocations={}",
                 complete.id.0,
                 totals.values[0],
@@ -2375,7 +2375,7 @@ impl SubmissionLowerer {
                 totals.values[4],
                 totals.values[5],
                 totals.values[6],
-            );
+            ));
         }
     }
 
@@ -3440,7 +3440,7 @@ fn wait_timeline(context: &VulkanContext, id: SubmissionId) -> GalResult<()> {
 
 fn stdout_trace(message: &str) {
     if trace_submissions_enabled() {
-        println!("{message}");
+        trace::stdout(format_args!("{message}"));
     }
 }
 

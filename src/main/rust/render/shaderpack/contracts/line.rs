@@ -148,7 +148,10 @@ pub fn prepare_line_source_program(
 ) -> GalResult<crate::render::shaderpack::programs::LoweredTexturedMaterialSourceProgram> {
     let contract = derive_line_pass_contract(source, scope)?;
     let lowered = lower_line_source_pair(source, &contract)?;
-    let declarations = TerrainSourceResourceBindings::from_source(source)?;
+    let fragment = preprocess_artifact_with_runtime_options(
+        source, &contract.source_summary.fragment_entry, &[],
+    )?;
+    let declarations = TerrainSourceResourceBindings::from_preprocessed_stage(source, &fragment)?;
     let bindings: TerrainSourceOpaqueResourceBindingPlan = lowered
         .opaque_resource_contract()
         .bind_semantic_roles(&declarations)?;
