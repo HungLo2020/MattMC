@@ -8,22 +8,22 @@ All IDs below use the `minecraft:` namespace. One Banner item places either form
 
 | Base color | Inventory / standing ID | Wall ID | Recipe and shared loot |
 | --- | --- | --- | --- |
-| White | `white_banner` | `white_wall_banner` | [Recipe][recipe-white-banner] · [Loot][loot-white-banner] |
-| Orange | `orange_banner` | `orange_wall_banner` | [Recipe][recipe-orange-banner] · [Loot][loot-orange-banner] |
-| Magenta | `magenta_banner` | `magenta_wall_banner` | [Recipe][recipe-magenta-banner] · [Loot][loot-magenta-banner] |
-| Light Blue | `light_blue_banner` | `light_blue_wall_banner` | [Recipe][recipe-light-blue-banner] · [Loot][loot-light-blue-banner] |
-| Yellow | `yellow_banner` | `yellow_wall_banner` | [Recipe][recipe-yellow-banner] · [Loot][loot-yellow-banner] |
-| Lime | `lime_banner` | `lime_wall_banner` | [Recipe][recipe-lime-banner] · [Loot][loot-lime-banner] |
-| Pink | `pink_banner` | `pink_wall_banner` | [Recipe][recipe-pink-banner] · [Loot][loot-pink-banner] |
-| Gray | `gray_banner` | `gray_wall_banner` | [Recipe][recipe-gray-banner] · [Loot][loot-gray-banner] |
-| Light Gray | `light_gray_banner` | `light_gray_wall_banner` | [Recipe][recipe-light-gray-banner] · [Loot][loot-light-gray-banner] |
-| Cyan | `cyan_banner` | `cyan_wall_banner` | [Recipe][recipe-cyan-banner] · [Loot][loot-cyan-banner] |
-| Purple | `purple_banner` | `purple_wall_banner` | [Recipe][recipe-purple-banner] · [Loot][loot-purple-banner] |
-| Blue | `blue_banner` | `blue_wall_banner` | [Recipe][recipe-blue-banner] · [Loot][loot-blue-banner] |
-| Brown | `brown_banner` | `brown_wall_banner` | [Recipe][recipe-brown-banner] · [Loot][loot-brown-banner] |
-| Green | `green_banner` | `green_wall_banner` | [Recipe][recipe-green-banner] · [Loot][loot-green-banner] |
-| Red | `red_banner` | `red_wall_banner` | [Recipe][recipe-red-banner] · [Loot][loot-red-banner] |
-| Black | `black_banner` | `black_wall_banner` | [Recipe][recipe-black-banner] · [Loot][loot-black-banner] |
+| [White](../items/WhiteBanner.md) | `white_banner` | `white_wall_banner` | [Recipe][recipe-white-banner] · [Loot][loot-white-banner] |
+| [Orange](../items/OrangeBanner.md) | `orange_banner` | `orange_wall_banner` | [Recipe][recipe-orange-banner] · [Loot][loot-orange-banner] |
+| [Magenta](../items/MagentaBanner.md) | `magenta_banner` | `magenta_wall_banner` | [Recipe][recipe-magenta-banner] · [Loot][loot-magenta-banner] |
+| [Light Blue](../items/LightBlueBanner.md) | `light_blue_banner` | `light_blue_wall_banner` | [Recipe][recipe-light-blue-banner] · [Loot][loot-light-blue-banner] |
+| [Yellow](../items/YellowBanner.md) | `yellow_banner` | `yellow_wall_banner` | [Recipe][recipe-yellow-banner] · [Loot][loot-yellow-banner] |
+| [Lime](../items/LimeBanner.md) | `lime_banner` | `lime_wall_banner` | [Recipe][recipe-lime-banner] · [Loot][loot-lime-banner] |
+| [Pink](../items/PinkBanner.md) | `pink_banner` | `pink_wall_banner` | [Recipe][recipe-pink-banner] · [Loot][loot-pink-banner] |
+| [Gray](../items/GrayBanner.md) | `gray_banner` | `gray_wall_banner` | [Recipe][recipe-gray-banner] · [Loot][loot-gray-banner] |
+| [Light Gray](../items/LightGrayBanner.md) | `light_gray_banner` | `light_gray_wall_banner` | [Recipe][recipe-light-gray-banner] · [Loot][loot-light-gray-banner] |
+| [Cyan](../items/CyanBanner.md) | `cyan_banner` | `cyan_wall_banner` | [Recipe][recipe-cyan-banner] · [Loot][loot-cyan-banner] |
+| [Purple](../items/PurpleBanner.md) | `purple_banner` | `purple_wall_banner` | [Recipe][recipe-purple-banner] · [Loot][loot-purple-banner] |
+| [Blue](../items/BlueBanner.md) | `blue_banner` | `blue_wall_banner` | [Recipe][recipe-blue-banner] · [Loot][loot-blue-banner] |
+| [Brown](../items/BrownBanner.md) | `brown_banner` | `brown_wall_banner` | [Recipe][recipe-brown-banner] · [Loot][loot-brown-banner] |
+| [Green](../items/GreenBanner.md) | `green_banner` | `green_wall_banner` | [Recipe][recipe-green-banner] · [Loot][loot-green-banner] |
+| [Red](../items/RedBanner.md) | `red_banner` | `red_wall_banner` | [Recipe][recipe-red-banner] · [Loot][loot-red-banner] |
+| [Black](../items/BlackBanner.md) | `black_banner` | `black_wall_banner` | [Recipe][recipe-black-banner] · [Loot][loot-black-banner] |
 
 At a crafting table, put **six Wool blocks of the same color in two full rows**, with **one Stick centered below**, to make **one Banner** of that base color. The recipes name the exact Wool item, so mixed colors are not interchangeable. See [Wool and Carpet](WoolAndCarpet.md) for making and obtaining colored Wool.
 
