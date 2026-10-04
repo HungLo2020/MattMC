@@ -1,12 +1,30 @@
 # Shotgun Ammo Extended Mag III
 
+Shotgun Ammo Extended Mag III selects a level-3 magazine capacity on compatible TaCZ firearms. Check the gun-specific results below before choosing a tier.
+
 ## Obtaining
 
-Shotgun Ammo Extended Mag III can be obtained from the Creative Menu. It is registered as `minecraft:shotgun_extended_mag_3`.
+Craft **one Shotgun Ammo Extended Mag III** at the [TaCZ Attachment Table](../blocks/TaCZWorkbenches.md#attachment-table), in **Extended Mag**. Carry the following materials for one craft. [Recipe][recipe] · [Recipe group][index] · [Table groups][groups]
+
+| Material | Amount |
+| --- | ---: |
+| [Iron Ingots](IronIngot.md) | 24 |
+| [Gold Ingots](GoldIngot.md) | 5 |
+| [Lapis Lazuli](LapisLazuli.md) | 8 |
+
+This recipe is crafted directly from materials; it does not require a lower-tier magazine. The [workbench guide](../blocks/TaCZWorkbenches.md#using-a-workbench) explains the shared crafting controls and inventory handling. [Craft transaction][craft]
+
+It is registered as `minecraft:shotgun_extended_mag_3` and also has a Creative Menu entry. The [inventory item browser](../mechanics/InventoryBrowser.md#mode-and-permission-limits) is visible in Survival, but its catalog does not grant ordinary Survival item insertion. Use the recipe above to craft it in Survival. [Registration][registration] · [Creative entries][creative]
 
 ## Usage
 
-Shotgun Ammo Extended Mag III is a TaCZ extended mag attachment. Install it through the gun refit screen on compatible firearms.
+Carry the attachment, hold a compatible gun in your **main hand**, and open **Refit** with **Z** by default. Select **Extended Mag** and choose the carried attachment. Follow [Refitting attachments](../mechanics/TaCZFirearms.md#refitting-attachments) for the full installation, replacement, and **Unload** procedure. [Default key][keys] · [Refit opening][refit-input] · [Server installation][refit-server]
+
+Only one extended magazine occupies the slot, so tiers do not stack. Fitting the attachment does **not** add loaded ammunition. Press **R** by default to reload after increasing capacity, and keep holding the gun until the reload completes. See [Magazine, reserve, and reloading](../mechanics/TaCZFirearms.md#magazine-reserve-and-reloading). [Slot storage][slot-storage] · [Reload completion][reload-gate] · [Reload consumption][reload]
+
+All three compatible guns use [12 Gauge Bullets](12GaugeBullet.md), which stack to **36**. One full stack is enough to fill any capacity shown here, but Survival reloads take ammunition from the **first matching stack only**. A small first stack can leave the gun partly loaded even when more shells are carried elsewhere; combine stacks or reload again. Creative reloads supply missing rounds without consuming reserve ammunition. [Ammunition definitions][ammo-stacks] · [Stack registration][ammo-registration] · [Reload consumption][reload]
+
+The reload wait is based on the magazine space missing before reloading, even when the first ammunition stack cannot fill that space. Larger capacities can therefore mean a longer wait. Empty versus partly loaded state also matters; the SPAS-12 additionally uses its fire mode. Rounds are still added at completion. [Reload timing][reload-timing] · [Starting the countdown][reload-countdown] · [Reload completion][reload-gate]
 
 ## Properties
 
@@ -14,14 +32,69 @@ Shotgun Ammo Extended Mag III is a TaCZ extended mag attachment. Install it thro
 | --- | --- |
 | Attachment type | Extended Mag |
 | Attachment level | 3 |
+| Maximum stack size | 1 |
 | Compatible guns | [M1014 Battle Shotgun](M1014BattleShotgun.md), [M870](M870.md), [SPAS-12 Multi-purpose Shotgun](SPAS12MultipurposeShotgun.md) |
+
+[Attachment level][tier] · [Item registration][registration] · [Gun fit check][fit]
+
+**These do not fit every shotgun.** The [AA12 Shotgun](AA12Shotgun.md) uses [Heavy Ammo Extended Mag III](HeavyAmmoExtendedMagIII.md), while [DB-4 Ursus](DB4Ursus.md), [DB-2 Durin](DB2Durin.md), and [Winchester Model 1897](WinchesterModel1897.md) do not accept extended magazines. [AA12 fit][gun-aa12] · [Double-barrel fit][double-barrels] · [Winchester fit][gun-m1897]
 
 ## Behavior
 
-Attachments can alter gun handling, capacity, sighting, or ballistic behavior depending on their type and the firearm that accepts them.
+Level 3 selects the gun's configured tier-III capacity; it does not add a fixed number of rounds to every gun. **Base** below means no extended magazine is installed. These are magazine capacities in rounds, not rounds supplied by installing the attachment. [Capacity lookup][magazine] · [Level selection][level-selection]
 
-Extended magazine attachments use level 3 to select the corresponding larger magazine size from each compatible gun.
+| Compatible gun | Base | With this attachment | Source |
+| --- | ---: | ---: | --- |
+| [M1014 Battle Shotgun](M1014BattleShotgun.md) | 6 | 12 | [Definition][gun-m1014] |
+| [M870](M870.md) | 5 | 8 | [Definition][gun-m870] |
+| [SPAS-12 Multi-purpose Shotgun](SPAS12MultipurposeShotgun.md) | 5 | 8 | [Definition][gun-spas_12] |
+
+Compare the shotgun magazine tiers: [I](ShotgunAmmoExtendedMagI.md), [II](ShotgunAmmoExtendedMagII.md), **III**.
+
+**Reducing capacity can lose loaded ammunition.** Before replacing or removing a magazine, use up rounds above the capacity you will switch to. Refitting leaves the stored loaded count unchanged. The next shot subtracts one round and then caps the remainder at the new capacity, discarding any excess without returning it to your inventory. Reload cannot start while the loaded count is already at or above capacity. [Attachment changes][refit-storage] · [Ammo limit][magazine] · [Shot consumption][shot] · [Reload check][reload-gate]
 
 ## Notes
 
-* This item is part of the integrated TaCZ firearms system.
+- This item is part of the integrated TaCZ firearms system.
+- Compatibility requires both the Extended Mag category and this exact attachment in the gun's accepted list; the Shotgun name or ammunition caliber alone is not enough. [Gun fit check][fit]
+- Imported weight and aiming fields are not treated here as verified gameplay penalties. The active attachment profile path reads recoil modifiers, which this magazine's profile does not provide. [Attachment profile][profile] · [Profile consumer][profile-loader]
+- The loose attachment's English tooltip displays **Capacity: 33 rounds** for this tier. That fixed label does not determine a gun's capacity; use the table above or the fitted gun's ammunition tooltip. [Attachment tooltip][attachment-tooltip] · [English labels][tooltip-labels] · [Gun tooltip][gun-tooltip]
+
+## Sources and verification
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. The bundled recipe, active workbench loader and group, registered attachment level, gun-specific fit checks, capacity lookup, refit storage, ammunition stack limits, and reload/firing consumers were checked. This is **source review**, not an in-game crafting, refitting, reloading, or combat test. The results describe this integrated snapshot. [Recipe loading][loader]
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L2724-L2740
+[loader]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/crafting/TaczWorkbenchRecipe.java#L108-L174
+[craft]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/crafting/TaczWorkbenchRecipe.java#L42-L68
+[groups]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/inventory/TaczWorkbenchMenu.java#L151-L184
+[creative]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1663-L1671
+[fit]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L54-L66
+[refit-server]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java#L2227-L2266
+[refit-storage]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczRefitGun.java#L28-L48
+[slot-storage]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczRefitGun.java#L61-L80
+[magazine]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L308-L330
+[level-selection]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L215-L216
+[reload]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L261-L297
+[reload-gate]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L184-L218
+[shot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L146-L181
+[keys]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczKeyMappings.java#L13-L21
+[refit-input]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczClientInputHandler.java#L36-L46
+[profile-loader]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L285-L329
+[attachment-tooltip]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczAttachmentItem.java#L36-L41
+[tooltip-labels]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/assets/minecraft/lang/en_us.json#L8256-L8259
+[gun-tooltip]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L242-L250
+[ammo-registration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L2716-L2721
+[ammo-stacks]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L78-L91
+[recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipes/attachments/shotgun_extended_mag_3.json#L1-L27
+[index]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/index/attachments/shotgun_extended_mag_3.json#L1-L7
+[tier]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L176
+[profile]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/data/attachments/shotgun_extended_mag_3_data.json#L1-L9
+[gun-m1014]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L40
+[gun-m870]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L49
+[gun-spas_12]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L64
+[reload-timing]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunReloadTimings.java#L7-L67
+[reload-countdown]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L3195-L3204
+[gun-aa12]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L11
+[double-barrels]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L17-L18
+[gun-m1897]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L33
