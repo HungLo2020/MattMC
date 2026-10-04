@@ -103,12 +103,12 @@ An infested block can resemble ordinary masonry but release a **[Silverfish](../
 
 | Infested ID | Silk Touch output |
 | --- | --- |
-| `minecraft:infested_stone` | 1 ordinary Stone |
-| `minecraft:infested_cobblestone` | 1 ordinary Cobblestone |
-| `minecraft:infested_stone_bricks` | 1 ordinary Stone Bricks |
-| `minecraft:infested_mossy_stone_bricks` | 1 ordinary Mossy Stone Bricks |
-| `minecraft:infested_cracked_stone_bricks` | 1 ordinary Cracked Stone Bricks |
-| `minecraft:infested_chiseled_stone_bricks` | 1 ordinary Chiseled Stone Bricks |
+| [`minecraft:infested_stone`](../items/InfestedStone.md) | 1 ordinary Stone |
+| [`minecraft:infested_cobblestone`](../items/InfestedCobblestone.md) | 1 ordinary Cobblestone |
+| [`minecraft:infested_stone_bricks`](../items/InfestedStoneBricks.md) | 1 ordinary Stone Bricks |
+| [`minecraft:infested_mossy_stone_bricks`](../items/InfestedMossyStoneBricks.md) | 1 ordinary Mossy Stone Bricks |
+| [`minecraft:infested_cracked_stone_bricks`](../items/InfestedCrackedStoneBricks.md) | 1 ordinary Cracked Stone Bricks |
+| [`minecraft:infested_chiseled_stone_bricks`](../items/InfestedChiseledStoneBricks.md) | 1 ordinary Chiseled Stone Bricks |
 
 Without Silk Touch these loot tables give **no block item**, and the active break callback spawns a Silverfish when `doTileDrops` is enabled. **Silk Touch suppresses the Silverfish and gives the ordinary host block**, never the infested item. The spawn suppression uses an enchantment tag containing Silk Touch in the bundled data. Ordinary destructive explosions also reach that break callback with no enchanted tool. [Infested behavior][infested] · [Suppression tag][prevent-infestation] · [Exact loot][loot-infested-stone] [loot-infested-cobblestone][] [loot-infested-stone-bricks][] [loot-infested-mossy-stone-bricks][] [loot-infested-cracked-stone-bricks][] [loot-infested-chiseled-stone-bricks] · [Mining dispatch][break-dispatch] [block-destroy][] [block-drops][] · [Explosion callback][properties]
 

@@ -23,7 +23,7 @@ Use an unbroken axe on it to make **[Stripped Acacia Wood](StrippedAcaciaWood.md
 ## Notes
 
 * Item and placed-block ID: `minecraft:acacia_wood`. [Item registration][item] · [Block registration][block]
-* Available in the **Building Blocks** Creative tab. [Creative entry][creative]
+* Registered in the **Building Blocks** Creative category, which supplies the [inventory browser's catalog](../mechanics/InventoryBrowser.md#which-items-appear). [Creative entry][creative]
 * Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. No in-game crafting, mining, rendering, or fire test was run. Resource packs can change its appearance; data packs and server settings can change recipes, loot, and fire behavior.
 
 [model]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/assets/minecraft/models/block/acacia_wood.json

@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-**Infested Deepslate is available in the Creative Menu**, but mining does not return the infested item. No bundled crafting, smelting or stonecutting recipe produces it. [Creative entry]
+**Infested Deepslate is listed in the Functional Blocks catalog category.** Use the [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) in Creative mode to request it; ordinary Survival insertion requests are skipped. Mining does not return the infested item. No bundled crafting, smelting or stonecutting recipe produces it. [Creative entry]
 
 **Without Silk Touch**, breaking it drops no block item. **With Silk Touch**, it drops **1 ordinary [Deepslate](Deepslate.md)**, never Infested Deepslate. This block has no correct-tool requirement. [Drop table] · [Block registration] See the [collection and infestation guide](../blocks/Deepslate.md#infested-deepslate).
 

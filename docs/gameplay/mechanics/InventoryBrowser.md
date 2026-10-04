@@ -25,7 +25,7 @@ The gate tests the server ability, not only the displayed game-mode name. Modifi
 
 ## Which items appear
 
-The browser combines **category-tab display entries**, removing duplicate stacks with identical items and components. It does not simply enumerate every registered item. An item can therefore be registered but absent from this browser. A block without any inventory-item registration is another separate case. [Category-list assembly][list]
+The browser combines **category-tab display entries**, removing duplicate stacks with identical items and components. Category labels on item pages identify the registered groups that feed this combined catalog; use the panel's displayed-name search to find an item. It does not simply enumerate every registered item. An item can therefore be registered but absent from this browser. A block without any inventory-item registration is another separate case. [Category-list assembly][list]
 
 **Operator-category entries are permission-gated.** The tab builder receives `canUseGameMasterBlocks`, which requires both the instant-build ability and permission level **2 or higher**. Its operator list is added only when that permission flag is true. Ordinary listed building materials or ingredients do not acquire that gate merely because they lack a crafting recipe. [Permission passed to tabs][list] · [Player gate][permissions] · [Operator category][operator]
 
