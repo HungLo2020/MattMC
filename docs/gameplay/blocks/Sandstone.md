@@ -34,16 +34,21 @@ Hardness is not a measured breaking time. Tool speed and conditions affect the t
 
 ## Crafting finishes and shapes
 
-These instructions apply separately to either color. Use matching full blocks and slabs; the checked recipes do not recolor one family into the other.
+These instructions apply separately to the pale and red families. Where a row lists alternatives, **each occupied slot independently accepts any listed block of that color**, so those finishes may be mixed within the recipe. Pale and red materials cannot mix. Base, Cut and Smooth slabs are separate outputs. [Ingredient alternatives][ingredient-alternatives] · [Per-slot matching][pattern-matching]
 
-| Exact arrangement or process | Output |
-| --- | --- |
-| 4 base Sandstone in a 2 × 2 square | 4 Cut Sandstone |
-| 2 **base Sandstone Slabs** stacked vertically | 1 Chiseled Sandstone |
-| Smelt 1 base Sandstone | 1 Smooth Sandstone |
-| 6 base or Smooth full blocks in a 1/2/3 stair pattern | 4 matching stairs |
-| 3 base, Cut or Smooth full blocks in a horizontal row | 6 matching slabs |
-| 6 base Sandstone in two full rows | 6 matching walls |
+| Result, in either color | Accepted material in each occupied slot | Pattern or process | Yield | Recipes |
+| --- | --- | --- | --- | --- |
+| Cut full block | Base Sandstone | 2 × 2 square | 4 → 4 | [Pale][r-cut_sandstone] · [Red][r-cut_red_sandstone] |
+| Chiseled full block | Base Sandstone Slab | 2 vertically | 2 → 1 | [Pale][r-chiseled_sandstone] · [Red][r-chiseled_red_sandstone] |
+| Smooth full block | Base Sandstone | Furnace smelting | 1 → 1 | [Pale][r-smooth_sandstone] · [Red][r-smooth_red_sandstone] |
+| Base Sandstone Stairs | Base, Chiseled or Cut Sandstone | Three stair rows: 1 / 2 / 3 | 6 → 4 | [Pale][r-sandstone_stairs] · [Red][r-red_sandstone_stairs] |
+| Smooth Sandstone Stairs | Smooth Sandstone | Three stair rows: 1 / 2 / 3 | 6 → 4 | [Pale][r-smooth_sandstone_stairs] · [Red][r-smooth_red_sandstone_stairs] |
+| Base Sandstone Slab | Base or Chiseled Sandstone | One row of 3 | 3 → 6 | [Pale][r-sandstone_slab] · [Red][r-red_sandstone_slab] |
+| Cut Sandstone Slab | Cut Sandstone | One row of 3 | 3 → 6 | [Pale][r-cut_sandstone_slab] · [Red][r-cut_red_sandstone_slab] |
+| Smooth Sandstone Slab | Smooth Sandstone | One row of 3 | 3 → 6 | [Pale][r-smooth_sandstone_slab] · [Red][r-smooth_red_sandstone_slab] |
+| Sandstone Wall | Base Sandstone | Two full rows | 6 → 6 | [Pale][r-sandstone_wall] · [Red][r-red_sandstone_wall] |
+
+These crafting alternatives do not carry over to stonecutting. Base stairs, slabs and walls cut only from the base block; Cut slabs cut from base or Cut; Smooth stairs and slabs cut only from Smooth. For example, Chiseled Sandstone can be used to craft ordinary Sandstone Slabs or Stairs, but is not one of their Stonecutter inputs. [Stonecutting choices](#stonecutting)
 
 Use a Crafting Table for three-wide or three-tall layouts. The chiseled recipe uses the ordinary slab of that color, **not its Cut or Smooth slab**. The recipe evidence below lists every variant and input. [Ordinary chiseled input][r-chiseled_sandstone] · [Red chiseled input][r-chiseled_red_sandstone] · [Complete recipes](#recipe-evidence)
 
@@ -147,6 +152,8 @@ The following are all **38 production recipes** for the selected 20 outputs in t
 
 ## Verification and related pages
 
+The expanded crafting table, per-slot ingredient alternatives and their distinction from stonecutting were source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. No gameplay test was run for this clarification.
+
 Source-reviewed on **2026-10-02** at `1879e5f54378351fd773b9a2c10839eb9259c504`: all 20 registrations/loot tables, mining tags, property inheritance, all 1,501 recipe outputs for the scoped recipe inventory, and shared placement classes. No in-game mining, crafting, smelting, placement or waterlogging test was run. This guide provides a crafting acquisition route; it does not inventory every natural deposit, structure or trade. Data packs can change recipes and loot.
 
 [Blocks](Blocks.md) · [Stone category](catalog/stone.md) · [Sand and Gravel](SoilSandAndGravel.md) · [Stonecutter](Stonecutter.md) · [Furnace](Furnace.md)
@@ -164,26 +171,26 @@ Source-reviewed on **2026-10-02** at `1879e5f54378351fd773b9a2c10839eb9259c504`:
 [pickaxe]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
 [wood-tier]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/block/incorrect_for_wooden_tool.json
 [cutter]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/inventory/StonecutterMenu.java
-[r-chiseled_red_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/chiseled_red_sandstone.json
-[r-chiseled_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/chiseled_sandstone.json
-[r-cut_red_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/cut_red_sandstone.json
-[r-cut_red_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/cut_red_sandstone_slab.json
-[r-cut_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/cut_sandstone.json
-[r-cut_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/cut_sandstone_slab.json
+[r-chiseled_red_sandstone]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/chiseled_red_sandstone.json
+[r-chiseled_sandstone]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/chiseled_sandstone.json
+[r-cut_red_sandstone]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/cut_red_sandstone.json
+[r-cut_red_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/cut_red_sandstone_slab.json
+[r-cut_sandstone]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/cut_sandstone.json
+[r-cut_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/cut_sandstone_slab.json
 [r-red_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/red_sandstone.json
-[r-red_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/red_sandstone_slab.json
-[r-red_sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/red_sandstone_stairs.json
-[r-red_sandstone_wall]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/red_sandstone_wall.json
+[r-red_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/red_sandstone_slab.json
+[r-red_sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/red_sandstone_stairs.json
+[r-red_sandstone_wall]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/red_sandstone_wall.json
 [r-sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/sandstone.json
-[r-sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/sandstone_slab.json
-[r-sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/sandstone_stairs.json
-[r-sandstone_wall]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/sandstone_wall.json
-[r-smooth_red_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/smooth_red_sandstone_slab.json
-[r-smooth_red_sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/smooth_red_sandstone_stairs.json
-[r-smooth_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/smooth_sandstone_slab.json
-[r-smooth_sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/smooth_sandstone_stairs.json
-[r-smooth_red_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/smelting/smooth_red_sandstone.json
-[r-smooth_sandstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/smelting/smooth_sandstone.json
+[r-sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/sandstone_slab.json
+[r-sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/sandstone_stairs.json
+[r-sandstone_wall]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/sandstone_wall.json
+[r-smooth_red_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/smooth_red_sandstone_slab.json
+[r-smooth_red_sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/smooth_red_sandstone_stairs.json
+[r-smooth_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/smooth_sandstone_slab.json
+[r-smooth_sandstone_stairs]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/smooth_sandstone_stairs.json
+[r-smooth_red_sandstone]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/smelting/smooth_red_sandstone.json
+[r-smooth_sandstone]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/smelting/smooth_sandstone.json
 [r-chiseled_red_sandstone_from_red_sandstone_stonecutting]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/stonecutting/chiseled_red_sandstone_from_red_sandstone_stonecutting.json
 [r-chiseled_sandstone_from_sandstone_stonecutting]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/stonecutting/chiseled_sandstone_from_sandstone_stonecutting.json
 [r-cut_red_sandstone_from_red_sandstone_stonecutting]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/stonecutting/cut_red_sandstone_from_red_sandstone_stonecutting.json
@@ -222,3 +229,6 @@ Source-reviewed on **2026-10-02** at `1879e5f54378351fd773b9a2c10839eb9259c504`:
 [loot-smooth_sandstone_slab]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/blocks/smooth_sandstone_slab.json
 [loot-red_sandstone_wall]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/blocks/red_sandstone_wall.json
 [loot-sandstone_wall]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/blocks/sandstone_wall.json
+
+[ingredient-alternatives]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/crafting/Ingredient.java#L60-L66
+[pattern-matching]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/crafting/ShapedRecipePattern.java#L176-L194
