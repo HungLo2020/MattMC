@@ -11,14 +11,14 @@ fn mix(value: u64) -> u64 {
 #[derive(Debug, PartialEq)]
 pub(crate) struct AllocationError;
 
-pub(crate) struct PositionMap {
+pub(crate) struct PositionMap<V: Copy + Default> {
     keys: Vec<i64>,
-    values: Vec<u8>,
+    values: Vec<V>,
     used: Vec<bool>,
     len: usize,
 }
 
-impl PositionMap {
+impl<V: Copy + Default> PositionMap<V> {
     /// Capacity for `expected` entries at most half full, rounded to a power of two.
     pub fn with_expected(expected: usize) -> Result<Self, AllocationError> {
         let mut map = Self {
@@ -39,7 +39,7 @@ impl PositionMap {
         values.try_reserve_exact(slots).map_err(|_| AllocationError)?;
         used.try_reserve_exact(slots).map_err(|_| AllocationError)?;
         keys.resize(slots, 0);
-        values.resize(slots, 0);
+        values.resize(slots, V::default());
         used.resize(slots, false);
         let old_keys = std::mem::replace(&mut self.keys, keys);
         let old_values = std::mem::replace(&mut self.values, values);
@@ -72,11 +72,12 @@ impl PositionMap {
         Err(index)
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.len
     }
 
-    pub fn get(&self, key: i64) -> Option<u8> {
+    pub fn get(&self, key: i64) -> Option<V> {
         self.find(key).ok().map(|index| self.values[index])
     }
 
@@ -85,7 +86,7 @@ impl PositionMap {
     }
 
     /// Grows before insertion so a failed allocation leaves the map unchanged.
-    pub fn insert(&mut self, key: i64, value: u8) -> Result<(), AllocationError> {
+    pub fn insert(&mut self, key: i64, value: V) -> Result<(), AllocationError> {
         if let Ok(index) = self.find(key) {
             self.values[index] = value;
             return Ok(());
@@ -103,7 +104,7 @@ impl PositionMap {
     }
 
     /// Removes with backward shifting, keeping every probe chain contiguous.
-    pub fn remove(&mut self, key: i64) -> Option<u8> {
+    pub fn remove(&mut self, key: i64) -> Option<V> {
         let mut hole = self.find(key).ok()?;
         let removed = self.values[hole];
         let mask = self.mask();

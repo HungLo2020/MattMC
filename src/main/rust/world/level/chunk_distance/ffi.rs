@@ -8,7 +8,7 @@
 //! Status word: bits 0..8 code (0 ok, 3 allocation failure, 5 invalid field,
 //! 6 internal queue error), bit 8+field set while that field has queued work,
 //! bits 32.. the recorded change count of the field just run.
-use super::graph::Error;
+use super::graph::{DistanceField, Error};
 use super::PlayerDistances;
 
 const FIELDS: i32 = 2;
@@ -108,8 +108,12 @@ pub unsafe extern "C" fn mattmc_player_distance_drain(
     if !(0..FIELDS).contains(&field) {
         return -1;
     }
-    let distances = handle(id);
-    let field = distances.field_mut(field as usize);
+    drain_changes(handle(id).field_mut(field as usize), buffer, capacity)
+}
+
+/// Shared drain: copies a field's recorded pairs into a caller buffer of
+/// `capacity` pairs and clears them, or returns -1 without copying.
+pub(super) unsafe fn drain_changes(field: &mut DistanceField, buffer: *mut i64, capacity: i32) -> i32 {
     let changes = field.changes();
     if changes.len() > capacity.max(0) as usize {
         return -1;

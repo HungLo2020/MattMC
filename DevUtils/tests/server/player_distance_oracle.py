@@ -50,3 +50,25 @@ if __name__ == '__main__':
     root = Path(__file__).resolve().parents[3]
     (root / ORACLE).write_text(expected_oracle(root))
     print(root / ORACLE)
+
+
+SIMULATION_SOURCE = 'src/main/java/net/minecraft/server/level/SimulationChunkTracker.java'
+SIMULATION_ORACLE = 'src/test/java/net/minecraft/server/level/JavaSimulationChunkTracker.java'
+SIMULATION_REWRITES = [
+    ('import net.minecraft.world.level.TicketStorage;\n',
+     'import net.minecraft.world.level.TicketStorage;\nimport net.minecraft.world.level.lighting.JavaChunkTracker;\n'),
+    ('public class SimulationChunkTracker extends ChunkTracker {',
+     'public class JavaSimulationChunkTracker extends JavaChunkTracker {'),
+    ('public SimulationChunkTracker(TicketStorage ticketStorage) {',
+     'public JavaSimulationChunkTracker(TicketStorage ticketStorage) {'),
+]
+
+
+def expected_simulation_oracle(root):
+    """Original SimulationChunkTracker, renamed onto the pinned original ChunkTracker."""
+    text = subprocess.check_output(['git', 'show', REFERENCE + ':' + SIMULATION_SOURCE], cwd=root, text=True)
+    for old, new in SIMULATION_REWRITES:
+        if text.count(old) != 1:
+            raise RuntimeError('Simulation oracle rewrite does not apply exactly once: ' + old)
+        text = text.replace(old, new)
+    return text

@@ -170,3 +170,60 @@ fn position_map_backward_shift_keeps_colliding_chains_reachable() {
     }
     assert_eq!(keys.len() - keys.len().div_ceil(3), map.len());
 }
+
+#[test]
+fn simulation_settles_to_lowest_ticket_level_plus_distance() {
+    use super::simulation::SimulationDistance;
+    const ABSENT_TICKET: i32 = 45;
+    let mut seed = 0x51_u64;
+    let mut next = |bound: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % bound
+    };
+    let mut distance = SimulationDistance::new(ABSENT_TICKET).unwrap();
+    // Per chunk: every simulating ticket level, as TicketStorage holds them.
+    let mut tickets: Vec<(i64, Vec<i32>)> = Vec::new();
+    let lowest = |levels: &Vec<i32>| levels.iter().copied().min().unwrap_or(ABSENT_TICKET);
+    for step in 0..300 {
+        let position = as_long(next(15) as i32 - 7, next(15) as i32 - 7);
+        let index = match tickets.iter().position(|(chunk, _)| *chunk == position) {
+            Some(index) => index,
+            None => {
+                tickets.push((position, Vec::new()));
+                tickets.len() - 1
+            }
+        };
+        let before = lowest(&tickets[index].1);
+        if tickets[index].1.is_empty() || next(3) != 0 {
+            let level = next(40) as i32 - 3;
+            tickets[index].1.push(level);
+            // addTicket notifies only when the new ticket lowers the level.
+            if level < before {
+                distance.update(position, level, level, true).unwrap();
+            }
+        } else {
+            let removed = next(tickets[index].1.len() as u64) as usize;
+            tickets[index].1.remove(removed);
+            let after = lowest(&tickets[index].1);
+            distance.update(position, after, after, false).unwrap();
+        }
+        if step % 7 == 0 {
+            distance.run_updates(i32::MAX).unwrap();
+            for dx in -12..=12 {
+                for dz in -12..=12 {
+                    let probe = as_long(dx, dz);
+                    let best = tickets
+                        .iter()
+                        .map(|(chunk, levels)| lowest(levels).max(0).saturating_add(chebyshev(*chunk, probe) as i32))
+                        .min()
+                        .unwrap_or(i32::MAX)
+                        .clamp(0, 33);
+                    let expected = if best > 32 { 33 } else { best };
+                    assert_eq!(expected, distance.field().level(probe), "step {step} probe {dx},{dz}");
+                }
+            }
+        }
+    }
+}

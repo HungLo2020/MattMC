@@ -6,10 +6,11 @@ is the Java lifetime/exception adapter over
 Rust owns membership, FIFO order, storage, priority selection, rescheduling and
 priority scans. Production has no Java queue implementation or fallback.
 
-Current Java callers are the loading/simulation ticket trackers and POI section
-distances through `DynamicGraphMinFixedPoint`. The Rust-owned
-[player chunk distances](../chunk-loading/RUST-PLAYER-DISTANCE.md) use this
-queue directly, without Java; block-light/skylight propagation uses other queues.
+Current Java callers are the loading ticket tracker and POI section distances
+through `DynamicGraphMinFixedPoint`. The Rust-owned
+[player](../chunk-loading/RUST-PLAYER-DISTANCE.md) and
+[simulation](../chunk-loading/RUST-SIMULATION-DISTANCE.md) chunk distances use
+this queue directly, without Java; block-light/skylight propagation uses other queues.
 For those Java callers, graph traversal, callbacks and the computed-level map remain Java.
 
 ## Preserve these contracts

@@ -3,7 +3,7 @@
 [`DistanceManager`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/DistanceManager.java)
 tracks how far each chunk is from the nearest player chunk twice: the natural
 spawn counter (radius 8) and the player-ticket tracker (radius 32).
-[`player_distance/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/player_distance)
+[`chunk_distance/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk_distance)
 owns both graphs: player presence, levels, pending computed levels, work queues
 and propagation. [`PlayerChunkDistances`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/PlayerChunkDistances.java)
 is the Java lifetime/exception adapter. There is no Java graph or fallback for
@@ -11,8 +11,9 @@ these two trackers.
 
 Java keeps `playersPerChunk`, each tracker's published `chunks` map and every
 downstream reaction: spawn candidate iteration, `hasPlayersNearby`, the ticket
-tracker's `toUpdate`/view-distance logic and ticket dispatch. Loading and
-simulation ticket trackers and POI section distances still run the Java
+tracker's `toUpdate`/view-distance logic and ticket dispatch. The
+[simulation tracker](RUST-SIMULATION-DISTANCE.md) shares this graph code. The
+loading ticket tracker and POI section distances still run the Java
 `DynamicGraphMinFixedPoint` over the native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
 
 ## Preserve these contracts
@@ -39,7 +40,7 @@ simulation ticket trackers and POI section distances still run the Java
 
 The architecture boundary test matches `ash::`/`glow::` as plain substrings, so
 this module avoids `std::hash::` paths and uses its own
-[position map](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/player_distance/position_map.rs).
+[position map](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk_distance/position_map.rs).
 
 ## Verify and measure
 
@@ -77,19 +78,23 @@ and [parity checks](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c93
 
 ## Measurements
 
-The implementation author recorded a full release run on 2026-10-04: three
-alternating JVM pairs per workload on an i7-10750H laptop (CPU 5 measured, CPUs 0/1 for JVM workers), at least 15 s of
-warmup and 30 samples per JVM. Outputs and input traces matched across
-backends and JVMs.
+The implementation author recorded a full release run on 2026-10-04, after the
+graph became shared with the [simulation tracker](RUST-SIMULATION-DISTANCE.md):
+three alternating JVM pairs per workload on an i7-10750H laptop (CPU 5
+measured, CPUs 0/1 for JVM workers), at least 15 s of warmup and 30 samples per
+JVM. Outputs and input traces matched across backends and JVMs.
 
 | Workload | Java median | Rust median | Paired median reduction | 95% ratio interval |
 |---|---:|---:|---:|---:|
-| Single walker, 1,200 ticks | 819 ms | 525 ms | 36% | 0.605–0.698 |
-| Eight walkers, 300 ticks | 596 ms | 407 ms | 32% | 0.635–0.734 |
-| Four teleporting players, 300 ticks | 1,448 ms | 996 ms | 31% | 0.636–0.742 |
+| Single walker, 1,200 ticks | 898 ms | 599 ms | 33% | 0.639–0.729 |
+| Eight walkers, 300 ticks | 644 ms | 440 ms | 32% | 0.666–0.724 |
+| Four teleporting players, 300 ticks | 1,486 ms | 1,026 ms | 31% | 0.651–0.715 |
 
 Every pair improved by more than 5%, and thread CPU time agreed. Laptop
 variation was 5–8% per JVM; 15 of 540 samples overlapped JIT activity (recorded,
-not excluded). These are subsystem workloads through the production adapter,
-not whole-server tick or chunk-loading measurements. Raw rounds, hashes and
-metadata were recorded at `build/player-chunk-distance-migration/acceptance/results.json`; that ignored artifact is not bundled with the wiki. The documentation review inspected the source but did not rerun the Java/Rust tests, benchmark or a live server.
+not excluded). The earlier player-only run measured 31–36% on the pre-shared
+graph. These are subsystem workloads through the production adapter, not
+whole-server tick or chunk-loading measurements. Raw rounds, hashes and
+metadata were recorded at
+`build/player-chunk-distance-migration/acceptance-simulation/results.json`; that
+ignored artifact is not bundled with the wiki.

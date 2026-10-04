@@ -1,7 +1,8 @@
-//! Exact port of `DynamicGraphMinFixedPoint` + `ChunkTracker` specialised to
-//! `DistanceManager.FixedPlayerDistanceChunkTracker`. Integer arithmetic,
-//! clamping, byte storage and queue scheduling follow the Java sources
-//! statement by statement; see `RUST-PLAYER-DISTANCE.md` for the contracts.
+//! Exact port of `DynamicGraphMinFixedPoint` + `ChunkTracker` for trackers
+//! whose levels live in one byte map (`FixedPlayerDistanceChunkTracker`,
+//! `SimulationChunkTracker`). Integer arithmetic, clamping, byte storage and
+//! queue scheduling follow the Java sources statement by statement; see
+//! `RUST-PLAYER-DISTANCE.md` and `RUST-SIMULATION-DISTANCE.md` for contracts.
 use super::position_map::{AllocationError, PositionMap};
 use crate::world::level::lighting::priority_queue::queue::{Error as QueueError, Queue};
 
@@ -45,9 +46,14 @@ impl From<QueueError> for Error {
     }
 }
 
+/// A tracker's `getLevelFromSource`.
+pub(crate) trait SourceLevels {
+    fn level_from_source(&self, position: i64) -> i32;
+}
+
 /// Chunks holding at least one player; every field reads this one source.
 pub(crate) struct Players {
-    present: PositionMap,
+    present: PositionMap<u8>,
 }
 
 impl Players {
@@ -65,6 +71,9 @@ impl Players {
         self.present.remove(position);
     }
 
+}
+
+impl SourceLevels for Players {
     /// `FixedPlayerDistanceChunkTracker.getLevelFromSource`.
     fn level_from_source(&self, position: i64) -> i32 {
         if self.present.contains(position) {
@@ -77,12 +86,15 @@ impl Players {
 
 pub(crate) struct DistanceField {
     level_count: i32,
-    max_distance: i32,
+    /// `setLevel` removes levels above this and stores the rest.
+    max_stored: i32,
+    /// `chunks.defaultReturnValue`, before byte narrowing.
+    absent_level: i32,
     queue: Queue,
     /// Java `Long2ByteMap computedLevels`, read as `get(..) & 255`.
-    computed: PositionMap,
+    computed: PositionMap<u8>,
     /// Java `Long2ByteMap chunks`, read as a signed byte.
-    levels: PositionMap,
+    levels: PositionMap<u8>,
     /// Every `setLevel(pos, level)` in call order, for Java's published view.
     changes: Vec<(i64, i32)>,
 }
@@ -90,11 +102,21 @@ pub(crate) struct DistanceField {
 impl DistanceField {
     /// `FixedPlayerDistanceChunkTracker(i)`: `super(i + 2, 16, 256)`.
     /// The Java adapter validates the distance before construction.
-    pub fn new(max_distance: i32) -> Result<Self, Error> {
-        let level_count = max_distance + 2;
+    pub fn fixed_player(max_distance: i32) -> Result<Self, Error> {
+        Self::new(max_distance + 2, max_distance, max_distance + 2)
+    }
+
+    /// `SimulationChunkTracker`: `super(34, 16, 256)`, levels of 33 and above
+    /// removed, absent chunks at 33.
+    pub fn simulation() -> Result<Self, Error> {
+        Self::new(34, 32, 33)
+    }
+
+    fn new(level_count: i32, max_stored: i32, absent_level: i32) -> Result<Self, Error> {
         Ok(Self {
             level_count,
-            max_distance,
+            max_stored,
+            absent_level,
             queue: Queue::new(level_count, 16)?,
             computed: PositionMap::with_expected(256)?,
             levels: PositionMap::with_expected(256)?,
@@ -114,11 +136,11 @@ impl DistanceField {
         self.changes.clear();
     }
 
-    /// `chunks.get(l)` with default `(byte)(maxDistance + 2)`.
+    /// `chunks.get(l)` with its byte default.
     pub fn level(&self, position: i64) -> i32 {
         match self.levels.get(position) {
             Some(value) => value as i8 as i32,
-            None => (self.max_distance + 2) as i8 as i32,
+            None => self.absent_level as i8 as i32,
         }
     }
 
@@ -126,12 +148,12 @@ impl DistanceField {
         self.computed.get(position).map_or(NO_COMPUTED_LEVEL, i32::from)
     }
 
-    /// `FixedPlayerDistanceChunkTracker.setLevel`, recording the call.
+    /// The tracker's `setLevel`, recording the call.
     fn set_level(&mut self, position: i64, level: i32) -> Result<(), Error> {
         self.changes
             .try_reserve(1)
             .map_err(|_| Error::Allocation)?;
-        if level > self.max_distance {
+        if level > self.max_stored {
             self.levels.remove(position);
         } else {
             self.levels.insert(position, level as i8 as u8)?;
@@ -141,9 +163,9 @@ impl DistanceField {
     }
 
     /// `ChunkTracker.computeLevelFromNeighbor`.
-    fn level_from_neighbor(&self, players: &Players, from: i64, to: i64, level: i32) -> i32 {
+    fn level_from_neighbor(&self, source: &impl SourceLevels, from: i64, to: i64, level: i32) -> i32 {
         if from == INVALID_CHUNK_POS {
-            players.level_from_source(to)
+            source.level_from_source(to)
         } else {
             level.wrapping_add(1)
         }
@@ -152,19 +174,19 @@ impl DistanceField {
     /// `ChunkTracker.update`: `checkEdge(INVALID_CHUNK_POS, pos, level, decrease)`.
     pub fn update(
         &mut self,
-        players: &Players,
+        source: &impl SourceLevels,
         position: i64,
         level: i32,
         decrease: bool,
     ) -> Result<(), Error> {
         let current = self.level(position);
         let computed = self.computed_level(position);
-        self.check_edge(players, INVALID_CHUNK_POS, position, level, current, computed, decrease)
+        self.check_edge(source, INVALID_CHUNK_POS, position, level, current, computed, decrease)
     }
 
     fn check_edge(
         &mut self,
-        players: &Players,
+        source: &impl SourceLevels,
         from: i64,
         to: i64,
         level: i32,
@@ -183,7 +205,7 @@ impl DistanceField {
         let next = if decrease {
             computed.min(level)
         } else {
-            clamp(self.computed_from_neighbors(players, to, from, level), 0, top)
+            clamp(self.computed_from_neighbors(source, to, from, level), 0, top)
         };
         if current != next {
             let previous = if absent { NO_COMPUTED_LEVEL } else { computed };
@@ -199,7 +221,7 @@ impl DistanceField {
     /// `DynamicGraphMinFixedPoint.checkNeighbor`.
     fn check_neighbor(
         &mut self,
-        players: &Players,
+        source: &impl SourceLevels,
         from: i64,
         to: i64,
         level: i32,
@@ -207,10 +229,10 @@ impl DistanceField {
     ) -> Result<(), Error> {
         let top = self.level_count - 1;
         let computed = self.computed_level(to);
-        let candidate = clamp(self.level_from_neighbor(players, from, to, level), 0, top);
+        let candidate = clamp(self.level_from_neighbor(source, from, to, level), 0, top);
         if decrease {
             let current = self.level(to);
-            self.check_edge(players, from, to, candidate, current, computed, decrease)
+            self.check_edge(source, from, to, candidate, current, computed, decrease)
         } else {
             let absent = computed == NO_COMPUTED_LEVEL;
             let pending = if absent {
@@ -220,7 +242,7 @@ impl DistanceField {
             };
             if candidate == pending {
                 let current = if absent { pending } else { self.level(to) };
-                self.check_edge(players, from, to, top, current, computed, decrease)
+                self.check_edge(source, from, to, top, current, computed, decrease)
             } else {
                 Ok(())
             }
@@ -228,7 +250,7 @@ impl DistanceField {
     }
 
     /// `ChunkTracker.getComputedLevel`.
-    fn computed_from_neighbors(&self, players: &Players, position: i64, excluded: i64, level: i32) -> i32 {
+    fn computed_from_neighbors(&self, source: &impl SourceLevels, position: i64, excluded: i64, level: i32) -> i32 {
         let mut best = level;
         let x = position as i32;
         let z = (position >> 32) as i32;
@@ -240,7 +262,7 @@ impl DistanceField {
                 }
                 if neighbor != excluded {
                     let candidate =
-                        self.level_from_neighbor(players, neighbor, position, self.level(neighbor));
+                        self.level_from_neighbor(source, neighbor, position, self.level(neighbor));
                     if best > candidate {
                         best = candidate;
                     }
@@ -256,7 +278,7 @@ impl DistanceField {
     /// `ChunkTracker.checkNeighborsAfterUpdate`.
     fn check_neighbors_after_update(
         &mut self,
-        players: &Players,
+        source: &impl SourceLevels,
         position: i64,
         level: i32,
         decrease: bool,
@@ -268,7 +290,7 @@ impl DistanceField {
                 for dz in -1..=1 {
                     let neighbor = as_long(x.wrapping_add(dx), z.wrapping_add(dz));
                     if neighbor != position {
-                        self.check_neighbor(players, position, neighbor, level, decrease)?;
+                        self.check_neighbor(source, position, neighbor, level, decrease)?;
                     }
                 }
             }
@@ -277,7 +299,7 @@ impl DistanceField {
     }
 
     /// `DynamicGraphMinFixedPoint.runUpdates`; returns the remaining budget.
-    pub fn run_updates(&mut self, players: &Players, mut budget: i32) -> Result<i32, Error> {
+    pub fn run_updates(&mut self, source: &impl SourceLevels, mut budget: i32) -> Result<i32, Error> {
         let top = self.level_count - 1;
         while self.has_work() && budget > 0 {
             budget -= 1;
@@ -286,14 +308,14 @@ impl DistanceField {
             let computed = self.computed.remove(position).map_or(NO_COMPUTED_LEVEL, i32::from);
             if computed < current {
                 self.set_level(position, computed)?;
-                self.check_neighbors_after_update(players, position, computed, true)?;
+                self.check_neighbors_after_update(source, position, computed, true)?;
             } else if computed > current {
                 self.set_level(position, top)?;
                 if computed != top {
                     self.queue.enqueue_computed(position as u64, top, computed)?;
                     self.computed.insert(position, computed as u8)?;
                 }
-                self.check_neighbors_after_update(players, position, current, false)?;
+                self.check_neighbors_after_update(source, position, current, false)?;
             }
         }
         Ok(budget)

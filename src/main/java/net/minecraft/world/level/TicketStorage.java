@@ -7,6 +7,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
@@ -126,6 +127,11 @@ public class TicketStorage extends SavedData {
 		}
 
 		return false;
+	}
+
+	/** Chunks holding active tickets, so a listener attached after tickets exist can seed its state. */
+	public LongIterator activeTicketChunks() {
+		return this.tickets.keySet().iterator();
 	}
 
 	public List<Ticket> getTickets(long l) {

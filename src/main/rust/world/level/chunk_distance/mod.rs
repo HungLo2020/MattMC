@@ -1,10 +1,13 @@
-//! Native-owned player chunk-distance fields for `DistanceManager`: the natural
-//! spawn counter and player-ticket distance graphs, their level maps, pending
-//! computed levels, work queues and the shared player-presence source. Java
-//! keeps only a published level view rebuilt from each run's ordered changes.
+//! Native-owned chunk-distance trackers for `DistanceManager`: the natural
+//! spawn counter and player-ticket distance graphs with their shared
+//! player-presence source, and the simulation distance graph with its ticket
+//! level mirror. Each owns levels, pending computed levels and work queues.
+//! Java keeps only published level views rebuilt from each run's ordered changes.
 mod ffi;
 pub(crate) mod graph;
 mod position_map;
+pub(crate) mod simulation;
+mod simulation_ffi;
 #[cfg(test)]
 mod tests;
 
@@ -20,8 +23,8 @@ impl PlayerDistances {
         Ok(Self {
             players: Players::new()?,
             fields: [
-                DistanceField::new(natural_spawn_distance)?,
-                DistanceField::new(player_ticket_distance)?,
+                DistanceField::fixed_player(natural_spawn_distance)?,
+                DistanceField::fixed_player(player_ticket_distance)?,
             ],
         })
     }

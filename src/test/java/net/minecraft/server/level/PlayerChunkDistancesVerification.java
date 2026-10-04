@@ -184,6 +184,13 @@ public final class PlayerChunkDistancesVerification {
         };
         long moves = workload.stream().mapToLong(tick -> tick.players().length).sum();
         System.out.println("PLAYER_DISTANCE_FIXTURE case=" + name + " ticks=" + workload.size() + " moves=" + moves + " trace=" + trace(workload));
+        measure(mode, name, quick, factory, backend -> round(backend, workload));
+    }
+
+    /** Warmup and sampling shared by the distance benchmarks: {@code setup}
+     * builds a fresh untimed state; only {@code body} on it is timed. */
+    static <T> void measure(String mode, String name, boolean quick, java.util.function.Supplier<T> setup,
+                            java.util.function.ToLongFunction<T> body) {
         CompilationMXBean compiler = ManagementFactory.getCompilationMXBean();
         ThreadMXBean threads = ManagementFactory.getThreadMXBean();
         long minimumWarmup = quick ? 1_000_000_000L : 15_000_000_000L;
@@ -192,10 +199,10 @@ public final class PlayerChunkDistancesVerification {
         List<Long> recent = new ArrayList<>();
         // Warm until the minimum elapsed, recent medians are stable and JIT is idle.
         while (true) {
-            Backend backend = factory.get();
+            T state = setup.get();
             long compiled = compiler.getTotalCompilationTime();
             long start = System.nanoTime();
-            checksum = round(backend, workload);
+            checksum = body.applyAsLong(state);
             recent.add(System.nanoTime() - start);
             boolean idle = compiler.getTotalCompilationTime() == compiled;
             if (recent.size() > 20) recent.remove(0);
@@ -211,11 +218,11 @@ public final class PlayerChunkDistancesVerification {
         int repeats = quick ? 5 : 30;
         long[] samples = new long[repeats], cpu = new long[repeats], jit = new long[repeats];
         for (int repeat = 0; repeat < repeats; repeat++) {
-            Backend backend = factory.get();
+            T state = setup.get();
             long compiled = compiler.getTotalCompilationTime();
             long cpuStart = threads.getCurrentThreadCpuTime();
             long start = System.nanoTime();
-            long result = round(backend, workload);
+            long result = body.applyAsLong(state);
             samples[repeat] = System.nanoTime() - start;
             cpu[repeat] = threads.getCurrentThreadCpuTime() - cpuStart;
             jit[repeat] = compiler.getTotalCompilationTime() - compiled;
