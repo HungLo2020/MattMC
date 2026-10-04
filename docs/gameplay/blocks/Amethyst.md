@@ -8,9 +8,9 @@ Preserve **Budding Amethyst** when mining a geode: it is the renewable growth bl
 | --- | ---: | --- |
 | <span id="amethyst-block">Block of Amethyst, `minecraft:amethyst_block`</span> | 0 | Full building block and vibration resonator |
 | <span id="budding-amethyst">Budding Amethyst, `minecraft:budding_amethyst`</span> | 0 | Full block that grows crystals on its faces |
-| <span id="small-bud">Small Amethyst Bud, `minecraft:small_amethyst_bud`</span> | 1 | First growth stage |
-| <span id="medium-bud">Medium Amethyst Bud, `minecraft:medium_amethyst_bud`</span> | 2 | Second growth stage |
-| <span id="large-bud">Large Amethyst Bud, `minecraft:large_amethyst_bud`</span> | 4 | Third growth stage |
+| <span id="small-bud">[Small Amethyst Bud](../items/SmallAmethystBud.md), `minecraft:small_amethyst_bud`</span> | 1 | First growth stage |
+| <span id="medium-bud">[Medium Amethyst Bud](../items/MediumAmethystBud.md), `minecraft:medium_amethyst_bud`</span> | 2 | Second growth stage |
+| <span id="large-bud">[Large Amethyst Bud](../items/LargeAmethystBud.md), `minecraft:large_amethyst_bud`</span> | 4 | Third growth stage |
 | <span id="cluster">Amethyst Cluster, `minecraft:amethyst_cluster`</span> | 5 | Mature, shard-bearing crystal |
 
 All six have **hardness 1.5 and blast resistance 1.5**, and all are in the pickaxe mining-speed tag. The two full blocks require a correct tool for their ordinary drop gate; the buds and cluster do not. A faster tool is not the same as a required drop tool. [Properties and classes][blocks] · [Pickaxe tag][pickaxe] · [Harvest gate][player] [gate]

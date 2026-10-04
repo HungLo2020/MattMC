@@ -97,7 +97,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Dyes](items/Dyes.md): exact color recipes, ingredient choices, Sheep and collars, sign text, Banner patterns, equipment blends and storage colors
 
-- [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth
+- [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth; [bud item routes](blocks/Amethyst.md#six-registered-block-forms) cover Silk Touch collection and growth-stage placement
 
 - [Ores and Ancient Debris](blocks/OreResources.md): all nineteen ore/debris blocks, exact tool gates, drops/Fortune/XP, processing and checked generation examples
 - [Finding ores](mechanics/FindingOres.md): height distributions, biome bonuses, Nether and Primordial differences, and large Copper/Iron veins
