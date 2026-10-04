@@ -74,6 +74,8 @@ Attachment compatibility and installation do not, by themselves, establish that 
 
 ## Reading firearm stats
 
+**Bullet speed** values shown in m/s are nominal conversions at **20 game ticks per second**, treating one block as one metre: the Glock 17's 7.5-block-per-tick launch setting is listed as 150 m/s. Fire modes can adjust the launch setting. Spread and inherited shooter movement can change the actual initial speed; drag and gravity change it during flight. Changed or delayed ticking also changes the wall-clock speed. [Glock setting][speed-setting] · [Mode adjustments][speed-modes] · [Launch motion][speed-launch] · [Flight][speed-flight] · [Tick rate][speed-ticks]
+
 The item pages' **Damage** row is the gun definition's fallback shot value. It is not a promise of that much health lost on every hit. The active projectile path uses the bundled distance-based damage curve when available, applies fire-mode adjustments, and divides the value among the shot's projectiles. Headshots and the target's damage handling then affect the hit. Do not multiply a listed damage value by the pellet count to claim guaranteed total damage. [Shot creation][fire-round] · [Damage curve conversion][damage-curve] · [Hit handling][hit]
 
 Falloff entries are distance thresholds: a point applies while the hit is **closer than** its listed distance; equality moves to the next point. This is a step change, not interpolation. For example, the [Glock 17](../items/Glock17.md#damage-falloff) has fallback Damage 6, but its bundled curve supplies 7 below 18 blocks, 5 from 18 to below 45, and 4 at 45 or more, before headshot and target handling. [Glock data][glock-data] · [Distance selection][distance]
@@ -93,6 +95,8 @@ Falloff entries are distance thresholds: a point applies while the hit is **clos
 ## Sources and verification
 
 Source-reviewed on **2026-10-03** at `cfa7057b6fe2b8dfa84e93f21932be2602eff749`. This review traced key registration, current input and refit callbacks, packet encoding and admission, live server handlers, reload completion, inventory consumption, projectile damage, and the dedicated workbench recipe loader. It is **source review**, not an in-game controls, crafting, combat, or multiplayer test. No upstream-mod behavior is assumed beyond these integrated paths.
+
+Speed units were source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`, tracing the launch setting through projectile motion and game ticks. No in-game flight-speed test was run.
 
 [input]: https://github.com/HungLo2020/MattMC/blob/cfa7057b6fe2b8dfa84e93f21932be2602eff749/src/main/java/net/minecraft/client/tacz/TaczClientInputHandler.java#L35-L124
 [input-priority]: https://github.com/HungLo2020/MattMC/blob/cfa7057b6fe2b8dfa84e93f21932be2602eff749/src/main/java/net/minecraft/client/Minecraft.java#L2096-L2100
@@ -142,3 +146,9 @@ Source-reviewed on **2026-10-03** at `cfa7057b6fe2b8dfa84e93f21932be2602eff749`.
 [burst-task-creation]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L101-L145
 [burst-task-admission]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/MinecraftServer.java#L1008-L1014
 [burst-task-queue]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/util/thread/BlockableEventLoop.java#L87-L128
+
+[speed-setting]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L24
+[speed-modes]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L64-L67
+[speed-launch]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/Projectile.java#L129-L154
+[speed-flight]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L99-L134
+[speed-ticks]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/TickRateManager.java#L7-L29
