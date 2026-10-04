@@ -87,6 +87,9 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Materials, equipment, and enchanting
 
+- Custom resource limits: [Amber Curiosity](items/AmberCuriosity.md), [Heavy Bone](items/HeavyBone.md), [Tough Hide](items/ToughHide.md) and [Ominous Catalyst](items/OminousCatalyst.md), with actual registrations, access and connected-use distinctions
+- [Emu Feather](items/EmuFeather.md), [Lost Tentacle](items/LostTentacle.md) and [Maraca](items/Maraca.md): verified resource limits, disconnected capture behavior and conditional Cockroach equip/recovery
+
 - [Dyes](items/Dyes.md): exact color recipes, ingredient choices, Sheep and collars, sign text, Banner patterns, equipment blends and storage colors
 
 - [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth
