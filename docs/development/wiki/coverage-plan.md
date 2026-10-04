@@ -192,7 +192,7 @@ Navigation updated: Gameplay, Blocks, Items, Mobs, and Development indexes. New 
 
 ## Historical changelog backlog
 
-Reconcile missing August and September 2026 coverage against actual history before creating summaries. Also verify the January 2026 file's December heading before changing historical dating. These are review tasks, not completed or invented changelog entries.
+The bounded reconciliation in batch 232 adds seven verified outcomes to [August](../../changelog/changelog/8.2026.md) and [September](../../changelog/changelog/9.2026.md), with both month indexes updated. January's title was verified against its introducing diff and first master landing, then corrected without moving its content or breaking its previous heading URL. This closes those missing-file and label gaps; it does not exhaustively summarize the two months. Remaining commits, including month-boundary cases, still require source and dating review.
 
 ## Nineteenth batch: custom biome reference
 
@@ -1822,3 +1822,11 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Corrected a pre-existing Copper Construction statement that excluded waxed full blocks from ingot recovery: both an ordinary Block of Copper and a Waxed Block of Copper have direct recipes yielding nine Copper Ingots. The waxed recipe was already present at that owner's previous source pin; this is a documentation correction, not a new gameplay change. Weathered, cut and chiseled forms do not gain a direct unpacking recipe from this correction.
 - The resource audit covers the 53 producing recipes, 24 exact loot tables, source tool/interaction dispatch and optional bundled packs. Copper Ingot's existing text did not explicitly exclude the waxed recipe and was left intact. No source or tracker changes are part of this batch.
 - Synchronized from master `f5473e41dc4af8ced756db517fada27288df07a3`, preserving its priority-queue code, tests and developer documentation. All 334 frozen Copper evidence files remain byte-identical; item citations retain their `2fff1ef19106350f806ddedd4fb3c3b4fbc44716` pin. Independent per-form source/frozen-hash review plus integrated full documentation check, strict build, actual Markdown references/local links and original-heading checks apply. No live crafting, stonecutting, mining, oxidation, waxing, scraping or Golem-construction test is claimed; broader wiki catch-up remains incomplete.
+
+## Batch 232: Bounded monthly-history reconciliation
+
+- Added three concise August and four September entries grounded in actual master history and selected implementation diffs. Entries link verified commits or merged PR 741; no non-PR issue association was established for these outcomes and none was invented.
+- Both changelog indexes now include the missing months. January's December heading was a label error in its introducing commit; the corrected visible title preserves the existing heading URL and all body content. Existing monthly entries and links remain intact.
+- September's rendering entry distinguishes the sole Rust execution route from retained Java semantic producers/configuration and remaining feature gaps. Historical progress is not presented as fresh runtime validation or as the final no-Java architecture target already being achieved.
+- The seven selected outcomes have unambiguous month assignments under both recorded commit offsets and UTC. Other historical work, including September-evening/October-UTC boundaries, remains an evidence-based backlog rather than an invented comprehensive summary.
+- Independent source/history and frozen-diff review plus integrated documentation/index checks, strict build, rendered links and original-heading validation apply. No gameplay source, issue, milestone, workflow or historical release was changed; no old benchmark or runtime test was rerun by this documentation batch.
