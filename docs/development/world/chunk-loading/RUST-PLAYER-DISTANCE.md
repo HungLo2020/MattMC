@@ -53,24 +53,32 @@ The driver regenerates the original tracker oracle from Git
 (`player_distance_oracle.py`), checks it and the pinned original graph/queue
 oracles, and permits only the documented production edits to `DistanceManager`.
 Java tests compare ordered `onLevelChange` transcripts, published map iteration
-order and sampled levels after every run: all length-four histories of two
-players over three chunks, seeded walks/teleports around chunk 0,0, coordinate
-wrap and the `INVALID_CHUNK_POS` neighbourhood, shared chunks, constructor
-validation and GC release. Rust tests check converged levels against a
+order and sampled levels. The exhaustive length-four histories of two players
+over three chunks compare after every action and final drain; seeded walks and
+teleports compare at selected drain checkpoints around chunk 0,0, coordinate
+wrap and the `INVALID_CHUNK_POS` neighbourhood. Separate cases cover shared
+chunks and constructor validation. A GC stress case creates 2,000 instances,
+requests collection and checks a surviving instance; it does not count released
+handles or establish a native-memory bound. Rust tests check converged levels against a
 brute-force Chebyshev reference, budgets and the C ABI. A neighbour-order
 mutation that leaves converged levels unchanged fails three Java tests.
 Finite coverage is regression evidence, not proof of every history.
 
-Each JVM times one backend through the production adapter: DistanceManager
-player bookkeeping, ChunkMap's remove-then-add move order (including vertical
-section moves), per-tick `runAllUpdates` for both fields, ticket `toUpdate`
-collection and 16 spawn-range level queries per tick. Construction is excluded
+Each JVM times one backend using the production `PlayerChunkDistances` adapter
+and `FixedPlayerDistanceChunkTracker` published view. The benchmark driver
+reproduces DistanceManager's player bookkeeping, ChunkMap's remove-then-add move
+order (including vertical section moves), per-tick updates for both fields and
+ticket `toUpdate` collection. Movement ticks include 16 spawn-range level queries;
+the initial join tick has none. It does not instantiate the complete
+DistanceManager/PlayerTicketTracker dispatch path. Construction is excluded
 equally. Ticket dispatch, chunk loading and whole-game frame time are not measured.
+See the [benchmark driver](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c932c23abf34124418d6506b0/src/test/java/net/minecraft/server/level/PlayerChunkDistancesVerification.java#L42-L160)
+and [parity checks](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c932c23abf34124418d6506b0/src/test/java/net/minecraft/server/level/NativePlayerChunkDistancesTest.java#L109-L255).
 
 ## Measurements
 
-Full release run, 2026-10-04: three alternating JVM pairs per workload on an
-i7-10750H laptop (CPU 5 measured, CPUs 0/1 for JVM workers), at least 15 s of
+The implementation author recorded a full release run on 2026-10-04: three
+alternating JVM pairs per workload on an i7-10750H laptop (CPU 5 measured, CPUs 0/1 for JVM workers), at least 15 s of
 warmup and 30 samples per JVM. Outputs and input traces matched across
 backends and JVMs.
 
@@ -84,4 +92,4 @@ Every pair improved by more than 5%, and thread CPU time agreed. Laptop
 variation was 5–8% per JVM; 15 of 540 samples overlapped JIT activity (recorded,
 not excluded). These are subsystem workloads through the production adapter,
 not whole-server tick or chunk-loading measurements. Raw rounds, hashes and
-metadata are in `build/player-chunk-distance-migration/acceptance/results.json`.
+metadata were recorded at `build/player-chunk-distance-migration/acceptance/results.json`; that ignored artifact is not bundled with the wiki. The documentation review inspected the source but did not rerun the Java/Rust tests, benchmark or a live server.

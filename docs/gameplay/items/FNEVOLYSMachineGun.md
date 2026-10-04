@@ -55,6 +55,10 @@ Supported attachment categories: Ammo Modifier, Extended Mag, Grip, Laser, Muzzl
 * Extended Mag: [Heavy Ammo Extended Mag I](HeavyAmmoExtendedMagI.md), [Heavy Ammo Extended Mag II](HeavyAmmoExtendedMagII.md), [Heavy Ammo Extended Mag III](HeavyAmmoExtendedMagIII.md)
 * Ammo Modifier: [Full Metal Jacket Ammo](FullMetalJacketAmmo.md), [Hollow-Point Ammo](HollowPointAmmo.md), [Incendiary Ammo](IncendiaryAmmo.md)
 
+### Bundled first-person laser mount
+
+FN EVOLYS accepts [Lopro Tactical Laser](LoproTacticalLaser.md) and [PEQ15](laserpeq15.md), but its bundled gun geometry has no `laser_pos` mount. When either is installed, the inspected first-person attachment path skips that attachment's mesh. Installation can still affect other gun-model visibility, and resource-pack models can differ. This limitation is source-confirmed; no in-game appearance test was performed. [Tracked issue #814](https://github.com/HungLo2020/MattMC/issues/814) · [Accepted attachments](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c932c23abf34124418d6506b0/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L21) · [Mount check and submission](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c932c23abf34124418d6506b0/src/main/java/net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java#L542-L567) · [Bundled geometry](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c932c23abf34124418d6506b0/src/main/resources/assets/minecraft/geo_models/gun/fn_evolys_geo.json)
+
 ## Notes
 
 * This item is part of the integrated TaCZ firearms system.

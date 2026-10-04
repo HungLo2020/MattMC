@@ -29,7 +29,7 @@ In the reviewed **first-person rendering path**, the installed attachment body i
 
 The bundled attachment file also contains accuracy, weight, and aim-time values, but the inspected shot and aiming paths do not apply them. The active attachment recoil reader finds no recoil modifier in this profile either. Treat this as a fitting/model choice, without a source-supported accuracy bonus or handling penalty. [Profile][profile] · [Shot setup][shot] · [Ballistics][ballistics] · [Aim transition][aim] · [Recoil reader][recoil]
 
-**FN EVOLYS model limitation:** this gun accepts the attachment, but its bundled model has no `laser_pos` mount. The inspected first-person renderer therefore skips this attachment's model on FN EVOLYS. This is a source-derived limit of that rendering path, not an in-game visibility test. [Accepted guns][fits] · [Resolved gun model][model-loader] · [FN EVOLYS geometry][evolys-model] · [Geometry parser][geometry-parser] · [Exact mount lookup][marker-lookup] · [Draw/skip check][renderer]
+**FN EVOLYS model limitation:** this gun accepts the attachment, but its bundled model has no `laser_pos` mount. The inspected first-person renderer therefore skips this attachment's model on FN EVOLYS. This is a source-derived limit of that rendering path, not an in-game visibility test. Tracked in [issue #814](https://github.com/HungLo2020/MattMC/issues/814). [Accepted guns][fits] · [Resolved gun model][model-loader] · [FN EVOLYS geometry][evolys-model] · [Geometry parser][geometry-parser] · [Exact mount lookup][marker-lookup] · [Draw/skip check][renderer]
 
 ## Notes
 
