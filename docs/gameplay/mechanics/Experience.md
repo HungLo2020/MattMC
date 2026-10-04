@@ -45,7 +45,7 @@ The [Anvil](AnvilMechanics.md) also charges levels; the Grindstone awards points
 
 Source-reviewed on **2026-10-02** at `4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f`. Point-to-level conversion, active orb pickup/repair, the bundled Mending effect, and table payment were checked. No orb, Mending, fishing, Grindstone, enchanting, or death gameplay test was run. Custom enchantment definitions, item components, and later builds can change these rules.
 
-Related: [Enchanting](../enchanting/Enchanting.md) · [Anvil operations](AnvilMechanics.md) · [Death and respawn](DeathAndRespawn.md) · [Mechanics](Mechanics.md)
+Related: [Enchanting](../enchanting/Enchanting.md) · [Anvil operations](AnvilMechanics.md) · [Death and respawn](DeathAndRespawn.md) · [Mechanics](Mechanics.md) · [Bottle o' Enchanting](../items/BottleOEnchanting.md)
 
 [levels]: https://github.com/HungLo2020/MattMC/blob/4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f/src/main/java/net/minecraft/world/entity/player/Player.java#L1435-L1456
 [costs]: https://github.com/HungLo2020/MattMC/blob/4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f/src/main/java/net/minecraft/world/entity/player/Player.java#L1488-L1494

@@ -229,6 +229,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Exploration, archaeology, and trade
 
+- Expedition ingredients: [Dragon's Breath](items/DragonsBreath.md), [Heart of the Sea](items/HeartOfTheSea.md), [Echo Shards](items/EchoShard.md), [Breeze Rods](items/BreezeRod.md) and [Bottle o' Enchanting](items/BottleOEnchanting.md), with actual acquisition, quantities and next uses
+
 - [Desert Pyramid](structures/DesertPyramid.md), [Jungle Temple](structures/JungleTemple.md) and [Swamp Hut](structures/SwampHut.md): traps, chest and archaeology rewards, and Witch/Cat encounters
 
 - [Woodland Mansion](structures/WoodlandMansion.md), [Evoker](mobs/Evoker.md), [Vindicator](mobs/Vindicator.md), and [Vex](mobs/Vex.md): forest expeditions, room rewards, spell/axe encounters and summon limits

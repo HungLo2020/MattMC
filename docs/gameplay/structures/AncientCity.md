@@ -59,7 +59,7 @@ The main pool makes **5–10 weighted selections**. Useful possibilities include
 
 | Selected entry | Bundled result |
 | --- | --- |
-| Echo Shards | 1–3; save eight for a [Recovery Compass](../items/RecoveryCompass.md#obtaining) |
+| [Echo Shards](../items/EchoShard.md) | 1–3; save eight for a [Recovery Compass](../items/RecoveryCompass.md#obtaining) |
 | Disc Fragments | 1–3 fragments for Music Disc 5 |
 | Swift Sneak book | One book with Swift Sneak I–III; see [equipment and movement effects](../enchanting/MobilityEnchantments.md#swift-sneak-crouching-and-crawling) |
 | Enchanted Golden Apples | 1–2 |

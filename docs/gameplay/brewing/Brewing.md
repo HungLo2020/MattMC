@@ -42,7 +42,7 @@ These transformations change the bottle form while retaining the registered poti
 | Current form | Ingredient | Result |
 | --- | --- | --- |
 | Drinkable potion | Gunpowder | Splash potion of the same type |
-| Splash potion | Dragon's Breath | Lingering potion of the same type |
+| Splash potion | [Dragon's Breath](../items/DragonsBreath.md) | Lingering potion of the same type |
 
 Splash potions are thrown. For effect potions, the splash applies effects to nearby susceptible entities, with distance reducing duration or instant-effect strength. Throwing an effect-bearing lingering potion creates an area-effect cloud. Water and effect-free bases have different impact handling, so a Lingering Water Bottle should not be treated as an effect cloud.
 
