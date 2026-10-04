@@ -260,6 +260,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Monster Room](structures/MonsterRoom.md): Overworld and Primordial feature generation, cave approach, optional chest loot and cage preservation
 - [Village](structures/Village.md): five settlement styles, actual map/search routes, resident protection, zombie layouts and optional supplies/chests
 - [Desert wells](biomes/DesertsBadlandsAndSavannas.md#desert), [Arms Up Pottery Sherd](items/ArmsUpPotterySherd.md) and [Brewer Pottery Sherd](items/BrewerPotterySherd.md): underwater excavation, assigned loot and pot-pattern recovery
+- Desert Pyramid sherds: [Archer](items/ArcherPotterySherd.md), [Miner](items/MinerPotterySherd.md), [Prize](items/PrizePotterySherd.md) and [Skull](items/SkullPotterySherd.md), with cellar excavation, assigned loot and mapped pot-face recovery
 - [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
 - [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
 - [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
