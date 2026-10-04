@@ -198,6 +198,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting
 - [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
 - [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
+- Utility minecarts: [Chest](items/MinecartWithChest.md), [Hopper](items/MinecartWithHopper.md), [Furnace](items/MinecartWithFurnace.md), [TNT](items/MinecartWithTNT.md) and [Command Block](items/MinecartWithCommandBlock.md) acquisition, placement, recovery and distinct controls
 
 - [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
 - [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
