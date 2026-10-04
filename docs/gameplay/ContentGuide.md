@@ -47,6 +47,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Small and tall flowers](blocks/Flowers.md): exact dye/stew variants, soils, Bone Meal routes, Bee choices and Wither Rose limits
 
 - [Saplings and Azaleas](blocks/SaplingsAndAzaleas.md) and [Crimson/Warped Fungi](blocks/NetherFungi.md): planting patterns, Bone Meal, growth space and recovery
+- [Acacia Sapling](items/AcaciaSapling.md), [Azalea](items/Azalea.md), [Pewen Sapling](items/PewenSapling.md) and [Ancient Sapling](items/AncientSapling.md): starting supplies, active growth and custom-tree access limits
 - Sapling item routes: [Birch](items/BirchSapling.md), [Cherry](items/CherrySapling.md), [Dark Oak](items/DarkOakSapling.md), [Jungle](items/JungleSapling.md), [Pale Oak](items/PaleOakSapling.md), [Spruce](items/SpruceSapling.md) and [Flowering Azalea](items/FloweringAzalea.md), with acquisition, planting and growth differences
 
 - [Rabbit](mobs/Rabbit.md) and [Fox](mobs/Fox.md): breeding/coats/trust, crop and berry interactions, carried items, and Rabbit food/material drops
