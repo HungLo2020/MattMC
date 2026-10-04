@@ -37,6 +37,8 @@ With the **default mouse Shoot binding**:
 
 Configured burst RPM does **not guarantee spacing between the rounds** in this source snapshot. The gun queues tasks with future tick stamps, but the server can admit them while it has processing time, so several rounds can run together. The trigger cooldown is a separate limit; see the [SCAR-L example](../items/SCARLAssaultRifle.md#usage). This timing caveat was source-reviewed at `78e8e0423084f010bb47e36132550619b37644c2`, without an in-game rate test. [Burst task creation][burst-task-creation] · [Server admission][burst-task-admission] · [Queue processing][burst-task-queue]
 
+This shared burst scheduling limitation is tracked in [issue #810](https://github.com/HungLo2020/MattMC/issues/810).
+
 If Shoot is remapped to a keyboard key, keyboard repeat can generate further trigger pulls even in SEMI or a non-continuous BURST mode. The firing cooldown still applies. [Keyboard repeat][keyboard-repeat] · [Click consumption][input]
 
 The HUD shows the selected mode. A gun with only one supported mode stays on that mode when Fire Mode is pressed. The client sends shooting, reload, and fire-selection requests through the active server packet path; the server performs the firing and magazine changes. [Client controls][input] · [Modes and scheduled shots][shots] · [Mode cycling][cycle-mode] · [Burst definitions][burst-data] · [HUD][hud] · [Packet transport][transport] · [Packet codec][codec] · [Play registration][protocol] · [Server actions][server]
