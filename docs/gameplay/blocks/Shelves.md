@@ -10,18 +10,18 @@ Use **six of the exact stripped material**, three across the top row and three a
 
 | Block ID | Six recipe inputs | Recipe and ordinary block loot |
 | --- | --- | --- |
-| `acacia_shelf` | Stripped Acacia Log | [Recipe][recipe-acacia_shelf] · [Loot][loot-acacia_shelf] |
-| `bamboo_shelf` | Stripped Block of Bamboo | [Recipe][recipe-bamboo_shelf] · [Loot][loot-bamboo_shelf] |
-| `birch_shelf` | Stripped Birch Log | [Recipe][recipe-birch_shelf] · [Loot][loot-birch_shelf] |
-| `cherry_shelf` | Stripped Cherry Log | [Recipe][recipe-cherry_shelf] · [Loot][loot-cherry_shelf] |
-| `crimson_shelf` | Stripped Crimson Stem | [Recipe][recipe-crimson_shelf] · [Loot][loot-crimson_shelf] |
-| `dark_oak_shelf` | Stripped Dark Oak Log | [Recipe][recipe-dark_oak_shelf] · [Loot][loot-dark_oak_shelf] |
-| `jungle_shelf` | Stripped Jungle Log | [Recipe][recipe-jungle_shelf] · [Loot][loot-jungle_shelf] |
-| `mangrove_shelf` | Stripped Mangrove Log | [Recipe][recipe-mangrove_shelf] · [Loot][loot-mangrove_shelf] |
-| `oak_shelf` | Stripped Oak Log | [Recipe][recipe-oak_shelf] · [Loot][loot-oak_shelf] |
-| `pale_oak_shelf` | Stripped Pale Oak Log | [Recipe][recipe-pale_oak_shelf] · [Loot][loot-pale_oak_shelf] |
-| `spruce_shelf` | Stripped Spruce Log | [Recipe][recipe-spruce_shelf] · [Loot][loot-spruce_shelf] |
-| `warped_shelf` | Stripped Warped Stem | [Recipe][recipe-warped_shelf] · [Loot][loot-warped_shelf] |
+| `acacia_shelf` ([item](../items/AcaciaShelf.md)) | Stripped Acacia Log | [Recipe][recipe-acacia_shelf] · [Loot][loot-acacia_shelf] |
+| `bamboo_shelf` ([item](../items/BambooShelf.md)) | Stripped Block of Bamboo | [Recipe][recipe-bamboo_shelf] · [Loot][loot-bamboo_shelf] |
+| `birch_shelf` ([item](../items/BirchShelf.md)) | Stripped Birch Log | [Recipe][recipe-birch_shelf] · [Loot][loot-birch_shelf] |
+| `cherry_shelf` ([item](../items/CherryShelf.md)) | Stripped Cherry Log | [Recipe][recipe-cherry_shelf] · [Loot][loot-cherry_shelf] |
+| `crimson_shelf` ([item](../items/CrimsonShelf.md)) | Stripped Crimson Stem | [Recipe][recipe-crimson_shelf] · [Loot][loot-crimson_shelf] |
+| `dark_oak_shelf` ([item](../items/DarkOakShelf.md)) | Stripped Dark Oak Log | [Recipe][recipe-dark_oak_shelf] · [Loot][loot-dark_oak_shelf] |
+| `jungle_shelf` ([item](../items/JungleShelf.md)) | Stripped Jungle Log | [Recipe][recipe-jungle_shelf] · [Loot][loot-jungle_shelf] |
+| `mangrove_shelf` ([item](../items/MangroveShelf.md)) | Stripped Mangrove Log | [Recipe][recipe-mangrove_shelf] · [Loot][loot-mangrove_shelf] |
+| `oak_shelf` ([item](../items/OakShelf.md)) | Stripped Oak Log | [Recipe][recipe-oak_shelf] · [Loot][loot-oak_shelf] |
+| `pale_oak_shelf` ([item](../items/PaleOakShelf.md)) | Stripped Pale Oak Log | [Recipe][recipe-pale_oak_shelf] · [Loot][loot-pale_oak_shelf] |
+| `spruce_shelf` ([item](../items/SpruceShelf.md)) | Stripped Spruce Log | [Recipe][recipe-spruce_shelf] · [Loot][loot-spruce_shelf] |
+| `warped_shelf` ([item](../items/WarpedShelf.md)) | Stripped Warped Stem | [Recipe][recipe-warped_shelf] · [Loot][loot-warped_shelf] |
 
 Use [Tree Logs and Roots](TreeLogsAndRoots.md#stripping) for stripping timber and [Bamboo](Bamboo.md) for bamboo material preparation. The recipes and [Creative entries][creative] are verified acquisition routes; this guide does not infer naturally generated Shelves from their wood names.
 

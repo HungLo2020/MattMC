@@ -223,7 +223,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - Utility minecarts: [Chest](items/MinecartWithChest.md), [Hopper](items/MinecartWithHopper.md), [Furnace](items/MinecartWithFurnace.md), [TNT](items/MinecartWithTNT.md) and [Command Block](items/MinecartWithCommandBlock.md) acquisition, placement, recovery and distinct controls
 
 - [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
-- [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
+- [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents; the [variant item guides](blocks/Shelves.md#variants-and-crafting) give exact recipes and ordinary empty-item collection limits
 - [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
 - [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
 - Expedition music discs: [5](items/MusicDisc5.md) and [fragments](items/DiscFragment.md), [Otherside](items/MusicDiscOtherside.md), [Pigstep](items/MusicDiscPigstep.md) and [Relic](items/MusicDiscRelic.md), with distinct chest/archaeology routes, crafting and configured song data
