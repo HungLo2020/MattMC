@@ -337,6 +337,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [TaCZ firearms](mechanics/TaCZFirearms.md): gun controls, magazine and reserve ammunition, partial reloads, refitting and current limits
 - [TaCZ Workbenches](blocks/TaCZWorkbenches.md): firearm, ammunition and attachment menus, exact table recipes and inventory transactions
+- Compact sights: [ACRO P-1](items/AimpointACROP1Sight.md), [DeltaPoint](items/DeltaPointSight.md), [FastFire](items/FastFireSight.md), and their [ACRO Rised](items/AimpointACROP1SightRised.md), [DeltaPoint Rised](items/DeltaPointSightRised.md) and [FastFire Rised](items/FastFireSightRised.md) variants, with exact recipes, fitting lists and configured zoom
 - Extended magazines: Light [I](items/LightAmmoExtendedMagI.md), [II](items/LightAmmoExtendedMagII.md), [III](items/LightAmmoExtendedMagIII.md) and Heavy [I](items/HeavyAmmoExtendedMagI.md), [II](items/HeavyAmmoExtendedMagII.md), [III](items/HeavyAmmoExtendedMagIII.md), with exact recipes, gun-specific capacities and current exceptions
 
 ## Browse by topic
