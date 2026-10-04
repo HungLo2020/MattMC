@@ -27,8 +27,9 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | [Mineshaft](Mineshaft.md) | Eligible normal-Overworld biomes; separate Badlands variant | Track and building materials, optional chest-minecart supplies and cave-spider encounters |
 | [Igloo](Igloo.md) | Snowy Plains, Snowy Taiga and Snowy Slopes in the normal Overworld | Snowy shelter and a possible basement with residents and one set of curing supplies |
 | [Ruined Portal](RuinedPortal.md) | Seven placement variants across eligible Overworld and Nether biomes | Optional chest supplies and salvage, with frame repair and onward-travel preparation |
+| [Monster Room](MonsterRoom.md) | Eligible Overworld and loaded Primordial Caves biomes | Cave-side spawner encounters and optional chest supplies; generated as a biome feature |
 
-These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
+These are the exploration destinations reviewed in this section so far, not a complete inventory of MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 
 For fossil routes, see [Bone Block: finding fossils](../blocks/BoneBlock.md#finding-fossils) and [Dried Ghast](../blocks/DriedGhast.md).
 
@@ -49,9 +50,11 @@ A failed search is not proof that a structure does not exist anywhere. Check the
 
 ## When generation is eligible
 
-New structure starts require the world's structure-generation option to be enabled. The generator then uses the world's loaded structure sets, placement rules, and allowed biomes. A biome being eligible means a structure may start there, not that every patch of that biome contains one.
+New registered structure starts require the world's structure-generation option to be enabled. The generator then uses the world's loaded structure sets, placement rules, and allowed biomes. A biome being eligible means a structure may start there, not that every patch of that biome contains one.
 
-The guides describe bundled data and the normal world preset. Data packs, custom presets, and older already-generated terrain can differ. In particular, the bundled Primordial Caves preset uses Dry Midlands and Primordial Plains; neither biome belongs to the fortress or stronghold allowed biome tags. Do not carry a fortress or stronghold search into [Primordial Caves](../dimensions/PrimordialCaves.md) expecting the default Nether or Overworld result.
+The guides describe bundled data and the normal world preset. Data packs, custom presets, and older already-generated terrain can differ. In particular, the bundled loaded Primordial Caves dimension uses Dry Midlands, Primordial Plains and Primordial Ocean; none belongs to the fortress or stronghold allowed biome tags. See [the loaded-dimension explanation](../dimensions/PrimordialCaves.md#what-currently-generates) for how that definition takes precedence over the preset. Do not carry a fortress or stronghold search into [Primordial Caves](../dimensions/PrimordialCaves.md) expecting the default Nether or Overworld result.
+
+Monster Rooms are biome features, included here as expedition destinations. Their decoration attempts are separate from Generate Structures, and they have no `/locate structure` target; follow [their finding and generation guidance](MonsterRoom.md). The feature/structure distinction and loaded Primordial biome list were source-reviewed at `78e8e0423084f010bb47e36132550619b37644c2` on 2026-10-04.
 
 ## Before entering
 
@@ -74,3 +77,6 @@ Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No 
 - [Structure-generation setting](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/chunk/status/ChunkStatusTasks.java#L40-L59), [structure-set and biome filtering](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/chunk/ChunkGeneratorStructureState.java#L45-L64), and [placement and generation](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/chunk/ChunkGenerator.java#L453-L580)
 - [Locate permissions, dimension scope, failure, and coordinate output](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/server/commands/LocateCommand.java)
 - [Normal world preset, including Primordial Caves](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/world_preset/normal.json), [Nether biome tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/worldgen/biome/is_nether.json), and [Overworld biome tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/worldgen/biome/is_overworld.json)
+
+- [Registered-structure gate and separate feature decoration](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/chunk/ChunkGenerator.java#L333-L381), [locate registry targets](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/commands/LocateCommand.java#L55-L69), and [Monster Room feature registration](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/levelgen/feature/Feature.java#L103)
+- [Loaded Primordial dimension](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/dimension/primordial_caves.json), [world loading](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/WorldLoader.java#L35-L48), and [dimension override precedence](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/levelgen/WorldDimensions.java#L168-L183)

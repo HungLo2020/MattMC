@@ -253,6 +253,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Mineshaft](structures/Mineshaft.md): normal/Badlands search, branching-route preparation, cave-spider corridors, chest-cart loot and safe material recovery
 - [Igloo](structures/Igloo.md): snowy-biome search, optional basement inspection, finite cure supplies and resident protection
 - [Ruined Portal](structures/RuinedPortal.md): variant search, hazards, chest/salvage choices, valid frame repair and separate Primordial conversion
+- [Monster Room](structures/MonsterRoom.md): Overworld and Primordial feature generation, cave approach, optional chest loot and cage preservation
 - [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
 - [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
 - [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
