@@ -23,6 +23,7 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | [Swamp Hut](SwampHut.md) | Swamp | Witch/Cat residents and separate piece-bound spawning routes |
 | [Trial Chambers](TrialChambers.md) | Eligible normal-Overworld biomes, with Deep Dark excluded | Trial encounters, separate supply/container rewards, keys and normal or ominous Vault routes |
 | [Ancient City](AncientCity.md) | Deep Dark in the normal Overworld | Sculk-aware exploration, Swift Sneak, Echo Shards, Disc Fragments and possible Ward/Silence templates |
+| [Trail Ruins](TrailRuins.md) | Taiga families, Old Growth Birch Forest and Jungle in the normal Overworld | Careful Suspicious Gravel excavation for possible sherds, trim templates and the Relic disc |
 
 These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 
