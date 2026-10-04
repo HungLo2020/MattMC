@@ -1,18 +1,37 @@
 # Acacia Stairs
 
+Acacia Stairs (`minecraft:acacia_stairs`) are the stepped building form made from [Acacia Planks](AcaciaPlanks.md).
+
 ## Obtaining
 
-Acacia Stairs are crafted from Acacia Planks. They can also be obtained from the Creative Menu.
+Use a [Crafting Table](../blocks/CraftingTable.md) to arrange **6 Acacia Planks → 4 Acacia Stairs**: rows of one, two, then three planks aligned along one side. All six slots require Acacia Planks. See the [shared construction layouts](../blocks/WoodConstruction.md#crafting-construction-shapes). [Recipe][recipe]
+
+Ordinary Survival mining returns **one matching stair item**, with no required tool or Silk Touch. An unbroken axe mines it faster; this speed advantage is separate from [drop eligibility](../blocks/WoodConstruction.md#mining-and-drops). [Loot][loot]
 
 ## Usage
 
-Acacia Stairs are used for stairways, roofs, seating, trim, and angled wooden details.
+Place them upright for steps or upside down for roof edges and overhangs. They face your horizontal placement direction; the clicked face and height choose the half. Follow the [stair placement and corner guide](../blocks/WoodConstruction.md#stairs). [Placement][placement]
 
 ## Behavior
 
-Stairs connect into corner shapes depending on nearby stair blocks and placement direction.
+Compatible neighboring stairs can form inner or outer corners, including stairs of other materials. The placed half and corner shape do not change the matching item recovered by mining. These stairs can be waterlogged; see [water placement and bucket rules](../blocks/WoodConstruction.md#waterlogging-and-power). [Placement][placement] · [Loot][loot]
+
+When not waterlogged, the placed stairs can be consumed by spreading fire. One Acacia Stair item supplies **300 burn ticks** as default furnace fuel; see [fire and fuel planning](../blocks/WoodConstruction.md#fire-and-furnace-fuel). [Fire registration][fire] · [Fuel table][fuel]
 
 ## Notes
 
-* This item is the item form of the `minecraft:acacia_stairs` block.
-* It appears in the Building Blocks creative tab.
+* The block inherits Acacia Planks' hardness **2** and blast resistance **3**. [Stair registration][block] · [Plank properties][planks] · [Property copying][copy]
+* Available in the Building Blocks creative tab. [Creative entry][creative]
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. Recipes, loot, and tags can be changed by data packs. No in-game test was run. [Item registration][item]
+
+[recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/acacia_stairs.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/acacia_stairs.json
+[item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L594-L594
+[block]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L3111-L3111
+[copy]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L7255-L7258
+[placement]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/StairBlock.java#L91-L164
+[planks]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L155-L163
+[fire]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/FireBlock.java#L356-L356
+[fuel]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/entity/FuelValues.java#L38-L54
+[creative]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L136-L136

@@ -74,6 +74,8 @@ Single slabs can be waterlogged. Combining two slabs sets the result to **double
 
 ## Stairs
 
+Item entries: [Acacia Stairs](../items/AcaciaStairs.md) · [Bamboo Mosaic Stairs](../items/BambooMosaicStairs.md) · [Bamboo Stairs](../items/BambooStairs.md) · [Birch Stairs](../items/BirchStairs.md) · [Cherry Stairs](../items/CherryStairs.md) · [Crimson Stairs](../items/CrimsonStairs.md) · [Dark Oak Stairs](../items/DarkOakStairs.md) · [Jungle Stairs](../items/JungleStairs.md) · [Mangrove Stairs](../items/MangroveStairs.md) · [Oak Stairs](../items/OakStairs.md) · [Pale Oak Stairs](../items/PaleOakStairs.md) · [Spruce Stairs](../items/SpruceStairs.md) · [Warped Stairs](../items/WarpedStairs.md)
+
 Stairs face in the player's horizontal placement direction. The clicked face and height choose bottom or upside-down placement using the same half-selection rule as slabs. Neighboring stairs can form inner or outer corners when their orientations and halves fit. **Different stair materials can form corners together**; compatible halves and directions are still required, and a neighboring parallel stair can prevent a corner. [Stair placement and corner checks][stairs]
 
 Stairs keep their stair item when mined, regardless of their corner shape or half. All covered stair variants can be waterlogged. [Stair water state][stairs-water] · [Stair loot checks](#recipe-and-loot-matrix)
