@@ -337,6 +337,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [TaCZ firearms](mechanics/TaCZFirearms.md): gun controls, magazine and reserve ammunition, partial reloads, refitting and current limits
 - [TaCZ Workbenches](blocks/TaCZWorkbenches.md): firearm, ammunition and attachment menus, exact table recipes and inventory transactions
+- Extended magazines: Light [I](items/LightAmmoExtendedMagI.md), [II](items/LightAmmoExtendedMagII.md), [III](items/LightAmmoExtendedMagIII.md) and Heavy [I](items/HeavyAmmoExtendedMagI.md), [II](items/HeavyAmmoExtendedMagII.md), [III](items/HeavyAmmoExtendedMagIII.md), with exact recipes, gun-specific capacities and current exceptions
 
 ## Browse by topic
 
