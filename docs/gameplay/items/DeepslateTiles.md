@@ -2,16 +2,34 @@
 
 ## Obtaining
 
-Deepslate Tiles can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft **4 [Deepslate Bricks](DeepslateBricks.md) in a 2 × 2 square → 4 Deepslate Tiles**. [Recipe]
+
+At a [Stonecutter](../blocks/Stonecutter.md), **1 input → 1 Deepslate Tiles**. Choose [Cobbled Deepslate](CobbledDeepslate.md) [Stonecutting 1], [Polished Deepslate](PolishedDeepslate.md) [Stonecutting 2], [Deepslate Bricks](DeepslateBricks.md) [Stonecutting 3]. See the [exact input/output matrix](../blocks/Deepslate.md#stonecutting-shortcuts).
+
+Mine the placed block with an **unbroken pickaxe** to recover **1 Deepslate Tiles**; Silk Touch is unnecessary. Using another tool does not recover the item, even with Silk Touch. [Drop table] · [Pickaxe tag] · [Tool gate] · [Broken tools] See the [family mining rules](../blocks/Deepslate.md#obtaining-and-mining) for tool tiers and drop conditions.
 
 ## Usage
 
-Deepslate Tiles is a building, resource, or decorative block used in construction, crafting, or world interaction.
+Use Deepslate Tiles as a dark building finish or make its [stairs, slabs and walls](../blocks/Deepslate.md#building-variants).  Smelt **1 Deepslate Tiles → 1 [Cracked Deepslate Tiles](CrackedDeepslateTiles.md)**. [Cracking recipe] Follow the [crafting and smelting guide](../blocks/Deepslate.md#crafting-and-smelting) for exact shape counts.
 
 ## Behavior
 
-It behaves as a block and follows its normal mining, tool, placement, and interaction rules.
+This is a full building block without raw Deepslate’s axis placement. Mining keeps this finish; it does not turn into Cobbled Deepslate. [Block registration] · [Drop table] See [orientation differences](../blocks/Deepslate.md#orienting-ordinary-deepslate) and [block properties](../blocks/Deepslate.md#block-properties).
 
 ## Notes
 
-* This item is the item form of the `minecraft:deepslate_tiles` block.
+* This item is the item form of the `minecraft:deepslate_tiles` block. [Item registration] · [Block registration]
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. Bundled recipes and loot were checked; no in-game crafting, mining or placement test was run.
+
+[Item registration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L546-L546
+[Block registration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L6691-L6693
+[Drop table]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/deepslate_tiles.json
+[Pickaxe tag]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[Tool gate]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/player/Player.java#L655-L657
+[Broken tools]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L587-L589
+[Recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/deepslate_tiles.json
+[Stonecutting 1]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/stonecutting/deepslate_tiles_from_cobbled_deepslate_stonecutting.json
+[Stonecutting 2]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/stonecutting/deepslate_tiles_from_polished_deepslate_stonecutting.json
+[Stonecutting 3]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/stonecutting/deepslate_tiles_from_deepslate_bricks_stonecutting.json
+[Cracking recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/smelting/cracked_deepslate_tiles.json

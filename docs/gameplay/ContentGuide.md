@@ -19,7 +19,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
 - [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
-- [Stone](blocks/Stone.md) and [Deepslate](blocks/Deepslate.md): ordinary/mossy/brick construction, exact crafting/stonecutting choices, shaped placement, infestation, and reinforced-block limits
+- [Stone](blocks/Stone.md) and [Deepslate](blocks/Deepslate.md): ordinary/mossy/brick construction, exact crafting/stonecutting choices, shaped placement, infestation, and reinforced-block limits; [Deepslate item variants](blocks/Deepslate.md#building-variants) give exact recipe inputs and collection outcomes
 - [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations, storage, and the Blast Furnace/Smoker recipe and fuel comparison
 - [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
 - [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
