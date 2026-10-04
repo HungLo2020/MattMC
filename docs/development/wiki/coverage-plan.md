@@ -2000,3 +2000,11 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - The Master Shepherd offer returns three Paintings for a base two Emeralds, with ordinary price modifiers still applicable. Recovering a placed painting returns an ordinary item without preserving its selected picture. Current browser listing/insertion qualifications remain.
 - Active rendering inputs and submission are source-inspected without claiming verified appearance for every artwork, resource pack or shader. No third-party artwork was copied into the wiki.
 - Frozen independent content/metadata review, final documentation/index check and strict build, configured local/source links and old anchors apply. No game crafting, trading, placement, reroll, recovery or visual test was run. Historical entries remain intact and broader wiki catch-up remains incomplete.
+
+## Batch 254: Metal horse armor
+
+- Expanded Copper, Iron, Golden, Diamond and Netherite Horse Armor entries with current acquisition, protection, equipment/removal and recovery facts, and added a Content Guide route. Horse, Saddle, Armor and Smithing remain the shared mechanic owners.
+- Source pin `78e8e0423084f010bb47e36132550619b37644c2`: acquisition distinguishes actual chest-table and optional-pack routes, recycling and the valid loaded Netherite smithing recipe. The Netherite route was checked through the current Ingredient and TransmuteResult codecs and menu behavior rather than inferred from upstream conventions.
+- Ordinary hand equipping follows the Horse-specific interaction path; component presence alone does not establish generic equip-on-interact behavior. Default durability/enchantability, supported tags, dye/trim limits and actual armor attributes are kept distinct.
+- Golden armor's Piglin admiration behavior is not bartering, and Netherite dropped-item fire resistance is not a claim that the wearing Horse becomes fireproof. Current browser acquisition and permission qualifications remain.
+- Frozen independent content/metadata review, final documentation/index check and strict build, configured local/source links and all original headings apply. No game looting, crafting/smithing, equipping, damage, fire, death-drop or trading test was run. Historical entries remain intact and broader wiki catch-up remains incomplete.
