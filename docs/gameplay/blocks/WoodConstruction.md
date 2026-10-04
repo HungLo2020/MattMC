@@ -90,6 +90,8 @@ Fence collision rises **1.5 blocks**, even though the visible post is one block 
 
 ## Fence Gates
 
+Item entries: [Acacia Fence Gate](../items/AcaciaFenceGate.md) · [Bamboo Fence Gate](../items/BambooFenceGate.md) · [Birch Fence Gate](../items/BirchFenceGate.md) · [Cherry Fence Gate](../items/CherryFenceGate.md) · [Crimson Fence Gate](../items/CrimsonFenceGate.md) · [Dark Oak Fence Gate](../items/DarkOakFenceGate.md) · [Jungle Fence Gate](../items/JungleFenceGate.md) · [Mangrove Fence Gate](../items/MangroveFenceGate.md) · [Oak Fence Gate](../items/OakFenceGate.md) · [Pale Oak Fence Gate](../items/PaleOakFenceGate.md) · [Spruce Fence Gate](../items/SpruceFenceGate.md) · [Warped Fence Gate](../items/WarpedFenceGate.md)
+
 A gate's placement direction determines the direction you walk through it. Fence rails attach across the perpendicular axis; rotating the gate can therefore fix an apparent missing connection. A gate does not require adjacent fences or continuing floor support. [Placement and connection direction][gates] · [Default survival rule][default-support]
 
 Use a gate to open or close it by hand. Opening from its reverse side flips its facing so it opens away from that approach. **Closed collision is 1.5 blocks high; open collision is empty.** A wall-tagged neighbor along the rail axis sets the lower in-wall appearance, without reducing the closed collision height. Gates have no waterlogged state. [Shape, interaction, wall, and state definitions][gates]
