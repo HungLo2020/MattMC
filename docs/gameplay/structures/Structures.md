@@ -28,6 +28,7 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | [Igloo](Igloo.md) | Snowy Plains, Snowy Taiga and Snowy Slopes in the normal Overworld | Snowy shelter and a possible basement with residents and one set of curing supplies |
 | [Ruined Portal](RuinedPortal.md) | Seven placement variants across eligible Overworld and Nether biomes | Optional chest supplies and salvage, with frame repair and onward-travel preparation |
 | [Monster Room](MonsterRoom.md) | Eligible Overworld and loaded Primordial Caves biomes | Cave-side spawner encounters and optional chest supplies; generated as a biome feature |
+| [Village](Village.md) | Plains/Meadow, Desert, Savanna, Snowy Plains and Taiga in the normal Overworld | Settlement exploration, resident protection and layout-dependent crops, supplies and chest rewards |
 
 These are the exploration destinations reviewed in this section so far, not a complete inventory of MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 
