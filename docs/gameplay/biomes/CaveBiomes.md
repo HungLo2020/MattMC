@@ -34,6 +34,8 @@ Deep Dark is the sole member of the bundled Ancient City eligibility tag. The An
 
 ## Mining and finding the right cave
 
+For Dripstone Copper and the shared underground ore distributions, see [Finding ores](../mechanics/FindingOres.md#overworld-placements).
+
 All three biome definitions include ordinary Coal, Iron, Gold, Redstone, Diamond, Lapis and Copper placements, Amethyst geodes, and monster-room entries. Lush Caves additionally lists an Ore Clay placement. Underground terrain can contain materials from these systems alongside the distinctive vegetation or sculk. Consult [Ore resources](../blocks/OreResources.md) and [Clay and Bricks](../blocks/ClayAndBricks.md) for harvesting rather than assuming a biome changes the tool requirement. [Lush data][lush] · [Dripstone data][dripstone] · [Deep Dark data][deep-dark]
 
 The selector's cave depth values are **climate/noise coordinates, not literal Y levels**. Lush Caves uses a high-humidity selection range, Dripstone Caves a high-continentalness range, and Deep Dark a separate bottom-biome entry with erosion restrictions. These are search tendencies in the generator, not a fixed depth or distance recipe. [Cave selection][cave-selection] · [Underground/bottom parameter construction][cave-depth]

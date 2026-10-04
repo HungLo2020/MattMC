@@ -22,6 +22,8 @@ The magma and gravel vein definitions similarly target the missing `minecraft:ba
 
 Seeded automated tests exercise the biome-linked ore placements in fresh, solid chunk sections, including their configured height/count rules and native vein geometry. They are not a full natural-terrain generation or ore-yield survey, so this page does not promise a mining rate or height chart. The correction applies when features generate new terrain; it does not add ores to already generated chunks. Data-pack overrides can change the result.
 
+Use [Finding ores](../mechanics/FindingOres.md#primordial-caves-check-the-actual-biome) for the custom ordinary ore chart; the geode and missing Magma/Gravel host-tag distinctions above still apply.
+
 ## Mobs: listed candidates and restrictions
 
 These are data entries, not confirmed encounters. Weights are relative choices within each category, not percentages; group ranges are configured values.

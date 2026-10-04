@@ -89,6 +89,8 @@ Raw-metal storage recipes are described under [processing](#processing-raw-metal
 
 ### Generation examples and limits
 
+For the joined biome and height comparison, use [Finding ores](../mechanics/FindingOres.md). It separates origin sampling and attempts from successful ore placement.
+
 In the normal preset, the bundled **Forest** feature list includes Coal, Iron, Copper, Gold, Redstone, Diamond and Lapis ore placements. **Windswept Hills** additionally provides an Emerald ore route. Their configured features target the stone/deepslate replacement groups to choose the corresponding ore form. These are checked examples, not a complete biome or best-height chart. [Normal preset wiring][presets] · [Forest features][forest] · [Windswept Hills features][hills] · [Emerald targets][configured-ore_emerald] · [Ore placement implementation][ore-feature]
 
 **Nether Wastes** includes placed Nether Gold, Nether Quartz and two Ancient Debris features. The Debris features use the Nether base-stone target group and discard exposed candidates; the presence of a feature is not a guarantee of finding a vein in every chunk. [Nether biome][nether] · [Nether Gold placement][placed-ore_gold_nether] [configured-ore_gold_nether] · [Quartz placement][placed-ore_quartz_nether] [configured-ore_quartz_nether] · [Large Debris][placed-ore_ancient_debris_large] [configured-ore_ancient_debris_large] · [Small Debris][placed-ore_debris_small] [configured-ore_debris_small] · [Scattered-ore implementation][scattered]

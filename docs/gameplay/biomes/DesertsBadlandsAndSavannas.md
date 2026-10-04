@@ -72,6 +72,8 @@ The checked creature candidates match ordinary Savanna, including Horse, Donkey 
 
 ## Extra Gold and animal support
 
+[Finding ores](../mechanics/FindingOres.md#biome-bonuses) compares the Badlands extra Gold placement with ordinary Gold and its eligible host rock.
+
 All three Badlands variants reference one extra Gold placement: **50 attempted starting positions with a uniform Y range of 32–256**, followed by the biome filter. The configuration uses a vein size parameter of 9 and targets the stone/deepslate replacement tags. These are generator inputs, not fifty veins, nine guaranteed blocks per vein, a best-mining-height claim or a chunk yield. The tags include Stone/Granite/Diorite/Andesite and Deepslate/Tuff, **not Terracotta or Red Sand**; the active ore placer tests the target before writing. The [Ore Resources guide](../blocks/OreResources.md) remains the owner of pickaxe tiers, drops and processing. [Extra placement][placed-ore_gold_extra] · [Gold configuration][configured-ore_gold] · [Stone targets][ore-stone] · [Deepslate targets][ore-deepslate] · [Placement checks][ore-checks]
 
 Armadillos differ from ordinary farm animals here: their support tag includes the ordinary animal group, badlands terracotta, Red Sand and Coarse Dirt. Their registered predicate still requires brightness above 8. This makes terrain support relevant when comparing a Badlands route to a grassy Savanna, without turning either list into an encounter guarantee. [Spawn registration][spawn-registration] · [Armadillo predicate][armadillo-checks] · [Support tag][armadillo-ground] · [Brightness][animal-checks]

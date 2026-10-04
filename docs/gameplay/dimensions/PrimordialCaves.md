@@ -41,6 +41,8 @@ A scoped review of those active biome definitions found no positive natural-spaw
 
 ## Related pages
 
+- [Finding ores: biome-specific placements and large-vein limits](../mechanics/FindingOres.md#primordial-caves-check-the-actual-biome)
+
 - [Pitcher Pod acquisition and use](../items/PitcherPod.md)
 - [Nether](Nether.md)
 - [Dimensions](Dimensions.md)

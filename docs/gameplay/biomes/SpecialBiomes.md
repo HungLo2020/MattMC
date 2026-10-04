@@ -36,6 +36,8 @@ The custom Bubble Coral and Seagrass patches sample heights from the generator b
 
 The ordinary custom ore configurations use the current stone/deepslate replacement tags, including the Emerald example. The separate `ore/magma` and `ore/gravel` configurations still name **`base_stone_dwarfhollow`**, for which no bundled block-tag file was found in this snapshot. Do not treat those two vein entries as a demonstrated generation supply. Geodes and other Gravel features use different configurations; the limitation does not establish that all ores, Gravel or Magma are absent. See [Dry Midlands](DryMidlands.md#mining-geodes-versus-ordinary-veins) and [Ore resources](../blocks/OreResources.md) for the shared distinction. [Emerald vein targets][emerald-ore] · [Magma target][magma] · [Gravel target][gravel] · [Tag-match predicate][tag-match]
 
+The [Primordial ore chart](../mechanics/FindingOres.md#primordial-caves-check-the-actual-biome) joins those ordinary placements with their heights, counts and exposure checks, including Ocean-only Emerald.
+
 ### Listed creatures and practical limits
 
 The biome lists **Cod, Squid and Dolphins**, underground Glow Squid, Bats and ordinary hostile candidates, plus Drowned. It has no Axolotl, Tropical Fish or custom prehistoric-mob entry. These are candidate tables, not verified encounters. [Exact spawn lists][primordial]

@@ -6,6 +6,8 @@ Use [Pickaxes and Shovels](PickaxesAndShovels.md) for exact per-item recipes, ma
 
 Use [Haste and Mining Fatigue](../effects/MiningEffects.md) for effect multipliers, their interaction with Conduit Power, and separate attack-recharge changes.
 
+Choose where to search with [Finding ores](FindingOres.md), including biome bonuses, height distributions and buried deposits.
+
 ## Choose the tool family first
 
 Tools have rules for their intended block groups, such as pickaxe-mineable stone or axe-mineable wood. A block that requires a correct tool can fail its drop check even when its loot table names an item. If no matching correct-for-drops rule is found, the tool rule returns false.

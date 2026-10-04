@@ -6,6 +6,8 @@ Use the [Nether dimension guide](../dimensions/Nether.md) for portals, coordinat
 
 ## Compare the five biomes
 
+See [Finding ores](../mechanics/FindingOres.md#nether-quartz-gold-and-ancient-debris) for Nether Gold, Quartz and Debris origin heights, biome counts and host restrictions.
+
 Surface materials below are outputs of conditional surface rules, not a uniform floor covering. The Normal preset uses Netherrack as its base terrain and applies these biome-specific rules. [Surface settings][nether-surfaces] · [Surface generation][surface-caller]
 
 | Biome and exact ID | What to look for | Biome monster candidates |

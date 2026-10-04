@@ -90,6 +90,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth
 
 - [Ores and Ancient Debris](blocks/OreResources.md): all nineteen ore/debris blocks, exact tool gates, drops/Fortune/XP, processing and checked generation examples
+- [Finding ores](mechanics/FindingOres.md): height distributions, biome bonuses, Nether and Primordial differences, and large Copper/Iron veins
 
 - [Axes and Hoes](mechanics/AxesAndHoes.md): all seven materials, combat attributes, stripping/copper restoration, tilling, and MattMC crop-area harvesting
 - [Pickaxes and Shovels](mechanics/PickaxesAndShovels.md): all seven materials with exact recipes, mining/drop rules, path/campfire use, upkeep, and recycling

@@ -67,6 +67,8 @@ Sheep, Pigs, Chickens, Cows and Llamas are the creature candidates. For a longer
 
 ## Mining and snow precautions
 
+Use [Finding ores](../mechanics/FindingOres.md#biome-bonuses) for the exact Emerald biome list and high Iron origin distributions.
+
 All eight lists include **Emerald Ore and infested-stone feature entries**, in addition to their ordinary ore features. The configurations target the Stone/Deepslate ore-replaceable tags. A selected height in open air, snow or an unsuitable material does not turn into ore merely because the biome is mountainous. The Emerald placement's sampled range even extends beyond the Normal world's buildable terrain; it must not be read as a mountain height or a guaranteed yield. Use [Ore resources](../blocks/OreResources.md) for tools, drops and processing. [Emerald placement][placed-ore_emerald] · [Emerald targets][config-ore_emerald] · [Infested placement][placed-ore_infested] · [Infested targets][config-ore_infested] · [Stone targets][tag-stone_ore_replaceables] · [Deepslate targets][tag-deepslate_ore_replaceables] · [Placement, build-height and target checks][ore-checks] · [Normal terrain settings][surfaces]
 
 Every list also includes the top-layer snow/freezing feature, including warmer Stony Peaks. It still asks the biome's temperature and block/light checks whether Snow or Ice can form; its presence is not a promise of snow cover. Keep [Snow/Powder Snow](../blocks/Snow.md) and [Ice](../blocks/Ice.md) as the owners of collision, freezing, melting and harvesting behavior. [Top-layer placement][placed-freeze_top_layer] · [Configured feature][config-freeze_top_layer] · [Top-layer caller][freeze-checks] · [Environmental checks][cold-checks]
