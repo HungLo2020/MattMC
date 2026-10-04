@@ -30,6 +30,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Farming, food, and animal care
 
+- [Terrapin bucket transport](items/BucketOfTerrapin.md) and [Anaconda](items/AnacondaSpawnEgg.md), [Anteater](items/AnteaterSpawnEgg.md), [Atlatitan](items/AtlatitanSpawnEgg.md) and [Axolotl](items/AxolotlSpawnEgg.md) spawn eggs: preserved traits, release risks, adult/baby workflows and access limits
+
 - [Villager breeding and population](mobs/Villager.md#breeding-and-population): feeding both parents, reachable spare homes, birth, growth and troubleshooting
 
 - [Bison](mobs/Bison.md) and [Moose](mobs/Moose.md): browser/egg access, source-verified breeding, dispenser Fur harvesting, Antler shedding, and missing natural/recipe resource routes
