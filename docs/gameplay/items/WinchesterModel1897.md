@@ -1,31 +1,54 @@
 # Winchester Model 1897
 
-Slam fire? Thats a war crime! Ignore the gas that we used on the french...
+The Winchester Model 1897 is a five-shell TaCZ shotgun with SEMI and AUTO modes. Each shell creates nine pellets, and this gun accepts no attachments.
 
 ## Obtaining
 
-Winchester Model 1897 can be obtained from the Creative Menu. It is registered as `minecraft:m1897`.
+Craft **one** at the [TaCZ Gun Smith Table](../blocks/TaCZWorkbenches.md#gun-smith-table), in the **Shotgun** group, from **30 Iron Ingots**. See the workbench guide for table recipes and crafting controls. [Recipe][recipe] · [Category][category] · [Output count][craft-output]
+
+It also appears in the Creative Menu and is registered as `minecraft:m1897`. Carry [12 Gauge Bullet](12GaugeBullet.md) for Survival reloads; see that page for the ammunition recipe. [Creative entries][creative] · [Registration][registration]
 
 ## Usage
 
-Winchester Model 1897 is a TaCZ firearm. It uses [12 Gauge Bullet](12GaugeBullet.md) and fires with the TaCZ gun controls. Reload it with the reload key and aim down sights with the aim key.
+Hold the gun in the **main hand**. With the default bindings, **left-click** fires, **hold right-click** aims, and **R** reloads. See [TaCZ firearms](../mechanics/TaCZFirearms.md#controls) for remapping, aiming transitions, and other controls. [Defaults][keys] · [Input handling][input]
+
+It starts in **SEMI**, which fires one shell per click. Press **G** to select **AUTO** and hold Shoot for repeated shots while ammunition remains. Both modes create nine pellets per shell. [Modes][modes] · [Trigger and ammunition][trigger]
+
+### Reloading
+
+Keep the gun selected until the reload finishes. All new shells are added **once at completion**; the shell-loading animation does not grant usable ammunition in stages. Switching to a different item cancels the reload without adding shells, while previously loaded shells remain. [Reload completion][reload-start] · [Stopping use][stop-use] · [Ammunition grant][reload-ammo]
+
+| Starting load | Active reload duration |
+| --- | --- |
+| One shell missing, four still loaded | 38 ticks / 1.9 s |
+| Empty, base five-shell capacity | 128 ticks / 6.4 s |
+
+Timing counts every missing shell, with a longer opening allowance when the gun is empty. For other loads, the nominal duration is 0.4667 + 0.7 × missing shells + 0.7333 seconds, replacing 0.4667 with 2.1667 when empty. The total rounds to the nearest game tick. [Reload timing][reload-timing] Seconds here assume **20 game ticks per second**; they are not measured wall-clock times.
+
+The timer uses **missing capacity**, even if the first carried ammunition stack contains fewer shells. Survival takes shells from that **first matching stack only**, so a completed reload can be partial despite a larger HUD reserve total. Combine stacks or reload again as needed. Creative supplies missing shells without reserve ammunition, but each shot still spends a loaded shell. See [magazine and reserve rules](../mechanics/TaCZFirearms.md#magazine-reserve-and-reloading). [Reload supply][reload-ammo] · [Shot consumption][shot]
 
 ## Properties
+
+These are the gun's base values; damage and spread by mode and distance are explained below. [Gun definition][definition] · [Bundled profile][profile]
 
 | Property | Value |
 | --- | --- |
 | Ammo | [12 Gauge Bullet](12GaugeBullet.md) |
-| Magazine size | 5 |
-| Extended magazine sizes | 6, 7, 8 |
-| Fire modes | SEMI, AUTO |
-| RPM | 180 |
-| Damage | 36 |
-| Pellets per shot | 9 |
-| Bullet speed | 150 m/s |
-| Lifetime | 0.6 seconds |
-| Pierce | 1 |
-| Headshot multiplier | 1.33 |
-| Knockback | 0.15 |
+| Magazine size | 5 shells |
+| Extended magazine sizes | 6, 7, 8 defined, but unavailable through ordinary refitting |
+| Fire modes | SEMI, AUTO (default: SEMI) |
+| RPM | 180 configured; 333 ms becomes a 7-tick trigger cooldown |
+| Damage | 36 fallback shot value; 4 per pellet in the first distance band |
+| Pellets per shot | 9 from one shell |
+| Bullet speed | 150 m/s nominal: 7.5 blocks/tick at 20 ticks/s |
+| Lifetime | 12 ticks / 0.6 nominal seconds |
+| Pierce | 1 successful entity hit per pellet |
+| Headshot multiplier | 1.33 per pellet |
+| Knockback | 0.15 horizontal push strength, plus 0.03 upward |
+
+The RPM setting is converted to a game-tick trigger cooldown; it is not a measured firing rate. The speed uses the wiki's one-block-to-one-metre convention. Random spread, shooter movement, drag, and gravity affect actual travel; lifetime and speed do not promise a maximum hit distance. [Cooldown][trigger] · [Launch motion][spread] · [Projectile motion][motion]
+
+The definition lists extended capacities of 6, 7, and 8, but both accepted attachment categories and accepted item IDs are empty. Those capacities are **unavailable through ordinary refitting**. [Definition][definition] · [Compatibility check][compatibility]
 
 ## Accuracy
 
@@ -37,11 +60,21 @@ Winchester Model 1897 is a TaCZ firearm. It uses [12 Gauge Bullet](12GaugeBullet
 | Prone | 3.5 |
 | Aiming down sights | 3.5 |
 
+Lower values mean tighter **random spread**, not a hit percentage or a radius in blocks. Aiming takes priority only after the aim transition; otherwise the pose selection checks Prone, Sneaking, Moving, then Standing. Prone means the non-swimming SWIMMING pose, and the registered C binding does not provide a crawl action in this snapshot. See the [shared control limits](../mechanics/TaCZFirearms.md#controls). [Spread values][accuracy-data] · [Pose selection][pose] · [Random launch spread][spread]
+
 ## Damage Falloff
 
-* 18 blocks: 36
-* 32 blocks: 27
-* infinite blocks: 18
+| Distance from launch to hit | Shot value | Damage per pellet |
+| --- | --- | --- |
+| 0 to less than 18 blocks | 36 | 4 |
+| 18 to less than 32 blocks | 27 | 3 |
+| 32 blocks or more | 18 | 2 |
+
+Values are **health points before headshots and target defenses**, not hearts or guaranteed damage to one target. Each shot value is divided among its 9 pellets. Distance is measured in a straight line from launch to impact; equality enters the next band, with no interpolation. The last band does not remove the 12-tick lifetime or collision limits. [Damage division][curve] · [Distance selection][distance]
+
+A living-entity hit at or above 85% of its eye height above its base receives the **1.33** headshot multiplier for that pellet. Each pellet stops after its first successful damage hit; a failed damage attempt does not consume that successful-hit budget. Blocks stop it as well. Successful hits apply the listed push and reset the target's invulnerability time. [Hit handling][hit]
+
+Ordinary armor, armor toughness, effects, and absorption still apply. The imported armor-ignore field does not bypass them in this path; **Pierce 1 is not an armor-bypass percentage**. See [reading firearm stats](../mechanics/TaCZFirearms.md#reading-firearm-stats). [Bullet damage type][bullet-source] · [Armor-bypass tag][armor-tag] · [Armor calculation][armor-calculation] · [Target defenses][armor] · [Parsed adjustments][adjustments]
 
 ## Attachments
 
@@ -51,4 +84,43 @@ Supported attachment categories: None.
 
 ## Notes
 
-* This item is part of the integrated TaCZ firearms system.
+Its active air gravity subtracts **0.15 from vertical velocity each tick**, compared with 0.005 for the [M870](M870.md). Matching speed and lifetime rows therefore do not give these guns matching trajectories. [Definition][definition] · [Projectile motion][motion]
+
+Air motion retains 95% of the previous velocity before gravity is applied; water uses different drag and gravity. These are source-defined movement rules, not a measured range or accuracy result. [Projectile motion][motion] · [Definition][definition]
+
+A fresh plain crafted stack defaults to the base loaded-shell count in the ammo-reading code. This is an inference from the output and ammo paths, not an in-game crafting test. No separate chamber-plus-one count is used here. [Craft output][craft-output] · [Loaded count and capacity][capacity]
+
+## Sources and verification
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. The recipe, active firing and reload paths, damage curve, projectile handling, and accepted attachments were inspected. This is **source review**, not an in-game crafting, combat, timing, or multiplayer test.
+
+[accuracy-data]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/data/guns/m1897_data.json#L81-L87
+[adjustments]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L365-L385
+[armor]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L1830-L1848
+[armor-calculation]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L1780-L1786
+[armor-tag]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/tags/damage_type/bypasses_armor.json#L1-L23
+[bullet-source]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/damagesource/DamageSources.java#L247-L249
+[capacity]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L308-L330
+[category]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/index/guns/m1897.json#L1-L8
+[compatibility]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L54-L67
+[craft-output]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/crafting/TaczWorkbenchRecipe.java#L145-L151
+[creative]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1666-L1671
+[curve]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L51-L61
+[definition]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L33
+[distance]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L262-L272
+[hit]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L162-L251
+[input]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczClientInputHandler.java#L36-L124
+[keys]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczKeyMappings.java#L13-L21
+[modes]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunFireModes.java#L35
+[motion]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L100-L133
+[pose]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L224-L237
+[profile]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/data/guns/m1897_data.json#L1-L31
+[recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipes/gun/m1897.json#L1-L15
+[registration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L2708-L2713
+[reload-ammo]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L261-L305
+[reload-start]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L184-L218
+[reload-timing]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunReloadTimings.java#L7-L67
+[shot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L146-L181
+[spread]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/Projectile.java#L129-L154
+[stop-use]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L3124-L3131
+[trigger]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L101-L181
