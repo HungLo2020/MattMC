@@ -8,6 +8,29 @@ For a [White Bed](../items/WhiteBed.md), place three White Wool across a row abo
 
 A bed occupies two horizontal block positions. Its placement checks that the second position can be replaced and is within the world border. Leave room around and above it for sleeping and a usable exit.
 
+## Color variants
+
+Follow the item guides below for each bed color.
+
+| Bed item |
+| --- |
+| [Black Bed](../items/BlackBed.md) |
+| [Blue Bed](../items/BlueBed.md) |
+| [Brown Bed](../items/BrownBed.md) |
+| [Cyan Bed](../items/CyanBed.md) |
+| [Gray Bed](../items/GrayBed.md) |
+| [Green Bed](../items/GreenBed.md) |
+| [Light Blue Bed](../items/LightBlueBed.md) |
+| [Light Gray Bed](../items/LightGrayBed.md) |
+| [Lime Bed](../items/LimeBed.md) |
+| [Magenta Bed](../items/MagentaBed.md) |
+| [Orange Bed](../items/OrangeBed.md) |
+| [Pink Bed](../items/PinkBed.md) |
+| [Purple Bed](../items/PurpleBed.md) |
+| [Red Bed](../items/RedBed.md) |
+| [White Bed](../items/WhiteBed.md) |
+| [Yellow Bed](../items/YellowBed.md) |
+
 ## Sleeping and respawn
 
 In a suitable natural dimension, interacting with an in-range, unobstructed bed sets the player's respawn position before checking whether it is currently dark enough to sleep. Thus a daylight refusal to sleep can still follow a successful respawn-setting step.
