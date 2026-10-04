@@ -1,18 +1,47 @@
-﻿# Waxed Lightning Rod
+# Waxed Lightning Rod
+
+Waxed Lightning Rod preserves the unaffected copper finish. It is the waxed inventory form of the basic rod, with the same placed lightning and redstone role. [Block][block] · [Item][item]
 
 ## Obtaining
 
-Waxed Lightning Rod can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Combine **1 [Lightning Rod](LightningRod.md) + 1 Honeycomb → 1 Waxed Lightning Rod**, shapelessly. This two-ingredient recipe fits the inventory crafting grid. The basic rod itself costs three Copper Ingots in a vertical column at a Crafting Table. [Waxing recipe][recipe] · [Base rod recipe][base-recipe]
+
+Alternatively, use one Honeycomb on an unaffected, unwaxed rod already in the world, then collect the waxed rod. This consumes the Honeycomb and changes the placed block; it does not produce a second item beside it. [Placed waxing][wax]
+
+Mine the placed block with an **unbroken Stone, Copper, Iron, Diamond or Netherite Pickaxe** to recover **1 Waxed Lightning Rod**. Wooden/Golden Pickaxes, broken pickaxes and bare hands do not satisfy the normal drop gate. Its loot adds no Fortune bonus or Silk Touch requirement; explosions can destroy the drop. [Exact loot][loot] · [Tool and collection rules](../blocks/LightningRods.md#crafting-and-collecting)
+
+This item is category-listed for Creative access. The [inventory item browser](../mechanics/InventoryBrowser.md#mode-and-permission-limits) can show it in Survival, but ordinary Survival insertion requests are skipped; catalog visibility does not supply crafting materials or replace these acquisition routes. [Category entry][creative]
 
 ## Usage
 
-Waxed Lightning Rod is a copper-family block item used for building, decoration, storage, redstone, or lighting depending on the block type.
+One successful Survival placement consumes **1 item** and creates the matching rod block. It points along the clicked face, supporting floor, wall and underside placement; placement into source Water makes it waterlogged. See [rod placement and water](../blocks/LightningRods.md#placement-water-and-redstone) for the shared details. [Item placement][place-item] · [Facing and water state][placement]
+
+Use this variant when you want the initial copper finish to stay fixed after placement. A placed Waxed Lightning Rod has no oxidation callback. It retains the shared rod controls and waterlogging behavior. [Waxed registration][block]
 
 ## Behavior
 
-When placed, it creates the `minecraft:waxed_lightning_rod` block. Waxed variants keep their oxidation state, while unwaxed weathered variants represent their current copper age.
+One successful use of an **unbroken axe** removes the wax, leaving an ordinary [Lightning Rod](LightningRod.md). It returns no Honeycomb. The uncovered rod can then oxidize under the shared [random-tick aging rules](../blocks/CopperConstruction.md#oxidation-and-spacing); it has no earlier stage to scrape. See [waxing and scraping](../blocks/CopperConstruction.md#waxing-and-scraping) for axe durability and controls. [Wax inverse][wax] · [Axe conversion][axe] · [Broken-tool guard][use-guard] · [Stage map][weather]
+
+Waxing preserves lightning targeting and the redstone pulse. A waxed rod does not initiate the copper-cleaning routine when struck; the canonical [Lightning Rods guide](../blocks/LightningRods.md#oxidation-and-lightning-cleaning) explains this distinction. [Waxed registration][block] · [Strike cleaning][cleaning]
 
 ## Notes
 
-* This item is the item form of the `minecraft:waxed_lightning_rod` block.
+- This item is the item form of the `minecraft:waxed_lightning_rod` block. [Registration][item]
+- The aging, waxing and axe conversions above act on placed blocks unless a crafting recipe is explicitly named. Normal block loot carries the recovered variant, not the rod's active redstone pulse. [Exact loot][loot] · [Placed state](../blocks/LightningRods.md#placement-water-and-redstone)
+- Source-reviewed at `78e8e0423084f010bb47e36132550619b37644c2` on **2026-10-04**. No in-game test was run. Recipes, loot, tags and later code changes can alter these results
 
+Related: [All Lightning Rod variants](../blocks/LightningRods.md#exact-variants-recipes-and-loot) · [Copper finish controls](../blocks/CopperConstruction.md#waxing-and-scraping) · [Items](Items.md)
+
+[axe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/AxeItem.java#L62-L117
+[base-recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/lightning_rod.json
+[block]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L6511
+[cleaning]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/LightningBolt.java#L173-L210
+[creative]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1109
+[item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L1024
+[loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/waxed_lightning_rod.json
+[place-item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/BlockItem.java#L48-L83
+[placement]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/LightningRodBlock.java#L39-L49
+[recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/waxed_lightning_rod_from_honeycomb.json
+[use-guard]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L354-L372
+[wax]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/HoneycombItem.java#L72-L113
+[weather]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/WeatheringCopper.java#L55-L96

@@ -171,6 +171,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Quartz](blocks/Quartz.md) and [End Stone/Purpur](blocks/EndStoneAndPurpur.md): exact finishes, mixed crafting inputs, stonecutting, pillars and Dragon interactions
 
 - [Copper lighting](blocks/CopperLighting.md), [Copper Chests](blocks/CopperChests.md), [Lightning Rods](blocks/LightningRods.md), [Golem Statues](blocks/CopperGolemStatues.md), and [Raw Copper storage](blocks/RawCopperStorage.md): device controls, sorting, variant changes and collection
+- [Lightning Rod items](items/LightningRod.md): exact crafting output, all eight weathered/waxed forms and tool-qualified recovery, linked to the placed-block guide
 
 - [Sandstone](blocks/Sandstone.md), [Blackstone/Basalt](blocks/BlackstoneAndBasalt.md), and [Nether Bricks](blocks/NetherBricks.md): exact finishes, shape recipes, material yields, collection and Nether acquisition examples
 
