@@ -52,6 +52,9 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Aqua Affinity, Respiration and Thorns](UnderwaterAndThornsEnchantments.md): underwater mining, air consumption, retaliation, supported slots, acquisition and retained broken equipment
+- [Curse of Binding and Curse of Vanishing](EquipmentCurses.md): supported equipment, removal restrictions, death rules, stored books and repair limits
+
 - [Power, Punch, Flame and Infinity](BowEnchantments.md): Bow support, damage and knockback scaling, burning arrows, ammunition limits and acquisition
 
 - [Depth Strider, Frost Walker, Soul Speed and Swift Sneak](MobilityEnchantments.md): equipment choices, active movement conditions, broken gear and acquisition

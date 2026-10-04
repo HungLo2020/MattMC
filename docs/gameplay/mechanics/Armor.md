@@ -59,6 +59,9 @@ Netherite equipment follows the matching Diamond-item Smithing upgrade with a Ne
 
 ## Related pages
 
+- [Aqua Affinity, Respiration and Thorns](../enchanting/UnderwaterAndThornsEnchantments.md): underwater attributes, retaliation and effect-specific broken-equipment behavior
+- [Equipment curses](../enchanting/EquipmentCurses.md): Binding restrictions and Vanishing's death-inventory check
+
 - [Protection enchantments](../enchanting/ProtectionEnchantments.md): the separate damage-reduction stage, matching damage types and broken-stack distinctions
 
 - [Centipede Leggings](../items/CentipedeLeggings.md): chainmail-based attributes with separate recipe, repair ingredient and enchantment-tag limits

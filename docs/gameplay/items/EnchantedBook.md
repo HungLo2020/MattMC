@@ -18,6 +18,8 @@ Enchanted Books are not eligible for another ordinary Enchanting Table offer in 
 
 ## Related pages
 
+- [Equipment curses](../enchanting/EquipmentCurses.md#vanishing-the-death-inventory-check): stored curse books versus applied equipment effects
+
 - [Book](Book.md)
 - [Enchanting](../enchanting/Enchanting.md)
 - [Anvil](Anvil.md)

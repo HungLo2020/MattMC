@@ -39,7 +39,7 @@ Returning from the End through the checked credits/return path uses a different 
 
 Source-reviewed on **2026-10-02** at `4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f`. Active server death, inventory/equipment drops, player replacement, saved-point selection, fallback, and End-return dispatch were traced. No death, recovery, unloaded-chunk, respawn, Hardcore, or dimension gameplay test was run. World rules and custom enchantments/data can change the result; no runtime recovery guarantee is made.
 
-Related: [Health](Health.md) · [Experience](Experience.md) · [Bed](../blocks/Bed.md) · [Respawn Anchor](../blocks/RespawnAnchor.md) · [Mechanics](Mechanics.md)
+Related: [Health](Health.md) · [Experience](Experience.md) · [Bed](../blocks/Bed.md) · [Respawn Anchor](../blocks/RespawnAnchor.md) · [Mechanics](Mechanics.md) · [Equipment curses](../enchanting/EquipmentCurses.md#vanishing-the-death-inventory-check)
 
 [death]: https://github.com/HungLo2020/MattMC/blob/4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f/src/main/java/net/minecraft/server/level/ServerPlayer.java#L869-L927
 [drops]: https://github.com/HungLo2020/MattMC/blob/4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f/src/main/java/net/minecraft/world/entity/player/Player.java#L587-L603

@@ -48,6 +48,8 @@ Taking the result clears both input slots. Closing the menu before committing re
 
 ## Related pages
 
+- [Equipment curses](../enchanting/EquipmentCurses.md): why Binding and Vanishing survive repair and disenchantment
+
 - [Grindstone item](../items/Grindstone.md)
 - [Anvil repair and combining](../mechanics/AnvilMechanics.md)
 - [Enchanting](../enchanting/Enchanting.md)
