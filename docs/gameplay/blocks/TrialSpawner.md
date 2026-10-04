@@ -10,7 +10,7 @@ The checked Breeze route reaches a real template containing a waiting Trial Spaw
 
 **Breaking a Trial Spawner does not drop its block item, including with Silk Touch.** Its block loot has no pools, and its implementation adds no mining-XP reward. Preserve a found spawner if you want to repeat its trials. Its current hardness is 50, with no correct-tool drop gate; the bundled axe, hoe, pickaxe and shovel mining tags do not list it, so do not assume the ordinary pickaxe speed bonus applies. [Registration][registration] · [Empty loot][loot] · [Inherited break behavior][break-default] · [Pickaxe][pickaxe] · [Axe][axe] · [Hoe][hoe] · [Shovel][shovel]
 
-No bundled crafting recipe produces the block. The item is available in Creative's Spawn Eggs tab; see the [Trial Spawner item](../items/TrialSpawner.md) for supplied-item and spawn-egg setup. [Creative entry][creative]
+No bundled crafting recipe produces the block. The item is listed in the Spawn Eggs source category and can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative; see the [Trial Spawner item](../items/TrialSpawner.md) for supplied-item and spawn-egg setup. [Creative entry][creative] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 ## Activation and participants
 
@@ -138,3 +138,6 @@ Related: [Trial Spawner item](../items/TrialSpawner.md) · [Monster Spawner](Mon
 [egg-reset]: https://github.com/HungLo2020/MattMC/blob/053cd852a8609f4002234ce0d445d3a345b551ae/src/main/java/net/minecraft/world/level/block/entity/trialspawner/TrialSpawner.java#L340-L344
 [save]: https://github.com/HungLo2020/MattMC/blob/053cd852a8609f4002234ce0d445d3a345b551ae/src/main/java/net/minecraft/world/level/block/entity/trialspawner/TrialSpawner.java#L89-L97
 [packed-state]: https://github.com/HungLo2020/MattMC/blob/053cd852a8609f4002234ce0d445d3a345b551ae/src/main/java/net/minecraft/world/level/block/entity/trialspawner/TrialSpawnerStateData.java#L301-L321
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1968
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

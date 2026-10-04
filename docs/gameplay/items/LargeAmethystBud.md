@@ -6,7 +6,7 @@
 
 Break the bud with a **Silk Touch** tool to receive **one Large Amethyst Bud**. Without Silk Touch it drops nothing, including no Shards; Fortune adds no yield. It is in the pickaxe mining-speed tag, but has **no correct-tool or pickaxe-tier requirement** for this drop. An unbroken Silk Touch pickaxe is a straightforward collection tool. [Loot condition][loot] · [Block properties][blocks] · [Mining tag][pickaxe] · [Player drop gate][player] · [Harvest dispatch][harvest]
 
-The item also appears in the Creative menu. No bundled recipe producing it was found in the checked recipe inventory. For the natural source, see [finding an Amethyst geode](../blocks/Amethyst.md#finding-a-geode). [Creative listing][creative]
+The item is also available through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No bundled recipe producing it was found in the checked recipe inventory. For the natural source, see [finding an Amethyst geode](../blocks/Amethyst.md#finding-a-geode). [Creative listing][creative] · [Combined browser][catalog-browser]
 
 ## Usage
 
@@ -44,3 +44,5 @@ Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`.
 [support]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Block.java#L217-L226
 [removal]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/Level.java#L263-L278
 [loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/large_amethyst_bud.json
+
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

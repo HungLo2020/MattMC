@@ -6,7 +6,7 @@ The Redstone Repeater item places `minecraft:repeater`, a directional component 
 
 Craft it from two Redstone Torches, one Redstone Dust, and three ordinary Stone using the [block guide's recipe](../blocks/RedstoneRepeater.md#crafting-and-collecting). Ordinary Survival mining returns the placed item without a specific tool requirement.
 
-Place it on a supported surface with its output facing the intended destination. See the [Repeater block guide](../blocks/RedstoneRepeater.md) for input direction, the four delay settings, side locking, and a small circuit example. The item is also available in the Redstone Creative tab; that entry is separate from its crafting route.
+Place it on a supported surface with its output facing the intended destination. See the [Repeater block guide](../blocks/RedstoneRepeater.md) for input direction, the four delay settings, side locking, and a small circuit example. The item is also available in the Redstone Blocks source category feeding the [combined inventory item browser](../mechanics/InventoryBrowser.md) for Creative requests; that entry is separate from its crafting route. [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 ## Related pages
 
@@ -20,3 +20,6 @@ Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No 
 
 - [Item registration](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
 - [Creative tab](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1293
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

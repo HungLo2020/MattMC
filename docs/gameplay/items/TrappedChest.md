@@ -4,7 +4,7 @@ Trapped Chest is the item form of `minecraft:trapped_chest`, a storage block tha
 
 ## Obtaining
 
-Craft **one Chest + one Tripwire Hook → one Trapped Chest**, with no required arrangement. These are exact item ingredients. It is also in the Creative menu's Redstone Blocks tab; the guide covers [mansion acquisition and the TNT hazard](../blocks/TrappedChest.md#crafting-and-obtaining). [Complete recipe][recipe] · [Creative tab][creative-tab] · [Creative entry][creative-item]
+Craft **one Chest + one Tripwire Hook → one Trapped Chest**, with no required arrangement. These are exact item ingredients. It is also in the Redstone Blocks source category feeding the [combined inventory item browser](../mechanics/InventoryBrowser.md) for Creative requests; the guide covers [mansion acquisition and the TNT hazard](../blocks/TrappedChest.md#crafting-and-obtaining). [Complete recipe][recipe] · [Creative tab][creative-tab] · [Creative entry][creative-item] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 ## Usage
 
@@ -28,3 +28,6 @@ Source-reviewed at `cf1c134b3f9ff634490e448fe26c335b90f82227` on 2026-10-02; no 
 [opener-signal]: https://github.com/HungLo2020/MattMC/blob/cf1c134b3f9ff634490e448fe26c335b90f82227/src/main/java/net/minecraft/world/level/block/TrappedChestBlock.java#L41-L54
 [loot]: https://github.com/HungLo2020/MattMC/blob/cf1c134b3f9ff634490e448fe26c335b90f82227/src/main/resources/data/minecraft/loot_table/blocks/trapped_chest.json#L1-L30
 [axe-tag]: https://github.com/HungLo2020/MattMC/blob/cf1c134b3f9ff634490e448fe26c335b90f82227/src/main/resources/data/minecraft/tags/block/mineable/axe.json#L25-L42
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1332
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

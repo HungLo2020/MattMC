@@ -14,7 +14,7 @@ The test is the **attacker on the fatal damage source**, not any earlier hit or 
 
 ### Creative and other sources
 
-The disc is listed in the Creative menu. No crafting recipe or chest-loot entry for Wait is bundled in the reviewed resources, including the bundled optional data packs. Its Creeper-tag membership does not imply the chest sources of other discs. [Creative entry][creative] · [Recipes][recipes] · [Loot tables][loot-tables] · [Optional packs][optional-packs]
+The disc can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No crafting recipe or chest-loot entry for Wait is bundled in the reviewed resources, including the bundled optional data packs. Its Creeper-tag membership does not imply the chest sources of other discs. [Creative entry][creative] · [Recipes][recipes] · [Loot tables][loot-tables] · [Optional packs][optional-packs] · [Combined browser][catalog-browser]
 
 ## Usage
 
@@ -72,3 +72,5 @@ Related: [Jukebox item](Jukebox.md) · [Creeper](../mobs/Creeper.md#drops-and-sp
 [ejection]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/entity/JukeboxBlockEntity.java#L48-L61
 [loot-tables]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table
 [optional-packs]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/datapacks
+
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

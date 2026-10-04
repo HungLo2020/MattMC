@@ -4,7 +4,7 @@ A Trapped Chest (`minecraft:trapped_chest`) stores **27 slots**, or **54 slots**
 
 ## Crafting and obtaining
 
-Combine **one ordinary [Chest](Chest.md) and one [Tripwire Hook](Tripwire.md)** in any arrangement in a crafting grid to make **one Trapped Chest**. These are exact item ingredients: a Copper Chest, Ender Chest, or another Trapped Chest does not replace the ordinary Chest. The item is also listed in the Creative menu's Redstone Blocks tab. [Complete recipe][recipe] · [Creative tab][creative-tab] · [Creative entry][creative-item]
+Combine **one ordinary [Chest](Chest.md) and one [Tripwire Hook](Tripwire.md)** in any arrangement in a crafting grid to make **one Trapped Chest**. These are exact item ingredients: a Copper Chest, Ender Chest, or another Trapped Chest does not replace the ordinary Chest. The item is also listed in the Redstone Blocks source category feeding the [combined inventory item browser](../mechanics/InventoryBrowser.md) for Creative requests. [Complete recipe][recipe] · [Creative tab][creative-tab] · [Creative entry][creative-item] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 A possible **first-floor secret room in a Woodland Mansion** contains a Trapped Chest next to **two TNT blocks**. The bundled room template supplies two Ender Pearls in that chest; this is fixed template inventory. The generator can select this room, but it is not guaranteed in every mansion. Inspect and remove connected explosives before opening unfamiliar storage: the opening signal can prime adjacent TNT when the TNT-explodes game rule allows it. [Room template, binary NBT][mansion-template] · [First-floor room selection][secret-selector] · [Secret-room placement][secret-placement] · [Active mansion generator][mansion-generation] · [TNT signal response][tnt] · [TNT game-rule gate][tnt-rule]
 
@@ -123,3 +123,6 @@ Source-reviewed at `cf1c134b3f9ff634490e448fe26c335b90f82227` on 2026-10-02. Rev
 [opening]: https://github.com/HungLo2020/MattMC/blob/cf1c134b3f9ff634490e448fe26c335b90f82227/src/main/java/net/minecraft/world/level/block/ChestBlock.java#L247-L259
 [break-anger]: https://github.com/HungLo2020/MattMC/blob/cf1c134b3f9ff634490e448fe26c335b90f82227/src/main/java/net/minecraft/world/level/block/Block.java#L480-L487
 [piglins]: https://github.com/HungLo2020/MattMC/blob/cf1c134b3f9ff634490e448fe26c335b90f82227/src/main/java/net/minecraft/world/entity/monster/piglin/PiglinAi.java#L524-L533
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1332
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

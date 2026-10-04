@@ -14,7 +14,7 @@ The test is the **attacker on the fatal damage source**, not any earlier hit or 
 
 ### Creative and crafting
 
-The disc is listed in the Creative menu. No crafting recipe for this disc is bundled in the reviewed recipe resources; the recipe for Music Disc 5 does not create other tracks. [Creative entry][creative] · [Recipe resources][recipes]
+The disc can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No crafting recipe for this disc is bundled in the reviewed recipe resources; the recipe for Music Disc 5 does not create other tracks. [Creative entry][creative] · [Recipe resources][recipes] · [Combined browser][catalog-browser]
 
 ## Usage
 
@@ -63,3 +63,5 @@ Related: [Jukebox item](Jukebox.md) · [Creeper](../mobs/Creeper.md#drops-and-sp
 [duration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/JukeboxSong.java#L42-L50
 [song]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/jukebox_song/mall.json
 [recipes]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe
+
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

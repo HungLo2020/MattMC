@@ -26,7 +26,7 @@ To reuse a sherd already decorating a pot, follow [pot ingredient recovery](../b
 
 ## Notes
 
-- Registered as `minecraft:shelter_pottery_sherd` and listed in the **Ingredients** Creative tab; Creative availability is separate from the Survival archaeology route above. See [inventory mode and permission limits](../mechanics/InventoryBrowser.md#mode-and-permission-limits). [Registration][registration] · [Creative entry][creative]
+- Registered as `minecraft:shelter_pottery_sherd` and listed in the **Ingredients** source category feeding the [combined inventory item browser](../mechanics/InventoryBrowser.md); Creative availability is separate from the Survival archaeology route above. See [inventory mode and permission limits](../mechanics/InventoryBrowser.md#mode-and-permission-limits). [Registration][registration] · [Creative entry][creative] · [Combined browser][catalog-browser]
 - A player-placed suspicious block without an assigned loot table or stored item is not a fresh source of this sherd. Server data packs can change the tables and ingredients described here. [Stored-content handling][brush-loot]
 - Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. Generation wiring, weighted loot, brushing, pot ingredients and pattern mapping were inspected. No generated-world, underwater-brushing, crafting, recovery or visual-pattern gameplay test was run
 
@@ -56,3 +56,5 @@ Related: [Angler Pottery Sherd](AnglerPotterySherd.md) · [Snort Pottery Sherd](
 [loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/archaeology/ocean_ruin_warm.json
 [other-loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/archaeology/ocean_ruin_cold.json
 [block-loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/suspicious_sand.json
+
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

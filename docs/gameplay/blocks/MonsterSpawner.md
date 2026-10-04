@@ -8,7 +8,7 @@ Checked generation code places ordinary spawners in monster rooms, selected Mine
 
 **Breaking one does not drop a spawner item, even with Silk Touch.** Its bundled block loot is empty. A successful Survival break with a correct, usable pickaxe can award **15–43 XP** with block drops enabled; the two random rolls mean outcomes are not uniformly distributed. Breaking it destroys that reusable spawn source. Do not mine one expecting to relocate it. [Loot][loot] · [Properties][blocks] · [Tool tag][pickaxe] · [Break reward][spawner-block] · [Mining gate][mining] · [XP rule][block]
 
-The item is available in Creative's Spawn Eggs tab. No bundled crafting recipe produces it. See the [item page](../items/MonsterSpawner.md) for placement and configuration. [Creative listing][creative]
+The item is listed in the Spawn Eggs source category and can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No bundled crafting recipe produces it. See the [item page](../items/MonsterSpawner.md) for placement and configuration. [Creative listing][creative] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 ## Activation and timing
 
@@ -69,3 +69,6 @@ Related: [Monster Spawner item](../items/MonsterSpawner.md) · [Blaze](../mobs/B
 [spawner-entity]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/entity/SpawnerBlockEntity.java
 [entity-types]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/entity/BlockEntityType.java#L101
 [spawn-data]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/SpawnData.java#L27-L44
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1967
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

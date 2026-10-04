@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-It is listed in the Creative menu. This source audit did not establish a Survival archaeology loot route for this item; an archaeology source should not be assumed from its name. [Creative listing][custom-creative]
+It can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This source audit did not establish a Survival archaeology loot route for this item; an archaeology source should not be assumed from its name. [Creative listing][custom-creative] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 ## Usage
 
@@ -30,3 +30,6 @@ Related: [Decorated Pot](DecoratedPot.md) · [Items](Items.md)
 [material-lookup]: https://github.com/HungLo2020/MattMC/blob/8d065c943710a8d4e3d609b0406dda95ed62cc63/src/main/java/net/minecraft/client/renderer/Sheets.java#L200-L203
 [pattern-fallback]: https://github.com/HungLo2020/MattMC/blob/8d065c943710a8d4e3d609b0406dda95ed62cc63/src/main/java/net/minecraft/client/renderer/blockentity/DecoratedPotRenderer.java#L112-L121
 [shatter]: https://github.com/HungLo2020/MattMC/blob/8d065c943710a8d4e3d609b0406dda95ed62cc63/src/main/java/net/minecraft/world/level/block/DecoratedPotBlock.java#L173-L197
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1930
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108

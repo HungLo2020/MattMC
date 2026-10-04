@@ -4,7 +4,7 @@ The **Trial Spawner item** (`minecraft:trial_spawner`) places the block used for
 
 ## Obtaining
 
-The item is listed in Creative's **Spawn Eggs** tab. No bundled crafting recipe produces it. Trial Chambers contain configured placed spawners, but **breaking one does not drop this item, even with Silk Touch**: its loot table has no pools. Mining also has no dedicated XP reward in this implementation. Do not break a found Trial Spawner expecting to relocate it. [Creative listing][creative] · [Empty block loot][loot] · [Block class][block] · [Inherited break behavior][break-default]
+The item is listed in the **Spawn Eggs** source category and can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No bundled crafting recipe produces it. Trial Chambers contain configured placed spawners, but **breaking one does not drop this item, even with Silk Touch**: its loot table has no pools. Mining also has no dedicated XP reward in this implementation. Do not break a found Trial Spawner expecting to relocate it. [Creative listing][creative] · [Empty block loot][loot] · [Block class][block] · [Inherited break behavior][break-default] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
 The block's current hardness is 50. Its registration has no correct-tool drop requirement, and the standard pickaxe mining tag does not include it. See [Finding and preserving one](../blocks/TrialSpawner.md#finding-and-preserving-one) for the complete checked tool/loot limits. [Registration][registration] · [Pickaxe tag][pickaxe]
 
@@ -41,3 +41,6 @@ Related: [Trial Spawner block](../blocks/TrialSpawner.md) · [Trial Key](TrialKe
 [full-config]: https://github.com/HungLo2020/MattMC/blob/053cd852a8609f4002234ce0d445d3a345b551ae/src/main/java/net/minecraft/world/level/block/entity/trialspawner/TrialSpawner.java#L382-L403
 [players]: https://github.com/HungLo2020/MattMC/blob/053cd852a8609f4002234ce0d445d3a345b551ae/src/main/java/net/minecraft/world/level/block/entity/trialspawner/PlayerDetector.java#L23-L51
 [states]: https://github.com/HungLo2020/MattMC/blob/053cd852a8609f4002234ce0d445d3a345b551ae/src/main/java/net/minecraft/world/level/block/entity/trialspawner/TrialSpawnerState.java#L31-L146
+
+[catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1968
+[catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108
