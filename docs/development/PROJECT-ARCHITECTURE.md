@@ -55,7 +55,9 @@ src/main/rust/
         ├── chunk/
         │   └── palette/
         ├── lighting/
+        │   ├── priority_queue/
         │   └── skylight_sources/
+        ├── player_distance/
         ├── color_map_color_util.rs
         └── levelgen/
             ├── synth/
@@ -91,6 +93,10 @@ counter reconstruction, and [palette resizing](world/chunk/RUST-PALETTE-RESIZE.m
 under `world/level/chunk/palette/resize/` for bulk remapping during block palette growth.
 [Global palette loading](world/chunk/RUST-PALETTE-UNPACKING.md) uses
 `world/level/chunk/palette/unpack/` and the existing encoder for saved-data repacking.
+[Player chunk distances](world/chunk-loading/RUST-PLAYER-DISTANCE.md) use
+`world/level/player_distance/` for DistanceManager's natural-spawn and
+player-ticket distance graphs; Java keeps player sets, published level views
+and ticket dispatch.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.

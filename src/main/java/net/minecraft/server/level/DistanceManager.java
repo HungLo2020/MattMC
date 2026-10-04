@@ -39,8 +39,14 @@ public abstract class DistanceManager {
 	private final LoadingChunkTracker loadingChunkTracker;
 	private final SimulationChunkTracker simulationChunkTracker;
 	final TicketStorage ticketStorage;
-	private final DistanceManager.FixedPlayerDistanceChunkTracker naturalSpawnChunkCounter = new DistanceManager.FixedPlayerDistanceChunkTracker(8);
-	private final DistanceManager.PlayerTicketTracker playerTicketManager = new DistanceManager.PlayerTicketTracker(32);
+	// Rust owns both player-distance graphs and their shared player-presence source.
+	private final PlayerChunkDistances playerDistances = new PlayerChunkDistances(8, 32);
+	private final DistanceManager.FixedPlayerDistanceChunkTracker naturalSpawnChunkCounter = new DistanceManager.FixedPlayerDistanceChunkTracker(
+		this.playerDistances, PlayerChunkDistances.NATURAL_SPAWN
+	);
+	private final DistanceManager.PlayerTicketTracker playerTicketManager = new DistanceManager.PlayerTicketTracker(
+		this.playerDistances, PlayerChunkDistances.PLAYER_TICKETS
+	);
 	protected final Set<ChunkHolder> chunksToUpdateFutures = new ReferenceOpenHashSet<>();
 	final ThrottlingChunkTaskDispatcher ticketDispatcher;
 	final LongSet ticketsToRelease = new LongOpenHashSet();
@@ -113,8 +119,7 @@ public abstract class DistanceManager {
 		ChunkPos chunkPos = sectionPos.chunk();
 		long l = chunkPos.toLong();
 		this.playersPerChunk.computeIfAbsent(l, (Long2ObjectFunction<? extends ObjectSet<ServerPlayer>>)(lx -> new ObjectOpenHashSet<>())).add(serverPlayer);
-		this.naturalSpawnChunkCounter.update(l, 0, true);
-		this.playerTicketManager.update(l, 0, true);
+		this.playerDistances.playerEntered(l);
 		this.ticketStorage.addTicket(new Ticket(TicketType.PLAYER_SIMULATION, this.getPlayerTicketLevel()), chunkPos);
 	}
 
@@ -125,8 +130,7 @@ public abstract class DistanceManager {
 		objectSet.remove(serverPlayer);
 		if (objectSet.isEmpty()) {
 			this.playersPerChunk.remove(l);
-			this.naturalSpawnChunkCounter.update(l, Integer.MAX_VALUE, false);
-			this.playerTicketManager.update(l, Integer.MAX_VALUE, false);
+			this.playerDistances.chunkVacated(l);
 			this.ticketStorage.removeTicket(new Ticket(TicketType.PLAYER_SIMULATION, this.getPlayerTicketLevel()), chunkPos);
 		}
 	}
@@ -196,22 +200,26 @@ public abstract class DistanceManager {
 		return this.ticketStorage.hasTickets();
 	}
 
-	class FixedPlayerDistanceChunkTracker extends ChunkTracker {
+	/** Published level view of one native distance field. Each run replays the
+	 * field's ordered {@code setLevel} calls into this original map logic. */
+	static class FixedPlayerDistanceChunkTracker {
 		protected final Long2ByteMap chunks = new Long2ByteOpenHashMap();
 		protected final int maxDistance;
+		private final PlayerChunkDistances distances;
+		private final int field;
+		private final PlayerChunkDistances.LevelSink levelSink = this::setLevel;
 
-		protected FixedPlayerDistanceChunkTracker(final int i) {
-			super(i + 2, 16, 256);
-			this.maxDistance = i;
-			this.chunks.defaultReturnValue((byte)(i + 2));
+		protected FixedPlayerDistanceChunkTracker(PlayerChunkDistances distances, int field) {
+			this.distances = distances;
+			this.field = field;
+			this.maxDistance = distances.maxDistance(field);
+			this.chunks.defaultReturnValue((byte)(this.maxDistance + 2));
 		}
 
-		@Override
 		protected int getLevel(long l) {
 			return this.chunks.get(l);
 		}
 
-		@Override
 		protected void setLevel(long l, int i) {
 			byte b;
 			if (i > this.maxDistance) {
@@ -226,18 +234,8 @@ public abstract class DistanceManager {
 		protected void onLevelChange(long l, int i, int j) {
 		}
 
-		@Override
-		protected int getLevelFromSource(long l) {
-			return this.havePlayer(l) ? 0 : Integer.MAX_VALUE;
-		}
-
-		private boolean havePlayer(long l) {
-			ObjectSet<ServerPlayer> objectSet = DistanceManager.this.playersPerChunk.get(l);
-			return objectSet != null && !objectSet.isEmpty();
-		}
-
 		public void runAllUpdates() {
-			this.runUpdates(Integer.MAX_VALUE);
+			this.distances.runAllUpdates(this.field, this.levelSink);
 		}
 	}
 
@@ -246,10 +244,10 @@ public abstract class DistanceManager {
 		private final Long2IntMap queueLevels = Long2IntMaps.synchronize(new Long2IntOpenHashMap());
 		private final LongSet toUpdate = new LongOpenHashSet();
 
-		protected PlayerTicketTracker(final int i) {
-			super(i);
+		protected PlayerTicketTracker(PlayerChunkDistances distances, int field) {
+			super(distances, field);
 			this.viewDistance = 0;
-			this.queueLevels.defaultReturnValue(i + 2);
+			this.queueLevels.defaultReturnValue(this.maxDistance + 2);
 		}
 
 		@Override

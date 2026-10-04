@@ -2,6 +2,6 @@
 mod ffi;
 mod ordered_set;
 mod position_hash;
-mod queue;
+pub(crate) mod queue;
 #[cfg(test)]
 mod tests;

@@ -1,0 +1,172 @@
+//! Converged-state checks against a brute-force distance reference. Exact
+//! call-order parity with the original Java graph is covered by the Java
+//! oracle tests (`NativePlayerChunkDistancesTest`).
+use super::ffi::*;
+use super::graph::{as_long, INVALID_CHUNK_POS};
+use super::position_map::PositionMap;
+use super::PlayerDistances;
+
+const SPAWN: usize = 0;
+const TICKETS: usize = 1;
+
+fn chebyshev(a: i64, b: i64) -> i64 {
+    let dx = ((a as i32).wrapping_sub(b as i32)) as i64;
+    let dz = (((a >> 32) as i32).wrapping_sub((b >> 32) as i32)) as i64;
+    dx.abs().max(dz.abs())
+}
+
+/// Settled level of `position` for players at `players` with `max_distance`.
+fn expected(players: &[i64], position: i64, max_distance: i32) -> i32 {
+    if position == INVALID_CHUNK_POS {
+        // The source sentinel never receives a level of its own.
+        return max_distance + 2;
+    }
+    let nearest = players
+        .iter()
+        .map(|player| chebyshev(*player, position))
+        .min()
+        .unwrap_or(i64::MAX);
+    if nearest <= max_distance as i64 {
+        nearest as i32
+    } else {
+        max_distance + 2
+    }
+}
+
+fn settle(distances: &mut PlayerDistances) {
+    for field in [SPAWN, TICKETS] {
+        distances.run_updates(field, i32::MAX).unwrap();
+        assert!(!distances.field(field).has_work());
+    }
+}
+
+fn assert_settled(distances: &PlayerDistances, players: &[i64], centres: &[i64], radius: i32) {
+    for (field, max_distance) in [(SPAWN, 3), (TICKETS, 6)] {
+        for centre in centres {
+            let (x, z) = (*centre as i32, (*centre >> 32) as i32);
+            for dx in -radius..=radius {
+                for dz in -radius..=radius {
+                    let position = as_long(x.wrapping_add(dx), z.wrapping_add(dz));
+                    assert_eq!(
+                        expected(players, position, max_distance),
+                        distances.field(field).level(position),
+                        "field {field} position {position:#x} players {players:x?}",
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn single_player_settles_to_chebyshev_distance_and_vacating_restores_defaults() {
+    let mut distances = PlayerDistances::new(3, 6).unwrap();
+    let player = as_long(5, -7);
+    distances.player_entered(player).unwrap();
+    assert!(distances.field(SPAWN).has_work() && distances.field(TICKETS).has_work());
+    settle(&mut distances);
+    assert_settled(&distances, &[player], &[player], 9);
+    assert_eq!(49, distances.field(SPAWN).changes().len());
+    distances.chunk_vacated(player).unwrap();
+    settle(&mut distances);
+    assert_settled(&distances, &[], &[player], 9);
+}
+
+#[test]
+fn random_player_sets_match_reference_including_wrap_and_source_sentinel() {
+    let mut seed = 0x5eed_u64;
+    let mut next = |bound: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % bound
+    };
+    let anchors = [
+        as_long(0, 0),
+        as_long(i32::MAX, i32::MIN),
+        as_long(-1, -1),
+        // Neighbours of the sentinel must treat it as the source, never a node.
+        as_long(1_875_065, 1_875_067),
+    ];
+    for anchor in anchors {
+        let mut distances = PlayerDistances::new(3, 6).unwrap();
+        let mut players: Vec<i64> = Vec::new();
+        for step in 0..120 {
+            let (x, z) = (anchor as i32, (anchor >> 32) as i32);
+            let position = as_long(
+                x.wrapping_add(next(9) as i32 - 4),
+                z.wrapping_add(next(9) as i32 - 4),
+            );
+            if position == INVALID_CHUNK_POS {
+                continue;
+            }
+            if players.contains(&position) && next(2) == 0 {
+                players.retain(|player| *player != position);
+                distances.chunk_vacated(position).unwrap();
+            } else {
+                if !players.contains(&position) {
+                    players.push(position);
+                }
+                distances.player_entered(position).unwrap();
+            }
+            if step % 3 == 0 {
+                settle(&mut distances);
+                assert_settled(&distances, &players, &[anchor], 12);
+            }
+        }
+    }
+}
+
+#[test]
+fn budget_limits_processed_nodes_and_preserves_remaining_work() {
+    let mut distances = PlayerDistances::new(3, 6).unwrap();
+    distances.player_entered(as_long(0, 0)).unwrap();
+    assert_eq!(0, distances.run_updates(SPAWN, 1).unwrap());
+    assert_eq!(1, distances.field(SPAWN).changes().len());
+    assert!(distances.field(SPAWN).has_work());
+    assert!(distances.run_updates(SPAWN, i32::MAX).unwrap() < i32::MAX);
+    assert!(!distances.field(SPAWN).has_work());
+    // An empty queue returns the budget unchanged, as the original does.
+    assert_eq!(17, distances.run_updates(SPAWN, 17).unwrap());
+}
+
+#[test]
+fn ffi_reports_work_counts_and_drains_ordered_changes() {
+    unsafe {
+        assert_eq!(0, mattmc_player_distance_create(252, 8));
+        let id = mattmc_player_distance_create(2, 4);
+        assert_ne!(0, id);
+        let status = mattmc_player_distance_entered(id, as_long(1, 2));
+        assert_eq!(0x300, status, "both fields queue work");
+        let status = mattmc_player_distance_run(id, 0, i32::MAX);
+        assert_eq!(0x200, status & 0xffff_ffff, "field 0 settled; field 1 pending");
+        let count = (status >> 32) as usize;
+        assert_eq!(25, count);
+        let mut buffer = vec![0i64; count * 2];
+        assert_eq!(-1, mattmc_player_distance_drain(id, 0, buffer.as_mut_ptr(), count as i32 - 1));
+        assert_eq!(count as i32, mattmc_player_distance_drain(id, 0, buffer.as_mut_ptr(), count as i32));
+        assert_eq!([as_long(1, 2), 0], buffer[..2]);
+        assert_eq!(0, mattmc_player_distance_drain(id, 0, buffer.as_mut_ptr(), 0));
+        assert_eq!(5, mattmc_player_distance_run(id, 2, 1));
+        mattmc_player_distance_release(id);
+    }
+}
+
+#[test]
+fn position_map_backward_shift_keeps_colliding_chains_reachable() {
+    let mut map = PositionMap::with_expected(2).unwrap();
+    let keys: Vec<i64> = (0..400).map(|index| index * 0x1_0000_0001 - 77).collect();
+    for (index, key) in keys.iter().enumerate() {
+        map.insert(*key, index as u8).unwrap();
+    }
+    for (index, key) in keys.iter().enumerate().step_by(3) {
+        assert_eq!(Some(index as u8), map.remove(*key));
+    }
+    for (index, key) in keys.iter().enumerate() {
+        assert_eq!(index % 3 != 0, map.contains(*key), "key {key}");
+        if index % 3 != 0 {
+            assert_eq!(Some(index as u8), map.get(*key));
+        }
+    }
+    assert_eq!(keys.len() - keys.len().div_ceil(3), map.len());
+}

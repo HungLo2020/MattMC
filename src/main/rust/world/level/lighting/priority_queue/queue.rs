@@ -1,13 +1,13 @@
 use super::ordered_set::OrderedSet;
 
 #[derive(Debug, PartialEq)]
-pub(super) enum Error {
+pub(crate) enum Error {
     Index(i32),
     Empty,
     Allocation,
 }
 
-pub(super) struct Queue {
+pub(crate) struct Queue {
     buckets: Vec<OrderedSet>,
     pub first: i32,
 }
