@@ -95,6 +95,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Pickaxes and Shovels](mechanics/PickaxesAndShovels.md): all seven materials with exact recipes, mining/drop rules, path/campfire use, upkeep, and recycling
 - [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
 - [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
+- Custom headwear: [Moose Headgear](items/MooseHeadgear.md) and [Sombrero](items/Sombrero.md), with actual access, equipment routes, final properties and current limitations
 - [Durability and repair](mechanics/Durability.md): retained broken gear, guarded actions, and differences in repair data preservation
 - [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
 - [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
