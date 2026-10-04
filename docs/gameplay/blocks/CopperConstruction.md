@@ -21,7 +21,7 @@ Copper Ores and Raw Copper Block, Bulbs, Chests, Golem Statues, and torches are 
 
 ## Crafting and Stonecutter yields
 
-Start with the [Copper Ingot page's storage-block recipe](../items/CopperIngot.md#selected-uses), and follow its [packing/unpacking guidance](../items/CopperIngot.md#obtaining) for converting between ingots and the storage block. The checked unpacking recipe accepts only the ordinary, unwaxed **Block of Copper**, not an oxidized, waxed, cut, or chiseled variant. [Packing recipe][r-copper_block] · [Exact unpacking input][unpack]
+Start with the [Copper Ingot page's storage-block recipe](../items/CopperIngot.md#selected-uses), and follow its [packing/unpacking guidance](../items/CopperIngot.md#obtaining) for converting between ingots and the storage block. Both the ordinary **Block of Copper** and **Waxed Block of Copper** unpack directly into **9 Copper Ingots**. Exposed, Weathered, and Oxidized full blocks must be scraped back to the unaffected stage first, removing any wax before scraping; Cut and Chiseled Copper do not unpack into ingots. [Packing recipe][r-copper_block] · [Ordinary unpacking input][unpack] · [Waxed unpacking input][unpack-waxed]
 
 ### Crafting layouts
 
@@ -220,6 +220,8 @@ The checked inventory contains **43 shaped recipes, 32 shapeless waxing recipes,
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `2f6c6d4689df9796912eea87cf9def80fc320ee1`. The scope includes every selected registry entry, all 139 production recipes, all 64 loot tables, relevant tool tags, 32 waxing pairs, 24 oxidation steps, and the active placement, random-tick, tool-use, and lightning callbacks. No in-game crafting, aging, scraping, lightning, waterlogging, power, or mining test was run. Data packs can change recipes, tags, and loot; random ticks, server rules, and placement context affect results. Structures, trades, copper mobs, and the excluded copper devices were not reviewed as acquisition or use guides.
+
+The two unaffected full-block unpacking recipes were rechecked on **2026-10-04** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`; the waxed recipe already exists at the original source pin. This is a documentation correction, not a gameplay change.
 
 Related: [Blocks](Blocks.md) · [Copper catalog](catalog/copper.md) · [Stonecutter](Stonecutter.md) · [Copper Ingot](../items/CopperIngot.md) · [Honeycomb](../items/Honeycomb.md) · [Axes and Hoes](../mechanics/AxesAndHoes.md) · [Mining](../mechanics/Mining.md) · [Wood construction](WoodConstruction.md)
 
@@ -493,3 +495,5 @@ Related: [Blocks](Blocks.md) · [Copper catalog](catalog/copper.md) · [Stonecut
 [r-weathered_cut_copper_stairs_from_weathered_cut_copper_stonecutting]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/recipe/stonecutting/weathered_cut_copper_stairs_from_weathered_cut_copper_stonecutting.json
 [r-weathered_cut_copper_stairs_from_weathered_copper_stonecutting]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/recipe/stonecutting/weathered_cut_copper_stairs_from_weathered_copper_stonecutting.json
 [unpack]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/recipe/crafting/copper_ingot.json
+
+[unpack-waxed]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/recipe/crafting/copper_ingot_from_waxed_copper_block.json
