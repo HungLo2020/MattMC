@@ -1951,3 +1951,11 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Candidate frequency, corridor flags, spawner attempts and chest-cart attempts are not guaranteed world counts or travel distances. Loot quantities describe selected entries, and consumed cart loot does not reroll on revisiting.
 - Cobweb and spawner recovery follows both block loot and the usable correct-tool gate. Silk Touch alone does not establish a drop with an unsuitable tool, and preserving a spawner is not a tested farm-output claim.
 - Independent frozen content/metadata review, final documentation/index check and strict build, configured references/local links and preserved anchors apply. No generation, combat, lighting, harvesting, cart-loot, railway or farm test was run. Monthly history is retained and broader wiki catch-up remains incomplete.
+
+## Batch 248: Igloo expedition
+
+- Added an Igloo expedition owner and two navigation routes. It covers the three eligible snowy biomes, surface/shaft inspection, optional basement placement, infested masonry, finite supplies, curing prerequisites and a recoverable return route. Existing Zombie Villager, Villager, Brewing and Snow owners retain detailed shared mechanics.
+- Source pin `78e8e0423084f010bb47e36132550619b37644c2`: independent review checked 55 source files, all three decoded templates and 26 content assertions. The 50% basement piece-selection branch does not guarantee a surviving, untouched basement in a particular world.
+- The supplied Weakness splash is already prepared but the Brewing Stand has zero saved fuel. The Chest's fixed Golden Apple pool and other random selections are distinguished from supplies in every surface igloo; replacement brewing requires its own ingredients and fuel.
+- Persistent residents can still be lost to damage or difficulty rules, including Peaceful removal of the Zombie Villager during conversion. A successful cure can provide a second surviving Villager, not a completed breeding or trading setup.
+- Frozen independent content/metadata review, final documentation/index check and strict build, configured references/local links and old anchors apply. No structure search, terrain survey, cure, encounter or resident-transport test was run. Monthly history is preserved and broader wiki catch-up remains incomplete.
