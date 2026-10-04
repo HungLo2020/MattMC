@@ -17,8 +17,8 @@ Each row lists four distinct registered blocks. All IDs below use the `minecraft
 | <span id="dark_oak-timber">Dark Oak</span> | `dark_oak_log` | `stripped_dark_oak_log` | `dark_oak_wood` | `stripped_dark_oak_wood` |
 | <span id="pale_oak-timber">Pale Oak</span> | `pale_oak_log` | `stripped_pale_oak_log` | `pale_oak_wood` | `stripped_pale_oak_wood` |
 | <span id="mangrove-timber">Mangrove</span> | `mangrove_log` | `stripped_mangrove_log` | `mangrove_wood` | `stripped_mangrove_wood` |
-| <span id="crimson-timber">Crimson</span> | `crimson_stem` | `stripped_crimson_stem` | `crimson_hyphae` | `stripped_crimson_hyphae` |
-| <span id="warped-timber">Warped</span> | `warped_stem` | `stripped_warped_stem` | `warped_hyphae` | `stripped_warped_hyphae` |
+| <span id="crimson-timber">Crimson</span> | [`crimson_stem`](../items/CrimsonStem.md) | [`stripped_crimson_stem`](../items/StrippedCrimsonStem.md) | [`crimson_hyphae`](../items/CrimsonHyphae.md) | [`stripped_crimson_hyphae`](../items/StrippedCrimsonHyphae.md) |
+| <span id="warped-timber">Warped</span> | [`warped_stem`](../items/WarpedStem.md) | [`stripped_warped_stem`](../items/StrippedWarpedStem.md) | [`warped_hyphae`](../items/WarpedHyphae.md) | [`stripped_warped_hyphae`](../items/StrippedWarpedHyphae.md) |
 
 ### Mining and placement
 
