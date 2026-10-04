@@ -1967,3 +1967,12 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Template selection, gold removal, Obsidian aging and fluid/terrain alterations are distinguished from guaranteed supplies. Crying Obsidian is not valid ordinary portal-frame material; salvage does not automatically produce a working or safely linked portal.
 - The guide distinguishes an ordinary Nether portal repair from the existing Pitcher Pod conversion route, and honors the loaded three-biome Primordial dimension definition when assessing structure eligibility.
 - Frozen independent content/metadata review, final documentation/index check and strict build, configured references/local links and preserved anchors apply. No world generation, chest sampling, mining, repair, ignition, travel or visual test was run. Existing monthly history remains intact; broader wiki catch-up remains incomplete.
+
+## Batch 250: Paper and player-written books
+
+- Expanded Paper, Book and Quill, and Written Book into practical acquisition and writing guides, with one Content Guide route. Existing Book, Sugar Cane, Lectern, Bookshelves, map/cartography and trading owners remain linked.
+- Source pin `78e8e0423084f010bb47e36132550619b37644c2`: active editing, saving, signing, opening and copying routes are traced through UI, packet validation, server conversion and loaded recipes. Done saves the editable notebook; Escape follows close-only behavior. Normal signing-title limits are separated from wider data/packet limits.
+- Copying preserves the source book and author, increments the generation and consumes qualifying unsigned notebooks even when they contain notes. A second signed source invalidates the recipe, and generation-two copies do not create another crafting generation.
+- Acquisition follows real recipes, loot and current merchant-price calculation, including the writable-book payment stack clamp. The unsupported generic Written Book catalog-acquisition claim is replaced with the verified signing route and category/browser limits.
+- Independent review verified 98 source files, 88 source definitions, 113 rendered source uses, 68 local links and all 15 original heading IDs. Frozen metadata/content review and final integrated documentation/index checks, strict build, configured references/local links and old anchors apply.
+- No game editing, signing, copying, trading, reading or storage test was run. Existing monthly history remains intact and broader wiki catch-up remains incomplete.

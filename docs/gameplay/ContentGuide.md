@@ -153,6 +153,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Banners](blocks/Banners.md) and [Loom](blocks/Loom.md): colors, pattern layers/templates, duplication, washing, map markers and Shield decoration
 - [Bookshelves](blocks/Bookshelves.md) and [Lectern](blocks/Lectern.md): enchanting versus storage, book slots, reading, persistence and redstone outputs
+- [Paper](items/Paper.md), [Book and Quill](items/BookAndQuill.md) and [Written Book](items/WrittenBook.md): acquisition, editing and saving, signing, reading and copy generations
 
 - [Barrel](blocks/Barrel.md) and [Ender Chest](blocks/EnderChest.md): shared versus personal storage, persistence, access, automation and recovery
 - [Cauldrons](blocks/Cauldrons.md): bucket/bottle exchanges, washing, precipitation, dripstone, contact effects and comparator levels
