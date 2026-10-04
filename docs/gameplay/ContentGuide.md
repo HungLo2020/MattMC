@@ -87,6 +87,9 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Materials, equipment, and enchanting
 
+- Core ingredients: [Gold Ingot](items/GoldIngot.md), [Gold Nugget](items/GoldNugget.md), [Iron Nugget](items/IronNugget.md) and [Leather](items/Leather.md), with exact conversions, recycling and useful next recipes
+- [Golden Carrot](items/GoldenCarrot.md) and [Glistering Melon Slice](items/GlisteringMelonSlice.md): separate food/brewing roles, crafting budgets, Farmer offers and animal interactions
+
 - Custom resource limits: [Amber Curiosity](items/AmberCuriosity.md), [Heavy Bone](items/HeavyBone.md), [Tough Hide](items/ToughHide.md) and [Ominous Catalyst](items/OminousCatalyst.md), with actual registrations, access and connected-use distinctions
 - [Emu Feather](items/EmuFeather.md), [Lost Tentacle](items/LostTentacle.md) and [Maraca](items/Maraca.md): verified resource limits, disconnected capture behavior and conditional Cockroach equip/recovery
 
