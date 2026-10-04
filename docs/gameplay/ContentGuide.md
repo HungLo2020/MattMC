@@ -182,7 +182,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Signs and Hanging Signs](blocks/Signs.md): all material forms, placement, two-sided writing, dye/glow/wax and Pewen integration gaps
 - [Candles](blocks/Candles.md) and [Cake](blocks/Cake.md): colors, stacked light, water/ignition, slices, candle recovery and comparator output
 
-- [Coral](blocks/Coral.md): all living/dead blocks, plants and fans, exact Silk Touch/tool rules, water/support and renewable sources
+- [Coral](blocks/Coral.md): all living/dead blocks, plants and fans, exact Silk Touch/tool rules, water/support and renewable sources; [variant item entries](blocks/Coral.md#five-species-and-their-registered-forms) explain collection outcomes and placed-form aliases
 
 - [Beacon](blocks/Beacon.md) and [Conduit](blocks/Conduit.md): complete base/frame layouts, activation, effect ranges, payment and target limits
 - [Soul Sand, Soul Soil and Magma Blocks](blocks/SoulSandSoilAndMagma.md): movement, harvesting, crop support, columns and hot-floor safety

@@ -1,17 +1,33 @@
 # Dead Horn Coral
 
+**Dead Horn Coral** (`minecraft:dead_horn_coral`) is a dead coral plant for dry or underwater decoration. [Item registration][item]
+
 ## Obtaining
 
-Dead Horn Coral can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Break the placed `minecraft:dead_horn_coral` with an **unbroken Silk Touch pickaxe** to collect **1 Dead Horn Coral**. Both the correct pickaxe and Silk Touch are required. An ordinary pickaxe, Shears alone or a different Silk Touch tool gives nothing. [Block requirements][block] · [Loot][loot] · [Mining gate][mining] [tool-gate][]
+
+To make a collectible dead piece, place [Horn Coral](HornCoral.md) (`minecraft:horn_coral`), leave it without water until it turns dead, then collect it with that Silk Touch pickaxe. Keep its support intact while it dries. Breaking the living piece without Silk Touch does **not** yield this item. [Living loot][living-loot] · [Drying](../blocks/Coral.md#drying-and-dead-forms)
 
 ## Usage
 
-Dead Horn Coral is used for aquatic or reef-themed decoration.
+Place it upright on a **sturdy upper face**, not only on Sand. It is the plant form, separate from the full block and fan in the [horn coral family](../blocks/Coral.md#horn-coral). Collect it before removing its support; support loss does not bypass Silk Touch. See [placement and support](../blocks/Coral.md#placement-and-structural-support).
 
 ## Behavior
 
-Dead coral variants are inert decorative blocks and do not need water to remain in their dead form.
+It remains dead whether dry or waterlogged; water does not restore [Horn Coral](HornCoral.md). Its support is still required. See [dead forms and nonrevival](../blocks/Coral.md#drying-and-dead-forms).
 
 ## Notes
 
-* This item is the item form of the `minecraft:dead_horn_coral` block.
+- An unbroken wooden pickaxe already meets the material requirement. [Pickaxe tag][pickaxe] · [Tool durability check][tool-durability] See the [coral harvest rules](../blocks/Coral.md#harvesting-coral) for the other forms and normal Survival drop conditions.
+- The checked built-in recipe data provides no recipe for this item. [Recipe resources][recipes]
+- Source-reviewed at `78e8e0423084f010bb47e36132550619b37644c2` on 2026-10-04; no gameplay test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L900-L900
+[block]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L4969-L4979
+[loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/dead_horn_coral.json
+[mining]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L281-L295
+[tool-gate]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/player/Player.java#L655-L657
+[living-loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/horn_coral.json
+[recipes]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[tool-durability]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L587-L589
