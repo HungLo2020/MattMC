@@ -6,6 +6,10 @@
 
 It can be requested through the [combined inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This source audit did not establish a Survival archaeology loot route for this item; an archaeology source should not be assumed from its name. [Creative listing][custom-creative] · [Current catalog entry][catalog-entry] · [Combined browser][catalog-browser]
 
+### Catalog name
+
+For default item stacks with the reviewed bundled English resources, search the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) for `footprint_pottery_sherd`, including the underscores. The source-resolved display name is `item.minecraft.footprint_pottery_sherd`; this page's readable title is not a bundled translation. Custom item names, another language or resource-pack translations can change that text. This name/search guidance is source-derived, without a running-client check. [Default item names][catalog-name-init] · [Hover name][catalog-hover-name] · [Missing-key fallback][catalog-name-fallback] · [Name search][catalog-name-search] · [Bundled English][catalog-english]
+
 ## Usage
 
 Use it in one of the four cross-shaped ingredient positions for a [Decorated Pot](../blocks/DecoratedPot.md#crafting-and-choosing-faces). The selected face retains this sherd's item identity. You may mix it with Bricks or other accepted sherds. [Recipe][recipe] · [Stored decorations][decorations]
@@ -33,3 +37,9 @@ Related: [Decorated Pot](DecoratedPot.md) · [Items](Items.md)
 
 [catalog-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1930
 [catalog-browser]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L73-L108
+
+[catalog-name-init]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Item.java#L122-L125
+[catalog-hover-name]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L792-L817
+[catalog-name-fallback]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/locale/Language.java#L110-L114
+[catalog-name-search]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L115-L132
+[catalog-english]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/assets/minecraft/lang/en_us.json

@@ -2,6 +2,8 @@
 
 Cooked Trilocaris Tail is a food integrated from Alex's Caves. Cooking a raw tail improves its food value.
 
+Registry ID: `minecraft:cooked_trilocaris_tail`. [Item registration](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L1679)
+
 ## Obtaining
 
 [Trilocaris](../mobs/Trilocaris.md) have a loot-table entry for **0–1 raw tail**. That entry applies furnace smelting when the mob is on fire, allowing the cooked form instead. A drop is not guaranteed, and the checked table has no Looting count bonus.

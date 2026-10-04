@@ -8,6 +8,10 @@ Ominous Catalyst is an Ingredients-category entry. In Creative, request it throu
 
 No recipe output, loot entry or prefilled structure inventory supplying Ominous Catalyst was found in ordinary or bundled optional-pack data. Its rarity and name do not make it a [Vault](../blocks/Vault.md) reward or a [Trial Spawner](../blocks/TrialSpawner.md) ingredient. [Bundled data][data] · [Optional packs][packs]
 
+### Catalog name
+
+For default item stacks with the reviewed bundled English resources, search the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) for `ominous_catalyst`, including the underscores. The source-resolved display name is `item.minecraft.ominous_catalyst`; this page's readable title is not a bundled translation. Custom item names, another language or resource-pack translations can change that text. This name/search guidance is source-derived, without a running-client check. [Default item names][catalog-name-init] · [Hover name][catalog-hover-name] · [Missing-key fallback][catalog-name-fallback] · [Name search][catalog-name-search] · [Bundled English][catalog-english]
+
 ## Usage
 
 No bundled recipe ingredient or dedicated Java interaction consuming this item was found. It has no consumable or omen component. Carrying or using the normal Catalyst does not apply Bad Omen or turn a Trial Spawner ominous; the active system checks omen effects on players. [Item][item] · [Default use][plain-use] · [Trial effect checks][trial]
@@ -42,3 +46,9 @@ Related: [Ominous Bottle](OminousBottle.md) · [Trial Spawner](../blocks/TrialSp
 [trial]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/entity/trialspawner/TrialSpawnerStateData.java#L159-L178
 [data]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft
 [packs]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/datapacks
+
+[catalog-name-init]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Item.java#L122-L125
+[catalog-hover-name]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L792-L817
+[catalog-name-fallback]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/locale/Language.java#L110-L114
+[catalog-name-search]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L115-L132
+[catalog-english]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/assets/minecraft/lang/en_us.json

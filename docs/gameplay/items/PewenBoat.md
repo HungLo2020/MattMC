@@ -10,6 +10,10 @@ Obtaining the inputs is a separate limitation: the bundled log-to-plank recipe h
 
 This item has a [Creative inventory entry][creative].
 
+### Catalog name
+
+For default item stacks with the reviewed bundled English resources, search the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) for `pewen_boat`, including the underscores. The source-resolved display name is `item.minecraft.pewen_boat`; this page's readable title is not a bundled translation. Custom item names, another language or resource-pack translations can change that text. This name/search guidance is source-derived, without a running-client check. [Default item names][catalog-name-init] · [Hover name][catalog-hover-name] · [Missing-key fallback][catalog-name-fallback] · [Name search][catalog-name-search] · [Bundled English][catalog-english]
+
 ## Usage
 
 Use it to travel with another eligible passenger. Follow [placing and rowing](OakBoat.md#placing-and-rowing) for the controls and [carrying another passenger](OakBoat.md#carrying-another-passenger) for mob-loading restrictions. Two seats do not mean every mob can board. [Placement][placement] · [Passenger capacity][capacity]
@@ -46,3 +50,9 @@ Source-reviewed on **2026-10-04** at `f5473e41dc4af8ced756db517fada27288df07a3`.
 [dispenser]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/core/dispenser/DispenseItemBehavior.java#L145-L164
 [default-dispenser]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/DispenserBlock.java#L102-L112
 [ejected-item]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/core/dispenser/DefaultDispenseItemBehavior.java#L21-L46
+
+[catalog-name-init]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Item.java#L122-L125
+[catalog-hover-name]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L792-L817
+[catalog-name-fallback]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/locale/Language.java#L110-L114
+[catalog-name-search]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/gui/screens/inventory/JeiPanel.java#L115-L132
+[catalog-english]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/assets/minecraft/lang/en_us.json
