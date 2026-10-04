@@ -198,7 +198,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Copper construction](blocks/CopperConstruction.md): all structural oxidation/wax variants, efficient stonecutting, aging, scraping, lightning cleaning, doors and waterlogging
 - [Decorative stone](blocks/DecorativeStone.md) and [Tuff](blocks/Tuff.md): Granite/Diorite/Andesite/Calcite, exact polished/brick/chiseled variants and construction recipes
 
-- [Wood construction](blocks/WoodConstruction.md): twelve materials, Bamboo Mosaic, exact shape recipes, placement/connections, waterlogging, power, and fire/fuel differences
+- [Wood construction](blocks/WoodConstruction.md): twelve materials, Bamboo Mosaic, exact shape recipes, placement/connections, waterlogging, power, and fire/fuel differences; [plank item routes](blocks/WoodConstruction.md#planks-and-materials) give the exact family inputs and reusable building materials
 
 - [Crafter](blocks/Crafter.md): redstone crafting, slot controls, ingredient distribution, output overflow, and comparator signals
 
