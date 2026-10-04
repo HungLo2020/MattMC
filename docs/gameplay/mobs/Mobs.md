@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Shared encounter rules:** [natural spawning and despawning](../mechanics/NaturalSpawning.md): population caps, player distance, ticking terrain and retention differences
+
 - **Villager population:** [breeding and raising residents](Villager.md#breeding-and-population): food delivery/sharing, reachable spare homes, failed attempts, birth and growth
 
 - **Anteater care:** [Anteater](Anteater.md): honey breeding, baby riding, live-ant predation, Dirt/Sugar actions and current feeding/rendering limits

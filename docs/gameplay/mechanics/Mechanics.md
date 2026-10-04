@@ -2,6 +2,7 @@
 
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
+- [Natural spawning and despawning](NaturalSpawning.md): category caps, player distance, active terrain, persistence and troubleshooting
 - [TaCZ firearms](TaCZFirearms.md): controls, firing, magazine and reserve ammunition, reloads, refitting, and current limits
 - [Inventory item browser](InventoryBrowser.md): catalog visibility, Creative insertion and protocol/operator gates
 - [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
