@@ -82,6 +82,8 @@ Stairs keep their stair item when mined, regardless of their corner shape or hal
 
 ## Fences
 
+Item entries: [Acacia Fence](../items/AcaciaFence.md) · [Bamboo Fence](../items/BambooFence.md) · [Birch Fence](../items/BirchFence.md) · [Cherry Fence](../items/CherryFence.md) · [Crimson Fence](../items/CrimsonFence.md) · [Dark Oak Fence](../items/DarkOakFence.md) · [Jungle Fence](../items/JungleFence.md) · [Mangrove Fence](../items/MangroveFence.md) · [Oak Fence](../items/OakFence.md) · [Pale Oak Fence](../items/PaleOakFence.md) · [Spruce Fence](../items/SpruceFence.md) · [Warped Fence](../items/WarpedFence.md)
+
 The 12 covered wooden fences connect horizontally to one another, including Crimson and Warped. They also connect to a neighbor's sturdy side face unless that block is a connection exception, and to a correctly oriented Fence Gate. They do not join Nether Brick Fence through the same-fence rule: that fence is outside the wooden-fence tag. Leaves, pumpkins, melons, shulker boxes, and barriers are among the explicitly excluded sturdy-face connections. [Fence connection checks][fences] · [Wooden-fence tag][block-wooden_fences] · [Fence tag][block-fences] · [Connection exceptions][connection-exceptions]
 
 Fence collision rises **1.5 blocks**, even though the visible post is one block tall. Removing a rail connection changes the shape, not the fence's existence. Fences can be waterlogged. [Fence dimensions and neighbor updates][fences] · [Collision and fluid implementation][cross]
