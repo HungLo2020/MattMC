@@ -213,6 +213,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
 - [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
 - Classic music discs: [13](items/MusicDisc13.md), [Cat](items/MusicDiscCat.md), [Blocks](items/MusicDiscBlocks.md), [Chirp](items/MusicDiscChirp.md), [Far](items/MusicDiscFar.md) and [Mall](items/MusicDiscMall.md), with eligible Creeper loot, exact chest-roll scope and song/Comparator values
+- More classic discs: [11](items/MusicDisc11.md), [Mellohi](items/MusicDiscMellohi.md), [Stal](items/MusicDiscStal.md), [Strad](items/MusicDiscStrad.md), [Wait](items/MusicDiscWait.md) and [Ward](items/MusicDiscWard.md), with their actual Creeper route and distinct song/Comparator values
 - [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
 - [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
 - [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
