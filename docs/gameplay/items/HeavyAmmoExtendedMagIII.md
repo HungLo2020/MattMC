@@ -36,7 +36,7 @@ Only one extended magazine occupies the slot, so tiers do not stack. Fitting the
 
 Level 3 selects the gun's configured tier-III capacity; it does not add a fixed number of rounds to every gun. **Base** below means no extended magazine is installed. These are magazine capacities in rounds, not rounds supplied by installing the attachment. [Capacity lookup][magazine] · [Level selection][level-selection]
 
-**M1 Carbine exception:** this tier is accepted by the gun, but sets its magazine capacity to **1 round**, down from 15 without an extended magazine, 20 with tier I, or 30 with tier II. This is the literal selected capacity, not a bonus or a fallback marker. [Carbine definition][gun-m1] · [Capacity selection][level-selection]
+**M1 Carbine exception:** this tier is accepted by the gun, but sets its magazine capacity to **1 round**, down from 15 without an extended magazine, 20 with tier I, or 30 with tier II. This is the literal selected capacity, not a bonus or a fallback marker. [Carbine definition][gun-m1] · [Capacity selection][level-selection] The compatibility/capacity mismatch and related description limits are tracked in [issue #809](https://github.com/HungLo2020/MattMC/issues/809).
 
 | Compatible gun | Base | With this attachment | Source |
 | --- | ---: | ---: | --- |
