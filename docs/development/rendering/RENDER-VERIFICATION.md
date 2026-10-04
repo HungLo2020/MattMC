@@ -18,6 +18,44 @@ The architecture boundary tests run with the Rust tests; see
 "Mockito cannot mock this class" are a known JDK 25 limitation, not
 regressions; compare their count with the base commit.
 
+For GUI target declarations, [commit `78e8e04`](https://github.com/HungLo2020/MattMC/commit/78e8e0423084f010bb47e36132550619b37644c2)
+adds two GUI unit tests and extends one existing world-frame test:
+
+- [Blur scratch declarations](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/guirender/frontend/tests.rs#L2565-L2606)
+  check that recorded scratch passes are admitted with their owned-target list
+  and rejected with an empty list.
+- [Custom post-effect declarations](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/guirender/frontend/tests.rs#L2608-L2659)
+  check a main → private intermediate → main chain and the same empty-list
+  rejection. This fixture uses no external bindings or depth inputs; their
+  ownership handling is source-inspected implementation, not new test coverage.
+- The added [prebuilt-blur case](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/tests.rs#L2617-L2669)
+  in `source_candidate_prepares_matching_png_assets_without_admitting_execution`
+  checks that missing stats reject without increasing the submission count,
+  then supplying the recorded stats submits that frame exactly once.
+
+The two GUI tests use [mock GAL](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/guirender/frontend/tests.rs#L2661-L2665).
+The extended world case uses the
+[test-only selected-source coordinator](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/submit.rs#L200-L212);
+actual mid-frame [source preparation/arming](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/submit.rs#L152-L158)
+is compiled under `cfg(not(test))`. These assertions cover stats propagation
+and zero-versus-one submission, not execution of that production transition.
+No dedicated item-raster entry case was added.
+
+To exercise those cases from the repository root:
+
+```sh
+(cd src/main/rust && cargo test --release source_frame_gui_validation)
+(cd src/main/rust && cargo test --release source_candidate_prepares_matching_png_assets_without_admitting_execution)
+```
+
+This documentation review inspected their source only; it did not execute the
+tests or reproduce the original menu/world-entry failure in a live client.
+After rebuilding native release, repeat the affected blurred-menu/world-entry
+and custom post-effect flows, checking source-route continuity and validation
+output under [real-config checks](#3-real-config-session). This bounded fix does
+not establish the absence of other GUI crashes or broad rendering parity;
+[Goal 5 remains incomplete](GOAL-5-STATUS.md#remaining-work).
+
 For DH container lifetime and snapshot-pressure changes, run the real-container
 regressions before a normal-overlap gameplay pair:
 

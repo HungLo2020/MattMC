@@ -133,6 +133,27 @@ discards cached pixels needed by later items and causes repeated rasterization.
 Keep accepted static rasters across frames; identity, extent and asset-generation
 changes invalidate them. Pending command uses still prevent eviction.
 
+Prebuilt GUI commands must keep the `GuiSubmitStats` produced while recording
+through route selection: source preparation can arm the selected-source route
+for that same frame. At [commit `78e8e04`](https://github.com/HungLo2020/MattMC/commit/78e8e0423084f010bb47e36132550619b37644c2),
+[`submit_whole_frame_with_gui_stats`](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/submit.rs#L69-L92)
+threads those declarations into the
+[armed source submission](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/source/submit.rs#L347-L365).
+Replacing them with empty stats would reject legitimate private GUI targets.
+
+[Menu blur](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/guirender/frontend/recording/blur_boundary.rs#L237-L261)
+declares its ping-pong scratch render targets in `owned_intermediate_targets`.
+[Custom post effects](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/guirender/frontend/post_effects/custom.rs#L368-L406)
+report the private intermediate targets their passes write, including the
+[color-only execution target](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/guirender/frontend/post_effects/custom.rs#L228-L275)
+used for depth-sampling effects when it differs from the main target. External bindings are not reported as GUI-owned
+intermediates. The [whole-frame GUI paths](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/submit.rs#L1877-L2165)
+merge these declarations with the recorded GUI stats before source validation.
+The [validator](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/rust/render/worldrender/source/submit.rs#L2043-L2095)
+still rejects undeclared targets and a second presenter; this is no general
+permission for GUI work to write arbitrary targets. See the scoped coverage
+and live-check limits in [Render Verification](RENDER-VERIFICATION.md#1-tests).
+
 Direct DH composition tracks snapshot image usage separately from copied
 contents. Its early resolver establishes `ShaderRead` even when far fade is
 off and no vanilla pixels are copied. Later vanilla fade snapshots must
