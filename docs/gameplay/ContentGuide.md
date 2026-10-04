@@ -194,6 +194,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Glass and Glass Panes](blocks/GlassAndPanes.md): every stained color plus ordinary and tinted glass, with recipes, collection, connections, light, and beacon choices
 - [Repeater](blocks/RedstoneRepeater.md), [Comparator](blocks/RedstoneComparator.md), and [Observer](blocks/Observer.md): directional signals, timing, locking, container readings, and block updates
 - [Item Frame](items/ItemFrame.md) and [Glow Item Frame](items/GlowItemFrame.md): acquisition, display placement, rotation, MattMC visibility controls, recovery and Comparator readings
+- [Painting](items/Painting.md): recipe and trade acquisition, largest-fitting picture selection, preset limits, support and recovery
 
 - [Wool and Carpet](blocks/WoolAndCarpet.md): complete 16-color families with exact dye/craft/drop rules and quiet-building distinctions
 
