@@ -12,7 +12,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Snow and Powder Snow](blocks/Snow.md) and [Ice families](blocks/Ice.md): collecting, layering, melting, freezing, weather and slippery floors
 
-- [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials
+- [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials; [leaf variant entries](blocks/TreeLeaves.md#leaf-families-and-drops) connect collection, Fortune and persistent placement
 - [Water and Lava](blocks/WaterAndLava.md) and [Bubble Columns](blocks/BubbleColumns.md): fluid sources/flow, bucket rules, reusable pools and vertical transport
 
 - [Soil, Sand, and Gravel](blocks/SoilSandAndGravel.md): collection, Grass/Mycelium spread, tool conversions, falling terrain, Flint, and suspicious-block care

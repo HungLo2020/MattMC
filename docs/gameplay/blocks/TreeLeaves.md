@@ -8,17 +8,17 @@ All IDs use the `minecraft:` namespace. Every row can instead drop **one matchin
 
 | Leaf block ID | Plant roll without Shears / Silk Touch | Fruit roll | Other roll | Checked loot |
 | --- | --- | --- | --- | --- |
-| <span id="oak-leaves">`oak_leaves`</span> | 1 Oak Sapling (Standard chance) | 1 Apple | 1–2 Sticks | [Loot][s8] |
-| <span id="spruce-leaves">`spruce_leaves`</span> | 1 Spruce Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s9] |
-| <span id="birch-leaves">`birch_leaves`</span> | 1 Birch Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s10] |
-| <span id="jungle-leaves">`jungle_leaves`</span> | 1 Jungle Sapling (Jungle chance) | None | 1–2 Sticks | [Loot][s11] |
-| <span id="acacia-leaves">`acacia_leaves`</span> | 1 Acacia Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s12] |
-| <span id="cherry-leaves">`cherry_leaves`</span> | 1 Cherry Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s13] |
-| <span id="dark-oak-leaves">`dark_oak_leaves`</span> | 1 Dark Oak Sapling (Standard chance) | 1 Apple | 1–2 Sticks | [Loot][s14] |
-| <span id="pale-oak-leaves">`pale_oak_leaves`</span> | 1 Pale Oak Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s15] |
+| <span id="oak-leaves">[`oak_leaves`](../items/OakLeaves.md)</span> | 1 Oak Sapling (Standard chance) | 1 Apple | 1–2 Sticks | [Loot][s8] |
+| <span id="spruce-leaves">[`spruce_leaves`](../items/SpruceLeaves.md)</span> | 1 Spruce Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s9] |
+| <span id="birch-leaves">[`birch_leaves`](../items/BirchLeaves.md)</span> | 1 Birch Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s10] |
+| <span id="jungle-leaves">[`jungle_leaves`](../items/JungleLeaves.md)</span> | 1 Jungle Sapling (Jungle chance) | None | 1–2 Sticks | [Loot][s11] |
+| <span id="acacia-leaves">[`acacia_leaves`](../items/AcaciaLeaves.md)</span> | 1 Acacia Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s12] |
+| <span id="cherry-leaves">[`cherry_leaves`](../items/CherryLeaves.md)</span> | 1 Cherry Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s13] |
+| <span id="dark-oak-leaves">[`dark_oak_leaves`](../items/DarkOakLeaves.md)</span> | 1 Dark Oak Sapling (Standard chance) | 1 Apple | 1–2 Sticks | [Loot][s14] |
+| <span id="pale-oak-leaves">[`pale_oak_leaves`](../items/PaleOakLeaves.md)</span> | 1 Pale Oak Sapling (Standard chance) | None | 1–2 Sticks | [Loot][s15] |
 | <span id="mangrove-leaves">`mangrove_leaves`</span> | None; use the propagule interaction below | None | 1–2 Sticks | [Loot][s16] |
-| <span id="azalea-leaves">`azalea_leaves`</span> | 1 Azalea (Standard chance) | None | 1–2 Sticks | [Loot][s17] |
-| <span id="flowering-azalea-leaves">`flowering_azalea_leaves`</span> | 1 Flowering Azalea (Standard chance) | None | 1–2 Sticks | [Loot][s18] |
+| <span id="azalea-leaves">[`azalea_leaves`](../items/AzaleaLeaves.md)</span> | 1 Azalea (Standard chance) | None | 1–2 Sticks | [Loot][s17] |
+| <span id="flowering-azalea-leaves">[`flowering_azalea_leaves`](../items/FloweringAzaleaLeaves.md)</span> | 1 Flowering Azalea (Standard chance) | None | 1–2 Sticks | [Loot][s18] |
 
 ### Fortune chances
 
