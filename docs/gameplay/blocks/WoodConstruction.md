@@ -66,6 +66,8 @@ Silk Touch and Fortune do not change these bundled loot results. A double slab g
 
 ## Slabs
 
+Item entries: [Acacia Slab](../items/AcaciaSlab.md) · [Bamboo Mosaic Slab](../items/BambooMosaicSlab.md) · [Bamboo Slab](../items/BambooSlab.md) · [Birch Slab](../items/BirchSlab.md) · [Cherry Slab](../items/CherrySlab.md) · [Crimson Slab](../items/CrimsonSlab.md) · [Dark Oak Slab](../items/DarkOakSlab.md) · [Jungle Slab](../items/JungleSlab.md) · [Mangrove Slab](../items/MangroveSlab.md) · [Oak Slab](../items/OakSlab.md) · [Pale Oak Slab](../items/PaleOakSlab.md) · [Spruce Slab](../items/SpruceSlab.md) · [Warped Slab](../items/WarpedSlab.md)
+
 A single slab fills the lower or upper half of its block space. Clicking a top face normally places a bottom slab; clicking the underside places a top slab. On a side face, the clicked height selects the half. Place another **identical slab item** into the missing half to make a full-height double slab. Different materials, including regular Bamboo versus Bamboo Mosaic, cannot combine into one double slab. [Placement, replacement, and shapes][slab]
 
 Single slabs can be waterlogged. Combining two slabs sets the result to **double and not waterlogged**, and double slabs reject bucket waterlogging. Mine a double slab to recover its two constituent slabs. [Slab water rules][slab] · [Slab loot checks](#recipe-and-loot-matrix)
