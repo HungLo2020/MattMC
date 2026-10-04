@@ -24,6 +24,7 @@ This article covers ordinary chests. [Trapped Chests](TrappedChest.md), [Ender C
 
 ## Related pages
 
+- [Inventory controls](../mechanics/InventoryControls.md#move-stacks-quickly)
 - [Chest item](../items/Chest.md)
 - [Crafting Table](CraftingTable.md)
 - [Blocks](Blocks.md)

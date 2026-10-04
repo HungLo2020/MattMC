@@ -33,6 +33,8 @@ Visibility and possession also do not override a block or item's own use restric
 
 ## Reading acquisition notes elsewhere
 
+For producing-recipe lookup from a hovered item, see [Recipe Viewer](RecipeViewer.md#opening-a-recipe), including its controls and missing-result limits.
+
 A guide's “no bundled recipe” or “no natural source verified” statement describes those particular resource routes. An ordinary category-listed item can have a **Creative browser route** without having an ordinary Survival acquisition route. Conversely, a registered item can be absent from the category list. Obtaining an item, using an item already supplied by another route, and merely seeing its catalog entry are separate questions. [List construction][list] · [Client request][client] · [Protocol admission][protocol-gate]
 
 Related: [Items](../items/Items.md) · [Creative](../gamemodes/Creative.md) · [Survival](../gamemodes/Survival.md) · [Mechanics](Mechanics.md)

@@ -46,6 +46,8 @@ Carry food before exploring or fighting rather than waiting until you can no lon
 
 ## Related pages
 
+- [Movement and controls](Movement.md#starting-and-stopping-a-sprint): sprint keys and other start/stop conditions
+
 - [Hunger and Saturation effects](../effects/HungerAndSaturation.md): effect sources, tick behavior, and clearing
 
 - [Health, damage, and recovery](Health.md)

@@ -6,6 +6,9 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Natural spawning and despawning](NaturalSpawning.md): category caps, player distance, active terrain, persistence and troubleshooting
 - [TaCZ firearms](TaCZFirearms.md): controls, firing, magazine and reserve ammunition, reloads, refitting, and current limits
 - [Inventory item browser](InventoryBrowser.md): catalog visibility, Creative insertion and protocol/operator gates
+- [Inventory controls](InventoryControls.md): stack splitting, Shift transfers, dragging, hotbar/offhand swaps and dropping
+- [Recipe Viewer](RecipeViewer.md): opening and navigating recipe displays, search focus and missing-result limits
+- [Movement and controls](Movement.md): configurable keys, sprint conditions, crouching, crawling, ledge limits and swimming
 - [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
 - [Health, damage, and recovery](Health.md): health units, defenses, difficulty and recovery
 - [Death and respawn](DeathAndRespawn.md): inventory/experience loss, recovery and saved-point fallback

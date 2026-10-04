@@ -8,6 +8,8 @@ Craft a [Crafting Table](../blocks/CraftingTable.md) from four planks in a 2 × 
 
 ## Reading recipes
 
+Use the [Recipe Viewer](../mechanics/RecipeViewer.md#opening-a-recipe) to inspect producing recipes from a hovered item; its displays have [coverage and cache limits](../mechanics/RecipeViewer.md#when-a-recipe-is-missing).
+
 - **Shaped:** arrange ingredients in the required pattern and leave the pattern's empty cells clear.
 - **Shapeless:** provide the required ingredients; the specific grid positions do not define the recipe.
 - **Tags:** a recipe may accept a group of items rather than one exact item. Membership matters, even when another item's name looks equivalent.

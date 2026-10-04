@@ -18,6 +18,8 @@ Enchanted Books are not eligible for another ordinary Enchanting Table offer in 
 
 ## Related pages
 
+- [Librarian trades](../trading/LibrarianTrades.md#enchanted-book-selection-and-price): possible book offers and their base Emerald-plus-Book cost
+
 - [Equipment curses](../enchanting/EquipmentCurses.md#vanishing-the-death-inventory-check): stored curse books versus applied equipment effects
 
 - [Book](Book.md)
