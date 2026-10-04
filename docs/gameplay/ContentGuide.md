@@ -249,6 +249,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Trial Chambers](structures/TrialChambers.md): finding a chamber, preparation, room hazards, supply containers and distinct normal/ominous reward routes
 - [Ancient City](structures/AncientCity.md): Deep Dark search, sculk precautions, lower-center circuitry and distinct city/ice-box chest rewards
 - [Trail Ruins](structures/TrailRuins.md): biome search, buried-site identification, careful excavation and common versus rare archaeology rewards
+- [Mineshaft](structures/Mineshaft.md): normal/Badlands search, branching-route preparation, cave-spider corridors, chest-cart loot and safe material recovery
 - [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
 - [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
 - [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
