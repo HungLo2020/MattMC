@@ -56,7 +56,7 @@ The selected zoom does feed the gun’s aimed camera-recoil calculation. That is
 
 The first-person gun renderer loads the installed scope’s display and geometry, attaches it at the gun’s scope mount, and looks for the first selected scope-view node to align the weapon. Optical geometry has a separate stencil submission path. These are source-traced rendering connections, not an in-game check of reticle alignment, lens appearance, or every compatible gun. [Main-hand rendering][first-person-entry] · [Attachment loading][render-attachment] · [View alignment][render-view] · [Optical submission][render-optics]
 
-**LPVO alignment has a source-visible mismatch:** the selected view asks for `scope_view_2`, but the bundled model contains only `scope_view`. The renderer therefore falls back to the gun’s iron-sight positioning, while the FOV zoom still applies independently. The resulting appearance has not been checked in game. [Display selection][display] · [Model nodes][lpvo-geometry] · [Missing-view check][render-view] · [Positioning fallback][render-fallback] · [Independent FOV path][scope-loader]
+**LPVO alignment has a source-visible mismatch:** the selected view asks for `scope_view_2`, but the bundled model contains only `scope_view`. The renderer therefore falls back to the gun’s iron-sight positioning, while the FOV zoom still applies independently. The resulting appearance has not been checked in game. This selected-view mismatch is tracked in [issue #811](https://github.com/HungLo2020/MattMC/issues/811); it is not yet a verified rendering fix. [Display selection][display] · [Model nodes][lpvo-geometry] · [Missing-view check][render-view] · [Positioning fallback][render-fallback] · [Independent FOV path][scope-loader]
 
 ## Notes
 
