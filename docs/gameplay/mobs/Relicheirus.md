@@ -32,7 +32,7 @@ Hatching also does not tame this species, and its inherited owner-command and ow
 
 Relicheirus has an active leaf-nibbling goal. Despite its Pewen-related name, the current goal selects ordinary blocks in the **leaves tag**, subject to height and path checks. The nibble animation destroys a selected block without drops and immediately restores its state; it is not a demonstrated Pine Nut harvesting method.
 
-**Do not spend [Primordial Soup](../items/PrimordialSoup.md) expecting a tree-cutting helper.** The ordinary interaction consumes soup, but does not call the separate method that enables tree pushing. No active caller of that method was found. Even if enabled by code, the simplified pushing goal breaks one selected log block; it does not topple an entire tree into a falling-tree entity.
+**Do not spend [Primordial Soup](../items/PrimordialSoup.md) expecting a tree-cutting helper.** The ordinary interaction consumes soup, but does not call the separate method that enables tree pushing. No active caller of that method was found. Even if enabled by code, the simplified pushing goal breaks one selected log block; it does not topple an entire tree into a falling-tree entity. [Tracked consumption/activation limitation (#813)](https://github.com/HungLo2020/MattMC/issues/813); the issue is open and source-verified, without an in-game reproduction.
 
 ## Drops
 
