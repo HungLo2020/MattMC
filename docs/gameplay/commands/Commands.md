@@ -21,13 +21,13 @@ These examples describe operations; the wiki does not execute them.
 | `/gamemode creative` | Changes your own mode; see the [mode guide](../gamemodes/Gamemodes.md) |
 | `/tp @s ~ ~1 ~` | Moves the executing player one block upward relative to the command position; check clearance |
 | `/time query daytime` | Reads daytime in the command source's level |
-| `/time set day` | Sets day time to 1,000 across the server's loaded levels in this implementation |
+| `/time set day` | Sets shared day time to 1,000; fixed-time dimension environments retain their own rules |
 | `/weather clear` | Changes the server Overworld weather, even when invoked from another dimension |
 | `/locate structure minecraft:stronghold` | Searches for a matching structure; world settings and availability can make the search fail |
 | `/locate biome minecraft:plains` | Searches for the registered biome rather than creating it |
 | `/gamerule keepInventory` | Queries the current rule without a new value |
 
-Time `set` and `add` iterate over all loaded server levels. A dimension with a fixed-time property, such as [Primordial Caves](../dimensions/PrimordialCaves.md), still has its own environmental rules; changing stored time does not promise ordinary daylight there.
+Time `set` and `add` iterate over all loaded server levels; the Overworld owns the stored day time and the other levels read that shared value. A dimension with a fixed-time property, such as [Primordial Caves](../dimensions/PrimordialCaves.md), still has its own environmental rules. See [Time, weather, and sleep](../mechanics/TimeWeatherAndSleep.md#dimensions-and-what-the-client-shows) for shared clocks and dimension-dependent weather.
 
 ## Targets and identifiers
 

@@ -8,6 +8,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Getting started and survival
 
+- [Time, weather, and sleep](mechanics/TimeWeatherAndSleep.md): shared clocks, local precipitation, independent cycle rules, multiplayer rest and timer limits
+
 - [Snow and Powder Snow](blocks/Snow.md) and [Ice families](blocks/Ice.md): collecting, layering, melting, freezing, weather and slippery floors
 
 - [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials

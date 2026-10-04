@@ -47,7 +47,7 @@ The [shared lightning-cleaning guide](CopperConstruction.md#lightning-cleaning) 
 
 Source-reviewed on **2026-10-02** at `1879e5f54378351fd773b9a2c10839eb9259c504`. All eight rod variants, five recipes, eight loot tables, tool tags, exposed-column POI targeting, redstone, waterlogging, and the relevant oxidation/lightning dispatch were checked. No in-game test was run. Recipes, tags, loot, server rules, and later code changes can alter these results.
 
-Related: [Blocks](Blocks.md) · [Copper construction](CopperConstruction.md) · [Copper catalog](catalog/copper.md) · [Items](../items/Items.md)
+Related: [Blocks](Blocks.md) · [Copper construction](CopperConstruction.md) · [Copper catalog](catalog/copper.md) · [Items](../items/Items.md) · [Rain and thunder conditions](../mechanics/TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand)
 
 [rod-reg]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/level/block/Blocks.java#L6485-L6519
 [default]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L309-L326

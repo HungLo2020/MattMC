@@ -2,6 +2,7 @@
 
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
+- [Time, weather, and sleep](TimeWeatherAndSleep.md): shared clocks, local rain and snow, independent cycle rules, multiplayer rest and timer limits
 - [Natural spawning and despawning](NaturalSpawning.md): category caps, player distance, active terrain, persistence and troubleshooting
 - [TaCZ firearms](TaCZFirearms.md): controls, firing, magazine and reserve ammunition, reloads, refitting, and current limits
 - [Inventory item browser](InventoryBrowser.md): catalog visibility, Creative insertion and protocol/operator gates

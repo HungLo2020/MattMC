@@ -66,7 +66,7 @@ For a small source-derived example, place an exposed inverted detector beside a 
 
 Source-reviewed on 2026-10-02 at `96e5604a6abaec697de2004b1ba9775e303bfba7`. No gameplay test of light levels, weather, dimension behavior, timing or circuits was run. Examples assume the stated source inputs; altered dimension types, world settings and light conditions can change outcomes.
 
-Related: [Daylight Detector item](../items/DaylightDetector.md) · [Redstone basics](../redstone/Redstone.md) · [Redstone components](catalog/redstone.md) · [Blocks](Blocks.md)
+Related: [Daylight Detector item](../items/DaylightDetector.md) · [Redstone basics](../redstone/Redstone.md) · [Redstone components](catalog/redstone.md) · [Blocks](Blocks.md) · [Time and weather rules](../mechanics/TimeWeatherAndSleep.md#three-settings-to-check)
 
 [daylight-calc]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/DaylightDetectorBlock.java#L59-L75
 [daylight-use]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/DaylightDetectorBlock.java#L77-L96

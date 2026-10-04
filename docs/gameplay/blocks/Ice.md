@@ -67,6 +67,7 @@ Melting can advance neighboring Frosted Ice too. A separate Frosted-Ice neighbor
 
 ## Related pages
 
+- [Weather states and local precipitation](../mechanics/TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand)
 - [Snow, Snow Blocks and Powder Snow](Snow.md)
 - [Transport](../mechanics/Transport.md), [Enchanting](../enchanting/Enchanting.md), and [Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation)
 - [Blocks](Blocks.md) and [Items](../items/Items.md)

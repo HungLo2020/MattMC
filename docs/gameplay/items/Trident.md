@@ -59,6 +59,7 @@ MattMC keeps fully worn equipment as broken stacks. An already-broken Trident ca
 
 ## Notes
 
+- [Time, weather, and sleep](../mechanics/TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand) explains rain, thunder, and local precipitation checks
 - [Combat](../mechanics/Combat.md), [Drowned](../mobs/Drowned.md), and [Vault](../blocks/Vault.md) cover shared fighting and acquisition details
 - [Mace](Mace.md), [Wind Charge](WindCharge.md), [Enchanting](../enchanting/Enchanting.md), and [Items](Items.md) cover related choices
 

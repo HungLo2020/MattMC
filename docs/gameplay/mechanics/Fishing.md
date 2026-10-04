@@ -70,7 +70,7 @@ Two matching rods can be repaired by crafting, a Grindstone, or an Anvil under t
 
 Source-reviewed on 2026-10-01 at `4285adff2e35307c277a3a5bf54ebd064aa5e64b`. No gameplay test of casts, waits, open-water eligibility, loot distribution, entity pulling, or repairs was run. Timings assume 20 TPS, and data packs/components can change the reviewed defaults.
 
-Related: [Fishing Rod](../items/FishingRod.md) · [Enchanting](../enchanting/Enchanting.md) · [Mechanics](Mechanics.md)
+Related: [Fishing Rod](../items/FishingRod.md) · [Enchanting](../enchanting/Enchanting.md) · [Mechanics](Mechanics.md) · [Local rain and weather](TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand)
 
 [rod]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/FishingRodItem.java
 [hook]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/entity/projectile/FishingHook.java

@@ -18,7 +18,7 @@ An occupied bed normally reports that it is occupied. A sleeping villager can in
 
 ## Night skipping and weather
 
-The server uses the required sleeping-player percentage and sufficiently deep sleeping to decide when to wake everyone. If daylight cycling is enabled, it advances to the next day boundary. If weather cycling is enabled and it is raining, it resets the weather cycle. These are game-rule-dependent effects, not a guarantee that a single player always skips the night on every server.
+The server checks sleepers separately in each dimension and wakes the sleeping players in that level when its percentage and deep-sleep thresholds pass. In the Overworld, daylight cycling permits a jump to the next day boundary; weather cycling separately permits a reset when the level counts as raining. See [Time, weather, and sleep](../mechanics/TimeWeatherAndSleep.md#coordinate-multiplayer-sleep) for the counts and dimension limits.
 
 ## Dimension danger
 

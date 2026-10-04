@@ -27,7 +27,7 @@ The time calculation also needs an item owner and a client world. Ordinary playe
 
 Source-reviewed on **2026-10-03** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`. The active GUI, held-item and frame paths resolve the selected Clock model before sending its geometry to the Rust renderer; the GUI cache includes the selected model's identity. This is source evidence, **not an in-game test of dial motion or visual accuracy**. Crafting, chest generation, trades and frame interactions were not run in a client. Resource packs, data packs and server settings can change the defaults described here. [GUI extraction and cache][gui-native] · [Selected model identity][model-identity] · [Held Rust submission][held-native] · [Frame rendering][frame-renderer]
 
-Related: [Items](Items.md) · [Item Frame](ItemFrame.md) · [Glow Item Frame](GlowItemFrame.md) · [Daylight Detector](../blocks/DaylightDetector.md)
+Related: [Items](Items.md) · [Item Frame](ItemFrame.md) · [Glow Item Frame](GlowItemFrame.md) · [Daylight Detector](../blocks/DaylightDetector.md) · [Time and the day cycle](../mechanics/TimeWeatherAndSleep.md#read-the-day-cycle)
 
 [recipe]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/recipe/crafting/clock.json
 [shipwreck]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/loot_table/chests/shipwreck_map.json

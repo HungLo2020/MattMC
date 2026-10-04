@@ -83,6 +83,7 @@ Powder Snow extinguishes entities. Before extinguishing, a burning player can de
 
 ## Related pages
 
+- [Rain, snow, and the weather cycle](../mechanics/TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
 - [Snow Golem](../mobs/SnowGolem.md), [Snowball](../items/Snowball.md), and [Leather Boots](../items/LeatherBoots.md)
 - [Blocks](Blocks.md) and [Items](../items/Items.md)

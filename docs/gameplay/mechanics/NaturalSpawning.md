@@ -101,7 +101,7 @@ Persistence does **not** confer invulnerability, safe habitat or immunity to eve
 
 These checks identify source-defined failure points. They do not establish a seed-specific location, an optimized farm layout or a measured output rate.
 
-Related: [Mechanics](Mechanics.md) · [Mobs](../mobs/Mobs.md) · [Biomes](../biomes/Biomes.md) · [Dimensions](../dimensions/Dimensions.md) · [Name Tags](../items/NameTag.md)
+Related: [Mechanics](Mechanics.md) · [Mobs](../mobs/Mobs.md) · [Biomes](../biomes/Biomes.md) · [Dimensions](../dimensions/Dimensions.md) · [Name Tags](../items/NameTag.md) · [Time, weather, and sleep](TimeWeatherAndSleep.md#read-the-day-cycle)
 
 ## Sources and verification
 
