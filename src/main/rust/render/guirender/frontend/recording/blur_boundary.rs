@@ -247,6 +247,16 @@ impl GuiFrontend {
                     dst_queue: QueueClass::Graphics,
                 }));
                 initialized[output] = true;
+                // The ping-pong scratch image is a private GUI raster target;
+                // declare it so a complete source frame admits these passes.
+                if !stats
+                    .owned_intermediate_targets
+                    .contains(&scratch_targets[output])
+                {
+                    stats
+                        .owned_intermediate_targets
+                        .push(scratch_targets[output]);
+                }
             }
         }
         self.spider_initialized = initialized;

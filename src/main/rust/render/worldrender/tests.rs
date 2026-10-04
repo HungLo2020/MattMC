@@ -2614,6 +2614,61 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
             "a rejected second presenter must not submit a partial source frame",
         );
 
+        // GUI prebuilt before the route is chosen (a blurred menu during world
+        // entry) writes private blur scratch targets. Its recorded stats must
+        // reach the source submission; dropping them is the undeclared-target
+        // crash, and must still be rejected before any work is submitted.
+        let mut blurred_gui = crate::render::guirender::frontend::GuiFrontend::default();
+        let (blur_ops, blur_stats) = blurred_gui
+            .append_frame_ops_with_tiled_blur_boundary(
+                &mut gal,
+                1,
+                target,
+                target,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                1,
+                0,
+                false,
+            )
+            .expect("menu blur GUI must record against the acquired frame target");
+        assert!(
+            !blur_stats.owned_intermediate_targets.is_empty(),
+            "menu blur must declare its private scratch targets",
+        );
+        let undeclared_submissions = gal.metrics().submissions;
+        let mut blurred_frame = coordinator_frame.clone();
+        blurred_frame.frame_id = blurred_frame.frame_id.saturating_add(1);
+        let undeclared_error = frontend
+            .submit_whole_frame(&mut gal, 1, target, blurred_frame.clone(), blur_ops.clone())
+            .expect_err("GUI targets without their recorded declarations must stay rejected");
+        assert!(
+            undeclared_error.to_string().contains("undeclared target"),
+            "unexpected undeclared-target rejection: {undeclared_error}",
+        );
+        assert_eq!(
+            undeclared_submissions,
+            gal.metrics().submissions,
+            "a rejected GUI target must not submit a partial source frame",
+        );
+        frontend
+            .submit_whole_frame_with_gui_stats(
+                &mut gal,
+                1,
+                target,
+                blurred_frame,
+                blur_ops,
+                blur_stats,
+            )
+            .expect("prebuilt menu blur GUI with its recorded stats must enter the source frame");
+        assert_eq!(
+            undeclared_submissions + 1,
+            gal.metrics().submissions,
+            "the declared blurred GUI frame must submit exactly once",
+        );
+
         frontend.candidate_lowered_source_execution_enabled = false;
         let mut recovered_frame = coordinator_frame.clone();
         recovered_frame.frame_id = recovered_frame.frame_id.saturating_add(1);
@@ -3063,7 +3118,8 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         // so shadow/main-depth resources exist before selected execution.
         let stats = frontend
             .submit_whole_frame_with_initial_ops(
-                &mut gal, 1, target, warmup, Vec::new(), None, Vec::new(), true,
+                &mut gal, 1, target, warmup, Vec::new(), GuiSubmitStats::default(), None,
+                Vec::new(), true,
             )
             .expect("native source warmup must submit the Rust source-entry preparation graph");
         gal.present_frame(crate::render::vulkanic::frame::PresentFrameDesc {
@@ -3237,7 +3293,14 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         deferred1.fragment.source
     );
     let stats = frontend
-        .submit_armed_runtime_source_frame(&mut gal, 1, target, frame, Vec::new())
+        .submit_armed_runtime_source_frame(
+            &mut gal,
+            1,
+            target,
+            frame,
+            Vec::new(),
+            GuiSubmitStats::default(),
+        )
         .expect("complete normal-terrain and DH source chain must execute on a native acquired target")
         .0;
     assert!(stats.mesh_batch_count > 0);
@@ -3514,7 +3577,7 @@ fn source_entry_preparation_initializes_depth_before_any_terrain_mesh() {
     // Exercise the real preparation submission. Source admission is covered
     // separately; this fixture has no copied DH depth or atlas assets.
     let stats = frontend.submit_whole_frame_with_initial_ops(
-        &mut gal, 1, owner.target, scene.clone(), Vec::new(), None,
+        &mut gal, 1, owner.target, scene.clone(), Vec::new(), GuiSubmitStats::default(), None,
         vec![CommandOp::Barrier(texture_barrier(
             owner.color_texture, TextureUsageState::Undefined,
             TextureUsageState::ColorAttachment,
@@ -21636,6 +21699,7 @@ fn fabulous_material_frame_draws_the_semantic_sky_disc() {
                 target,
                 scene,
                 Vec::new(),
+                GuiSubmitStats::default(),
                 Some(direction),
             )
             .unwrap();
@@ -21680,6 +21744,7 @@ fn fabulous_material_frontdoor_preserves_explicit_output_direction() {
                 target,
                 scene,
                 Vec::new(),
+                GuiSubmitStats::default(),
                 Some(direction),
             )
             .unwrap();
@@ -21873,6 +21938,7 @@ fn private_owned_world_target_preserves_fabulous_owned_material_route() {
             target,
             scene,
             Vec::new(),
+            GuiSubmitStats::default(),
             Some(RasterYDirection::Up),
         )
         .unwrap();
@@ -22061,6 +22127,7 @@ fn private_owned_world_target_submits_reuses_resizes_and_retires() {
                     target,
                     scene.clone(),
                     Vec::new(),
+                    GuiSubmitStats::default(),
                     Some(direction)
                 )
                 .is_err());
@@ -22076,6 +22143,7 @@ fn private_owned_world_target_submits_reuses_resizes_and_retires() {
                 target,
                 scene,
                 Vec::new(),
+                GuiSubmitStats::default(),
                 Some(direction),
             )
             .unwrap();

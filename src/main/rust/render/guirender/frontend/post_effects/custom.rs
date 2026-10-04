@@ -50,7 +50,7 @@ impl GuiFrontend {
         identity: &str,
         shader_sources: &[CustomPostEffectSource],
     ) -> GalResult<Vec<CommandOp>> {
-        self.append_custom_post_effect_with_external_targets(
+        self.append_custom_post_effect_with_owned_targets(
             gal,
             render_target,
             color_attachment,
@@ -58,12 +58,14 @@ impl GuiFrontend {
             shader_sources,
             None,
         )
+        .map(|(ops, _)| ops)
     }
 
     /// Executes a custom graph with a validated Rust-owned external target
     /// inventory. The legacy wrapper above intentionally supplies no
     /// inventory, keeping external roles unavailable until the frame
     /// coordinator has installed the complete attachment set.
+    #[cfg(test)]
     pub(crate) fn append_custom_post_effect_with_external_targets(
         &mut self,
         gal: &mut VulkanicGal,
@@ -73,6 +75,30 @@ impl GuiFrontend {
         shader_sources: &[CustomPostEffectSource],
         external_targets: Option<&VanillaPostEffectExternalTargetBindings>,
     ) -> GalResult<Vec<CommandOp>> {
+        self.append_custom_post_effect_with_owned_targets(
+            gal,
+            render_target,
+            color_attachment,
+            identity,
+            shader_sources,
+            external_targets,
+        )
+        .map(|(ops, _)| ops)
+    }
+
+    /// Same graph as above, additionally returning the private GUI-owned
+    /// render targets its passes write besides `render_target`: declared
+    /// intermediates and the color-only depth execution target. External
+    /// bindings are never reported; they are not GUI-owned intermediates.
+    pub(crate) fn append_custom_post_effect_with_owned_targets(
+        &mut self,
+        gal: &mut VulkanicGal,
+        render_target: Handle,
+        color_attachment: Handle,
+        identity: &str,
+        shader_sources: &[CustomPostEffectSource],
+        external_targets: Option<&VanillaPostEffectExternalTargetBindings>,
+    ) -> GalResult<(Vec<CommandOp>, Vec<Handle>)> {
         if shader_sources.is_empty() || shader_sources.len() > MAX_CUSTOM_POST_EFFECT_PASSES {
             return Err(GalError::unsupported_feature(
                 format!(
@@ -276,6 +302,7 @@ impl GuiFrontend {
             intermediates.insert(target_name.clone(), handles);
         }
         let mut ops = Vec::new();
+        let mut owned_targets = Vec::<Handle>::new();
         for (pass_index, source) in shader_sources.iter().enumerate() {
             let input_depth_views = (0..source.input_count)
                 .map(|input_index| {
@@ -343,6 +370,11 @@ impl GuiFrontend {
             let image_initialized = self.custom_post_effect_image_initialized[pass_index].clone();
             let (pass_target, pass_color_attachment, pass_handle) =
                 if source.output_target == "minecraft:main" {
+                    if execution_target != render_target
+                        && !owned_targets.contains(&execution_target)
+                    {
+                        owned_targets.push(execution_target);
+                    }
                     (
                         execution_target,
                         color_attachment,
@@ -365,6 +397,9 @@ impl GuiFrontend {
                                 "custom post-effect intermediate target was not allocated",
                             )
                         })?;
+                    if !owned_targets.contains(&target) {
+                        owned_targets.push(target);
+                    }
                     (target, view, pass)
                 };
             let mut source_states = BTreeMap::<String, TextureUsageState>::new();
@@ -785,6 +820,6 @@ impl GuiFrontend {
             }
             self.custom_post_effect_snapshot_initialized[pass_index].fill(true);
         }
-        Ok(ops)
+        Ok((ops, owned_targets))
     }
 }

@@ -56,9 +56,38 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
+        self.submit_whole_frame_with_gui_stats(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            GuiSubmitStats::default(),
+        )
+    }
+
+    /// Submits prebuilt GUI operations together with the stats that recorded
+    /// them. The route is chosen inside this call: source preparation may arm
+    /// the selected-source route for this very frame, and that submission
+    /// validates the GUI stream against the private targets the stats declare.
+    pub(super) fn submit_whole_frame_with_gui_stats(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
+    ) -> GalResult<WorldPrimitiveSubmitStats> {
         gal.begin_command_recording()?;
-        let result =
-            self.submit_whole_frame_recorded(gal, generation, frame_target, frame, gui_ops);
+        let result = self.submit_whole_frame_recorded(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            gui_stats,
+        );
         let finish = gal.finish_command_recording();
         result.and_then(|stats| finish.map(|()| stats))
     }
@@ -70,6 +99,7 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         let direction = match crate::core::environment::var("MATTMC_RUST_OWNED_WORLD_TARGET").as_deref() {
             Ok("1") => Some(RasterYDirection::Up),
@@ -82,6 +112,7 @@ impl WorldPrimitiveFrontend {
             frame_target,
             frame,
             gui_ops,
+            gui_stats,
             direction,
         )
     }
@@ -115,6 +146,7 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
         owned_world_direction: Option<RasterYDirection>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         #[cfg(not(test))]
@@ -125,7 +157,15 @@ impl WorldPrimitiveFrontend {
             self.prepare_runtime_source_before_presentation(gal, generation, frame_target, &mut frame)?;
         }
         self.submit_whole_frame_with_initial_ops(
-            gal, generation, frame_target, frame, gui_ops, owned_world_direction, Vec::new(), false,
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            gui_stats,
+            owned_world_direction,
+            Vec::new(),
+            false,
         )
     }
 
@@ -136,6 +176,7 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
         owned_world_direction: Option<RasterYDirection>,
         mut pre_graph_ops: Vec<CommandOp>,
         preparing_source_entry: bool,
@@ -166,7 +207,7 @@ impl WorldPrimitiveFrontend {
                     generation,
                     frame_target,
                     frame,
-                    move |_, _, _, _| Ok((gui_ops.clone(), GuiSubmitStats::default())),
+                    move |_, _, _, _| Ok((gui_ops.clone(), gui_stats.clone())),
                 )
                 .map(|(stats, _)| stats);
         }
@@ -191,7 +232,14 @@ impl WorldPrimitiveFrontend {
             self.pending_terrain_fabulous_handoff = false;
             Self::reject_source_gui_presenters(&gui_ops)?;
             return self
-                .submit_armed_runtime_source_frame(gal, generation, frame_target, frame, gui_ops)
+                .submit_armed_runtime_source_frame(
+                    gal,
+                    generation,
+                    frame_target,
+                    frame,
+                    gui_ops,
+                    gui_stats,
+                )
                 .map(|(stats, _)| stats);
         }
         if self.frame_has_fabulous_transparency_work(&frame)
@@ -1829,20 +1877,31 @@ impl WorldPrimitiveFrontend {
                     gui_blur_radius,
                     false,
                 )?;
+            let mut gui_stats = gui_stats;
             if let Some(shader_sources) = custom_post_effect.as_ref() {
-                let mut custom_ops = gui_frontend.append_custom_post_effect_with_external_targets(
-                    gal,
-                    frame_target,
-                    frame_target,
-                    std::str::from_utf8(&post_effect_id).expect("validated post-effect identity"),
-                    shader_sources,
-                    custom_external_targets.as_ref(),
-                )?;
+                let (mut custom_ops, custom_owned_targets) = gui_frontend
+                    .append_custom_post_effect_with_owned_targets(
+                        gal,
+                        frame_target,
+                        frame_target,
+                        std::str::from_utf8(&post_effect_id)
+                            .expect("validated post-effect identity"),
+                        shader_sources,
+                        custom_external_targets.as_ref(),
+                    )?;
                 custom_ops.extend(gui_ops);
                 gui_ops = custom_ops;
+                gui_stats = declare_gui_owned_targets(gui_stats, &custom_owned_targets);
             }
             return self
-                .submit_whole_frame(gal, generation, frame_target, frame, gui_ops)
+                .submit_whole_frame_with_gui_stats(
+                    gal,
+                    generation,
+                    frame_target,
+                    frame,
+                    gui_ops,
+                    gui_stats.clone(),
+                )
                 .map(|stats| (stats, gui_stats));
         }
         #[cfg(test)]
@@ -1854,9 +1913,12 @@ impl WorldPrimitiveFrontend {
                 frame,
                 |gal, target, color_attachment, diagnostic_capture| {
                     let mut post_ops = Vec::new();
+                    // Private custom post-effect targets must be declared to
+                    // the complete source frame's GUI target validation.
+                    let mut post_owned_targets = Vec::new();
                     if let Some(shader_sources) = custom_post_effect.as_ref() {
-                        post_ops.extend(
-                            gui_frontend.append_custom_post_effect_with_external_targets(
+                        let (custom_ops, custom_owned_targets) =
+                            gui_frontend.append_custom_post_effect_with_owned_targets(
                                 gal,
                                 target,
                                 color_attachment,
@@ -1864,8 +1926,9 @@ impl WorldPrimitiveFrontend {
                                     .expect("validated post-effect identity"),
                                 shader_sources,
                                 custom_external_targets.as_ref(),
-                            )?,
-                        );
+                            )?;
+                        post_ops.extend(custom_ops);
+                        post_owned_targets = custom_owned_targets;
                     }
                     if gui_blur_before_stratum >= 0 {
                         let (gui_ops, stats) = gui_frontend
@@ -1883,7 +1946,10 @@ impl WorldPrimitiveFrontend {
                                 true,
                             )?;
                         post_ops.extend(gui_ops);
-                        return Ok((post_ops, stats));
+                        return Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ));
                     }
                     if diagnostic_capture {
                         let (gui_ops, stats) = gui_frontend
@@ -1898,7 +1964,10 @@ impl WorldPrimitiveFrontend {
                                 gui_tiled_quads.clone(),
                             )?;
                         post_ops.extend(gui_ops);
-                        Ok((post_ops, stats))
+                        Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ))
                     } else {
                         let (gui_ops, stats) = gui_frontend
                             .append_frame_ops_with_tiled_quads_to_target(
@@ -1916,7 +1985,10 @@ impl WorldPrimitiveFrontend {
                                 gui_tiled_quads.clone(),
                             )?;
                         post_ops.extend(gui_ops);
-                        Ok((post_ops, stats))
+                        Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ))
                     }
                 },
             );
@@ -1960,9 +2032,12 @@ impl WorldPrimitiveFrontend {
                 frame,
                 move |gal, target, color_attachment, diagnostic_capture| {
                     let mut post_ops = Vec::new();
+                    // Private custom post-effect targets must be declared to
+                    // the complete source frame's GUI target validation.
+                    let mut post_owned_targets = Vec::new();
                     if let Some(shader_sources) = custom_post_effect.as_ref() {
-                        post_ops.extend(
-                            gui_frontend.append_custom_post_effect_with_external_targets(
+                        let (custom_ops, custom_owned_targets) =
+                            gui_frontend.append_custom_post_effect_with_owned_targets(
                                 gal,
                                 target,
                                 color_attachment,
@@ -1970,8 +2045,9 @@ impl WorldPrimitiveFrontend {
                                     .expect("validated post-effect identity"),
                                 shader_sources,
                                 custom_external_targets.as_ref(),
-                            )?,
-                        );
+                            )?;
+                        post_ops.extend(custom_ops);
+                        post_owned_targets = custom_owned_targets;
                     }
                     if gui_blur_before_stratum >= 0 {
                         let (gui_ops, stats) = gui_frontend
@@ -1989,11 +2065,20 @@ impl WorldPrimitiveFrontend {
                                 false,
                             )?;
                         post_ops.extend(gui_ops);
-                        return Ok((post_ops, stats));
+                        return Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ));
                     }
                     if !diagnostic_capture {
                         post_ops.extend(prepared_gui_ops.clone());
-                        return Ok((post_ops, prepared_gui_stats.clone()));
+                        return Ok((
+                            post_ops,
+                            declare_gui_owned_targets(
+                                prepared_gui_stats.clone(),
+                                &post_owned_targets,
+                            ),
+                        ));
                     }
                     let (gui_ops, stats) = gui_frontend
                         .append_frame_ops_with_tiled_quads_to_target(
@@ -2011,7 +2096,10 @@ impl WorldPrimitiveFrontend {
                             gui_tiled_quads.clone(),
                         )?;
                     post_ops.extend(gui_ops);
-                    Ok((post_ops, stats))
+                    Ok((
+                        post_ops,
+                        declare_gui_owned_targets(stats, &post_owned_targets),
+                    ))
                 },
             );
         }
@@ -2048,20 +2136,33 @@ impl WorldPrimitiveFrontend {
                 gui_tiled_quads,
             )?
         };
+        let mut gui_stats = gui_stats;
         if let Some(shader_sources) = custom_post_effect.as_ref() {
-            let mut custom_ops = gui_frontend.append_custom_post_effect_with_external_targets(
-                gal,
-                frame_target,
-                frame_target,
-                std::str::from_utf8(&post_effect_id).expect("validated post-effect identity"),
-                shader_sources,
-                custom_external_targets.as_ref(),
-            )?;
+            let (mut custom_ops, custom_owned_targets) = gui_frontend
+                .append_custom_post_effect_with_owned_targets(
+                    gal,
+                    frame_target,
+                    frame_target,
+                    std::str::from_utf8(&post_effect_id).expect("validated post-effect identity"),
+                    shader_sources,
+                    custom_external_targets.as_ref(),
+                )?;
             custom_ops.extend(gui_ops);
             gui_ops = custom_ops;
+            gui_stats = declare_gui_owned_targets(gui_stats, &custom_owned_targets);
         }
-        self.submit_whole_frame(gal, generation, frame_target, frame, gui_ops)
-            .map(|stats| (stats, gui_stats))
+        // Source preparation inside this submission may arm the selected
+        // route for this frame; keep the recorded GUI declarations with the
+        // operations so that route validates them like its own GUI.
+        self.submit_whole_frame_with_gui_stats(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            gui_stats.clone(),
+        )
+        .map(|stats| (stats, gui_stats))
     }
 
     pub fn submit_partial_frame(
@@ -2167,4 +2268,16 @@ impl WorldPrimitiveFrontend {
         }
         result
     }
+}
+
+/// Adds private GUI-owned targets written by GUI-side post work (custom
+/// post-effect intermediates) to the stats that the complete source frame
+/// validates its GUI command stream against.
+fn declare_gui_owned_targets(mut stats: GuiSubmitStats, owned_targets: &[Handle]) -> GuiSubmitStats {
+    for target in owned_targets {
+        if !stats.owned_intermediate_targets.contains(target) {
+            stats.owned_intermediate_targets.push(*target);
+        }
+    }
+    stats
 }

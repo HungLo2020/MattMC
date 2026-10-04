@@ -2562,6 +2562,102 @@ fn blur_boundary_replay_copies_owned_render_targets_with_explicit_attachment_bar
     .unwrap();
 }
 
+#[test]
+fn blur_boundary_declares_scratch_targets_for_source_frame_gui_validation() {
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    let (ops, stats) = frontend
+        .append_frame_ops_with_tiled_blur_boundary(
+            &mut gal,
+            1,
+            target,
+            target,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            1,
+            0,
+            false,
+        )
+        .unwrap();
+    let scratch_targets: Vec<Handle> = ops
+        .iter()
+        .filter_map(|op| match op {
+            CommandOp::BeginPass { target: pass_target, .. } if *pass_target != target => {
+                Some(*pass_target)
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(!scratch_targets.is_empty(), "blur must ping-pong through scratch targets");
+    for scratch in &scratch_targets {
+        assert!(stats.owned_intermediate_targets.contains(scratch));
+    }
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(
+        &ops,
+        target,
+        &stats.owned_intermediate_targets,
+    )
+    .expect("menu blur scratch passes are declared GUI-owned intermediates");
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(&ops, target, &[])
+        .expect_err("undeclared blur scratch targets must still be rejected");
+}
+
+#[test]
+fn custom_post_effect_reports_owned_intermediates_for_source_frame_gui_validation() {
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    let vertex = br#"#version 330
+out vec2 texCoord;
+void main() { texCoord = vec2(0.0); }
+"#;
+    let fragment = br#"#version 330
+in vec2 texCoord;
+uniform sampler2D InSampler;
+out vec4 fragColor;
+void main() { fragColor = texture(InSampler, texCoord); }
+"#;
+    let pass = |input: &str, output: &str| CustomPostEffectSource {
+        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+        sampler_info_uniform: None,
+        vertex_shader: vertex.to_vec(),
+        fragment_shader: fragment.to_vec(),
+        input_count: 1,
+        input_bilinear: vec![false; 1],
+        input_targets: vec![input.to_owned()],
+        input_images: vec![None],
+        input_use_depth: vec![false],
+        output_target: output.to_owned(),
+        uniform_blocks: Vec::new(),
+    };
+    let (ops, owned_targets) = frontend
+        .append_custom_post_effect_with_owned_targets(
+            &mut gal,
+            target,
+            target,
+            "minecraft:test_owned_intermediate",
+            &[
+                pass("minecraft:main", "intermediate"),
+                pass("intermediate", "minecraft:main"),
+            ],
+            None,
+        )
+        .unwrap();
+    let intermediate = frontend.custom_post_effect_intermediates["intermediate"].target;
+    assert_eq!(vec![intermediate], owned_targets);
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(
+        &ops,
+        target,
+        &owned_targets,
+    )
+    .expect("declared custom post-effect intermediate is admitted");
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(&ops, target, &[])
+        .expect_err("undeclared custom post-effect intermediate must still be rejected");
+}
+
 fn mock_gal() -> VulkanicGal {
     let mut capabilities = vulkan_capabilities();
     capabilities.features.presentation = true;

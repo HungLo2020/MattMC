@@ -130,7 +130,8 @@ impl WorldPrimitiveFrontend {
         )?;
         let result = (|| {
             self.submit_whole_frame_with_initial_ops(
-                gal, generation, owner.target, frame.clone(), Vec::new(), None,
+                gal, generation, owner.target, frame.clone(), Vec::new(),
+                GuiSubmitStats::default(), None,
                 vec![CommandOp::Barrier(texture_barrier(
                     owner.color_texture,
                     TextureUsageState::Undefined,
@@ -350,13 +351,16 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
+        // `gui_stats` came from recording `gui_ops`; its declared private
+        // intermediates are what the source GUI validation admits.
         self.submit_armed_runtime_source_frame_with_gui(
             gal,
             generation,
             frame_target,
             frame,
-            move |_, _, _, _| Ok((gui_ops.clone(), GuiSubmitStats::default())),
+            move |_, _, _, _| Ok((gui_ops.clone(), gui_stats.clone())),
         )
     }
 
