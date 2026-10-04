@@ -212,6 +212,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
 - [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
 - [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
+- Expedition music discs: [5](items/MusicDisc5.md) and [fragments](items/DiscFragment.md), [Otherside](items/MusicDiscOtherside.md), [Pigstep](items/MusicDiscPigstep.md) and [Relic](items/MusicDiscRelic.md), with distinct chest/archaeology routes, crafting and configured song data
 - Classic music discs: [13](items/MusicDisc13.md), [Cat](items/MusicDiscCat.md), [Blocks](items/MusicDiscBlocks.md), [Chirp](items/MusicDiscChirp.md), [Far](items/MusicDiscFar.md) and [Mall](items/MusicDiscMall.md), with eligible Creeper loot, exact chest-roll scope and song/Comparator values
 - More classic discs: [11](items/MusicDisc11.md), [Mellohi](items/MusicDiscMellohi.md), [Stal](items/MusicDiscStal.md), [Strad](items/MusicDiscStrad.md), [Wait](items/MusicDiscWait.md) and [Ward](items/MusicDiscWard.md), with their actual Creeper route and distinct song/Comparator values
 - [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
