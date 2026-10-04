@@ -24,6 +24,8 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 
 These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 
+For fossil routes, see [Bone Block: finding fossils](../blocks/BoneBlock.md#finding-fossils) and [Dried Ghast](../blocks/DriedGhast.md).
+
 ## Finding a structure
 
 For a Survival stronghold search, use [Eyes of Ender](Stronghold.md#finding-a-stronghold). Fortress exploration starts in the [Nether](../dimensions/Nether.md); distinguish its Nether-brick bridges and corridors from a bastion before committing to a dangerous approach.

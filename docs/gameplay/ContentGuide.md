@@ -4,7 +4,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directory](blocks/Blocks.md), or by [material and purpose](blocks/catalog/index.md). These inventories expose missing articles explicitly; they do not imply that detailed block coverage is finished.
 
-## Vanilla-derived gameplay
+## Shared gameplay guides {#vanilla-derived-gameplay}
 
 ### Getting started and survival
 
@@ -25,6 +25,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Buckets](items/Bucket.md), [Water](items/WaterBucket.md), and [Lava](items/LavaBucket.md): source collection, waterlogging, dimension restrictions, source pools, and fuel
 - [Hunger and healing](mechanics/Hunger.md): food, saturation, sprinting, and regeneration
 - [Commands](commands/Commands.md): permission-aware examples, targeting, and shared time/weather scope
+
+- [Campfires](blocks/Campfires.md): four-slot cooking, damage, extinguishing and smoke
 
 ### Farming, food, and animal care
 
@@ -68,6 +70,16 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Wolf](mobs/Wolf.md) and [Wolf Armor](items/WolfArmor.md): real spawn/food routes, owner care, scute repairs, and fully damaged armor behavior
 - [Axolotl](mobs/Axolotl.md), [Dolphin](mobs/Dolphin.md), and [Bucket of Axolotl](items/BucketOfAxolotl.md): aquatic care, breeding, player assistance, structure guidance, and bucket-state preservation
 
+- [Nylium and Nether vegetation](blocks/NetherGroundAndVegetation.md): renewable ground, roots, sprouts and fungus-cap blocks
+- [Composter](blocks/Composter.md) and [Stonecutter](blocks/Stonecutter.md): accepted inputs, output transactions, automation limits and village jobs
+- [Mushrooms](blocks/Mushrooms.md): light and support, spreading, huge growth, cap/stem recovery and building faces
+- [Dripleaves](blocks/Dripleaves.md) and [Lily Pads](blocks/LilyPad.md): water, support, growth, recovery and tilting platforms
+- [Shrubs and Dry Grass](blocks/ShrubsAndDryGrass.md): exact item identities, harvesting, Bone Meal, light and starter sources
+- [Cocoa](blocks/Cocoa.md) and [Sweet Berry Bush](blocks/SweetBerryBush.md): support, growth, harvesting and food/dye uses
+- [Grass and Ferns](blocks/GrassAndFerns.md), [flowerbeds/Leaf Litter](blocks/FlowerbedsAndLeafLitter.md) and [Eyeblossoms](blocks/Eyeblossoms.md): exact collection, propagation, coverage and day/night behavior
+- [Torchflower](blocks/Torchflower.md) and [Pitcher Plant](blocks/PitcherPlant.md): actual Sniffer acquisition, crop-to-flower lifecycles and separate harvest rules
+- [Placed animal eggs](blocks/AnimalEggs.md): species-specific hatching, collection, trampling and current acquisition gaps
+
 ### Materials, equipment, and enchanting
 
 - [Dyes](items/Dyes.md): exact color recipes, ingredient choices, Sheep and collars, sign text, Banner patterns, equipment blends and storage colors
@@ -92,6 +104,11 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Brewing](brewing/Brewing.md) and [Brewing Stand](blocks/BrewingStand.md): verified potion chains, fuel, modifiers, splash/lingering forms
 - [Nether Wart](blocks/NetherWart.md), [Blaze Powder](items/BlazePowder.md), and [Glass Bottle](items/GlassBottle.md): brewing inputs and acquisition
 - [Status effects](effects/Effects.md): Poison, Wither, Regeneration, and choosing Milk versus Honey
+
+- [Resource Storage Blocks](blocks/ResourceStorageBlocks.md): ten exact compression families, mining tiers, fuel and device uses
+- [Heads and Skulls](blocks/HeadsAndSkulls.md): seven collectibles/fourteen placed forms, real acquisition and retained data
+- [Bamboo blocks](blocks/BambooBlocks.md), [Bone Block](blocks/BoneBlock.md), [Netherrack](blocks/Netherrack.md) and [Petrified Oak Slab](blocks/PetrifiedOakSlab.md): material conversions, harvesting and current acquisition limits
+- [Resin](blocks/Resin.md) and [Creaking Heart](blocks/CreakingHeart.md): renewable material production, masonry and exact operating conditions
 
 ### Combat and mob resources
 
@@ -129,6 +146,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Gunpowder](items/Gunpowder.md), [Bone](items/Bone.md), and [Arrow](items/Arrow.md): hostile-mob resources and verified uses
 - [Rotten Flesh](items/RottenFlesh.md), [String](items/String.md), [Spider Eye](items/SpiderEye.md), and [Fermented Spider Eye](items/FermentedSpiderEye.md): mob resources, food risks, recipes, brewing, and trades
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
+
+- [Spawn eggs](items/SpawnEggs.md): ordinary browser access, two unlisted boss exceptions, placement/spawner controls and conditional offspring interactions
 
 ### Building, redstone, and travel
 
@@ -180,6 +199,19 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
 - [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
 
+- [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
+- [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
+- [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
+- [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
+- [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
+- [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
+- [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
+- [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
+- [TNT](blocks/TNT.md) and [Trapped Chest](blocks/TrappedChest.md): priming/fuse rules, counted opening signals and storage automation
+- [Iron fixtures](blocks/IronFixtures.md) and [Ladders](blocks/Ladder.md): distinct collection, support, power, water and climbing rules
+- [Slime and Honey Blocks](blocks/SlimeAndHoneyBlocks.md): crafting remainders, landing/slide behavior and piston groups
+- [Soul Torches](blocks/Torch.md#soul-torch), [End Rods](blocks/EndRod.md) and [Jack o'Lanterns](blocks/JackOLantern.md): support, water, lighting and specific mob/construction interactions
+
 ### Exploration, archaeology, and trade
 
 - [Desert Pyramid](structures/DesertPyramid.md), [Jungle Temple](structures/JungleTemple.md) and [Swamp Hut](structures/SwampHut.md): traps, chest and archaeology rewards, and Witch/Cat encounters
@@ -209,6 +241,12 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Ender Pearl](items/EnderPearl.md), [Eye of Ender](items/EyeOfEnder.md), and [Blaze Rod](items/BlazeRod.md): teleport risks, portal supplies, recipes, and fuel
 - [Brush](items/Brush.md): suspicious-block excavation, dispenser use, and broken-item interaction limits
 - [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
+
+- [Cartography Table](blocks/CartographyTable.md) and [Fletching Table](blocks/FletchingTable.md): implemented map operations, job sites and workstation limits
+- [Trial Spawner](blocks/TrialSpawner.md) and [Vault](blocks/Vault.md): finite encounters, key rewards, ominous configurations and per-player openings
+- [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
+- [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
+- [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
 
 ## Alex's Mobs additions
 
@@ -277,48 +315,15 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Atlatitan](mobs/Atlatitan.md) and [Serene Salad](items/SereneSalad.md): the active temporary mounting route and remaining breeding/control limits
 
-- [Nylium and Nether vegetation](blocks/NetherGroundAndVegetation.md): renewable ground, roots, sprouts and fungus-cap blocks
-- [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
+## MattMC tools
 
-- [Composter](blocks/Composter.md) and [Stonecutter](blocks/Stonecutter.md): accepted inputs, output transactions, automation limits and village jobs
-- [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
-
-- [Mushrooms](blocks/Mushrooms.md): light and support, spreading, huge growth, cap/stem recovery and building faces
-- [Cartography Table](blocks/CartographyTable.md) and [Fletching Table](blocks/FletchingTable.md): implemented map operations, job sites and workstation limits
-
-- [Dripleaves](blocks/Dripleaves.md) and [Lily Pads](blocks/LilyPad.md): water, support, growth, recovery and tilting platforms
-- [Campfires](blocks/Campfires.md): four-slot cooking, damage, extinguishing and smoke
-- [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
-
-- [Trial Spawner](blocks/TrialSpawner.md) and [Vault](blocks/Vault.md): finite encounters, key rewards, ominous configurations and per-player openings
-- [Shrubs and Dry Grass](blocks/ShrubsAndDryGrass.md): exact item identities, harvesting, Bone Meal, light and starter sources
-
-- [Resource Storage Blocks](blocks/ResourceStorageBlocks.md): ten exact compression families, mining tiers, fuel and device uses
-- [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
-- [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
-
-- [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
-- [Heads and Skulls](blocks/HeadsAndSkulls.md): seven collectibles/fourteen placed forms, real acquisition and retained data
-- [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
-- [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
-- [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
-- [Cocoa](blocks/Cocoa.md) and [Sweet Berry Bush](blocks/SweetBerryBush.md): support, growth, harvesting and food/dye uses
-- [Grass and Ferns](blocks/GrassAndFerns.md), [flowerbeds/Leaf Litter](blocks/FlowerbedsAndLeafLitter.md) and [Eyeblossoms](blocks/Eyeblossoms.md): exact collection, propagation, coverage and day/night behavior
-- [Torchflower](blocks/Torchflower.md) and [Pitcher Plant](blocks/PitcherPlant.md): actual Sniffer acquisition, crop-to-flower lifecycles and separate harvest rules
-- [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
 - [Inventory item browser](mechanics/InventoryBrowser.md): catalog browsing, Creative insertion, protocol admission and operator-category limits
-- [Spawn eggs](items/SpawnEggs.md): ordinary browser access, two unlisted boss exceptions, placement/spawner controls and conditional offspring interactions
-- [Placed animal eggs](blocks/AnimalEggs.md): species-specific hatching, collection, trampling and current acquisition gaps
 - [Elevator](blocks/Elevator.md) and [Redstone Randomizer](blocks/RedstoneRandomizer.md): actual controls, search/output behavior, collection and limits
-- [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
-- [TNT](blocks/TNT.md) and [Trapped Chest](blocks/TrappedChest.md): priming/fuse rules, counted opening signals and storage automation
-- [Iron fixtures](blocks/IronFixtures.md) and [Ladders](blocks/Ladder.md): distinct collection, support, power, water and climbing rules
-- [Slime and Honey Blocks](blocks/SlimeAndHoneyBlocks.md): crafting remainders, landing/slide behavior and piston groups
+
+## TaCZ firearms and workbenches
+
 - [TaCZ firearms](mechanics/TaCZFirearms.md): gun controls, magazine and reserve ammunition, partial reloads, refitting and current limits
 - [TaCZ Workbenches](blocks/TaCZWorkbenches.md): firearm, ammunition and attachment menus, exact table recipes and inventory transactions
-- [Bamboo blocks](blocks/BambooBlocks.md), [Bone Block](blocks/BoneBlock.md), [Netherrack](blocks/Netherrack.md) and [Petrified Oak Slab](blocks/PetrifiedOakSlab.md): material conversions, harvesting and current acquisition limits
-- [Resin](blocks/Resin.md) and [Creaking Heart](blocks/CreakingHeart.md): renewable material production, masonry and exact operating conditions
-- [Soul Torches](blocks/Torch.md#soul-torch), [End Rods](blocks/EndRod.md) and [Jack o'Lanterns](blocks/JackOLantern.md): support, water, lighting and specific mob/construction interactions
 
 ## Browse by topic
 

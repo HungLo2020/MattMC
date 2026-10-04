@@ -20,6 +20,26 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 - [Hopper](../blocks/Hopper.md): item movement and powered locking
 - [Chest](../blocks/Chest.md): a container with analog fullness output
 
+### Inputs and sensing
+
+- [Daylight Detector](../blocks/DaylightDetector.md)
+- [Target](../blocks/Target.md)
+- [Sculk Sensors](../blocks/SculkSensors.md)
+- [Lightning Rods](../blocks/LightningRods.md)
+
+### Storage and crafting
+
+- [Crafter](../blocks/Crafter.md)
+- [Trapped Chest](../blocks/TrappedChest.md)
+- [Wooden Shelves](../blocks/Shelves.md)
+
+### Outputs and effects
+
+- [Note Block](../blocks/NoteBlock.md)
+- [Redstone Randomizer](../blocks/RedstoneRandomizer.md)
+- [Copper lighting](../blocks/CopperLighting.md)
+- [TNT](../blocks/TNT.md)
+
 ## Strength is not duration
 
 A Lever and a pressed Button both supply signal 15, but the lever holds its state while the button schedules release. Ordinary wire loses strength as it carries a signal farther. A pulse's duration and a wire's strength are distinct properties.
