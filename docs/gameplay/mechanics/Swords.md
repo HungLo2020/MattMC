@@ -55,6 +55,8 @@ An unbroken ordinary sword blocks normal Creative block destruction through its 
 
 Compare [Sharpness, Smite and Bane of Arthropods](../enchanting/MeleeDamageEnchantments.md) for exact damage bonuses, tagged targets and the slowing effect.
 
+Use [Looting, Fire Aspect and Knockback](../enchanting/MeleeUtilityEnchantments.md) to compare reward bonuses, ignition, cooked-loot conditions and the primary hit's push.
+
 Use [Enchanting](../enchanting/Enchanting.md) for table setup and [Anvil combining](AnvilMechanics.md#combining-enchantments) for books and donors. Sweeping Edge supports the ordinary sword tag. Sharpness, Smite, and Bane of Arthropods belong to the same checked exclusion group, so the normal compatibility check does not combine them on one sword. This is selected sword guidance, not a complete enchantment catalogue. [Sword enchantment tag][enchant-sword] · [Sweeping Edge][sweep-enchantment] · [Sharpness][sharpness] · [Smite][smite] · [Bane][bane] · [Exclusion group][damage-exclusive] · [Compatibility callback][compatibility]
 
 The normal successful-hit callback requests **1 durability** for a sword. Ordinary mining of a nonzero-hardness block requests **2 durability**; zero-hardness mining skips that wear. The ordinary weapon wear is applied once through the primary hit callback, not once for every secondary sweep target. Enchantment and infinite-material checks can change ordinary wear. [Sword wear values][sword-properties] · [Mining callback][mine-wear] · [Sweep and hit ordering][sweep] · [Primary hit callback][hit-route] · [Hit wear][mine-guard] · [Damage processing][broken]

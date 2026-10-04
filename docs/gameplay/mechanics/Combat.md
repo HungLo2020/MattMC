@@ -52,6 +52,8 @@ A raised Shield does not cover every source. The bundled bypass tag includes env
 
 ## Equipment and further reading
 
+- [Looting, Fire Aspect and Knockback](../enchanting/MeleeUtilityEnchantments.md): reward conditions, fire and knockback after accepted hits, with Sweeping Edge linked from the sword guide
+
 - [Swords](Swords.md): material choice, sweeping details, mining and upkeep
 - [Spears](Spears.md): release-thrust timing, moving contact, mounted interactions, Lunge and material choices
 - [Mace](../items/Mace.md): falling smash attacks; [Trident](../items/Trident.md): throws, returns and Riptide; [Wind Charge](../items/WindCharge.md): bursts, movement and block triggers

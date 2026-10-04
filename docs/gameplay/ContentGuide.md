@@ -104,6 +104,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Protection enchantments](enchanting/ProtectionEnchantments.md): four armor choices, matching damage types, combined reduction, secondary attributes and broken gear
 - [Aqua Affinity, Respiration and Thorns](enchanting/UnderwaterAndThornsEnchantments.md): underwater mining, air conservation, retaliation and broken-equipment distinctions
 - [Equipment curses](enchanting/EquipmentCurses.md): Binding removal restrictions, Vanishing on death, eligible items and curse-preserving repairs
+- [Looting, Fire Aspect and Knockback](enchanting/MeleeUtilityEnchantments.md): mob rewards, cooked-loot conditions, direct-hit fire, push strength and broken-weapon differences
 - [Efficiency, Fortune and Silk Touch](enchanting/MiningEnchantments.md): supported tools, mining-speed bonuses, loot contexts and collection limits
 - [Bookshelf](items/Bookshelf.md), [Book](items/Book.md), [Enchanted Book](items/EnchantedBook.md), and [Lapis Lazuli](items/LapisLazuli.md): supporting materials
 - [Smithing](smithing/Smithing.md): equipment upgrades, trims, and component preservation

@@ -52,6 +52,13 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Looting, Fire Aspect and Knockback](MeleeUtilityEnchantments.md): loot counts and equipment chances, ignition and cooked-loot conditions, push strength, supported weapons and retained broken stacks
+- [Crossbow enchantments](../items/Crossbow.md): Quick Charge, Multishot and Piercing in the existing weapon guide
+- [Trident enchantments](../items/Trident.md#enchantment-choices-and-conditions): Loyalty, Riptide, Channeling and Impaling conditions
+- [Mace enchantments](../items/Mace.md#choosing-enchantments): Density, Breach and Wind Burst choices
+- [Spear Lunge](../mechanics/Spears.md#lunge-and-other-enchantments): release movement and ordinary Spear eligibility
+- [Lure and Luck of the Sea](../mechanics/Fishing.md#waiting-weather-and-enchantments): waiting counters, fishing luck and open-water limits
+
 - [Aqua Affinity, Respiration and Thorns](UnderwaterAndThornsEnchantments.md): underwater mining, air consumption, retaliation, supported slots, acquisition and retained broken equipment
 - [Curse of Binding and Curse of Vanishing](EquipmentCurses.md): supported equipment, removal restrictions, death rules, stored books and repair limits
 
