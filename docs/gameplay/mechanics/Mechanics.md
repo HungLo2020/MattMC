@@ -10,6 +10,7 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Experience points, levels, and Mending](Experience.md): level costs, orb collection, equipment repairs and spending
 - [Combat](Combat.md): attack charge, criticals, sweeps, Shields and projectile differences
 - [Fireworks](Fireworks.md): star and rocket recipes, launching, Elytra boosts, flight, damage, and effect data
+- [Villager breeding and population](../mobs/Villager.md#breeding-and-population): food, sharing, reachable beds, birth and growth
 - [Raids](Raid.md): omen conversion, village recognition, waves, outcomes and stopping
 - [Swords](Swords.md): material values, sweeping, fixed mining rules, enchantments and repair
 - [Spears](Spears.md): all seven materials, release thrusts, moving contact, Lunge, target conditions, and upkeep

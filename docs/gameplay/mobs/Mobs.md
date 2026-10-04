@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Villager population:** [breeding and raising residents](Villager.md#breeding-and-population): food delivery/sharing, reachable spare homes, failed attempts, birth and growth
+
 - **Anteater care:** [Anteater](Anteater.md): honey breeding, baby riding, live-ant predation, Dirt/Sugar actions and current feeding/rendering limits
 
 - **Rain Frog care:** [Rain Frog](RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
