@@ -26,6 +26,7 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | [Trail Ruins](TrailRuins.md) | Taiga families, Old Growth Birch Forest and Jungle in the normal Overworld | Careful Suspicious Gravel excavation for possible sherds, trim templates and the Relic disc |
 | [Mineshaft](Mineshaft.md) | Eligible normal-Overworld biomes; separate Badlands variant | Track and building materials, optional chest-minecart supplies and cave-spider encounters |
 | [Igloo](Igloo.md) | Snowy Plains, Snowy Taiga and Snowy Slopes in the normal Overworld | Snowy shelter and a possible basement with residents and one set of curing supplies |
+| [Ruined Portal](RuinedPortal.md) | Seven placement variants across eligible Overworld and Nether biomes | Optional chest supplies and salvage, with frame repair and onward-travel preparation |
 
 These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 
