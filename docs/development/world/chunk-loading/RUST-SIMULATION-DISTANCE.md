@@ -5,12 +5,12 @@ decides which chunks are within simulation range of a simulating ticket; its
 levels drive `inEntityTickingRange`, `inBlockTickingRange` and
 `forEachEntityTickingChunk`. [`chunk_distance/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk_distance)
 owns the graph, pending levels, work queue and a mirror of each chunk's lowest
-simulating ticket level. [`SimulationChunkDistance`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/SimulationChunkDistance.java)
+simulating ticket level. [`TicketChunkDistance`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/TicketChunkDistance.java)
 is the lifetime/exception adapter; the tracker keeps only its published
 `chunks` view. There is no Java graph or fallback.
 
-`TicketStorage` still owns tickets, timeouts and persistence. The loading
-ticket tracker and POI section distances remain Java.
+`TicketStorage` still owns tickets, timeouts and persistence. The
+[loading tracker](RUST-LOADING-DISTANCE.md) shares this adapter and graph.
 
 ## Preserve these contracts
 
@@ -60,11 +60,11 @@ Full release run, 2026-10-04, with the same setup and run as the
 
 | Workload | Java median | Rust median | Paired median reduction | 95% ratio interval |
 |---|---:|---:|---:|---:|
-| Four walkers with simulation tickets, 600 ticks | 200 ms | 151 ms | 24% | 0.639–0.780 |
-| Walkers plus ender-pearl/portal tickets, 600 ticks | 302 ms | 233 ms | 23% | 0.756–0.811 |
-| Simulation distance change every 30 ticks, 300 ticks | 117 ms | 62 ms | 47% | 0.439–0.610 |
+| Four walkers with simulation tickets, 600 ticks | 170 ms | 132 ms | 23% | 0.701–0.796 |
+| Walkers plus ender-pearl/portal tickets, 600 ticks | 268 ms | 207 ms | 23% | 0.719–0.818 |
+| Simulation distance change every 30 ticks, 300 ticks | 104 ms | 58 ms | 44% | 0.545–0.585 |
 
 Every pair improved by more than 5%; times include the shared Java
 `TicketStorage` work and entity-ticking queries, which are equal on both sides.
-Variation was 4–9% per JVM, 16% in one distance-change JVM; 10 of 540 samples
-overlapped JIT activity. Not whole-server measurements.
+Variation was 2–6% per JVM; 10 of 540 samples overlapped JIT activity. The
+previous two-tracker run measured 23–47%. Not whole-server measurements.

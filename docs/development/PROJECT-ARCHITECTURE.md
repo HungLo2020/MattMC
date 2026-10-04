@@ -94,9 +94,11 @@ under `world/level/chunk/palette/resize/` for bulk remapping during block palett
 [Global palette loading](world/chunk/RUST-PALETTE-UNPACKING.md) uses
 `world/level/chunk/palette/unpack/` and the existing encoder for saved-data repacking.
 [Player chunk distances](world/chunk-loading/RUST-PLAYER-DISTANCE.md) use
-`world/level/chunk_distance/` for DistanceManager's natural-spawn, player-ticket
-and [simulation](world/chunk-loading/RUST-SIMULATION-DISTANCE.md) distance
-graphs; Java keeps player sets, tickets, published level views and ticket dispatch.
+`world/level/chunk_distance/` for DistanceManager's natural-spawn, player-ticket,
+[simulation](world/chunk-loading/RUST-SIMULATION-DISTANCE.md) and
+[loading](world/chunk-loading/RUST-LOADING-DISTANCE.md) distance graphs and
+[POI village](world/chunk-loading/RUST-POI-DISTANCE.md) section distances;
+Java keeps player sets, tickets, POI records, holders and published level views.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.

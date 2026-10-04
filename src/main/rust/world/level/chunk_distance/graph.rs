@@ -15,6 +15,70 @@ pub(crate) const fn as_long(x: i32, z: i32) -> i64 {
     ((x as u32 as u64) | ((z as u32 as u64) << 32)) as i64
 }
 
+/// `SectionPos` packing: x 22 bits at 42, z 22 bits at 20, y 20 bits at 0.
+pub(crate) const fn section_long(x: i32, y: i32, z: i32) -> i64 {
+    ((x as i64 & 0x3f_ffff) << 42) | (y as i64 & 0xf_ffff) | ((z as i64 & 0x3f_ffff) << 20)
+}
+
+fn section_x(position: i64) -> i32 {
+    (position >> 42) as i32
+}
+
+fn section_y(position: i64) -> i32 {
+    ((position << 44) >> 44) as i32
+}
+
+fn section_z(position: i64) -> i32 {
+    ((position << 22) >> 42) as i32
+}
+
+/// Neighbourhood and source sentinel of the graph's Java tracker family.
+#[derive(Clone, Copy)]
+pub(crate) enum Topology {
+    /// `ChunkTracker`: 8 chunk neighbours, source `INVALID_CHUNK_POS`.
+    Chunk,
+    /// `SectionTracker`: 26 section neighbours, source `Long.MAX_VALUE`.
+    Section,
+}
+
+impl Topology {
+    fn source(self) -> i64 {
+        match self {
+            Topology::Chunk => INVALID_CHUNK_POS,
+            Topology::Section => i64::MAX,
+        }
+    }
+
+    /// Every offset position in the original loop order, the centre included
+    /// (callers skip or substitute it exactly as the Java loops do).
+    fn neighbourhood(self, position: i64, out: &mut [i64; 27]) -> usize {
+        let mut count = 0;
+        match self {
+            Topology::Chunk => {
+                let (x, z) = (position as i32, (position >> 32) as i32);
+                for dx in -1..=1 {
+                    for dz in -1..=1 {
+                        out[count] = as_long(x.wrapping_add(dx), z.wrapping_add(dz));
+                        count += 1;
+                    }
+                }
+            }
+            Topology::Section => {
+                let (x, y, z) = (section_x(position), section_y(position), section_z(position));
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        for dz in -1..=1 {
+                            out[count] = section_long(x.wrapping_add(dx), y.wrapping_add(dy), z.wrapping_add(dz));
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        count
+    }
+}
+
 /// `Mth.clamp(int, int, int)`.
 fn clamp(value: i32, min: i32, max: i32) -> i32 {
     if value < min {
@@ -85,6 +149,7 @@ impl SourceLevels for Players {
 }
 
 pub(crate) struct DistanceField {
+    topology: Topology,
     level_count: i32,
     /// `setLevel` removes levels above this and stores the rest.
     max_stored: i32,
@@ -97,23 +162,42 @@ pub(crate) struct DistanceField {
     levels: PositionMap<u8>,
     /// Every `setLevel(pos, level)` in call order, for Java's published view.
     changes: Vec<(i64, i32)>,
+    /// Loading only: `ChunkPos.MAX_COORDINATE_VALUE`. Java's `setLevel` then
+    /// creates a `ChunkHolder`, which throws beyond this chessboard distance.
+    holder_bound: Option<i32>,
 }
 
 impl DistanceField {
     /// `FixedPlayerDistanceChunkTracker(i)`: `super(i + 2, 16, 256)`.
     /// The Java adapter validates the distance before construction.
     pub fn fixed_player(max_distance: i32) -> Result<Self, Error> {
-        Self::new(max_distance + 2, max_distance, max_distance + 2)
+        Self::new(Topology::Chunk, max_distance + 2, max_distance, max_distance + 2)
     }
 
     /// `SimulationChunkTracker`: `super(34, 16, 256)`, levels of 33 and above
     /// removed, absent chunks at 33.
     pub fn simulation() -> Result<Self, Error> {
-        Self::new(34, 32, 33)
+        Self::new(Topology::Chunk, 34, 32, 33)
     }
 
-    fn new(level_count: i32, max_stored: i32, absent_level: i32) -> Result<Self, Error> {
+    /// `LoadingChunkTracker`: `super(MAX_LEVEL + 1, 16, 256)` with
+    /// `MAX_LEVEL = ChunkLevel.MAX_LEVEL + 1`; levels above `ChunkLevel.MAX_LEVEL`
+    /// mean "no holder" and read back as `MAX_LEVEL`, exactly as the holder map does.
+    pub fn loading(chunk_max_level: i32, max_coordinate: i32) -> Result<Self, Error> {
+        let mut field = Self::new(Topology::Chunk, chunk_max_level + 2, chunk_max_level, chunk_max_level + 1)?;
+        field.holder_bound = Some(max_coordinate);
+        Ok(field)
+    }
+
+    /// `PoiManager.DistanceTracker`: `super(7, 16, 256)`, levels above 6
+    /// removed, absent sections at 7.
+    pub fn poi() -> Result<Self, Error> {
+        Self::new(Topology::Section, 7, 6, 7)
+    }
+
+    fn new(topology: Topology, level_count: i32, max_stored: i32, absent_level: i32) -> Result<Self, Error> {
         Ok(Self {
+            topology,
             level_count,
             max_stored,
             absent_level,
@@ -121,6 +205,17 @@ impl DistanceField {
             computed: PositionMap::with_expected(256)?,
             levels: PositionMap::with_expected(256)?,
             changes: Vec::new(),
+            holder_bound: None,
+        })
+    }
+
+    /// Whether Java's `setLevel(pos, level)` throws creating an out-of-bounds
+    /// holder: a loaded level at a chunk whose `ChunkPos.getChessboardDistance(ZERO)`
+    /// exceeds the bound. Such chunks never hold a holder, so it would be created.
+    fn holder_creation_fails(&self, position: i64, level: i32) -> bool {
+        self.holder_bound.is_some_and(|bound| {
+            let distance = (position as i32).wrapping_abs().max(((position >> 32) as i32).wrapping_abs());
+            level <= self.max_stored && distance > bound
         })
     }
 
@@ -164,14 +259,14 @@ impl DistanceField {
 
     /// `ChunkTracker.computeLevelFromNeighbor`.
     fn level_from_neighbor(&self, source: &impl SourceLevels, from: i64, to: i64, level: i32) -> i32 {
-        if from == INVALID_CHUNK_POS {
+        if from == self.topology.source() {
             source.level_from_source(to)
         } else {
             level.wrapping_add(1)
         }
     }
 
-    /// `ChunkTracker.update`: `checkEdge(INVALID_CHUNK_POS, pos, level, decrease)`.
+    /// `ChunkTracker`/`SectionTracker.update`: `checkEdge(source, pos, level, decrease)`.
     pub fn update(
         &mut self,
         source: &impl SourceLevels,
@@ -181,7 +276,7 @@ impl DistanceField {
     ) -> Result<(), Error> {
         let current = self.level(position);
         let computed = self.computed_level(position);
-        self.check_edge(source, INVALID_CHUNK_POS, position, level, current, computed, decrease)
+        self.check_edge(source, self.topology.source(), position, level, current, computed, decrease)
     }
 
     fn check_edge(
@@ -194,7 +289,7 @@ impl DistanceField {
         computed: i32,
         decrease: bool,
     ) -> Result<(), Error> {
-        if to == INVALID_CHUNK_POS {
+        if to == self.topology.source() {
             return Ok(());
         }
         let top = self.level_count - 1;
@@ -249,33 +344,29 @@ impl DistanceField {
         }
     }
 
-    /// `ChunkTracker.getComputedLevel`.
+    /// `ChunkTracker`/`SectionTracker.getComputedLevel`.
     fn computed_from_neighbors(&self, source: &impl SourceLevels, position: i64, excluded: i64, level: i32) -> i32 {
         let mut best = level;
-        let x = position as i32;
-        let z = (position >> 32) as i32;
-        for dx in -1..=1 {
-            for dz in -1..=1 {
-                let mut neighbor = as_long(x.wrapping_add(dx), z.wrapping_add(dz));
-                if neighbor == position {
-                    neighbor = INVALID_CHUNK_POS;
+        let mut neighbourhood = [0i64; 27];
+        let count = self.topology.neighbourhood(position, &mut neighbourhood);
+        for mut neighbor in neighbourhood[..count].iter().copied() {
+            if neighbor == position {
+                neighbor = self.topology.source();
+            }
+            if neighbor != excluded {
+                let candidate = self.level_from_neighbor(source, neighbor, position, self.level(neighbor));
+                if best > candidate {
+                    best = candidate;
                 }
-                if neighbor != excluded {
-                    let candidate =
-                        self.level_from_neighbor(source, neighbor, position, self.level(neighbor));
-                    if best > candidate {
-                        best = candidate;
-                    }
-                    if best == 0 {
-                        return best;
-                    }
+                if best == 0 {
+                    return best;
                 }
             }
         }
         best
     }
 
-    /// `ChunkTracker.checkNeighborsAfterUpdate`.
+    /// `ChunkTracker`/`SectionTracker.checkNeighborsAfterUpdate`.
     fn check_neighbors_after_update(
         &mut self,
         source: &impl SourceLevels,
@@ -284,14 +375,11 @@ impl DistanceField {
         decrease: bool,
     ) -> Result<(), Error> {
         if !decrease || level < self.level_count - 2 {
-            let x = position as i32;
-            let z = (position >> 32) as i32;
-            for dx in -1..=1 {
-                for dz in -1..=1 {
-                    let neighbor = as_long(x.wrapping_add(dx), z.wrapping_add(dz));
-                    if neighbor != position {
-                        self.check_neighbor(source, position, neighbor, level, decrease)?;
-                    }
+            let mut neighbourhood = [0i64; 27];
+            let count = self.topology.neighbourhood(position, &mut neighbourhood);
+            for neighbor in neighbourhood[..count].iter().copied() {
+                if neighbor != position {
+                    self.check_neighbor(source, position, neighbor, level, decrease)?;
                 }
             }
         }
@@ -307,6 +395,14 @@ impl DistanceField {
             let current = clamp(self.level(position), 0, top);
             let computed = self.computed.remove(position).map_or(NO_COMPUTED_LEVEL, i32::from);
             if computed < current {
+                if self.holder_creation_fails(position, computed) {
+                    // Stop exactly where Java's setLevel throws: node popped,
+                    // pending level removed, level unchanged. Java's replay of
+                    // this final call throws the original exception.
+                    self.changes.try_reserve(1).map_err(|_| Error::Allocation)?;
+                    self.changes.push((position, computed));
+                    return Ok(budget);
+                }
                 self.set_level(position, computed)?;
                 self.check_neighbors_after_update(source, position, computed, true)?;
             } else if computed > current {

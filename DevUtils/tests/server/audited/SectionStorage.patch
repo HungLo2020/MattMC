@@ -1,0 +1,15 @@
+diff --git a/src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java b/src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java
+--- a/src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java
++++ b/src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java
+@@ -123,6 +123,11 @@ public class SectionStorage<R, P> implements AutoCloseable {
+ 		return this.storage.get(l);
+ 	}
+ 
++	/** Keys of every section entry, loaded or known empty. */
++	protected LongIterator loadedSectionKeys() {
++		return this.storage.keySet().iterator();
++	}
++
+ 	protected Optional<R> getOrLoad(long l) {
+ 		if (this.outsideStoredRange(l)) {
+ 			return Optional.empty();

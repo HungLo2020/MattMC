@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Rust-owned chunk-distance trackers (player fields, simulation) against pinned original Java."""
+"""Verify the Rust-owned chunk/section distance trackers (player fields, simulation, loading, POI) against pinned original Java."""
 import argparse
 import hashlib
 import json
@@ -21,9 +21,22 @@ TEST_BASE = ROOT / 'src/test/java/net/minecraft/server/level'
 LIGHTING_TESTS = 'src/test/java/net/minecraft/world/level/lighting/'
 # Commit that pinned the original graph, chunk tracker and queue oracles.
 GRAPH_ORACLE_COMMIT = 'f5473e41d'
-CASES = ['single_walk', 'group_walk', 'teleport_churn', 'player_walk', 'ticket_churn', 'distance_changes']
-SIMULATION_CASES = {'player_walk', 'ticket_churn', 'distance_changes'}
-PARITY_TESTS = ['NativePlayerChunkDistancesTest', 'NativeSimulationChunkTrackerTest']
+CASES = ['single_walk', 'group_walk', 'teleport_churn', 'player_walk', 'ticket_churn', 'distance_changes',
+         'loading_walk', 'loading_group', 'loading_churn', 'village_occupancy', 'village_growth', 'poi_churn']
+BENCHMARKS = {
+    **{case: 'net.minecraft.server.level.PlayerChunkDistancesVerification' for case in ['single_walk', 'group_walk', 'teleport_churn']},
+    **{case: 'net.minecraft.server.level.SimulationChunkTrackerVerification' for case in ['player_walk', 'ticket_churn', 'distance_changes']},
+    **{case: 'net.minecraft.server.level.LoadingChunkTrackerVerification' for case in ['loading_walk', 'loading_group', 'loading_churn']},
+    **{case: 'net.minecraft.world.entity.ai.village.poi.PoiDistanceTrackerVerification' for case in ['village_occupancy', 'village_growth', 'poi_churn']},
+}
+PARITY_TESTS = ['net.minecraft.server.level.NativePlayerChunkDistancesTest', 'net.minecraft.server.level.NativeSimulationChunkTrackerTest',
+                'net.minecraft.server.level.NativeLoadingChunkTrackerTest', 'net.minecraft.world.entity.ai.village.poi.NativePoiDistanceTrackerTest']
+# Production edits pinned as exact diffs against the reference commit.
+AUDITED_PATCHES = {
+    'src/main/java/net/minecraft/world/entity/ai/village/poi/PoiManager.java': 'PoiManager.patch',
+    'src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java': 'SectionStorage.patch',
+    'src/main/java/net/minecraft/server/MinecraftServer.java': 'MinecraftServer.patch',
+}
 TICKET_STORAGE = 'src/main/java/net/minecraft/world/level/TicketStorage.java'
 TICKET_STORAGE_REWRITES = [
     ('import it.unimi.dsi.fastutil.longs.LongOpenHashSet;\n',
@@ -102,6 +115,15 @@ def audit(out):
         raise RuntimeError('Original tracker oracle differs from the pinned reference rewrite')
     if (ROOT / oracle.SIMULATION_ORACLE).read_text() != oracle.expected_simulation_oracle(ROOT):
         raise RuntimeError('Original simulation tracker oracle differs from the pinned reference rewrite')
+    for path, build in [(oracle.LOADING_ORACLE, oracle.expected_loading_oracle), (oracle.SECTION_ORACLE, oracle.expected_section_oracle),
+                        (oracle.POI_ORACLE, oracle.expected_poi_oracle)]:
+        if (ROOT / path).read_text() != build(ROOT):
+            raise RuntimeError('Original oracle differs from the pinned reference rewrite: ' + path)
+    for path, patch in AUDITED_PATCHES.items():
+        diff = subprocess.check_output(['git', 'diff', oracle.REFERENCE, '--', path], cwd=ROOT, text=True)
+        diff = ''.join(line for line in diff.splitlines(True) if not line.startswith('index '))
+        if diff != (Path(__file__).resolve().parent / 'audited' / patch).read_text():
+            raise RuntimeError('Production edit differs from its audited patch: ' + path)
     expected = git_show(oracle.REFERENCE, TICKET_STORAGE)
     for old, new in TICKET_STORAGE_REWRITES:
         if expected.count(old) != 1:
@@ -158,12 +180,12 @@ def main():
     run(command, out / 'build.log')
     tests = []
     for name in PARITY_TESTS:
-        tests += ['--tests', PACKAGE + name]
+        tests += ['--tests', name]
     run(['./gradlew', '-I', str(init), 'test', '-x', 'buildRustNative', '-x', 'testRustNative', *tests, '--console=plain'], out / 'parity.log')
     java_tests = 0
     for name in PARITY_TESTS:
-        xml = (ROOT / ('build/test-results/test/TEST-' + PACKAGE + name + '.xml')).read_text()
-        (out / ('parity-' + name + '.xml')).write_text(xml)
+        xml = (ROOT / ('build/test-results/test/TEST-' + name + '.xml')).read_text()
+        (out / ('parity-' + name.rsplit('.', 1)[1] + '.xml')).write_text(xml)
         result = ET.fromstring(xml)
         if int(result.attrib['failures']) or int(result.attrib['errors']):
             raise RuntimeError('Parity failed: ' + name)
@@ -171,7 +193,7 @@ def main():
     rust = subprocess.run(['cargo', 'test', '--release', 'world::level::chunk_distance'], cwd=ROOT / 'src/main/rust',
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     (out / 'rust-tests.log').write_text(rust.stdout)
-    if rust.returncode or 'test result: ok. 6 passed' not in rust.stdout:
+    if rust.returncode or 'test result: ok. 8 passed' not in rust.stdout:
         raise RuntimeError('Rust tests failed; see rust-tests.log')
     library = ROOT / 'build/rust/native/mattmc_rust-linux-x64.so'
     flags = ['-Xbatch', '-Xms512m', '-Xmx3g', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders', '--enable-native-access=ALL-UNNAMED',
@@ -179,13 +201,17 @@ def main():
     base = ['taskset', '-c', ','.join(str(cpu) for cpu in [args.cpu, *background]), 'java', *flags,
             '-Dmattmc.rust.natives.dir=' + str(library.parent), '-cp', classpath.read_text().strip()]
     files = [ROOT / PRODUCTION, ROOT / 'src/main/java/net/minecraft/server/level/PlayerChunkDistances.java',
-             ROOT / TICKET_STORAGE, ROOT / oracle.SIMULATION_ORACLE,
-             *[ROOT / 'src/main/java/net/minecraft/server/level' / name for name in ['SimulationChunkTracker.java', 'SimulationChunkDistance.java']],
+             ROOT / TICKET_STORAGE, ROOT / oracle.SIMULATION_ORACLE, ROOT / oracle.LOADING_ORACLE, ROOT / oracle.SECTION_ORACLE, ROOT / oracle.POI_ORACLE,
+             *[ROOT / path for path in AUDITED_PATCHES], *sorted((Path(__file__).resolve().parent / 'audited').glob('*.patch')),
+             ROOT / 'src/main/java/net/minecraft/world/entity/ai/village/poi/PoiSectionDistance.java',
+             *[ROOT / 'src/main/java/net/minecraft/server/level' / name for name in ['SimulationChunkTracker.java', 'TicketChunkDistance.java', 'LoadingChunkTracker.java']],
              Path(__file__).resolve(), Path(oracle.__file__).resolve(), ROOT / oracle.ORACLE,
              *sorted((ROOT / 'src/main/rust/world/level/chunk_distance').glob('*.rs')),
              ROOT / 'src/main/rust/world/level/lighting/priority_queue/queue.rs',
              *[TEST_BASE / name for name in ['NativePlayerChunkDistancesTest.java', 'PlayerChunkDistancesVerification.java',
-                                             'NativeSimulationChunkTrackerTest.java', 'SimulationChunkTrackerVerification.java']],
+                                             'NativeSimulationChunkTrackerTest.java', 'SimulationChunkTrackerVerification.java',
+                                             'NativeLoadingChunkTrackerTest.java', 'LoadingChunkTrackerVerification.java']],
+             *[ROOT / 'src/test/java/net/minecraft/world/entity/ai/village/poi' / name for name in ['NativePoiDistanceTrackerTest.java', 'PoiDistanceTrackerVerification.java']],
              *[ROOT / LIGHTING_TESTS / name for name in ['JavaChunkTracker.java', 'JavaDynamicGraphMinFixedPoint.java', 'JavaLeveledPriorityQueue.java']]]
     report = {
         'reference': oracle.REFERENCE,
@@ -218,8 +244,7 @@ def main():
             row = pair.setdefault(name, {})
             for mode in (['java', 'native'] if fork % 2 == 0 else ['native', 'java']):
                 print(f'Comparison {fork + 1}: {name} {mode}', flush=True)
-                benchmark = 'SimulationChunkTrackerVerification' if name in SIMULATION_CASES else 'PlayerChunkDistancesVerification'
-                text = run(base + [PACKAGE + benchmark, mode, name] + (['quick'] if args.pilot else []),
+                text = run(base + [BENCHMARKS[name], mode, name] + (['quick'] if args.pilot else []),
                            out / f'{fork}-{name}-{mode}.log')
                 bench = re.findall(r'PLAYER_DISTANCE_BENCH case=(\w+) mode=(\w+) warmup_ns=(\d+) repeats=\d+ ns=(\[.*?\]) '
                                    r'cpu_ns=(\[.*?\]) jit=(\[.*?\]) checksum=(-?\d+)', text)

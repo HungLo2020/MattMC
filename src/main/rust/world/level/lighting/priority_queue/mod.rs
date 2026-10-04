@@ -1,5 +1,6 @@
-//! Native-owned ordered lighting work queues; no Java collection mirror.
-mod ffi;
+//! Leveled FIFO work queue behind the Rust chunk/section distance graphs
+//! (`world::level::chunk_distance`): the original `LeveledPriorityQueue`
+//! semantics, with the graph's compound scheduling operations. No Java adapter.
 mod ordered_set;
 mod position_hash;
 pub(crate) mod queue;

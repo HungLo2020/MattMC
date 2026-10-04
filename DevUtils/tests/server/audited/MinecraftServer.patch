@@ -1,0 +1,14 @@
+diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
+--- a/src/main/java/net/minecraft/server/MinecraftServer.java
++++ b/src/main/java/net/minecraft/server/MinecraftServer.java
+@@ -1715,6 +1715,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+ 				WorldDataConfiguration worldDataConfiguration = new WorldDataConfiguration(getSelectedPacks(this.packRepository, true), this.worldData.enabledFeatures());
+ 				this.worldData.setDataConfiguration(worldDataConfiguration);
+ 				this.resources.managers.updateStaticRegistryTags();
++				// POI village membership is a tag: resync native village-centre mirrors.
++				for (ServerLevel serverLevel : this.getAllLevels()) {
++					serverLevel.getPoiManager().refreshVillageCentres();
++				}
+ 				this.resources.managers.getRecipeManager().finalizeRecipeLoading(this.worldData.enabledFeatures());
+ 				this.getPlayerList().saveAll();
+ 				this.getPlayerList().reloadResources();

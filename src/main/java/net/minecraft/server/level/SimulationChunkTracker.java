@@ -13,7 +13,7 @@ public class SimulationChunkTracker {
 	public static final int MAX_LEVEL = 33;
 	protected final Long2ByteMap chunks = new Long2ByteOpenHashMap();
 	private final TicketStorage ticketStorage;
-	private final SimulationChunkDistance distance = new SimulationChunkDistance(ChunkLevel.MAX_LEVEL + 1);
+	private final TicketChunkDistance distance = new TicketChunkDistance(TicketChunkDistance.SIMULATION, ChunkLevel.MAX_LEVEL + 1);
 	private final PlayerChunkDistances.LevelSink levelSink = this::setLevel;
 
 	public SimulationChunkTracker(TicketStorage ticketStorage) {
@@ -49,6 +49,6 @@ public class SimulationChunkTracker {
 	}
 
 	public void runAllUpdates() {
-		this.distance.runAllUpdates(this.levelSink);
+		this.distance.runUpdates(Integer.MAX_VALUE, this.levelSink);
 	}
 }

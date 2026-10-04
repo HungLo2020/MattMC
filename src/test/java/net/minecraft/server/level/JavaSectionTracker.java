@@ -1,10 +1,10 @@
 package net.minecraft.server.level;
 
 import net.minecraft.core.SectionPos;
-import net.minecraft.world.level.lighting.DynamicGraphMinFixedPoint;
+import net.minecraft.world.level.lighting.JavaDynamicGraphMinFixedPoint;
 
-public abstract class SectionTracker extends DynamicGraphMinFixedPoint {
-	protected SectionTracker(int i, int j, int k) {
+public abstract class JavaSectionTracker extends JavaDynamicGraphMinFixedPoint {
+	protected JavaSectionTracker(int i, int j, int k) {
 		super(i, j, k);
 	}
 

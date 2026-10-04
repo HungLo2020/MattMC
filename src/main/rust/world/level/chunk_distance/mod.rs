@@ -1,13 +1,15 @@
-//! Native-owned chunk-distance trackers for `DistanceManager`: the natural
-//! spawn counter and player-ticket distance graphs with their shared
-//! player-presence source, and the simulation distance graph with its ticket
-//! level mirror. Each owns levels, pending computed levels and work queues.
+//! Native-owned chunk/section distance trackers: `DistanceManager`'s natural
+//! spawn counter and player-ticket graphs with their shared player-presence
+//! source, the simulation and loading ticket graphs with ticket level mirrors,
+//! and `PoiManager`'s village section distances with a village-centre mirror. Each owns levels, pending computed levels and work queues.
 //! Java keeps only published level views rebuilt from each run's ordered changes.
 mod ffi;
 pub(crate) mod graph;
 mod position_map;
-pub(crate) mod simulation;
-mod simulation_ffi;
+mod poi;
+mod poi_ffi;
+pub(crate) mod ticket;
+mod ticket_ffi;
 #[cfg(test)]
 mod tests;
 

@@ -1,9 +1,10 @@
-//! Native-owned `SimulationChunkTracker`: the simulation distance graph and
-//! an exact mirror of `TicketStorage.getTicketLevelAt(pos, true)`.
+//! Native-owned ticket distance trackers (`SimulationChunkTracker`,
+//! `LoadingChunkTracker`): a distance graph and an exact mirror of
+//! `TicketStorage.getTicketLevelAt(pos, simulate)` for the tracker's ticket kind.
 use super::graph::{DistanceField, Error, SourceLevels};
 use super::position_map::PositionMap;
 
-/// Lowest simulating ticket level per chunk; absent chunks report
+/// Lowest ticket level of the tracker's kind per chunk; absent chunks report
 /// `ChunkLevel.MAX_LEVEL + 1`, as `getTicketLevelAt` does without a ticket.
 pub(crate) struct TicketLevels {
     levels: PositionMap<i32>,
@@ -27,19 +28,19 @@ impl SourceLevels for TicketLevels {
     }
 }
 
-pub(crate) struct SimulationDistance {
+pub(crate) struct TicketDistance {
     tickets: TicketLevels,
     field: DistanceField,
 }
 
-impl SimulationDistance {
-    pub fn new(absent_ticket_level: i32) -> Result<Self, Error> {
+impl TicketDistance {
+    pub fn new(absent_ticket_level: i32, field: DistanceField) -> Result<Self, Error> {
         Ok(Self {
             tickets: TicketLevels {
                 levels: PositionMap::with_expected(16)?,
                 absent: absent_ticket_level,
             },
-            field: DistanceField::simulation()?,
+            field,
         })
     }
 

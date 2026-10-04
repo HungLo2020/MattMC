@@ -189,7 +189,7 @@ public final class PlayerChunkDistancesVerification {
 
     /** Warmup and sampling shared by the distance benchmarks: {@code setup}
      * builds a fresh untimed state; only {@code body} on it is timed. */
-    static <T> void measure(String mode, String name, boolean quick, java.util.function.Supplier<T> setup,
+    public static <T> void measure(String mode, String name, boolean quick, java.util.function.Supplier<T> setup,
                             java.util.function.ToLongFunction<T> body) {
         CompilationMXBean compiler = ManagementFactory.getCompilationMXBean();
         ThreadMXBean threads = ManagementFactory.getThreadMXBean();

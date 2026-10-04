@@ -12,9 +12,9 @@ these two trackers.
 Java keeps `playersPerChunk`, each tracker's published `chunks` map and every
 downstream reaction: spawn candidate iteration, `hasPlayersNearby`, the ticket
 tracker's `toUpdate`/view-distance logic and ticket dispatch. The
-[simulation tracker](RUST-SIMULATION-DISTANCE.md) shares this graph code. The
-loading ticket tracker and POI section distances still run the Java
-`DynamicGraphMinFixedPoint` over the native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
+[simulation](RUST-SIMULATION-DISTANCE.md), [loading](RUST-LOADING-DISTANCE.md)
+and [POI village](RUST-POI-DISTANCE.md) trackers share this graph code over the
+native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
 
 ## Preserve these contracts
 
@@ -78,23 +78,22 @@ and [parity checks](https://github.com/HungLo2020/MattMC/blob/cc140840a21e5c6c93
 
 ## Measurements
 
-The implementation author recorded a full release run on 2026-10-04, after the
-graph became shared with the [simulation tracker](RUST-SIMULATION-DISTANCE.md):
-three alternating JVM pairs per workload on an i7-10750H laptop (CPU 5
-measured, CPUs 0/1 for JVM workers), at least 15 s of warmup and 30 samples per
-JVM. Outputs and input traces matched across backends and JVMs.
+The implementation author recorded a full release run on 2026-10-04 covering
+all four distance trackers on the shared graph: three alternating JVM pairs per
+workload on an i7-10750H laptop (CPU 5 measured, CPUs 0/1 for JVM workers), at
+least 15 s of warmup and 30 samples per JVM. Outputs and input traces matched
+across backends and JVMs.
 
 | Workload | Java median | Rust median | Paired median reduction | 95% ratio interval |
 |---|---:|---:|---:|---:|
-| Single walker, 1,200 ticks | 898 ms | 599 ms | 33% | 0.639–0.729 |
-| Eight walkers, 300 ticks | 644 ms | 440 ms | 32% | 0.666–0.724 |
-| Four teleporting players, 300 ticks | 1,486 ms | 1,026 ms | 31% | 0.651–0.715 |
+| Single walker, 1,200 ticks | 763 ms | 523 ms | 31% | 0.661–0.706 |
+| Eight walkers, 300 ticks | 557 ms | 389 ms | 30% | 0.635–0.716 |
+| Four teleporting players, 300 ticks | 1,338 ms | 926 ms | 31% | 0.656–0.708 |
 
-Every pair improved by more than 5%, and thread CPU time agreed. Laptop
-variation was 5–8% per JVM; 15 of 540 samples overlapped JIT activity (recorded,
-not excluded). The earlier player-only run measured 31–36% on the pre-shared
-graph. These are subsystem workloads through the production adapter, not
-whole-server tick or chunk-loading measurements. Raw rounds, hashes and
-metadata were recorded at
-`build/player-chunk-distance-migration/acceptance-simulation/results.json`; that
-ignored artifact is not bundled with the wiki.
+Every pair improved by more than 5%, and thread CPU time agreed. Variation was
+3–7% per JVM; 12 of 540 samples overlapped JIT activity (recorded, not
+excluded). Earlier runs on the player-only and two-tracker graphs measured
+31–36% and 31–33%. These are subsystem workloads through the production
+adapter, not whole-server tick or chunk-loading measurements. Raw rounds, hashes
+and metadata were recorded at `build/player-chunk-distance-migration/acceptance-loading-poi/results.json`; that ignored artifact is not bundled
+with the wiki.

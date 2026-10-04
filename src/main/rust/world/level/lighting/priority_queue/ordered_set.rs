@@ -1,7 +1,6 @@
 use super::position_hash::mix;
 
 const NONE: u32 = u32::MAX;
-const FAST_PROBES: usize = 32;
 const LOAD_DENOMINATOR: usize = 4;
 
 #[derive(Clone, Copy)]
@@ -13,18 +12,6 @@ const UNLINKED: Links = Links {
     previous: NONE,
     next: NONE,
 };
-
-// These plans are private to a single, exclusive queue operation. The target
-// bucket must remain unchanged until commit; distinct-priority removal cannot
-// alter its slots. Commit never allocates and cannot request a retry.
-pub(super) enum Insertion {
-    Duplicate,
-    At(usize),
-}
-pub(super) enum Removal {
-    Absent,
-    At(usize),
-}
 
 /// Primitive insertion-ordered open-addressed set. Zero has its own reserved
 /// slot. FIFO links refer directly to table cells, so popping needs no hash lookup.
@@ -164,63 +151,7 @@ impl OrderedSet {
         Ok(())
     }
 
-    pub fn prepare_insert(&self, value: u64) -> Option<Insertion> {
-        match self.find(value, FAST_PROBES) {
-            Some(Ok(_)) => Some(Insertion::Duplicate),
-            Some(Err(index)) if self.size < (self.capacity() / LOAD_DENOMINATOR).max(1) => {
-                Some(Insertion::At(index))
-            }
-            _ => None,
-        }
-    }
-
-    pub fn commit_insert(&mut self, value: u64, plan: Insertion) {
-        if let Insertion::At(index) = plan {
-            self.append(value, index);
-        }
-    }
-
-    pub fn prepare_remove(&self, value: u64) -> Option<Removal> {
-        match self.find(value, FAST_PROBES) {
-            Some(Err(_)) => Some(Removal::Absent),
-            Some(Ok(index)) if self.short_gap(index) => Some(Removal::At(index)),
-            _ => None,
-        }
-    }
-
-    pub fn commit_remove(&mut self, plan: Removal) {
-        if let Removal::At(index) = plan {
-            self.remove_index(index);
-        }
-    }
-
-    /// Never allocates, waits or changes state before a rejected fast operation.
-    pub fn insert_without_growth(&mut self, value: u64) -> bool {
-        match self.prepare_insert(value) {
-            Some(plan) => {
-                self.commit_insert(value, plan);
-                true
-            }
-            None => false,
-        }
-    }
-
     #[inline]
-    fn short_gap(&self, index: usize) -> bool {
-        if index == self.capacity() {
-            return true;
-        }
-        let mask = self.capacity() - 1;
-        let mut scan = (index + 1) & mask;
-        for _ in 0..FAST_PROBES {
-            if self.keys[scan] == 0 {
-                return true;
-            }
-            scan = (scan + 1) & mask;
-        }
-        false
-    }
-
     fn relocate_links(&mut self, from: usize, to: usize) {
         let links = self.links[from];
         if links.previous == NONE {
@@ -284,16 +215,6 @@ impl OrderedSet {
         Ok(())
     }
 
-    pub fn remove_bounded(&mut self, value: u64) -> bool {
-        match self.prepare_remove(value) {
-            Some(plan) => {
-                self.commit_remove(plan);
-                true
-            }
-            None => false,
-        }
-    }
-
     pub fn pop(&mut self) -> Result<Option<u64>, ()> {
         if self.is_empty() {
             return Ok(None);
@@ -320,16 +241,6 @@ impl OrderedSet {
             self.close_gap(index);
         }
         value
-    }
-
-    pub fn pop_bounded(&mut self) -> Option<Option<u64>> {
-        if self.is_empty() {
-            return Some(None);
-        }
-        if !self.short_gap(self.first as usize) {
-            return None;
-        }
-        Some(Some(self.remove_head()))
     }
 
     #[cfg(test)]

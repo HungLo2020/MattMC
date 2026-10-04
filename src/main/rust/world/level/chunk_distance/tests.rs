@@ -173,7 +173,8 @@ fn position_map_backward_shift_keeps_colliding_chains_reachable() {
 
 #[test]
 fn simulation_settles_to_lowest_ticket_level_plus_distance() {
-    use super::simulation::SimulationDistance;
+    use super::graph::DistanceField;
+    use super::ticket::TicketDistance;
     const ABSENT_TICKET: i32 = 45;
     let mut seed = 0x51_u64;
     let mut next = |bound: u64| {
@@ -182,7 +183,7 @@ fn simulation_settles_to_lowest_ticket_level_plus_distance() {
         seed ^= seed << 17;
         seed % bound
     };
-    let mut distance = SimulationDistance::new(ABSENT_TICKET).unwrap();
+    let mut distance = TicketDistance::new(ABSENT_TICKET, DistanceField::simulation().unwrap()).unwrap();
     // Per chunk: every simulating ticket level, as TicketStorage holds them.
     let mut tickets: Vec<(i64, Vec<i32>)> = Vec::new();
     let lowest = |levels: &Vec<i32>| levels.iter().copied().min().unwrap_or(ABSENT_TICKET);
@@ -221,6 +222,114 @@ fn simulation_settles_to_lowest_ticket_level_plus_distance() {
                         .unwrap_or(i32::MAX)
                         .clamp(0, 33);
                     let expected = if best > 32 { 33 } else { best };
+                    assert_eq!(expected, distance.field().level(probe), "step {step} probe {dx},{dz}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn poi_sections_settle_to_three_dimensional_distance_from_village_centres() {
+    use super::graph::section_long;
+    use super::poi::PoiDistance;
+    let mut seed = 0x9e1_u64;
+    let mut next = |bound: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % bound
+    };
+    let unpack = |position: i64| ((position >> 42) as i32, ((position << 44) >> 44) as i32, ((position << 22) >> 42) as i32);
+    // Ordinary, packed-coordinate wrap (x/z 22 bits, y 20 bits) and zero anchors.
+    for (ax, ay, az) in [(0, 0, 0), ((1 << 21) - 1, (1 << 19) - 1, -(1 << 21)), (-5, 3, 9)] {
+        let mut distance = PoiDistance::new().unwrap();
+        let mut centres: Vec<i64> = Vec::new();
+        for step in 0..160 {
+            let position = section_long(ax + next(9) as i32 - 4, ay + next(9) as i32 - 4, az + next(9) as i32 - 4);
+            let centre = !centres.contains(&position) && next(3) != 0;
+            centres.retain(|existing| *existing != position);
+            if centre {
+                centres.push(position);
+            }
+            distance.section_changed(position, centre).unwrap();
+            if step % 5 == 0 {
+                distance.run_updates(i32::MAX).unwrap();
+                assert!(!distance.field().has_work());
+                for dx in -6..=6 {
+                    for dy in -6..=6 {
+                        for dz in -6..=6 {
+                            let probe = section_long(ax + dx, ay + dy, az + dz);
+                            let (px, py, pz) = unpack(probe);
+                            let nearest = centres
+                                .iter()
+                                .map(|centre| {
+                                    let (cx, cy, cz) = unpack(*centre);
+                                    // Distances wrap with the packed field widths.
+                                    let wrap = |a: i32, b: i32, bits: u32| {
+                                        let d = (a.wrapping_sub(b) as i64).rem_euclid(1 << bits);
+                                        d.min((1 << bits) - d)
+                                    };
+                                    wrap(px, cx, 22).max(wrap(py, cy, 20)).max(wrap(pz, cz, 22))
+                                })
+                                .min()
+                                .unwrap_or(i64::MAX);
+                            // Propagation stops at levelCount - 2 = 5. The original's
+                            // increase path stores its top level 6, so farther sections
+                            // read 6 or the default 7 depending on history.
+                            let level = distance.field().level(probe);
+                            if nearest <= 5 {
+                                assert_eq!(nearest as i32, level, "step {step} probe {dx},{dy},{dz}");
+                            } else {
+                                assert!(level == 6 || level == 7, "step {step} probe {dx},{dy},{dz}: {level}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn loading_settles_to_lowest_load_ticket_plus_distance() {
+    use super::graph::DistanceField;
+    use super::ticket::TicketDistance;
+    const MAX: i32 = 44; // ChunkLevel.MAX_LEVEL
+    let mut distance = TicketDistance::new(MAX + 1, DistanceField::loading(MAX, 2_096_000).unwrap()).unwrap();
+    let mut tickets: Vec<(i64, i32)> = Vec::new();
+    let mut seed = 0x10ad_u64;
+    let mut next = |bound: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % bound
+    };
+    for step in 0..200 {
+        let position = as_long(next(11) as i32 - 5, next(11) as i32 - 5);
+        let previous = tickets.iter().find(|(chunk, _)| *chunk == position).map(|(_, level)| *level);
+        tickets.retain(|(chunk, _)| *chunk != position);
+        if previous.is_some() && next(2) == 0 {
+            distance.update(position, MAX + 1, MAX + 1, false).unwrap();
+        } else {
+            let level = 20 + next(28) as i32;
+            tickets.push((position, level));
+            let lowered = previous.map_or(true, |old| level < old);
+            distance.update(position, level, level, lowered).unwrap();
+        }
+        if step % 4 == 0 {
+            let remaining = distance.run_updates(i32::MAX).unwrap();
+            assert!(remaining <= i32::MAX);
+            for dx in -30..=30 {
+                for dz in -30..=30 {
+                    let probe = as_long(dx, dz);
+                    let best = tickets
+                        .iter()
+                        .map(|(chunk, level)| level.max(&0) + chebyshev(*chunk, probe) as i32)
+                        .min()
+                        .unwrap_or(i32::MAX)
+                        .clamp(0, MAX + 1);
+                    let expected = if best > MAX { MAX + 1 } else { best };
                     assert_eq!(expected, distance.field().level(probe), "step {step} probe {dx},{dz}");
                 }
             }
