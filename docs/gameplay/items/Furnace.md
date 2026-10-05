@@ -8,6 +8,8 @@ Craft eight stone-crafting-materials-tag items around an empty center; the bundl
 
 Tags determine accepted ingredients; similarly named integrated materials are not automatically interchangeable. See the block page before assuming a custom block can substitute in this recipe.
 
+Combine one Furnace with one Minecart in any two crafting slots to make one [Minecart with Furnace](MinecartWithFurnace.md#obtaining). The resulting cart uses Coal or Charcoal for propulsion and has no smelting menu; follow its guide for fueling and use. [Cart recipe][furnace-cart-recipe] · [Fuel interaction][furnace-cart-fuel] · [Accepted fuels][furnace-cart-fuel-tag]
+
 ## Related pages
 
 - [Furnace: recipe and block behavior](../blocks/Furnace.md)
@@ -19,3 +21,9 @@ Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Thi
 
 - [Crafting recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/furnace.json)
 - [Item registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/Items.java)
+
+The additional Furnace Minecart route was source-reviewed at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb` on 2026-10-04; no in-game crafting or fueling test was run.
+
+[furnace-cart-recipe]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/resources/data/minecraft/recipe/crafting/furnace_minecart.json
+[furnace-cart-fuel]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/world/entity/vehicle/MinecartFurnace.java#L108-L129
+[furnace-cart-fuel-tag]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/resources/data/minecraft/tags/item/furnace_minecart_fuel.json
