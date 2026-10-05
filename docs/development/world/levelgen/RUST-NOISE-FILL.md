@@ -26,7 +26,9 @@ All must hold; otherwise the Java loop runs:
   `veinRidged` `MulOrAdd(ADD, c, Ap2(MAX, Mapped(ABS, interp), Mapped(ABS, interp)))`,
   `veinGap` a `Noise` — and an Xoroshiro or Legacy ore factory.
 
-All vanilla noise settings qualify.
+The bundled vanilla noise settings can qualify when these chunk-state and
+context checks also pass. Once native fill is selected, a failure throws rather
+than silently falling back to the Java loop.
 
 ## Preserve these contracts
 
@@ -57,8 +59,9 @@ The driver rebuilds every edited production Java file from the reference
 commit with its exact audited rewrites and requires a byte-for-byte match. `NativeNoiseFillTest` fills each vanilla
 noise setting at three seeds and five chunk positions through `fillFromNoise`
 with both routes and compares section network bytes, saved packs, counters,
-heightmaps, post-processing lists and later aquifer reads; every pair must take
-the native route and produce ore and raw-ore blocks. It also compares native
+heightmaps, post-processing lists and later aquifer reads; every candidate fill
+must take the native route, and the aggregate fixture must exercise ore and
+raw-ore blocks. It does not require ore in each individual chunk. It also compares native
 aquifer centres with Java's `location()` (Xoroshiro and Legacy) and replays up
 to 400-state write sequences against real `PalettedContainer` resizes. A raw-ore
 chance mutation and a write-order palette mutation each fail a test.
@@ -74,7 +77,7 @@ alternating JVM pairs per setting on an i7-10750H laptop (CPU 5 measured, CPUs
 sample filling eight fresh chunks. Both routes produced identical checksums in
 every JVM.
 
-| Setting | Java loop median | Native fill median | Paired median reduction | 95% ratio interval |
+| Setting | Java loop median per eight fills | Native fill median per eight fills | Paired median reduction | 95% ratio interval |
 |---|---:|---:|---:|---:|
 | Overworld (aquifers, ore veins) | 88.9 ms | 71.0 ms | 20% | 0.689–0.822 |
 | Amplified | 101.9 ms | 68.0 ms | 33% | 0.604–0.824 |
@@ -86,3 +89,34 @@ activity. Times cover the whole fill stage, including the unchanged Java slice
 and cell-cache work. Not surface, carving, feature or whole-game measurements.
 Raw rounds and hashes were recorded at
 `build/noise-fill-migration/acceptance/results.json` (not bundled with the wiki).
+
+## Maintenance review and remaining acceptance
+
+The [2026-10-05 source review for #775](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-5987249254)
+inspected this implementation at `858476969d6500b2a9e26d10c5d8c5967222ccfe`.
+The [three Java test methods](https://github.com/HungLo2020/MattMC/blob/858476969d6500b2a9e26d10c5d8c5967222ccfe/src/test/java/net/minecraft/world/level/levelgen/NativeNoiseFillTest.java#L148-L241)
+and [eight added native noise-fill tests](https://github.com/HungLo2020/MattMC/blob/858476969d6500b2a9e26d10c5d8c5967222ccfe/src/main/rust/world/level/levelgen/noise_fill/tests.rs)
+were read, not rerun. The driver's Rust filter covers the broader levelgen suite;
+eight is the added noise-fill test count, not that whole suite's size. Static
+reconstruction matched eight modified production Java files from twenty-one
+exact rewrites; new bridge/Rust files were hashed rather than reconstructed
+from an original-Java oracle. The distance driver's three converted files also
+matched fourteen rewrites, an audit-format change rather than another runtime
+migration. No Java/Rust suite, mutation test, benchmark or live world was run in
+this maintenance review.
+
+The comparison is the **Java fill loop versus native fill**, with previously
+native worldgen helpers still present in the Java-loop route. It is not a wholly
+Java historical worldgen baseline. The [benchmark workload](https://github.com/HungLo2020/MattMC/blob/858476969d6500b2a9e26d10c5d8c5967222ccfe/src/test/java/net/minecraft/world/level/levelgen/NoiseFillVerification.java#L47-L80)
+times eight fills per sample, including Java cell/slice work and native result
+installation. Its checksum covers heightmap words and section air/non-air flags;
+it is narrower than the detailed parity assertions. The recorded reductions are
+fill-workload elapsed times, not per-chunk full-generation or whole-game gains.
+
+Java still owns cell traversal/cache preparation, generator and NoiseChunk
+lifetime, registry identity, chunk-object installation and later stage
+orchestration. Built-in ore/aquifer positional randomness moving here does not
+move every worldgen random owner. Keep custom/blended/prewritten-state fallback,
+cancellation/concurrency/failure recovery, native memory bounds and FULL-chunk
+acceptance explicit before extending the supported scope. This bounded migration
+does not close #775 or complete world-generation ownership.
