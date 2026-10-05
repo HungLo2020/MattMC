@@ -22,8 +22,8 @@ import net.minecraft.world.level.levelgen.synth.NativeNoiseState;
 import org.jetbrains.annotations.Nullable;
 
 /** Native-owned NOISE-stage block fill for {@code NoiseBasedChunkGenerator.doFill}.
- * Java still fills interpolation slices, cell density caches and aquifer cell
- * materials; Rust runs every block in the original order (interpolation,
+ * {@link NativeNoiseRouter} fills the interpolation slices; Java still fills
+ * cell density caches and aquifer cell materials; Rust runs every block in the original order (interpolation,
  * substance, ore veins, default block) and owns the resulting section palettes,
  * counters, both world-generation heightmaps and fluid post-processing marks,
  * which Java installs once. Chunks outside the gate keep the Java loop. */
@@ -231,16 +231,18 @@ final class NativeNoiseFill {
             throw new IllegalStateException("Cannot start native noise fill", error);
         }
         if (handle == 0) throw new IllegalStateException("Native noise fill rejected its configuration");
+        NativeNoiseRouter router = null;
         try {
+            router = NativeNoiseRouter.create(this.chunk);
             int width = this.chunk.cellWidth, height = this.chunk.cellHeight, cells = 16 / width;
             int minX = this.chunkAccess.getPos().getMinBlockX(), minZ = this.chunkAccess.getPos().getMinBlockZ();
             MemorySegment density = MemorySegment.ofArray(this.chunk.aquiferDensity.values);
             MemorySegment cornerMemory = MemorySegment.ofArray(this.corners);
             MemorySegment gapMemory = this.gap == null ? MemorySegment.NULL : this.gap.state();
             boolean ore = this.toggle != null;
-            this.chunk.initializeForFirstCellX();
+            this.chunk.initializeForFirstCellX(router);
             for (int cellX = 0; cellX < cells; cellX++) {
-                this.chunk.advanceCellX(cellX);
+                this.chunk.advanceCellX(cellX, router);
                 for (int cellZ = 0; cellZ < cells; cellZ++) {
                     for (int cellY = cellCountY - 1; cellY >= 0; cellY--) {
                         this.chunk.selectCellYZ(cellY, cellZ);
@@ -272,8 +274,12 @@ final class NativeNoiseFill {
             throw new IllegalStateException("Native noise fill failed", error);
         } finally {
             Reference.reachabilityFence(this.gap);
-            try { RELEASE.invokeExact(handle); }
-            catch (Throwable error) { throw new IllegalStateException("Cannot release native noise fill", error); }
+            try {
+                if (router != null) router.close();
+            } finally {
+                try { RELEASE.invokeExact(handle); }
+                catch (Throwable error) { throw new IllegalStateException("Cannot release native noise fill", error); }
+            }
         }
     }
 

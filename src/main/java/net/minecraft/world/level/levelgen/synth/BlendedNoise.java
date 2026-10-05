@@ -122,6 +122,8 @@ public class BlendedNoise implements DensityFunction.SimpleFunction {
 	}
 
 	private volatile NativeNoise nativeNoise;
+    /** The state compute samples, for native density routers. */
+    public NativeNoiseState nativeState() { return nativeNoise(); }
 	NativeNoise nativeNoise() {
 		NativeNoise value = nativeNoise;
 		if (value == null) {

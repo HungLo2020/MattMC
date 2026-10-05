@@ -84,8 +84,9 @@ World simulation and world data helpers belong here. Current code includes
 `world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
 under `world/level/chunk/palette/`, and `world/level/levelgen/` for
 noise synthesis, density evaluation, aquifers, surface evaluation, worldgen
-randomness and the [NOISE fill](world/levelgen/RUST-NOISE-FILL.md) that owns
-base-terrain block writes. See
+randomness, the [NOISE fill](world/levelgen/RUST-NOISE-FILL.md) that owns
+base-terrain block writes and the [noise router](world/levelgen/RUST-NOISE-ROUTER.md)
+that fills its interpolation slices. See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.
 

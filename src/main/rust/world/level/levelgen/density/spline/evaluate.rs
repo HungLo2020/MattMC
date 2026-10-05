@@ -4,7 +4,7 @@ fn lerp(t: f32, a: f32, b: f32) -> f32 {
     a + t * (b - a)
 }
 // Do not reassociate, use FMA, or widen to double: Java rounds every operation.
-pub(super) fn evaluate(nodes: &[Node], knots: &[Knot], id: usize, axes: &[f32; 4]) -> f32 {
+pub(crate) fn evaluate(nodes: &[Node], knots: &[Knot], id: usize, axes: &[f32; 4]) -> f32 {
     let n = &nodes[id];
     if n.axis == -1 {
         return n.value;

@@ -13,6 +13,8 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
 - [Structure Terrain Adjustment](RUST-BEARDIFIER.md): Beardifier cell evaluation, geometry ownership, and parity/performance checks.
 - [NOISE Fill](RUST-NOISE-FILL.md): native block loop, ore veins, section/heightmap
   ownership, eligibility gate and parity/performance checks.
+- [Noise Router](RUST-NOISE-ROUTER.md): native interpolation slices from compiled
+  density graphs, short circuits, cache rules and parity/performance checks.
 - [Aquifer Evaluation](RUST-AQUIFER.md): cell material decisions, fluid sources, and parity/performance checks.
 - [Surface Evaluation](RUST-SURFACE.md): column processing, callbacks, and compatibility limits.
 - [World-Generation Organization and Refactor Report](RUST-WORLDGEN-ORGANIZATION.md):

@@ -9,5 +9,6 @@ pub(crate) mod heightmap;
 pub(crate) mod math;
 pub(crate) mod noise_fill;
 pub(crate) mod random;
+pub(crate) mod router;
 pub(crate) mod surface;
 pub(crate) mod synth;

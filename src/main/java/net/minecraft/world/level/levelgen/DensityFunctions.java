@@ -526,6 +526,10 @@ public final class DensityFunctions {
 			this.islandNoise = new SimplexNoise(randomSource);
 		}
 
+        SimplexNoise islandNoise() {
+            return this.islandNoise;
+        }
+
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
 			return (this.islandNoise.endIslandHeight(functionContext.blockX() / 8, functionContext.blockZ() / 8) - 8.0) / 128.0;

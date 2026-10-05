@@ -40,6 +40,8 @@ public class SimplexNoise {
     }
 
 	private volatile NativeNoise nativeNoise;
+    /** The state endIslandHeight samples, for native density routers. */
+    public NativeNoiseState nativeState() { return nativeNoise(); }
 	NativeNoise nativeNoise() {
 		NativeNoise value = nativeNoise;
 		if (value == null) {

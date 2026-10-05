@@ -8,8 +8,8 @@ vein rule with native positional randomness, the default block, section palette
 writes and counters, both world-generation heightmaps and fluid post-processing
 marks. Java installs the sections, heightmaps and marks once.
 
-Java still fills interpolation slices, cell density caches and, on request,
-aquifer cell materials (including fluid-status requests), and owns the generator, the
+The [noise router](RUST-NOISE-ROUTER.md) fills the interpolation slices. Java
+still fills cell density caches and, on request, aquifer cell materials (including fluid-status requests), and owns the generator, the
 `NoiseChunk` and every chunk object. Ineligible chunks run the unchanged Java loop.
 
 ## Eligibility
@@ -54,6 +54,9 @@ than silently falling back to the Java loop.
 python3 DevUtils/tests/worldgen/VerifyRustNoiseFill.py --parity-only
 python3 DevUtils/tests/worldgen/VerifyRustNoiseFill.py --forks 3 --cpu 5 --background-cpus 0,1
 ```
+
+This driver audits production files as of commit `858476969`; later edits to
+the same files are audited by [the router's driver](RUST-NOISE-ROUTER.md).
 
 The driver rebuilds every edited production Java file from the reference
 commit with its exact audited rewrites and requires a byte-for-byte match. `NativeNoiseFillTest` fills each vanilla

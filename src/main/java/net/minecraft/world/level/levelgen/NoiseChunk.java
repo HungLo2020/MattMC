@@ -250,9 +250,21 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		return this.blender;
 	}
 
-	private void fillSlice(boolean bl, int i) {
+	private void fillSlice(boolean bl, int i, @Nullable NativeNoiseRouter router) {
 		this.cellStartBlockX = i * this.cellWidth;
 		this.inCellX = 0;
+        if (router != null && router.fill(bl, this.cellStartBlockX)) {
+            // The column loop's end state. Every field is reassigned before its
+            // next read; the counters only need to pass every recorded value.
+            this.cellStartBlockZ = (this.firstCellZ + this.cellCountXZ) * this.cellWidth;
+            this.inCellZ = 0;
+            this.cellStartBlockY = (this.cellCountY + this.cellNoiseMinY) * this.cellHeight;
+            this.inCellY = 0;
+            this.arrayIndex = this.cellCountY;
+            this.interpolationCounter += (long)(this.cellCountXZ + 1) * (this.cellCountY + 1) * this.interpolators.size();
+            this.arrayInterpolationCounter += this.cellCountXZ + 2;
+            return;
+        }
 
 		for (int j = 0; j < this.cellCountXZ + 1; j++) {
 			int k = this.firstCellZ + j;
@@ -270,19 +282,32 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	}
 
 	public void initializeForFirstCellX() {
+        this.initializeForFirstCellX(null);
+	}
+
+    /** With a router, slices come from Rust; Java fills any slice it declines. */
+	void initializeForFirstCellX(@Nullable NativeNoiseRouter router) {
 		if (this.interpolating) {
 			throw new IllegalStateException("Staring interpolation twice");
 		} else {
 			this.interpolating = true;
 			this.interpolationCounter = 0L;
-			this.fillSlice(true, this.firstCellX);
+			this.fillSlice(true, this.firstCellX, router);
 		}
 	}
 
 	public void advanceCellX(int i) {
-		this.fillSlice(false, this.firstCellX + i + 1);
+        this.advanceCellX(i, null);
+	}
+
+	void advanceCellX(int i, @Nullable NativeNoiseRouter router) {
+		this.fillSlice(false, this.firstCellX + i + 1, router);
 		this.cellStartBlockX = (this.firstCellX + i) * this.cellWidth;
 	}
+
+    int firstCellZ() {
+        return this.firstCellZ;
+    }
 
 	public NoiseChunk forIndex(int i) {
 		int j = Math.floorMod(i, this.cellWidth);

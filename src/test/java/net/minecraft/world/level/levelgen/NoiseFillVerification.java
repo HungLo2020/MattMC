@@ -18,7 +18,8 @@ import net.minecraft.world.level.chunk.UpgradeData;
 import net.minecraft.world.level.levelgen.blending.Blender;
 
 /** Production-path timing of the NOISE fill. One JVM runs one mode: {@code java}
- * (doFill's Java loop) or {@code native} (the Rust fill). Each round fills fresh
+ * (doFill's Java loop), {@code javaslices} (the Rust fill with Java's
+ * interpolation slices) or {@code native} (the Rust fill and Rust slices). Each round fills fresh
  * chunks through {@code NoiseBasedChunkGenerator.fillFromNoise}; chunk and
  * NoiseChunk construction are untimed and identical for both modes. */
 public final class NoiseFillVerification {
@@ -53,9 +54,10 @@ public final class NoiseFillVerification {
             System.out.println("PLAYER_DISTANCE_FIXTURE case=" + name + " ticks=" + positions.length + " moves=" + positions.length
                 + " trace=" + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest((setting + java.util.Arrays.toString(positions)).getBytes())));
-            NativeNoiseFill.setEnabled(mode.equals("native"));
-            if (!mode.equals("native") && !mode.equals("java")) throw new IllegalArgumentException(mode);
-            long before = NativeNoiseFill.RUNS.get();
+            if (!mode.equals("native") && !mode.equals("javaslices") && !mode.equals("java")) throw new IllegalArgumentException(mode);
+            NativeNoiseFill.setEnabled(!mode.equals("java"));
+            NativeNoiseRouter.setEnabled(mode.equals("native"));
+            long before = NativeNoiseFill.RUNS.get(), slicesBefore = NativeNoiseRouter.SLICES.get();
             PlayerChunkDistancesVerification.measure(mode, name, quick, () -> {
                 List<Job> jobs = new ArrayList<>();
                 for (ChunkPos pos : positions) {
@@ -76,8 +78,9 @@ public final class NoiseFillVerification {
                 }
                 return checksum;
             });
-            long nativeRuns = NativeNoiseFill.RUNS.get() - before;
-            if (mode.equals("native") == (nativeRuns == 0)) throw new IllegalStateException("Unexpected route: native runs " + nativeRuns);
+            long nativeRuns = NativeNoiseFill.RUNS.get() - before, nativeSlices = NativeNoiseRouter.SLICES.get() - slicesBefore;
+            if (mode.equals("java") != (nativeRuns == 0) || mode.equals("native") == (nativeSlices == 0))
+                throw new IllegalStateException("Unexpected route: native runs " + nativeRuns + ", native slices " + nativeSlices);
         }
     }
 }

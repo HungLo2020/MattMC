@@ -148,7 +148,7 @@ class NativeNoiseFillTest {
     @Test void nativeFillMatchesJavaLoopForEveryVanillaSetting() {
         long[] seeds = {0, 42, -7_340_013_412_337L};
         ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(37, -91), new ChunkPos(-6250, 4321), new ChunkPos(131_000, -131_000)};
-        long before = NativeNoiseFill.RUNS.get();
+        long before = NativeNoiseFill.RUNS.get(), slicesBefore = NativeNoiseRouter.SLICES.get(), slices = 0;
         int pairs = 0;
         for (var setting : settings) {
             for (long seed : seeds) {
@@ -159,13 +159,17 @@ class NativeNoiseFillTest {
                     var candidate = fill(setting, RandomState.create(setting.value(), noises, seed), pos, true);
                     compare(java, candidate, context);
                     pairs++;
+                    slices += 16 / setting.value().noiseSettings().getCellWidth() + 1;
                 }
             }
         }
         assertTrue(oreBlocks > 0 && rawOreBlocks > 0, "ore veins and raw ore blocks must be exercised: " + oreBlocks + "/" + rawOreBlocks);
         long runs = NativeNoiseFill.RUNS.get() - before;
-        System.out.println("NOISE_FILL_PARITY pairs=" + pairs + " native_runs=" + runs + " ore_blocks=" + oreBlocks + " raw_ore_blocks=" + rawOreBlocks);
+        long nativeSlices = NativeNoiseRouter.SLICES.get() - slicesBefore;
+        System.out.println("NOISE_FILL_PARITY pairs=" + pairs + " native_runs=" + runs + " native_slices=" + nativeSlices + " ore_blocks=" + oreBlocks
+            + " raw_ore_blocks=" + rawOreBlocks);
         assertEquals(pairs, runs, "every vanilla setting must take the native fill");
+        assertEquals(slices, nativeSlices, "every native fill must take native interpolation slices");
     }
 
     /** Palette growth beyond what NOISE-stage sections reach: every resize
