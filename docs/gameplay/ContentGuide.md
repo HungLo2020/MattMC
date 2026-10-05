@@ -369,6 +369,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ## MattMC tools
 
+- [Region Editor](mechanics/RegionEditor.md): saved Overworld terrain selection, direct writes, clipboard and undo limits
+
 - [Minimap and waypoints](mechanics/MinimapAndWaypoints.md): VoxelMap controls, named places, local map data and current limits
 - [WorldEdit basics](commands/WorldEdit.md) and the [World Edit Wand](items/WorldEditWand.md): permitted selection, editing, clipboard and block-state history controls
 - [Building Wand](items/BuildingWand.md) and [Trowel](items/Trowel.md): separate placement tools with their own material, target and current-behavior limits

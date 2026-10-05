@@ -52,6 +52,8 @@ For pack selection during creation and changes to loaded data, see [World data p
 
 For the creation rule editor and later queries or changes, see [Game rules](GameRules.md).
 
+For the title-menu terrain tool, read [Region Editor](RegionEditor.md) before opening a save.
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-04** at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb`. The review followed active menu actions through creation, saved settings, permissions, normal shutdown, renaming, archive writing, and re-creation. English labels were checked across the four bundled language namespaces and their deprecation transform; the effective label is **Allow Commands**. External language packs can change labels. [Language loading][language] · [Label migration][label-migration] · [Bundled rename mapping][deprecated-labels]

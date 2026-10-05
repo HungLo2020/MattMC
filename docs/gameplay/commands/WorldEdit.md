@@ -70,6 +70,8 @@ The active limit is **1,000,000 counted changes per edit**. A large operation ca
 
 Source-reviewed on **2026-10-04** at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb`, following active registration, parsers, consumers, and session lifecycle. No game commands, world edits, or runtime tests were performed. This guide covers only the workflow above; syntax from other WorldEdit installations should not be assumed compatible. [Region gate][region-gate] · [Clipboard gate][clipboard-gate] · [History gate][history-gate] · [Global-mask gate][general-gate]
 
+The title-menu [Region Editor](../mechanics/RegionEditor.md) operates on saved terrain with its own clipboard and limited undo.
+
 Related: [Commands](Commands.md) · [World Edit Wand](../items/WorldEditWand.md) · [Local worlds and backups](../mechanics/LocalWorlds.md) · [Gameplay](../Gameplay.md)
 
 [edits]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/worldedit/command/RegionCommands.java#L116-L178

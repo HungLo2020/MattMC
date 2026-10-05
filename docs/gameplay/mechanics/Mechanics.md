@@ -3,6 +3,7 @@
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
 - [Local worlds, saving, and backups](LocalWorlds.md): creation choices, difficulty, normal quit, backup archives and Re-Create
+- [Region Editor](RegionEditor.md): saved terrain selection, direct disk writes, clipboard and limited undo
 - [Multiplayer and LAN](MultiplayerAndLAN.md): joining, local hosting, session permissions, mode selection and keeping the host world running
 - [Dedicated servers](DedicatedServers.md): current launch routes, save locations, permissions and normal shutdown
 - [Game rules](GameRules.md): creation editing, loaded-world queries, value limits and shared-world persistence
