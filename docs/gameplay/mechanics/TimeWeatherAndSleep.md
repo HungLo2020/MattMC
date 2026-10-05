@@ -96,6 +96,8 @@ These effects are checked separately. With daylight cycling off, the group can w
 | Find a suitable climate or understand mob encounters | [Biomes](../biomes/Biomes.md) · [Natural spawning](NaturalSpawning.md) |
 | Inspect or change world settings | [Commands](../commands/Commands.md) |
 
+For random updates, machine timers and active terrain, see [Ticks and chunk activity](TicksAndChunkActivity.md).
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. The review followed saved settings, active server-level construction and ticking, sleep entry/counting, command registration, packet destinations and the client weather-extraction route. No game commands, multiplayer sleep, weather waits, crop-growth runs or cross-dimension visual tests were performed. Tick conversions and timer ranges are source-derived; data packs, saved settings and altered dimension/biome definitions can change the result.

@@ -15,6 +15,9 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Locator Bar](LocatorBar.md): built-in tracked-entity directions, display priorities and transmission controls
 - [Minimap and waypoints](MinimapAndWaypoints.md): map controls, named places, local data and current limitations
 
+- [Ticks and chunk activity](TicksAndChunkActivity.md): update types, simulation distance, unloading and paused-server limits
+- [Light](Light.md): propagation, block light, skylight and the value each mechanic checks
+- [Loot and drops](LootAndDrops.md): reward conditions, player credit, generated storage and item recovery
 - [Time, weather, and sleep](TimeWeatherAndSleep.md): shared clocks, local rain and snow, independent cycle rules, multiplayer rest and timer limits
 - [Natural spawning and despawning](NaturalSpawning.md): category caps, player distance, active terrain, persistence and troubleshooting
 - [TaCZ firearms](TaCZFirearms.md): controls, firing, magazine and reserve ammunition, reloads, refitting, and current limits

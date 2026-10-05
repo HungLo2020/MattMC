@@ -38,6 +38,43 @@ Trading unlocks further levels, up to level 5. The profession alone does not gua
 
 If an offer sells out, allow the villager to work at its own job site. Work-based restocking is limited and not an immediate response to placing a block.
 
+## Farmer crop tending
+
+A Farmer can harvest mature **Wheat, Carrots, Potatoes and Beetroots**, then plant suitable items from its inventory on empty Farmland. Give an adult its own reachable [Composter](../blocks/Composter.md), access to the field, and planting supplies. Harvesting and planting are work activities, alongside using the workstation and walking; they are not a continuous or guaranteed production cycle. [Work activity and job requirement][farmer-brain] · [Work choices][farmer-work] · [Harvest and planting][farmer-harvest]
+
+### Setting up the field
+
+- **Allow daytime work:** the default adult schedule selects work from day tick 2,000 until 9,000. The villager needs a claimed job site for that activity. A Farmer outfit alone does not establish a working job-site claim. [Schedule][farmer-schedule] · [Work requirement][farmer-brain]
+- **Keep the field reachable:** the Farmer notices Farmland within four blocks in each horizontal direction and two vertically from its current block position. Its harvest/plant search is smaller: the surrounding 3 × 3 × 3 positions. It must approach a selected target before acting. These are local searches, not the dimensions of a guaranteed farm design. [Farmland recognition][farmer-profession] · [Nearby field scan][farmer-sensor] · [Target selection and approach][farmer-harvest]
+- **Supply the right items:** drop planting items where the Farmer can collect them. Pickup needs inventory room and an expired item pickup delay, and `mobGriefing` must be true. The same rule is checked before starting the harvest/plant routine. For the shared inventory and food rules, see [food pickup](#food-pickup-and-willingness). [Pickup admission][farmer-pickup] · [Shared pickup gate][farmer-pickup-gate] · [Crop-work gate][farmer-harvest]
+
+### What Farmers harvest and plant
+
+The bundled planting list contains exactly these six items. The harvesting check is narrower: it selects a mature block in the ordinary `CropBlock` family. [Planting tag][farmer-seeds] · [Harvest selection][farmer-harvest]
+
+| Item in the Farmer's inventory | Planted crop | Farmer harvests the mature crop? |
+| --- | --- | --- |
+| Wheat Seeds | [Wheat](../blocks/Wheat.md) | Yes |
+| Carrot | [Carrots](../blocks/RootCrops.md) | Yes |
+| Potato | [Potatoes](../blocks/RootCrops.md) | Yes |
+| Beetroot Seeds | [Beetroots](../blocks/RootCrops.md) | Yes |
+| Torchflower Seeds | [Torchflower Crop](../blocks/Torchflower.md) | No: it becomes a separate flower block |
+| Pitcher Pod | [Pitcher Crop](../blocks/PitcherPlant.md) | No: its crop uses the double-plant family |
+
+[Wheat registration][farmer-wheat-block] · [Root-crop registrations][farmer-root-blocks] · [Carrot inheritance][farmer-carrot] · [Potato inheritance][farmer-potato] · [Beetroot registration][farmer-beetroot-block] · [Beetroot inheritance][farmer-beetroot] · [Torchflower transition][farmer-torchflower] · [Mature flower type][farmer-flower-block] · [Pitcher crop type][farmer-pitcher]
+
+Planting requires **air directly above Farmland** and consumes **one item**. The Farmer scans its inventory in slot order and uses the first nonempty item that both belongs to the planting tag and places a block. All six bundled items meet that requirement. With mixed supplies, it can replace a harvested crop with a different one; it does not remember what grew there. For a single-crop field, keep the Farmer's planting supply to that crop. Data packs can change the tag, but adding an ordinary non-block item does not make it plantable by this routine. [Planting transaction][farmer-planting] · [Wheat item][farmer-wheat-item] · [Carrot and Potato items][farmer-root-items] · [Remaining planting items][farmer-other-items] · [Block-item construction][farmer-block-item]
+
+The Farmer **breaks** a mature crop before replanting; it does not use MattMC's player-only [harvest-and-regrow controls](../blocks/RootCrops.md#mattmc-harvesting-controls). The planting check reads the state captured before that tick's break, so do not expect the same tick to both harvest and replant. Empty soil can remain when supplies, access or work activity interrupt the next planting opportunity. [Harvest and planting order][farmer-planting]
+
+### Bone Meal and stalled crop work
+
+Farmers can collect dropped **Bone Meal**, in addition to the general villager pickup list. Their [Composter work](../blocks/Composter.md#comparator-and-farmer-use) can also compost surplus Wheat Seeds and Beetroot Seeds and empty ready compost. The resulting Bone Meal is a loose item with a pickup delay; it still needs to be collected and does not go straight into the Farmer's inventory. Wheat-to-Bread conversion and food sharing are covered under [breeding and population](#breeding-and-population). [Farmer supplies][farmer-profession] · [Workstation routine][farmer-compost] · [Bone Meal release][farmer-compost-output] · [Pickup][farmer-pickup-gate]
+
+A separate work behavior spends stored Bone Meal on a nearby **immature `CropBlock`**, including growing Torchflower Crops. It does not select Pitcher Crops, even though a player can fertilize them. It has its own timing and target checks and requires the villager to approach the crop. **This behavior does not check `mobGriefing`**, so disabling the rule is not a reliable way to stop fertilizing by a Farmer that already holds Bone Meal. [Bone Meal selection and timing][farmer-bonemeal] · [Application and consumption][farmer-bonemeal-use] · [Torchflower type][farmer-torchflower] · [Pitcher type][farmer-pitcher] · [Player fertilizing][farmer-pitcher-bonemeal]
+
+If work stalls, check the job claim and work time first, then the route to the crop and the Farmer's planting supplies. A mature Torchflower or Pitcher Crop remaining untouched follows the limits above. For slow natural growth or soil reverting to Dirt, use the [Farmland](../blocks/Farmland.md), [Wheat](../blocks/Wheat.md) and [root-crop](../blocks/RootCrops.md) guides. These source-reviewed behaviors do not establish a tested automatic layout, harvest rate or item-collection yield.
+
 ## Breeding and population
 
 To raise another villager, give **both adults enough food**, let them meet while awake, and leave a **reachable, unclaimed bed for the child**. A useful starting arrangement is a bed for each existing resident plus a spare, with clear routes between the villagers and beds. The actual birth check looks for an available home; it does not compare a village-wide villager count with a bed count. [Readiness][population-readiness] · [Birth and bed search][population-birth]
@@ -120,6 +157,8 @@ Jobs and trading were source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c924
 
 Breeding and population were source-reviewed at `f5473e41dc4af8ced756db517fada27288df07a3` on 2026-10-04. The registered villager installs the idle breeding behavior and ticks its Brain; home points come from registered bed states and server block-state updates. No in-game pickup, sharing, breeding, bed-layout, cooldown or growth test was run. This verifies the reviewed code and bundled pickup tags, not a tested automatic breeder design. [Entity registration][population-register] · [Activity installation and caller][population-brain] · [Brain tick][population-dispatch] · [Bed-point updates][population-home-update]
 
+Farmer crop tending was source-reviewed at `5218ac875eda9f2c4151ff1a97795f20f5f356cf` on 2026-10-05. The active villager installs and ticks the work behaviors and secondary-field sensor; the reviewed planting tag resolves to six registered block items. No in-game crop tending, mixed-inventory planting, Bone Meal, workstation, layout or output test was run. Existing employment, trading and population verification scopes above are unchanged. [Entity registration][farmer-entity] · [Server AI caller][farmer-ai-caller] · [Villager Brain tick][farmer-ai-tick] · [Behavior and sensor dispatch][farmer-dispatch] · [Sensor registration][farmer-sensor-type]
+
 [population-readiness]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/npc/Villager.java#L652-L694
 [population-birth]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/ai/behavior/VillagerMakeLove.java#L62-L117
 [population-interact]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/npc/Villager.java#L320-L346
@@ -161,3 +200,37 @@ Breeding and population were source-reviewed at `f5473e41dc4af8ced756db517fada27
 [population-brain]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/npc/Villager.java#L223-L271
 [population-dispatch]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/ai/Brain.java#L401-L405
 [population-home-update]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/server/level/ServerLevel.java#L1418-L1434
+
+[farmer-brain]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/npc/Villager.java#L223-L249
+[farmer-work]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/behavior/VillagerGoalPackages.java#L74-L102
+[farmer-harvest]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/behavior/HarvestFarmland.java#L36-L112
+[farmer-schedule]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/schedule/Schedule.java#L24-L30
+[farmer-profession]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/npc/VillagerProfession.java#L107-L114
+[farmer-sensor]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/sensing/SecondaryPoiSensor.java#L16-L45
+[farmer-pickup]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/npc/Villager.java#L789-L816
+[farmer-pickup-gate]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/Mob.java#L439-L455
+[farmer-seeds]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/resources/data/minecraft/tags/item/villager_plantable_seeds.json#L1-L10
+[farmer-wheat-block]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/Blocks.java#L1270-L1284
+[farmer-root-blocks]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/Blocks.java#L2714-L2723
+[farmer-carrot]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/CarrotBlock.java#L13-L28
+[farmer-potato]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/PotatoBlock.java#L13-L28
+[farmer-beetroot-block]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/Blocks.java#L4276-L4280
+[farmer-beetroot]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/BeetrootBlock.java#L19-L46
+[farmer-torchflower]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/TorchflowerCropBlock.java#L19-L63
+[farmer-flower-block]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/Blocks.java#L916-L930
+[farmer-pitcher]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/PitcherCropBlock.java#L32-L50
+[farmer-pitcher-bonemeal]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/PitcherCropBlock.java#L196-L213
+[farmer-planting]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/behavior/HarvestFarmland.java#L102-L153
+[farmer-wheat-item]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/item/Items.java#L1354-L1356
+[farmer-root-items]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/item/Items.java#L2056-L2059
+[farmer-other-items]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/item/Items.java#L2236-L2239
+[farmer-block-item]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/item/Items.java#L2704-L2706
+[farmer-compost]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/behavior/WorkAtComposter.java#L19-L71
+[farmer-compost-output]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/block/ComposterBlock.java#L284-L295
+[farmer-bonemeal]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/behavior/UseBonemeal.java#L27-L118
+[farmer-bonemeal-use]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/item/BoneMealItem.java#L63-L78
+[farmer-entity]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/EntityType.java#L1468-L1470
+[farmer-ai-caller]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/Mob.java#L634-L672
+[farmer-ai-tick]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/npc/Villager.java#L267-L272
+[farmer-dispatch]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/Brain.java#L401-L411
+[farmer-sensor-type]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/ai/sensing/SensorType.java#L26-L30

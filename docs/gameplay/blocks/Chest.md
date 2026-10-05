@@ -44,6 +44,8 @@ This article covers ordinary chests. [Trapped Chests](TrappedChest.md), [Ender C
 - [Crafting Table](CraftingTable.md)
 - [Blocks](Blocks.md)
 
+For pending rewards and early inventory access, see [Generated loot and first access](../mechanics/LootAndDrops.md#generated-containers-first-access-can-matter).
+
 ## Sources and verification
 
 Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. This is not a gameplay test; data packs and later builds can change recipes and tags.

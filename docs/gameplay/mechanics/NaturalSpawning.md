@@ -103,6 +103,8 @@ These checks identify source-defined failure points. They do not establish a see
 
 Related: [Mechanics](Mechanics.md) · [Mobs](../mobs/Mobs.md) · [Biomes](../biomes/Biomes.md) · [Dimensions](../dimensions/Dimensions.md) · [Name Tags](../items/NameTag.md) · [Time, weather, and sleep](TimeWeatherAndSleep.md#read-the-day-cycle)
 
+For the shared terrain and lighting concepts, see [Ticks and chunk activity](TicksAndChunkActivity.md#loaded-visible-and-simulated-terrain) and [Light requirements](Light.md#apply-the-right-requirement). Keep the species and player-distance checks above separate.
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-04** at `f5473e41dc4af8ced756db517fada27288df07a3`. The review follows the server-level/chunk caller through category counting, player/chunk eligibility, biome/structure selection, registered and per-mob predicates, addition and despawning. It also checks the separate generation/breeding routes and selected persistence exceptions. No in-game spawning, despawn timing, multiplayer, simulation-distance or farm test was run. Active data packs, dimensions, game rules and custom entity data can change the relevant inputs. Species-specific acquisition and environmental conditions remain with their existing guides.

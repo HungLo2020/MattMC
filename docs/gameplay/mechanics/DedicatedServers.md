@@ -46,6 +46,8 @@ For any separate external backup copy, first complete that normal shutdown. A `s
 
 `save-all` requests a save; `save-all flush` also requests flushing. Neither creates a backup archive. `save-off` disables per-level automatic saving, and `save-on` restores it, but `save-off` does not stop gameplay or every writer: player data and world metadata can still be saved. Normal shutdown also turns world saving back on. Do not treat `save-off` as a safe-copy barrier or a way to discard a session's changes. [Save command][save-all] · [Save path][saving] · [Save toggles][save-toggle] · [Player disconnect saving][player-save] · [Shutdown saves][shutdown]
 
+For view/simulation distance and the empty-server pause setting, see [Ticks and chunk activity](TicksAndChunkActivity.md#forced-chunks-and-paused-servers).
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-04** at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb`; the architecture target is cited at documentation commit `d723254d406f300bdcf2579d39dfd5a433e43869`. Command names, property keys and launcher filenames retain their source spelling.

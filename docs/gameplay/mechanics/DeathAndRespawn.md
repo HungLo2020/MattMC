@@ -35,6 +35,8 @@ Those linked block guides own the complete setup, placement, charge, and explosi
 
 Returning from the End through the checked credits/return path uses a different restoration mode: it preserves player state and does not spend an ordinary anchor charge. A **Hardcore** death respawn switches the player to **Spectator**. Command-forced respawn positions also have different block requirements; this guide's ordinary bed/anchor instructions are not a promise about those overrides. [Death versus End-return and Hardcore][request] · [State modes][restore] · [Forced-position branch][respawn]
 
+See [Collecting and keeping dropped items](LootAndDrops.md#collecting-and-keeping-the-result) and [Leaving an active area](TicksAndChunkActivity.md#what-happens-when-you-leave) for pickup, saved age and ticking distinctions.
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f`. Active server death, inventory/equipment drops, player replacement, saved-point selection, fallback, and End-return dispatch were traced. No death, recovery, unloaded-chunk, respawn, Hardcore, or dimension gameplay test was run. World rules and custom enchantments/data can change the result; no runtime recovery guarantee is made.

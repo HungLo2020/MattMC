@@ -58,6 +58,8 @@ See [Durability and repair](Durability.md) when a previously suitable tool stops
 - [Pewen tool caveats](../blocks/Pewen.md#recipes-and-tools-that-need-caution)
 - [Mechanics](Mechanics.md)
 
+For reward conditions across other acquisition routes, see [Loot and drops](LootAndDrops.md).
+
 ## Sources and verification
 
 Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No timed growth, harvesting, or tool test was performed in-game.

@@ -8,6 +8,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Getting started and survival
 
+- [Ticks and chunk activity](mechanics/TicksAndChunkActivity.md), [Light](mechanics/Light.md) and [Loot and drops](mechanics/LootAndDrops.md): active farms, lighting requirements and missing-reward diagnosis
+
 - [World types](mechanics/WorldTypes.md): generation presets, Superflat and Single Biome customization, Skyblock and Debug limits
 - [Locator Bar](mechanics/LocatorBar.md): built-in tracked-entity directions, display priorities and hiding conditions
 
@@ -43,6 +45,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Campfires](blocks/Campfires.md): four-slot cooking, damage, extinguishing and smoke
 
 ### Farming, food, and animal care
+
+- [Farmer crop tending](mobs/Villager.md#farmer-crop-tending): work access, harvest and planting choices, mixed supplies and Bone Meal
 
 - [Terrapin bucket transport](items/BucketOfTerrapin.md) and [Anaconda](items/AnacondaSpawnEgg.md), [Anteater](items/AnteaterSpawnEgg.md), [Atlatitan](items/AtlatitanSpawnEgg.md) and [Axolotl](items/AxolotlSpawnEgg.md) spawn eggs: preserved traits, release risks, adult/baby workflows and access limits
 

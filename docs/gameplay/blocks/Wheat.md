@@ -34,6 +34,8 @@ Use [Wheat](../items/Wheat.md) to make Bread or Hay Bales and to feed supported 
 - [Wheat Seeds](../items/WheatSeeds.md)
 - [Blocks](Blocks.md)
 
+For the difference between stored skylight, block light and night-time darkening, see [Which light value matters](../mechanics/Light.md#which-light-value-matters).
+
 ## Sources and verification
 
 Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No timed growth, harvesting, or tool test was performed in-game.

@@ -81,6 +81,8 @@ The inspected implementation explicitly registers **115 items**. The list below 
 
 - Cake, Pumpkin Pie
 
+For harvesting, replanting and Bone Meal work, see [Farmer crop tending](../mobs/Villager.md#farmer-crop-tending).
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `ae92d4575f1af7752d0f461bbf7bf0843c3cddf7`. Checked the complete initialized compostable map and resolved all 115 item IDs, exact recipe/loot/tools, active player and sided-container transactions, first-item exception, failed-roll consumption, level-7 tick, level-8 collection/mining, comparator, chunk state/tick serialization and Farmer job/work paths. Natural generation was not surveyed. No in-game composting, automation, timing, harvesting, save/reload or Villager test was run. Later implementations can change the accepted-item map; server data can alter recipes and loot.
