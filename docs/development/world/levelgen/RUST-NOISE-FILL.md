@@ -8,9 +8,12 @@ vein rule with native positional randomness, the default block, section palette
 writes and counters, both world-generation heightmaps and fluid post-processing
 marks. Java installs the sections, heightmaps and marks once.
 
-The [noise router](RUST-NOISE-ROUTER.md) fills the interpolation slices. Java
-still fills cell density caches and, on request, aquifer cell materials (including fluid-status requests), and owns the generator, the
-`NoiseChunk` and every chunk object. Ineligible chunks run the unchanged Java loop.
+The [noise router](RUST-NOISE-ROUTER.md) fills eligible interpolation slices;
+Java fills slices that its separate router gate declines. Java still traverses
+cells, fills cell density caches and, on request, aquifer cell materials
+(including fluid-status requests), and owns the generator, the `NoiseChunk`
+and every chunk object. Chunks ineligible for native fill run the unchanged
+Java block loop.
 
 ## Eligibility
 
@@ -26,9 +29,11 @@ All must hold; otherwise the Java loop runs:
   `veinRidged` `MulOrAdd(ADD, c, Ap2(MAX, Mapped(ABS, interp), Mapped(ABS, interp)))`,
   `veinGap` a `Noise` — and an Xoroshiro or Legacy ore factory.
 
-The bundled vanilla noise settings can qualify when these chunk-state and
+The bundled noise settings can qualify when these chunk-state and
 context checks also pass. Once native fill is selected, a failure throws rather
-than silently falling back to the Java loop.
+than silently restarting the Java block loop. Router rejection or its explicit
+per-slice fallback can still select Java slice evaluation inside that native
+fill; see the [separate router contract](RUST-NOISE-ROUTER.md#eligibility).
 
 ## Preserve these contracts
 
@@ -50,31 +55,41 @@ than silently falling back to the Java loop.
 
 ## Verify and measure
 
+For the current implementation, use the
+[router verification driver](RUST-NOISE-ROUTER.md#verify-and-measure), which runs
+both router and fill parity classes. The following commands reproduce the
+historical fill migration in a separate checkout of `858476969`; they are not
+current-tree verification commands:
+
 ```sh
 python3 DevUtils/tests/worldgen/VerifyRustNoiseFill.py --parity-only
 python3 DevUtils/tests/worldgen/VerifyRustNoiseFill.py --forks 3 --cpu 5 --background-cpus 0,1
 ```
 
-This driver audits production files as of commit `858476969`; later edits to
-the same files are audited by [the router's driver](RUST-NOISE-ROUTER.md).
+This historical driver reconstructs the `858476969` production files from
+reference commit `5218ac875`. Its exact-rewrite audit rejects the later router
+changes to `NoiseChunk.java` before tests run. Use the current driver above on
+`da1109de6` rather than bypassing this audit.
 
-The driver rebuilds every edited production Java file from the reference
-commit with its exact audited rewrites and requires a byte-for-byte match. `NativeNoiseFillTest` fills each vanilla
-noise setting at three seeds and five chunk positions through `fillFromNoise`
+At that historical snapshot, the driver rebuilds every edited production Java
+file from the reference commit with its exact audited rewrites and requires a
+byte-for-byte match. `NativeNoiseFillTest` fills each bundled noise setting at
+three seeds and five chunk positions through `fillFromNoise`
 with both routes and compares section network bytes, saved packs, counters,
 heightmaps, post-processing lists and later aquifer reads; every candidate fill
 must take the native route, and the aggregate fixture must exercise ore and
-raw-ore blocks. It does not require ore in each individual chunk. It also compares native
-aquifer centres with Java's `location()` (Xoroshiro and Legacy) and replays up
-to 400-state write sequences against real `PalettedContainer` resizes. A raw-ore
-chance mutation and a write-order palette mutation each fail a test.
+raw-ore blocks. It does not require ore in each individual chunk. It also
+compares native aquifer centres with Java's `location()` (Xoroshiro and Legacy) and replays up
+to 400-state write sequences against real `PalettedContainer` resizes. The
+implementation author reported that a raw-ore chance mutation and a write-order palette mutation each failed a test.
 
 Benchmarks time `fillFromNoise` on fresh chunks per mode in separate JVMs;
 chunk and `NoiseChunk` construction are excluded equally.
 
 ## Measurements
 
-The implementation author recorded a full release run on 2026-10-04: three
+For the pre-router fill implementation at `858476969`, the implementation
+author recorded a full release run on 2026-10-04: three
 alternating JVM pairs per setting on an i7-10750H laptop (CPU 5 measured, CPUs
 0/1 for JVM workers), at least 15 s of warmup and 30 samples per JVM, each
 sample filling eight fresh chunks. Both routes produced identical checksums in
@@ -122,4 +137,7 @@ orchestration. Built-in ore/aquifer positional randomness moving here does not
 move every worldgen random owner. Keep custom/blended/prewritten-state fallback,
 cancellation/concurrency/failure recovery, native memory bounds and FULL-chunk
 acceptance explicit before extending the supported scope. This bounded migration
-does not close #775 or complete world-generation ownership.
+does not close #775 or complete world-generation ownership. The later
+[router review](RUST-NOISE-ROUTER.md#maintenance-review-and-remaining-acceptance)
+records current slice ownership and evidence limits at `da1109de6`; the
+historical fill measurements above do not verify that later implementation.

@@ -36,17 +36,19 @@ samplers, spline evaluation (float coordinates) and the End island height.
 Noise states are referenced, not copied; Java keeps them reachable until
 release.
 
-Rust evaluates each column as up to 64 lanes (one per corner Y). A node
+Rust evaluates each column in blocks of up to 64 lanes (one per corner Y). A node
 computes only the lanes its parent needs: `MUL`, `MIN` and `MAX` evaluate their
 right input only where Java's short circuit would, and `RangeChoice` evaluates
 each branch only for its own lanes. Nodes that cannot depend on Y (constants,
 FlatCache, `ShiftA`/`ShiftB`, End islands, noises with zero Y scale and anything
-built only from those) run once per column.
+built only from those) run once per column per lane block.
 
 ## Eligibility
 
-`NativeNoiseRouter.create` returns null, and Java fills the slices, unless:
+`NativeNoiseRouter.create` returns null, and Java fills the slices within the
+otherwise eligible native fill, unless:
 
+- the router is enabled (`-Dmattmc.worldgen.javaNoiseRouter=true` disables it);
 - the chunk is a plain `NoiseChunk` with the empty `Blender`, not yet
   interpolating, with 1–64 plain `NoiseInterpolator`s it owns;
 - every node is one of the functions above (nested interpolators, cell caches,
@@ -56,9 +58,15 @@ built only from those) run once per column.
   router replaced. Java's slice fill leaves such a cache's last value behind;
   the router does not, so sharing it would be observable.
 
-A slice whose FlatCache lookup would fall outside the chunk's quart grid
-(impossible for 16-block chunks) returns status 1 and Java fills that slice.
-All vanilla noise settings take the router.
+A needed FlatCache lookup outside the chunk's quart grid returns status 1;
+Java copies no native output into its slice arrays and fills that slice itself.
+Normal 16-block chunk traversal stays inside the grid; the fallback test
+explicitly requests an out-of-grid slice. Other nonzero slice statuses or
+failed downcalls throw, rather than restarting the whole fill in Java. See the
+[current slice handoff](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseRouter.java#L127-L147).
+The bundled noise settings are expected to take the router in the fresh,
+empty-blender test fixture; custom graphs and other chunk contexts must still
+pass every gate.
 
 ## Preserve these contracts
 
@@ -80,21 +88,39 @@ python3 DevUtils/tests/worldgen/VerifyRustNoiseRouter.py --parity-only
 python3 DevUtils/tests/worldgen/VerifyRustNoiseRouter.py --forks 3 --cpu 5 --background-cpus 0,1
 ```
 
-The driver rebuilds every edited production file from the reference commit
-with its exact audited rewrites and requires a byte-for-byte match.
-`NativeNoiseRouterTest` fills chunks of every vanilla noise setting (three seeds,
-six positions out to the world border) with both slice fills and compares every
-slice value bit for bit after each step. A synthetic router exercises every node
-type, short circuit, shared `CacheOnce`, spline over Y-dependent coordinates and
-`Cache2D` over a FlatCache; further cases check each gate and the per-slice
-fallback. `NativeNoiseFillTest` additionally requires every vanilla fill to take
-native slices while matching the Java loop's sections, heightmaps and
-post-processing exactly. Rust tests cover lane blocks, short circuits, FlatCache
-indexing, validation, Y-independence and splines.
+The current [driver](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/DevUtils/tests/worldgen/VerifyRustNoiseRouter.py)
+audits modified production Java/Rust files against `858476969` with exact
+rewrites before building. New router files and test files are hashed; they are
+not reconstructed from an earlier Java oracle. The driver uses Linux affinity
+and native-library paths. Select available, distinct CPU IDs for `--cpu` and
+`--background-cpus` (at least two worker IDs); this validation also runs with
+`--parity-only`.
+
+[`NativeNoiseRouterTest`](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/test/java/net/minecraft/world/level/levelgen/NativeNoiseRouterTest.java)
+has four methods. Its bundled-setting fixture compares each slice value bit
+for bit after each step across three seeds and six positions out to the world
+border. The synthetic fixture covers the supported operations, short circuits, shared `CacheOnce`,
+Y-dependent spline coordinates and `Cache2D` over a FlatCache. Other cases check
+selected graph-rejection gates, the disabled switch and per-slice fallback;
+they do not exhaust every size, ownership or lifecycle gate.
+[`NativeNoiseFillTest`](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/test/java/net/minecraft/world/level/levelgen/NativeNoiseFillTest.java#L148-L173)
+also requires every bundled fixture fill and slice to take the native route
+while comparing sections, heightmaps and post-processing with the Java loop.
+The [seven added Rust router tests](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/main/rust/world/level/levelgen/router/tests.rs)
+cover lane blocks, short circuits, FlatCache indexing, validation,
+Y-independence and splines. The driver's Rust filter runs the broader levelgen
+suite, not only these seven tests.
 
 Benchmarks (`NoiseFillVerification`) time `fillFromNoise` on fresh chunks
 through the native fill in separate JVMs: `javaslices` (the previous production
-route) against `native`. Router compile and release are inside the timing.
+route) against `native`. Both modes retain the native block fill and previously
+native worldgen helpers. Router compile and release are inside the timing;
+chunk and `NoiseChunk` construction are excluded equally. Each sample times
+eight fills plus the workload's checksum reads. The checksum covers heightmap
+words and section air/non-air flags, a narrower comparison than the parity
+assertions. The [benchmark route check](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/test/java/net/minecraft/world/level/levelgen/NoiseFillVerification.java#L52-L83)
+requires nonzero native fill/slice counts in native mode, not native execution
+of every measured slice.
 
 ## Measurements
 
@@ -103,7 +129,7 @@ laptop (CPU 5 measured, CPUs 0/1 for JVM workers), alternating JVM pairs, at
 least 15 s of warmup and 30 samples per JVM, each sample filling eight fresh
 chunks. Both routes produced identical checksums in every JVM.
 
-| Setting | Java slices median | Native slices median | Paired ratios | 95% ratio interval |
+| Setting | Java slices median per eight fills | Native slices median per eight fills | Paired ratios | 95% ratio interval |
 |---|---:|---:|---|---:|
 | Overworld (3 pairs) | 95.4 ms | 53.5 ms | 0.53, 0.61, 0.50 | 0.48–0.65 |
 | Amplified (3 pairs) | 80.1 ms | 61.5 ms | 0.73, 0.69, 0.80 | 0.65–0.84 |
@@ -117,3 +143,28 @@ measured 9% less time per chunk (about 1.52 ms to 1.38 ms). Times cover the
 whole fill stage. Not surface, carving, feature or whole-game measurements.
 Raw rounds and hashes were recorded under `build/noise-router-migration/`
 (not bundled with the wiki).
+
+The CPU assignments above are the author's recorded setup. The checked-in
+driver applies one process-wide `taskset` CPU mask; it does not itself prove
+separate measured-thread and JVM-worker affinity. Its `cpu_ns` records only the
+calling thread's CPU time while `fillFromNoise` dispatches background work;
+use the elapsed-time samples for the stated workload comparison.
+
+## Maintenance review and remaining acceptance
+
+The [2026-10-05 static review for #775](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-5988872723) inspected
+[`da1109de6fe84592bf75e32cffef0cb5506d2651`](https://github.com/HungLo2020/MattMC/commit/da1109de6fe84592bf75e32cffef0cb5506d2651).
+Static reconstruction matched ten modified production Java/Rust files from
+24 exact rewrites against `858476969`; this checks the recorded edit boundary,
+not runtime parity. The tests and measurements above are source-defined checks
+and author-recorded results, not reruns by this review. No Java/Rust suite,
+mutation test, benchmark or live world was run, and the unbundled measurement
+files were not verified.
+
+Java still compiles graphs, copies slice output, traverses cells, prepares cell
+caches and requested aquifer materials, and installs the native fill results.
+This is a bounded interpolation-slice migration, not native ownership of the complete
+world-generation pipeline. Retain explicit acceptance work for custom/blended
+contexts, failure and cancellation recovery, concurrency, native memory bounds
+and FULL-chunk generation before extending scope. The migration does not close
+[#775](https://github.com/HungLo2020/MattMC/issues/775).
