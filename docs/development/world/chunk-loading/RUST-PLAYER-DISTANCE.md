@@ -33,7 +33,7 @@ native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
   replaying after the run is equivalent. Sinks must not reenter the adapter.
 - `runAllUpdates` skips the downcall when the last native result reported no
   queued work for that field, as the original returned on an empty queue.
-- Handles follow the queue's lifetime rules: an auto arena owns release, every
+- The Java adapter owns handle lifetime: an auto arena owns release, every
   downcall fences the owner, and a lock serializes access. Only `drain`, a
   bounded copy into a heap array, is bound `critical(true)`. Allocation is
   fallible and surfaces as `OutOfMemoryError`; native memory use differs from Java.
@@ -61,9 +61,17 @@ wrap and the `INVALID_CHUNK_POS` neighbourhood. Separate cases cover shared
 chunks and constructor validation. A GC stress case creates 2,000 instances,
 requests collection and checks a surviving instance; it does not count released
 handles or establish a native-memory bound. Rust tests check converged levels against a
-brute-force Chebyshev reference, budgets and the C ABI. A neighbour-order
-mutation that leaves converged levels unchanged fails three Java tests.
+brute-force Chebyshev reference, budgets and the C ABI. The implementation author
+reported that a neighbour-order mutation leaving converged levels unchanged
+failed three Java tests.
 Finite coverage is regression evidence, not proof of every history.
+
+At the [loading/POI migration checkpoint](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/DevUtils/tests/server/VerifyRustPlayerChunkDistances.py#L181-L197),
+the shared driver selects 16 Java test methods across the player (5), simulation
+(4), loading (4) and POI (3) suites, plus eight Rust `chunk_distance` tests.
+The four Rust work-queue tests run separately with the command on the
+[queue page](../lighting/RUST-PRIORITY-QUEUE.md#verify). These are inspected suite
+contents, not new passing results from the documentation review.
 
 Each JVM times one backend using the production `PlayerChunkDistances` adapter
 and `FixedPlayerDistanceChunkTracker` published view. The benchmark driver
@@ -97,3 +105,8 @@ excluded). Earlier runs on the player-only and two-tracker graphs measured
 adapter, not whole-server tick or chunk-loading measurements. Raw rounds, hashes
 and metadata were recorded at `build/player-chunk-distance-migration/acceptance-loading-poi/results.json`; that ignored artifact is not bundled
 with the wiki.
+
+The documentation review inspected the shared implementation, test and driver
+sources at this checkpoint; it did not rerun Java/Rust tests, live servers,
+mutation checks or benchmarks. The loading and POI pages describe their fixture
+boundaries alongside the author-recorded results.

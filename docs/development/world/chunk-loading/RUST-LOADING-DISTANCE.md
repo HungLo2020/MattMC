@@ -33,21 +33,31 @@ There is no Java graph or fallback.
 
 The [player distance driver](RUST-PLAYER-DISTANCE.md#verify-and-measure) covers
 this tracker; `--case loading_walk,loading_group,loading_churn` selects its
-workloads. Java tests give the original and the native tracker separate
-DistanceManagers with ChunkMap's holder scheduling and separate real
-`TicketStorage`s, and compare ordered `setLevel` transcripts, remaining budgets
-or exceptions, holder levels, drop/unload state and futures: all length-four
+workloads. Java tests give the original and the native tracker separate real
+`TicketStorage`s and [test DistanceManagers](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/test/java/net/minecraft/server/level/NativeLoadingChunkTrackerTest.java#L37-L86)
+that copy ChunkMap's holder scheduling and holder moves during unloads. They
+compare ordered `setLevel` transcripts, remaining budgets or exceptions, holder
+levels, drop/unload state and the `chunksToUpdateFutures` collection: all length-four
 histories over two chunks (one-node and full runs, unloads), seeded churn with
 all ticket kinds, small budgets, replacements, close/reactivate cycles and
-unloads at edge positions (101 mid-run holder failures compared), pre-existing
-tickets, and GC release. Removing ticket seeding fails the pre-existing test.
+unloads at edge positions, and pre-existing tickets. The implementation author
+recorded 101 mid-run holder failures compared and reported that removing ticket
+seeding failed the pre-existing test; the source asserts that at least one such
+failure is exercised. The [GC case](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/test/java/net/minecraft/server/level/NativeLoadingChunkTrackerTest.java#L290-L303)
+creates 1,000 unreachable tracker instances, requests collection and checks a
+surviving instance; it does not count released handles or prove bounded memory.
 
 Benchmarks run walking players whose loading tickets shift with an 8-chunk view,
-portal/pearl churn, per-tick runs, futures clearing and unload processing.
+portal/pearl churn, per-tick runs, futures-collection clearing and the fixture's
+holder moves during unloads. The [benchmark](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/test/java/net/minecraft/server/level/LoadingChunkTrackerVerification.java#L23-L125)
+uses the same test manager and scheduled ticket removals. It does not run the
+real ticket purge, complete ChunkMap lifecycle, chunk generation, storage I/O
+or future completion. Construction is excluded from timed rounds.
 
 ## Measurements
 
-Full release run, 2026-10-04, with the same setup and run as the
+The implementation author recorded a full release run on 2026-10-04, with the
+same setup and run as the
 [player distance measurements](RUST-PLAYER-DISTANCE.md#measurements).
 
 | Workload | Java median | Rust median | Paired median reduction | 95% ratio interval |
@@ -59,3 +69,7 @@ Full release run, 2026-10-04, with the same setup and run as the
 Every pair improved by more than 5%; times include the equal Java ticket storage
 and holder scheduling work. Variation was 1–7% per JVM; 4 of 540 samples
 overlapped JIT activity. Not whole-server or chunk-generation measurements.
+
+The [shared verification note](RUST-PLAYER-DISTANCE.md#verify-and-measure) records
+the current suite selection and documentation-review limits. Raw acceptance
+results are ignored and are not bundled with this guide.
