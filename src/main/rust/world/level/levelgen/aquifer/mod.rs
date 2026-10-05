@@ -3,6 +3,7 @@
 mod cell;
 mod decision;
 mod ffi;
+pub(crate) mod locations;
 mod fluid;
 mod nearest;
 #[cfg(test)]

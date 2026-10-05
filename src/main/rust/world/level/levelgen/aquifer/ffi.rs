@@ -224,3 +224,42 @@ pub unsafe extern "C" fn mattmc_aquifer_cell(
     }
     0
 }
+
+/// Native `cellLocations` for built-in positional factories (`kind` 1 Xoroshiro
+/// with seedLo/seedHi, 2 Legacy with seed): fills the missing aquifer centres a
+/// cell batch reads. Grid and shape follow `mattmc_aquifer_cell`. Returns 0, or
+/// -1 for invalid arguments or a cell outside the grid.
+/// # Safety
+/// `grid` has `len` writable i64s and `shape` five readable i32s, aligned,
+/// disjoint and borrowed for this call only.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_aquifer_locations(
+    grid: *mut i64,
+    len: i32,
+    shape: *const i32,
+    kind: i32,
+    a: i64,
+    b: i64,
+    x: i32,
+    y: i32,
+    z: i32,
+    width: i32,
+    height: i32,
+) -> i32 {
+    let Some(random) = crate::world::level::levelgen::random::Positional::from_abi(kind, a, b) else {
+        return -1;
+    };
+    if grid.is_null() || shape.is_null() || !(1..=65536).contains(&len) || !(1..=16).contains(&width) || !(1..=32).contains(&height) {
+        return -1;
+    }
+    let grid = unsafe { std::slice::from_raw_parts_mut(grid, len as usize) };
+    let shape = unsafe { std::slice::from_raw_parts(shape, 5) };
+    if !valid_shape(shape, len) {
+        return -1;
+    }
+    if super::locations::fill_cell_locations(grid, shape, random, x, y, z, width, height) {
+        0
+    } else {
+        -1
+    }
+}

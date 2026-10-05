@@ -3,8 +3,12 @@
 ## Ownership and boundary
 
 `levelgen/aquifer/` owns nearest-center selection, pressure/material decisions,
-fluid-level calculations, and fluid-update decisions. Java owns seeded random
-sources, density-graph bindings, block-state identity, and chunk writes.
+fluid-level calculations, and fluid-update decisions. For the built-in Xoroshiro
+and Legacy positional factories it also draws each grid cell's random centre
+(`aquifer/locations.rs` over [`levelgen/random.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/random.rs));
+custom factories keep Java's `location()`. Java owns density-graph bindings and
+block-state identity. The [native NOISE fill](RUST-NOISE-FILL.md) owns chunk
+writes for eligible chunks; the remaining Java loop keeps them otherwise.
 
 For the built-in fluid picker and known pure density sources, Rust consumes the
 already-filled density cell and returns block choices plus update flags. Material calls
@@ -32,7 +36,9 @@ and `NoiseChunk` subclasses retain eager updates.
 - Batch eligibility must reject unknown callbacks, including ore callbacks that
   interleave with aquifer decisions. Cell results expire at the next cell epoch.
 - Keep chunk writes, heightmap changes, and postprocessing entries in their
-  existing Java order. Rendering is outside this subsystem.
+  existing order (the native fill reproduces it). Rendering is outside this subsystem.
+- Native centre draws must stay bit-identical to `location()`: `Mth.getSeed`,
+  the factory seeds and `nextInt(10)`, `nextInt(9)`, `nextInt(10)` in that order.
 
 ## Verification
 

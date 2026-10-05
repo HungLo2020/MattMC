@@ -115,6 +115,10 @@ public class XoroshiroRandomSource implements RandomSource {
 			this.seedHi = m;
 		}
 
+		long seedLo() { return this.seedLo; }
+
+		long seedHi() { return this.seedHi; }
+
 		@Override
 		public RandomSource at(int i, int j, int k) {
 			long l = Mth.getSeed(i, j, k);

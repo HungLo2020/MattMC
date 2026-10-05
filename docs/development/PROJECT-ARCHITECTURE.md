@@ -83,7 +83,9 @@ World simulation and world data helpers belong here. Current code includes
 `world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md), [skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) under
 `world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
 under `world/level/chunk/palette/`, and `world/level/levelgen/` for
-noise synthesis, density evaluation, aquifers, and surface evaluation. See
+noise synthesis, density evaluation, aquifers, surface evaluation, worldgen
+randomness and the [NOISE fill](world/levelgen/RUST-NOISE-FILL.md) that owns
+base-terrain block writes. See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.
 

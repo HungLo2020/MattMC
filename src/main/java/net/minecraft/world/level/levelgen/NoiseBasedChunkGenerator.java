@@ -340,6 +340,12 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 		NoiseChunk noiseChunk = chunkAccess.getOrCreateNoiseChunk(chunkAccessx -> this.createNoiseChunk(chunkAccessx, structureManager, blender, randomState));
 		Heightmap heightmap = chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
 		Heightmap heightmap2 = chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
+		// Rust owns the block loop and its writes when every rule it assumes holds.
+		NativeNoiseFill nativeFill = NativeNoiseFill.prepare(this.settings.value(), noiseChunk, chunkAccess, heightmap, heightmap2, i, j);
+		if (nativeFill != null) {
+			nativeFill.run(i, j);
+			return chunkAccess;
+		}
 		ChunkPos chunkPos = chunkAccess.getPos();
 		int k = chunkPos.getMinBlockX();
 		int l = chunkPos.getMinBlockZ();

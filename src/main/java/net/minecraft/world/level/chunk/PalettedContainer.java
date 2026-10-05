@@ -96,6 +96,27 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		}
 	}
 
+	/** Whether this is still a fresh single-value container holding only {@code value}. */
+	boolean isUntouched(T value) {
+		PalettedContainer.Data<T> data = this.data;
+		return data.palette instanceof SingleValuePalette<T> && data.storage instanceof ZeroBitStorage && data.palette.valueFor(0) == value;
+	}
+
+	/** Storage bits of this strategy's global palette. */
+	int globalPaletteBits() {
+		return this.strategy.getConfigurationForBitCount(32).bitsInMemory();
+	}
+
+	/** Installs the palette and storage that replaying a write sequence into this
+	 * fresh container produces, as computed by the native NOISE fill. */
+	void installGenerated(int requestedBits, List<T> entries, long[] raw) {
+		Configuration configuration = this.strategy.getConfigurationForBitCount(requestedBits);
+		BitStorage bitStorage = configuration.bitsInMemory() == 0
+			? new ZeroBitStorage(this.strategy.entryCount())
+			: new SimpleBitStorage(configuration.bitsInMemory(), this.strategy.entryCount(), raw);
+		this.data = new PalettedContainer.Data<>(configuration, bitStorage, configuration.createPalette(this.strategy, entries));
+	}
+
 	@Override
 	public int onResize(int i, T object) {
 		PalettedContainer.Data<T> data = this.data;

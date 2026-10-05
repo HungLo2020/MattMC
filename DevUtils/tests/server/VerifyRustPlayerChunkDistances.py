@@ -31,11 +31,42 @@ BENCHMARKS = {
 }
 PARITY_TESTS = ['net.minecraft.server.level.NativePlayerChunkDistancesTest', 'net.minecraft.server.level.NativeSimulationChunkTrackerTest',
                 'net.minecraft.server.level.NativeLoadingChunkTrackerTest', 'net.minecraft.world.entity.ai.village.poi.NativePoiDistanceTrackerTest']
-# Production edits pinned as exact diffs against the reference commit.
-AUDITED_PATCHES = {
-    'src/main/java/net/minecraft/world/entity/ai/village/poi/PoiManager.java': 'PoiManager.patch',
-    'src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java': 'SectionStorage.patch',
-    'src/main/java/net/minecraft/server/MinecraftServer.java': 'MinecraftServer.patch',
+# Further production edits, as exact (original, replacement) pairs applied in order.
+AUDITED_REWRITES = {
+    'src/main/java/net/minecraft/world/entity/ai/village/poi/PoiManager.java': [
+        ('\t\tpublic void runAllUpdates() {\n\t\t\tsuper.runUpdates(Integer.MAX_VALUE);\n',
+         '\t\tpublic void runAllUpdates() {\n\t\t\tthis.distance.runUpdates(Integer.MAX_VALUE, this.levelSink);\n'),
+        ('\t\t\treturn this.levels.get(l);\n\t\t}\n\n\t\t@Override\n',
+         '\t\t\treturn this.levels.get(l);\n\t\t}\n\n'),
+        ('\t\t\treturn PoiManager.this.isVillageCenter(l) ? 0 : 7;\n\t\t}\n\n\t\t@Override\n',
+         '\t\t\treturn PoiManager.this.isVillageCenter(l) ? 0 : 7;\n\t\t}\n\n\t\tvoid refreshCentres() {\n\t\t\tthis.distance.clearCentres();\n\t\t\tfor (LongIterator iterator = this.loadedSections.get(); iterator.hasNext(); ) {\n\t\t\t\tlong l = iterator.nextLong();\n\t\t\t\tif (this.villageCenter.test(l)) {\n\t\t\t\t\tthis.distance.seed(l, true);\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n'),
+        ('\n\t\t@Override\n\t\tprotected int getLevelFromSource(long l) {\n\t\t\treturn PoiManager.this.isVillageCenter(l) ? 0 : 7;\n',
+         '\n\t\t/** {@code update(l, getLevelFromSource(l), false)}. */\n\t\tvoid sectionChanged(long l) {\n\t\t\tthis.distance.sectionChanged(l, this.villageCenter.test(l));\n'),
+        ('\n\t\tprotected DistanceTracker() {\n\t\t\tsuper(7, 16, 256);\n',
+         '\n\t\t/** {@code villageCenter} is {@link PoiManager#isVillageCenter}; {@code loadedSections}\n\t\t * enumerates the section entries a tag rebind may change. */\n\t\tDistanceTracker(LongPredicate villageCenter, Supplier<LongIterator> loadedSections) {\n\t\t\tthis.villageCenter = villageCenter;\n\t\t\tthis.loadedSections = loadedSections;\n'),
+        ('\n\tfinal class DistanceTracker extends SectionTracker {\n\t\tprivate final Long2ByteMap levels = new Long2ByteOpenHashMap();\n',
+         '\n\t/** Published level view of the native-owned section distance graph. Rust\n\t * owns propagation and mirrors {@link PoiManager#isVillageCenter}, which\n\t * changes only through setDirty/onSectionLoad or a tag rebind; each run\n\t * replays the original ordered {@code setLevel} calls into this map. */\n\tstatic final class DistanceTracker {\n\t\tfinal Long2ByteMap levels = new Long2ByteOpenHashMap();\n\t\tprivate final PoiSectionDistance distance = new PoiSectionDistance();\n\t\tprivate final PoiSectionDistance.LevelSink levelSink = this::setLevel;\n\t\tprivate final LongPredicate villageCenter;\n\t\tprivate final Supplier<LongIterator> loadedSections;\n'),
+        ('\tprotected void onSectionLoad(long l) {\n\t\tthis.distanceTracker.update(l, this.distanceTracker.getLevelFromSource(l), false);\n',
+         '\tprotected void onSectionLoad(long l) {\n\t\tthis.distanceTracker.sectionChanged(l);\n\t}\n\n\t/** Village membership is a POI type tag; after tags rebind, resynchronize the\n\t * native village-centre mirror with every loaded section without scheduling\n\t * graph work, as the original graph would read the new state lazily. */\n\tpublic void refreshVillageCentres() {\n\t\tthis.distanceTracker.refreshCentres();\n'),
+        ('\t\tsuper.setDirty(l);\n\t\tthis.distanceTracker.update(l, this.distanceTracker.getLevelFromSource(l), false);\n',
+         '\t\tsuper.setDirty(l);\n\t\tthis.distanceTracker.sectionChanged(l);\n'),
+        ('\t\t);\n\t\tthis.distanceTracker = new PoiManager.DistanceTracker();\n',
+         '\t\t);\n\t\tthis.distanceTracker = new PoiManager.DistanceTracker(this::isVillageCenter, this::loadedSectionKeys);\n'),
+        ('import net.minecraft.resources.ResourceKey;\nimport net.minecraft.server.level.SectionTracker;\n',
+         'import net.minecraft.resources.ResourceKey;\n'),
+        ('import java.util.function.Predicate;\n',
+         'import java.util.function.Predicate;\nimport java.util.function.Supplier;\nimport java.util.function.LongPredicate;\n'),
+        ('import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;\n',
+         'import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;\nimport it.unimi.dsi.fastutil.longs.LongIterator;\n'),
+    ],
+    'src/main/java/net/minecraft/world/level/chunk/storage/SectionStorage.java': [
+        ('\t\treturn this.storage.get(l);\n',
+         '\t\treturn this.storage.get(l);\n\t}\n\n\t/** Keys of every section entry, loaded or known empty. */\n\tprotected LongIterator loadedSectionKeys() {\n\t\treturn this.storage.keySet().iterator();\n'),
+    ],
+    'src/main/java/net/minecraft/server/MinecraftServer.java': [
+        ('\t\t\t\tthis.resources.managers.updateStaticRegistryTags();\n',
+         '\t\t\t\tthis.resources.managers.updateStaticRegistryTags();\n\t\t\t\t// POI village membership is a tag: resync native village-centre mirrors.\n\t\t\t\tfor (ServerLevel serverLevel : this.getAllLevels()) {\n\t\t\t\t\tserverLevel.getPoiManager().refreshVillageCentres();\n\t\t\t\t}\n'),
+    ],
 }
 TICKET_STORAGE = 'src/main/java/net/minecraft/world/level/TicketStorage.java'
 TICKET_STORAGE_REWRITES = [
@@ -119,11 +150,14 @@ def audit(out):
                         (oracle.POI_ORACLE, oracle.expected_poi_oracle)]:
         if (ROOT / path).read_text() != build(ROOT):
             raise RuntimeError('Original oracle differs from the pinned reference rewrite: ' + path)
-    for path, patch in AUDITED_PATCHES.items():
-        diff = subprocess.check_output(['git', 'diff', oracle.REFERENCE, '--', path], cwd=ROOT, text=True)
-        diff = ''.join(line for line in diff.splitlines(True) if not line.startswith('index '))
-        if diff != (Path(__file__).resolve().parent / 'audited' / patch).read_text():
-            raise RuntimeError('Production edit differs from its audited patch: ' + path)
+    for path, rewrites in AUDITED_REWRITES.items():
+        expected = git_show(oracle.REFERENCE, path)
+        for old, new in rewrites:
+            if expected.count(old) != 1:
+                raise RuntimeError('Production rewrite does not apply exactly once: ' + path)
+            expected = expected.replace(old, new)
+        if (ROOT / path).read_text() != expected:
+            raise RuntimeError('Production edit differs from its audited rewrites: ' + path)
     expected = git_show(oracle.REFERENCE, TICKET_STORAGE)
     for old, new in TICKET_STORAGE_REWRITES:
         if expected.count(old) != 1:
@@ -202,7 +236,7 @@ def main():
             '-Dmattmc.rust.natives.dir=' + str(library.parent), '-cp', classpath.read_text().strip()]
     files = [ROOT / PRODUCTION, ROOT / 'src/main/java/net/minecraft/server/level/PlayerChunkDistances.java',
              ROOT / TICKET_STORAGE, ROOT / oracle.SIMULATION_ORACLE, ROOT / oracle.LOADING_ORACLE, ROOT / oracle.SECTION_ORACLE, ROOT / oracle.POI_ORACLE,
-             *[ROOT / path for path in AUDITED_PATCHES], *sorted((Path(__file__).resolve().parent / 'audited').glob('*.patch')),
+             *[ROOT / path for path in AUDITED_REWRITES],
              ROOT / 'src/main/java/net/minecraft/world/entity/ai/village/poi/PoiSectionDistance.java',
              *[ROOT / 'src/main/java/net/minecraft/server/level' / name for name in ['SimulationChunkTracker.java', 'TicketChunkDistance.java', 'LoadingChunkTracker.java']],
              Path(__file__).resolve(), Path(oracle.__file__).resolve(), ROOT / oracle.ORACLE,

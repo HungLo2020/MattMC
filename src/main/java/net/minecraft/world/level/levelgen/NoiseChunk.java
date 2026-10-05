@@ -41,6 +41,13 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	private final DensityFunction preliminarySurfaceLevel;
     CacheAllInCell aquiferDensity;
 	private final NoiseChunk.BlockStateFiller blockStateRule;
+	// Chunk-wrapped ore vein inputs for the native fill gate; null without ore veins.
+	@Nullable
+	final DensityFunction veinToggle;
+	@Nullable
+	final DensityFunction veinRidged;
+	@Nullable
+	final DensityFunction veinGap;
 	private final Blender blender;
 	private final NoiseChunk.FlatCache blendAlpha;
 	private final NoiseChunk.FlatCache blendOffset;
@@ -167,6 +174,13 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
         }
 		if (noiseGeneratorSettings.oreVeinsEnabled()) {
 			list.add(OreVeinifier.create(noiseRouter2.veinToggle(), noiseRouter2.veinRidged(), noiseRouter2.veinGap(), randomState.oreRandom()));
+			this.veinToggle = noiseRouter2.veinToggle();
+			this.veinRidged = noiseRouter2.veinRidged();
+			this.veinGap = noiseRouter2.veinGap();
+		} else {
+			this.veinToggle = null;
+			this.veinRidged = null;
+			this.veinGap = null;
 		}
 
 		this.blockStateRule = new MaterialRuleList((NoiseChunk.BlockStateFiller[])list.toArray(new NoiseChunk.BlockStateFiller[0]));
@@ -306,6 +320,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 
 	private final RandomState randomState;
     boolean aquiferBatchSafe() { return randomState.aquiferBatchSafe(); }
+    RandomState randomState() { return this.randomState; }
 	private final DensityBatch noiseBatch = new DensityBatch();
 
 	public void selectCellYZ(int i, int j) {

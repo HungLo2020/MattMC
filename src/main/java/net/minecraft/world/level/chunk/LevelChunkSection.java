@@ -1,5 +1,7 @@
 package net.minecraft.world.level.chunk;
 
+import java.util.List;
+import net.minecraft.world.level.block.Blocks;
 import java.util.function.Predicate;
 import net.minecraft.core.Holder;
 import net.minecraft.network.FriendlyByteBuf;
@@ -92,6 +94,25 @@ public class LevelChunkSection {
 		}
 
 		return blockState2;
+	}
+
+	/** A fresh all-air section whose block palette has never grown. */
+	public boolean isUntouchedAirForGeneration() {
+		return this.nonEmptyBlockCount == 0 && this.tickingBlockCount == 0 && this.tickingFluidCount == 0
+			&& this.states.isUntouched(Blocks.AIR.defaultBlockState());
+	}
+
+	public int generatedGlobalPaletteBits() {
+		return this.states.globalPaletteBits();
+	}
+
+	/** Installs a native NOISE fill result into a fresh section: the block palette
+	 * and storage its writes produce and the counters setBlockState would keep. */
+	public void installGenerated(int requestedBits, List<BlockState> palette, long[] raw, int nonEmpty, int ticking, int fluid) {
+		this.states.installGenerated(requestedBits, palette, raw);
+		this.nonEmptyBlockCount = (short)nonEmpty;
+		this.tickingBlockCount = (short)ticking;
+		this.tickingFluidCount = (short)fluid;
 	}
 
 	public boolean hasOnlyAir() {

@@ -31,7 +31,7 @@ keeps only its published levels. There is no Java graph or fallback.
 The [player distance driver](RUST-PLAYER-DISTANCE.md#verify-and-measure) covers
 this tracker; `--case village_occupancy,village_growth,poi_churn` selects its
 workloads. Production edits to `PoiManager`, `SectionStorage` and
-`MinecraftServer` are pinned as exact patches under `DevUtils/tests/server/audited/`.
+`MinecraftServer` are audited as exact rewrites of the reference files.
 Java tests drive the original and the native tracker through a
 [predicate-backed fixture](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/test/java/net/minecraft/world/entity/ai/village/poi/NativePoiDistanceTrackerTest.java#L22-L55)
 that models PoiManager's notification protocol using sets of loaded sections
@@ -44,7 +44,7 @@ creates 2,000 unreachable fixtures, requests collection and checks a surviving
 tracker; it does not count released handles or prove bounded memory. Rust checks
 levels against a 3D distance reference. The tag-reload tests invoke the tracker
 reseed directly; the live server data-pack reload path is source-inspected and
-patch-audited, not exercised by these cases.
+rewrite-audited, not exercised by these cases.
 
 Benchmarks replay POI notifications (mostly unchanged, as ticket claims are),
 centres appearing/disappearing, per-tick runs and query behavior corresponding

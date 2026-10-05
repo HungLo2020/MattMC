@@ -23,18 +23,21 @@ public interface Aquifer {
 	}
 
 	static Aquifer createDisabled(Aquifer.FluidPicker fluidPicker) {
-		return new Aquifer() {
-			@Nullable
-			@Override
-			public BlockState computeSubstance(DensityFunction.FunctionContext functionContext, double d) {
-				return d > 0.0 ? null : fluidPicker.computeFluid(functionContext.blockX(), functionContext.blockY(), functionContext.blockZ()).at(functionContext.blockY());
-			}
+		return new Aquifer.Disabled(fluidPicker);
+	}
 
-			@Override
-			public boolean shouldScheduleFluidUpdate() {
-				return false;
-			}
-		};
+	/** The disabled aquifer, named so the native NOISE fill can recognize its picker. */
+	record Disabled(Aquifer.FluidPicker fluidPicker) implements Aquifer {
+		@Nullable
+		@Override
+		public BlockState computeSubstance(DensityFunction.FunctionContext functionContext, double d) {
+			return d > 0.0 ? null : this.fluidPicker.computeFluid(functionContext.blockX(), functionContext.blockY(), functionContext.blockZ()).at(functionContext.blockY());
+		}
+
+		@Override
+		public boolean shouldScheduleFluidUpdate() {
+			return false;
+		}
 	}
 
 	@Nullable
@@ -114,13 +117,11 @@ public interface Aquifer {
 
 		}
 
-        private NativeAquifer nativeAquifer() {
+        NativeAquifer nativeAquifer() {
             if(this.nativeAquifer==null) {
                 this.nativeAquifer = new NativeAquifer(this, noiseChunk, aquiferLocationCache,
                     new int[]{minGridX,minGridY,minGridZ,gridSizeX,gridSizeZ},
-                    globalFluidPicker, barrierNoise, skipSamplingAboveY,
-                    positionalRandomFactory.getClass() == XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class
-                        || positionalRandomFactory.getClass() == LegacyRandomSource.LegacyPositionalRandomFactory.class);
+                    globalFluidPicker, barrierNoise, skipSamplingAboveY, positionalRandomFactory);
             }
             return this.nativeAquifer;
         }
@@ -166,6 +167,12 @@ public interface Aquifer {
 
         // Random factories and lazy fluid/noise sources remain Java bindings.
         // Unknown factories visit precisely the original twelve centers in order.
+        long[] locationCache() { return aquiferLocationCache; }
+
+        int skipSamplingAboveY() { return skipSamplingAboveY; }
+
+        Aquifer.FluidPicker globalFluidPicker() { return globalFluidPicker; }
+
         long location(int x, int y, int z) {
             int index = getIndex(x,y,z);
             long value = aquiferLocationCache[index];

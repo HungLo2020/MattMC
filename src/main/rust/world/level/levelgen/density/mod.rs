@@ -2,9 +2,9 @@
 mod beardifier;
 mod cell;
 mod end_islands;
-mod evaluator;
+pub(crate) mod evaluator;
 mod ffi;
-mod math;
+pub(crate) mod math;
 mod operations;
 mod program;
 mod spline;

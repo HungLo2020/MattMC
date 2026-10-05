@@ -7,5 +7,7 @@ pub(crate) mod density;
 pub(crate) mod feature;
 pub(crate) mod heightmap;
 pub(crate) mod math;
+pub(crate) mod noise_fill;
+pub(crate) mod random;
 pub(crate) mod surface;
 pub(crate) mod synth;
