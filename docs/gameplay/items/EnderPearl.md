@@ -25,7 +25,7 @@ The thrown pearl teleports its eligible owner when it hits. The destination uses
 A successful player teleport attempts **5 damage points, or 2.5 hearts**, before applicable protection and immunity checks. Do not use that as a fixed final health loss:
 
 - Ordinary armor protection does not reduce this damage: the bundled damage tag bypasses armor
-- Pearl damage is also tagged as fall damage. The bundled Feather Falling enchantment can reduce it, and disabling the `fallDamage` game rule makes the player immune to this tagged damage
+- Pearl damage is also tagged as fall damage. The bundled [Feather Falling](../enchanting/FeatherFalling.md) enchantment can reduce it, and disabling the `fallDamage` game rule makes the player immune to this tagged damage
 - Other applicable damage protection, absorption, or invulnerability can affect the result
 
 Keep enough health for the teleport and for what is waiting at the destination. A successful hit on another entity calls a zero-damage projectile hit; the pearl is primarily a movement tool, not a direct-damage weapon.

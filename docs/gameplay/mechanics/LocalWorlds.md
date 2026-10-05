@@ -4,6 +4,8 @@ Use **Singleplayer** to create or reopen a world stored on your computer. Normal
 
 ## Create a local world
 
+For generation presets and their customization controls, see [World types](WorldTypes.md).
+
 From the title screen, choose **Singleplayer → Create New World**. Review the three tabs, then use **Create New World** to start. [World-list actions][selection] · [Creation tabs and button][tabs]
 
 | Tab | What to choose |

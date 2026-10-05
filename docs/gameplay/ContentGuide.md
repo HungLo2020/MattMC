@@ -8,6 +8,9 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Getting started and survival
 
+- [World types](mechanics/WorldTypes.md): generation presets, Superflat and Single Biome customization, Skyblock and Debug limits
+- [Locator Bar](mechanics/LocatorBar.md): built-in tracked-entity directions, display priorities and hiding conditions
+
 - [Game rules](mechanics/GameRules.md): choose, inspect and change shared world settings
 
 - [Dedicated servers](mechanics/DedicatedServers.md): current launch routes, save locations, permissions and normal shutdown
@@ -120,6 +123,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
 - [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
 - [Enchanting](enchanting/Enchanting.md): bookshelf setup, costs versus requirements, eligibility, and reroll behavior
+- [Feather Falling](enchanting/FeatherFalling.md): Boots, eligible fall damage, combined protection and acquisition
 - [Protection enchantments](enchanting/ProtectionEnchantments.md): four armor choices, matching damage types, combined reduction, secondary attributes and broken gear
 - [Aqua Affinity, Respiration and Thorns](enchanting/UnderwaterAndThornsEnchantments.md): underwater mining, air conservation, retaliation and broken-equipment distinctions
 - [Equipment curses](enchanting/EquipmentCurses.md): Binding removal restrictions, Vanishing on death, eligible items and curse-preserving repairs

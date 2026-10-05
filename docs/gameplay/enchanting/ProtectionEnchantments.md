@@ -79,6 +79,8 @@ The **damage-protection contribution follows a different path**. The active equi
 
 ## Related pages
 
+- [Feather Falling](FeatherFalling.md): Boots, tagged fall damage and the shared protection cap
+
 - [Combat status effects](../effects/CombatEffects.md)
 
 - [Armor and damage reduction](../mechanics/Armor.md)

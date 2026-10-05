@@ -52,6 +52,8 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Feather Falling](FeatherFalling.md): eligible Boots, fall-source damage, protection levels and acquisition
+
 - [Looting, Fire Aspect and Knockback](MeleeUtilityEnchantments.md): loot counts and equipment chances, ignition and cooked-loot conditions, push strength, supported weapons and retained broken stacks
 - [Crossbow enchantments](../items/Crossbow.md): Quick Charge, Multishot and Piercing in the existing weapon guide
 - [Trident enchantments](../items/Trident.md#enchantment-choices-and-conditions): Loyalty, Riptide, Channeling and Impaling conditions

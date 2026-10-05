@@ -2,6 +2,8 @@
 
 Experience **points** fill the progress bar; completing that bar increases your **level**. A level is not a fixed number of points. This matters when saving for enchantments, paying for repairs, or recovering experience after death. [Point collection and level conversion][levels]
 
+For the on-screen choice between experience, locator and jump displays, see [Locator Bar](LocatorBar.md).
+
 ## How much is the next level?
 
 The required points depend on your current level:

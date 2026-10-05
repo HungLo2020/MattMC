@@ -26,6 +26,8 @@ These are range multipliers for that helper, not chances to be spotted. Sneaking
 
 Invisibility I also reduces the ordinary waypoint-transmit attribute to zero. The server untracks a living entity's locator waypoint when this attribute is nonpositive. This concerns the built-in locator system, not a promise to hide every modded map or marker. [Effect modifier][invisibility-register] · [Modifier application][attribute-install] · [Waypoint update][waypoint-update] · [Transmit gate][waypoint-gate]
 
+See [Locator Bar](../mechanics/LocatorBar.md) for its tracking, display priorities and other hiding conditions.
+
 ### Body rendering and its limits
 
 For the ordinary living-body renderer, an entity invisible to the viewer supplies no normal base-body draw unless Glowing selects its separate outline route. Spectator viewers and teammates allowed to see friendly invisible entities instead select a translucent body. These choices reach the active semantic model collector and Rust mesh transport; they are not merely unused render-type registrations. [Viewer exceptions][invisible-viewer] · [Body selection][body-select] · [Render-type choice][body-material] · [Current entity traversal][entity-traversal] · [Semantic collector][model-collector]

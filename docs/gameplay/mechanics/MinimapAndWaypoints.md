@@ -2,6 +2,8 @@
 
 Use **M** to browse the persistent world map, **N** to name your current location, and **U** to choose a waypoint to highlight. These are MattMC's integrated VoxelMap controls; the [current limits](#current-limits) below describe the source-reviewed scope. [Input actions][input]
 
+For the built-in tracked-entity direction bar and its display rules, see [Locator Bar](LocatorBar.md).
+
 ## Default controls
 
 Saved bindings can replace these defaults. The action names below are the current English key rows. [Defaults][defaults] · [Saved bindings][saved-keys] · [Key rows][key-rows] · [English names][key-labels]

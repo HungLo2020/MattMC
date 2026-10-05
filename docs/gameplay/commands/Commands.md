@@ -51,6 +51,8 @@ For experiments involving entities, portals, or block editing, use a separate te
 
 ## Related pages
 
+- [Locator Bar](../mechanics/LocatorBar.md): built-in waypoint listing/icon controls and permission limits
+
 - [Game modes](../gamemodes/Gamemodes.md)
 - [Dimensions](../dimensions/Dimensions.md)
 - [Content guide](../ContentGuide.md)

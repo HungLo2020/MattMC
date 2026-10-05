@@ -2,6 +2,7 @@
 
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
+- [World types](WorldTypes.md): generation presets, customization, Superflat choices and Debug Mode
 - [Local worlds, saving, and backups](LocalWorlds.md): creation choices, difficulty, normal quit, backup archives and Re-Create
 - [Region Editor](RegionEditor.md): saved terrain selection, direct disk writes, clipboard and limited undo
 - [Multiplayer and LAN](MultiplayerAndLAN.md): joining, local hosting, session permissions, mode selection and keeping the host world running
@@ -11,6 +12,7 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Graphics settings and packs](GraphicsAndPacks.md): menu routes, Apply/Undo, resource ordering, shader choices and current rendering limits
 - [Chat and closed captions](ChatAndCaptions.md): visibility, readable text, sound cues and their timing controls
 - [Advancements and statistics](AdvancementsAndStatistics.md): progress screens, reward conditions and recorded counters
+- [Locator Bar](LocatorBar.md): built-in tracked-entity directions, display priorities and transmission controls
 - [Minimap and waypoints](MinimapAndWaypoints.md): map controls, named places, local data and current limitations
 
 - [Time, weather, and sleep](TimeWeatherAndSleep.md): shared clocks, local rain and snow, independent cycle rules, multiplayer rest and timer limits
