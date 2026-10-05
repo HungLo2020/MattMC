@@ -8,6 +8,15 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Getting started and survival
 
+- [Game rules](mechanics/GameRules.md): choose, inspect and change shared world settings
+
+- [Dedicated servers](mechanics/DedicatedServers.md): current launch routes, save locations, permissions and normal shutdown
+- [World data packs](mechanics/WorldDataPacks.md): creation selection, loaded-world commands and reload limits
+
+- [Chat and closed captions](mechanics/ChatAndCaptions.md) and [Advancements and statistics](mechanics/AdvancementsAndStatistics.md): readable information, progress and recorded counters
+
+- [Create and preserve a local world](mechanics/LocalWorlds.md), [join or host multiplayer](mechanics/MultiplayerAndLAN.md), and [adjust graphics or packs](mechanics/GraphicsAndPacks.md): current menu workflows and their save, permission and compatibility limits
+
 - [Time, weather, and sleep](mechanics/TimeWeatherAndSleep.md): shared clocks, local precipitation, independent cycle rules, multiplayer rest and timer limits
 
 - [Snow and Powder Snow](blocks/Snow.md) and [Ice families](blocks/Ice.md): collecting, layering, melting, freezing, weather and slippery floors
@@ -359,6 +368,10 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Atlatitan](mobs/Atlatitan.md) and [Serene Salad](items/SereneSalad.md): the active temporary mounting route and remaining breeding/control limits
 
 ## MattMC tools
+
+- [Minimap and waypoints](mechanics/MinimapAndWaypoints.md): VoxelMap controls, named places, local map data and current limits
+- [WorldEdit basics](commands/WorldEdit.md) and the [World Edit Wand](items/WorldEditWand.md): permitted selection, editing, clipboard and block-state history controls
+- [Building Wand](items/BuildingWand.md) and [Trowel](items/Trowel.md): separate placement tools with their own material, target and current-behavior limits
 
 - [Inventory item browser](mechanics/InventoryBrowser.md): catalog browsing, Creative insertion, protocol admission and operator-category limits
 - [Elevator](blocks/Elevator.md) and [Redstone Randomizer](blocks/RedstoneRandomizer.md): actual controls, search/output behavior, collection and limits

@@ -6,6 +6,8 @@ MattMC's [inventory item browser](../mechanics/InventoryBrowser.md#mode-and-perm
 
 ## A practical start
 
+Use [Local worlds](../mechanics/LocalWorlds.md) for creation, difficulty and backups, or [Multiplayer and LAN](../mechanics/MultiplayerAndLAN.md) when sharing or joining a world.
+
 1. Collect materials that match current recipe tags. Familiar integrated materials can have missing tag wiring; ordinary oak planks are in the bundled planks tag.
 2. Make a [Crafting Table](../blocks/CraftingTable.md), then a [Furnace](../blocks/Furnace.md) and [Chest](../blocks/Chest.md).
 3. Establish a food source. [Cows](../mobs/Cow.md) and the [cooking guides](../smelting/Smelting.md) are useful source-reviewed examples.

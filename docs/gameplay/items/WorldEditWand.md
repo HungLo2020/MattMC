@@ -27,6 +27,8 @@ WorldEdit must be initialized, and changing either corner requires its selection
 
 The selection callbacks mark positions without placing blocks. The wand cancels normal block destruction when its block-breaking callback is reached. It does not itself fill, replace, clear, or copy the selected area; use the supported editing commands after making a selection. See [Commands](../commands/Commands.md) for more uses. [Wand behavior][wand] · [Server destruction check][destroy-check]
 
+For the checked fill, replace, clipboard and history workflow, follow [WorldEdit basics](../commands/WorldEdit.md). Its history stores block states rather than a full-world backup.
+
 ## Selection
 
 Selections belong to the player's WorldEdit session and are kept separately for each world. The default selector needs both corners to define a **cuboid**, including the corner blocks and every block position between them. Either corner can be above or below the other. [World-specific selection][session] · [Two-corner requirement][selector] · [Inclusive bounds][cuboid]

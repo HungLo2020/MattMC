@@ -4,6 +4,8 @@ Explore MattMC gameplay by topic. These pages cover the behavior implemented in 
 
 Start with the [content guide](ContentGuide.md) for source-reviewed examples and how to read unfinished entries.
 
+For basic setup, see [Local worlds and backups](mechanics/LocalWorlds.md), [Multiplayer and LAN](mechanics/MultiplayerAndLAN.md), and [Graphics settings and packs](mechanics/GraphicsAndPacks.md).
+
 ## Table of Contents
 
 - [Biomes](biomes/Biomes.md)

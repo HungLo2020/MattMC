@@ -4,7 +4,15 @@ Commands can inspect or change a world, give items, create entities, and manage 
 
 For commands stored in placed blocks, see [Command Blocks](../blocks/CommandBlocks.md) for Game Master permissions, trigger modes and conditional chains.
 
+For region selection, fill/replace, clipboard and undo/redo, see [WorldEdit basics](WorldEdit.md). Its operator checks and supported syntax are documented separately from the selected commands below.
+
 ## Start with help and permissions
+
+For the rule editor, values and saved-world scope, see [Game rules](../mechanics/GameRules.md).
+
+See [World data packs](../mechanics/WorldDataPacks.md) for `/datapack` and `/reload`, and [Dedicated servers](../mechanics/DedicatedServers.md) for console, stop and save controls.
+
+For enabling commands when creating a local world, see [Local-world settings](../mechanics/LocalWorlds.md#choose-modes-difficulty-and-commands). The [LAN command setting](../mechanics/MultiplayerAndLAN.md#allow-commands) applies to that shared session and leaves independent owner/operator permissions relevant.
 
 Use `/help` to request available command usage, or `/help give` for a specific command's syntax. The examples below are written for an in-game player source. A server console has no self-player for commands that require one.
 
