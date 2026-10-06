@@ -685,6 +685,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.extractVisibleEntities(camera, frustum, deltaTracker, this.levelRenderState);
 			this.extractVisibleBlockEntities(camera, deltaTracker.getGameTimeDeltaPartialTick(false), this.levelRenderState);
 		}
+		// This frame's camera search applied to the camera-pass entities only.
+		net.vulkanic.world.RustGalWholeFrameTerrainSource.closeEntityCulling();
 		// Independent of the camera pass (and of capture entity suppression),
 		// exactly like Iris's ShadowRenderer player extraction.
 		this.extractRustShadowCandidates(camera);

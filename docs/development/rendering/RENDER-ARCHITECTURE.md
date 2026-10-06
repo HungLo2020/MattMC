@@ -163,6 +163,11 @@ which is outside any bridge context so selecting never joins a pipelined frame.
   so the search crosses them immediately.
 - Shader shadow casters are built geometry sections the camera did not select.
   The shadow pass never schedules builds; Rust applies the shadow-pass test.
+- Entities follow Frozen's Sodium entity culling
+  ([`RustGalEntityCullingHook`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalEntityCullingHook.java)):
+  a camera-pass entity whose culling box touches no section visited this frame
+  is not extracted. Glowing and named entities, very large boxes and the
+  shadow pass skip the check.
 
 Keep the graph's behaviour identical to Frozen: its unit tests in
 `section_graph/tests.rs` pin each rule, so run

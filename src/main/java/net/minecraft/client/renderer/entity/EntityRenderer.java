@@ -144,7 +144,7 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 		if (passenger || !affected) flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.BYPASS_FRUSTUM;
 		if (client.player != null && (entity == client.player || entity == client.player.getVehicle()))
 			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.PLAYER_GROUP;
-		if (affected && !passenger && !HookRegistry.getEntityRendererHooks().isEmpty())
+		if (affected && !passenger && HookRegistry.entityRendererHooksAffectShadowPass())
 			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.UNRESOLVED_HOOKS;
 		net.vulkanic.bridge.VulkanicGalBridge.WorldAabbRecord holder = null;
 		if (entity instanceof Leashable leashable && leashable.getLeashHolder() != null) {

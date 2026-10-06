@@ -86,6 +86,14 @@ public final class RustGalWholeFrameTerrainSource {
 	private final float[] cullingMatrix = new float[16];
 	private final ArrayList<RenderSection> visibleSections = new ArrayList<>();
 	private final LongOpenHashSet visibleKeys = new LongOpenHashSet();
+	/** Every section the current camera search visited, as Sodium's last-visible frame. */
+	private final LongArrayList visitedKeys = new LongArrayList();
+	private final LongOpenHashSet visitedKeySet = new LongOpenHashSet();
+	private boolean visitedKeySetCurrent;
+	/** The source whose search belongs to the frame now extracting entities. */
+	private static volatile RustGalWholeFrameTerrainSource entityCullingSource;
+	// The volume of a section multiplied by the number of sections to be checked at most.
+	private static final double MAX_ENTITY_CHECK_VOLUME = 16 * 16 * 16 * 15;
 	private final LongArrayList buildRequests = new LongArrayList();
 	private final SectionKeyOrder sectionKeyOrder = new SectionKeyOrder();
 	private int completedBuildsConsumedThisFrame;
@@ -259,9 +267,12 @@ public final class RustGalWholeFrameTerrainSource {
 		this.visibleSections.clear();
 		this.visibleKeys.clear();
 		this.buildRequests.clear();
+		this.visitedKeys.clear();
+		this.visitedKeySetCurrent = false;
 		int urgent = 0;
 		for (int index = 0, count = this.graph.visitCount(); index < count; index++) {
 			long key = SectionPos.asLong(this.graph.visitX(index), this.graph.visitY(index), this.graph.visitZ(index));
+			this.visitedKeys.add(key);
 			if (this.needsBuild.contains(key) && !this.inFlight.contains(key)) {
 				// Block edits are important rebuilds; everything else keeps visit order.
 				if (this.urgentRebuilds.contains(key)) {
@@ -279,7 +290,65 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		// Canonical order: an identical visible set must reach Rust identically.
 		this.sectionKeyOrder.sort(this.visibleSections, RenderSection::getPositionAsLong);
+		entityCullingSource = this;
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
+	}
+
+	/**
+	 * Frozen's entity culling ({@code SodiumWorldRenderer.isEntityVisible}):
+	 * an entity is drawn only when its culling box touches a section the
+	 * camera search visited this frame. Null when no search belongs to the
+	 * frame being extracted, which keeps the plain frustum test.
+	 */
+	public static Boolean isEntityVisible(net.minecraft.client.renderer.entity.EntityRenderer<?, ?> renderer,
+			net.minecraft.world.entity.Entity entity) {
+		RustGalWholeFrameTerrainSource source = entityCullingSource;
+		if (source == null || source.level == null) {
+			return null;
+		}
+		if (net.minecraft.client.Minecraft.getInstance().shouldEntityAppearGlowing(entity) || entity.shouldShowName()) {
+			return true;
+		}
+		@SuppressWarnings({"unchecked", "rawtypes"})
+		net.minecraft.world.phys.AABB box = ((net.minecraft.client.renderer.entity.EntityRenderer)renderer).getBoundingBoxForCulling(entity);
+		double volume = (box.maxX - box.minX) * (box.maxY - box.minY) * (box.maxZ - box.minZ);
+		if (volume > MAX_ENTITY_CHECK_VOLUME) {
+			return true;
+		}
+		return source.isBoxVisible(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ);
+	}
+
+	/** Ends the frame's entity extraction; later checks keep the frustum test. */
+	public static void closeEntityCulling() {
+		entityCullingSource = null;
+	}
+
+	private boolean isBoxVisible(double x1, double y1, double z1, double x2, double y2, double z2) {
+		// Boxes outside the valid level height never map to a rendered section.
+		if (y2 < this.level.getMinY() + 0.5D || y1 > this.level.getMaxY() - 0.5D) {
+			return true;
+		}
+		if (!this.visitedKeySetCurrent) {
+			this.visitedKeySet.clear();
+			this.visitedKeySet.addAll(this.visitedKeys);
+			this.visitedKeySetCurrent = true;
+		}
+		int minX = SectionPos.posToSectionCoord(x1 - 0.5D);
+		int minY = SectionPos.posToSectionCoord(y1 - 0.5D);
+		int minZ = SectionPos.posToSectionCoord(z1 - 0.5D);
+		int maxX = SectionPos.posToSectionCoord(x2 + 0.5D);
+		int maxY = SectionPos.posToSectionCoord(y2 + 0.5D);
+		int maxZ = SectionPos.posToSectionCoord(z2 + 0.5D);
+		for (int x = minX; x <= maxX; x++) {
+			for (int z = minZ; z <= maxZ; z++) {
+				for (int y = minY; y <= maxY; y++) {
+					if (this.visitedKeySet.contains(SectionPos.asLong(x, y, z))) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	private void scheduleBuilds(Camera camera) {

@@ -24,4 +24,13 @@ public interface EntityRendererHooks {
     default <T extends Entity, S extends EntityRenderState> Boolean onEntityFrustumCheck(EntityRenderer<T, S> renderer, T entity, Frustum frustum, AABB aabb) {
         return null;
     }
+
+    /**
+     * Whether this hook can hide an entity from the shadow pass. Rust selects
+     * shadow casters from copied culling facts and cannot run hooks, so it
+     * rejects frames whose entities depend on one that returns true.
+     */
+    default boolean affectsShadowPass() {
+        return true;
+    }
 }
