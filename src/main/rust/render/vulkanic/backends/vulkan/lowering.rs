@@ -401,6 +401,31 @@ impl SubmissionLowerer {
                                 continue;
                             }
                         }
+                        // A run of host writes to distinct buffers (the GAL
+                        // gathers them at the start of a list) shares one
+                        // dependency on each side instead of draining per write.
+                        if matches!(list.operations[op_index], CommandOp::HostWriteBuffer { .. }) {
+                            let start = op_index;
+                            let mut end = op_index;
+                            let mut buffers = HashSet::new();
+                            while let Some(CommandOp::HostWriteBuffer { buffer, .. }) = list.operations.get(end) {
+                                if !buffers.insert(*buffer) {
+                                    break;
+                                }
+                                end += 1;
+                            }
+                            if end - start > 1 {
+                                self.encode_host_write_group(
+                                    objects,
+                                    command_buffer,
+                                    &mut state,
+                                    &list.operations[start..end],
+                                    &list.operations[end..],
+                                )?;
+                                op_index = end;
+                                continue;
+                            }
+                        }
                         let op = &list.operations[op_index];
                         let following_publication_barrier = following_shader_read_publication(
                             op,
@@ -1108,6 +1133,100 @@ impl SubmissionLowerer {
     /// The GAL stream remains the source of truth: callers still retain every
     /// barrier for validation and profiling, and repeated handles are kept on
     /// the single-barrier path so a layout transition cannot be reordered.
+    /// Lowers consecutive host writes to distinct buffers with one barrier
+    /// before them and one after, omitting the after side for buffers the
+    /// barriers that follow publish to shader reads themselves.
+    fn encode_host_write_group(
+        &self,
+        objects: &VulkanObjects,
+        command_buffer: vk::CommandBuffer,
+        state: &mut EncodingState,
+        writes: &[CommandOp],
+        following: &[CommandOp],
+    ) -> GalResult<()> {
+        let _zone = trace::Zone::new("vulkan.lowering.host-write-group");
+        let published = |target: Handle| {
+            following
+                .iter()
+                .map_while(|op| match op {
+                    CommandOp::Barrier(barrier) => Some(barrier),
+                    _ => None,
+                })
+                .any(|barrier| {
+                    barrier.resource == target
+                        && barrier.before == TextureUsageState::TransferDst
+                        && barrier.after == TextureUsageState::ShaderRead
+                })
+        };
+        let mut before = Vec::with_capacity(writes.len());
+        let mut after = Vec::with_capacity(writes.len());
+        for op in writes {
+            let CommandOp::HostWriteBuffer { buffer: handle, offset, data } = op else {
+                return Err(GalError::backend("non-write operation reached Vulkan host-write group"));
+            };
+            if data.is_empty() {
+                continue;
+            }
+            let buffer = objects.buffer(*handle)?;
+            // Order reuse against reads/writes in earlier submissions too.
+            before.push(
+                vk::BufferMemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+                    .src_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+                    .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                    .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .buffer(buffer.buffer)
+                    .offset(*offset)
+                    .size(data.len() as u64),
+            );
+            if !published(*handle) {
+                after.push(
+                    vk::BufferMemoryBarrier2::default()
+                        .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                        .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                        .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+                        .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+                        .buffer(buffer.buffer)
+                        .offset(*offset)
+                        .size(data.len() as u64),
+                );
+            }
+        }
+        unsafe {
+            if !before.is_empty() {
+                self.context.device.cmd_pipeline_barrier2(
+                    command_buffer,
+                    &vk::DependencyInfo::default().buffer_memory_barriers(&before),
+                );
+            }
+            for op in writes {
+                let CommandOp::HostWriteBuffer { buffer: handle, offset, data } = op else {
+                    unreachable!("validated above");
+                };
+                if data.is_empty() {
+                    continue;
+                }
+                let buffer = objects.buffer(*handle)?;
+                if *offset % 4 == 0 && data.len() % 4 == 0 && data.len() <= 65_536 {
+                    self.context.device.cmd_update_buffer(command_buffer, buffer.buffer, *offset, data);
+                } else {
+                    // Staging is owned by this submission until its timeline retires.
+                    let (source, source_offset) = state.staging.stage(&self.context, data)?;
+                    self.context.device.cmd_copy_buffer(command_buffer, source, buffer.buffer,
+                        &[vk::BufferCopy::default().src_offset(source_offset)
+                            .dst_offset(*offset).size(data.len() as u64)]);
+                }
+            }
+            if !after.is_empty() {
+                self.context.device.cmd_pipeline_barrier2(
+                    command_buffer,
+                    &vk::DependencyInfo::default().buffer_memory_barriers(&after),
+                );
+            }
+        }
+        Ok(())
+    }
+
     fn encode_barrier_group(
         &self,
         objects: &VulkanObjects,
@@ -3500,3 +3619,4 @@ fn trace_barrier_label_filter() -> Option<&'static str> {
         })
         .as_deref()
 }
+

@@ -23,6 +23,7 @@ mod submission;
 mod command_validation;
 mod hazards;
 mod normalization;
+mod host_write_hoist;
 mod profiling;
 mod capture;
 mod test_hooks;

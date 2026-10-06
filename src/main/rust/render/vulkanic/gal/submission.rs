@@ -132,6 +132,15 @@ impl VulkanicGal {
                 .gal_redundant_index_buffer_binds_removed
                 .saturating_add(normalization.index_buffer_binds_removed);
         }
+        // Gather host buffer writes at the start of their lists so the GPU
+        // does not drain between passes for each one.
+        for list in &mut batch.command_lists {
+            host_write_hoist::hoist_host_writes(list, |set, buffer| {
+                self.resource_sets.get(set).map_or(true, |record| {
+                    record.desc.bindings.iter().any(|binding| binding.resource == buffer)
+                })
+            });
+        }
         let referenced = referenced_handles(&batch);
         let validate_handles_started = std::time::Instant::now();
         for handle in &referenced {
