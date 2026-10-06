@@ -77,11 +77,21 @@ pub(crate) struct TerrainVoxelSourceMemo {
     pub(in crate::render::worldrender) meshes: Arc<[TerrainVoxelSourceMesh]>,
 }
 
+/// Static terrain a voxel volume may include: a validated terrain instance
+/// or an admitted scene section, with its camera-relative transform.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TerrainVoxelCandidate {
+    pub(crate) mesh_key: u64,
+    pub(crate) mesh_generation: u64,
+    pub(crate) transform: [f32; 16],
+}
+
 impl WorldPrimitiveFrontend {
     /// Returns the currently visible static-terrain source meshes with the
     /// exact model transforms used by the frame. This is intentionally a
     /// semantic cache query: it does not allocate GPU resources, record
     /// commands, or select a shader path.
+    #[cfg(test)]
     pub(crate) fn terrain_voxel_source_meshes(
         &mut self,
         frame: &WorldPrimitiveFrame,
@@ -92,10 +102,22 @@ impl WorldPrimitiveFrontend {
     /// As `terrain_voxel_source_meshes`, but static terrain meshes whose block
     /// centres all lie outside the half-open world `cull` box are omitted:
     /// such meshes can only produce out-of-volume samples.
+    #[cfg(test)]
     pub(crate) fn terrain_voxel_source_meshes_within(
         &mut self,
         frame: &WorldPrimitiveFrame,
         cull: Option<[[i32; 3]; 2]>,
+    ) -> GalResult<Arc<[TerrainVoxelSourceMesh]>> {
+        self.terrain_voxel_source_meshes_with_scene(frame, cull, &SceneTerrainFrame::default())
+    }
+
+    /// As [`Self::terrain_voxel_source_meshes_within`], also voxelizing the
+    /// static terrain the scene path draws (which is not in the instances).
+    pub(crate) fn terrain_voxel_source_meshes_with_scene(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+        cull: Option<[[i32; 3]; 2]>,
+        scene: &SceneTerrainFrame,
     ) -> GalResult<Arc<[TerrainVoxelSourceMesh]>> {
         let camera_world_position = frame.voxel_volume.camera_world_position;
         if camera_world_position.iter().any(|value| !value.is_finite()) {
@@ -107,12 +129,23 @@ impl WorldPrimitiveFrontend {
         // classification comes from a compact per-mesh table, so instances
         // outside the volume never touch their (cold) asset.
         let mut relevant = Vec::new();
-        for (index, instance) in frame.mesh_instances.iter().enumerate() {
-            if instance.stratum != WORLD_STRATUM_TERRAIN {
-                continue;
-            }
+        let candidates = frame
+            .mesh_instances
+            .iter()
+            .filter(|instance| instance.stratum == WORLD_STRATUM_TERRAIN)
+            .map(|instance| TerrainVoxelCandidate {
+                mesh_key: instance.mesh_key,
+                mesh_generation: instance.mesh_generation,
+                transform: instance.transform,
+            })
+            .chain(scene.camera.iter().chain(&scene.casters).map(|entry| TerrainVoxelCandidate {
+                mesh_key: entry.mesh_key,
+                mesh_generation: entry.mesh_generation,
+                transform: entry.transform,
+            }));
+        for instance in candidates {
             if let Some(cull) = cull {
-                let Some(bounds) = self.terrain_voxel_mesh_bounds(instance)? else {
+                let Some(bounds) = self.terrain_voxel_mesh_bounds(&instance)? else {
                     continue;
                 };
                 // Static sections are pure translations: test their box from
@@ -135,19 +168,19 @@ impl WorldPrimitiveFrontend {
                 if !terrain_voxel_bounds_may_touch(bounds, world, cull) {
                     continue;
                 }
-                relevant.push((index, world));
+                relevant.push((instance, world));
                 continue;
             }
             let world = Self::world_transform_from_camera_relative(
                 instance.transform,
                 camera_world_position,
             )?;
-            relevant.push((index, world));
+            relevant.push((instance, world));
         }
         // Frame order moves a section between the camera and shadow-candidate
         // groups as visibility changes; every consumer keys meshes by
         // identity, so select them in key order and let reuse see a set.
-        relevant.sort_unstable_by_key(|&(index, _)| frame.mesh_instances[index].mesh_key);
+        relevant.sort_unstable_by_key(|(instance, _)| instance.mesh_key);
         // DH meshes join the list only through a pack `dh_shadow` program;
         // without one (e.g. Complementary) the list is static-only and
         // depends only on the relevant instances' identities and world
@@ -162,10 +195,7 @@ impl WorldPrimitiveFrontend {
         let memo_instances = (!distant_horizons_voxelized).then(|| {
             relevant
                 .iter()
-                .map(|&(index, world)| {
-                    let instance = &frame.mesh_instances[index];
-                    (instance.mesh_key, instance.mesh_generation, world.map(f32::to_bits))
-                })
+                .map(|(instance, world)| (instance.mesh_key, instance.mesh_generation, world.map(f32::to_bits)))
                 .collect::<Vec<_>>()
         });
         if let (Some(instances), Some(memo)) = (&memo_instances, &self.terrain_voxel_source_memo) {
@@ -176,7 +206,7 @@ impl WorldPrimitiveFrontend {
                 return Ok(Arc::clone(&memo.meshes));
             }
         }
-        let mut meshes = self.build_terrain_voxel_source_meshes(frame, &relevant)?;
+        let mut meshes = self.build_terrain_voxel_source_meshes(&relevant)?;
         if distant_horizons_voxelized {
             let mut seen = meshes.iter().map(|mesh| mesh.mesh_key).collect::<MeshKeySet<u64>>();
             for mesh in self.distant_horizons_voxel_source_meshes(frame)? {
@@ -204,7 +234,7 @@ impl WorldPrimitiveFrontend {
     /// per immutable mesh generation through the asset checks below.
     fn terrain_voxel_mesh_bounds(
         &mut self,
-        instance: &WorldMeshInstanceRequest,
+        instance: &TerrainVoxelCandidate,
     ) -> GalResult<Option<[[f32; 3]; 2]>> {
         if let Some(&(generation, bounds)) = self.terrain_voxel_mesh_bounds.get(&instance.mesh_key) {
             if generation == instance.mesh_generation {
@@ -229,7 +259,7 @@ impl WorldPrimitiveFrontend {
 
     fn checked_terrain_voxel_asset<'a>(
         mesh_assets: &'a mut MeshAssetMap,
-        instance: &WorldMeshInstanceRequest,
+        instance: &TerrainVoxelCandidate,
     ) -> GalResult<&'a mut MeshAssetStore> {
         let asset = mesh_assets.get_mut(&instance.mesh_key).ok_or_else(|| {
             GalError::invalid_argument(format!(
@@ -252,12 +282,12 @@ impl WorldPrimitiveFrontend {
         Ok(asset)
     }
 
-    /// Voxel source meshes for the selected static instances (frame index and
-    /// world transform), in frame order.
+    /// Voxel source meshes for the selected static terrain (candidate and
+    /// world transform), in the given order. Candidates are validated
+    /// instances or admitted scene sections.
     pub(crate) fn build_terrain_voxel_source_meshes(
         &mut self,
-        frame: &WorldPrimitiveFrame,
-        relevant: &[(usize, [f32; 16])],
+        relevant: &[(TerrainVoxelCandidate, [f32; 16])],
     ) -> GalResult<Vec<TerrainVoxelSourceMesh>> {
         let mut seen_meshes = MeshKeySet::with_capacity_and_hasher(relevant.len(), Default::default());
         let mut result = Vec::with_capacity(relevant.len());
@@ -265,9 +295,7 @@ impl WorldPrimitiveFrontend {
             .shader_runtime
             .as_ref()
             .and_then(ShaderPackRuntimeExecutor::candidate_runtime_block_state_material_ids);
-        for &(index, transform) in relevant {
-            let instance = &frame.mesh_instances[index];
-            validate_mesh_instance(instance, frame)?;
+        for &(ref instance, transform) in relevant {
             if !seen_meshes.insert(instance.mesh_key) {
                 return Err(GalError::invalid_argument(format!(
                     "terrain voxel source frame has duplicate visible mesh {}",

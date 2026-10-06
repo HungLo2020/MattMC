@@ -645,9 +645,9 @@ impl WorldPrimitiveFrontend {
                     .casters
                     .iter()
                     .filter(|entry| {
-                        source_shadow_instance_intersects(
+                        source_shadow_origin_intersects(
                             frustum,
-                            &frame.mesh_instances[entry.index],
+                            [entry.transform[12], entry.transform[13], entry.transform[14]],
                             Some(frame.shader_environment.far_plane),
                         )
                     })
@@ -658,7 +658,7 @@ impl WorldPrimitiveFrontend {
                 && scene
                     .camera
                     .iter()
-                    .any(|entry| frame.mesh_instances[entry.index].terrain_visible_facing_mask != 0x7f);
+                    .any(|entry| entry.facing_mask != 0x7f);
             let mut selected_shadow_batches = match shadow_frustum.as_ref().filter(|_| !shadow_batches.is_empty()) {
                 None => Vec::new(),
                 Some(frustum) => shadow_batches

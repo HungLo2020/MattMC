@@ -13,6 +13,10 @@
 //! path, which makes them resident and records them for the next frame.
 
 use super::*;
+use crate::render::worldrender::frame::static_terrain::{
+    expand_static_terrain_sections, expand_static_terrain_shadow_casters,
+};
+use crate::render::worldrender::terrain::placement::TerrainSectionPlacement;
 
 /// Material kinds a terrain group can draw with; indexes per-kind inputs.
 pub(crate) const SCENE_TERRAIN_KIND_OPAQUE: u8 = 0;
@@ -73,42 +77,26 @@ pub(crate) fn scene_terrain_groups(
         .collect()
 }
 
-/// Whether a frame instance is camera-visible static chunk terrain the scene
-/// path may draw (camera-sorted and outline-only instances keep their paths).
-pub(crate) fn is_scene_terrain_instance(instance: &WorldMeshInstanceRequest) -> bool {
-    instance.stratum == WORLD_STRATUM_TERRAIN
-        && instance.mesh_section_index == WORLD_MESH_SECTION_ALL
-        && instance.flags
-            & (WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS
-                | WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY
-                | WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY)
-            == 0
-}
-
-/// Whether a frame instance is an off-camera static terrain shadow caster
-/// the scene path may draw.
-pub(crate) fn is_scene_terrain_caster(instance: &WorldMeshInstanceRequest) -> bool {
-    instance.stratum == WORLD_STRATUM_TERRAIN
-        && instance.mesh_section_index == WORLD_MESH_SECTION_ALL
-        && instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY != 0
-        && instance.flags & (WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS | WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY) == 0
-}
-
-/// One frame instance the scene path draws, with the facts of its record
-/// resolved once (the frame stays read-only while they are used).
+/// One static terrain section the scene path draws this frame: its compact
+/// placement lowered once, and the facts of its retained record.
 #[derive(Clone, Debug)]
 pub(crate) struct SceneTerrainEntry {
-    /// Index into `frame.mesh_instances`.
-    pub(crate) index: usize,
+    pub(crate) mesh_key: u64,
+    pub(crate) mesh_generation: u64,
+    /// Camera-relative placement, as the instance expansion computes it.
+    pub(crate) transform: [f32; 16],
+    /// Facings the camera sees (casters: every facing).
+    pub(crate) facing_mask: u8,
     groups: Arc<[SceneTerrainGroup]>,
     page: Handle,
     index_buffer: Handle,
 }
 
-/// The frame instances (ascending frame indices) the scene path draws.
+/// The frame's static terrain drawn by the scene path; everything else was
+/// expanded into ordinary instances.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct SceneTerrainFrame {
-    /// Camera-visible sections.
+    /// Camera-visible sections, in Java's draw order.
     pub(crate) camera: Vec<SceneTerrainEntry>,
     /// Off-camera shadow casters, before the light-frustum test.
     pub(crate) casters: Vec<SceneTerrainEntry>,
@@ -118,24 +106,6 @@ pub(crate) struct SceneTerrainFrame {
     /// Upper bound on the indirect commands the scene path appends: camera
     /// groups twice (camera and supplement faces) and every caster group.
     pub(crate) command_bound: u64,
-}
-
-impl SceneTerrainFrame {
-    /// Whether `index` is drawn by the scene path; the cursors walk sorted
-    /// indices, so a caller iterating in frame order pays O(1) each.
-    pub(crate) fn excludes(&self) -> impl FnMut(usize) -> bool + '_ {
-        let mut camera = self.camera.iter().map(|entry| entry.index).peekable();
-        let mut casters = self.casters.iter().map(|entry| entry.index).peekable();
-        move |index| {
-            while camera.peek().is_some_and(|&next| next < index) {
-                camera.next();
-            }
-            while casters.peek().is_some_and(|&next| next < index) {
-                casters.next();
-            }
-            camera.peek() == Some(&index) || casters.peek() == Some(&index)
-        }
-    }
 }
 
 /// Per-kind camera pass inputs, indexed by `SCENE_TERRAIN_KIND_*`.
@@ -229,76 +199,112 @@ impl RunBuilder {
 }
 
 impl WorldPrimitiveFrontend {
-    /// The described, resident record of an instance's mesh, if the scene
-    /// path can draw it this frame without the general path.
+    /// Whether this frame's static terrain goes to the scene path: the shader
+    /// route is armed and can draw indirect runs.
+    pub(crate) fn scene_terrain_available(&self, gal: &VulkanicGal) -> bool {
+        self.runtime_source_execution_is_armed()
+            && source_terrain_multidraw_enabled()
+            && gal.capabilities().supports(BackendFeature::IndirectDraw)
+            && crate::core::environment::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").is_none()
+    }
+
+    /// The scene entry of a compact section, if its mesh is resident and
+    /// described for the scene path at the generation Rust acknowledged.
     fn scene_terrain_entry(
         &self,
-        index: usize,
-        instance: &WorldMeshInstanceRequest,
+        mesh_key: u64,
+        placement: TerrainSectionPlacement,
+        facing_mask: Option<u8>,
         material_ids: bool,
-    ) -> Option<SceneTerrainEntry> {
-        let record = self.retained_source_terrain_meshes.get(&instance.mesh_key)?;
-        if record.generation != instance.mesh_generation || record.material_ids != material_ids {
-            return None;
-        }
-        let groups = record.groups.as_ref()?;
+    ) -> GalResult<Option<SceneTerrainEntry>> {
+        // A record is dropped whenever its key acknowledges another
+        // generation, so its presence proves it describes the drawable one.
+        let Some(record) = self.retained_source_terrain_meshes.get(&mesh_key) else {
+            return Ok(None);
+        };
+        let mesh_generation = record.generation;
+        let Some(groups) = record.groups.as_ref().filter(|_| record.material_ids == material_ids) else {
+            return Ok(None);
+        };
         if !self.pending_lowered_source_terrain_geometry_uploads.is_empty()
             && self.pending_lowered_source_terrain_geometry_uploads.contains_key(&LoweredSourceTerrainDataKey {
-                mesh_key: instance.mesh_key,
-                mesh_generation: instance.mesh_generation,
+                mesh_key,
+                mesh_generation,
                 abi: SourceGeometryAbi::Terrain,
             })
         {
-            return None;
+            return Ok(None);
         }
-        Some(SceneTerrainEntry {
-            index,
+        Ok(Some(SceneTerrainEntry {
+            mesh_key,
+            mesh_generation,
+            transform: placement.lower()?,
+            facing_mask: facing_mask.unwrap_or_else(|| placement.visible_facing_mask()),
             groups: Arc::clone(groups),
             page: record.page,
             index_buffer: record.index_buffer,
-        })
+        }))
     }
 
-    /// The instances the scene path draws this frame, each with its record
-    /// resolved once. Everything else stays with the general batch path.
-    pub(crate) fn partition_scene_terrain_instances(
+    /// Takes the frame's compact static terrain: sections and casters the
+    /// scene path can draw become entries; the rest are expanded into
+    /// ordinary instances exactly as admission would have.
+    pub(crate) fn take_scene_terrain(
         &self,
         gal: &VulkanicGal,
-        frame: &WorldPrimitiveFrame,
-    ) -> SceneTerrainFrame {
+        frame: &mut WorldPrimitiveFrame,
+    ) -> GalResult<SceneTerrainFrame> {
         let mut scene = SceneTerrainFrame::default();
-        if !source_terrain_multidraw_enabled()
-            || !gal.capabilities().supports(BackendFeature::IndirectDraw)
-            || crate::core::environment::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").is_some()
-        {
-            return scene;
+        if !self.scene_terrain_available(gal) {
+            self.expand_static_terrain(frame)?;
+            return Ok(scene);
         }
         let material_ids = self.source_terrain_material_ids_active();
-        for (index, instance) in frame.mesh_instances.iter().enumerate() {
-            let camera = is_scene_terrain_instance(instance);
-            if !camera && !is_scene_terrain_caster(instance) {
-                continue;
-            }
-            if !instance.transform.iter().all(|component| component.is_finite()) {
-                continue;
-            }
-            let Some(entry) = self.scene_terrain_entry(index, instance, material_ids) else {
+        let sections = std::mem::take(&mut frame.static_terrain_sections);
+        let mut leftover_sections = Vec::new();
+        for section in &sections.sections {
+            let placement = TerrainSectionPlacement { origin: section.origin, camera: sections.camera };
+            let entry = if section.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS == 0 {
+                self.scene_terrain_entry(section.mesh_key, placement, None, material_ids)?
+            } else {
+                None
+            };
+            let Some(entry) = entry else {
+                leftover_sections.push(*section);
                 continue;
             };
-            if camera {
-                scene.command_bound += 2 * entry.groups.len() as u64;
-                for group in entry.groups.iter() {
-                    if instance.terrain_visible_facing_mask & group.facing_mask != 0 {
-                        scene.camera_kinds[group.kind as usize] = true;
-                    }
+            scene.command_bound += 2 * entry.groups.len() as u64;
+            for group in entry.groups.iter() {
+                if entry.facing_mask & group.facing_mask != 0 {
+                    scene.camera_kinds[group.kind as usize] = true;
                 }
-                scene.camera.push(entry);
-            } else {
-                scene.command_bound += entry.groups.len() as u64;
-                scene.casters.push(entry);
+            }
+            scene.camera.push(entry);
+        }
+        let casters = std::mem::take(&mut frame.static_terrain_shadow_casters);
+        let mut leftover_casters = Vec::new();
+        for caster in &casters.casters {
+            let placement = TerrainSectionPlacement { origin: caster.origin, camera: casters.camera };
+            match self.scene_terrain_entry(caster.mesh_key, placement, Some(0x7f), material_ids)? {
+                Some(entry) => {
+                    scene.command_bound += entry.groups.len() as u64;
+                    scene.casters.push(entry);
+                }
+                None => leftover_casters.push(*caster),
             }
         }
-        scene
+        let resident = |mesh_key: u64| self.static_terrain_resident_generation(mesh_key);
+        expand_static_terrain_sections(
+            frame,
+            &StaticTerrainSections { camera: sections.camera, sections: leftover_sections },
+            resident,
+        )?;
+        expand_static_terrain_shadow_casters(
+            frame,
+            &StaticTerrainShadowCasters { camera: casters.camera, casters: leftover_casters },
+            resident,
+        )?;
+        Ok(scene)
     }
 
     /// Draws the scene's sections: one instance record each (camera sections,
@@ -361,12 +367,13 @@ impl WorldPrimitiveFrontend {
         let mut records = std::mem::take(&mut self.retained_source_terrain_instance_scratch);
         records.clear();
         records.reserve((camera.len() + casters.len()) * TERRAIN_SOURCE_INSTANCE_BYTES);
+        // Static terrain is untinted (the expansion's colour is opaque white).
+        let white = argb_to_rgba(0xFFFF_FFFF);
         for entry in entries() {
-            let instance = &frame.mesh_instances[entry.index];
-            for component in instance.transform {
+            for component in entry.transform {
                 push_f32(&mut records, component);
             }
-            for component in argb_to_rgba(instance.color_argb) {
+            for component in white {
                 push_f32(&mut records, component);
             }
         }
@@ -389,15 +396,14 @@ impl WorldPrimitiveFrontend {
         let casting_kinds = shadow.map_or([false; 3], |shadow| shadow.casting_kinds);
         let supplement = shadow.is_some_and(|shadow| shadow.supplement);
         for (ordinal, entry) in entries().enumerate() {
-            let instance = &frame.mesh_instances[entry.index];
             let first_instance = base_instance + ordinal as u32;
             let is_caster = ordinal >= camera.len();
             let (camera_mask, shadow_mask) = if is_caster {
                 (0, 0x7f)
             } else if supplement {
-                (instance.terrain_visible_facing_mask, !instance.terrain_visible_facing_mask & 0x7f)
+                (entry.facing_mask, !entry.facing_mask & 0x7f)
             } else {
-                (instance.terrain_visible_facing_mask, 0)
+                (entry.facing_mask, 0)
             };
             for group in entry.groups.iter() {
                 let key = RunKey {

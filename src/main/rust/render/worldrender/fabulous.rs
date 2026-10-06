@@ -74,12 +74,13 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
         fabulous_attachments_initialized: bool,
         raster_y_direction: RasterYDirection,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         self.world_text.begin_submission();
+        self.expand_static_terrain(&mut frame)?;
         validate_frame(&frame)?;
         if self.generation == 0 {
             self.generation = generation;

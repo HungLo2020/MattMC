@@ -183,7 +183,7 @@ fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
                 scene.shader_environment.time_of_day = time;
                 scene.shader_environment.configured_shadow_distance_chunks = 5;
                 let selected = frontend
-                    .source_shadow_terrain_instance_indices(&scene, generation, &Default::default())
+                    .source_shadow_terrain_instance_indices(&scene, generation)
                     .unwrap();
                 let policy = frontend
                     .shader_pack_sources
@@ -232,7 +232,7 @@ fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
     for dimension in [WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_END] {
         scene.background.sky_type = dimension;
         assert!(frontend
-            .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+            .source_shadow_terrain_instance_indices(&scene, 41)
             .unwrap()
             .is_empty());
     }
@@ -493,31 +493,31 @@ fn shadow_batch_selection_does_not_hide_invalid_culled_asset_or_sorted_topology(
     scene.shader_environment.configured_shadow_distance_chunks = 2;
     scene.mesh_instances = vec![caster(1, [2000.0; 3])];
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .unwrap()
         .is_empty());
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 42, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 42)
         .is_err());
     scene.mesh_instances[0].mesh_key = 2;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .is_err());
     scene.mesh_instances[0].mesh_key = 1;
     scene.mesh_instances[0].mesh_generation = 2;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .is_err());
     scene.mesh_instances[0].mesh_generation = 1;
     scene.mesh_instances[0].mesh_section_index = 9;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .is_err());
     scene.mesh_instances[0].mesh_section_index = WORLD_MESH_SECTION_ALL;
     scene.mesh_instances[0].flags |= WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
     // The installed opaque mesh is not a canonical translucent quad source.
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .is_err());
     let mut translucent = mesh_asset(1, 2, IndexType::U16);
     translucent.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
@@ -527,12 +527,12 @@ fn shadow_batch_selection_does_not_hide_invalid_culled_asset_or_sorted_topology(
         .unwrap();
     scene.mesh_instances[0].mesh_generation = 2;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .unwrap()
         .is_empty());
     scene.mesh_instances[0].transform[0] = 2.0;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
+        .source_shadow_terrain_instance_indices(&scene, 41)
         .is_err());
 }
 

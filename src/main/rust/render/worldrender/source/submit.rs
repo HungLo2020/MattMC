@@ -11,6 +11,7 @@ impl WorldPrimitiveFrontend {
     pub(crate) fn append_private_terrain_occupancy_for_frame(
         &mut self,
         occupancy_frame: &WorldPrimitiveFrame,
+        scene: &SceneTerrainFrame,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<bool> {
         // Occupancy submissions are confirmed by the call that submits them;
@@ -61,7 +62,7 @@ impl WorldPrimitiveFrontend {
         let cull = mapping
             .filter(|_| puddle_descriptor.is_none())
             .map(|mapping| [mapping.valid_world_min, mapping.valid_world_max_exclusive]);
-        let source_meshes = self.terrain_voxel_source_meshes_within(occupancy_frame, cull)?;
+        let source_meshes = self.terrain_voxel_source_meshes_with_scene(occupancy_frame, cull, scene)?;
         let runtime = self
             .shader_runtime
             .as_mut()
@@ -197,11 +198,17 @@ impl WorldPrimitiveFrontend {
                 std::mem::take(&mut frame.first_person_mesh_instances);
             let lod_instances = std::mem::take(&mut frame.lod_instances);
             let dh_generic_boxes = std::mem::take(&mut frame.dh_generic_boxes);
+            // Compact terrain belongs to the selected planner below, not to
+            // this provisional mesh-less graph.
+            let terrain_sections = std::mem::take(&mut frame.static_terrain_sections);
+            let terrain_casters = std::mem::take(&mut frame.static_terrain_shadow_casters);
             let snapshot = frame.clone();
             frame.mesh_instances = mesh_instances;
             frame.first_person_mesh_instances = first_person_mesh_instances;
             frame.lod_instances = lod_instances;
             frame.dh_generic_boxes = dh_generic_boxes;
+            frame.static_terrain_sections = terrain_sections;
+            frame.static_terrain_shadow_casters = terrain_casters;
             snapshot
         };
         let frame: &WorldPrimitiveFrame = frame;
@@ -740,7 +747,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         mut append_gui: F,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)>
     where
@@ -769,6 +776,9 @@ impl WorldPrimitiveFrontend {
             started.elapsed(),
         );
         let validate_started = std::time::Instant::now();
+        // Resident static terrain is drawn by the scene path straight from its
+        // compact entries; the rest becomes ordinary instances here.
+        let scene = self.take_scene_terrain(gal, &mut frame)?;
         validate_frame(&frame)?;
         let entity_outline_plan = features::outline::prepare_entity_outline_post_effect(&frame)?;
         // The armed entry validates this exact frame's coverage just before
@@ -858,16 +868,11 @@ impl WorldPrimitiveFrontend {
         };
         // Described, resident static chunk sections are drawn by the scene
         // path; only the rest go through batch plans.
-        let scene = self.partition_scene_terrain_instances(gal, &frame);
-        let mut in_scene = scene.excludes();
         let static_indices = frame
             .mesh_instances
             .iter()
             .enumerate()
-            .filter(|(index, instance)| {
-                if in_scene(*index) {
-                    return false;
-                }
+            .filter(|(_, instance)| {
                 static_selection.includes(instance)
                     && is_source_terrain_mesh_stratum(instance.stratum)
                     && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
@@ -889,7 +894,7 @@ impl WorldPrimitiveFrontend {
             Some(&static_indices),
         );
         let shadow_indices = self.source_shadow_supplement_instance_indices(
-            &frame, programs.opaque.shader_pack_generation, &scene,
+            &frame, programs.opaque.shader_pack_generation,
         )?;
         let shadow_identities = shadow_indices.iter().map(|&index| mesh_identities[index].clone()).collect::<Vec<_>>();
         let shadow_batches = self.cached_mesh_batch_plan_selected(
@@ -1446,7 +1451,7 @@ impl WorldPrimitiveFrontend {
             }
         }
         let occupancy_started = std::time::Instant::now();
-        match self.append_private_terrain_occupancy_for_frame(&frame, &mut operations) {
+        match self.append_private_terrain_occupancy_for_frame(&frame, &scene, &mut operations) {
             Ok(true) => whole_frame_phase_trace(
                 "private-occupancy",
                 frame.frame_id,

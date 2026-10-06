@@ -871,16 +871,28 @@ impl WorldPrimitiveFrontend {
         let lacking = &self.mesh_assets_lacking_source_semantics;
         if let Some((mesh_key, stratum, identity)) = (!lacking.is_empty())
             .then(|| {
-                frame.mesh_instances.iter().find_map(|instance| {
-                    lacking.contains(&instance.mesh_key).then(|| {
-                        let identity = self
-                            .mesh_assets
-                            .get(&instance.mesh_key)
-                            .map(|asset| asset.entity_identity.clone())
-                            .unwrap_or_default();
-                        (instance.mesh_key, instance.stratum, identity)
+                let compact_terrain = frame
+                    .static_terrain_sections
+                    .sections
+                    .iter()
+                    .map(|section| section.mesh_key)
+                    .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
+                    .map(|mesh_key| (mesh_key, WORLD_STRATUM_TERRAIN));
+                frame
+                    .mesh_instances
+                    .iter()
+                    .map(|instance| (instance.mesh_key, instance.stratum))
+                    .chain(compact_terrain)
+                    .find_map(|(mesh_key, stratum)| {
+                        lacking.contains(&mesh_key).then(|| {
+                            let identity = self
+                                .mesh_assets
+                                .get(&mesh_key)
+                                .map(|asset| asset.entity_identity.clone())
+                                .unwrap_or_default();
+                            (mesh_key, stratum, identity)
+                        })
                     })
-                })
             })
             .flatten()
         {
@@ -1349,6 +1361,68 @@ impl WorldPrimitiveFrontend {
     /// would consume. The source route has one Rust-owned presenter, so it
     /// cannot be armed for a frame that contains an unsupported mesh and then
     /// delegate that mesh to the ordinary graph or Java.
+    /// Validates one source terrain mesh identity `(stratum, key, generation)`
+    /// not yet in the validated memo, and records whether it is translucent.
+    fn validate_source_terrain_identity(
+        &mut self,
+        key: (u32, u64, u64),
+        translucent_stage_status: &mut Option<Option<String>>,
+        any_translucent: &mut bool,
+    ) -> GalResult<()> {
+        self.validate_source_terrain_mesh(key.1, key.2)?;
+        // Scan without allocating; the section list is only needed for
+        // the rejection message.
+        let translucent_asset = self
+            .mesh_assets
+            .get(&key.1)
+            .filter(|asset| asset.mesh_generation == key.2)
+            .filter(|asset| {
+                asset
+                    .sections
+                    .iter()
+                    .any(|section| section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT)
+            });
+        let is_translucent = translucent_asset.is_some();
+        if let Some(asset) = translucent_asset {
+            *any_translucent = true;
+            let stage_status = translucent_stage_status.get_or_insert_with(|| {
+                match self.shader_runtime.as_ref() {
+                    Some(runtime) => {
+                        match runtime.prepared_lowered_translucent_terrain_source_program() {
+                            Ok(Some(_)) => None,
+                            Ok(None) => Some(
+                                "translucent source contract has not been discovered"
+                                    .to_string(),
+                            ),
+                            Err(reason) => Some(reason.to_string()),
+                        }
+                    }
+                    None => Some("shader runtime is unavailable".to_string()),
+                }
+            });
+            let Some(stage_status) = stage_status else {
+                self.source_terrain_validated_identities.insert(key, true);
+                return Ok(());
+            };
+            let translucent_sections = asset
+                .sections
+                .iter()
+                .enumerate()
+                .filter_map(|(index, section)| {
+                    (section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT).then_some(index)
+                })
+                .collect::<Vec<_>>();
+            return Err(GalError::unsupported_feature(format!(
+                "selected source terrain mesh {} generation {} has unsupported translucent section ranges {:?}; {stage_status}",
+                key.1, key.2, translucent_sections
+            )));
+        }
+        if !is_translucent {
+            self.source_terrain_validated_identities.insert(key, false);
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_source_meshes_for_frame(&mut self, frame: &WorldPrimitiveFrame) -> GalResult<()> {
         let material_ids = self
             .shader_runtime
@@ -1444,57 +1518,29 @@ impl WorldPrimitiveFrontend {
                 }
                 continue;
             }
-            self.validate_source_terrain_mesh(instance.mesh_key, instance.mesh_generation)?;
-            // Scan without allocating; the section list is only needed for
-            // the rejection message.
-            let translucent_asset = self
-                .mesh_assets
-                .get(&instance.mesh_key)
-                .filter(|asset| asset.mesh_generation == instance.mesh_generation)
-                .filter(|asset| {
-                    asset
-                        .sections
-                        .iter()
-                        .any(|section| section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT)
-                });
-            let is_translucent = translucent_asset.is_some();
-            if let Some(asset) = translucent_asset {
-                any_translucent = true;
-                let stage_status = translucent_stage_status.get_or_insert_with(|| {
-                    match self.shader_runtime.as_ref() {
-                        Some(runtime) => {
-                            match runtime.prepared_lowered_translucent_terrain_source_program() {
-                                Ok(Some(_)) => None,
-                                Ok(None) => Some(
-                                    "translucent source contract has not been discovered"
-                                        .to_string(),
-                                ),
-                                Err(reason) => Some(reason.to_string()),
-                            }
-                        }
-                        None => Some("shader runtime is unavailable".to_string()),
-                    }
-                });
-                let Some(stage_status) = stage_status else {
-                    self.source_terrain_validated_identities.insert(key, true);
-                    continue;
-                };
-                let translucent_sections = asset
-                    .sections
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, section)| {
-                        (section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT).then_some(index)
-                    })
-                    .collect::<Vec<_>>();
-                return Err(GalError::unsupported_feature(format!(
-                    "selected source terrain mesh {} generation {} has unsupported translucent section ranges {:?}; {stage_status}",
-                    instance.mesh_key, instance.mesh_generation, translucent_sections
-                )));
+            self.validate_source_terrain_identity(key, &mut translucent_stage_status, &mut any_translucent)?;
+        }
+        // Compact static terrain the shader route's scene draws.
+        for mesh_key in frame
+            .static_terrain_sections
+            .sections
+            .iter()
+            .map(|section| section.mesh_key)
+            .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
+        {
+            let Some(mesh_generation) = self.static_terrain_resident_generation(mesh_key) else {
+                continue;
+            };
+            let key = (WORLD_STRATUM_TERRAIN, mesh_key, mesh_generation);
+            terrain_identity_count += 1;
+            if let Some(translucent) = self.source_terrain_validated_identities.get(&key) {
+                any_translucent |= *translucent;
+                continue;
             }
-            if !is_translucent {
-                self.source_terrain_validated_identities.insert(key, false);
+            if !seen.insert(key) {
+                continue;
             }
+            self.validate_source_terrain_identity(key, &mut translucent_stage_status, &mut any_translucent)?;
         }
         // Retained translucent meshes still need a translucent writer now.
         if any_translucent
@@ -1516,6 +1562,10 @@ impl WorldPrimitiveFrontend {
                 .iter()
                 .filter(|instance| is_terrain(instance))
                 .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
+                .chain(
+                    self.compact_static_terrain_identities(frame)
+                        .map(|(mesh_key, generation)| (WORLD_STRATUM_TERRAIN, mesh_key, generation)),
+                )
                 .collect::<MeshKeySet<_>>();
             self.source_terrain_validated_identities.retain(|key, _| visible.contains(key));
         }

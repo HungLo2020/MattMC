@@ -15,27 +15,50 @@ use crate::render::worldrender::terrain::placement::TerrainSectionPlacement;
 use crate::render::worldrender::*;
 
 impl WorldPrimitiveFrontend {
-    /// Drains the frame's compact camera sections and shadow casters into
-    /// `frame.mesh_instances`.
-    pub(crate) fn admit_static_terrain(&self, frame: &mut WorldPrimitiveFrame) -> GalResult<()> {
-        let sections = std::mem::take(&mut frame.static_terrain_sections);
-        expand_static_terrain_sections(frame, &sections, |mesh_key| {
-            self.mesh_asset_drawable_generations.get(&mesh_key).map(|&(generation, _)| generation)
-        })?;
-        self.admit_static_terrain_shadow_casters(frame)
-    }
-
-    fn admit_static_terrain_shadow_casters(
-        &self,
-        frame: &mut WorldPrimitiveFrame,
-    ) -> GalResult<()> {
-        let mut casters = std::mem::take(&mut frame.static_terrain_shadow_casters);
+    /// Admits the frame's compact static terrain. With `keep_compact` the
+    /// sections and casters stay compact for the shader route's scene, which
+    /// expands only what it cannot draw itself; otherwise they are expanded
+    /// into `frame.mesh_instances` here.
+    pub(crate) fn admit_static_terrain(&self, frame: &mut WorldPrimitiveFrame, keep_compact: bool) -> GalResult<()> {
         // Java's section-map order shifts as terrain streams; key order keeps
         // identical caster sets identical for the cached batch plans.
-        casters.casters.sort_unstable_by_key(|caster| caster.mesh_key);
-        expand_static_terrain_shadow_casters(frame, &casters, |mesh_key| {
-            self.mesh_asset_drawable_generations.get(&mesh_key).map(|&(generation, _)| generation)
-        })
+        frame.static_terrain_shadow_casters.casters.sort_unstable_by_key(|caster| caster.mesh_key);
+        if keep_compact {
+            return Ok(());
+        }
+        self.expand_static_terrain(frame)
+    }
+
+    /// Expands whatever compact terrain the frame still carries: camera
+    /// sections before every other instance, casters after them. A frame
+    /// leaving the shader route calls this before any other route reads it.
+    pub(crate) fn expand_static_terrain(&self, frame: &mut WorldPrimitiveFrame) -> GalResult<()> {
+        let resident = |mesh_key: u64| self.static_terrain_resident_generation(mesh_key);
+        let sections = std::mem::take(&mut frame.static_terrain_sections);
+        expand_static_terrain_sections(frame, &sections, resident)?;
+        let casters = std::mem::take(&mut frame.static_terrain_shadow_casters);
+        expand_static_terrain_shadow_casters(frame, &casters, resident)
+    }
+
+    /// The generation a static terrain section of `mesh_key` draws: the one
+    /// Rust acknowledged, or none while the key has never crossed.
+    pub(crate) fn static_terrain_resident_generation(&self, mesh_key: u64) -> Option<u64> {
+        self.mesh_asset_drawable_generations.get(&mesh_key).map(|&(generation, _)| generation)
+    }
+
+    /// `(mesh_key, generation)` of every resident compact section and caster
+    /// the frame still carries.
+    pub(crate) fn compact_static_terrain_identities<'a>(
+        &'a self,
+        frame: &'a WorldPrimitiveFrame,
+    ) -> impl Iterator<Item = (u64, u64)> + 'a {
+        frame
+            .static_terrain_sections
+            .sections
+            .iter()
+            .map(|section| section.mesh_key)
+            .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
+            .filter_map(|mesh_key| Some((mesh_key, self.static_terrain_resident_generation(mesh_key)?)))
     }
 }
 

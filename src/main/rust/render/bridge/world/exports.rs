@@ -314,9 +314,12 @@ pub(super) fn execute_whole_frame(
         generation, world_frame_id, ffi_decode_nanos
     ));
     let frontend_started = std::time::Instant::now();
+    // The armed shader route draws resident terrain from its scene straight
+    // from the compact entries; every other route needs instances.
+    let keep_compact = context.world_primitive_frontend.scene_terrain_available(&context.gal);
     context
         .world_primitive_frontend
-        .admit_static_terrain(&mut world_frame)?;
+        .admit_static_terrain(&mut world_frame, keep_compact)?;
     // Capture short menu transitions without sampling past the
     // requested frame. Bound diagnostics across the process.
     static TILED_RECEIPTS: std::sync::atomic::AtomicUsize =
@@ -513,7 +516,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_primitives_submit(
             |(generation, frame_target, mut world_frame)| {
                 context
                     .world_primitive_frontend
-                    .admit_static_terrain(&mut world_frame)?;
+                    .admit_static_terrain(&mut world_frame, false)?;
                 let world_stats = context.world_primitive_frontend.submit_partial_frame(
                     &mut context.gal,
                     generation,

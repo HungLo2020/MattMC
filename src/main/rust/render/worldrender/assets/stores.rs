@@ -1096,6 +1096,7 @@ impl WorldPrimitiveFrontend {
         }
         self.destroy_mesh_resources_for_keys(gal, retired_resource_keys);
         self.destroy_lowered_source_terrain_resources_for_keys(gal, retired_lowered_source_keys);
+        self.forget_retained_source_terrain_meshes(retirement_keys.iter().copied());
         for mesh_key in &retirement_keys {
             self.mesh_assets.remove(mesh_key);
             self.mesh_asset_drawable_generations.remove(mesh_key);
@@ -1141,6 +1142,15 @@ impl WorldPrimitiveFrontend {
                 self.mesh_texture_animation_generation.wrapping_add(1);
         }
         for (mesh_key, asset) in decoded_meshes {
+            // A retained scene record describes exactly one generation; the
+            // scene treats a record's presence as proof that it is current.
+            if self
+                .retained_source_terrain_meshes
+                .get(&mesh_key)
+                .is_some_and(|record| record.generation != asset.mesh_generation)
+            {
+                self.forget_retained_source_terrain_meshes([mesh_key]);
+            }
             if source_mesh_layout_has_shader_semantics(asset.vertex_layout_version) && asset.source_input.is_none() {
                 self.mesh_assets_lacking_source_semantics.insert(mesh_key);
             } else {

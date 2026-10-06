@@ -19,7 +19,19 @@ pub(crate) fn source_shadow_instance_intersects(
     instance: &WorldMeshInstanceRequest,
     distance_limit: Option<f32>,
 ) -> bool {
-    let origin = [instance.transform[12], instance.transform[13], instance.transform[14]];
+    source_shadow_origin_intersects(
+        frustum,
+        [instance.transform[12], instance.transform[13], instance.transform[14]],
+        distance_limit,
+    )
+}
+
+/// As [`source_shadow_instance_intersects`], for a section's camera-relative origin.
+pub(crate) fn source_shadow_origin_intersects(
+    frustum: &crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum,
+    origin: [f32; 3],
+    distance_limit: Option<f32>,
+) -> bool {
     if !distance_limit.is_none_or(|limit| source_shadow_section_within_vanilla_distance(origin, limit)) {
         return false;
     }
@@ -274,16 +286,13 @@ impl WorldPrimitiveFrontend {
         &self,
         frame: &WorldPrimitiveFrame,
         shader_pack_generation: u64,
-        scene: &SceneTerrainFrame,
     ) -> GalResult<Vec<usize>> {
-        let mut in_scene = scene.excludes();
         let candidates = frame
             .mesh_instances
             .iter()
             .enumerate()
-            .filter(move |(index, instance)| {
-                !in_scene(*index)
-                    && MeshBatchSelection::ShadowOnly.includes(instance)
+            .filter(|(_, instance)| {
+                MeshBatchSelection::ShadowOnly.includes(instance)
                     && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
             });
         let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?;
@@ -337,11 +346,10 @@ impl WorldPrimitiveFrontend {
         &self,
         frame: &WorldPrimitiveFrame,
         shader_pack_generation: u64,
-        scene: &SceneTerrainFrame,
     ) -> GalResult<Vec<usize>> {
-        // Scene sections draw their own casters and supplement faces.
-        let selected = self.source_shadow_terrain_instance_indices(frame, shader_pack_generation, scene)?;
-        let mut in_scene = scene.excludes();
+        // Scene sections are not instances: they draw their own casters and
+        // supplement faces.
+        let selected = self.source_shadow_terrain_instance_indices(frame, shader_pack_generation)?;
         if terrain_program_scope_for_sky_type(frame.background.sky_type)? != Some(TerrainProgramScope::Overworld) {
             return Ok(selected);
         }
@@ -351,8 +359,7 @@ impl WorldPrimitiveFrontend {
                 off_camera.next();
                 return Some(index);
             }
-            (!in_scene(index)
-                && is_source_terrain_mesh_stratum(instance.stratum)
+            (is_source_terrain_mesh_stratum(instance.stratum)
                 && instance.flags & (WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY
                     | WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS) == 0
                 && instance.mesh_section_index == WORLD_MESH_SECTION_ALL

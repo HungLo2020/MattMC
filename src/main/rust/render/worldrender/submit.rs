@@ -325,6 +325,7 @@ impl WorldPrimitiveFrontend {
         let phase_started = std::time::Instant::now();
         if self.append_private_terrain_occupancy_for_frame(
             source_frame_for_admission,
+            &SceneTerrainFrame::default(),
             &mut pre_graph_ops,
         )? {
             whole_frame_phase_trace("private-occupancy", world_frame_id, Some(phase_started));
@@ -1615,7 +1616,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         gui_frontend: &mut GuiFrontend,
         gui_sprites: Vec<GuiSpriteRequest>,
         mut gui_affine_quads: Vec<GuiAffineQuadRequest>,
@@ -1628,11 +1629,14 @@ impl WorldPrimitiveFrontend {
         self.discard_stale_pending_vanilla_lightmap(gal);
         self.disarm_source_route_on_extent_change(&frame);
         #[cfg(not(test))]
-        let mut frame = frame;
-        #[cfg(not(test))]
         self.prepare_runtime_source_before_presentation(gal, generation, frame_target, &mut frame)?;
         #[cfg(not(test))]
-        let frame = self.admit_armed_source_frame(frame);
+        let mut frame = self.admit_armed_source_frame(frame);
+        // A frame that left the shader route (disarmed or never armed) is
+        // drawn from instances; expand any terrain kept compact for the scene.
+        if !self.runtime_source_execution_is_armed() {
+            self.expand_static_terrain(&mut frame)?;
+        }
         #[cfg(not(test))]
         self.report_shader_route_outcome(&frame);
         crate::render::guirender::frontend::preflight_tiled_affine_count(

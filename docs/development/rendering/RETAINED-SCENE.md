@@ -87,10 +87,14 @@ Static chunk sections whose meshes are resident are drawn by
   construction (`scene_terrain` and `indexed_indirect_runs_*` tests).
 
 Since ABI 70, Java sends visible sections and casters as compact entries (see
-[Java Bridge](JAVA-BRIDGE.md)); Rust expands them into instances during
-admission (`frame/static_terrain.rs`). The expansion and the passes that scan
-it (partition, validation, shadow selection, coverage) are next to remove, after
-the vanilla route also draws terrain from the scene.
+[Java Bridge](JAVA-BRIDGE.md)). When the shader route is armed, admission
+(`frame/static_terrain.rs`) keeps them compact: `take_scene_terrain` turns
+described sections and casters into scene entries and expands only the rest
+into instances. A frame that leaves the shader route, and every other route,
+calls `expand_static_terrain` first, so they still see ordinary instances.
+Coverage validation and voxel occupancy read the compact and scene terrain
+directly. A retained record is dropped whenever its key acknowledges another
+generation, so a record's presence proves it is current.
 
 ## Phases
 

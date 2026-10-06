@@ -33,6 +33,8 @@ impl WorldPrimitiveFrontend {
         raster_y_direction: RasterYDirection,
         preparing_source_entry: bool,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
+        // The vanilla graph draws terrain from instances.
+        self.expand_static_terrain(&mut frame)?;
         self.pending_terrain_external_item_entity_written = false;
         // Staged device-local uploads are batched into one flush per frame.
         let batch_staged_uploads = gal.capabilities().supports(BackendFeature::DeviceLocalMemory);
