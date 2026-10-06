@@ -26,6 +26,8 @@ cargo doc --no-deps --open    # then open mattmc_rust::render::vulkanic
 3. **Work is explicit command lists.** Record `CommandOp`s, wrap them with
    `create_command_list`, and submit a `SubmissionBatch`. Submission validates
    ops and handles, removes redundant binds, and runs hazard analysis.
+   Release play skips the op, handle and hazard checks; see the validation
+   notes below.
 4. **Hazards need explicit barriers.** The GAL tracks every access in a
    batch. Overlapping accesses that conflict (a write and any other access
    to the same range) must be separated by a `CommandOp::Barrier`, or the
@@ -76,10 +78,18 @@ events of one resource set and dynamic-offset combination are built once per
 submission. Pending barrier destinations are kept per resource key, so an access
 only examines destinations of its own resource.
 
-For CPU changes to hazard tracking, compare the gameplay benchmark's
-`gal-hazard-analysis` time alongside its read/write-event and barrier counters.
-Keep validation enabled for correctness runs and use a separate validation-off
-workload for timing. Accesses to unrelated ranges preserve the pending destination
+Release builds skip the per-frame command-op, handle and hazard checks during
+normal play. Debug builds, `cargo test`, buffer-upload captures and any run
+with `MATTMC_GAL_VALIDATION=1` keep them; the capture harness sets that
+variable whenever `--validation standard` is active
+([`per_frame_validation`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/gal/submission.rs)).
+Creation-time descriptor checks always run. Run new rendering work under a
+validation capture before trusting it.
+
+For CPU changes to hazard tracking, set `MATTMC_GAL_VALIDATION=1` and compare
+the gameplay benchmark's `gal-hazard-analysis` time alongside its
+read/write-event and barrier counters. Keep validation enabled for correctness
+runs and use a separate validation-off workload for timing. Accesses to unrelated ranges preserve the pending destination
 vector; overlapping accesses still validate its state and subtract their covered
 range. Preserve every untouched range and destination-state check when changing
 this hot path.

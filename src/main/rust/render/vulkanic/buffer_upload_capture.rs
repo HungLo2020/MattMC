@@ -47,6 +47,11 @@ impl BufferUploadCapture {
         self.accepted.insert(key, None);
         Ok(())
     }
+    /// Whether any range is watched; submissions must then record writes.
+    pub(super) fn is_watching(&self) -> bool {
+        !self.accepted.is_empty()
+    }
+
     pub(super) fn begin(&mut self) {
         // A failed encode/submit may already have touched mapped memory.
         // Never retain older proof for ranges touched by an unaccepted batch.

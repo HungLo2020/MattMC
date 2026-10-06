@@ -1667,6 +1667,10 @@ class CaptureRunner:
         return command
 
     def configure_validation_environment(self) -> None:
+        if self.config.validation_mode == "standard":
+            # Validation runs also keep the Rust GAL's per-frame command,
+            # handle and hazard checks, which normal play skips.
+            self.env["MATTMC_GAL_VALIDATION"] = "1"
         if not self.validation_enabled:
             return
         current_layers = self.env.get("VK_INSTANCE_LAYERS", "")

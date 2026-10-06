@@ -64,6 +64,10 @@ impl VulkanicGal {
                 }
             });
         }
+        // Command, handle and hazard checks guard against producer bugs. Normal
+        // play skips them (see `per_frame_validation`); upload capture needs
+        // the hazard walk to observe watched writes.
+        let validate = per_frame_validation() || self.buffer_upload_capture.is_watching();
         for list in &batch.command_lists {
             if list.operations.len() > capabilities.limits.max_commands_per_list as usize {
                 return self.unsupported(format!(
@@ -73,6 +77,9 @@ impl VulkanicGal {
                     capabilities.name,
                     capabilities.limits.max_commands_per_list
                 ));
+            }
+            if !validate {
+                continue;
             }
             let validate_ops_started = std::time::Instant::now();
             self.validate_command_ops(&list.label, &list.operations)?;
@@ -143,8 +150,10 @@ impl VulkanicGal {
         }
         let referenced = referenced_handles(&batch);
         let validate_handles_started = std::time::Instant::now();
-        for handle in &referenced {
-            self.validate_any_resource(*handle)?;
+        if validate {
+            for handle in &referenced {
+                self.validate_any_resource(*handle)?;
+            }
         }
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_validate_handles_nanos = profile
@@ -152,7 +161,9 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(validate_handles_started));
         }
         let hazards_started = std::time::Instant::now();
-        self.validate_submission_hazards(&batch, profile.as_deref_mut())?;
+        if validate {
+            self.validate_submission_hazards(&batch, profile.as_deref_mut())?;
+        }
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_hazard_analysis_nanos = profile
                 .gal_hazard_analysis_nanos
@@ -395,6 +406,19 @@ impl VulkanicGal {
 }
 
 /// Every handle the batch names directly, sorted and deduplicated.
+/// Whether submissions are validated every frame (command ops, handles and
+/// hazards). Always in tests and debug builds; in release builds only with
+/// `MATTMC_GAL_VALIDATION=1` (captures and validation runs set it). Normal
+/// play trusts its producers, as Vulkan itself does without validation layers.
+pub(crate) fn per_frame_validation() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        cfg!(test)
+            || cfg!(debug_assertions)
+            || matches!(std::env::var("MATTMC_GAL_VALIDATION").as_deref(), Ok("1" | "true" | "on"))
+    })
+}
+
 pub(super) fn referenced_handles(batch: &SubmissionBatch) -> Vec<Handle> {
     let mut handles = ReferencedHandles(Vec::with_capacity(batch.command_lists.iter().map(|list| list.operations.len() * 2).sum()));
     for list in &batch.command_lists {
