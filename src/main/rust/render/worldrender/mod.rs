@@ -596,6 +596,9 @@ pub struct WorldPrimitiveFrontend {
     /// Complete source generations are owned and validated by Rust. Loading
     /// them alone cannot select source-derived shader execution.
     shader_pack_sources: ShaderPackSourceStore,
+    /// The active pack's overworld shadow policy, shared with
+    /// [`EntityShadowQuery`] handles. Refreshed on every source update.
+    entity_shadow_policy: source::SharedEntityShadowPolicy,
     post_effect_source_cache: post_effects::PostEffectSourceCache,
     /// Immutable binary assets paired with a shader-pack source generation.
     /// They are not GPU objects and do not make selected-source execution

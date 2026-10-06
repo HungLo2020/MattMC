@@ -88,6 +88,25 @@ Preserve equal-boundary order, camera placements, culling facts and shadow roles
 appearance residency and published immutable records must remain unchanged.
 See [the semantic collector](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/ExperienceOrbSemanticCollector.java).
 
+## Standalone query handles
+
+Some render-thread questions are answered by handles that share no context
+state with a pipelined frame, so asking never joins it. They use plain
+pointer arguments rather than ABI records.
+
+- **Entity shadow query**
+  ([`EntityShadowQuery.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/EntityShadowQuery.java),
+  [`world/entity_shadow_query.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/entity_shadow_query.rs)).
+  It shares only the active pack's overworld shadow policy, refreshed by each
+  shader-pack source update. Before extracting off-camera entities for the
+  shadow pass, Java sends their copied culling facts with the frame's copied
+  environment, matrices and sky type; Rust returns which ones Iris's shadow
+  pass admits. The frame plan applies the same admission again. "Undecided"
+  (no policy, unresolved hooks) means Java keeps every candidate. The bridge
+  owns the handle and destroys it before its context.
+- **Section graph** (Frozen's camera terrain search): see
+  [Render architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+
 ## Rules the boundary tests enforce
 
 - The bridge uses only the public GAL modules and is the only code that creates

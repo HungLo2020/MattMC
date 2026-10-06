@@ -8,6 +8,14 @@ impl WorldPrimitiveFrontend {
         update: ShaderPackSourceUpdate,
     ) -> GalResult<()> {
         self.shader_pack_sources.apply_update(update)?;
+        let overworld_policy = self
+            .shader_pack_sources
+            .active_shadow_policy_for_scope(TerrainProgramScope::Overworld)
+            .ok()
+            .flatten();
+        if let Ok(mut policy) = self.entity_shadow_policy.lock() {
+            *policy = overworld_policy;
+        }
         self.post_effect_source_cache.get_mut().clear();
         // Converted source streams embed the pack's block-state material
         // mapping; a new source generation must not reuse them.
@@ -23,6 +31,12 @@ impl WorldPrimitiveFrontend {
         self.source_execution_distant_horizons_reported = false;
         self.observe_shader_pack_source_candidate();
         Ok(())
+    }
+
+    /// A standalone handle answering shadow-pass entity admission without
+    /// access to this frontend (see [`EntityShadowQuery`]).
+    pub(crate) fn entity_shadow_query(&self) -> EntityShadowQuery {
+        EntityShadowQuery::new(self.entity_shadow_policy.clone())
     }
 
     /// A prepared source mesh contains source-generation material identities.

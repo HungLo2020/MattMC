@@ -297,6 +297,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	private int[] materialKeyBucketsScratch = new int[0];
 	private int[] materialIndexesScratch = new int[0];
 	private boolean closed;
+	private EntityShadowQuery entityShadowQuery;
 
 	private VulkanicGalBridge(Arena arena, long contextId, long negotiatedFeatures) {
 		this.arena = arena;
@@ -4655,12 +4656,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 	}
 
+	/** This context's entity shadow query, created on first use. */
+	public EntityShadowQuery entityShadowQuery() {
+		if (closed) {
+			throw new IllegalStateException("Rust VulkanicGAL bridge is closed");
+		}
+		if (entityShadowQuery == null) {
+			entityShadowQuery = new EntityShadowQuery(contextId);
+		}
+		return entityShadowQuery;
+	}
+
 	@Override
 	public void close() {
 		if (closed) {
 			return;
 		}
 		closed = true;
+		if (entityShadowQuery != null) {
+			entityShadowQuery.close();
+			entityShadowQuery = null;
+		}
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		Native.contextDestroy(contextId, status);
 		// Context destruction joined any pipelined frame still reading this.

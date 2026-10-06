@@ -1733,6 +1733,12 @@ public final class RustGalFrameCoordinator {
 	 * preparation (shadow casters, shadow terrain, shader view bobbing) must
 	 * use this same switch.
 	 */
+	/** The active context's entity shadow query, or {@code null} without a context. */
+	public static net.vulkanic.bridge.EntityShadowQuery entityShadowQuery() {
+		VulkanicGalBridge current = bridge;
+		return current == null ? null : current.entityShadowQuery();
+	}
+
 	public static boolean isRustShaderExecutionActive() {
 		if (!isRustShaderPackSourceReady()) {
 			return false;

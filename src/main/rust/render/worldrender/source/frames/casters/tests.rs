@@ -127,3 +127,36 @@ fn entity_shadow_culling_preserves_independent_block_flags_and_player_only_role(
     absent.stratum = WORLD_STRATUM_ENTITY_MESH;
     assert!(selected(vec![absent], policy(1.0, true, false, false)).is_err());
 }
+
+#[test]
+fn entity_shadow_query_matches_frame_selection_and_defers_what_it_cannot_decide() {
+    let mut leash = caster(4, ENTITY_CULL_ELIGIBLE | ENTITY_CULL_LEASH_HOLDER, [50.0, 50.0, 50.0, 51.0, 51.0, 51.0]);
+    leash.entity_culling.as_mut().unwrap().leash_holder_bounds = Some([-1.0, -1.0, -1.0, 0.0, 0.0, 0.0]);
+    let instances = vec![
+        caster(1, ENTITY_CULL_ELIGIBLE, [40.0, -0.5, -0.5, 41.0, 0.5, 0.5]),
+        caster(2, ENTITY_CULL_ELIGIBLE, [40.0 + 1e-5, -0.5, -0.5, 41.0, 0.5, 0.5]),
+        caster(3, 0, [-0.5, -0.5, -0.5, 0.5, 0.5, 0.5]),
+        leash,
+        caster(5, ENTITY_CULL_ELIGIBLE | ENTITY_CULL_BYPASS_FRUSTUM, [500.0; 6]),
+    ];
+    let policy = policy(0.5, true, false, false);
+    let expected = selected(instances.clone(), policy).unwrap();
+    let mut frame = frame(Vec::new());
+    frame.shader_environment.far_plane = 160.0;
+    frame.shader_environment.configured_shadow_distance_chunks = 32;
+    let shared: SharedEntityShadowPolicy = Default::default();
+    let query = EntityShadowQuery::new(shared.clone());
+    let inputs = || instances.iter().map(|instance| instance.entity_culling.unwrap());
+    let mut out = vec![9u8; instances.len()];
+    let overworld = WORLD_BACKGROUND_SKY_OVERWORLD;
+    assert_eq!(query.select(overworld, EntityShadowFrame::of(&frame), inputs(), &mut out), None);
+    *shared.lock().unwrap() = Some(policy);
+    query.select(overworld, EntityShadowFrame::of(&frame), inputs(), &mut out).unwrap();
+    let admitted: Vec<u64> = instances.iter().zip(&out).filter(|(_, a)| **a == 1).map(|(i, _)| i.mesh_key).collect();
+    assert_eq!(admitted, expected);
+    assert_eq!(expected, vec![1, 4, 5]);
+    query.select(WORLD_BACKGROUND_SKY_NETHER, EntityShadowFrame::of(&frame), inputs(), &mut out).unwrap();
+    assert!(out.iter().all(|admitted| *admitted == 0));
+    let hooks = [caster(6, ENTITY_CULL_ELIGIBLE | ENTITY_CULL_UNRESOLVED_HOOKS, [0.0; 6]).entity_culling.unwrap()];
+    assert_eq!(query.select(overworld, EntityShadowFrame::of(&frame), hooks.into_iter(), &mut out[..1]), None);
+}

@@ -132,6 +132,7 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
 	private final java.util.List<net.minecraft.client.renderer.entity.state.EntityRenderState> rustShadowOnlyEntityStates = new java.util.ArrayList<>();
+	private final java.util.List<Entity> rustShadowCandidateEntities = new java.util.ArrayList<>();
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -503,29 +504,47 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	/** Copies bounded off-camera candidates; Rust applies the selected pack's culling. */
+	/**
+	 * Copies bounded off-camera candidates. Rust applies the selected pack's
+	 * culling; asking it first (from copied culling facts) skips extracting
+	 * entities the shadow pass rejects.
+	 */
 	private void extractRustShadowCandidates(Camera camera) {
 		this.rustShadowOnlyEntityStates.clear();
+		this.rustShadowCandidateEntities.clear();
 		if (!net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) return;
 		var cameraEntities = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
 		for (EntityRenderState state : this.levelRenderState.entityRenderStates) cameraEntities.add(state.entityId);
 		var tickRates = this.level.tickRateManager();
 		var dispatcherCamera = this.entityRenderDispatcher.camera;
+		var query = dispatcherCamera == null ? null : net.vulkanic.gui.RustGalFrameCoordinator.entityShadowQuery();
+		if (query != null) query.clear();
 		for (Entity entity : this.level.entitiesForRendering()) {
 			if (cameraEntities.contains(entity.getId())) continue;
-			float delta = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(!tickRates.isEntityFrozen(entity));
 			if (entity.tickCount == 0) {
 				entity.xOld=entity.getX(); entity.yOld=entity.getY(); entity.zOld=entity.getZ();
 			}
 			// Only ELIGIBLE states are kept below; skip extracting the rest.
-			if (dispatcherCamera != null
-				&& !this.entityRenderDispatcher.getRenderer(entity).rustShadowCullingEligible(entity, dispatcherCamera.getPosition()))
+			var renderer = this.entityRenderDispatcher.getRenderer(entity);
+			if (dispatcherCamera != null && !renderer.rustShadowCullingEligible(entity, dispatcherCamera.getPosition()))
 				continue;
+			this.rustShadowCandidateEntities.add(entity);
+			if (query != null) query.add(renderer.copyEntityCulling(entity, dispatcherCamera.getPosition()));
+		}
+		Vec3 submitCamera = this.levelRenderState.cameraRenderState.pos;
+		boolean decided = query != null && submitCamera != null
+			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.selectEntityShadowCandidates(
+				query, submitCamera.x, submitCamera.y, submitCamera.z);
+		for (int index = 0; index < this.rustShadowCandidateEntities.size(); index++) {
+			if (decided && !query.admitted(index)) continue;
+			Entity entity = this.rustShadowCandidateEntities.get(index);
+			float delta = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(!tickRates.isEntityFrozen(entity));
 			EntityRenderState state = this.entityRenderDispatcher.extractEntity(entity,delta);
 			var inputs = state.rustEntityCulling;
 			if (inputs != null && (inputs.flags() & net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.ELIGIBLE) != 0)
 				addRustShadowOnlyEntity(state);
 		}
+		this.rustShadowCandidateEntities.clear();
 		// Frozen's player-only branch extracts these states with the ordinary
 		// partial tick and skips the entity frustum/compiled-section predicates.
 		// Carry a separate CPU role; Java never reads shadowEntities/shadowPlayer.

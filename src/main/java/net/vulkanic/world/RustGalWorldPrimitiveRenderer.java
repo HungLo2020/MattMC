@@ -3943,6 +3943,24 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * camera pass does not; Rust decides admission from the copied pack's
 	 * caster directives.
 	 */
+	/**
+	 * Asks Rust which of the query's candidates this frame's shadow pass admits,
+	 * from the same copied environment, matrices and sky type the frame request
+	 * carries. Returns {@code false} (keep every candidate) when undecided.
+	 */
+	public static boolean selectEntityShadowCandidates(net.vulkanic.bridge.EntityShadowQuery query,
+			double cameraX, double cameraY, double cameraZ) {
+		synchronized (LOCK) {
+			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord environment = pendingShaderEnvironmentFrame;
+			if (!environment.enabled()) {
+				return false;
+			}
+			return query.select(pendingBackground.skyType(), environment.timeOfDay(), PENDING_PROJECTION,
+				PENDING_VIEW, environment.farPlane(), environment.configuredShadowDistanceChunks(),
+				cameraX, cameraY, cameraZ);
+		}
+	}
+
 	public static void beginShadowOnlyEntityCapture() {
 		synchronized (LOCK) {
 			if (shadowCasterCaptureInstanceMark >= 0) {

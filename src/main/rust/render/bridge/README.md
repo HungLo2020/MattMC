@@ -24,7 +24,8 @@ submission.rs     command submission, completion, retirement, readback
 frame.rs          surface, acquire, resize, present, capture
 gui/              atlas, quads, mesh, frame, assets
 world/            exports, whole_frame, meshes, mesh_assets, first_person,
-                  lod, dh_boxes, environment, assets, background
+                  lod, dh_boxes, environment, assets, background,
+                  entity_shadow_query (standalone shadow-entity prefilter)
 shader_pack.rs, sprite_animation.rs
 canonical.rs      (tests) canonical encoding of decoded batches
 tests/            end-to-end ABI tests; gal_abi.rs for records and batches

@@ -11,6 +11,7 @@ mod environment;
 mod assets;
 mod background;
 mod mesh_assets;
+mod entity_shadow_query;
 
 pub(crate) use self::whole_frame::*;
 pub(crate) use self::meshes::*;
