@@ -71,7 +71,7 @@ fluid-kind code or air id fail them; using the fluid level instead of
 fill's own substance rule answers every block below a sea before the batch. The driver benchmarks `NoiseFillVerification` in `javamaterials`
 against `native` mode.
 
-Measurements (2026-10-05, the same laptop and method as the cell traversal):
+Author-recorded measurements (2026-10-05, the same laptop and method as the cell traversal):
 4.96 → 4.97 ms per overworld fill (paired ratios 0.96, 0.93, 1.02), 4.78 →
 4.74 ms amplified (0.96, 0.99, 1.03) and 0.93 → 0.95 ms nether, which has no
 aquifer (1.03, 0.99, 0.95). No 95% interval excludes 1: the material
@@ -116,9 +116,11 @@ fill; see the [separate router contract](RUST-NOISE-ROUTER.md#eligibility).
   heightmaps reduce to the highest matching `y + 1` and counters to tallies.
   Any change that writes twice or into non-fresh state must leave the gate.
 - Rust repeats `NoiseBasedAquifer.compute`'s early returns (solid, above the
-  sampling ceiling, lava) and asks Java for a cell's batch materials (status 1,
-  before any write) only when some block reaches the batch — exactly the cells
-  the Java loop prepares, so fluid-status requests and caches match too.
+  sampling ceiling, lava) and prepares batch materials only when some block
+  reaches the batch. A traversal with a native aquifer binding computes these
+  materials in Rust; otherwise it requests them from Java (status 1, before
+  writing that cell). Preserve the material-request order and cache results
+  on each route.
 - Section installs go through `LevelChunkSection.installGenerated`.
 - The native traversal visits cells in the same order as Java's (X, then Z,
   then Y down) and requests materials for exactly the cells Java's loop would.
@@ -166,7 +168,11 @@ chunk-noise templates enabled. An eligible template [runs Rust traversal
 unconditionally](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseFill.java#L290-L300),
 so the benchmark's route assertion is expected to fail instead of comparing
 Java cells with native cells. This is a static source finding, not a rerun;
-it does not establish a failure of the separate parity-only path.
+it does not establish a failure of the separate parity-only path. The
+[`5c02fd82` benchmark update](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/test/java/net/minecraft/world/level/levelgen/NoiseFillVerification.java#L61-L100)
+still leaves chunk-noise templates enabled in `javacells` mode, and the
+[template fill still traverses natively](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseFill.java#L300-L310),
+so this source-identified limitation remains current.
 
 `NativeNoiseFillTest` requires fills of every bundled setting to take the Rust traversal,
 and `cellTraversalsMatchJavaLoop` also compares fills whose slices Java fills
@@ -250,8 +256,10 @@ fill-workload elapsed times, not per-chunk full-generation or whole-game gains.
 At the reviewed `858476969` snapshot, Java still owned cell traversal and
 cache preparation. The later [native traversal](#cell-traversal) moves those
 cell operations into Rust for eligible fills. Java retains the generator and
-`NoiseChunk` lifetime, requested aquifer-material preparation, registry
-identity, chunk-object installation and later-stage orchestration. Built-in ore/aquifer positional randomness moving here does not
+`NoiseChunk` lifetime, aquifer-material preparation on compatibility routes,
+registry identity, chunk-object installation and later-stage orchestration.
+The current [native aquifer binding](#rust-owned-aquifer-materials) moves
+material preparation into Rust for eligible traversals. Built-in ore/aquifer positional randomness moving here does not
 move every worldgen random owner. Keep custom/blended/prewritten-state fallback,
 cancellation/concurrency/failure recovery, native memory bounds and FULL-chunk
 acceptance explicit before extending the supported scope. This bounded migration

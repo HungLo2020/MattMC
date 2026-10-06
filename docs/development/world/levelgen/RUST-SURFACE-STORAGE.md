@@ -12,7 +12,9 @@ moves the chunk to [shared chunk storage](#shared-chunk-storage) when
 
 - a quart biome table (registry IDs) covering every quart a column's biome
   corners can select, filled once from the stage's `BiomeManager`;
-- which rule condition slots are `steep`.
+- native condition slots for steepness, eligible vertical gradients and noise
+  thresholds, plus available band-offset, secondary-noise and preliminary-level
+  inputs; unsupported inputs retain Java answers.
 
 Rust then scans each column, selects its rule-evaluation biomes from the
 table, runs the [surface evaluator](RUST-SURFACE.md), commits completed blocks
@@ -62,13 +64,16 @@ writes, unless:
 
 A batched rule program depends only on the rule, the surface system's bands,
 the biome registry, whether biomes are native and the generation height range.
-`NativeSurface` compiles and validates it once per surface system (one per
-`RandomState`) and caches it by the rule's identity; each context then only
-applies the program's condition sources. Programs with extension rules or
+`NativeSurface` caches eligible validated programs per surface system (one per
+`RandomState`, which also fixes the bands). Its key contains the rule and
+registry identities, the native-biome flag, minimum generation Y and generation
+depth; later contexts apply the cached condition sources. Concurrent first
+users can still compile the same key before it is cached. Programs with extension rules or
 continuations are compiled per context as before.
 `-Dmattmc.worldgen.surfaceCompileEachChunk=true` compiles every context's
 program, and `-Dmattmc.worldgen.javaSurfaceConditions=true` keeps Java
-answering the requests above, for comparisons.
+answering the newly moved gradient/noise/minimum-level requests, for
+comparisons. Steepness remains native on Rust-owned storage with either setting.
 
 ```sh
 python3 DevUtils/tests/worldgen/VerifyRustSurfaceConditions.py --parity-only
@@ -84,13 +89,17 @@ fresh with Java's answers. Mutations of the gradient's orientation, the
 minimum surface offset and the secondary noise's coordinates fail it; Rust's
 rounding in place of Java's fails `band_offset_rounds_halves_like_java`
 (`surface/chunk.rs`); `<=` in place of the gradient's `<` survives (equal only
-when `nextFloat()` hits the probability exactly). Measured on 2026-10-05/06 (same laptop and driver
+when `nextFloat()` hits the probability exactly). These mutation outcomes are
+implementation-author reports. The author measured on 2026-10-05/06 (same laptop and driver
 method as below), per chunk, Java answers and per-chunk compilation versus Rust
 answers and cached programs: overworld 4.08 → 3.55 ms (paired ratios 0.87,
 0.89, 0.85; 95% interval 0.83–0.91), amplified 4.90 → 4.41 ms (0.89, 0.90,
 0.92; 0.87–0.93), nether 3.85 → 3.53 ms (0.92, 0.93, 0.89; 0.88–0.95, its
 upper bound 0.953 just above the driver's 0.95 gate). Raw rounds are under
-`build/surface-conditions-migration/` (not bundled with the wiki).
+`build/surface-conditions-migration/` (not bundled with the wiki). This combined
+comparison changes both condition execution and program caching; it does not
+isolate either contribution. The documentation review did not rerun these
+checks or independently inspect the raw measurement artifacts.
 
 ## Gate
 

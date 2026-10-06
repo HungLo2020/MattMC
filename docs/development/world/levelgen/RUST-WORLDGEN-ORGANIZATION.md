@@ -85,9 +85,12 @@ column scan and rule loop, including its yields before external requests.
 `ffi.rs` owns the existing surface exports, including the compatibility adapter
 for biome column selection. On eligible chunks, `chunk.rs` evaluates columns
 and commits blocks over [shared native chunk storage](RUST-SURFACE-STORAGE.md);
-Java retains the X/Z column loop, extension-biome lookup, external conditions
-and the badlands/frozen-ocean extensions. Compatibility paths retain Java
-block commits while using the native rule evaluator.
+Rust also answers eligible gradient/noise/minimum-level requests there. Java
+retains the X/Z column loop, extension-biome lookup, temperature and unsupported
+condition answers, and the badlands/frozen-ocean extensions. Batched rule
+programs are cached per surface system; extension/continuation programs remain
+per context. Compatibility paths retain Java block commits while using the
+native rule evaluator.
 
 ### Native stage integration
 
@@ -134,16 +137,26 @@ Use each current stage guide's driver and its stated limits for parity and
 timing. In particular, the [cell-traversal timing route](RUST-NOISE-FILL.md#cell-traversal-verification)
 has a source-identified route-assertion problem, and current
 [preliminary-level timing](RUST-PRELIMINARY-SURFACE.md#verify-and-measure)
-also changes template and fluid-source eligibility.
+also changes template and fluid-source eligibility. The
+[climate oracle's Java hooks](../biome/RUST-CLIMATE.md#verify-a-change) do not
+observe the native BIOMES fill's internal sampling or searches.
 The seven drivers added with [the native-stage migration](https://github.com/HungLo2020/MattMC/commit/365de0289bfb03fa828889de1bcab315b7a19c6c)
-share an exact rewrite audit against `da1109de6`: 41 existing production files
-and 144 rewrites. The [2026-10-06 source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6010282862)
+shared an exact rewrite audit against `da1109de6` at the reviewed `54611cfc`
+snapshot: 41 existing production files and 144 rewrites. Those counts describe
+that historical review; they are not current-driver audit totals. The [2026-10-06 source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6010282862)
 matched that reconstruction to
 [`54611cfc`](https://github.com/HungLo2020/MattMC/commit/54611cfc25dbdf60ae4b11dc17557d2bec77469d).
 The drivers hash their selected additional bridge/native/test files and the
 built library; those hashes do not reconstruct a Java oracle or cover every
 new source file. The rewrite audit checks the recorded edit boundary, not
 runtime parity.
+
+The [later 2026-10-06 review for #775](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6025163587)
+checked `5c02fd82` and the two new drivers, `VerifyRustFillAquifer.py` and
+`VerifyRustSurfaceConditions.py`. Each reconstructs the same 14 production
+files from 71 exact rewrites against `54611cfc`; both declarations cover one
+shared production file set. That bounded check did not complete a current
+audit of the broader older-driver set.
 
 The review did not run Java/Rust suites, mutation tests, benchmarks or live
 worlds, or verify the unbundled measurement artifacts. Author-recorded stage

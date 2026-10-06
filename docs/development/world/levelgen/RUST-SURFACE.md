@@ -2,8 +2,11 @@
 
 ## Production path
 
-`SurfaceSystem.buildSurface` compiles its rule tree into a private, forward-only
-native program once per chunk. Ordinary `ProtoChunk` columns are scanned and
+`SurfaceSystem.buildSurface` uses a private, forward-only native rule program.
+Eligible batched programs are cached per `SurfaceSystem` and reused across
+chunk contexts; extension rules and continuations still compile per context.
+See the [cache inputs and comparison switches](RUST-SURFACE-STORAGE.md#compiled-rule-programs).
+Ordinary `ProtoChunk` columns are scanned and
 evaluated in Rust. For those chunks Rust also owns the chunk's sections and
 world-generation heightmaps for the whole stage, commits blocks in the original
 descending order and installs the results once; see
@@ -48,13 +51,19 @@ point expression order, saturating float-to-integer conversion, biome distance
 comparison, and first-match rule order are preserved. The native evaluator does
 not reorder predicates or eagerly evaluate noise/random conditions. Vertical
 gradients first check the lower bound, then the upper bound, exactly as Java
-does; only heights strictly between those bounds request the Java random test.
+does; only heights strictly between those bounds need the random test.
+Eligible Rust-owned storage answers that test with the condition's native
+positional random factory. Other routes request the Java answer, preserving
+the same order.
 
 ## Boundary and ownership
 
-The FFM interface borrows Java-owned arrays for one call and retains no pointers.
-Each compiled evaluator owns its mutable buffers; evaluators are confined to
-their chunk/task. Only the FFI entry points construct slices from raw pointers.
+The scalar evaluator interface borrows Java-owned arrays for one call and
+retains no pointers into those arrays. Rust-owned stage storage can retain
+native noise-state and preliminary-level pointers between column calls;
+[`NativeSurfaceChunk`](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/main/java/net/minecraft/world/level/levelgen/NativeSurfaceChunk.java#L85-L124)
+keeps their Java owners live until the stage is closed. Evaluator buffers
+remain confined to their chunk/task while eligible immutable programs are shared. Only the FFI entry points construct slices from raw pointers.
 Their safety contracts specify lengths, alignment, disjoint buffers, and the
 validated immutable program required from the Java caller.
 
@@ -76,6 +85,11 @@ continuations. Large program validation uses a regular downcall and native
 memory instead of a long heap-pinning critical call.
 
 ## Reproducing verification
+
+For the later storage, native-condition and program-cache changes, use the
+[current stage drivers](RUST-SURFACE-STORAGE.md#compiled-rule-programs) as well.
+The recorded validation and measurements below describe the original surface
+evaluator migration, not independent acceptance of those later changes.
 
 Use JDK 25 and a release native library. No copied Java implementation is kept
 in production or test source: the driver extracts the original `SurfaceSystem`

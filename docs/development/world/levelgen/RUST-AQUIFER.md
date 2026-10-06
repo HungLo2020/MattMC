@@ -32,8 +32,11 @@ compiler. Java evaluates the chunk-wrapped sources at point contexts, where a
 grid and its input at the point outside it; the router's FLAT_POINT node does
 the same through a per-chunk binding that `NativeAquifer` owns, computing each
 corner once. Before the first native status, `NativeAquifer` copies the
-chunk's cached surface levels into its surface window. Java still owns the
-status cache and its callers. `NativeFluidSourcesTest` compares every status
+chunk's cached surface levels into its surface window. On this per-status
+request path Java owns the status cache and its callers. Eligible
+[NOISE traversals](RUST-NOISE-FILL.md#rust-owned-aquifer-materials) and
+[carvers](carver/RUST-CARVERS.md) instead copy the aquifer caches into a
+Rust-owned binding for the stage and copy the resulting memos back afterwards. `NativeFluidSourcesTest` compares every status
 of the fill's aquifer centres and points across the chunk grid's edge with
 Java's request path for every aquifer-enabled vanilla setting.
 

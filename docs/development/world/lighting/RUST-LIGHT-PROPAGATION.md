@@ -14,24 +14,28 @@ package, for palette data). Java still owns everything else: section statuses,
 
 1. Java drains both queues into native memory. Rust replays the original
    loops in the same order: every decrease, then every increase.
-2. The first time a pass touches a section, Rust calls back into Java once.
-   The callback returns the section's updating `DataLayer` (bytes, or the
-   default value of a lazy layer) and `lightOnInSection`. It returns block
-   states only when the pass first reads one: palette types plus packed words,
-   or one type per block for chunk kinds the bridge does not model.
+2. One callback function supplies two separately cached snapshots per section:
+   the updating `DataLayer` (bytes, or the default value of a lazy layer) and
+   `lightOnInSection` on the first layer request, then block states only when
+   first needed. The block snapshot contains palette types plus packed words,
+   or one type per block for chunk kinds the bridge does not model. A section
+   needing both snapshots makes two callback invocations.
 3. Rust writes levels into its own copies. At the end Java installs each
    written section with the original copy-on-write: the first write in a pass
    copies the layer. Java then adds the `sectionsAffectedByLightUpdates`
    entries.
-4. If Rust rejects a pass, nothing in Java has changed, so Java refills the
-   queues and runs the original loops. Rust rejects input the original would
-   throw on (reading an unstored section, missing palette entries, unknown
-   states) and any failed callback. Java then reproduces the original
-   exception.
+4. Unsupported input or a failed section callback returns before propagation
+   writes are installed. Java restores both drained queues in their original
+   order and runs the original loops, which may complete or throw. This is a
+   boundary around propagation writes, not a rollback of earlier `checkNode`
+   work or callback side effects. Invalid ABI input (`-1`), downcall failures
+   and result-transfer failures throw instead of replaying in Java; see the
+   [bridge status handling](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L274-L325).
 
 Sky seeding runs one critical downcall per section. It needs no allocations
 or callbacks. Java keeps the section iteration, `getDataLayerToWrite` and the
-`enqueueIncrease` calls, in the original order.
+`enqueueIncrease` calls, in the original order. A rejected sky-seeding call
+throws; it does not use the propagation pass's Java replay path.
 
 ## Constraints when changing this code
 
@@ -43,11 +47,12 @@ or callbacks. Java keeps the section iteration, `getDataLayerToWrite` and the
   occlusion face. Faces are merged only by exact box lists. Occlusion is a
   truth table of `Shapes.faceShapeOccludes`, so never approximate geometry.
 - Only exact `BlockLightEngine`/`SkyLightEngine` with their vanilla storages
-  use Rust. `ProtoChunk`, `LevelChunk` and `ImposterProtoChunk` (non-debug)
+  use Rust queue propagation. `ProtoChunk`, `LevelChunk` and `ImposterProtoChunk` (non-debug)
   sections are read packed. Other `LightChunk`s answer per block through
   `getBlockState`. A null chunk reads as bedrock and blocks outside the build
   height read as air, as in `LightEngine.getState`.
-- Rust keeps no pointers between calls. Each engine has its own Rust handle and
+- Rust keeps no pointers into the propagation pass's Java inputs between calls.
+  Each engine has its own Rust handle and
   callback buffer, and the engine's thread owns the pass.
 - `-Dmattmc.lighting.javaPropagation=true` keeps the Java loops.
   `NativeLightPropagation.setEnabled` toggles this in tests.
@@ -67,12 +72,17 @@ chunks and compare all light storage after every pass:
 - updating, visible and queued layers, including whether each layer is lazy or
   allocated and which layers are shared between the two maps
 - section states, changed and affected sections, sky top sections
-- light-update notifications and work counts
+- light-update notification membership (sets, not order or duplicate counts)
+  and work counts
 
 Worlds:
 
-- 36 saved FULL overworld chunks (`src/test/resources/lighting/terrain.json.gz`,
-  extracted by `DevUtils/tests/lighting/ExtractLightTerrainCorpus.py`)
+- block states from 36 saved FULL overworld chunks
+  (`src/test/resources/lighting/terrain.json.gz`, extracted by
+  `DevUtils/tests/lighting/ExtractLightTerrainCorpus.py`),
+  [reconstructed as `ProtoChunk` fixtures](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/test/java/net/minecraft/world/level/lighting/LightPropagationFixtures.java#L48-L65)
+  and relit; the corpus contains no saved light and does not test a region-file
+  save/load roundtrip
 - noise-filled overworld, amplified, nether and End terrain (sky light over islands above the void)
 - sparse empty chunks with floating blocks and pillars, so skylight fills
   unstored sections below stored ones across every chunk border
@@ -84,7 +94,10 @@ sections, queued section data and chunks with light switched off. Every pass
 also checks that layers published before it are unchanged (copy-on-write). Another test checks every registered state
 against its table type, and checks every merged face against every other face.
 
-The benchmark times production calls only. Terrain loading and engine
+These fixtures exercise the light engines over saved/generated blocks, not a
+live loaded-`LevelChunk`/`ImposterProtoChunk` lifecycle or full-server world
+generation. They do not establish concurrent/reentrant pass or handle-cleanup
+coverage. The benchmark times production calls only. Terrain loading and engine
 construction are untimed.
 
 | Case | Workload |
@@ -96,13 +109,19 @@ construction are untimed.
 Three independent JVM pairs alternate the route order on the same CPUs. Each
 case must save at least 5% in every pair and at the upper 95% bootstrap
 bound. Results are written to `build/light-propagation-migration/acceptance/`.
+Inspect `results.json` → `performance` → each case's `passes` value: the
+[driver records a failed performance gate without failing its process](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/DevUtils/tests/lighting/VerifyRustLightPropagation.py#L163-L186),
+so exit success alone is not performance acceptance.
 
 ## Status
 
-Release acceptance passed on 2026-10-06: Ryzen 5 5600G, Linux x86_64, OpenJDK 25.
-Eight Java tests and eleven Rust lighting tests passed with zero differences
-(1,801 Rust passes compared). Thirteen deliberate semantic mutations were all
-caught. Each mutation broke one of: entry bits, comparisons, edge crossings in
+The implementation author recorded release acceptance on 2026-10-06:
+Ryzen 5 5600G, Linux x86_64, OpenJDK 25. The author reported eight Java tests
+and eleven Rust lighting tests passing with zero differences (1,801 Rust
+passes compared). Four of those Rust tests are newly added propagation tests;
+eleven is the broader lighting-suite count. The author also reported that
+thirteen deliberate semantic mutations were all caught. Each mutation broke one
+of: entry bits, comparisons, edge crossings in
 each direction, the lowest data section, affected sections, `lightOnInSection`,
 occlusion direction, copy-on-write, lazy-layer allocation or seeding.
 
@@ -121,4 +140,8 @@ samples per case); medians and bootstrap bounds include them. These are
 warmed subsystem timings on this machine and corpus, not whole-game frame or
 chunk-generation claims. Finite parity tests cannot enumerate every input.
 Raw samples, checksums and source/library hashes are in
-`build/light-propagation-migration/acceptance/results.json`.
+`build/light-propagation-migration/acceptance/results.json` (not bundled with
+the wiki). The [2026-10-06 maintenance review for #776](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6025144528)
+inspected source and committed fixtures;
+it did not rerun the Java/Rust suites, mutations, benchmarks or a live world,
+or independently verify those raw acceptance results.

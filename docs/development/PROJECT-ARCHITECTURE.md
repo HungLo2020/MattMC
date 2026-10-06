@@ -56,6 +56,7 @@ src/main/rust/
         │   └── palette/
         ├── lighting/
         │   ├── priority_queue/
+        │   ├── propagation/
         │   └── skylight_sources/
         ├── chunk_distance/
         ├── color_map_color_util.rs
@@ -91,14 +92,18 @@ Shared engine primitives belong here. Use this for low-level types, algorithms, 
 World simulation and world data helpers belong here. Current code includes
 `world/level/color_map_color_util.rs` for Java color-map behavior,
 `world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md) (with the
-[biome fill](world/biome/RUST-BIOME-FILL.md) in `world/level/levelgen/biome_fill/`), [skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) under
-`world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
+[biome fill](world/biome/RUST-BIOME-FILL.md) in `world/level/levelgen/biome_fill/`),
+[skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) and
+[block/sky light propagation and sky seeding](world/lighting/RUST-LIGHT-PROPAGATION.md)
+under `world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
 under `world/level/chunk/palette/`, and `world/level/levelgen/` for
-noise synthesis, density evaluation, aquifers, surface evaluation over
+noise synthesis, density evaluation, aquifers, surface evaluation with eligible
+native conditions and cached rule programs over
 [Rust-owned chunk storage](world/levelgen/RUST-SURFACE-STORAGE.md), the
 [carvers stage](world/levelgen/carver/RUST-CARVERS.md), worldgen
 randomness, the [NOISE fill](world/levelgen/RUST-NOISE-FILL.md) that owns
-base-terrain block writes and eligible cell traversal, and the
+base-terrain block writes, eligible cell traversal and native-route aquifer
+materials, and the
 [noise router](world/levelgen/RUST-NOISE-ROUTER.md) that fills interpolation
 slices and evaluates shared point programs for
 [preliminary surface levels](world/levelgen/RUST-PRELIMINARY-SURFACE.md) and
