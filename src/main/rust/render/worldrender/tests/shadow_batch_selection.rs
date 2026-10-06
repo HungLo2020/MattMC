@@ -177,7 +177,10 @@ fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
     for advanced in [false, true] {
         install_policy(&mut frontend, advanced);
         let generation = if advanced { 42 } else { 41 };
-        for distance in [32.0, 80.0, 160.0] {
+        // Iris bounds casters by the pack's 80-block shadow distance only when
+        // it does not exceed the render distance (Sodium's shadow tree has no
+        // distance test of its own), so these render distances all cull.
+        for distance in [96.0, 160.0, 320.0] {
             for time in [0.0, 0.25, 0.5, 0.75] {
                 scene.shader_environment.far_plane = distance;
                 scene.shader_environment.time_of_day = time;
@@ -214,11 +217,7 @@ fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
                 .unwrap();
                 for batch in &mut late {
                     batch.indices.retain(|index| {
-                        source_shadow_instance_intersects(
-                            &frustum,
-                            &scene.mesh_instances[*index],
-                            Some(distance),
-                        )
+                        source_shadow_instance_intersects(&frustum, &scene.mesh_instances[*index])
                     });
                 }
                 late.retain(|batch| !batch.indices.is_empty());
@@ -489,7 +488,9 @@ fn shadow_batch_selection_does_not_hide_invalid_culled_asset_or_sorted_topology(
         )
         .unwrap();
     let mut scene = frame(Vec::new());
-    scene.shader_environment.far_plane = 32.0;
+    // A render distance beyond the pack's 80-block shadow distance makes Iris
+    // cull by that distance, so the far caster below is culled.
+    scene.shader_environment.far_plane = 256.0;
     scene.shader_environment.configured_shadow_distance_chunks = 2;
     scene.mesh_instances = vec![caster(1, [2000.0; 3])];
     assert!(frontend

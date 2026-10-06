@@ -146,6 +146,8 @@ pub(crate) struct SceneTerrainDraws {
 #[derive(Clone, Copy, Eq, PartialEq)]
 struct RunKey {
     kind: u8,
+    /// Camera runs: whether their sections pass the shadow-pass test.
+    casts: bool,
     cull_policy: u32,
     winding: u32,
     page: Handle,
@@ -316,6 +318,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         frame: &WorldPrimitiveFrame,
         camera: &[SceneTerrainEntry],
+        camera_casts: &[bool],
         casters: &[&SceneTerrainEntry],
         passes: [Option<&SceneTerrainPass<'_>>; 3],
         shadow: Option<&SceneTerrainShadowPass<'_>>,
@@ -398,9 +401,12 @@ impl WorldPrimitiveFrontend {
         for (ordinal, entry) in entries().enumerate() {
             let first_instance = base_instance + ordinal as u32;
             let is_caster = ordinal >= camera.len();
+            // Frozen's shadow pass applies its section test to camera-visible
+            // sections too: only passing ones cast (all their faces).
+            let casts = is_caster || camera_casts.get(ordinal).copied().unwrap_or(false);
             let (camera_mask, shadow_mask) = if is_caster {
                 (0, 0x7f)
-            } else if supplement {
+            } else if supplement && casts {
                 (entry.facing_mask, !entry.facing_mask & 0x7f)
             } else {
                 (entry.facing_mask, 0)
@@ -408,6 +414,7 @@ impl WorldPrimitiveFrontend {
             for group in entry.groups.iter() {
                 let key = RunKey {
                     kind: group.kind,
+                    casts,
                     cull_policy: group.cull_policy,
                     winding: group.winding,
                     page: entry.page,
@@ -459,7 +466,7 @@ impl WorldPrimitiveFrontend {
                 .map_err(|_| GalError::invalid_argument("scene terrain run index count exceeds u32"))?;
             let indexed_indirect = self.append_source_terrain_multidraw_commands(frame_id, &run.commands)?;
             let shadow_draw = match (shadow, shadow_uniforms) {
-                (Some(shadow), Some(uniforms)) if casting_kinds[kind] => {
+                (Some(shadow), Some(uniforms)) if casting_kinds[kind] && run.key.casts => {
                     Some(self.scene_terrain_shadow_draw(gal, frame_id, shadow, uniforms, &run, stream_buffer, instance_range)?)
                 }
                 _ => None,

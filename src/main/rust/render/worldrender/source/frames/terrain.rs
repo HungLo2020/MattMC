@@ -17,44 +17,24 @@ pub(crate) fn source_shadow_required_for_material_mode(material_mode: u32) -> bo
 pub(crate) fn source_shadow_instance_intersects(
     frustum: &crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum,
     instance: &WorldMeshInstanceRequest,
-    distance_limit: Option<f32>,
 ) -> bool {
     source_shadow_origin_intersects(
         frustum,
         [instance.transform[12], instance.transform[13], instance.transform[14]],
-        distance_limit,
     )
 }
 
-/// As [`source_shadow_instance_intersects`], for a section's camera-relative origin.
+/// Frozen's shadow-pass section test, for a section's camera-relative
+/// origin. Iris renders shadows through Sodium's section tree
+/// (`RemovableMultiForest`), which disables its distance test and accepts a
+/// leaf whose box of half-size 8 around the section centre passes the shadow
+/// frustum (`TraversableTree::testLeafNode`); node tests only prune subtrees
+/// whose padded boxes lie outside, so they never reject a passing leaf.
 pub(crate) fn source_shadow_origin_intersects(
     frustum: &crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum,
     origin: [f32; 3],
-    distance_limit: Option<f32>,
 ) -> bool {
-    if !distance_limit.is_none_or(|limit| source_shadow_section_within_vanilla_distance(origin, limit)) {
-        return false;
-    }
-    // Sodium's shadow Viewport tests a section centered at origin+8 with
-    // radius 8+1+1/8: one block of model overhang plus frustum allowance.
-    let min = origin.map(|coordinate| coordinate - 1.125);
-    let max = min.map(|coordinate| coordinate + 18.25);
-    frustum.intersects(min, max)
-}
-
-pub(crate) fn source_shadow_section_within_vanilla_distance(origin: [f32; 3], limit: f32) -> bool {
-    // Frozen's Sodium shadow tree still uses its normal render-distance
-    // cylinder even when Iris replaces the camera frustum. The copied `far`
-    // scalar is effective render distance * 16 blocks on this source route.
-    // Its overhang envelope is one block, distinct from the 1/8 precision
-    // extension on the light-frustum section AABB above.
-    let closest = origin.map(|coordinate| {
-        let min = coordinate - 1.0;
-        let max = coordinate + 17.0;
-        if min > 0.0 { min } else if max < 0.0 { max } else { 0.0 }
-    });
-    closest[0] * closest[0] + closest[2] * closest[2] < limit * limit
-        && closest[1].abs() < limit
+    frustum.intersects(origin, origin.map(|coordinate| coordinate + 16.0))
 }
 
 /// Immutable CPU uniform blocks for one exact source program and render frame.
@@ -327,11 +307,7 @@ impl WorldPrimitiveFrontend {
                 }
             }
             if frustum.as_ref().is_some_and(|frustum| {
-                source_shadow_instance_intersects(
-                    frustum,
-                    instance,
-                    Some(frame.shader_environment.far_plane),
-                )
+                source_shadow_instance_intersects(frustum, instance)
             }) {
                 selected.push(index);
             }

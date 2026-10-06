@@ -1513,7 +1513,7 @@ impl WorldPrimitiveFrontend {
                     let instance = &frame.mesh_instances[index];
                     shadow_frustum
                         .as_ref()
-                        .is_none_or(|frustum| source_shadow_instance_intersects(frustum, instance, None))
+                        .is_none_or(|frustum| source_shadow_instance_intersects(frustum, instance))
                         .then_some((instance.transform, instance.color_argb))
                 })
                 .collect::<Vec<_>>();

@@ -80,6 +80,10 @@ Static chunk sections whose meshes are resident are drawn by
 - Camera runs carry shadow twins; the camera sections' unselected faces and
   the light-frustum casters become shadow-only runs. Translucent runs keep
   frame order and split on any state change.
+- Shadow casters follow Frozen: Java offers only sections the camera
+  traversal has built (no shadow-only builds), and every section, camera
+  visible or not, casts only if it passes Sodium's shadow-tree leaf test
+  (`source_shadow_origin_intersects`: centre ±8, no distance cylinder).
 - Undescribed sections (first frame after upload, changed material ids, a
   pending upload) and camera-sorted translucent sections keep the batch path.
 - Terrain coverage receipts subtract the scene's indices

@@ -648,17 +648,31 @@ impl WorldPrimitiveFrontend {
                         source_shadow_origin_intersects(
                             frustum,
                             [entry.transform[12], entry.transform[13], entry.transform[14]],
-                            Some(frame.shader_environment.far_plane),
                         )
                     })
                     .collect::<Vec<_>>(),
                 None => Vec::new(),
             };
+            // Camera-visible sections cast only when they pass the shadow-pass
+            // section test, as in Frozen (every section without a frustum).
+            let scene_camera_casts = scene
+                .camera
+                .iter()
+                .map(|entry| {
+                    shadow_frustum.as_ref().is_none_or(|frustum| {
+                        source_shadow_origin_intersects(
+                            frustum,
+                            [entry.transform[12], entry.transform[13], entry.transform[14]],
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
             let scene_supplement = shadow_frustum.is_some()
                 && scene
                     .camera
                     .iter()
-                    .any(|entry| entry.facing_mask != 0x7f);
+                    .zip(&scene_camera_casts)
+                    .any(|(entry, casts)| *casts && entry.facing_mask != 0x7f);
             let mut selected_shadow_batches = match shadow_frustum.as_ref().filter(|_| !shadow_batches.is_empty()) {
                 None => Vec::new(),
                 Some(frustum) => shadow_batches
@@ -667,11 +681,7 @@ impl WorldPrimitiveFrontend {
                         let mut selected = batch.clone();
                         selected.indices.retain(|index| {
                             let instance = &frame.mesh_instances[*index];
-                            instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY == 0 || source_shadow_instance_intersects(
-                                &frustum,
-                                instance,
-                                Some(frame.shader_environment.far_plane),
-                            )
+                            source_shadow_instance_intersects(&frustum, instance)
                         });
                         (!selected.indices.is_empty()).then_some(selected)
                     })
@@ -1594,6 +1604,7 @@ impl WorldPrimitiveFrontend {
                     gal,
                     frame,
                     &scene.camera,
+                    &scene_camera_casts,
                     &scene_casters,
                     [opaque_pass.as_ref(), cutout_pass.as_ref(), translucent_pass.as_ref()],
                     shadow_pass.as_ref(),

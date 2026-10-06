@@ -14082,32 +14082,6 @@ fn selected_source_shadow_admission_includes_translucent_terrain() {
 }
 
 #[test]
-fn source_shadow_candidates_respect_sodiums_vanilla_distance_cylinder() {
-    let camera = [150.5, 101.62, 530.5];
-    let relative_origin = |z| {
-        let transform = crate::render::worldrender::terrain::placement::TerrainSectionPlacement {
-            origin: [128, 48, z],
-            camera,
-        }
-        .lower()
-        .unwrap();
-        [transform[12], transform[13], transform[14]]
-    };
-    assert!(!source_shadow_section_within_vanilla_distance(
-        relative_origin(448),
-        64.0,
-    ));
-    assert!(source_shadow_section_within_vanilla_distance(
-        relative_origin(464),
-        64.0,
-    ));
-    assert!(!source_shadow_section_within_vanilla_distance(
-        [60.0, 0.0, 60.0],
-        64.0,
-    ));
-}
-
-#[test]
 fn source_terrain_preparation_accepts_atlas_backed_non_fluid_translucency() {
     let mut mesh = mesh_asset(0x7a20, 1, IndexType::U16);
     mesh.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;

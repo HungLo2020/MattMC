@@ -42,9 +42,6 @@ import org.joml.Vector3d;
  */
 public final class RustGalWholeFrameTerrainSource {
 	private static final int MAX_SEMANTIC_MESH_WORKERS = 8;
-	private static final int MAX_SHADOW_HALO_REQUESTS_PER_FRAME = 384;
-	private static final int MAX_SHADOW_SWEEP_COLUMNS_PER_FRAME = 256;
-	private static final int SHADOW_SWEEP_RETRY_INTERVAL_FRAMES = 16;
 	private static final int SHADOW_BACKLOG_THRESHOLD = 64;
 	private static final int MAX_BACKLOG_COMPLETED_BUILDS_PER_FRAME = 8;
 	/**
@@ -143,18 +140,6 @@ public final class RustGalWholeFrameTerrainSource {
 	/** One nearest-prefetch slot followed by three current portal-frontier slots. */
 	private int terrainBuildDispatchCursor;
 	private boolean workerSeparateAo;
-	/** Distance-ordered (dx, dz) column offsets for the shadow-caster build sweep. */
-	private int[] shadowSweepOffsets = new int[0];
-	private int shadowSweepRadius = -1;
-	private int shadowSweepCursor;
-	private long shadowSweepCameraSection = Long.MIN_VALUE;
-	/**
-	 * Sweep columns whose chunk had not arrived when the cursor passed them.
-	 * Without a retry the sweep's caster domain depended on the race between
-	 * the sweep and chunk streaming.
-	 */
-	private final it.unimi.dsi.fastutil.ints.IntArrayList shadowSweepDeferred = new it.unimi.dsi.fastutil.ints.IntArrayList();
-	private int shadowSweepRetryFrame;
     private int buildFrame;
 	private long emptySnapshotBuilds;
 	private long meshlessOutputBuilds;
@@ -454,20 +439,10 @@ public final class RustGalWholeFrameTerrainSource {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.semantic-submit");
 		ArrayList<RenderSection> shadowCandidates = new ArrayList<>();
 		if (net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) {
-			// Iris/Sodium render every built section in the shadow frustum within
-			// render distance, including off-camera casters (e.g. terrain toward
-			// the sun while looking down). The camera portal frontier only builds
-			// camera-visible sections, so sweep the current render window in
-			// distance order, bounded per frame. Rust still owns light-aware
-			// admission of the resulting resident candidates.
-			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.shadow-build-requests");
-			int haloRequests = this.requestShadowCasterBuilds();
-			if (haloRequests != 0) {
-				wholeFrameSurfaceQueueDrained = false;
-				wholeFrameTerrainQueueDrained = false;
-				this.scheduleBuilds(camera);
-			}
-			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.shadow-build-requests");
+			// As in Frozen (Iris over Sodium's section tree), the shadow pass
+			// casts only sections the camera traversal has already built; it
+			// never schedules builds of its own. Rust applies the shadow-pass
+			// section test to these resident candidates.
 			// Java supplies only bounded resident immutable section candidates.
 			// Rust derives the active source shadow domain and owns pass selection.
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.shadow-candidate-collection");
@@ -1558,108 +1533,6 @@ public final class RustGalWholeFrameTerrainSource {
 				output.destroy();
 			}
 		}
-	}
-
-	private int requestShadowCasterBuilds() {
-		if (this.level == null || this.lastCameraSection == Long.MIN_VALUE) {
-			return 0;
-		}
-		int radius = this.configuredHorizontalRadius();
-		if (radius != this.shadowSweepRadius) {
-			int width = radius * 2 + 1;
-			Integer[] order = new Integer[width * width];
-			for (int index = 0; index < order.length; index++) {
-				order[index] = index;
-			}
-			java.util.Arrays.sort(order, java.util.Comparator.comparingInt((Integer index) -> {
-				int dx = index % width - radius;
-				int dz = index / width - radius;
-				return dx * dx + dz * dz;
-			}));
-			int[] offsets = new int[order.length * 2];
-			for (int index = 0; index < order.length; index++) {
-				offsets[index * 2] = order[index] % width - radius;
-				offsets[index * 2 + 1] = order[index] / width - radius;
-			}
-			this.shadowSweepOffsets = offsets;
-			this.shadowSweepRadius = radius;
-			this.shadowSweepCursor = 0;
-			this.shadowSweepDeferred.clear();
-		}
-		if (this.lastCameraSection != this.shadowSweepCameraSection) {
-			this.shadowSweepCameraSection = this.lastCameraSection;
-			this.shadowSweepCursor = 0;
-			this.shadowSweepDeferred.clear();
-		}
-		int columns = this.shadowSweepOffsets.length / 2;
-		int centerX = SectionPos.x(this.lastCameraSection);
-		int centerZ = SectionPos.z(this.lastCameraSection);
-		int[] requests = new int[1];
-		if (this.shadowSweepCursor >= columns) {
-			if (this.shadowSweepDeferred.isEmpty() || ++this.shadowSweepRetryFrame % SHADOW_SWEEP_RETRY_INTERVAL_FRAMES != 0) {
-				return 0;
-			}
-			// Retry columns whose chunk has arrived since the pass visited them.
-			for (int index = 0; index < this.shadowSweepDeferred.size(); ) {
-				int column = this.shadowSweepDeferred.getInt(index);
-				int x = centerX + this.shadowSweepOffsets[column * 2];
-				int z = centerZ + this.shadowSweepOffsets[column * 2 + 1];
-				if (!this.isChunkLoaded(x, z)) {
-					index++;
-					continue;
-				}
-				if (!this.requestShadowCasterColumn(x, z, requests)) {
-					return requests[0];
-				}
-				this.shadowSweepDeferred.removeInt(index);
-			}
-			return requests[0];
-		}
-		int examined = 0;
-		while (this.shadowSweepCursor < columns && examined < MAX_SHADOW_SWEEP_COLUMNS_PER_FRAME) {
-			int x = centerX + this.shadowSweepOffsets[this.shadowSweepCursor * 2];
-			int z = centerZ + this.shadowSweepOffsets[this.shadowSweepCursor * 2 + 1];
-			examined++;
-			if (!this.isChunkLoaded(x, z)) {
-				this.shadowSweepDeferred.add(this.shadowSweepCursor);
-			} else if (!this.requestShadowCasterColumn(x, z, requests)) {
-				// Resume this column next frame; completed keys are skipped.
-				return requests[0];
-			}
-			this.shadowSweepCursor++;
-		}
-		return requests[0];
-	}
-
-	/**
-	 * Queues every non-air, not-yet-requested section of one loaded column.
-	 * Returns false when the per-frame request bound stopped it part-way.
-	 */
-	private boolean requestShadowCasterColumn(int x, int z, int[] requests) {
-		net.minecraft.world.level.chunk.LevelChunk chunk = this.level.getChunk(x, z);
-		net.minecraft.world.level.chunk.LevelChunkSection[] chunkSections = chunk.getSections();
-		int minY = this.level.getMinSectionY();
-		int maxY = this.level.getMaxSectionY();
-		for (int y = minY; y <= maxY; y++) {
-			int sectionIndex = this.level.getSectionIndexFromSectionY(y);
-			if (sectionIndex < 0 || sectionIndex >= chunkSections.length
-				|| chunkSections[sectionIndex] == null || chunkSections[sectionIndex].hasOnlyAir()) {
-				// An all-air section can never cast a shadow.
-				continue;
-			}
-			long key = SectionPos.asLong(x, y, z);
-			if (this.sections.containsKey(key) || this.inFlight.contains(key)
-				|| this.unavailableSections.contains(key) || this.queued.contains(key)) {
-				continue;
-			}
-			if (requests[0] >= MAX_SHADOW_HALO_REQUESTS_PER_FRAME) {
-				return false;
-			}
-			this.queued.add(key);
-			this.pending.addLast(SectionPos.of(x, y, z));
-			requests[0]++;
-		}
-		return true;
 	}
 
 	private boolean isInsideCurrentWindow(SectionPos section) {
