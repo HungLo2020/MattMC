@@ -79,6 +79,8 @@ pub(crate) struct BridgeRegistry {
     // otherwise copies whole contexts through several stack frames, exhausting
     // ordinary JVM native stacks when inserting into an existing node.
     pub(crate) contexts: BTreeMap<u64, Box<BridgeContext>>,
+    /// Pipelined frame workers by context id; see `pipeline`.
+    pub(crate) pipelines: BTreeMap<u64, FramePipeline>,
     pub(crate) last_error: String,
     pub(crate) windowed_presenter_active: bool,
 }
@@ -88,6 +90,8 @@ impl Drop for BridgeRegistry {
         // The registry is thread-local, so a thread can terminate with live
         // contexts if its owner did not reach the explicit destroy seam. Do
         // not strand the process-wide admission counters in that case.
+        // Finish and stop every frame worker before its context is dropped.
+        self.pipelines.clear();
         let live = self.contexts.len();
         let presenter_active = self.windowed_presenter_active;
         // Drop the owning GALs before releasing their admission slots. This
@@ -115,6 +119,7 @@ thread_local! {
     static BRIDGE_REGISTRY: RefCell<BridgeRegistry> = RefCell::new(BridgeRegistry {
         next_context_id: 1,
         contexts: BTreeMap::new(),
+        pipelines: BTreeMap::new(),
         last_error: String::new(),
         windowed_presenter_active: false,
     });
@@ -124,9 +129,14 @@ pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> 
     let budget = memory::RequestBudget::begin();
     BRIDGE_REGISTRY.with(|registry| {
         let mut registry = registry.borrow_mut();
+        registry.join_pipelined_frames();
         let before: Vec<_> = registry.contexts.iter().map(|(id, ctx)| (*id, ctx.ffi_calls, ctx.ffi_input_bytes)).collect();
         let result = f(&mut registry);
         for (id, calls, bytes) in before {
+            // A pipelined frame now owns its context; decode already charged it.
+            if registry.pipelines.get(&id).is_some_and(FramePipeline::is_pending) {
+                continue;
+            }
             if let Some(context) = registry.contexts.get_mut(&id) {
                 if context.ffi_calls != calls {
                     context.ffi_input_bytes = bytes.saturating_add(budget.bytes() as u64);
@@ -138,7 +148,21 @@ pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> 
 }
 
 pub(crate) fn with_registry<T>(f: impl FnOnce(&BridgeRegistry) -> T) -> T {
-    BRIDGE_REGISTRY.with(|registry| f(&registry.borrow()))
+    BRIDGE_REGISTRY.with(|registry| {
+        let registry = registry.borrow();
+        registry.join_pipelined_frames();
+        f(&registry)
+    })
+}
+
+impl BridgeRegistry {
+    /// Every entry point calls this before touching any context: a pipelined
+    /// frame owns its context until joined.
+    pub(crate) fn join_pipelined_frames(&self) {
+        for pipeline in self.pipelines.values() {
+            pipeline.join();
+        }
+    }
 }
 
 fn reserve_windowed_presenter(registry: &mut BridgeRegistry) -> GalResult<()> {
@@ -518,6 +542,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
             write_status_out(out, status_error(Some(context), &error));
             return error.code as i32;
         }
+        registry.pipelines.remove(&context_id);
         let mut context = registry
             .contexts
             .remove(&context_id)

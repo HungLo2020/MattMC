@@ -105,7 +105,7 @@ use crate::render::shaderpack::runtime::fullscreen::{
     FullscreenSourceExecutionPlan, FullscreenSourcePassFrame, SourceFinalOutputCache,
     SourceFinalOutputPlan, SourceFinalOutputReservation, SourceFinalPresentationCapture,
 };
-use crate::render::shaderpack::properties::item_ids::canonical_resource_location;
+use crate::render::shaderpack::properties::item_ids::{canonical_resource_location, is_canonical_resource_location};
 use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapBinding;
 use crate::render::shaderpack::lowering::TerrainSourceUniformField;
 use crate::render::shaderpack::contracts::material::{
@@ -198,7 +198,18 @@ pub struct WorldPrimitiveFrontend {
     material_asset_payload_bytes: u64,
     material_asset_update_failures: u64,
     mesh_asset_generation: u64,
-    mesh_assets: BTreeMap<u64, MeshAssetStore>,
+    mesh_assets: MeshAssetMap,
+    /// Compact mirror of `mesh_assets`: (drawable generation, has optical-
+    /// stencil sections) per key; assets without sections are omitted.
+    /// Per-frame residency checks of thousands of keys read this instead of
+    /// the large inline asset stores.
+    mesh_asset_drawable_generations: HashMap<u64, (u64, bool), MeshKeyBuildHasher>,
+    /// Keys of resident assets uploaded without retained source semantics
+    /// (normally empty); see `validate_selected_source_frame_coverage`.
+    mesh_assets_lacking_source_semantics: std::collections::HashSet<u64, MeshKeyBuildHasher>,
+    /// Compact static-terrain section-range memo for batch planning; see
+    /// `geometry::batching::MeshRangeMemo`.
+    mesh_range_memo: std::cell::RefCell<geometry::batching::MeshRangeMemo>,
     /// Reuses frame-local mesh batch topology while instance transforms and
     /// colours animate. Entries contain semantic ranges and frame indices
     /// only; they own no GAL handles and are cleared at mesh replacement.
@@ -386,7 +397,7 @@ pub struct WorldPrimitiveFrontend {
     /// admissible for the current pack/material stamp, with whether each has
     /// translucent sections. Streaming changes the visible set every frame;
     /// only newly seen identities are validated.
-    source_terrain_validated_identities: HashMap<(u32, u64, u64), bool>,
+    source_terrain_validated_identities: HashMap<(u32, u64, u64), bool, MeshKeyBuildHasher>,
     source_terrain_validated_stamp: Option<(bool, Option<u64>)>,
     /// (source generation, scope) -> whether DH joins the pack's shadow pass.
     distant_horizons_shadow_pass_memo: std::cell::Cell<Option<((u64, TerrainProgramScope), bool)>>,
@@ -397,9 +408,18 @@ pub struct WorldPrimitiveFrontend {
     /// Per-frame memo of `source_resources_for_local_material`: every entity
     /// draw rebuilt the same merged availability/resource sets per texture.
     local_material_resource_memo: Option<(u64, Vec<LocalMaterialMemoGroup>)>,
+    /// Entity/hand/glint draw bindings shared by every draw of a frame with
+    /// the same program configuration or resource snapshot.
+    local_source_pipeline_memo: FrameMemo<LocalSourcePipelineMemoKey, (Handle, Handle)>,
+    local_source_pack_memo: FrameMemo<LocalSourcePackMemoKey, Handle>,
+    /// Immutable program interfaces already validated for this frame.
+    local_source_validated_interfaces: FrameMemo<(usize, u64), ()>,
     /// Last voxel source mesh list, keyed by the exact terrain instances
     /// (key, generation, world transform bits) and cull box it was built for.
     terrain_voxel_source_memo: Option<TerrainVoxelSourceMemo>,
+    /// mesh key -> (generation, model-space voxel bounds): the compact
+    /// classification used to reject instances outside the voxel volume.
+    terrain_voxel_mesh_bounds: HashMap<u64, (u64, Option<[[f32; 3]; 2]>), MeshKeyBuildHasher>,
     /// Converted source terrain streams reused across frames. Streaming a
     /// render distance of sections would make an unbounded cache grow without
     /// limit, so entries are evicted least-recently-used above a byte budget.
@@ -461,11 +481,11 @@ pub struct WorldPrimitiveFrontend {
     // Mesh section bindings are looked up for every visible instance batch;
     // retain insertion order nowhere in this cache, so hash lookup avoids a
     // logarithmic tree walk during streamed-terrain preparation.
-    mesh_resources: HashMap<MeshResourceKey, MeshResources>,
+    mesh_resources: HashMap<MeshResourceKey, MeshResources, crate::render::vulkanic::gal::AccessHashBuilder>,
     /// Shared page-wide bindings used only by the builtin indexed route. The
     /// legacy per-section sets remain available to source, foil, layered and
     /// diagnostic paths whose addressing contracts differ.
-    mesh_page_resource_sets: HashMap<MeshPageResourceSetKey, Handle>,
+    mesh_page_resource_sets: HashMap<MeshPageResourceSetKey, Handle, crate::render::vulkanic::gal::AccessHashBuilder>,
     source_mesh_resources: BTreeMap<SourceMeshResourceKey, SourceMeshResources>,
     /// Replaced streamed resources remain live until the next explicit frame
     /// submission has validated all semantic batches that may still reference
@@ -479,14 +499,21 @@ pub struct WorldPrimitiveFrontend {
     /// Immutable geometry ranges retire with their descriptor sets and are
     /// reusable only after GAL reports the associated submission complete.
     deferred_mesh_geometry_range_releases: Vec<MeshGeometryResources>,
-    lowered_source_terrain_geometry_resources:
-        BTreeMap<LoweredSourceTerrainDataKey, LoweredSourceTerrainGeometryResources>,
+    lowered_source_terrain_geometry_resources: std::collections::HashMap<
+        LoweredSourceTerrainDataKey,
+        LoweredSourceTerrainGeometryResources,
+        MeshKeyBuildHasher,
+    >,
     source_terrain_geometry_pages: SourceTerrainGeometryPages,
     /// Special-foil glint meshes whose UVs are the SheetedDecal projection of
     /// one instance pose, and the keys used by the frame being prepared.
     source_decal_glint_meshes: std::collections::HashMap<u64, Arc<SourceEntityMeshAsset>>,
     source_decal_glint_used: std::collections::HashSet<u64>,
-    source_terrain_range_memo: std::collections::HashMap<SourceTerrainRangeKey, SourceTerrainRangeSelection>,
+    source_terrain_range_memo: std::collections::HashMap<SourceTerrainRangeKey, SourceTerrainRangeSelection, MeshKeyBuildHasher>,
+    /// Per-mesh facts for selected-source terrain batches whose geometry is
+    /// resident; follows the range memo and geometry residency.
+    retained_source_terrain_meshes: HashMap<u64, RetainedSourceTerrainMesh, MeshKeyBuildHasher>,
+    retained_source_terrain_instance_scratch: Vec<u8>,
     /// Frame whose terrain draws may use shared-page multi-draw.
     source_terrain_multidraw_frame: Option<u64>,
     lowered_source_terrain_frame_data_resources:
@@ -697,3 +724,88 @@ impl WorldPrimitiveFrontend {
 
 #[cfg(test)]
 mod tests;
+
+/// Hasher for Java-built 64-bit mesh keys. Frame preparation looks up every
+/// visible instance's asset several times per frame; an ordered tree made
+/// each lookup a cache-missing descent. Keys can differ only in high bits, so
+/// finish with a full avalanche mix before the table takes low bits.
+#[derive(Clone, Copy, Default)]
+pub(in crate::render::worldrender) struct MeshKeyHasher(u64);
+
+impl std::hash::Hasher for MeshKeyHasher {
+    fn finish(&self) -> u64 {
+        let mut z = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.0 = self.0.rotate_left(8) ^ u64::from(*byte);
+        }
+    }
+
+    fn write_u64(&mut self, value: u64) {
+        // Bijective per word; tuple keys combine words before the final mix.
+        self.0 = (self.0 ^ value).wrapping_mul(0x9e37_79b9_7f4a_7c15).rotate_left(29);
+    }
+
+    fn write_u8(&mut self, value: u8) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u16(&mut self, value: u16) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u32(&mut self, value: u32) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        self.write_u64(value as u64);
+    }
+}
+
+pub(in crate::render::worldrender) type MeshKeyBuildHasher = std::hash::BuildHasherDefault<MeshKeyHasher>;
+
+/// Mesh assets by key. Lookup only: nothing may depend on iteration order.
+pub(in crate::render::worldrender) type MeshAssetMap = HashMap<u64, MeshAssetStore, MeshKeyBuildHasher>;
+
+/// Per-frame membership sets keyed by mesh identities (no ordering).
+pub(in crate::render::worldrender) type MeshKeySet<K> = std::collections::HashSet<K, MeshKeyBuildHasher>;
+
+/// Results that are fixed for one frame id, such as pass bindings resolved by
+/// many draws. Entries are discarded when a different frame asks, so nothing
+/// outlives the frame whose resources produced it.
+pub(in crate::render::worldrender) struct FrameMemo<K, V> {
+    frame_id: u64,
+    entries: Vec<(K, V)>,
+}
+
+impl<K: PartialEq, V: Clone> FrameMemo<K, V> {
+    pub(in crate::render::worldrender) fn get(&self, frame_id: u64, key: &K) -> Option<V> {
+        if self.frame_id != frame_id {
+            return None;
+        }
+        self.entries
+            .iter()
+            .find(|(candidate, _)| candidate == key)
+            .map(|(_, value)| value.clone())
+    }
+
+    pub(in crate::render::worldrender) fn insert(&mut self, frame_id: u64, key: K, value: V) {
+        if self.frame_id != frame_id {
+            self.frame_id = frame_id;
+            self.entries.clear();
+        }
+        self.entries.push((key, value));
+    }
+}
+
+impl<K, V> Default for FrameMemo<K, V> {
+    fn default() -> Self {
+        Self { frame_id: 0, entries: Vec::new() }
+    }
+}

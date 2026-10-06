@@ -1,40 +1,48 @@
 //! Lowered source programs, prepared once per pack generation and memoized.
 
 use super::*;
+use std::sync::Arc;
 
 /// Prepared lowered programs are pure functions of the discovered source
 /// candidate, but preparing one re-derives its contract and interface; the
-/// frontend asks for them several times per frame.
+/// frontend asks for them several times per frame. Immutable snapshots are
+/// shared, so cache hits never copy source text or contracts; callers keep
+/// their exact generation alive until their CPU preparation completes.
 #[derive(Debug, Default)]
 pub(super) struct PreparedSourceProgramMemos {
-    pub(super) terrain: std::cell::RefCell<Vec<(u64, u8, LoweredTerrainSourceProgram)>>,
-    pub(super) entity: std::cell::RefCell<Option<(u64, LoweredEntitySourceProgram)>>,
-    pub(super) hand: std::cell::RefCell<Option<(u64, LoweredHandSourceProgram)>>,
-    pub(super) cloud: std::cell::RefCell<Option<(u64, LoweredCloudSourceProgram)>>,
-    pub(super) distant_horizons: std::cell::RefCell<Option<(u64, LoweredDistantHorizonsSourceProgram)>>,
+    pub(super) terrain: std::cell::RefCell<Vec<(u64, u8, Arc<LoweredTerrainSourceProgram>)>>,
+    pub(super) entity: std::cell::RefCell<Option<(u64, Arc<LoweredEntitySourceProgram>)>>,
+    pub(super) hand: std::cell::RefCell<Option<(u64, Arc<LoweredHandSourceProgram>)>>,
+    pub(super) cloud: std::cell::RefCell<Option<(u64, Arc<LoweredCloudSourceProgram>)>>,
+    pub(super) distant_horizons: std::cell::RefCell<Option<(u64, Arc<LoweredDistantHorizonsSourceProgram>)>>,
     pub(super) distant_horizons_translucent:
-        std::cell::RefCell<Option<(u64, LoweredDistantHorizonsSourceProgram)>>,
-    pub(super) weather: std::cell::RefCell<Option<(u64, LoweredWeatherSourceProgram)>>,
-    pub(super) textured_material: std::cell::RefCell<Option<(u64, LoweredTexturedMaterialSourceProgram)>>,
+        std::cell::RefCell<Option<(u64, Arc<LoweredDistantHorizonsSourceProgram>)>>,
+    pub(super) weather: std::cell::RefCell<Option<(u64, Arc<LoweredWeatherSourceProgram>)>>,
+    pub(super) textured_material: std::cell::RefCell<Option<(u64, Arc<LoweredTexturedMaterialSourceProgram>)>>,
     /// Post-terrain fullscreen chains, keyed by (terrain candidate epoch,
     /// DH candidate epoch, DH chain). Shared so a frame never deep-copies
     /// every stage's lowered source text.
     pub(super) fullscreen: std::cell::RefCell<
         Option<((u64, u64, bool), Vec<std::sync::Arc<LoweredFullscreenSourceProgram>>)>,
     >,
+    /// Individually shared fullscreen stages (pre-terrain, sky, celestial) by
+    /// program address and candidate epochs; see `shared_fullscreen_program`.
+    pub(super) shared_fullscreen: std::cell::RefCell<
+        Vec<((usize, u64, u64), std::sync::Arc<LoweredFullscreenSourceProgram>)>,
+    >,
 }
 
-pub(super) fn memoized_source_program<T: Clone>(
-    cell: &std::cell::RefCell<Option<(u64, T)>>,
+pub(super) fn memoized_source_program<T>(
+    cell: &std::cell::RefCell<Option<(u64, Arc<T>)>>,
     epoch: u64,
     build: impl FnOnce() -> GalResult<Option<T>>,
-) -> GalResult<Option<T>> {
+) -> GalResult<Option<Arc<T>>> {
     if let Some((built_epoch, program)) = cell.borrow().as_ref() {
         if *built_epoch == epoch {
             return Ok(Some(program.clone()));
         }
     }
-    let built = build()?;
+    let built = build()?.map(Arc::new);
     *cell.borrow_mut() = built.as_ref().map(|program| (epoch, program.clone()));
     Ok(built)
 }
@@ -46,7 +54,7 @@ impl ShaderPackRuntimeExecutor {
     /// artifact can ever be executed.
     pub(crate) fn prepared_lowered_distant_horizons_source_program(
         &self,
-    ) -> GalResult<Option<LoweredDistantHorizonsSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredDistantHorizonsSourceProgram>>> {
         memoized_source_program(
             &self.prepared_program_memos.distant_horizons,
             self.distant_horizons_source_candidate_epoch,
@@ -116,7 +124,7 @@ impl ShaderPackRuntimeExecutor {
     /// with the owned depth-history resource required by the contract.
     pub(crate) fn prepared_lowered_distant_horizons_translucent_source_program(
         &self,
-    ) -> GalResult<Option<LoweredDistantHorizonsSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredDistantHorizonsSourceProgram>>> {
         memoized_source_program(
             &self.prepared_program_memos.distant_horizons_translucent,
             self.distant_horizons_source_candidate_epoch,
@@ -176,7 +184,7 @@ impl ShaderPackRuntimeExecutor {
     /// itself never mutates route admission or allocates backend resources.
     pub(crate) fn prepared_lowered_cloud_source_program(
         &self,
-    ) -> GalResult<Option<LoweredCloudSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredCloudSourceProgram>>> {
         memoized_source_program(&self.prepared_program_memos.cloud, self.source_candidate_epoch, || {
             self.prepared_lowered_cloud_source_program_uncached()
         })
@@ -239,7 +247,7 @@ impl ShaderPackRuntimeExecutor {
     /// target writer is staged by the combined source-frame transaction.
     pub(crate) fn prepared_lowered_weather_source_program(
         &self,
-    ) -> GalResult<Option<LoweredWeatherSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredWeatherSourceProgram>>> {
         memoized_source_program(&self.prepared_program_memos.weather, self.source_candidate_epoch, || {
             self.prepared_lowered_weather_source_program_uncached()
         })
@@ -281,7 +289,7 @@ impl ShaderPackRuntimeExecutor {
     /// can execute.
     pub(crate) fn prepared_lowered_textured_material_source_program(
         &self,
-    ) -> GalResult<Option<LoweredTexturedMaterialSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredTexturedMaterialSourceProgram>>> {
         memoized_source_program(&self.prepared_program_memos.textured_material, self.source_candidate_epoch, || {
             self.prepared_lowered_textured_material_source_program_uncached()
         })
@@ -324,7 +332,7 @@ impl ShaderPackRuntimeExecutor {
     /// a draw.
     pub(crate) fn prepared_lowered_entity_source_program(
         &self,
-    ) -> GalResult<Option<LoweredEntitySourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredEntitySourceProgram>>> {
         memoized_source_program(&self.prepared_program_memos.entity, self.source_candidate_epoch, || {
             self.prepared_lowered_entity_source_program_uncached()
         })
@@ -368,7 +376,7 @@ impl ShaderPackRuntimeExecutor {
     /// copied first-person projection and depth-clear contract.
     pub(crate) fn prepared_lowered_hand_source_program(
         &self,
-    ) -> GalResult<Option<LoweredHandSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredHandSourceProgram>>> {
         memoized_source_program(&self.prepared_program_memos.hand, self.source_candidate_epoch, || {
             self.prepared_lowered_hand_source_program_uncached()
         })
@@ -412,7 +420,7 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_terrain_source_program(
         &self,
         kind: TerrainMaterialProgramKind,
-    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredTerrainSourceProgram>>> {
         let slot = match kind {
             TerrainMaterialProgramKind::Opaque => 0,
             TerrainMaterialProgramKind::Cutout => 1,
@@ -427,7 +435,7 @@ impl ShaderPackRuntimeExecutor {
         &self,
         slot: u8,
         build: impl FnOnce() -> GalResult<Option<LoweredTerrainSourceProgram>>,
-    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredTerrainSourceProgram>>> {
         let epoch = self.source_candidate_epoch;
         if let Some((_, _, program)) = self
             .prepared_program_memos
@@ -438,7 +446,7 @@ impl ShaderPackRuntimeExecutor {
         {
             return Ok(Some(program.clone()));
         }
-        let built = build()?;
+        let built = build()?.map(Arc::new);
         let mut memos = self.prepared_program_memos.terrain.borrow_mut();
         memos.retain(|(built_epoch, built_slot, _)| *built_epoch == epoch && *built_slot != slot);
         if let Some(program) = built.as_ref() {
@@ -516,7 +524,7 @@ impl ShaderPackRuntimeExecutor {
     /// admitting the pass.
     pub(crate) fn prepared_lowered_translucent_terrain_source_program(
         &self,
-    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredTerrainSourceProgram>>> {
         self.memoized_terrain_program(3, || {
             self.prepared_lowered_translucent_terrain_source_program_uncached()
         })
@@ -564,7 +572,7 @@ impl ShaderPackRuntimeExecutor {
     /// provide a matching shadow attachment/output contract and resource set.
     pub(crate) fn prepared_lowered_shadow_source_program(
         &self,
-    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+    ) -> GalResult<Option<Arc<LoweredTerrainSourceProgram>>> {
         self.memoized_terrain_program(4, || {
             self.prepared_lowered_shadow_source_program_uncached()
         })

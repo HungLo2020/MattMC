@@ -195,6 +195,10 @@ public class IrisConfig {
 		// NB: This uses ISO-8859-1 with unicode escapes as the encoding
 		try (OutputStream os = Files.newOutputStream(propertiesPath)) {
 			properties.store(os, COMMENT);
+		} finally {
+			// Coarse file timestamps can hide a same-size rewrite from the
+			// Rust route's per-frame settings snapshot.
+			net.vulkanic.shaderpack.RustShaderPackSourceCollector.invalidateIrisProperties();
 		}
 	}
 

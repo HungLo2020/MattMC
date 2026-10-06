@@ -1701,6 +1701,7 @@ impl WorldPrimitiveFrontend {
                         indirect_stream.map(|stream| TerrainIndexedIndirect {
                             buffer: stream.buffer,
                             offset: command_offset,
+                            draw_count: 1,
                         });
                 }
                 let draws = pending_draws

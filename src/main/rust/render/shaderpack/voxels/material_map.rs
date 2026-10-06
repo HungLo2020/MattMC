@@ -62,6 +62,35 @@ pub struct VoxelMaterialMap {
     non_solid_divisor: i32,
     rules: Vec<VoxelMaterialRule>,
     default_voxel: u8,
+    /// Lazily built results for ids 0..=u16::MAX; a pure function of the
+    /// fields above, so it takes no part in equality.
+    dense: DenseOccupancyLookup,
+}
+
+/// `occupancy_value` for ids 0..=u16::MAX, filled on first use of each id
+/// (0 = not yet computed, 1 = `None`, `2 + value` otherwise). Voxel staging
+/// asks per vertex sample, and each slow lookup scans every rule.
+#[derive(Default)]
+struct DenseOccupancyLookup(std::sync::OnceLock<Box<[std::sync::atomic::AtomicU16]>>);
+
+impl Clone for DenseOccupancyLookup {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+impl PartialEq for DenseOccupancyLookup {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for DenseOccupancyLookup {}
+
+impl std::fmt::Debug for DenseOccupancyLookup {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("DenseOccupancyLookup")
+    }
 }
 
 impl VoxelMaterialMap {
@@ -116,6 +145,7 @@ impl VoxelMaterialMap {
             non_solid_divisor,
             rules,
             default_voxel,
+            dense: DenseOccupancyLookup::default(),
         })
     }
 
@@ -130,6 +160,27 @@ impl VoxelMaterialMap {
     /// `None` means the selected source intentionally does not write this
     /// material into the occupancy volume.
     pub fn occupancy_value(&self, material: i32) -> Option<u8> {
+        let Ok(index) = u16::try_from(material) else {
+            return self.occupancy_value_uncached(material);
+        };
+        use std::sync::atomic::{AtomicU16, Ordering};
+        let table = self
+            .dense
+            .0
+            .get_or_init(|| (0..=u16::MAX).map(|_| AtomicU16::new(0)).collect());
+        let slot = &table[usize::from(index)];
+        match slot.load(Ordering::Relaxed) {
+            0 => {
+                let value = self.occupancy_value_uncached(material);
+                slot.store(value.map_or(1, |value| 2 + u16::from(value)), Ordering::Relaxed);
+                value
+            }
+            1 => None,
+            encoded => Some((encoded - 2) as u8),
+        }
+    }
+
+    fn occupancy_value_uncached(&self, material: i32) -> Option<u8> {
         if material == self.water_material
             || (material < self.non_solid_less_than
                 && material.rem_euclid(self.non_solid_divisor) == self.non_solid_remainder)
@@ -541,5 +592,22 @@ mod tests {
         assert_eq!(Some(216), map.occupancy_value(32004)); // Ice
         assert_eq!(Some(200), map.occupancy_value(31000)); // Stained glass range
         assert_eq!(None, map.occupancy_value(32000)); // Water
+    }
+
+    #[test]
+    fn memoized_lookup_matches_rule_scan_for_every_id_and_equality_ignores_it() {
+        let source =
+            crate::render::shaderpack::contracts::terrain::bundled_complementary_hung_loified_source(1).unwrap();
+        let contract =
+            crate::render::shaderpack::contracts::terrain::derive_complementary_terrain_contract(&source).unwrap();
+        let map = VoxelMaterialMap::derive(&source, &contract).unwrap();
+        let fresh = map.clone();
+        for pass in 0..2 {
+            for id in (-3..=i32::from(u16::MAX) + 3).chain([i32::MIN, i32::MAX]) {
+                assert_eq!(map.occupancy_value_uncached(id), map.occupancy_value(id), "id {id} pass {pass}");
+            }
+        }
+        // A warmed table does not change identity with an unwarmed clone.
+        assert_eq!(fresh, map);
     }
 }

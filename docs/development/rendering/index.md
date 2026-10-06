@@ -7,12 +7,16 @@ each module there has a short README with its own file map.
 - [Goal 5 rendering checkpoint](GOAL-5-STATUS.md): current source scope, bounded evidence, open tracker work and remaining parity/performance limits.
 - [Render Architecture](RENDER-ARCHITECTURE.md): the layers, what each may
   depend on, and where new code belongs.
+- [Retained render scene](RETAINED-SCENE.md): the proposed persistent scene
+  model and its phased rollout toward Frozen parity.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:
   handles, validation, submission, hazards and common errors.
 - [Java Bridge](JAVA-BRIDGE.md): the C ABI Java calls, and how to change it
   without breaking Java.
 - [Render Verification](RENDER-VERIFICATION.md): tests, Frozen image
   comparisons, real-config sessions and A/B performance checks.
+- [Capture storage and recovery](ARTIFACT-STORAGE.md): reclaim reproducible
+  caches and restore losslessly archived historical capture data.
 - [Shader terrain profiling](SHADER-TERRAIN-PROFILING.md): compare moving shader
   workloads and isolate batching and Java allocation costs.
 - [RenderDoc input observations](RENDERDOC-INPUTS.md): capture Frozen's actual

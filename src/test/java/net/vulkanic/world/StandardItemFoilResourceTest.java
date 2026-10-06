@@ -30,8 +30,7 @@ class StandardItemFoilResourceTest {
         assertTrue(ground.contains("\"minecraft:item_entity/ground-glint\", true)"));
         assertTrue(ground.contains("glintInstance.withItemFoil(standardFoil)"));
         assertFalse(ground.contains("standardItemFoilUv"));
-        int first = source.indexOf("private static BlockMeshExtraction extractItemQuadMesh(");
-        int body = source.indexOf("private static BlockMeshExtraction extractItemQuadMesh(", first + 1);
+        int body = source.indexOf("private static BlockMeshExtraction extractItemQuadMeshUncached(");
         var extraction = source.substring(body, source.indexOf("\n\tprivate static", body + 1));
         assertFalse(extraction.contains("ticks % 110000L"));
         assertFalse(extraction.contains("specialFoilInversePose"));

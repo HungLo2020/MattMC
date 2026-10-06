@@ -14,6 +14,9 @@ pub(in crate::render::worldrender) struct MeshAssetStore {
     /// `texture_animation_signature` for the frontend's texture-animation
     /// generation it was computed under (it walks every section).
     pub(in crate::render::worldrender) texture_animation_signature_cache: std::cell::Cell<Option<(u64, u64)>>,
+    /// Whether any section uses optical stencil materials. Batching asks for
+    /// every visible and shadow-candidate instance each frame; derive it once.
+    pub(in crate::render::worldrender) optical_stencil_sections: std::cell::OnceCell<bool>,
     pub(in crate::render::worldrender) mesh_generation: u64,
     pub(in crate::render::worldrender) index_generation: u64,
     pub(in crate::render::worldrender) vertex_layout_version: u32,
@@ -47,6 +50,7 @@ impl Default for MeshAssetStore {
             translucent_order: Default::default(),
             section_ranges_cache: Default::default(),
             texture_animation_signature_cache: Default::default(),
+            optical_stencil_sections: Default::default(),
             mesh_generation: 0,
             index_generation: 0,
             vertex_layout_version: 0,
@@ -66,6 +70,17 @@ impl Default for MeshAssetStore {
 }
 
 impl MeshAssetStore {
+    pub(in crate::render::worldrender) fn has_optical_stencil_sections(&self) -> bool {
+        *self.optical_stencil_sections.get_or_init(|| {
+            self.sections.iter().any(|section| {
+                matches!(
+                    section.material_mode,
+                    WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
+                )
+            })
+        })
+    }
+
     pub(in crate::render::worldrender) fn compatible_section_ranges(
         &self,
         instance: &WorldMeshInstanceRequest,
@@ -742,12 +757,13 @@ impl WorldPrimitiveFrontend {
             .copied()
             .filter(|key| retirement_keys.contains(&key.mesh_key))
             .collect::<Vec<_>>();
-        let retired_lowered_source_keys = self
+        let mut retired_lowered_source_keys = self
             .lowered_source_terrain_geometry_resources
             .keys()
             .filter(|key| retirement_keys.contains(&key.mesh_key))
             .cloned()
             .collect::<Vec<_>>();
+        retired_lowered_source_keys.sort_unstable();
         let mut incoming_texture_ids = BTreeSet::new();
         if textures.len() > WORLD_MAX_MESH_TEXTURE_ASSETS {
             return Err(GalError::ffi(
@@ -958,6 +974,7 @@ impl WorldPrimitiveFrontend {
                     translucent_order: Default::default(),
                     section_ranges_cache: Default::default(),
                     texture_animation_signature_cache: Default::default(),
+                    optical_stencil_sections: Default::default(),
                     mesh_generation: mesh.mesh_generation,
                     index_generation: 0,
                     vertex_layout_version: mesh.vertex_layout_version,
@@ -1030,7 +1047,7 @@ impl WorldPrimitiveFrontend {
                             }))
             })
             .collect();
-        let stale_lowered_source_keys = self
+        let mut stale_lowered_source_keys = self
             .lowered_source_terrain_geometry_resources
             .keys()
             .filter(|key| {
@@ -1042,6 +1059,7 @@ impl WorldPrimitiveFrontend {
             })
             .cloned()
             .collect::<Vec<_>>();
+        stale_lowered_source_keys.sort_unstable();
         // Validate the complete future asset view before retiring or replacing anything.
         let mut sorted_keys = BTreeSet::new();
         let mut sorted_uploads = Vec::new();
@@ -1080,6 +1098,9 @@ impl WorldPrimitiveFrontend {
         self.destroy_lowered_source_terrain_resources_for_keys(gal, retired_lowered_source_keys);
         for mesh_key in &retirement_keys {
             self.mesh_assets.remove(mesh_key);
+            self.mesh_asset_drawable_generations.remove(mesh_key);
+            self.mesh_assets_lacking_source_semantics.remove(mesh_key);
+            self.terrain_voxel_mesh_bounds.remove(mesh_key);
         }
         self.mesh_asset_generation = generation;
         self.mesh_asset_payload_bytes = payload_bytes;
@@ -1120,6 +1141,17 @@ impl WorldPrimitiveFrontend {
                 self.mesh_texture_animation_generation.wrapping_add(1);
         }
         for (mesh_key, asset) in decoded_meshes {
+            if source_mesh_layout_has_shader_semantics(asset.vertex_layout_version) && asset.source_input.is_none() {
+                self.mesh_assets_lacking_source_semantics.insert(mesh_key);
+            } else {
+                self.mesh_assets_lacking_source_semantics.remove(&mesh_key);
+            }
+            if asset.sections.is_empty() {
+                self.mesh_asset_drawable_generations.remove(&mesh_key);
+            } else {
+                self.mesh_asset_drawable_generations
+                    .insert(mesh_key, (asset.mesh_generation, asset.has_optical_stencil_sections()));
+            }
             self.mesh_assets.insert(mesh_key, asset);
         }
         // Batch plans contain frame indices into the previous mesh-instance

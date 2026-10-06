@@ -231,11 +231,20 @@ impl WorldPrimitiveFrontend {
         // Validated once when converted (source_terrain_mesh_asset).
         let geometry_key =
             self.ensure_lowered_source_terrain_geometry_resources(gal, program, prepared)?;
+        let (geometry_vertex_buffer, index_buffer, index_base, paged_vertex_buffer) = self
+            .lowered_source_terrain_geometry_resources
+            .get(&geometry_key)
+            .map(|resources| {
+                (
+                    resources.vertex_buffer,
+                    resources.index_buffer,
+                    resources.index_offset(),
+                    resources.paged.map(|(vertex, _)| vertex.buffer),
+                )
+            })
+            .ok_or_else(|| GalError::backend("source terrain geometry resources vanished"))?;
         let page = if self.source_terrain_multidraw_frame == Some(prepared.frame_id) {
-            self.lowered_source_terrain_geometry_resources
-                .get(&geometry_key)
-                .and_then(|resources| resources.paged)
-                .map(|(vertex, _)| vertex.buffer)
+            paged_vertex_buffer
         } else {
             None
         };
@@ -325,94 +334,55 @@ impl WorldPrimitiveFrontend {
                 None,
             ),
         };
-        if !self
-            .lowered_source_terrain_frame_data_resources
-            .contains_key(&key)
-        {
-            let program_layouts =
-                self.ensure_lowered_source_terrain_program_layouts(gal, program)?;
-            let label = format!(
-                "source-terrain-frame-data-{}-mesh{}-gen{}",
-                program.identity.as_str(),
-                geometry_key.mesh_key,
-                geometry_key.mesh_generation,
-            );
-            let vertex_buffer = match page {
-                Some(page) => page,
-                None => self
-                    .lowered_source_terrain_geometry_resources
-                    .get(&geometry_key)
-                    .map(|resources| resources.vertex_buffer)
-                    .ok_or_else(|| GalError::backend("source terrain geometry resources vanished"))?,
-            };
-            let instance_range = key.instance_bytes;
-            let mut created = Vec::new();
-            let result = (|| -> GalResult<LoweredSourceTerrainFrameDataResources> {
-                let mut bindings = vec![
-                    ResourceBinding {
-                        binding: interface.vertex_stream.binding,
-                        array_index: 0,
-                        resource: vertex_buffer,
-                        kind: ResourceBindingKind::StorageBuffer,
-                        access: AccessFlags::READ,
-                        dynamic_offsets: Vec::new(),
-                        buffer_range: None,
-                    },
-                    ResourceBinding {
-                        binding: interface.legacy_transforms.binding,
-                        array_index: 0,
-                        resource: stream.buffer,
-                        kind: ResourceBindingKind::UniformBuffer,
-                        access: AccessFlags::READ,
-                        dynamic_offsets: vec![0],
-                        buffer_range: Some(u64::from(interface.legacy_transform_bytes)),
-                    },
-                    ResourceBinding {
-                        binding: interface.instance_stream.binding,
-                        array_index: 0,
-                        resource: stream.buffer,
-                        kind: ResourceBindingKind::StorageBuffer,
-                        access: AccessFlags::READ,
-                        dynamic_offsets: vec![0],
-                        // Dynamic offsets choose the record range inside the
-                        // shared completion-gated stream. The byte length remains
-                        // part of this stable binding key so backend descriptor
-                        // range validation stays exact without keying on payload.
-                        buffer_range: Some(instance_range),
-                    },
-                ];
-                if let Some(binding) = interface.scalar_uniforms {
-                    bindings.push(ResourceBinding {
-                        binding: binding.binding,
-                        array_index: 0,
-                        resource: stream.buffer,
-                        kind: ResourceBindingKind::UniformBuffer,
-                        access: AccessFlags::READ,
-                        dynamic_offsets: vec![0],
-                        buffer_range: Some(u64::from(interface.scalar_uniform_bytes)),
-                    });
-                }
-                bindings.sort_by_key(|binding| binding.binding);
-                let resource_set = gal.create_resource_set(ResourceSetDesc {
-                    label: format!("{label}.set-zero"),
-                    layout: program_layouts.source_data,
-                    bindings,
-                })?;
-                created.push(resource_set);
-                Ok(LoweredSourceTerrainFrameDataResources { resource_set })
-            })();
-            if result.is_err() {
-                for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
-                }
-            }
-            self.lowered_source_terrain_frame_data_resources
-                .insert(key.clone(), result?);
+        // Multi-draw batches of one program share a page set for the frame;
+        // reuse it without comparing the program-identity key per batch.
+        let memo_key = page.map(|page| SourceTerrainFrameDataMemoKey {
+            program: program as *const LoweredTerrainSourceProgram as usize,
+            page,
+            stream_buffer: stream.buffer,
+            instance_bytes: key.instance_bytes,
+        });
+        let memoized = memo_key.and_then(|memo_key| {
+            self.source_terrain_batch_scope
+                .as_ref()
+                .filter(|scope| scope.frame_id == prepared.frame_id)
+                .and_then(|scope| {
+                    scope
+                        .multidraw_frame_data
+                        .iter()
+                        .find(|(candidate, _, _)| *candidate == memo_key)
+                        .map(|(_, _, resource_set)| *resource_set)
+                })
+        });
+        if memoized.is_none() {
+            self.ensure_source_terrain_frame_data_set(gal, program, &key, page.unwrap_or(geometry_vertex_buffer))?;
         }
-        let geometry_upload_ops = self
-            .pending_lowered_source_terrain_geometry_uploads
-            .remove(&geometry_key)
-            .unwrap_or_default();
+        let resource_set = match memoized {
+            Some(resource_set) => resource_set,
+            None => {
+                let resource_set = self
+                    .lowered_source_terrain_frame_data_resources
+                    .get(&key)
+                    .map(|resources| resources.resource_set)
+                    .ok_or_else(|| GalError::backend("source terrain frame data resources vanished"))?;
+                if let (Some(memo_key), Some(scope)) = (
+                    memo_key,
+                    self.source_terrain_batch_scope
+                        .as_mut()
+                        .filter(|scope| scope.frame_id == prepared.frame_id),
+                ) {
+                    scope.multidraw_frame_data.push((memo_key, key.clone(), resource_set));
+                }
+                resource_set
+            }
+        };
+        let geometry_upload_ops = if self.pending_lowered_source_terrain_geometry_uploads.is_empty() {
+            Vec::new()
+        } else {
+            self.pending_lowered_source_terrain_geometry_uploads
+                .remove(&geometry_key)
+                .unwrap_or_default()
+        };
         let transaction = self
             .pending_source_terrain_frame_transactions
             .entry(prepared.frame_id)
@@ -453,8 +423,8 @@ impl WorldPrimitiveFrontend {
             );
             if transaction.shared_uniforms.len() < 64 {
                 transaction.shared_uniforms.push((
-                    prepared.legacy_texture_transforms.to_vec(),
-                    prepared.scalar_uniforms.to_vec(),
+                    Arc::clone(&prepared.legacy_texture_transforms),
+                    Arc::clone(&prepared.scalar_uniforms),
                     stream.legacy_transform_offset,
                     stream.scalar_uniform_offset,
                 ));
@@ -465,7 +435,141 @@ impl WorldPrimitiveFrontend {
             frame_data_key: key,
             stream,
             multidraw_first_instance,
+            resource_set,
+            index_buffer,
+            index_base,
         })
+    }
+
+    /// The set-zero binding `program`'s vertex stream (`vertex_buffer`), its
+    /// uniform blocks and the instance stream for `key`, created once and
+    /// reused until its stream buffer or geometry is released.
+    pub(crate) fn ensure_source_terrain_frame_data_set(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredTerrainSourceProgram,
+        key: &LoweredSourceTerrainFrameDataKey,
+        vertex_buffer: Handle,
+    ) -> GalResult<Handle> {
+        if let Some(resources) = self.lowered_source_terrain_frame_data_resources.get(key) {
+            return Ok(resources.resource_set);
+        }
+        let interface = &program.execution_interface;
+        let program_layouts = self.ensure_lowered_source_terrain_program_layouts(gal, program)?;
+        let label = format!(
+            "source-terrain-frame-data-{}-mesh{}-gen{}",
+            program.identity.as_str(),
+            key.geometry.mesh_key,
+            key.geometry.mesh_generation,
+        );
+        let stream_buffer = key.stream_buffer;
+        let instance_range = key.instance_bytes;
+        let mut bindings = vec![
+            ResourceBinding {
+                binding: interface.vertex_stream.binding,
+                array_index: 0,
+                resource: vertex_buffer,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            },
+            ResourceBinding {
+                binding: interface.legacy_transforms.binding,
+                array_index: 0,
+                resource: stream_buffer,
+                kind: ResourceBindingKind::UniformBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![0],
+                buffer_range: Some(u64::from(interface.legacy_transform_bytes)),
+            },
+            ResourceBinding {
+                binding: interface.instance_stream.binding,
+                array_index: 0,
+                resource: stream_buffer,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![0],
+                // Dynamic offsets choose the record range inside the shared
+                // completion-gated stream. The byte length remains part of
+                // this stable binding key so backend descriptor range
+                // validation stays exact without keying on payload.
+                buffer_range: Some(instance_range),
+            },
+        ];
+        if let Some(binding) = interface.scalar_uniforms {
+            bindings.push(ResourceBinding {
+                binding: binding.binding,
+                array_index: 0,
+                resource: stream_buffer,
+                kind: ResourceBindingKind::UniformBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![0],
+                buffer_range: Some(u64::from(interface.scalar_uniform_bytes)),
+            });
+        }
+        bindings.sort_by_key(|binding| binding.binding);
+        let resource_set = gal.create_resource_set(ResourceSetDesc {
+            label: format!("{label}.set-zero"),
+            layout: program_layouts.source_data,
+            bindings,
+        })?;
+        self.lowered_source_terrain_frame_data_resources
+            .insert(key.clone(), LoweredSourceTerrainFrameDataResources { resource_set });
+        Ok(resource_set)
+    }
+
+    /// Multi-draw set-zero of `program` for one geometry page and frame
+    /// stream, memoized in the frame's batch scope.
+    pub(crate) fn source_terrain_page_frame_data_set(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame_id: u64,
+        program: &LoweredTerrainSourceProgram,
+        page: Handle,
+        stream_buffer: Handle,
+        instance_range: u64,
+    ) -> GalResult<Handle> {
+        let memo_key = SourceTerrainFrameDataMemoKey {
+            program: program as *const LoweredTerrainSourceProgram as usize,
+            page,
+            stream_buffer,
+            instance_bytes: instance_range,
+        };
+        if let Some(set) = self
+            .source_terrain_batch_scope
+            .as_ref()
+            .filter(|scope| scope.frame_id == frame_id)
+            .and_then(|scope| {
+                scope
+                    .multidraw_frame_data
+                    .iter()
+                    .find(|(candidate, _, _)| *candidate == memo_key)
+                    .map(|(_, _, set)| *set)
+            })
+        {
+            return Ok(set);
+        }
+        let key = LoweredSourceTerrainFrameDataKey {
+            geometry: LoweredSourceTerrainDataKey {
+                mesh_key: page.raw(),
+                mesh_generation: 0,
+                abi: SourceGeometryAbi::TerrainPage,
+            },
+            shader_program_identity: program.identity.clone(),
+            shader_pack_generation: program.shader_pack_generation,
+            stream_buffer,
+            instance_bytes: instance_range,
+        };
+        let set = self.ensure_source_terrain_frame_data_set(gal, program, &key, page)?;
+        if let Some(scope) = self
+            .source_terrain_batch_scope
+            .as_mut()
+            .filter(|scope| scope.frame_id == frame_id)
+        {
+            scope.multidraw_frame_data.push((memo_key, key, set));
+        }
+        Ok(set)
     }
 
     /// Materializes the lowered source program's set-one semantic sampler and
@@ -479,24 +583,93 @@ impl WorldPrimitiveFrontend {
         program: &LoweredTerrainSourceProgram,
         resources: &TerrainSourceOwnedResourceSet,
     ) -> GalResult<LoweredSourceTerrainPackKey> {
+        self.resolve_lowered_source_terrain_pack_resources(gal, program, resources)
+            .map(|(key, _)| key)
+    }
+
+    /// Set-one bindings for a (program, resource snapshot) pair. Within a
+    /// batch scope every batch of a pass shares them, so they are resolved
+    /// once by address rather than by comparing identity keys per batch.
+    pub(crate) fn resolve_lowered_source_terrain_pack_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredTerrainSourceProgram,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<(LoweredSourceTerrainPackKey, Handle)> {
         let addresses = (
             program as *const LoweredTerrainSourceProgram as usize,
             resources as *const TerrainSourceOwnedResourceSet as usize,
         );
         if let Some(scope) = self.source_terrain_batch_scope.as_ref() {
-            if let Some((_, _, key)) = scope
+            if let Some((_, _, key, set)) = scope
                 .pack_keys
                 .iter()
-                .find(|(program, resources, _)| (*program, *resources) == addresses)
+                .find(|(program, resources, _, _)| (*program, *resources) == addresses)
             {
-                return Ok(key.clone());
+                return Ok((key.clone(), *set));
             }
         }
         let key = self.ensure_lowered_source_terrain_pack_resources_uncached(gal, program, resources)?;
+        let set = self
+            .lowered_source_terrain_pack_resources
+            .get(&key)
+            .map(|resources| resources.resource_set)
+            .ok_or_else(|| GalError::backend("source terrain pack resources vanished"))?;
         if let Some(scope) = self.source_terrain_batch_scope.as_mut() {
-            scope.pack_keys.push((addresses.0, addresses.1, key.clone()));
+            scope.pack_keys.push((addresses.0, addresses.1, key.clone(), set));
         }
-        Ok(key)
+        Ok((key, set))
+    }
+
+    /// Pipeline and layout for one pass configuration, memoized for the
+    /// batch scope. Misses take the ordinary keyed creation path.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn resolve_lowered_source_terrain_pipeline(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredTerrainSourceProgram,
+        material_mode: u32,
+        cull_policy: u32,
+        winding: u32,
+        color_formats: &[TextureFormat],
+        raster_y_direction: crate::render::vulkanic::resources::RasterYDirection,
+        shadow_alpha_cutoff: Option<f32>,
+    ) -> GalResult<(Handle, Handle)> {
+        let memo_key = SourceTerrainPipelineMemoKey {
+            program: program as *const LoweredTerrainSourceProgram as usize,
+            material_mode,
+            cull_policy,
+            winding,
+            color_formats: color_formats.iter().copied().collect(),
+            raster_y_direction,
+            shadow_alpha_cutoff_bits: shadow_alpha_cutoff.map(f32::to_bits),
+        };
+        if let Some(scope) = self.source_terrain_batch_scope.as_ref() {
+            if let Some((_, pipeline, layout)) =
+                scope.pipelines.iter().find(|(candidate, _, _)| *candidate == memo_key)
+            {
+                return Ok((*pipeline, *layout));
+            }
+        }
+        let key = self.ensure_lowered_source_terrain_pipeline_resources_with_raster(
+            gal,
+            program,
+            material_mode,
+            cull_policy,
+            winding,
+            color_formats.to_vec(),
+            raster_y_direction,
+            shadow_alpha_cutoff,
+        )?;
+        let resolved = self
+            .lowered_source_terrain_pipeline_resources
+            .get(&key)
+            .map(|resources| (resources.pipeline, resources.pipeline_layout))
+            .ok_or_else(|| GalError::backend("source terrain pipeline resources vanished"))?;
+        if let Some(scope) = self.source_terrain_batch_scope.as_mut() {
+            scope.pipelines.push((memo_key, resolved.0, resolved.1));
+        }
+        Ok(resolved)
     }
 
     pub(crate) fn ensure_lowered_source_terrain_pack_resources_uncached(
@@ -674,6 +847,28 @@ impl WorldPrimitiveFrontend {
             WORLD_CULL_NONE,
             winding,
             vec![SHADER_G_BUFFER_COLOR_FORMAT; 2],
+            crate::render::vulkanic::resources::RasterYDirection::Down,
+            shadow_alpha_cutoff,
+        )
+    }
+
+    /// Memoized form of `ensure_lowered_source_shadow_pipeline_resources`.
+    pub(crate) fn resolve_lowered_source_shadow_pipeline(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredTerrainSourceProgram,
+        material_mode: u32,
+        _terrain_cull_policy: u32,
+        winding: u32,
+        shadow_alpha_cutoff: Option<f32>,
+    ) -> GalResult<(Handle, Handle)> {
+        self.resolve_lowered_source_terrain_pipeline(
+            gal,
+            program,
+            material_mode,
+            WORLD_CULL_NONE,
+            winding,
+            &[SHADER_G_BUFFER_COLOR_FORMAT; 2],
             crate::render::vulkanic::resources::RasterYDirection::Down,
             shadow_alpha_cutoff,
         )
@@ -872,7 +1067,7 @@ impl WorldPrimitiveFrontend {
             material_mode,
             cull_policy,
             winding,
-            vec![SHADER_G_BUFFER_COLOR_FORMAT; 4],
+            &[SHADER_G_BUFFER_COLOR_FORMAT; 4],
         )
     }
 
@@ -889,7 +1084,7 @@ impl WorldPrimitiveFrontend {
         material_mode: u32,
         cull_policy: u32,
         winding: u32,
-        color_formats: Vec<TextureFormat>,
+        color_formats: &[TextureFormat],
     ) -> GalResult<Vec<TerrainMeshDraw>> {
         self.ensure_source_mesh_generation(
             "terrain",
@@ -916,38 +1111,20 @@ impl WorldPrimitiveFrontend {
         }
 
         let frame_data = self.ensure_lowered_source_terrain_frame_data(gal, program, prepared)?;
-        let geometry_key = frame_data.geometry_key.clone();
-        let frame_data_key = frame_data.frame_data_key.clone();
-        let pack_key =
-            self.ensure_lowered_source_terrain_pack_resources(gal, program, pack_resources)?;
-        let pipeline_key = self.ensure_lowered_source_terrain_pipeline_resources_for_outputs(
+        let (_, pack_resource_set) =
+            self.resolve_lowered_source_terrain_pack_resources(gal, program, pack_resources)?;
+        let (pipeline, pipeline_layout) = self.resolve_lowered_source_terrain_pipeline(
             gal,
             program,
             material_mode,
             cull_policy,
             winding,
             color_formats,
+            crate::render::vulkanic::resources::RasterYDirection::Up,
+            None,
         )?;
-        let (index_buffer, index_base) = self
-            .lowered_source_terrain_geometry_resources
-            .get(&geometry_key)
-            .map(|resources| (resources.index_buffer, resources.index_offset()))
-            .ok_or_else(|| GalError::backend("source terrain geometry resources vanished"))?;
-        let resource_set = self
-            .lowered_source_terrain_frame_data_resources
-            .get(&frame_data_key)
-            .map(|resources| resources.resource_set)
-            .ok_or_else(|| GalError::backend("source terrain frame data resources vanished"))?;
-        let pack_resource_set = self
-            .lowered_source_terrain_pack_resources
-            .get(&pack_key)
-            .map(|resources| resources.resource_set)
-            .ok_or_else(|| GalError::backend("source terrain pack resources vanished"))?;
-        let (pipeline, pipeline_layout) = self
-            .lowered_source_terrain_pipeline_resources
-            .get(&pipeline_key)
-            .map(|resources| (resources.pipeline, resources.pipeline_layout))
-            .ok_or_else(|| GalError::backend("source terrain pipeline resources vanished"))?;
+        let (index_buffer, index_base, resource_set) =
+            (frame_data.index_buffer, frame_data.index_base, frame_data.resource_set);
         let material_mode = terrain_material_pass_mode(material_mode)?;
 
         let dynamic_offsets = frame_data.dynamic_offsets();
@@ -1034,7 +1211,7 @@ impl WorldPrimitiveFrontend {
         self.prepare_lowered_source_shadow_draws_with_first_instance(
             gal, program, prepared, pack_resources, material_mode, cull_policy, winding, shadow_alpha_cutoff,
         )
-        .map(|(draws, _)| draws)
+        .map(|(draws, ..)| draws)
     }
 
     /// As above, also returning the multi-draw `firstInstance` of this
@@ -1051,13 +1228,11 @@ impl WorldPrimitiveFrontend {
         cull_policy: u32,
         winding: u32,
         shadow_alpha_cutoff: Option<f32>,
-    ) -> GalResult<(Vec<TerrainShadowDraw>, Option<u32>)> {
+    ) -> GalResult<(Vec<TerrainShadowDraw>, Option<u32>, Handle, u64)> {
         let frame_data = self.ensure_lowered_source_terrain_frame_data(gal, program, prepared)?;
-        let geometry_key = frame_data.geometry_key.clone();
-        let frame_data_key = frame_data.frame_data_key.clone();
-        let pack_key =
-            self.ensure_lowered_source_terrain_pack_resources(gal, program, pack_resources)?;
-        let pipeline_key = self.ensure_lowered_source_shadow_pipeline_resources(
+        let (_, pack_resource_set) =
+            self.resolve_lowered_source_terrain_pack_resources(gal, program, pack_resources)?;
+        let (pipeline, pipeline_layout) = self.resolve_lowered_source_shadow_pipeline(
             gal,
             program,
             material_mode,
@@ -1065,21 +1240,7 @@ impl WorldPrimitiveFrontend {
             winding,
             shadow_alpha_cutoff,
         )?;
-        let resource_set = self
-            .lowered_source_terrain_frame_data_resources
-            .get(&frame_data_key)
-            .map(|resources| resources.resource_set)
-            .ok_or_else(|| GalError::backend("source shadow frame data resources vanished"))?;
-        let pack_resource_set = self
-            .lowered_source_terrain_pack_resources
-            .get(&pack_key)
-            .map(|resources| resources.resource_set)
-            .ok_or_else(|| GalError::backend("source shadow pack resources vanished"))?;
-        let (pipeline, pipeline_layout) = self
-            .lowered_source_terrain_pipeline_resources
-            .get(&pipeline_key)
-            .map(|resources| (resources.pipeline, resources.pipeline_layout))
-            .ok_or_else(|| GalError::backend("source shadow pipeline resources vanished"))?;
+        let resource_set = frame_data.resource_set;
         let instance_count =
             u32::try_from(prepared.instance_transforms.len() / TERRAIN_SOURCE_INSTANCE_BYTES)
                 .map_err(|_| {
@@ -1090,7 +1251,6 @@ impl WorldPrimitiveFrontend {
                 "source shadow draw preparation requires at least one instance",
             ));
         }
-        let _ = geometry_key;
         let dynamic_offsets = frame_data.dynamic_offsets();
         let draws = prepared
             .section_indices
@@ -1106,7 +1266,7 @@ impl WorldPrimitiveFrontend {
                 }),
             })
             .collect();
-        Ok((draws, frame_data.multidraw_first_instance))
+        Ok((draws, frame_data.multidraw_first_instance, frame_data.index_buffer, frame_data.index_base))
     }
 
     /// Builds an independent shadow-only draw from a resident copied terrain
@@ -1123,17 +1283,10 @@ impl WorldPrimitiveFrontend {
         winding: u32,
         shadow_alpha_cutoff: Option<f32>,
     ) -> GalResult<Vec<TerrainShadowMeshDraw>> {
-        let (shadows, multidraw_first_instance) = self
+        let (shadows, multidraw_first_instance, index_buffer, index_base) = self
             .prepare_lowered_source_shadow_draws_with_first_instance(
                 gal, program, prepared, pack_resources, material_mode, cull_policy, winding, shadow_alpha_cutoff,
             )?;
-        let geometry_key =
-            self.ensure_lowered_source_terrain_geometry_resources(gal, program, prepared)?;
-        let (index_buffer, index_base) = self
-            .lowered_source_terrain_geometry_resources
-            .get(&geometry_key)
-            .map(|resources| (resources.index_buffer, resources.index_offset()))
-            .ok_or_else(|| GalError::backend("shadow-only terrain geometry resources vanished"))?;
         let instance_count = u32::try_from(
             prepared.instance_transforms.len() / TERRAIN_SOURCE_INSTANCE_BYTES,
         )

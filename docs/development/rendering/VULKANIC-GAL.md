@@ -67,6 +67,15 @@ tracking must record each use even when the resource set was not rebound after
 a barrier. Pass fusion may combine attachment load/store passes, but must
 preserve repeated clears and discard boundaries.
 
+Consecutive draws reuse each bound binding's recorded read accesses until that
+binding changes: a bind clears only its own entry, any other non-draw command
+clears all of them, and write bindings are always re-recorded so repeated writes
+are still rejected (`consecutive_draws_reuse_read_bindings_*`,
+`rebinding_one_set_still_checks_unchanged_reads_against_new_writes`). Access
+events of one resource set and dynamic-offset combination are built once per
+submission. Pending barrier destinations are kept per resource key, so an access
+only examines destinations of its own resource.
+
 For CPU changes to hazard tracking, compare the gameplay benchmark's
 `gal-hazard-analysis` time alongside its read/write-event and barrier counters.
 Keep validation enabled for correctness runs and use a separate validation-off
@@ -111,6 +120,20 @@ half-float attachment in both private backends. Its appended wire value is 12;
 all prior texture-format values and request layouts remain unchanged. The
 shared color-format conformance test clears it to 0.5 and checks half-float
 readback on both backends, alongside exact resource creation for other formats.
+
+The Vulkan lowerer copies large or unaligned `HostWriteBuffer` data through
+persistently mapped staging chunks (`backends/vulkan/lowering/staging.rs`).
+A submission owns its chunks until its timeline value retires; they then return
+to a bounded idle list (32 MiB). Do not reintroduce per-upload buffer and memory
+allocation: driver allocation churn cost about 2 ms per shader frame.
+
+GLSL modules compile through Shaderc at 50–80 ms each, so the Vulkan backend
+keeps compiled SPIR-V on disk (`backends/vulkan/spirv_disk_cache.rs`), keyed by
+a schema/Shaderc tag, build profile, stage, entry point and full source, and
+validated on load. It defaults to `~/.cache/mattmc/spirv-v1`;
+`MATTMC_SPIRV_CACHE_DIR` overrides it (`off` disables it), and a shader dump
+directory disables it. Bump `SCHEMA` when compile options change.
+`MATTMC_TRACE_VK_SHADER_COMPILE=1` prints compile and pipeline creation times.
 
 ## Testing
 

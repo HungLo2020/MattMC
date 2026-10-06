@@ -10,8 +10,10 @@ impl WorldPrimitiveFrontend {
                 let _ = gal.destroy(handle);
             }
         }
-        let geometry_resources =
-            std::mem::take(&mut self.lowered_source_terrain_geometry_resources);
+        let mut geometry_resources =
+            std::mem::take(&mut self.lowered_source_terrain_geometry_resources)
+                .into_iter().collect::<Vec<_>>();
+        geometry_resources.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         for (_, resources) in geometry_resources {
             for handle in resources.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
@@ -19,6 +21,7 @@ impl WorldPrimitiveFrontend {
         }
         self.source_terrain_geometry_pages.destroy_all(gal);
         self.source_terrain_range_memo.clear();
+        self.clear_retained_source_terrain_meshes();
         self.pending_lowered_source_terrain_geometry_uploads.clear();
     }
 
@@ -56,6 +59,9 @@ impl WorldPrimitiveFrontend {
                     .retain(|key, _| !evicted.contains(&(key.mesh_key, key.mesh_generation)));
             }
         }
+        self.forget_retained_source_terrain_meshes(
+            keys.iter().filter(|key| key.abi == SourceGeometryAbi::Terrain).map(|key| key.mesh_key),
+        );
         for key in keys {
             self.pending_lowered_source_terrain_geometry_uploads
                 .remove(&key);
@@ -205,13 +211,7 @@ impl WorldPrimitiveFrontend {
             .filter(|key| binds(&key.resource_generations))
             .cloned()
             .collect();
-        for key in entity {
-            if let Some(resources) = self.lowered_entity_source_pack_resources.remove(&key) {
-                for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
-                }
-            }
-        }
+        self.destroy_lowered_entity_source_pack_resources_for_keys(gal, entity);
         self.lod_exact_atlas_source_pass_resources.destroy(gal);
         self.lod_source_pass_resources.release_pack_resources(gal);
     }
@@ -252,6 +252,7 @@ impl WorldPrimitiveFrontend {
     }
 
     pub(crate) fn destroy_lowered_entity_source_pack_resources(&mut self, gal: &mut VulkanicGal) {
+        self.local_source_pack_memo = FrameMemo::default();
         let resources = std::mem::take(&mut self.lowered_entity_source_pack_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
@@ -262,6 +263,7 @@ impl WorldPrimitiveFrontend {
 
     pub(crate) fn destroy_lowered_entity_source_resources(&mut self, gal: &mut VulkanicGal) {
         self.destroy_lowered_entity_source_pack_resources(gal);
+        self.local_source_pipeline_memo = FrameMemo::default();
         let pipelines = std::mem::take(&mut self.lowered_entity_source_pipeline_resources);
         for (_, resources) in pipelines {
             for handle in resources.handles_in_destroy_order() {
@@ -275,6 +277,10 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         keys: Vec<LoweredEntitySourcePackKey>,
     ) {
+        if !keys.is_empty() {
+            // Memoized handles may name the sets being destroyed.
+            self.local_source_pack_memo = FrameMemo::default();
+        }
         for key in keys {
             if let Some(resources) = self.lowered_entity_source_pack_resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {

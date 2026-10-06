@@ -33,6 +33,11 @@ pub struct TerrainOccupancyRuntime {
     /// In-place patch updates keep the voxelizer and only need its previous
     /// (same-cell) mapping restored when the submission is rejected.
     pub(super) pending_mapping_rollback: Option<VoxelLightVolumeMapping>,
+    /// The shared source list last found equal to `meshes`. The frontend
+    /// hands the same list back while the volume's instances are unchanged,
+    /// so identity proves equality without re-checking every mesh. Cleared
+    /// whenever `meshes` changes.
+    pub(super) matched_source_list: Option<Arc<[TerrainVoxelSourceMesh]>>,
 }
 
 impl TerrainOccupancyRuntime {
@@ -67,6 +72,7 @@ impl TerrainOccupancyRuntime {
             pending_meshes: None,
             pending_voxelizer_rollback: None,
             pending_mapping_rollback: None,
+            matched_source_list: None,
         })
     }
 
@@ -111,6 +117,7 @@ impl TerrainOccupancyRuntime {
         old_resources.destroy(gal)?;
         self.voxelizer = voxelizer;
         self.meshes.clear();
+        self.matched_source_list = None;
         self.pending_meshes = None;
         self.pending_voxelizer_rollback = None;
         Ok(())
@@ -160,16 +167,25 @@ impl TerrainOccupancyRuntime {
     pub(crate) fn append_terrain_source_snapshot_for_mapping(
         &mut self,
         mapping: VoxelLightVolumeMapping,
-        meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
+        meshes: impl Into<Arc<[TerrainVoxelSourceMesh]>>,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<TerrainOccupancyUpdateStats> {
+        let meshes = meshes.into();
         if self.upload_pending {
             return Err(GalError::invalid_argument(
                 "terrain occupancy upload is already pending submission confirmation",
             ));
         }
-        let meshes = meshes.into_iter().collect::<Vec<_>>();
-        let source_meshes_match = self.confirmed_terrain_source_meshes_match(&meshes)?;
+        let source_meshes_match = match &self.matched_source_list {
+            Some(matched) if Arc::ptr_eq(matched, &meshes) => true,
+            _ => {
+                let matched = self.confirmed_terrain_source_meshes_match(&meshes)?;
+                if matched {
+                    self.matched_source_list = Some(Arc::clone(&meshes));
+                }
+                matched
+            }
+        };
         if source_meshes_match && mapping == self.voxelizer.descriptor().mapping {
             // Nothing changed: skip staging a copy of the whole field.
             return Ok(TerrainOccupancyUpdateStats::default());
@@ -215,6 +231,7 @@ impl TerrainOccupancyRuntime {
                 Ok(Some(stats)) => {
                     self.resources.update_mapping(&descriptor)?;
                     if self.voxelizer.pending_patches().is_empty() {
+                        self.matched_source_list = None;
                         self.meshes = candidate;
                     } else {
                         self.pending_mapping_rollback = Some(previous_mapping);
@@ -265,6 +282,7 @@ impl TerrainOccupancyRuntime {
                         self.pending_meshes = Some(candidate);
                         self.upload_pending = true;
                     } else {
+                        self.matched_source_list = None;
                         self.meshes = candidate;
                     }
                     Ok(stats)
@@ -291,6 +309,7 @@ impl TerrainOccupancyRuntime {
             self.resources
                 .update_mapping(staged_voxelizer.descriptor())?;
             self.voxelizer = staged_voxelizer;
+            self.matched_source_list = None;
             self.meshes = candidate;
             return Ok(stats);
         };
@@ -391,6 +410,7 @@ impl TerrainOccupancyRuntime {
         }
         self.resources.confirm_submission()?;
         self.voxelizer.confirm_pending_upload()?;
+        self.matched_source_list = None;
         self.meshes = self.pending_meshes.take().ok_or_else(|| {
             GalError::invalid_argument("terrain occupancy pending mesh set is missing")
         })?;
@@ -447,6 +467,7 @@ impl TerrainOccupancyRuntime {
             // The mesh ownership changed only in semantic data which emitted
             // no occupancy difference, so the current D3 field already
             // represents the candidate exactly.
+            self.matched_source_list = None;
             self.meshes = candidate;
             return Ok(stats);
         };

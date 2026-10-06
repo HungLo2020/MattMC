@@ -16,6 +16,7 @@ impl WorldPrimitiveFrontend {
         self.validated_source_terrain_meshes.clear();
         self.source_terrain_validated_identities.clear();
         self.source_terrain_range_memo.clear();
+        self.clear_retained_source_terrain_meshes();
         self.reset_candidate_source_occupancy_stability();
         self.source_execution_armed = false;
         self.source_execution_activation_reported = false;
@@ -867,14 +868,21 @@ impl WorldPrimitiveFrontend {
         &mut self,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<()> {
-        if let Some((mesh_key, stratum, identity)) =
-            frame.mesh_instances.iter().find_map(|instance| {
-                self.mesh_assets.get(&instance.mesh_key).and_then(|asset| {
-                    (source_mesh_layout_has_shader_semantics(asset.vertex_layout_version)
-                        && asset.source_input.is_none())
-                    .then(|| (instance.mesh_key, instance.stratum, asset.entity_identity.clone()))
+        let lacking = &self.mesh_assets_lacking_source_semantics;
+        if let Some((mesh_key, stratum, identity)) = (!lacking.is_empty())
+            .then(|| {
+                frame.mesh_instances.iter().find_map(|instance| {
+                    lacking.contains(&instance.mesh_key).then(|| {
+                        let identity = self
+                            .mesh_assets
+                            .get(&instance.mesh_key)
+                            .map(|asset| asset.entity_identity.clone())
+                            .unwrap_or_default();
+                        (instance.mesh_key, instance.stratum, identity)
+                    })
                 })
             })
+            .flatten()
         {
             // Uploaded while shaders were off; the rebuild requested when the
             // source route activated will resend it with source semantics.
@@ -1353,19 +1361,15 @@ impl WorldPrimitiveFrontend {
                 && instance.stratum != WORLD_STRATUM_ENTITY_SHADOW_CASTER
                 && instance.stratum != WORLD_STRATUM_ENTITY_MESH
         };
-        let identities = frame
-            .mesh_instances
-            .iter()
-            .filter(|instance| is_terrain(instance))
-            .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
-            .collect::<Vec<_>>();
+        let mut terrain_identity_count = 0usize;
         let stamp = (material_ids, pack_generation);
         if self.source_terrain_validated_stamp != Some(stamp) {
             self.source_terrain_validated_identities.clear();
             self.source_terrain_validated_stamp = Some(stamp);
         }
         let mut any_translucent = false;
-        let mut seen = BTreeSet::new();
+        // Only identities missing from the validated memo need deduplication.
+        let mut seen = MeshKeySet::default();
         // The translucent writer's availability is frame-invariant; resolve it
         // at most once instead of per translucent mesh.
         let mut translucent_stage_status: Option<Option<String>> = None;
@@ -1383,14 +1387,15 @@ impl WorldPrimitiveFrontend {
                 instance.mesh_key,
                 instance.mesh_generation,
             );
-            if !seen.insert(key) {
-                continue;
-            }
             if is_terrain(instance) {
+                terrain_identity_count += 1;
                 if let Some(translucent) = self.source_terrain_validated_identities.get(&key) {
                     any_translucent |= *translucent;
                     continue;
                 }
+            }
+            if !seen.insert(key) {
+                continue;
             }
             if instance.stratum == WORLD_STRATUM_ENTITY_SHADOW_CASTER {
                 // Shadow-only casters (Iris `shadowPlayer`) never reach a
@@ -1505,8 +1510,13 @@ impl WorldPrimitiveFrontend {
             ));
         }
         // Bound the cache to identities still visible.
-        if self.source_terrain_validated_identities.len() > identities.len().saturating_mul(2).max(4096) {
-            let visible = identities.iter().copied().collect::<std::collections::HashSet<_>>();
+        if self.source_terrain_validated_identities.len() > terrain_identity_count.saturating_mul(2).max(4096) {
+            let visible = frame
+                .mesh_instances
+                .iter()
+                .filter(|instance| is_terrain(instance))
+                .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
+                .collect::<MeshKeySet<_>>();
             self.source_terrain_validated_identities.retain(|key, _| visible.contains(key));
         }
         Ok(())

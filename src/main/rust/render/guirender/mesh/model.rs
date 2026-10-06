@@ -324,27 +324,37 @@ pub struct GuiMeshPreparedDraw {
 /// uniforms, while this key permits immutable vertex/index residency across
 /// frames without retaining Java objects or native pointers.
 pub fn geometry_fingerprint(draw: &GuiMeshPreparedDraw) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    hasher.write_u64(draw.vertices.len() as u64);
-    for vertex in &draw.vertices {
-        for value in vertex.position {
-            hasher.write_u32(value.to_bits());
-        }
-        for value in vertex.local_uv {
-            hasher.write_u32(value.to_bits());
-        }
-        for value in vertex.color {
-            hasher.write_u32(value.to_bits());
-        }
-        for value in vertex.normal {
-            hasher.write_u32(value.to_bits());
-        }
+    // GUI item caches fingerprint every mesh draw each frame. Pack the same
+    // fields as before into one buffer and hash it with XXH3 instead of
+    // streaming every component through SipHash.
+    thread_local! {
+        static BYTES: std::cell::RefCell<Vec<u8>> = const { std::cell::RefCell::new(Vec::new()) };
     }
-    hasher.write_u64(draw.indices.len() as u64);
-    for index in &draw.indices {
-        hasher.write_u32(*index);
-    }
-    hasher.finish()
+    BYTES.with(|bytes| {
+        let mut bytes = bytes.borrow_mut();
+        bytes.clear();
+        bytes.reserve(16 + draw.vertices.len() * 48 + std::mem::size_of_val(draw.indices.as_slice()));
+        bytes.extend_from_slice(&(draw.vertices.len() as u64).to_le_bytes());
+        for vertex in &draw.vertices {
+            // One fixed-size block per vertex keeps the copy branch-free.
+            let mut block = [0u8; 48];
+            let values = vertex
+                .position
+                .iter()
+                .chain(&vertex.local_uv)
+                .chain(&vertex.color)
+                .chain(&vertex.normal);
+            for (chunk, value) in block.chunks_exact_mut(4).zip(values) {
+                chunk.copy_from_slice(&value.to_bits().to_le_bytes());
+            }
+            bytes.extend_from_slice(&block);
+        }
+        bytes.extend_from_slice(&(draw.indices.len() as u64).to_le_bytes());
+        for index in &draw.indices {
+            bytes.extend_from_slice(&index.to_le_bytes());
+        }
+        xxhash_rust::xxh3::xxh3_64(&bytes)
+    })
 }
 
 /// One non-overlapping range in a persistent GUI-mesh stream. A command list

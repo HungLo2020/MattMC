@@ -2,7 +2,6 @@ package net.vulkanic.world;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayDeque;
@@ -27,7 +26,7 @@ class TerrainAirFrontierTest {
         assertEquals(1, air.getIncomingDirections());
         assertEquals(GraphDirectionSet.ALL,
             RustGalWholeFrameTerrainSource.rootVisibilityConnections(air.getVisibilityData(), true));
-        LongArrayFIFOQueue frontier = field(source, "propagationPending");
+        LongRingQueue frontier = field(source, "propagationPending");
         assertEquals(section.asLong(), frontier.dequeueLong());
         LongOpenHashSet running = field(source, "inFlight");
         assertTrue(running.isEmpty());
@@ -59,7 +58,7 @@ class TerrainAirFrontierTest {
         assertTrue(invalidated.contains(section.asLong()));
         Long2ObjectOpenHashMap<RenderSection> resident = field(source, "sections");
         assertFalse(resident.containsKey(section.asLong()));
-        LongArrayFIFOQueue frontier = field(source, "propagationPending");
+        LongRingQueue frontier = field(source, "propagationPending");
         assertTrue(frontier.isEmpty());
     }
 

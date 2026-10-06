@@ -525,7 +525,18 @@ public class QuadTree<T>
 					&& this.rootNodeIterator.hasNext())
 			{
 				long sectionPos = this.rootNodeIterator.nextLong();
-				QuadNode<T> rootNode = QuadTree.this.getNode(sectionPos);
+				QuadNode<T> rootNode;
+				try
+				{
+					rootNode = QuadTree.this.getNode(sectionPos);
+				}
+				catch (IndexOutOfBoundsException recentered)
+				{
+					// The render thread iterates without LodQuadTree's lock while its
+					// tick can recenter the tree. A root position captured before that
+					// recenter is no longer part of the tree, so it has no nodes to yield.
+					continue;
+				}
 				if (rootNode != null)
 				{
 					nodeIterator = this.onlyReturnLeaves ? rootNode.getLeafNodeIterator() : rootNode.getNodeIterator(this.stopIteratingFunc);

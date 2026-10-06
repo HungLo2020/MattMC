@@ -69,6 +69,61 @@ that knows about blocks, entities, the GUI or shader packs belongs in a
 renderer. If a renderer needs a backend difference, add a capability rather
 than checking the backend.
 
+The Java CPU boundary may move upward into Rust when gameplay profiles identify
+avoidable collection, policy, state rebuilding or boundary traffic. Measure the
+producer and transfer separately before moving ownership; preserve equivalent
+semantic inputs and generation/lifetime checks. Keep game-specific state in the
+renderer or its CPU source, and use VulkanicGAL for all GPU work. This does not
+authorize borrowed Java GPU state, a fallback renderer or another presenter.
+
+Selected-source frames carry thousands of mesh instances (mostly off-camera
+shadow candidates), and several passes look each one up every frame. Keep
+those lookups hashed: `mesh_assets` is a `MeshAssetMap` keyed through
+`MeshKeyHasher` (see [`worldrender/mod.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/mod.rs)),
+and nothing may depend on its iteration order. Derive per-asset facts once
+(for example `has_optical_stencil_sections`) instead of scanning sections per
+instance. On the Java side, resource texture bytes requested during frame
+extraction go through `TexturePayloadCache`, which resource reload clears.
+
+Java emits camera-visible terrain sections in ascending section-key order
+(`SectionKeyOrder`). Hash-map iteration order shifted as sections streamed, so
+identical sets missed Rust's batch-plan cache; opaque and shadow terrain do not
+depend on submission order, and translucent sections keep their camera-distance
+sort. Off-camera shadow casters cross as compact arrays (mesh key, generation,
+section origin, depth policy; ABI 69) instead of per-instance records. The
+frontend sorts them by mesh key and expands each resident one into a shadow-only
+terrain instance with the frame's terrain camera
+([`frame/shadow_casters.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/frame/shadow_casters.rs)).
+A caster whose newer generation has not crossed yet keeps casting with the
+acknowledged one. Java keeps no active-instance state for casters.
+
+Whole frames execute on a native frame worker by default: Java hands over a
+copied request and collects the next frame while Rust prepares, submits and
+presents the previous one. Every bridge entry point joins the worker before
+touching a context; see [pipelined frames](JAVA-BRIDGE.md#pipelined-frames).
+With native work off the render thread, frame time is the larger of native
+work and Java collection, plus the short serial hand-off between them.
+
+Source terrain draws already use one indirect command each, and consecutive
+commands with identical bindings merge into one multi-draw. Opaque and cutout
+batches are therefore ordered by material mode and retained geometry page
+before draws are built; translucent batches keep their order. Entity mesh
+sections with identical state, uniforms and instances whose index ranges are
+contiguous draw as one range (`PreparedSourceEntityFrame::section_count`).
+Twin shadow draws replay the camera draws' indirect commands, so they stage no
+second copy of the instance records. Source resource sets (`TerrainSourceOwnedResourceSet`)
+are immutable and `Arc`-shared: per-draw material preparation clones and compares
+them, so keep them cheap to clone and do not add mutable state.
+
+The shared mesh instance stream is bound into every mesh resource set, so
+growing it rebuilds them all. It grows to at least twice its previous capacity;
+growing to the exact requirement while terrain streamed caused ~30 ms frames.
+
+Distant Horizons builds its render list on the render thread without
+`LodQuadTree`'s lock while the tick thread can recenter the tree. The node
+iterator therefore skips root positions that left the tree after it captured
+them; an out-of-bounds root previously crashed the client during world load.
+
 ## Resource ownership and retries
 
 The independent CPU terrain source shares its bounded meshing workers between

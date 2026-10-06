@@ -32,5 +32,12 @@ Rules (enforced by `vulkanic/architecture_boundary.rs`): depend only on
 Tests build GALs through `vulkanic::test_support`. Large test modules live in
 `tests.rs` beside the code they test.
 
+The runtime's cached source-program getters return immutable `Arc` snapshots,
+keyed by candidate epoch and terrain material slot. Keep per-frame uniforms and
+GPU resources outside these snapshots. Reloads replace the memoized CPU value;
+callers must still reject mismatched pack/resource generations before using it.
+Run the runtime and world-renderer native tests after changing this contract,
+including `prepared_program_epoch_replacement` for replacement and failed retry.
+
 The built-in programs serve the world renderer's own graph (which the runtime
 executor also records); they may move to `render/worldrender` with it.

@@ -120,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 68;
+	public static final int ABI_VERSION = 69;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -619,6 +619,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return new CapturedFrame(capturedWidth, capturedHeight, bytes.asSlice(0, length).toArray(ValueLayout.JAVA_BYTE));
 		}
 	}
+
+	private PipelinedPresent pipelinedPresent;
+	/** Request memory of the in-flight pipelined frame, closed at its join. */
+	private Arena pipelinedRequestArena;
 
 	public PresentedFrame presentFrame(long frameId, long correlationId, long waitSubmissionId) {
 		MemorySegment request = Struct.FRAME_PRESENT.allocate(arena);
@@ -1700,7 +1704,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiTiledQuadRecord> guiTiledQuads, EngineGlobalsRecord engineGlobals,
 		List<WorldParticleQuadRecord> worldParticles, List<WorldExperienceOrbInstanceRecord> worldOrbs,
 		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
-		TerrainFrameCamera terrainFrameCamera
+		TerrainFrameCamera terrainFrameCamera,
+		StaticTerrainShadowCasters staticTerrainShadowCasters
 	) {
 		return submitWorldFrame(generation, frameId, correlationId, frameTarget, guiWidth, guiHeight,
 			viewportWidth, viewportHeight, viewMatrix, projectionMatrix, worldBackground, worldSegments,
@@ -1709,7 +1714,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads, firstPersonFrame,
 			firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId, true,
 			guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
-			worldDistantHorizonsGenericBoxes, terrainFrameCamera);
+			worldDistantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters);
 	}
 
 	private WholeFrameSubmitResult submitWorldFrame(
@@ -1835,7 +1840,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads,
 			firstPersonFrame, firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId,
 			wholeFrame, guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
-			worldDistantHorizonsGenericBoxes, null
+			worldDistantHorizonsGenericBoxes, null, StaticTerrainShadowCasters.EMPTY
 		);
 	}
 
@@ -1877,11 +1882,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldParticleQuadRecord> worldParticles,
 		List<WorldExperienceOrbInstanceRecord> worldOrbs,
 		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
-		TerrainFrameCamera terrainFrameCamera
+		TerrainFrameCamera terrainFrameCamera,
+		StaticTerrainShadowCasters staticTerrainShadowCasters
 	) {
+		if (pipelinedRequestArena != null) {
+			// The worker still decodes the previous request, which shares the
+			// persistent instance arrays this packing would rewrite.
+			throw new IllegalStateException("a pipelined frame still reads its request; join it before packing another");
+		}
 		Arena previousArena = arena;
 		Arena frameArena = Arena.ofConfined();
 		arena = frameArena;
+		boolean requestHandedOff = false;
 		try {
 		Objects.requireNonNull(viewMatrix, "viewMatrix");
 		Objects.requireNonNull(projectionMatrix, "projectionMatrix");
@@ -2304,6 +2316,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 46,
 			encodeDistantHorizonsGenericBoxes(arena, worldDistantHorizonsGenericBoxes),
 			worldDistantHorizonsGenericBoxes.size());
+		writeStaticTerrainShadowCasters(arena, request, staticTerrainShadowCasters, terrainFrameCamera);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-particles-and-orbs");
 		MemorySegment firstPerson = request.asSlice(
 			Struct.WHOLE_FRAME_SUBMIT.offset(29),
@@ -2357,11 +2370,89 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
+		if (wholeFrame && pipelinedPresent != null) {
+			PipelinedPresent present = pipelinedPresent;
+			pipelinedPresent = null;
+			MemorySegment presentRequest = Struct.FRAME_PRESENT.allocate(arena);
+			Abi.writeHeader(presentRequest, Struct.FRAME_PRESENT);
+			Struct.FRAME_PRESENT.setLong(presentRequest, 1, present.frameId());
+			Struct.FRAME_PRESENT.setLong(presentRequest, 2, present.correlationId());
+			Struct.FRAME_PRESENT.setLong(presentRequest, 3, 0L);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
+			int status = Native.wholeFrameSubmitPipelined(contextId, request, presentRequest, result);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
+			checkStatus(status, "pipelined whole-frame submission");
+			// The native worker decodes this request; it lives until the join.
+			pipelinedRequestArena = frameArena;
+			requestHandedOff = true;
+			return null;
+		}
 		int status = wholeFrame
 			? Native.wholeFrameSubmit(contextId, request, result)
 			: Native.worldPrimitivesSubmit(contextId, request, result);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 		checkStatus(status, wholeFrame ? "whole-frame submission" : "world primitive submission");
+		return readWholeFrameSubmitResult(result);
+		} finally {
+			arena = previousArena;
+			if (!requestHandedOff) {
+				frameArena.close();
+			}
+		}
+	}
+
+	/**
+	 * The next whole-frame submit executes and presents on the native frame
+	 * worker and returns {@code null}; {@link #joinPipelinedFrame()} later
+	 * returns its results. Java must not need the frame's results before then.
+	 */
+	public void armPipelinedPresent(long frameId, long correlationId) {
+		pipelinedPresent = new PipelinedPresent(frameId, correlationId);
+	}
+
+	/**
+	 * Waits for the pipelined frame and returns its submit and present results,
+	 * or {@code null} if none completed since the last join. A failed frame
+	 * was cancelled natively; its failure is thrown here, as the synchronous
+	 * submit would have thrown it.
+	 */
+	public PipelinedFrameResult joinPipelinedFrame() {
+		try (Arena joinArena = Arena.ofConfined()) {
+			MemorySegment submit = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(joinArena);
+			MemorySegment present = Struct.FRAME_PRESENT_RESULT.allocate(joinArena);
+			MemorySegment hasOutcome = joinArena.allocate(ValueLayout.JAVA_INT);
+			int joined;
+			try {
+				joined = Native.wholeFrameJoin(contextId, submit, present, hasOutcome);
+			} finally {
+				// Joined: the worker no longer reads the handed-off request.
+				if (pipelinedRequestArena != null) {
+					pipelinedRequestArena.close();
+					pipelinedRequestArena = null;
+				}
+			}
+			checkStatus(joined, "pipelined frame join");
+			if (hasOutcome.get(ValueLayout.JAVA_INT, 0) == 0) {
+				return null;
+			}
+			checkStatus(Struct.WHOLE_FRAME_SUBMIT_RESULT.getInt(submit, 1), "pipelined whole-frame submission");
+			checkStatus(Struct.FRAME_PRESENT_RESULT.getInt(present, 1), "pipelined frame present");
+			return new PipelinedFrameResult(
+				readWholeFrameSubmitResult(submit),
+				new PresentedFrame(
+					Struct.FRAME_PRESENT_RESULT.getLong(present, 3),
+					Struct.FRAME_PRESENT_RESULT.getLong(present, 4),
+					Struct.FRAME_PRESENT_RESULT.getInt(present, 5),
+					Struct.FRAME_PRESENT_RESULT.getLong(present, 6),
+					Struct.FRAME_PRESENT_RESULT.getLong(present, 7)));
+		}
+	}
+
+	private record PipelinedPresent(long frameId, long correlationId) {}
+
+	public record PipelinedFrameResult(WholeFrameSubmitResult submit, PresentedFrame presented) {}
+
+	private WholeFrameSubmitResult readWholeFrameSubmitResult(MemorySegment result) {
 		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(53);
 		long profileOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(54);
 		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
@@ -2424,10 +2515,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			metrics,
 			profile
 		);
-		} finally {
-			arena = previousArena;
-			frameArena.close();
-		}
 	}
 
 
@@ -4572,6 +4659,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		closed = true;
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		Native.contextDestroy(contextId, status);
+		// Context destruction joined any pipelined frame still reading this.
+		if (pipelinedRequestArena != null) {
+			pipelinedRequestArena.close();
+			pipelinedRequestArena = null;
+		}
 		persistentGuiMeshTopologies.clear();
 		arena.close();
 	}
@@ -5810,6 +5902,64 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Off-camera static-terrain shadow casters as compact copied arrays: mesh
+	 * identity, aligned section origin (x, y, z per caster) and layer depth
+	 * policy. Rust expands resident casters into shadow-only instances with the
+	 * frame's terrain camera; no per-caster Java record is built.
+	 */
+	public record StaticTerrainShadowCasters(
+		long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] depthPolicies, int count
+	) {
+		public static final StaticTerrainShadowCasters EMPTY =
+			new StaticTerrainShadowCasters(new long[0], new long[0], new int[0], new int[0], 0);
+
+		public StaticTerrainShadowCasters {
+			Objects.requireNonNull(meshKeys, "meshKeys");
+			Objects.requireNonNull(meshGenerations, "meshGenerations");
+			Objects.requireNonNull(sectionOrigins, "sectionOrigins");
+			Objects.requireNonNull(depthPolicies, "depthPolicies");
+			if (count < 0 || count > meshKeys.length || count > meshGenerations.length
+				|| count > depthPolicies.length || (long) count * 3L > sectionOrigins.length) {
+				throw new IllegalArgumentException("static terrain shadow casters are not bounded");
+			}
+		}
+	}
+
+	private static void writeStaticTerrainShadowCasters(
+		Arena arena, MemorySegment request, StaticTerrainShadowCasters casters, TerrainFrameCamera camera
+	) {
+		int count = casters.count();
+		if (count != 0 && camera == null) {
+			throw new IllegalStateException("static terrain shadow casters require the frame terrain camera");
+		}
+		var layout = Struct.STATIC_TERRAIN_SHADOW_CASTER;
+		MemorySegment records = layout.array(arena, count);
+		long keyOffset = layout.offset(0);
+		long generationOffset = layout.offset(1);
+		long originOffset = layout.offset(2);
+		long depthOffset = layout.offset(3);
+		long stride = layout.byteSize();
+		long[] keys = casters.meshKeys();
+		long[] generations = casters.meshGenerations();
+		int[] origins = casters.sectionOrigins();
+		int[] depths = casters.depthPolicies();
+		for (int i = 0; i < count; i++) {
+			long base = i * stride;
+			records.set(ValueLayout.JAVA_LONG, base + keyOffset, keys[i]);
+			records.set(ValueLayout.JAVA_LONG, base + generationOffset, generations[i]);
+			records.set(ValueLayout.JAVA_INT, base + originOffset, origins[i * 3]);
+			records.set(ValueLayout.JAVA_INT, base + originOffset + Integer.BYTES, origins[i * 3 + 1]);
+			records.set(ValueLayout.JAVA_INT, base + originOffset + 2L * Integer.BYTES, origins[i * 3 + 2]);
+			records.set(ValueLayout.JAVA_INT, base + depthOffset, depths[i]);
+		}
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 47, records, count);
+		long cameraOffset = Struct.WHOLE_FRAME_SUBMIT.offset(48);
+		request.set(ValueLayout.JAVA_DOUBLE, cameraOffset, camera == null ? 0.0D : camera.x());
+		request.set(ValueLayout.JAVA_DOUBLE, cameraOffset + Double.BYTES, camera == null ? 0.0D : camera.y());
+		request.set(ValueLayout.JAVA_DOUBLE, cameraOffset + 2L * Double.BYTES, camera == null ? 0.0D : camera.z());
+	}
+
 	/** Immutable semantic section origin; frame camera and Rust matrix lowering remain separate. */
 	public record TerrainSectionPlacement(int x, int y, int z) {
 		public TerrainSectionPlacement {
@@ -6873,6 +7023,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle FRAME_SHUTDOWN = downcall("mattmc_vulkanic_gal_frame_shutdown", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_SUBMIT_FRAME = downcall("mattmc_vulkanic_gal_gui_submit_frame", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WHOLE_FRAME_SUBMIT = downcall("mattmc_vulkanic_gal_whole_frame_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WHOLE_FRAME_SUBMIT_PIPELINED = downcall("mattmc_vulkanic_gal_whole_frame_submit_pipelined", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WHOLE_FRAME_JOIN = downcall("mattmc_vulkanic_gal_whole_frame_join", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_PRIMITIVES_SUBMIT = downcall("mattmc_vulkanic_gal_world_primitives_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_gui_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_UPDATE_RAW_IMAGES = downcall("mattmc_vulkanic_gal_gui_update_raw_images", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -7064,6 +7216,22 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int wholeFrameSubmitPipelined(long contextId, MemorySegment request, MemorySegment present, MemorySegment result) {
+			try {
+				return (int) WHOLE_FRAME_SUBMIT_PIPELINED.invokeExact(contextId, request, present, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to submit pipelined Rust VulkanicGAL whole frame", throwable);
+			}
+		}
+
+		static int wholeFrameJoin(long contextId, MemorySegment submit, MemorySegment present, MemorySegment hasOutcome) {
+			try {
+				return (int) WHOLE_FRAME_JOIN.invokeExact(contextId, submit, present, hasOutcome);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to join pipelined Rust VulkanicGAL frame", throwable);
+			}
+		}
+
 		static int worldPrimitivesSubmit(long contextId, MemorySegment request, MemorySegment result) {
 			try {
 				return (int) WORLD_PRIMITIVES_SUBMIT.invokeExact(contextId, request, result);
@@ -7246,6 +7414,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WORLD_EXPERIENCE_ORB_ASSET(109),
 			WORLD_EXPERIENCE_ORB_INSTANCE(110),
 			WORLD_DH_GENERIC_BOX(111),
+			STATIC_TERRAIN_SHADOW_CASTER(112),
 			WORLD_CRACK_QUAD_REQUEST(51),
 			WORLD_BORDER_QUAD_REQUEST(52),
 			WHOLE_FRAME_SUBMIT(53),

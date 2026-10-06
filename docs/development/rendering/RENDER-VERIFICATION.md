@@ -4,6 +4,15 @@ What to run before calling a rendering change done. Frozen, the unmodified
 Java reference checkout, is the correctness baseline: compare against it,
 don't change it.
 
+Large historical capture inputs may be stored as lossless `.gz` archives.
+Restore the original file before running tools that require its plain path;
+see [capture storage and recovery](ARTIFACT-STORAGE.md).
+
+Serialize experiments that share native/class outputs. Native builds now publish
+libraries atomically to preserve existing mappings; that does not establish
+equivalent binary identity for concurrent benchmarks. See
+[native builds and running clients](../tooling/NATIVE-BUILDS.md).
+
 On Linux, `cleanup_client_core_dumping=true` is native crash evidence, even if
 the wrapper exits 143 and no `hs_err` is retained. The capture runner observes
 the same process start identity during its existing termination grace; flight
@@ -556,8 +565,21 @@ false positives; inspect the candidate strips and retain the same thresholds.
 Check the tile counts across all rows too. `--rank-by tiles` saves a separate
 candidate set so a small coherent patch is not hidden by texture-edge pixels.
 
-For a moving path, queue-drain readiness loss restarts timing and resets the
-benchmark camera path. Reject such video as an uninterrupted motion observation.
+Moving-camera performance rows still require a drained terrain queue before
+measurement starts, but the harness passes
+`-Dmattmc.dev.graphicsFrameBenchmark.terrainQueueDrainDuringMeasurement=false`:
+a rotating camera keeps exposing sections (cave networks advance one portal hop
+per rotation in both Sodium implementations), Frozen builds them inside its own
+window, and restarting on every build left vanilla rows unable to settle.
+`measurementFramesWithTerrainStreaming` in the benchmark JSON counts those frames;
+compare it across runs. Settled-static rows keep restarting on any build.
+
+The capture runner's timed diagnostic dump (thread dump, heap and native-memory
+summaries) stops the JVM at a safepoint, so it waits until a frame benchmark
+completes or fails; its class histogram uses `-all` so it never forces a full GC.
+
+When readiness restarts timing, the benchmark camera path resets.
+Reject such video as an uninterrupted motion observation.
 A deliberately labeled streaming diagnostic can pass
 `--jvm-arg=-Dmattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=false`;
 retain asynchronous build/pop-in evidence and do not use it for steady-state

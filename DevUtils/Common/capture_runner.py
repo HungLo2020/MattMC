@@ -237,6 +237,19 @@ def static_terrain_requires_translucent_camera_sort(scenario: str) -> bool:
     return scenario in {"translucent-overlap", "translucent-moving-camera-performance"}
 
 
+
+def timed_dump_allowed(frame_benchmark_configured: bool, frame_benchmark_status: str | None) -> bool:
+    """Whether the timed diagnostic dump may run now.
+
+    The dump's jcmd commands stop the JVM at a safepoint (thread dump, heap and
+    native-memory summaries), which stalls the render thread for 100+ ms. A
+    frame benchmark writes no status while it measures, so defer the dump while
+    its status is non-terminal; it runs once the benchmark completes or fails.
+    """
+    if not frame_benchmark_configured or frame_benchmark_status is None:
+        return True
+    return frame_benchmark_status in {"complete", "failed"}
+
 @dataclass
 class CaptureConfig:
     backend: str
@@ -1971,7 +1984,11 @@ class CaptureRunner:
                     self.terminate_run_processes("title_screen_capture_complete")
                     break
 
-            if not self.dump_taken and elapsed >= self.config.dump_secs:
+            if (
+                not self.dump_taken
+                and elapsed >= self.config.dump_secs
+                and timed_dump_allowed(self.frame_benchmark_status_path is not None, self.frame_benchmark_status())
+            ):
                 self.take_dump(elapsed, client_pid)
 
             if elapsed >= self.config.max_secs:
@@ -2386,8 +2403,10 @@ class CaptureRunner:
                 "===== jcmd GC.class_histogram (bounded diagnostic) =====",
                 # This is intentionally a non-live histogram: it identifies
                 # retained heap owners without forcing a full collection or
-                # changing the measured game's allocation behaviour.
-                command_text(["jcmd", str(client_pid), "GC.class_histogram"], cwd=self.root, timeout_secs=8),
+                # changing the measured game's allocation behaviour. Without
+                # `-all`, jcmd inspects live objects and forces a full GC
+                # (~90 ms observed inside a measured window).
+                command_text(["jcmd", str(client_pid), "GC.class_histogram", "-all"], cwd=self.root, timeout_secs=8),
                 "",
                 "===== jcmd VM.native_memory summary =====",
                 command_text(

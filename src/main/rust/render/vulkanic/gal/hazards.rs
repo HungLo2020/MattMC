@@ -104,7 +104,50 @@ pub type AccessHashBuilder = hashing::BuildHasherDefault<AccessHasher>;
 #[derive(Default)]
 pub(super) struct AccessTracker {
     pub(super) resources: HashMap<AccessResourceKey, AccessBucket, AccessHashBuilder>,
-    destinations: Vec<(AccessTarget, TextureUsageState)>,
+    destinations: PendingDestinations,
+}
+
+/// Barrier destinations not yet consumed by an access. Overlap only exists
+/// within one resource, so they are kept per resource in arrival order and
+/// every check, subtraction and insertion touches only that resource.
+#[derive(Default)]
+pub(super) struct PendingDestinations(
+    HashMap<AccessResourceKey, Vec<(AccessTarget, TextureUsageState)>, AccessHashBuilder>,
+);
+
+impl PendingDestinations {
+    fn for_target(&self, target: AccessTarget) -> &[(AccessTarget, TextureUsageState)] {
+        self.0.get(&target.resource_key()).map_or(&[], Vec::as_slice)
+    }
+
+    fn subtract(&mut self, cover: AccessTarget) {
+        let key = cover.resource_key();
+        if let Some(entries) = self.0.get_mut(&key) {
+            *entries = entries
+                .drain(..)
+                .flat_map(|(target, state)| {
+                    subtract_target(target, cover).into_iter().map(move |target| (target, state))
+                })
+                .collect();
+            if entries.is_empty() {
+                self.0.remove(&key);
+            }
+        }
+    }
+
+    fn retain_non_overlapping(&mut self, target: AccessTarget) {
+        let key = target.resource_key();
+        if let Some(entries) = self.0.get_mut(&key) {
+            entries.retain(|(prior, _)| !targets_overlap(*prior, target));
+            if entries.is_empty() {
+                self.0.remove(&key);
+            }
+        }
+    }
+
+    fn push(&mut self, target: AccessTarget, state: TextureUsageState) {
+        self.0.entry(target.resource_key()).or_default().push((target, state));
+    }
 }
 
 #[derive(Default)]
@@ -115,11 +158,12 @@ pub(super) struct AccessBucket {
 }
 
 impl AccessTracker {
-    pub(super) fn push_read(&mut self, event: AccessEvent) {
-        let bucket = self
-            .resources
-            .entry(event.target.resource_key())
-            .or_default();
+    pub(super) fn push_read_into(bucket: &mut AccessBucket, event: AccessEvent) {
+        // Consecutive draws usually repeat the same read; `reads` only holds
+        // members, so an equal last entry is already recorded.
+        if bucket.reads.last() == Some(&event) {
+            return;
+        }
         if bucket.read_membership.insert(event) {
             bucket.reads.push(event);
         }
@@ -188,11 +232,26 @@ impl VulkanicGal {
     ) -> GalResult<()> {
         self.buffer_upload_capture.begin();
         let mut accesses = AccessTracker::default();
+        // Bound-set accesses depend only on the immutable set and its dynamic
+        // offsets, so each distinct binding is resolved once per submission.
+        let mut set_events = HashMap::<
+            (Handle, smallvec::SmallVec<[u64; 4]>),
+            std::rc::Rc<[AccessEvent]>,
+            AccessHashBuilder,
+        >::default();
         for list in &batch.command_lists {
-            let mut bound_sets = BTreeMap::<(Handle, u32), Vec<AccessEvent>>::new();
+            let mut bound_sets = BTreeMap::<(Handle, u32), std::rc::Rc<[AccessEvent]>>::new();
             let mut vertices = BTreeMap::<u32, AccessEvent>::new();
             let mut indices = None;
             let mut active_layout = None;
+            // Read-only bound state already recorded since the last change.
+            // Re-recording identical reads changes nothing as long as no
+            // write was recorded and no other command (barrier, copy, pass)
+            // intervened, so draws skip sets, vertex and index bindings that
+            // are unchanged since then; a rebind forgets only that binding.
+            let mut recorded_sets: smallvec::SmallVec<[(Handle, u32); 8]> = smallvec::SmallVec::new();
+            let mut vertices_recorded = false;
+            let mut indices_recorded = false;
             for op in &list.operations {
                 let draw = matches!(
                     op,
@@ -205,26 +264,60 @@ impl VulkanicGal {
                     op,
                     CommandOp::Dispatch { .. } | CommandOp::DispatchIndirect { .. }
                 );
+                match op {
+                    CommandOp::BindResourceSet { pipeline_layout, set_index, .. } => {
+                        recorded_sets.retain(|key| *key != (*pipeline_layout, *set_index));
+                    }
+                    CommandOp::SetVertexBuffer { .. } => vertices_recorded = false,
+                    CommandOp::SetIndexBuffer { .. } => indices_recorded = false,
+                    CommandOp::BindGraphicsPipeline(_) | CommandOp::BindComputePipeline(_) => {}
+                    _ if draw || dispatch => {}
+                    _ => {
+                        recorded_sets.clear();
+                        vertices_recorded = false;
+                        indices_recorded = false;
+                    }
+                }
                 if draw || dispatch {
-                    for ((layout, _), events) in &bound_sets {
-                        if Some(*layout) == active_layout {
-                            for event in events {
-                                self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
-                            }
+                    let mut wrote = false;
+                    for (key, events) in &bound_sets {
+                        if Some(key.0) != active_layout || recorded_sets.contains(key) {
+                            continue;
+                        }
+                        let mut reads_only = true;
+                        for event in events.iter() {
+                            reads_only &= event.mode == AccessMode::Read;
+                            self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                        }
+                        if reads_only {
+                            recorded_sets.push(*key);
+                        } else {
+                            wrote = true;
                         }
                     }
                     if draw {
-                        for event in vertices.values() {
-                            self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                        if !vertices_recorded {
+                            for event in vertices.values() {
+                                self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                            }
+                            vertices_recorded = true;
                         }
                         if matches!(
                             op,
                             CommandOp::DrawIndexed { .. } | CommandOp::DrawIndexedIndirect { .. }
-                        ) {
+                        ) && !indices_recorded
+                        {
                             if let Some(event) = indices {
                                 self.record_access(&mut accesses, event, profile.as_deref_mut())?;
+                                indices_recorded = true;
                             }
                         }
+                    }
+                    if wrote {
+                        // Later reads must be checked against these writes.
+                        recorded_sets.clear();
+                        vertices_recorded = false;
+                        indices_recorded = false;
                     }
                 }
                 match op {
@@ -295,32 +388,40 @@ impl VulkanicGal {
                         pipeline_layout,
                         set_index,
                     } => {
-                        let mut events = Vec::new();
-                        let binding_count = self.resource_sets.get(*set)?.desc.bindings.len();
-                        let mut offset_index = 0;
-                        for index in 0..binding_count {
-                            let count = self.resource_sets.get(*set)?.desc.bindings[index]
-                                .dynamic_offsets
-                                .len();
-                            // Keep normal binding validation allocation-free;
-                            // each declared range contributes one access event.
-                            for slot in 0..count.max(1) {
-                                let event = {
-                                    let binding =
-                                        &self.resource_sets.get(*set)?.desc.bindings[index];
-                                    let offset = if count == 0 {
-                                        0
-                                    } else if dynamic_offsets.is_empty() {
-                                        binding.dynamic_offsets[slot]
-                                    } else {
-                                        dynamic_offsets[offset_index + slot]
+                        let cache_key = (*set, smallvec::SmallVec::from_slice(dynamic_offsets));
+                        let events = if let Some(events) = set_events.get(&cache_key) {
+                            std::rc::Rc::clone(events)
+                        } else {
+                            let mut events = Vec::new();
+                            let binding_count = self.resource_sets.get(*set)?.desc.bindings.len();
+                            let mut offset_index = 0;
+                            for index in 0..binding_count {
+                                let count = self.resource_sets.get(*set)?.desc.bindings[index]
+                                    .dynamic_offsets
+                                    .len();
+                                // Keep normal binding validation allocation-free;
+                                // each declared range contributes one access event.
+                                for slot in 0..count.max(1) {
+                                    let event = {
+                                        let binding =
+                                            &self.resource_sets.get(*set)?.desc.bindings[index];
+                                        let offset = if count == 0 {
+                                            0
+                                        } else if dynamic_offsets.is_empty() {
+                                            binding.dynamic_offsets[slot]
+                                        } else {
+                                            dynamic_offsets[offset_index + slot]
+                                        };
+                                        self.resource_binding_access(binding, offset)?
                                     };
-                                    self.resource_binding_access(binding, offset)?
-                                };
-                                events.push(event);
+                                    events.push(event);
+                                }
+                                offset_index += count;
                             }
-                            offset_index += count;
-                        }
+                            let events: std::rc::Rc<[AccessEvent]> = events.into();
+                            set_events.insert(cache_key, std::rc::Rc::clone(&events));
+                            events
+                        };
                         bound_sets.insert((*pipeline_layout, *set_index), events);
                     }
                     CommandOp::SetVertexBuffer {
@@ -613,12 +714,8 @@ impl VulkanicGal {
                             texture: *texture,
                             range: *subresources,
                         };
-                        accesses
-                            .destinations
-                            .retain(|(prior, _)| !targets_overlap(*prior, target));
-                        accesses
-                            .destinations
-                            .push((target, TextureUsageState::TransferSrc));
+                        accesses.destinations.retain_non_overlapping(target);
+                        accesses.destinations.push(target, TextureUsageState::TransferSrc);
                     }
                     CommandOp::HostWriteBuffer {
                         buffer,
@@ -713,21 +810,13 @@ impl VulkanicGal {
                             .map(|event| intersect_target(event.target, barrier_target))
                             .collect();
                         accesses.retain_non_overlapping(barrier_target);
-                        accesses.destinations = accesses
-                            .destinations
-                            .drain(..)
-                            .flat_map(|(target, state)| {
-                                subtract_target(target, barrier_target)
-                                    .into_iter()
-                                    .map(move |target| (target, state))
-                            })
-                            .collect();
+                        accesses.destinations.subtract(barrier_target);
                         if matches!(barrier_target, AccessTarget::Buffer { .. }) {
-                            accesses.destinations.extend(
-                                published.into_iter().map(|target| (target, barrier.after)),
-                            );
+                            for target in published {
+                                accesses.destinations.push(target, barrier.after);
+                            }
                         } else {
-                            accesses.destinations.push((barrier_target, barrier.after));
+                            accesses.destinations.push(barrier_target, barrier.after);
                         }
                         if let Some(profile) = profile.as_deref_mut() {
                             profile.gal_hazard_barriers_applied =
@@ -857,7 +946,7 @@ impl VulkanicGal {
             return Ok(());
         }
         let mut consumes_destination = false;
-        for (target, state) in &accesses.destinations {
+        for (target, state) in accesses.destinations.for_target(event.target) {
             if !targets_overlap(*target, event.target) {
                 continue;
             }
@@ -874,15 +963,7 @@ impl VulkanicGal {
         // every unrelated range. Overlapping ranges still undergo every
         // destination-state check above and the same subtraction below.
         if consumes_destination {
-            accesses.destinations = accesses
-                .destinations
-                .drain(..)
-                .flat_map(|(target, state)| {
-                    subtract_target(target, event.target)
-                        .into_iter()
-                        .map(move |target| (target, state))
-                })
-                .collect();
+            accesses.destinations.subtract(event.target);
         }
         if let Some(profile) = profile.as_deref_mut() {
             match event.mode {
@@ -898,7 +979,9 @@ impl VulkanicGal {
         }
         match event.mode {
             AccessMode::Read => {
-                if let Some(bucket) = accesses.bucket(event.target) {
+                // One bucket lookup serves the conflict scan and the insert.
+                let bucket = accesses.resources.entry(event.target.resource_key()).or_default();
+                {
                     for previous in bucket.writes.iter().copied() {
                         if let Some(profile) = profile.as_deref_mut() {
                             profile.gal_hazard_candidates_examined =
@@ -919,7 +1002,7 @@ impl VulkanicGal {
                         }
                     }
                 }
-                accesses.push_read(event);
+                AccessTracker::push_read_into(bucket, event);
             }
             AccessMode::Write => {
                 if let Some(bucket) = accesses.bucket(event.target) {

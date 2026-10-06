@@ -184,16 +184,19 @@ impl VanillaLightmapCache {
             ));
         }
         frame.validate()?;
-        let rgba8 = frame.inputs.rgba8()?.to_vec();
         if self.world_generation == world_generation && self.lightmap_generation == frame.generation
         {
-            if self.rgba8 != rgba8 {
+            // Java assigns each input set a fresh generation and resends it on
+            // frames between lightmap updates. Re-deriving 256 texels only to
+            // prove that is a debug check, not per-frame release work.
+            if cfg!(debug_assertions) && self.rgba8 != frame.inputs.rgba8()?.as_slice() {
                 return Err(GalError::invalid_argument(
                     "vanilla lightmap generation changed its semantic contents",
                 ));
             }
             return Ok(VanillaLightmapCacheUpdate::Unchanged);
         }
+        let rgba8 = frame.inputs.rgba8()?.to_vec();
         if self.world_generation == world_generation
             && self.lightmap_generation != 0
             && frame.generation < self.lightmap_generation

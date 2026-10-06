@@ -84,8 +84,8 @@ fn backend_specific_crates_stay_inside_their_backend_modules() {
         let source = read_source(&file);
         for (line_index, line) in source.lines().enumerate() {
             if !is_inside(&file, &vulkan_backend) {
-                if line.contains(&format!("{ASH_TOKEN}::"))
-                    || line.contains(&format!("{SHADERC_TOKEN}::"))
+                if references_module(line, ASH_TOKEN)
+                    || references_module(line, SHADERC_TOKEN)
                 {
                     violations.push(format!(
                         "{}:{}: {}",
@@ -96,7 +96,7 @@ fn backend_specific_crates_stay_inside_their_backend_modules() {
                 }
             }
 
-            if !is_inside(&file, &opengl_backend) && line.contains(&format!("{GLOW_TOKEN}::")) {
+            if !is_inside(&file, &opengl_backend) && references_module(line, GLOW_TOKEN) {
                 violations.push(format!(
                     "{}:{}: {}",
                     relative(&file),
@@ -112,6 +112,25 @@ fn backend_specific_crates_stay_inside_their_backend_modules() {
         "Backend-specific Rust graphics dependencies must stay inside their backend modules:\n{}",
         violations.join("\n")
     );
+}
+
+fn references_module(line: &str, module: &str) -> bool {
+    line.match_indices(&format!("{module}::")).any(|(offset, _)| {
+        offset == 0 || !line[..offset].chars().next_back()
+            .is_some_and(|ch| ch.is_alphanumeric() || ch == '_')
+    })
+}
+
+#[test]
+fn graphics_dependency_scan_matches_complete_module_names() {
+    for module in [ASH_TOKEN, SHADERC_TOKEN, GLOW_TOKEN] {
+        assert!(references_module(&format!("use {module}::Type;"), module));
+        assert!(references_module(&format!("::{module}::Type"), module));
+        assert!(references_module(&format!("let value = {module}::function();"), module));
+        assert!(!references_module(&format!("use super::position_{module}::mix;"), module));
+        assert!(!references_module(&format!("use longer{module}::Type;"), module));
+    }
+    assert!(!references_module(&format!("use std::{}::Hash;", "hash"), ASH_TOKEN));
 }
 
 #[test]

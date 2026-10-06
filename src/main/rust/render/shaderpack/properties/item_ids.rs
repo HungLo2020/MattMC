@@ -195,6 +195,19 @@ pub(crate) fn canonical_resource_location(value: &str) -> Result<String, &'stati
         Some((namespace, path)) => (namespace, path),
         None => ("minecraft", value),
     };
+    validate_resource_location_parts(namespace, path)?;
+    Ok(format!("{namespace}:{path}"))
+}
+
+/// Same as `canonical_resource_location(value) == Ok(value)` without
+/// allocating; per-frame mesh validation calls it for every source entity.
+pub(crate) fn is_canonical_resource_location(value: &str) -> bool {
+    value
+        .split_once(':')
+        .is_some_and(|(namespace, path)| validate_resource_location_parts(namespace, path).is_ok())
+}
+
+fn validate_resource_location_parts(namespace: &str, path: &str) -> Result<(), &'static str> {
     if namespace.is_empty() || path.is_empty() || path.contains(':') {
         return Err("an invalid namespace:path identity");
     }
@@ -209,12 +222,21 @@ pub(crate) fn canonical_resource_location(value: &str) -> Result<String, &'stati
     if !valid_namespace || !valid_path {
         return Err("a non-canonical resource location");
     }
-    Ok(format!("{namespace}:{path}"))
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::render::shaderpack::properties::item_ids::*;
+    #[test]
+    fn canonical_predicate_matches_formatted_identity() {
+        for value in ["minecraft:pig", "pig", "Minecraft:pig", "minecraft:", ":pig", "a:b:c",
+            "mod-x.y:model-part/arm_1", "minecraft:Pig", "", "minecraft:pig "] {
+            assert_eq!(is_canonical_resource_location(value),
+                canonical_resource_location(value).ok().as_deref() == Some(value), "{value:?}");
+        }
+    }
+
     use crate::render::shaderpack::source::ShaderSourceFile;
 
     fn source(files: Vec<ShaderSourceFile>) -> ShaderPackSource {

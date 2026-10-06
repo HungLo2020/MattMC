@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -91,6 +92,17 @@ public final class GraphicsFrameBenchmark {
 			"mattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain",
 			Boolean.toString(REQUIRE_DH_EXECUTION)
 		));
+	/**
+	 * Whether a terrain build during the measured window restarts it. Moving
+	 * workloads keep discovering newly visible sections (Frozen's Sodium builds
+	 * them during its window too), so the harness disables this for them: the
+	 * drained queue is still required to start measuring, and later streaming
+	 * is counted in {@code measurementFramesWithTerrainStreaming}.
+	 */
+	private static final boolean TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT =
+		Boolean.parseBoolean(System.getProperty(
+			"mattmc.dev.graphicsFrameBenchmark.terrainQueueDrainDuringMeasurement", "true"));
+	private static long measurementFramesWithTerrainStreaming;
 	private static final int TERRAIN_QUEUE_DRAIN_STABLE_FRAMES = Math.max(1,
 		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.terrainQueueDrainStableFrames", 8));
 	private static final long POSITIVE_CONTROL_DELAY_NANOS = Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos", 0L));
@@ -484,6 +496,7 @@ public final class GraphicsFrameBenchmark {
 		// across that gap: discard the partial window, settle again, and retain
 		// only one contiguous workload generation for timing and allocation data.
 		measurementRestartsAfterReadinessLoss++;
+		measurementFramesWithTerrainStreaming = 0L;
 		producerWorkloadStartNanos = -1L;
 		lastMeasurementRestartCause = lastProducerWorkloadBlocker
 			+ "; changingCounters=" + staticTerrainLastChangingCounters
@@ -538,7 +551,10 @@ public final class GraphicsFrameBenchmark {
 				PHASE_STACK.clear();
 				return;
 			}
-			if (REQUIRE_TERRAIN_QUEUE_DRAIN
+			if (REQUIRE_TERRAIN_QUEUE_DRAIN && !TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT
+				&& !RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
+				measurementFramesWithTerrainStreaming++;
+			} else if (REQUIRE_TERRAIN_QUEUE_DRAIN
 				&& !RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
 				// The camera path is applied before the pre-render readiness check,
 				// but the source can admit a newly visible section during this render.
@@ -1032,7 +1048,8 @@ public final class GraphicsFrameBenchmark {
 
 	private static boolean producerWorkloadReady(Minecraft minecraft) {
 		List<String> missing = missingProducerWorkloads();
-		if (REQUIRE_TERRAIN_QUEUE_DRAIN) {
+		boolean measuring = !FRAME_NANOS.isEmpty();
+		if (REQUIRE_TERRAIN_QUEUE_DRAIN && !(measuring && !TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT)) {
 			if (RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
 				terrainQueueDrainStableFrames++;
 			} else {
@@ -1960,6 +1977,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
 		json.append("  \"terrainQueueDrainRequired\": ").append(REQUIRE_TERRAIN_QUEUE_DRAIN).append(",\n");
 		json.append("  \"terrainQueueDrainStableFramesRequired\": ").append(TERRAIN_QUEUE_DRAIN_STABLE_FRAMES).append(",\n");
+		json.append("  \"terrainQueueDrainDuringMeasurement\": ").append(TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT).append(",\n");
+		json.append("  \"measurementFramesWithTerrainStreaming\": ").append(measurementFramesWithTerrainStreaming).append(",\n");
 		json.append("  \"terrainQueueDrainStableFrames\": ").append(terrainQueueDrainStableFrames).append(",\n");
 		json.append("  \"dhQuiescenceRequired\": ").append(REQUIRE_DH_QUIESCENCE).append(",\n");
 		json.append("  \"dhQuiescenceStableFramesRequired\": ").append(DH_QUIESCENCE_STABLE_FRAMES).append(",\n");
@@ -2848,12 +2867,13 @@ public final class GraphicsFrameBenchmark {
 				json.append(",\n");
 			}
 			PhaseStats stats = entry.getValue();
+			long[] sorted = stats.sortedSamples();
 			json.append("    \"").append(escape(entry.getKey())).append("\": { ");
 			json.append("\"count\": ").append(stats.count).append(", ");
 			json.append("\"total\": ").append(stats.totalNanos).append(", ");
-			json.append("\"median\": ").append(stats.percentile(0.50)).append(", ");
-			json.append("\"p95\": ").append(stats.percentile(0.95)).append(", ");
-			json.append("\"p99\": ").append(stats.percentile(0.99)).append(", ");
+			json.append("\"median\": ").append(PhaseStats.percentile(sorted, 0.50)).append(", ");
+			json.append("\"p95\": ").append(PhaseStats.percentile(sorted, 0.95)).append(", ");
+			json.append("\"p99\": ").append(PhaseStats.percentile(sorted, 0.99)).append(", ");
 			json.append("\"max\": ").append(stats.worstNanos).append(", ");
 			json.append("\"worst\": ").append(stats.worstNanos).append(" }");
 			index++;
@@ -2891,9 +2911,14 @@ public final class GraphicsFrameBenchmark {
 		return runtime.totalMemory() - runtime.freeMemory();
 	}
 
+	// The platform collector set is fixed for the JVM's lifetime. Looking it up
+	// per call built ObjectNames several times every measured frame.
+	private static final List<GarbageCollectorMXBean> GC_BEANS =
+		List.copyOf(ManagementFactory.getGarbageCollectorMXBeans());
+
 	private static long totalGcCount() {
 		long total = 0L;
-		for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
+		for (GarbageCollectorMXBean bean : GC_BEANS) {
 			long count = bean.getCollectionCount();
 			if (count > 0L) {
 				total += count;
@@ -2904,7 +2929,7 @@ public final class GraphicsFrameBenchmark {
 
 	private static long totalGcTimeMillis() {
 		long total = 0L;
-		for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
+		for (GarbageCollectorMXBean bean : GC_BEANS) {
 			long time = bean.getCollectionTime();
 			if (time > 0L) {
 				total += time;
@@ -3197,23 +3222,34 @@ public final class GraphicsFrameBenchmark {
 		private long count;
 		private long totalNanos;
 		private long worstNanos;
-		private final ArrayList<Long> samples = new ArrayList<>();
+		// Primitive storage: boxing every phase sample allocated on each
+		// measured frame of the workload being timed.
+		private long[] samples = new long[64];
+		private int sampleCount;
 
 		private void add(long nanos) {
 			this.count++;
 			this.totalNanos += nanos;
 			this.worstNanos = Math.max(this.worstNanos, nanos);
-			this.samples.add(nanos);
+			if (this.sampleCount == this.samples.length) {
+				this.samples = Arrays.copyOf(this.samples, this.samples.length * 2);
+			}
+			this.samples[this.sampleCount++] = nanos;
 		}
 
-		private long percentile(double percentile) {
-			if (this.samples.isEmpty()) {
+		// Status writes report three percentiles for every phase; sort once.
+		private long[] sortedSamples() {
+			long[] sorted = Arrays.copyOf(this.samples, this.sampleCount);
+			Arrays.sort(sorted);
+			return sorted;
+		}
+
+		private static long percentile(long[] sorted, double percentile) {
+			if (sorted.length == 0) {
 				return 0L;
 			}
-			ArrayList<Long> sorted = new ArrayList<>(this.samples);
-			sorted.sort(Long::compare);
-			int index = (int)Math.floor((sorted.size() - 1) * percentile);
-			return sorted.get(Math.max(0, Math.min(sorted.size() - 1, index)));
+			int index = (int)Math.floor((sorted.length - 1) * percentile);
+			return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
 		}
 	}
 }

@@ -492,6 +492,31 @@ impl ShaderPackRuntimeExecutor {
         Ok(programs)
     }
 
+    /// A shared owner of one retained fullscreen stage, without deep-copying
+    /// its lowered source each frame. Programs are owned by the candidate
+    /// state, which changes only with its epochs.
+    pub(crate) fn shared_fullscreen_program(
+        &self,
+        program: &LoweredFullscreenSourceProgram,
+    ) -> std::sync::Arc<LoweredFullscreenSourceProgram> {
+        let key = (
+            program as *const LoweredFullscreenSourceProgram as usize,
+            self.source_candidate_epoch,
+            self.distant_horizons_source_candidate_epoch,
+        );
+        if let Some((_, shared)) = self.prepared_program_memos.shared_fullscreen.borrow().iter().find(|(candidate, _)| *candidate == key) {
+            return std::sync::Arc::clone(shared);
+        }
+        let shared = std::sync::Arc::new(program.clone());
+        let mut memo = self.prepared_program_memos.shared_fullscreen.borrow_mut();
+        memo.retain(|((_, terrain, distant_horizons), _)| (*terrain, *distant_horizons) == (key.1, key.2));
+        if memo.len() >= 32 {
+            memo.clear();
+        }
+        memo.push((key, std::sync::Arc::clone(&shared)));
+        shared
+    }
+
     pub(crate) fn prepared_lowered_post_terrain_fullscreen_programs(
         &self,
     ) -> GalResult<Vec<&LoweredFullscreenSourceProgram>> {

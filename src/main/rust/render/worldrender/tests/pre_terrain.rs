@@ -51,6 +51,7 @@ fn pre_terrain_fullscreen_recording_orders_shadows_and_publishes_opaque_before_d
     let shadow_target = Handle::new(HandleKind::RenderTarget, 1000, 1).unwrap();
     let terrain_target = Handle::new(HandleKind::RenderTarget, 1001, 1).unwrap();
     let plan = PreparedNamedSourceTerrainFramePlan {
+        scene_coverage: Default::default(),
         terrain: PreparedLoweredSourceTerrainFramePlan { frame_id: source_frame.frame_id, draws: Vec::new(), transaction: None },
         shadow_only_draws: Vec::new(), entity_shadow_draws: Vec::new(),
         entities: None, hands: None, textured_material: None, weather: None,

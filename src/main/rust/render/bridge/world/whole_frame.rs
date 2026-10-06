@@ -164,9 +164,13 @@ pub(crate) fn merge_experience_orb_instances(
         .checked_add(orbs.len())
         .filter(|&count| count <= FFI_MAX_BATCH_ITEMS)
         .ok_or_else(|| GalError::invalid_argument("combined mesh/orb frame bound exceeded"))?;
+    if orbs.is_empty() {
+        // Most frames carry no orbs; keep the decoded vector instead of
+        // copying every mesh instance into a new one.
+        return Ok(meshes);
+    }
     let mesh_count = meshes.len();
-    let mut source = meshes.into_iter();
-    let mut output = Vec::with_capacity(count);
+    let mut placed = Vec::with_capacity(orbs.len());
     let mut cursor = 0;
     for orb in orbs {
         validate_item_size::<FfiWorldExperienceOrbInstanceRecord>(orb.byte_size, "orb placement")?;
@@ -189,12 +193,25 @@ pub(crate) fn merge_experience_orb_instances(
         if orb.shadow_only == 1 {
             instance.stratum = crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER;
         }
-        output.extend(source.by_ref().take(index - cursor));
         cursor = index;
-        output.push(instance);
+        placed.push((index, instance));
     }
-    output.extend(source);
-    Ok(output)
+    // Merge in place from the back: only instances after the first orb move,
+    // instead of copying the whole (mostly terrain) frame into a new vector.
+    let mut meshes = meshes;
+    meshes.extend(placed.iter().map(|(_, instance)| instance.clone()));
+    let mut remaining_meshes = mesh_count;
+    let mut write = count;
+    while let Some(&(index, _)) = placed.last() {
+        write -= 1;
+        if index >= remaining_meshes {
+            meshes[write] = placed.pop().expect("orb checked above").1;
+        } else {
+            remaining_meshes -= 1;
+            meshes.swap(remaining_meshes, write);
+        }
+    }
+    Ok(meshes)
 }
 
 pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
@@ -1033,7 +1050,17 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         ));
     }
     let raw_orbs = read_slice(request.world_experience_orbs, true, "orb placements")?;
-    let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len());
+    // Reserve for the orbs merged below and the shadow casters the frontend
+    // appends after decoding, so neither reallocates the decoded stream.
+    let appended_capacity = usize::try_from(
+        request
+            .world_static_terrain_shadow_casters
+            .count
+            .saturating_add(request.world_experience_orbs.count),
+    )
+    .unwrap_or(FFI_MAX_BATCH_ITEMS)
+    .min(FFI_MAX_BATCH_ITEMS);
+    let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len() + appended_capacity);
     for instance in raw_mesh_instances {
         validate_item_size::<FfiWorldMeshInstanceRecord>(
             instance.byte_size,
@@ -1113,6 +1140,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             ],
         )?;
     }
+    let static_terrain_shadow_casters =
+        decode_static_terrain_shadow_casters(&request, mesh_instances.len())?;
     let raw_text_quads = read_slice(request.world_text_quads, true, "world text quads")?;
     if raw_text_quads.len() > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
@@ -1327,6 +1356,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             text_quads,
             lod_instances,
             lod_render_frame,
+            static_terrain_shadow_casters,
         },
         gui_sprites,
         gui_affine_quads,
@@ -1336,4 +1366,58 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         post_effect_id,
         gui_tiled_quads,
     ))
+}
+
+/// Copies the compact caster stream. Expansion into shadow-only instances
+/// needs the frontend's acknowledged mesh generations, so it happens there.
+fn decode_static_terrain_shadow_casters(
+    request: &FfiWholeFrameSubmitRequest,
+    mesh_instance_count: usize,
+) -> GalResult<crate::render::worldrender::StaticTerrainShadowCasters> {
+    if request.world_static_terrain_shadow_casters.count
+        > FFI_MAX_BATCH_ITEMS.saturating_sub(mesh_instance_count) as u64
+    {
+        return Err(GalError::invalid_argument(
+            "combined mesh/shadow-caster frame bound exceeded",
+        ));
+    }
+    let raw = unsafe {
+        read_slice(
+            request.world_static_terrain_shadow_casters,
+            true,
+            "static terrain shadow casters",
+        )?
+    };
+    if raw.is_empty() {
+        return Ok(Default::default());
+    }
+    let camera = request.static_terrain_camera;
+    if camera.iter().any(|axis| !axis.is_finite()) {
+        return Err(GalError::invalid_argument(
+            "static terrain shadow casters require a finite terrain camera",
+        ));
+    }
+    let mut casters = Vec::with_capacity(raw.len());
+    for caster in raw {
+        if caster.mesh_key == 0 || caster.mesh_generation == 0 {
+            return Err(GalError::invalid_argument(
+                "static terrain shadow caster key and generation must be non-zero",
+            ));
+        }
+        if caster.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+            && caster.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown shadow caster depth policy {}", caster.depth_policy),
+            ));
+        }
+        casters.push(crate::render::worldrender::StaticTerrainShadowCaster {
+            mesh_key: caster.mesh_key,
+            mesh_generation: caster.mesh_generation,
+            origin: caster.origin,
+            depth_policy: caster.depth_policy,
+        });
+    }
+    Ok(crate::render::worldrender::StaticTerrainShadowCasters { camera, casters })
 }

@@ -17,6 +17,8 @@ pub(crate) struct PreparedFullscreenSourcePass {
     /// feedback validation and semantic diagnostics, not target layout.
     pub outputs: Vec<FullscreenSourceColorAttachment>,
     pub(super) color_resources: ShaderPackSourceColorResources,
+    /// False when the per-stage cache owns `color_resources`.
+    pub(super) owns_color_resources: bool,
 }
 
 /// Resource sets and owned buffers required by one compiled source pass.
@@ -28,6 +30,9 @@ pub(crate) struct BoundFullscreenSourcePass {
     pub pack_resources_set: Handle,
     pub texture_transform_buffer: Handle,
     pub scalar_uniform_buffer: Option<Handle>,
+    /// False when the per-stage cache owns the uniform buffers and the
+    /// source-data set; the pack set is always this pass's own.
+    pub(super) owns_stage_resources: bool,
 }
 
 /// Per-execution state for one compiled source fullscreen pass. The caller
@@ -63,7 +68,29 @@ impl PreparedFullscreenSourcePass {
         targets: &ShaderPackColorTargets,
         external_inputs: impl IntoIterator<Item = TerrainSourceOwnedResourceSet>,
     ) -> GalResult<Self> {
-        let color_resources = prepare_fullscreen_source_color_resources(gal, program, targets)?;
+        Self::prepare_with(gal, program, manifest, targets, external_inputs, None)
+    }
+
+    /// As [`Self::prepare`], reusing color resources a stage cache owns.
+    pub(crate) fn prepare_with(
+        gal: &mut VulkanicGal,
+        program: &LoweredFullscreenSourceProgram,
+        manifest: &ShaderPackColorTargetManifest,
+        targets: &ShaderPackColorTargets,
+        external_inputs: impl IntoIterator<Item = TerrainSourceOwnedResourceSet>,
+        cached_color_resources: Option<ShaderPackSourceColorResources>,
+    ) -> GalResult<Self> {
+        let owns_color_resources = cached_color_resources.is_none();
+        let color_resources = match cached_color_resources {
+            Some(cached) => cached,
+            None => prepare_fullscreen_source_color_resources(gal, program, targets)?,
+        };
+        // Releases this pass's own color resources on a rejected contract.
+        let release = |gal: &mut VulkanicGal, resources: ShaderPackSourceColorResources| {
+            if owns_color_resources {
+                resources.destroy(gal);
+            }
+        };
         // Geometry admission snapshots can contain that program's current
         // color samplers. This stage owns its feedback/mipmap selection and
         // must not inherit those bindings. Exclude only the explicitly owned
@@ -83,12 +110,12 @@ impl PreparedFullscreenSourcePass {
         let mut input_sets = match input_sets {
             Ok(sets) => sets.into_iter(),
             Err(error) => {
-                color_resources.destroy(gal);
+                release(gal, color_resources);
                 return Err(error);
             }
         };
         let Some(mut inputs) = input_sets.next() else {
-            color_resources.destroy(gal);
+            release(gal, color_resources);
             return Err(GalError::invalid_argument(
                 "fullscreen source pass requires an exact source resource snapshot",
             ));
@@ -97,7 +124,7 @@ impl PreparedFullscreenSourcePass {
             let unique = match resources.excluding_roles_already_owned_by(&inputs) {
                 Ok(unique) => unique,
                 Err(error) => {
-                    color_resources.destroy(gal);
+                    release(gal, color_resources);
                     return Err(error);
                 }
             };
@@ -107,7 +134,7 @@ impl PreparedFullscreenSourcePass {
             inputs = match TerrainSourceOwnedResourceSet::merge([&inputs, &unique]) {
                 Ok(merged) => merged,
                 Err(error) => {
-                    color_resources.destroy(gal);
+                    release(gal, color_resources);
                     return Err(error);
                 }
             };
@@ -116,14 +143,14 @@ impl PreparedFullscreenSourcePass {
         {
             Ok(outputs) => outputs,
             Err(error) => {
-                color_resources.destroy(gal);
+                release(gal, color_resources);
                 return Err(error);
             }
         };
         let color_targets = outputs.clone();
 
         if inputs.availability().shader_pack_generation() != program.shader_pack_generation {
-            color_resources.destroy(gal);
+            release(gal, color_resources);
             return Err(GalError::invalid_argument(format!(
                 "fullscreen source program generation {} does not match its prepared input generation {}",
                 program.shader_pack_generation,
@@ -131,7 +158,7 @@ impl PreparedFullscreenSourcePass {
             )));
         }
         if let Err(error) = program.require_semantic_resources(inputs.availability()) {
-            color_resources.destroy(gal);
+            release(gal, color_resources);
             let available = inputs
                 .availability()
                 .resources()
@@ -144,11 +171,11 @@ impl PreparedFullscreenSourcePass {
             )));
         }
         if let Err(error) = validate_feedback_separation(program, &outputs) {
-            color_resources.destroy(gal);
+            release(gal, color_resources);
             return Err(error);
         }
         if let Err(error) = validate_output_target_slots(&outputs, &color_targets) {
-            color_resources.destroy(gal);
+            release(gal, color_resources);
             return Err(error);
         }
 
@@ -158,13 +185,16 @@ impl PreparedFullscreenSourcePass {
             color_targets,
             outputs,
             color_resources,
+            owns_color_resources,
         })
     }
 
     /// Explicit destruction of the program-local color samplers. Source color
     /// targets themselves remain owned by their generation cache.
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
-        self.color_resources.destroy(gal);
+        if self.owns_color_resources {
+            self.color_resources.destroy(gal);
+        }
     }
 
     /// Compiles an explicit backend-neutral fullscreen pass from this already
@@ -188,6 +218,20 @@ impl PreparedFullscreenSourcePass {
         program: &LoweredFullscreenSourceProgram,
         extent: crate::render::vulkanic::resources::Extent3d,
         cache: Option<(&FullscreenPipelineCache, (u64, u64))>,
+    ) -> GalResult<CompiledFullscreenSourcePass> {
+        self.compile_reusing(gal, program, extent, cache, None)
+    }
+
+    /// As [`Self::compile_cached`]; with `stage_target`, a stage cache's
+    /// render target and pass are used on a pipeline-cache hit instead of
+    /// creating new ones (the result then does not own them).
+    pub(crate) fn compile_reusing(
+        &self,
+        gal: &mut VulkanicGal,
+        program: &LoweredFullscreenSourceProgram,
+        extent: crate::render::vulkanic::resources::Extent3d,
+        cache: Option<(&FullscreenPipelineCache, (u64, u64))>,
+        stage_target: Option<(Handle, Handle)>,
     ) -> GalResult<CompiledFullscreenSourcePass> {
         if self.program_identity != program.identity.as_str()
             || self.inputs.availability().shader_pack_generation() != program.shader_pack_generation
@@ -250,6 +294,20 @@ impl PreparedFullscreenSourcePass {
                     })
                     .map(|cached| std::sync::Arc::clone(&cached.objects))
             });
+            if let (Some(shared), Some((target, pass))) = (cached.clone(), stage_target) {
+                return Ok(CompiledFullscreenSourcePass {
+                    target,
+                    pass,
+                    source_data_layout: shared.source_data_layout,
+                    pack_resources_layout: shared.pack_resources_layout,
+                    pipeline_layout: shared.pipeline_layout,
+                    vertex_shader: shared.vertex_shader,
+                    fragment_shader: shared.fragment_shader,
+                    pipeline: shared.pipeline,
+                    shared: Some(shared),
+                    owns_target: false,
+                });
+            }
             if let Some(shared) = cached {
                 let target = gal.create_render_target(RenderTargetDesc {
                     label: format!("{label}.target"),
@@ -279,6 +337,7 @@ impl PreparedFullscreenSourcePass {
                     fragment_shader: shared.fragment_shader,
                     pipeline: shared.pipeline,
                     shared: Some(shared),
+                    owns_target: true,
                 });
             }
         }
@@ -361,6 +420,7 @@ impl PreparedFullscreenSourcePass {
                 fragment_shader,
                 pipeline,
                 shared: None,
+                owns_target: true,
             })
         })();
         if result.is_err() {
@@ -406,6 +466,39 @@ impl PreparedFullscreenSourcePass {
         program: &LoweredFullscreenSourceProgram,
         compiled: &CompiledFullscreenSourcePass,
     ) -> GalResult<BoundFullscreenSourcePass> {
+        self.bind_resources_reusing(gal, program, compiled, None)
+    }
+
+    /// As [`Self::bind_resources`]; with `stage_resources` (uniform buffers
+    /// and source-data set owned by a stage cache) only the pack set, which
+    /// binds this frame's inputs, is created.
+    pub(crate) fn bind_resources_reusing(
+        &self,
+        gal: &mut VulkanicGal,
+        program: &LoweredFullscreenSourceProgram,
+        compiled: &CompiledFullscreenSourcePass,
+        stage_resources: Option<(Handle, Option<Handle>, Handle)>,
+    ) -> GalResult<BoundFullscreenSourcePass> {
+        if let Some((texture_transform_buffer, scalar_uniform_buffer, source_data_set)) = stage_resources {
+            if self.program_identity != program.identity.as_str() {
+                return Err(GalError::invalid_argument(
+                    "fullscreen source resources cannot bind a different program",
+                ));
+            }
+            program.execution_interface.validate()?;
+            let pack_resources_set = gal.create_resource_set(program.pack_resource_set_desc(
+                format!("fullscreen-source.{}.pack-resources-set", self.program_identity),
+                compiled.pack_resources_layout,
+                &self.inputs,
+            )?)?;
+            return Ok(BoundFullscreenSourcePass {
+                source_data_set,
+                pack_resources_set,
+                texture_transform_buffer,
+                scalar_uniform_buffer,
+                owns_stage_resources: false,
+            });
+        }
         if self.program_identity != program.identity.as_str() {
             return Err(GalError::invalid_argument(
                 "fullscreen source resources cannot bind a different program",
@@ -475,6 +568,7 @@ impl PreparedFullscreenSourcePass {
                 pack_resources_set,
                 texture_transform_buffer,
                 scalar_uniform_buffer,
+                owns_stage_resources: true,
             })
         })();
         if result.is_err() {
@@ -618,9 +712,17 @@ impl PreparedFullscreenSourcePass {
             })
             .collect::<GalResult<Vec<_>>>()?;
 
+        // Cached uniform buffers were last read by this stage's previous draw.
+        let reused_before = |state: TextureUsageState| {
+            if !bound.owns_stage_resources && state == TextureUsageState::Undefined {
+                TextureUsageState::ShaderRead
+            } else {
+                state
+            }
+        };
         operations.push(CommandOp::Barrier(buffer_barrier(
             bound.texture_transform_buffer,
-            frame.texture_transform_before,
+            reused_before(frame.texture_transform_before),
             TextureUsageState::TransferDst,
         )));
         operations.push(CommandOp::HostWriteBuffer {
@@ -639,7 +741,7 @@ impl PreparedFullscreenSourcePass {
                 .expect("validated scalar uniform prior state");
             operations.push(CommandOp::Barrier(buffer_barrier(
                 buffer,
-                before,
+                reused_before(before),
                 TextureUsageState::TransferDst,
             )));
             operations.push(CommandOp::HostWriteBuffer {
@@ -701,6 +803,10 @@ impl PreparedFullscreenSourcePass {
 
 impl BoundFullscreenSourcePass {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
+        if !self.owns_stage_resources {
+            let _ = gal.destroy(self.pack_resources_set);
+            return;
+        }
         for handle in [
             Some(self.pack_resources_set),
             Some(self.source_data_set),

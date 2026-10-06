@@ -55,6 +55,16 @@ pub(crate) struct PreparedSourceTerrainUniforms<'program> {
     scalar_uniforms: Arc<[u8]>,
 }
 
+impl PreparedSourceTerrainUniforms<'_> {
+    pub(in crate::render::worldrender) fn legacy_texture_transforms(&self) -> &Arc<[u8]> {
+        &self.legacy_texture_transforms
+    }
+
+    pub(in crate::render::worldrender) fn scalar_uniforms(&self) -> &Arc<[u8]> {
+        &self.scalar_uniforms
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum SourceTerrainFrameUniforms<'a> {
     Semantic {
@@ -76,7 +86,7 @@ pub(crate) struct PreparedSourceTerrainFrame {
     /// Source-mesh section ordinals selected by the semantic frame batch.
     /// They retain the original opaque/cutout admission and ordering without
     /// making a future source route expand unrelated mesh sections.
-    pub section_indices: Vec<u32>,
+    pub section_indices: Arc<[u32]>,
     /// A camera-sorted translucent run inside the single selected section:
     /// `(first_index, index_count)` relative to that section.
     pub index_subrange: Option<(u32, u32)>,
@@ -106,7 +116,7 @@ pub(crate) struct SourceTerrainFrameTransaction {
     pub(in crate::render::worldrender) stream_staging: Vec<u8>,
     /// Uniform blocks already staged this frame, as (legacy, scalar,
     /// legacy offset, scalar offset); equal blocks share one stream copy.
-    pub(in crate::render::worldrender) shared_uniforms: Vec<(Vec<u8>, Vec<u8>, u64, Option<u64>)>,
+    pub(in crate::render::worldrender) shared_uniforms: Vec<(Arc<[u8]>, Arc<[u8]>, u64, Option<u64>)>,
     /// Multi-draw commands staged for the slot's indirect buffer.
     pub(in crate::render::worldrender) indirect_buffer: Option<Handle>,
     pub(in crate::render::worldrender) indirect_staging: Vec<u8>,
@@ -138,6 +148,13 @@ impl SourceTerrainFrameTransaction {
     pub(crate) fn stage_stream_write(&mut self, offset: u64, data: &[u8]) {
         let start = offset as usize;
         let end = start + data.len();
+        if start >= self.stream_staging.len() {
+            // Allocations advance monotonically: zero only the alignment gap
+            // and append, rather than zero-filling then overwriting.
+            self.stream_staging.resize(start, 0);
+            self.stream_staging.extend_from_slice(data);
+            return;
+        }
         if self.stream_staging.len() < end {
             self.stream_staging.resize(end, 0);
         }
@@ -158,10 +175,19 @@ impl SourceTerrainFrameTransaction {
         self.stage_stream_write(stream.instance_offset, payload);
     }
 
-    pub(crate) fn shared_uniform_offsets(&self, legacy: &[u8], scalar: &[u8]) -> Option<(u64, Option<u64>)> {
+    pub(crate) fn shared_uniform_offsets(&self, legacy: &Arc<[u8]>, scalar: &Arc<[u8]>) -> Option<(u64, Option<u64>)> {
+        // Batches of one pass share the same packed blocks, so pointer
+        // identity usually decides; check it for every entry before falling
+        // back to byte comparison, so other passes' blocks are not compared
+        // byte by byte on every batch. Equal bytes still share a copy.
         self.shared_uniforms
             .iter()
-            .find(|entry| entry.0 == legacy && entry.1 == scalar)
+            .find(|entry| Arc::ptr_eq(&entry.0, legacy) && Arc::ptr_eq(&entry.1, scalar))
+            .or_else(|| {
+                self.shared_uniforms
+                    .iter()
+                    .find(|entry| entry.0[..] == legacy[..] && entry.1[..] == scalar[..])
+            })
             .map(|entry| (entry.2, entry.3))
     }
 
@@ -248,13 +274,16 @@ impl WorldPrimitiveFrontend {
         &self,
         frame: &WorldPrimitiveFrame,
         shader_pack_generation: u64,
+        scene: &SceneTerrainFrame,
     ) -> GalResult<Vec<usize>> {
+        let mut in_scene = scene.excludes();
         let candidates = frame
             .mesh_instances
             .iter()
             .enumerate()
-            .filter(|(_, instance)| {
-                MeshBatchSelection::ShadowOnly.includes(instance)
+            .filter(move |(index, instance)| {
+                !in_scene(*index)
+                    && MeshBatchSelection::ShadowOnly.includes(instance)
                     && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
             });
         let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?;
@@ -280,10 +309,13 @@ impl WorldPrimitiveFrontend {
         };
         let mut selected = Vec::new();
         for (index, instance) in candidates {
-            let asset = mesh_batch_asset(frame, self, instance, false)?;
-            if instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 {
-                geometry::translucent_order::validate_instance(instance)?;
-                geometry::translucent_order::validate_geometry(asset)?;
+            let camera_sorted = instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0;
+            if camera_sorted || !geometry::batching::plain_mesh_instance_is_valid(self, instance) {
+                let asset = mesh_batch_asset(frame, self, instance, false)?;
+                if camera_sorted {
+                    geometry::translucent_order::validate_instance(instance)?;
+                    geometry::translucent_order::validate_geometry(asset)?;
+                }
             }
             if frustum.as_ref().is_some_and(|frustum| {
                 source_shadow_instance_intersects(
@@ -305,8 +337,11 @@ impl WorldPrimitiveFrontend {
         &self,
         frame: &WorldPrimitiveFrame,
         shader_pack_generation: u64,
+        scene: &SceneTerrainFrame,
     ) -> GalResult<Vec<usize>> {
-        let selected = self.source_shadow_terrain_instance_indices(frame, shader_pack_generation)?;
+        // Scene sections draw their own casters and supplement faces.
+        let selected = self.source_shadow_terrain_instance_indices(frame, shader_pack_generation, scene)?;
+        let mut in_scene = scene.excludes();
         if terrain_program_scope_for_sky_type(frame.background.sky_type)? != Some(TerrainProgramScope::Overworld) {
             return Ok(selected);
         }
@@ -316,7 +351,8 @@ impl WorldPrimitiveFrontend {
                 off_camera.next();
                 return Some(index);
             }
-            (is_source_terrain_mesh_stratum(instance.stratum)
+            (!in_scene(index)
+                && is_source_terrain_mesh_stratum(instance.stratum)
                 && instance.flags & (WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY
                     | WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS) == 0
                 && instance.mesh_section_index == WORLD_MESH_SECTION_ALL
@@ -493,6 +529,128 @@ impl WorldPrimitiveFrontend {
         )
     }
 
+    /// This frame's source terrain transaction, created on first use. Every
+    /// payload of a frame must land in the same stream slot generation.
+    pub(in crate::render::worldrender) fn source_terrain_frame_transaction(
+        &mut self,
+        frame_id: u64,
+        stream: &SourceTerrainFrameStreamAllocation,
+    ) -> GalResult<&mut SourceTerrainFrameTransaction> {
+        let transaction = self
+            .pending_source_terrain_frame_transactions
+            .entry(frame_id)
+            .or_insert_with(|| SourceTerrainFrameTransaction {
+                frame_id,
+                stream_buffer: stream.buffer,
+                stream_epoch: stream.epoch,
+                operations: Vec::new(),
+                source_material_texture_ids: BTreeSet::new(),
+                geometry_uploads: Vec::new(),
+                stream_staging: Vec::new(),
+                shared_uniforms: Vec::new(),
+                indirect_buffer: None,
+                indirect_staging: Vec::new(),
+            });
+        if transaction.stream_buffer != stream.buffer || transaction.stream_epoch != stream.epoch {
+            return Err(GalError::backend(
+                "source terrain frame payloads resolved to different stream slots",
+            ));
+        }
+        Ok(transaction)
+    }
+
+    /// Stages one pass's uniform blocks in the frame stream (once per frame
+    /// and identical blocks) and returns their offsets.
+    pub(crate) fn stage_source_terrain_pass_uniforms(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame_id: u64,
+        program: &LoweredTerrainSourceProgram,
+        legacy_texture_transforms: &Arc<[u8]>,
+        scalar_uniforms: &Arc<[u8]>,
+    ) -> GalResult<(u64, Option<u64>)> {
+        let interface = &program.execution_interface;
+        if interface.scalar_uniforms.is_some() == scalar_uniforms.is_empty()
+            || legacy_texture_transforms.len() != interface.legacy_transform_bytes as usize
+        {
+            return Err(GalError::invalid_argument(
+                "packed source terrain uniforms do not match the program interface",
+            ));
+        }
+        if let Some(shared) = self
+            .pending_source_terrain_frame_transactions
+            .get(&frame_id)
+            .and_then(|transaction| transaction.shared_uniform_offsets(legacy_texture_transforms, scalar_uniforms))
+        {
+            return Ok(shared);
+        }
+        let stream = self.allocate_source_terrain_frame_stream_aligned(
+            gal,
+            frame_id,
+            u64::from(interface.legacy_transform_bytes),
+            u64::from(interface.scalar_uniform_bytes),
+            0,
+            None,
+            SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT,
+        )?;
+        let transaction = self.source_terrain_frame_transaction(frame_id, &stream)?;
+        transaction.stage_stream_write(stream.legacy_transform_offset, legacy_texture_transforms);
+        if let Some(offset) = stream.scalar_uniform_offset {
+            transaction.stage_stream_write(offset, scalar_uniforms);
+        }
+        if transaction.shared_uniforms.len() < 64 {
+            transaction.shared_uniforms.push((
+                Arc::clone(legacy_texture_transforms),
+                Arc::clone(scalar_uniforms),
+                stream.legacy_transform_offset,
+                stream.scalar_uniform_offset,
+            ));
+        }
+        Ok((stream.legacy_transform_offset, stream.scalar_uniform_offset))
+    }
+
+    /// Stages a block of instance records addressed by `firstInstance` from
+    /// the start of the frame stream, next to already staged `shared`
+    /// uniforms. Returns the stream buffer, the bindable instance range and
+    /// the block's first instance.
+    pub(crate) fn stage_source_terrain_instance_block(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame_id: u64,
+        program: &LoweredTerrainSourceProgram,
+        shared: (u64, Option<u64>),
+        records: &[u8],
+    ) -> GalResult<(Handle, u64, u32)> {
+        let interface = &program.execution_interface;
+        let stream = self.allocate_source_terrain_frame_stream_aligned(
+            gal,
+            frame_id,
+            u64::from(interface.legacy_transform_bytes),
+            u64::from(interface.scalar_uniform_bytes),
+            records.len() as u64,
+            Some(shared),
+            SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT,
+        )?;
+        let capacity = self
+            .source_terrain_frame_stream_slots
+            .iter()
+            .find(|slot| slot.buffer == stream.buffer)
+            .map(|slot| slot.capacity)
+            .ok_or_else(|| GalError::backend("source multi-draw stream slot vanished"))?;
+        let range = capacity.min(SOURCE_TERRAIN_MULTIDRAW_INSTANCE_RANGE_MAX);
+        if stream.instance_offset + records.len() as u64 > range {
+            return Err(GalError::unsupported_feature(
+                "source multi-draw instance records exceed the bindable stream range",
+            ));
+        }
+        let first_instance = u32::try_from(stream.instance_offset / TERRAIN_SOURCE_INSTANCE_BYTES as u64)
+            .map_err(|_| GalError::invalid_argument("source multi-draw first instance exceeds u32"))?;
+        let buffer = stream.buffer;
+        self.source_terrain_frame_transaction(frame_id, &stream)?
+            .stage_stream_write(stream.instance_offset, records);
+        Ok((buffer, range, first_instance))
+    }
+
     pub(crate) fn source_program_prevalidated(&self, frame_id: u64, program: &LoweredTerrainSourceProgram) -> bool {
         let address = program as *const LoweredTerrainSourceProgram as usize;
         self.source_terrain_batch_scope.as_ref().is_some_and(|scope| {
@@ -517,6 +675,10 @@ impl WorldPrimitiveFrontend {
                 .is_some(),
             validated_programs,
             pack_keys: Vec::new(),
+            pipelines: Vec::new(),
+            multidraw_frame_data: Vec::new(),
+            retained_passes: Default::default(),
+            retained_draw_states: Default::default(),
         });
         Ok(())
     }
@@ -597,7 +759,7 @@ impl WorldPrimitiveFrontend {
             program,
             frame_id,
             mesh,
-            section_indices.to_vec(),
+            Arc::from(section_indices),
             instances,
             uniforms,
         )
@@ -610,7 +772,7 @@ impl WorldPrimitiveFrontend {
         program: &LoweredTerrainSourceProgram,
         frame_id: u64,
         mesh: Arc<SourceTerrainMeshAsset>,
-        section_indices: Vec<u32>,
+        section_indices: Arc<[u32]>,
         instances: &[SourceTerrainInstance],
         uniforms: SourceTerrainFrameUniforms<'_>,
     ) -> GalResult<PreparedSourceTerrainFrame> {
@@ -882,6 +1044,7 @@ impl WorldPrimitiveFrontend {
         if prepared.mesh.vertex_bytes.is_empty() {
             if self.source_terrain_range_memo.len() >= SOURCE_TERRAIN_RANGE_MEMO_MAX_ENTRIES {
                 self.source_terrain_range_memo.clear();
+                self.clear_retained_source_terrain_meshes();
             }
             self.source_terrain_range_memo.insert(
                 range_key,

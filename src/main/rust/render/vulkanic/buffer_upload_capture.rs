@@ -60,9 +60,17 @@ impl BufferUploadCapture {
         self.pending_host_source_bytes = 0;
     }
     pub(super) fn write(&mut self, buffer: Handle, offset: u64, size: u64) {
-        for key in self.accepted.keys() {
-            if overlaps(*key, buffer, offset, size) {
-                self.pending.insert(*key, None);
+        // Hazard analysis reports every buffer write here. Accepted ranges never
+        // overlap (`watch` evicts overlaps), so in offset order their ends are
+        // ordered too: walk back from the write's end until a range ends before it.
+        if size != 0 {
+            let end = offset.saturating_add(size);
+            for key in self.accepted.range((buffer, 0, 0)..(buffer, end, 0)).rev().map(|(key, _)| *key) {
+                if key.1 + key.2 as u64 <= offset {
+                    break;
+                }
+                debug_assert!(overlaps(key, buffer, offset, size));
+                self.pending.insert(key, None);
             }
         }
         let mut retained_bytes = 0;
@@ -90,7 +98,7 @@ impl BufferUploadCapture {
         let Some(end) = offset.checked_add(bytes.len() as u64) else {
             return;
         };
-        for key in self.accepted.keys() {
+        for key in self.accepted.range((buffer, offset, 0)..(buffer, end, 0)).map(|(key, _)| key) {
             let (watched, start, size) = *key;
             if watched == buffer && offset <= start && start + size as u64 <= end {
                 let first = (start - offset) as usize;
@@ -100,7 +108,8 @@ impl BufferUploadCapture {
         }
     }
     pub(super) fn copy(&mut self, src: Handle, src_offset: u64, dst: Handle, dst_offset: u64, size: u64) {
-        for (&key, _) in &self.accepted {
+        let copy_end = dst_offset.saturating_add(size);
+        for (&key, _) in self.accepted.range((dst, dst_offset, 0)..(dst, copy_end, 0)) {
             let (watched, start, length) = key;
             if watched != dst || start < dst_offset
                 || start.saturating_add(length as u64) > dst_offset.saturating_add(size) {
@@ -162,6 +171,56 @@ fn overlaps(key: Range, buffer: Handle, start: u64, size: u64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ranged_write_and_host_write_match_full_scans() {
+        let buffers = [Handle::from_raw(11), Handle::from_raw(12)];
+        let mut state = 0x2545_f491_u32;
+        let mut next = |bound: u64| {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            u64::from(state) % bound
+        };
+        for case in 0..300 {
+            let mut capture = BufferUploadCapture::default();
+            for _ in 0..(1 + case % 40) {
+                let buffer = buffers[next(2) as usize];
+                let _ = capture.watch(buffer, next(400), 1 + next(64) as usize);
+            }
+            let buffer = buffers[next(2) as usize];
+            let (offset, size) = (next(450), next(80));
+            let expected_write = capture
+                .accepted
+                .keys()
+                .filter(|key| overlaps(**key, buffer, offset, size))
+                .copied()
+                .collect::<Vec<_>>();
+            capture.write(buffer, offset, size);
+            let mut actual = capture.pending.keys().copied().collect::<Vec<_>>();
+            actual.sort();
+            assert_eq!(expected_write, actual, "write case {case}");
+            capture.pending.clear();
+            let bytes = vec![7_u8; size as usize];
+            let end = offset + size;
+            let expected_proof = capture
+                .accepted
+                .keys()
+                .filter(|(watched, start, length)| {
+                    *watched == buffer && offset <= *start && start + *length as u64 <= end
+                })
+                .copied()
+                .collect::<Vec<_>>();
+            capture.host_write(buffer, offset, &bytes);
+            let proven = capture
+                .pending
+                .iter()
+                .filter(|(_, value)| value.is_some())
+                .map(|(key, _)| *key)
+                .collect::<Vec<_>>();
+            assert_eq!(expected_proof, proven, "host write case {case}");
+        }
+    }
     #[test]
     fn vulkan_capture_tracks_accepted_uploads_across_submissions_and_invalidates_gpu_writes() {
         use super::super::resources::{BufferDesc, BufferUsage, MemoryDomain};

@@ -91,6 +91,12 @@ public final class RustGalTerrainRenderer {
 	 * re-reads the authoritative layer entry, so concurrent writers converge.
 	 */
 	private static final ConcurrentHashMap<Long, TerrainSectionAsset[]> SECTION_ASSET_ROWS = new ConcurrentHashMap<>();
+	/**
+	 * Primitive shadow-caster view of {@link #SECTION_ASSET_ROWS}: mesh key and
+	 * generation per {@link #rowSlot} (key zero means absent). Off-camera caster
+	 * collection reads only this array, not the three asset objects.
+	 */
+	private static final ConcurrentHashMap<Long, long[]> SECTION_SHADOW_IDENTITIES = new ConcurrentHashMap<>();
 	/** Direct semantic identity lookup for post-submit receipts and sort metadata. */
 	private static final Map<Long, TerrainAssetIdentity> SECTION_ASSETS_BY_MESH_KEY = new ConcurrentHashMap<>();
 	/** Replacement generation built off-screen while the published atlas remains live. */
@@ -110,6 +116,7 @@ public final class RustGalTerrainRenderer {
 	 */
 	private static final int MAX_SHADOW_CANDIDATE_SECTIONS = 12_288;
 	private static boolean shadowCandidateTruncationLogged;
+	/** Indexed by {@link #rowSlot}. */
 	private static final ChunkSectionLayer[] SHADOW_CANDIDATE_LAYERS = {
 		ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT_MIPPED, ChunkSectionLayer.TRANSLUCENT
 	};
@@ -218,6 +225,28 @@ public final class RustGalTerrainRenderer {
 		long[] cachedOpaqueMeshKeyArray = new long[256];
 		long[] cachedOpaqueMeshGenerationArray = new long[256];
 		int cachedOpaqueMeshKeyCount;
+		long[] shadowMeshKeys = new long[1024];
+		long[] shadowMeshGenerations = new long[1024];
+		int[] shadowSectionOrigins = new int[1024 * 3];
+		int[] shadowDepthPolicies = new int[1024];
+		int shadowCount;
+
+		void appendShadowCandidate(long meshKey, long meshGeneration, int x, int y, int z, int depthPolicy) {
+			if (shadowCount == shadowMeshKeys.length) {
+				int capacity = shadowMeshKeys.length * 2;
+				shadowMeshKeys = Arrays.copyOf(shadowMeshKeys, capacity);
+				shadowMeshGenerations = Arrays.copyOf(shadowMeshGenerations, capacity);
+				shadowSectionOrigins = Arrays.copyOf(shadowSectionOrigins, capacity * 3);
+				shadowDepthPolicies = Arrays.copyOf(shadowDepthPolicies, capacity);
+			}
+			int index = shadowCount++;
+			shadowMeshKeys[index] = meshKey;
+			shadowMeshGenerations[index] = meshGeneration;
+			shadowSectionOrigins[index * 3] = x;
+			shadowSectionOrigins[index * 3 + 1] = y;
+			shadowSectionOrigins[index * 3 + 2] = z;
+			shadowDepthPolicies[index] = depthPolicy;
+		}
 		final ArrayList<RenderSection> sectionSnapshot = new ArrayList<>();
 		final ArrayList<TerrainSectionAsset> solidAssetSnapshot = new ArrayList<>();
 		final ArrayList<TerrainSectionAsset> cutoutAssetSnapshot = new ArrayList<>();
@@ -229,6 +258,7 @@ public final class RustGalTerrainRenderer {
 			visibleSubmissions.clear();
 			cachedOpaqueMeshKeys.clear();
 			cachedOpaqueMeshKeyCount = 0;
+			shadowCount = 0;
 			sectionSnapshot.clear();
 			solidAssetSnapshot.clear();
 			cutoutAssetSnapshot.clear();
@@ -728,24 +758,30 @@ public final class RustGalTerrainRenderer {
 		// This is a separate bounded semantic stream. Candidate assets stay
 		// resident, but only Rust may select them into a source shadow pass.
 		if (shadowCandidates != null) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.shadow-candidate-limit");
 			shadowCandidates = nearestShadowCandidates(shadowCandidates, camera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.shadow-candidate-limit");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.shadow-submit");
+			int[] depthPolicies = new int[SHADOW_CANDIDATE_LAYERS.length];
+			for (int slot = 0; slot < depthPolicies.length; slot++) {
+				depthPolicies[slot] = terrainDepthPolicy(SHADOW_CANDIDATE_LAYERS[slot]);
+			}
 			for (RenderSection section : shadowCandidates) {
 				if (section == null || !section.isBuilt()) continue;
 				long sectionPos = section.getPositionAsLong();
-				// A camera-visible section already contributed every layer asset
-				// from this frame's snapshot, so none can be a new shadow key.
-				boolean alreadyVisible = scratch.seenPositions.contains(sectionPos);
-				TerrainSectionAsset[] row = alreadyVisible ? null : sectionAssetRow(sectionPos);
-				for (ChunkSectionLayer layer : SHADOW_CANDIDATE_LAYERS) {
-					if (row == null) break;
-					TerrainSectionAsset asset = row[rowSlot(layer)];
-					if (asset == null || !visibleMeshKeys.add(asset.meshKey())) continue;
-					RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSectionInstance(
-						asset.meshKey(), asset.meshGeneration(),
-						section.getOriginX(), section.getOriginY(), section.getOriginZ(),
-						camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
-						viewportWidth, viewportHeight, terrainDepthPolicy(layer),
-						RustGalWorldPrimitiveRenderer.CULL_BACK, false, true);
+				// A camera-visible section already contributed every layer asset.
+				// Candidate sections are distinct and mesh keys are unique per
+				// section layer, so no key here can repeat a visible or earlier one.
+				long[] identities = scratch.seenPositions.contains(sectionPos)
+					? null : SECTION_SHADOW_IDENTITIES.get(sectionPos);
+				if (identities != null) {
+					for (int slot = 0; slot < SHADOW_CANDIDATE_LAYERS.length; slot++) {
+						long meshKey = identities[slot * 2];
+						if (meshKey == 0L) continue;
+						scratch.appendShadowCandidate(meshKey, identities[slot * 2 + 1],
+							section.getOriginX(), section.getOriginY(), section.getOriginZ(),
+							depthPolicies[slot]);
+					}
 				}
 				var animatedSprites = section.getAnimatedSprites();
 				if (animatedSprites != null) {
@@ -756,6 +792,11 @@ public final class RustGalTerrainRenderer {
 					}
 				}
 			}
+			RustGalWorldPrimitiveRenderer.enqueueStaticTerrainShadowCandidates(
+				scratch.shadowMeshKeys, scratch.shadowMeshGenerations, scratch.shadowSectionOrigins,
+				scratch.shadowDepthPolicies, scratch.shadowCount,
+				camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z());
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.shadow-submit");
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-reconcile");
 		if (!resourceReloadStaging) {
@@ -905,7 +946,7 @@ public final class RustGalTerrainRenderer {
 			double dy = section.getOriginY() + 8.0D - cy;
 			double dz = section.getOriginZ() + 8.0D - cz;
 			return dx * dx + dy * dy + dz * dz;
-		}));
+		}).thenComparingLong(RenderSection::getPositionAsLong));
 		return nearest.subList(0, MAX_SHADOW_CANDIDATE_SECTIONS);
 	}
 
@@ -3892,6 +3933,7 @@ public final class RustGalTerrainRenderer {
 			SECTION_ASSETS.clear();
 			SECTION_ASSETS.putAll(replacement);
 			SECTION_ASSET_ROWS.clear();
+			SECTION_SHADOW_IDENTITIES.clear();
 			for (LayerKey key : replacement.keySet()) {
 				mirrorSectionAssetRow(key);
 			}
@@ -4671,7 +4713,20 @@ public final class RustGalTerrainRenderer {
 		SECTION_ASSET_ROWS.compute(layerKey.sectionPos(), (sectionPos, row) -> {
 			TerrainSectionAsset[] next = row == null ? new TerrainSectionAsset[3] : row.clone();
 			next[slot] = SECTION_ASSETS.get(layerKey);
-			return next[0] == null && next[1] == null && next[2] == null ? null : next;
+			if (next[0] == null && next[1] == null && next[2] == null) {
+				SECTION_SHADOW_IDENTITIES.remove(sectionPos);
+				return null;
+			}
+			long[] identities = new long[6];
+			for (int index = 0; index < 3; index++) {
+				if (next[index] != null) {
+					identities[index * 2] = next[index].meshKey();
+					identities[index * 2 + 1] = next[index].meshGeneration();
+				}
+			}
+			// Written inside the row's compute so both views change together.
+			SECTION_SHADOW_IDENTITIES.put(sectionPos, identities);
+			return next;
 		});
 	}
 

@@ -1,6 +1,7 @@
 package net.vulkanic.world;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -70,6 +71,75 @@ class RustGalStaticTerrainVisibilityTest {
 		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 7L));
 		assertTrue(!StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 8L));
 		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 42L, 8L));
+	}
+
+	@Test
+	void primitiveProtectionKeepsReferencedGenerationsAndAllowsUnreferencedMeshes() {
+		var frozen = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();
+		StaticTerrainVisibilitySet.protectGeneration(frozen, 41L, 7L);
+		StaticTerrainVisibilitySet.protectGeneration(frozen, 41L, 7L);
+		StaticTerrainVisibilitySet.protectGeneration(frozen, Long.MIN_VALUE, Long.MAX_VALUE);
+		assertEquals(2, frozen.size());
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 7L));
+		assertTrue(!StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 8L));
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 42L, 8L));
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, Long.MIN_VALUE, Long.MAX_VALUE));
+		assertTrue(!StaticTerrainVisibilitySet.mayPublishGeneration(frozen, Long.MIN_VALUE, 7L));
+	}
+
+	@Test
+	void conflictingGenerationDoesNotReplaceFrozenProtection() {
+		var frozen = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();
+		StaticTerrainVisibilitySet.protectGeneration(frozen, 41L, 7L);
+		assertThrows(IllegalStateException.class, () ->
+			StaticTerrainVisibilitySet.protectGeneration(frozen, 41L, 8L));
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 7L));
+		assertTrue(!StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 8L));
+	}
+
+	@Test
+	void zeroGenerationAndZeroKeyAreNeverConfusedWithAbsentProtection() {
+		var frozen = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();
+		StaticTerrainVisibilitySet.protectGeneration(frozen, 0L, 0L);
+		assertThrows(IllegalStateException.class, () ->
+			StaticTerrainVisibilitySet.protectGeneration(frozen, 0L, 1L));
+		assertTrue(!StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 0L, 1L));
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 1L, 0L));
+	}
+
+	@Test
+	void primitiveVisibilityWithdrawalPreservesSurvivorOrder() {
+		var active = new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<String>();
+		active.put(0L, "zero");
+		active.put(Long.MIN_VALUE, "negative");
+		active.put(42L, "withdrawn");
+		active.put(Long.MAX_VALUE, "positive");
+		var visible = new it.unimi.dsi.fastutil.longs.LongOpenHashSet(
+			new long[] {Long.MIN_VALUE, Long.MAX_VALUE});
+		assertEquals(2, StaticTerrainVisibilitySet.reconcile(active, visible));
+		assertArrayEquals(new long[] {Long.MIN_VALUE, Long.MAX_VALUE}, active.keySet().toLongArray());
+		assertEquals("negative", active.get(Long.MIN_VALUE));
+		assertEquals("positive", active.get(Long.MAX_VALUE));
+		assertEquals(2, StaticTerrainVisibilitySet.reconcile(active,
+			new it.unimi.dsi.fastutil.longs.LongOpenHashSet()));
+		assertTrue(active.isEmpty());
+	}
+
+	@Test
+	void boundedAdmissionEvictsEldestDespiteLookupAndReplacement() {
+		var active = new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<String>();
+		StaticTerrainVisibilitySet.rememberBounded(active, 0L, "oldest", 3);
+		StaticTerrainVisibilitySet.rememberBounded(active, Long.MIN_VALUE, "middle", 3);
+		StaticTerrainVisibilitySet.rememberBounded(active, Long.MAX_VALUE, "last", 3);
+		assertEquals("oldest", active.get(0L));
+		StaticTerrainVisibilitySet.rememberBounded(active, 0L, "replacement", 3);
+		StaticTerrainVisibilitySet.rememberBounded(active, 41L, "new", 3);
+		assertEquals(3, active.size());
+		assertTrue(!active.containsKey(0L));
+		assertArrayEquals(new long[] {Long.MIN_VALUE, Long.MAX_VALUE, 41L}, active.keySet().toLongArray());
+		StaticTerrainVisibilitySet.rememberBounded(active, Long.MIN_VALUE, "updated", 3);
+		assertEquals("updated", active.get(Long.MIN_VALUE));
+		assertArrayEquals(new long[] {Long.MIN_VALUE, Long.MAX_VALUE, 41L}, active.keySet().toLongArray());
 	}
 
 }

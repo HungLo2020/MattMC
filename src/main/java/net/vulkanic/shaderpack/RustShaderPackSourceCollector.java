@@ -408,14 +408,48 @@ public final class RustShaderPackSourceCollector {
 	private static boolean wholeFrameShaderConfigEnabled() throws IOException {
 		Path config = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
 			.resolve("config").resolve("iris.properties");
-		if (!Files.isRegularFile(config)) {
-			return true;
+		Properties values = irisProperties(config);
+		return values == null || !"false".equals(values.getProperty("enableShaders"));
+	}
+
+	private record IrisPropertiesSnapshot(Path path, java.nio.file.attribute.FileTime modified, long size,
+			Properties values) {
+	}
+
+	private static volatile IrisPropertiesSnapshot irisPropertiesSnapshot;
+
+	/** Called after an in-process settings write. */
+	public static void invalidateIrisProperties() {
+		irisPropertiesSnapshot = null;
+	}
+
+	/**
+	 * The frame coordinator asks for the active pack every frame. Reparse the
+	 * Iris settings only when the file's identity changes, so a frame costs one
+	 * stat instead of opening and parsing the file. Returns null when absent.
+	 */
+	private static Properties irisProperties(Path config) throws IOException {
+		java.nio.file.attribute.BasicFileAttributes attributes;
+		try {
+			attributes = Files.readAttributes(config, java.nio.file.attribute.BasicFileAttributes.class);
+		} catch (java.nio.file.NoSuchFileException missing) {
+			return null;
+		}
+		if (!attributes.isRegularFile()) {
+			return null;
+		}
+		IrisPropertiesSnapshot cached = irisPropertiesSnapshot;
+		if (cached != null && cached.path().equals(config) && cached.size() == attributes.size()
+				&& cached.modified().equals(attributes.lastModifiedTime())) {
+			return cached.values();
 		}
 		Properties values = new Properties();
 		try (var input = Files.newInputStream(config)) {
 			values.load(input);
 		}
-		return !"false".equals(values.getProperty("enableShaders"));
+		irisPropertiesSnapshot = new IrisPropertiesSnapshot(config, attributes.lastModifiedTime(),
+			attributes.size(), values);
+		return values;
 	}
 
 	private static Optional<String> configuredPackNameFromDisk() throws IOException {
@@ -539,12 +573,9 @@ public final class RustShaderPackSourceCollector {
 	}
 
 	static Optional<String> configuredPackNameFromProperties(Path config) throws IOException {
-		if (!Files.isRegularFile(config)) {
+		Properties values = irisProperties(config);
+		if (values == null) {
 			return Optional.empty();
-		}
-		Properties values = new Properties();
-		try (var input = Files.newInputStream(config)) {
-			values.load(input);
 		}
 		// Iris retains the last selected filename when shaders are switched off.
 		// That preference is not an active source pack: a vanilla post effect

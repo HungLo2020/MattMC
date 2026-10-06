@@ -190,8 +190,11 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(backend_submit_started));
         }
         self.metrics.submissions += 1;
+        // Shared dependencies (layouts, samplers, textures behind several
+        // sets) are marked once per submission instead of once per referrer.
+        let mut marked = HashSet::new();
         for handle in referenced {
-            self.mark_in_flight(handle, id)?;
+            self.mark_in_flight(handle, id, &mut marked)?;
         }
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_submit_total_nanos = profile
@@ -287,20 +290,29 @@ impl VulkanicGal {
         self.backend.completed_host_reads()
     }
 
-    pub(super) fn mark_in_flight(&mut self, handle: Handle, id: SubmissionId) -> GalResult<()> {
+    pub(super) fn mark_in_flight(
+        &mut self,
+        handle: Handle,
+        id: SubmissionId,
+        marked: &mut HashSet<Handle>,
+    ) -> GalResult<()> {
+        if !marked.insert(handle) {
+            // Already marked with its whole dependency closure for `id`.
+            return Ok(());
+        }
         // A command references resource sets and pipelines, while their
         // descriptor/layout dependency edges own the sampler, image view,
         // texture, and shader handles they contain.  Retire the complete
         // dependency closure with the submission; marking only the directly
         // encoded set allowed a replaced sampler to be destroyed while its
         // descriptor set was still executing on Vulkan.
-        let dependencies = self
+        let dependencies: smallvec::SmallVec<[Handle; 8]> = self
             .reverse_dependencies
             .get(&handle)
-            .cloned()
+            .map(|dependencies| dependencies.iter().copied().collect())
             .unwrap_or_default();
         for dependency in dependencies {
-            self.mark_in_flight(dependency, id)?;
+            self.mark_in_flight(dependency, id, marked)?;
         }
         match handle.kind() {
             Some(HandleKind::Buffer) => {

@@ -2080,7 +2080,7 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
                 &source_uniforms,
             )
             .unwrap();
-        let mut stale_program = lowered_program.clone();
+        let mut stale_program = (*lowered_program).clone();
         stale_program.shader_pack_generation =
             stale_program.shader_pack_generation.saturating_add(1);
         assert!(frontend
@@ -2280,6 +2280,7 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
             1,
             &source_frame_with_dh,
             &source_batches,
+            &Default::default(),
             &[],
             Extent3d {
                 width: 128,
@@ -4136,6 +4137,7 @@ pub(crate) fn frame(segments: Vec<WorldLineSegmentRequest>) -> WorldPrimitiveFra
         text_quads: Vec::new(),
         lod_instances: Vec::new(),
         lod_render_frame: WorldLodRenderFrame::default(),
+        static_terrain_shadow_casters: StaticTerrainShadowCasters::default(),
     }
 }
 
@@ -8228,6 +8230,72 @@ fn prepared_entity_source_program_for_test() -> LoweredEntitySourceProgram {
 }
 
 #[test]
+fn source_entity_frames_merge_contiguous_same_state_sections_into_one_draw_range() {
+    let source = ShaderPackSource::new(
+        "source-entity-section-run-test",
+        17,
+        vec![
+            ShaderSourceFile::new(
+                "world0/gbuffers_entities.vsh",
+                "#version 130\nvoid main() { vec4 p = gl_Vertex; vec2 light = GetLightMapCoordinates(); vec3 normal = gl_Normal; vec4 color = gl_Color; gl_Position = ftransform(); }",
+            ),
+            ShaderSourceFile::new(
+                "world0/gbuffers_entities.fsh",
+                "#version 130\nuniform sampler2D tex;\nuniform int entityId;\nuniform vec4 entityColor;\nvoid DoLighting() {}\nvoid main() { vec4 color = texture2D(tex, texCoord); color *= glColor; color.rgb = mix(color.rgb, entityColor.rgb, entityColor.a); DoLighting(); gl_FragData[0] = color; gl_FragData[1] = color; /* DRAWBUFFERS:06 */ }",
+            ),
+            ShaderSourceFile::new("entity.properties", "entity.50076=boat\n"),
+            ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+        ],
+    )
+    .unwrap();
+    let contract = derive_entity_contract(&source, TerrainProgramScope::Overworld).unwrap();
+    let lowered = lower_entity_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = bind_entity_source_resources(&lowered, &declarations).unwrap();
+    let program = prepare_lowered_entity_source_program(&contract, &lowered, &bindings).unwrap();
+
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let mut asset = mesh_asset(0xe771_5a6f, 1, IndexType::U32);
+    asset.entity_identity = "minecraft:boat".to_string();
+    let quad = asset.index_bytes.clone();
+    asset.index_bytes = [quad.as_slice(), quad.as_slice(), quad.as_slice()].concat();
+    let section = asset.sections[0].clone();
+    asset.sections = (0..3u32)
+        .map(|index| WorldMeshSection {
+            index_offset: index * 24,
+            // The third face changes draw state and must stay separate.
+            cull_policy: if index == 2 { WORLD_CULL_NONE } else { section.cull_policy },
+            ..section.clone()
+        })
+        .collect();
+    frontend
+        .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
+        .unwrap();
+    let mut source_frame = frame(Vec::new());
+    let mut instance = mesh_instance(0xe771_5a6f, 1);
+    instance.stratum = WORLD_STRATUM_ENTITY_MESH;
+    instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
+    source_frame.mesh_instances.push(instance);
+
+    let prepared = frontend
+        .prepare_source_entity_frames(&program, &source_frame)
+        .unwrap();
+    assert_eq!(
+        prepared
+            .iter()
+            .map(|frame| (frame.section_index, frame.section_count, frame.cull_policy))
+            .collect::<Vec<_>>(),
+        vec![(0, 2, WORLD_CULL_BACK), (2, 1, WORLD_CULL_NONE)]
+    );
+    assert_eq!(
+        crate::render::worldrender::source::source_entity_section_run_end(&prepared[0].mesh, 0, 2)
+            .unwrap(),
+        Some(48)
+    );
+}
+
+#[test]
 fn source_entity_frame_uses_the_active_pack_entity_render_stage_only_when_declared() {
     let source = ShaderPackSource::new(
         "source-entity-render-stage-test",
@@ -10602,6 +10670,52 @@ fn terrain_voxel_source_cache_tracks_only_visible_v3_terrain_assets() {
     assert!(frontend
         .terrain_voxel_source_meshes(&terrain_frame)
         .is_err());
+}
+
+#[test]
+fn terrain_voxel_source_volume_cull_keys_reuse_on_instances_inside_the_volume() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let assets = [0x711, 0x712].map(|key| {
+        let mut terrain = mesh_asset(key, 1, IndexType::U16);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        terrain
+    });
+    frontend
+        .apply_world_mesh_asset_update(&mut gal, 1, assets.to_vec(), Vec::new())
+        .unwrap();
+    let instance = |key, x: f32| {
+        let mut instance = mesh_instance(key, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        instance.transform[12] = x;
+        instance
+    };
+    let cull = Some([[-64, -64, -64], [64, 64, 64]]);
+    let mut terrain_frame = frame(Vec::new());
+    terrain_frame.mesh_instances = vec![instance(0x711, 0.0), instance(0x712, 10_000.0)];
+    let both = frontend.terrain_voxel_source_meshes_within(&terrain_frame, cull).unwrap();
+    assert_eq!(vec![0x711], both.iter().map(|mesh| mesh.mesh_key).collect::<Vec<_>>());
+    // Only the in-volume instance keys the reuse; the far one may come and go.
+    terrain_frame.mesh_instances.pop();
+    let near_only = frontend.terrain_voxel_source_meshes_within(&terrain_frame, cull).unwrap();
+    assert_eq!(1, near_only.len());
+    assert!(Arc::ptr_eq(&both[0].vertices, &near_only[0].vertices));
+    assert_eq!(1, frontend.terrain_voxel_source_memo.as_ref().unwrap().instances.len());
+    // Without a cull box every static instance is selected, as before.
+    terrain_frame.mesh_instances.push(instance(0x712, 10_000.0));
+    let all = frontend.terrain_voxel_source_meshes(&terrain_frame).unwrap();
+    assert_eq!(vec![0x711, 0x712], all.iter().map(|mesh| mesh.mesh_key).collect::<Vec<_>>());
+    // Frame order is not identity: the same in-volume set reuses the list.
+    terrain_frame.mesh_instances = vec![instance(0x712, 3.0), instance(0x711, 0.0)];
+    let first = frontend.terrain_voxel_source_meshes_within(&terrain_frame, cull).unwrap();
+    terrain_frame.mesh_instances.reverse();
+    let reordered = frontend.terrain_voxel_source_meshes_within(&terrain_frame, cull).unwrap();
+    assert!(Arc::ptr_eq(&first, &reordered));
+    assert_eq!(vec![0x711, 0x712], reordered.iter().map(|mesh| mesh.mesh_key).collect::<Vec<_>>());
+    // Moving the near instance out of the volume changes the selection.
+    terrain_frame.mesh_instances = vec![instance(0x711, 0.0)];
+    terrain_frame.mesh_instances[0].transform[12] = -10_000.0;
+    assert!(frontend.terrain_voxel_source_meshes_within(&terrain_frame, cull).unwrap().is_empty());
 }
 
 #[test]
@@ -14404,7 +14518,7 @@ fn source_terrain_frame_preparation_matches_the_lowered_source_abi() {
         .unwrap();
     assert_eq!(1, prepared.frame_id);
     assert_eq!(0x7a1d, prepared.mesh.mesh_key);
-    assert_eq!(vec![0], prepared.section_indices);
+    assert_eq!(&[0][..], &*prepared.section_indices);
     assert_eq!(
         program.execution_interface.legacy_transform_bytes as usize,
         prepared.legacy_texture_transforms.len()
@@ -15771,7 +15885,8 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             color_attachments
                 .iter()
                 .map(|attachment| attachment.format)
-                .collect(),
+                .collect::<Vec<_>>()
+                .as_slice(),
         )
         .unwrap();
     assert_eq!(1, draws.len());
@@ -15796,7 +15911,8 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
                 .color_attachments
                 .iter()
                 .map(|attachment| attachment.format)
-                .collect(),
+                .collect::<Vec<_>>()
+                .as_slice(),
         )
         .unwrap();
     assert_eq!(1, translucent_draws.len());
@@ -15843,6 +15959,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
         pass: targets.pass,
     };
     let named_source_frame = PreparedNamedSourceTerrainFramePlan {
+        scene_coverage: Default::default(),
         terrain,
         shadow_only_draws: Vec::new(),
         entity_shadow_draws: Vec::new(),
@@ -17617,6 +17734,26 @@ fn vulkan_standard_foil_creates_owned_stream_bindings_and_retires_them() {
     )
     .unwrap();
     verify_standard_foil_stream_bindings(backend);
+}
+
+#[test]
+fn instance_stream_grows_geometrically_under_incremental_streaming() {
+    // Each regrowth rebinds every mesh resource set; streaming terrain must
+    // not reallocate the shared stream for every small increase.
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let base = frontend.ensure_mesh_instance_stream(&mut gal, 1).unwrap().capacity;
+    let mut grows = 0;
+    let mut required = 1_u64;
+    for _ in 0..512 {
+        required += base / 16;
+        let binding = frontend.ensure_mesh_instance_stream(&mut gal, required).unwrap();
+        assert!(binding.capacity >= required + WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES);
+        grows += usize::from(binding.grew);
+    }
+    // 512 steps of base/16 reach about 33x the base capacity.
+    assert!(grows <= 7, "stream regrew {grows} times");
+    assert_eq!(frontend.mesh_instance_stream_slots.len(), 1);
 }
 
 fn verify_standard_foil_stream_bindings(mut gal: VulkanicGal) {

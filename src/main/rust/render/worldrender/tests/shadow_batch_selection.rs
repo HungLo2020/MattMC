@@ -183,7 +183,7 @@ fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
                 scene.shader_environment.time_of_day = time;
                 scene.shader_environment.configured_shadow_distance_chunks = 5;
                 let selected = frontend
-                    .source_shadow_terrain_instance_indices(&scene, generation)
+                    .source_shadow_terrain_instance_indices(&scene, generation, &Default::default())
                     .unwrap();
                 let policy = frontend
                     .shader_pack_sources
@@ -232,7 +232,7 @@ fn shadow_batch_selection_matches_late_frustum_culling_and_draw_order() {
     for dimension in [WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_END] {
         scene.background.sky_type = dimension;
         assert!(frontend
-            .source_shadow_terrain_instance_indices(&scene, 41)
+            .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
             .unwrap()
             .is_empty());
     }
@@ -362,7 +362,8 @@ fn shadow_batch_selection_reuses_full_repeated_plan_without_losing_culled_order(
     scene.mesh_instances[0].mesh_generation = 1;
     frontend.apply_world_mesh_asset_update(&mut gal, 2,
         vec![mesh_asset(2, 2, IndexType::U16)], Vec::new()).unwrap();
-    assert!(frontend.mesh_batch_plan_cache.is_empty());
+    // The stale full plan is invalidated (an empty selection's plan names no mesh).
+    assert!(!frontend.mesh_batch_plan_cache.iter().any(|entry| Arc::ptr_eq(&entry.batches, &full)));
     scene.mesh_instances[1].mesh_generation = 2;
     selected_plan(&mut frontend, &scene, &[2]);
     assert!(!Arc::ptr_eq(&full, &frontend.mesh_batch_plan_cache[0].batches));
@@ -492,31 +493,31 @@ fn shadow_batch_selection_does_not_hide_invalid_culled_asset_or_sorted_topology(
     scene.shader_environment.configured_shadow_distance_chunks = 2;
     scene.mesh_instances = vec![caster(1, [2000.0; 3])];
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .unwrap()
         .is_empty());
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 42)
+        .source_shadow_terrain_instance_indices(&scene, 42, &Default::default())
         .is_err());
     scene.mesh_instances[0].mesh_key = 2;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .is_err());
     scene.mesh_instances[0].mesh_key = 1;
     scene.mesh_instances[0].mesh_generation = 2;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .is_err());
     scene.mesh_instances[0].mesh_generation = 1;
     scene.mesh_instances[0].mesh_section_index = 9;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .is_err());
     scene.mesh_instances[0].mesh_section_index = WORLD_MESH_SECTION_ALL;
     scene.mesh_instances[0].flags |= WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
     // The installed opaque mesh is not a canonical translucent quad source.
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .is_err());
     let mut translucent = mesh_asset(1, 2, IndexType::U16);
     translucent.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
@@ -526,11 +527,187 @@ fn shadow_batch_selection_does_not_hide_invalid_culled_asset_or_sorted_topology(
         .unwrap();
     scene.mesh_instances[0].mesh_generation = 2;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .unwrap()
         .is_empty());
     scene.mesh_instances[0].transform[0] = 2.0;
     assert!(frontend
-        .source_shadow_terrain_instance_indices(&scene, 41)
+        .source_shadow_terrain_instance_indices(&scene, 41, &Default::default())
         .is_err());
+}
+
+
+#[test]
+fn lazy_mesh_batch_index_matches_keyed_batches_when_meshes_repeat_mid_stream() {
+    let instance = mesh_instance(1, 1);
+    let mut asset = mesh_asset(1, 1, IndexType::U16);
+    let section = asset.sections.remove(0);
+    let base = mesh_key_for_section(&instance, &section, 0, WORLD_CULL_NONE, 1, 4,
+        ColorFormat::Rgba8Unorm, RasterYDirection::Up, false, false);
+    let mut state = 0x9E37_79B9_7F4A_7C15u64;
+    let mut next = |bound: u64| {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (state >> 33) % bound
+    };
+    for round in 0..40 {
+        let unique_prefix = next(30) as usize;
+        let mut reference_batches = Vec::new();
+        let mut reference = HashMap::with_hasher(Default::default());
+        let mut batches = Vec::new();
+        let mut index = MeshBatchIndex::with_capacity(4);
+        for instance_index in 0..80usize {
+            let mesh = if instance_index < unique_prefix { 1000 + instance_index as u64 } else { next(12) };
+            index.begin_instance(&batches, mesh);
+            for _ in 0..=next(3) {
+                let section_index = next(3) as u32;
+                let mut key = base;
+                key.mesh_key = mesh;
+                key.section_index = section_index;
+                if (mesh + u64::from(section_index) + round) % 7 == 0 {
+                    key.material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
+                }
+                let order = (mesh % 4 == 0).then_some((mesh % 3) as i32);
+                let offset = mesh * 16 + u64::from(section_index) * 4;
+                let expected = push_mesh_batch(&mut reference_batches, &mut reference, key, offset, 6,
+                    instance_index, order);
+                let actual = index.push(&mut batches, key, offset, 6, instance_index, order);
+                assert_eq!(expected.is_ok(), actual.is_ok());
+            }
+        }
+        assert_batches_equal(&reference_batches, &batches);
+    }
+    // A repeated key with a different range fails in both modes.
+    let mut batches = Vec::new();
+    let mut index = MeshBatchIndex::with_capacity(4);
+    index.begin_instance(&batches, 5);
+    let mut key = base;
+    key.mesh_key = 5;
+    index.push(&mut batches, key, 0, 6, 0, None).unwrap();
+    assert!(index.push(&mut batches, key, 6, 6, 0, None).is_err());
+}
+
+
+#[test]
+fn covering_selection_with_repeated_meshes_matches_the_full_plan_and_ignores_excluded_churn() {
+    for material_mode in [WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT] {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut assets = vec![mesh_asset(1, 1, IndexType::U16), mesh_asset(2, 1, IndexType::U16)];
+        for asset in &mut assets {
+            asset.sections[0].material_mode = material_mode;
+            if material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT {
+                asset.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+            }
+        }
+        frontend.apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new()).unwrap();
+        let camera = |key, x: f32| {
+            let mut instance = caster(key, [x, 0.0, 0.0]);
+            instance.flags = 0;
+            instance
+        };
+        let mut scene = frame(Vec::new());
+        // Mesh 1 repeats among the camera instances; the last is shadow-only.
+        scene.mesh_instances = vec![camera(1, 0.0), camera(2, 1.0), camera(1, 2.0), caster(2, [50.0, 0.0, 0.0])];
+        let plan = |frontend: &mut WorldPrimitiveFrontend, scene: &WorldPrimitiveFrame| {
+            let indices = (0..scene.mesh_instances.len())
+                .filter(|&index| MeshBatchSelection::Static.includes(&scene.mesh_instances[index]))
+                .collect::<Vec<_>>();
+            assert!(mesh_batch_indices_cover_selection(scene, MeshBatchSelection::Static, true, &indices));
+            let identities = indices
+                .iter()
+                .map(|&index| terrain_batch_instance_key(&scene.mesh_instances[index]))
+                .collect::<Vec<_>>();
+            frontend
+                .cached_mesh_batch_plan_selected(scene, ColorFormat::Rgba8Unorm, RasterYDirection::Up, true,
+                    MeshBatchSelection::Static, &identities, true, Some(&indices))
+                .unwrap()
+        };
+        let first = plan(&mut frontend, &scene);
+        let full = mesh_batches_filtered(&scene, &frontend, ColorFormat::Rgba8Unorm, RasterYDirection::Up,
+            true, MeshBatchSelection::Static, true).unwrap();
+        assert_batches_equal(&full, &first);
+        // A change confined to the excluded shadow-only caster reuses the plan.
+        scene.mesh_instances[3].terrain_visible_facing_mask = 0x15;
+        assert!(Arc::ptr_eq(&first, &plan(&mut frontend, &scene)));
+        frontend.reset(&mut gal);
+    }
+}
+
+#[test]
+fn culled_repeats_of_unselected_meshes_do_not_change_the_selected_plan() {
+    for material_mode in [WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT] {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut assets = (1..=3).map(|key| mesh_asset(key, 1, IndexType::U16)).collect::<Vec<_>>();
+        for asset in &mut assets {
+            asset.sections[0].material_mode = material_mode;
+            if material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT {
+                asset.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+            }
+        }
+        frontend.apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new()).unwrap();
+        let mut scene = frame(Vec::new());
+        // Mesh 3 repeats, but only among culled instances.
+        scene.mesh_instances = vec![
+            caster(1, [0.0; 3]), caster(3, [1.0; 3]), caster(2, [2.0; 3]), caster(3, [3.0; 3]),
+        ];
+        let selected = [0, 2];
+        assert!(!mesh_batch_selection_repeats_selected_mesh(
+            &scene, MeshBatchSelection::ShadowOnly, true, &selected));
+        let mut reference = mesh_batches_filtered(&scene, &frontend, ColorFormat::Rgba8Unorm,
+            RasterYDirection::Up, true, MeshBatchSelection::ShadowOnly, true).unwrap();
+        for batch in &mut reference {
+            batch.indices.retain(|index| selected.contains(index));
+        }
+        reference.retain(|batch| !batch.indices.is_empty());
+        assert_batches_equal(&reference, &selected_plan(&mut frontend, &scene, &selected));
+        // Selecting a repeated mesh keeps the full-plan path.
+        assert!(mesh_batch_selection_repeats_selected_mesh(
+            &scene, MeshBatchSelection::ShadowOnly, true, &[1]));
+        frontend.reset(&mut gal);
+    }
+}
+
+#[test]
+fn memoized_static_terrain_ranges_reproduce_cold_plans_for_every_selection() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let assets = (1..=9).map(|key| {
+        let mut asset = mesh_asset(key, 1, IndexType::U16);
+        let indices = asset.index_bytes.clone();
+        let section = asset.sections[0].clone();
+        asset.index_bytes.clear();
+        asset.sections.clear();
+        for facing in 0..7 {
+            let mut section = section.clone();
+            section.source_facing = facing;
+            section.index_offset = asset.index_bytes.len() as u32;
+            asset.sections.push(section);
+            asset.index_bytes.extend_from_slice(&indices);
+        }
+        asset
+    }).collect();
+    frontend.apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new()).unwrap();
+    let mut scene = frame(Vec::new());
+    scene.mesh_instances = (1..=9).map(|key| {
+        let mut instance = caster(key, [key as f32, 0.0, 0.0]);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        // Camera instances (no shadow-only flag) with distinct facing masks.
+        instance.flags = if key % 3 == 0 { WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY } else { 0 };
+        instance.terrain_visible_facing_mask = (1 << (key % 6)) | (1 << 6);
+        instance
+    }).collect();
+    for selection in [MeshBatchSelection::All, MeshBatchSelection::ShadowOnly, MeshBatchSelection::ShadowSupplement] {
+        frontend.mesh_range_memo.borrow_mut().clear();
+        let cold = mesh_batches_filtered(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true, selection, true).unwrap();
+        // The cold build populated the memo; this one is served from it.
+        assert!(frontend.mesh_range_memo.borrow().len() > 0);
+        let warm = mesh_batches_filtered(&scene, &frontend,
+            ColorFormat::Rgba8Unorm, RasterYDirection::Up, true, selection, true).unwrap();
+        assert_batches_equal(&cold, &warm);
+        assert!(!warm.is_empty());
+    }
+    frontend.reset(&mut gal);
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
 }

@@ -280,7 +280,7 @@ impl TerrainOccupancyVoxelizer {
                 }) {
                     continue;
                 }
-                for sample in mesh.samples.iter() {
+                for (index, sample) in mesh.samples.iter().enumerate() {
                     stats.input_samples = stats.input_samples.saturating_add(1);
                     let Some(value) = self.materials.occupancy_value(sample.shader_material_id)
                     else {
@@ -288,7 +288,11 @@ impl TerrainOccupancyVoxelizer {
                             stats.skipped_non_solid_samples.saturating_add(1);
                         continue;
                     };
-                    let center = sample.world_block_center()?;
+                    // Cached at snapshot creation; recompute only to report its error.
+                    let center = match mesh.world_centers.get(index) {
+                        Some(Some(center)) => *center,
+                        _ => sample.world_block_center()?,
+                    };
                     if center.iter().any(|value| !value.is_finite()) {
                         continue;
                     }

@@ -396,22 +396,7 @@ pub(super) fn decode_world_shader_environment_frame(
     Ok(environment)
 }
 
-pub(crate) fn is_canonical_resource_location(value: &str) -> bool {
-    let Some((namespace, path)) = value.split_once(':') else {
-        return false;
-    };
-    !namespace.is_empty()
-        && !path.is_empty()
-        && !path.contains(':')
-        && namespace.bytes().all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-' | b'.')
-        })
-        && path.bytes().all(|byte| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'_' | b'-' | b'.' | b'/')
-        })
-}
+pub(crate) use crate::render::shaderpack::properties::item_ids::is_canonical_resource_location;
 
 pub(super) fn decode_world_voxel_volume_frame(
     request: FfiWorldVoxelVolumeFrame,

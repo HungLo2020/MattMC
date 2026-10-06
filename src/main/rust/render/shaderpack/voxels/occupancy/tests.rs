@@ -1159,7 +1159,7 @@ fn incremental_occupancy_matches_full_rebuild_across_moves_and_mesh_changes() {
         runtime
             .append_terrain_source_snapshot_for_mapping(
                 mapping,
-                meshes.values().cloned(),
+                meshes.values().cloned().collect::<Vec<_>>(),
                 &mut ops,
             )
             .unwrap();
@@ -1739,7 +1739,7 @@ fn empty_source_snapshot_seeds_a_cleared_field_like_iris() {
             0,
             descriptor.mapping,
             None,
-            std::iter::empty(),
+            Vec::new(),
             &mut first_ops,
         )
         .unwrap();
@@ -1768,7 +1768,7 @@ fn empty_source_snapshot_seeds_a_cleared_field_like_iris() {
             1,
             descriptor.mapping,
             None,
-            std::iter::empty(),
+            Vec::new(),
             &mut steady_ops,
         )
         .unwrap();
@@ -2347,4 +2347,51 @@ fn rejects_descriptor_reload_that_would_reuse_a_stale_material_map() {
     next.resource_generation += 1;
     assert!(voxelizer.replace_descriptor(next).is_err());
     assert_eq!(1, voxelizer.descriptor().shader_pack_generation);
+}
+
+#[test]
+fn occupancy_runtime_trusts_a_shared_source_list_only_while_its_meshes_are_confirmed() {
+    let descriptor = descriptor();
+    let mut gal = crate::render::vulkanic::test_support::mock_gal();
+    let mut runtime =
+        TerrainOccupancyRuntime::create(&mut gal, descriptor.clone(), materials()).unwrap();
+    let mesh = |generation, material| TerrainVoxelSourceMesh {
+        mesh_key: 0x8c,
+        mesh_generation: generation,
+        vertices: Arc::new(vec![TerrainVoxelSourceVertex {
+            position: [0.0, 0.0, 0.0],
+            mid_block_packed: 0,
+            shader_material_id: material,
+        }]),
+        indices: Arc::new(vec![0, 0, 0]),
+        translucent_indices: Arc::new(Vec::new()),
+        transform: identity_transform(),
+    };
+    let first: Arc<[TerrainVoxelSourceMesh]> = vec![mesh(1, 30_008)].into();
+    let mut ops = Vec::new();
+    runtime
+        .append_terrain_source_snapshot_for_mapping(descriptor.mapping, Arc::clone(&first), &mut ops)
+        .unwrap();
+    submit_runtime_update(&mut gal, &mut runtime, "shared-list-first", ops);
+    // The identical shared list is recognized as unchanged.
+    let mut ops = Vec::new();
+    let unchanged = runtime
+        .append_terrain_source_snapshot_for_mapping(descriptor.mapping, Arc::clone(&first), &mut ops)
+        .unwrap();
+    assert!(unchanged.updated_region.is_none() && ops.is_empty());
+    // A new generation replaces the confirmed meshes...
+    let mut ops = Vec::new();
+    runtime
+        .append_terrain_source_snapshot_for_mapping(descriptor.mapping, vec![mesh(2, 30_012)], &mut ops)
+        .unwrap();
+    submit_runtime_update(&mut gal, &mut runtime, "shared-list-second", ops);
+    // ...so the earlier list is a real change again, not a remembered match.
+    let mut ops = Vec::new();
+    let reverted = runtime
+        .append_terrain_source_snapshot_for_mapping(descriptor.mapping, Arc::clone(&first), &mut ops)
+        .unwrap();
+    assert!(reverted.updated_region.is_some());
+    assert!(!ops.is_empty());
+    runtime.discard_submission();
+    runtime.destroy(&mut gal).unwrap();
 }

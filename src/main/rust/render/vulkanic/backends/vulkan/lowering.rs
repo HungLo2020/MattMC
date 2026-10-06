@@ -4,7 +4,10 @@ use std::sync::Arc;
 use ash::vk;
 use ash::vk::Handle as _;
 use smallvec::SmallVec;
+mod staging;
 mod timeline;
+
+use staging::{StagingChunk, StagingCursor};
 
 use super::device::VulkanContext;
 use super::resources::VulkanObjects;
@@ -39,6 +42,8 @@ pub(super) struct VulkanLoweringMetrics {
     pub(super) gpu_timestamp_status: u64,
     pub(super) gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
     pub(super) gpu_frame_total_nanos: u64,
+    /// Native staging chunks created; reuse keeps this flat in steady state.
+    pub(super) staging_chunks_created: u64,
 }
 
 pub(super) struct SubmissionLowerer {
@@ -56,6 +61,8 @@ pub(super) struct SubmissionLowerer {
     statistics_scope_names: fn(u8) -> &'static str,
     live_command_buffers: HashSet<vk::CommandBuffer>,
     recycled_command_buffers: Vec<vk::CommandBuffer>,
+    /// Retired upload staging, reused by later encodes (bounded).
+    idle_staging: Vec<StagingChunk>,
     // Swapchain acquisition signals bounded binary semaphores. A semaphore is
     // returned to this pool only after the timeline proves that the submission
     // which waited on it has completed.
@@ -219,6 +226,7 @@ impl SubmissionLowerer {
             statistics_scope_names: unnamed_profile_scope,
             live_command_buffers: HashSet::new(),
             recycled_command_buffers: Vec::new(),
+            idle_staging: Vec::new(),
             acquire_semaphores: Vec::new(),
             available_acquire_semaphores: Vec::new(),
             present_semaphores: HashMap::new(),
@@ -248,6 +256,7 @@ impl SubmissionLowerer {
         let _zone = trace::Zone::new("vulkan.lowering.command-recording");
         let mut state = EncodingState {
             timestamp_set,
+            staging: StagingCursor::with_idle(std::mem::take(&mut self.idle_staging)),
             ..EncodingState::default()
         };
         let mut command_buffers = Vec::with_capacity(batch.command_lists.len().max(1));
@@ -472,7 +481,15 @@ impl SubmissionLowerer {
             }
             Ok(())
         })();
+        self.metrics.staging_chunks_created = self
+            .metrics
+            .staging_chunks_created
+            .saturating_add(state.staging.chunks_created);
+        let staging = std::mem::take(&mut state.staging);
+        self.idle_staging = staging.idle;
         if let Err(error) = result {
+            // Never submitted: the GPU cannot read these chunks.
+            staging::recycle_chunks(&mut self.idle_staging, staging.used);
             self.free_command_buffers(&command_buffers)?;
             self.metrics.command_buffers_freed += command_buffers.len() as u64;
             return Err(error);
@@ -480,7 +497,7 @@ impl SubmissionLowerer {
         self.pending.push_back(EncodedSubmission {
             command_buffers,
             host_reads: state.host_reads,
-            uploads: state.uploads,
+            uploads: staging.used,
             timestamp_set: state.timestamp_set,
             pipeline_statistics_set: state.pipeline_statistics_set,
             present_image_index,
@@ -643,7 +660,8 @@ impl SubmissionLowerer {
             if front.id > self.completed {
                 break;
             }
-            let complete = self.in_flight.pop_front().expect("front existed");
+            let mut complete = self.in_flight.pop_front().expect("front existed");
+            staging::recycle_chunks(&mut self.idle_staging, std::mem::take(&mut complete.uploads));
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
             self.complete_pipeline_statistics(&complete);
@@ -663,10 +681,11 @@ impl SubmissionLowerer {
             let _zone = trace::Zone::new("vulkan.backend.wait-timeline");
             let wait_started = std::time::Instant::now();
             let context = &self.context;
-            let complete = wait_then_pop_front(&mut self.in_flight, |entry| {
+            let mut complete = wait_then_pop_front(&mut self.in_flight, |entry| {
                 wait_timeline(context, entry.id)
             })?
             .expect("front existed");
+            staging::recycle_chunks(&mut self.idle_staging, std::mem::take(&mut complete.uploads));
             self.metrics.timeline_wait_nanos = self
                 .metrics
                 .timeline_wait_nanos
@@ -2122,11 +2141,11 @@ impl SubmissionLowerer {
                     if *offset % 4 == 0 && data.len() % 4 == 0 && data.len() <= 65_536 {
                         self.context.device.cmd_update_buffer(command_buffer, buffer.buffer, *offset, data);
                     } else {
-                        let upload = SubmissionUpload::new(self.context.clone(), data)?;
-                        self.context.device.cmd_copy_buffer(command_buffer, upload.buffer, buffer.buffer,
-                            &[vk::BufferCopy::default().src_offset(0).dst_offset(*offset).size(data.len() as u64)]);
-                        // Ownership follows the submission until its timeline retires.
-                        state.uploads.push(upload);
+                        // Staging is owned by this submission until its timeline retires.
+                        let (source, source_offset) = state.staging.stage(&self.context, data)?;
+                        self.context.device.cmd_copy_buffer(command_buffer, source, buffer.buffer,
+                            &[vk::BufferCopy::default().src_offset(source_offset)
+                                .dst_offset(*offset).size(data.len() as u64)]);
                     }
                     if !following_publication_barrier {
                         let after = vk::BufferMemoryBarrier2::default()
@@ -3007,41 +3026,6 @@ mod timestamp_tests {
 
 }
 
-// RAII also releases staging allocations when encoding or submission fails.
-struct SubmissionUpload {
-    context: Arc<VulkanContext>,
-    buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
-}
-
-impl SubmissionUpload {
-    fn new(context: Arc<VulkanContext>, bytes: &[u8]) -> GalResult<Self> {
-        let info = vk::BufferCreateInfo::default().size(bytes.len() as u64)
-            .usage(vk::BufferUsageFlags::TRANSFER_SRC).sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let buffer = unsafe { context.device.create_buffer(&info, None) }
-            .map_err(|e| GalError::backend(format!("upload buffer creation failed: {e:?}")))?;
-        let mut upload = Self { context, buffer, memory: vk::DeviceMemory::null() };
-        let requirements = unsafe { upload.context.device.get_buffer_memory_requirements(buffer) };
-        upload.memory = upload.context.allocate_memory(requirements,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)?;
-        unsafe { upload.context.device.bind_buffer_memory(buffer, upload.memory, 0) }
-            .map_err(|e| GalError::backend(format!("upload buffer binding failed: {e:?}")))?;
-        upload.context.write_mapped_memory(upload.memory, 0, bytes)?;
-        Ok(upload)
-    }
-}
-
-impl Drop for SubmissionUpload {
-    fn drop(&mut self) {
-        unsafe {
-            self.context.device.destroy_buffer(self.buffer, None);
-            if self.memory != vk::DeviceMemory::null() {
-                self.context.device.free_memory(self.memory, None);
-            }
-        }
-    }
-}
-
 #[derive(Default)]
 struct EncodingState {
     pass_extent: Option<crate::render::vulkanic::resources::Extent3d>,
@@ -3056,7 +3040,7 @@ struct EncodingState {
     transfer_dst_textures: BTreeSet<Handle>,
     pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
-    uploads: Vec<SubmissionUpload>,
+    staging: StagingCursor,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     current_timestamp_pass: Option<TimingSpan>,
@@ -3076,7 +3060,7 @@ struct FramePresentTransition {
 struct EncodedSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
-    uploads: Vec<SubmissionUpload>,
+    uploads: Vec<StagingChunk>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     present_image_index: Option<u32>,
@@ -3086,7 +3070,7 @@ struct InFlightSubmission {
     id: SubmissionId,
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
-    uploads: Vec<SubmissionUpload>,
+    uploads: Vec<StagingChunk>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     present_image_index: Option<u32>,

@@ -714,7 +714,7 @@ impl WorldPrimitiveFrontend {
             self.write_selected_source_distant_horizons_material_receipt(
                 frame,
                 &program,
-                translucent_program.as_ref(),
+                translucent_program.as_deref(),
                 draws.len(),
                 draws.iter().map(|draw| u64::from(draw.index_count)).sum(),
                 transparent_draw_count,

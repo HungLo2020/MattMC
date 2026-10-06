@@ -848,21 +848,48 @@ impl WorldPrimitiveFrontend {
                 && MeshBatchSelection::All.includes(instance)
                 && is_source_terrain_mesh_stratum(instance.stratum)
         });
-        let static_batches = self.cached_mesh_batch_plan(
+        // Key the camera plan by exactly the instances it can draw, so churn
+        // in shadow-only candidates (excluded by this selection) does not
+        // invalidate it. The core skips every other instance anyway.
+        let static_selection = if has_camera_sorted_meshes {
+            MeshBatchSelection::Static
+        } else {
+            MeshBatchSelection::All
+        };
+        // Described, resident static chunk sections are drawn by the scene
+        // path; only the rest go through batch plans.
+        let scene = self.partition_scene_terrain_instances(gal, &frame);
+        let mut in_scene = scene.excludes();
+        let static_indices = frame
+            .mesh_instances
+            .iter()
+            .enumerate()
+            .filter(|(index, instance)| {
+                if in_scene(*index) {
+                    return false;
+                }
+                static_selection.includes(instance)
+                    && is_source_terrain_mesh_stratum(instance.stratum)
+                    && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let static_identities = static_indices
+            .iter()
+            .map(|&index| mesh_identities[index].clone())
+            .collect::<Vec<_>>();
+        let static_batches = self.cached_mesh_batch_plan_selected(
             &frame,
             color_format,
             RasterYDirection::Up,
             true,
-            if has_camera_sorted_meshes {
-                MeshBatchSelection::Static
-            } else {
-                MeshBatchSelection::All
-            },
-            &mesh_identities,
+            static_selection,
+            &static_identities,
             true,
+            Some(&static_indices),
         );
         let shadow_indices = self.source_shadow_supplement_instance_indices(
-            &frame, programs.opaque.shader_pack_generation,
+            &frame, programs.opaque.shader_pack_generation, &scene,
         )?;
         let shadow_identities = shadow_indices.iter().map(|&index| mesh_identities[index].clone()).collect::<Vec<_>>();
         let shadow_batches = self.cached_mesh_batch_plan_selected(
@@ -907,6 +934,7 @@ impl WorldPrimitiveFrontend {
             g_buffer_generation,
             &frame,
             &batches,
+            &scene,
             &shadow_batches,
             expected_extent,
             source_depth_texture,
@@ -923,7 +951,8 @@ impl WorldPrimitiveFrontend {
         let source_draw_coverage = SourceTerrainDrawCoverage::from_batches_and_draws(
             &batches,
             &plan.terrain.terrain.draws,
-        );
+        )
+        .without_scene(plan.terrain.scene_coverage);
         require_source_terrain_writer_coverage(&batches, source_draw_coverage)?;
         let source_lod_draw_count = plan.distant_horizons.as_ref().map_or(0_u64, |dh| {
             (dh.draws.len() + dh.exact_atlas_draws.len() + dh.translucent_draws.len()) as u64

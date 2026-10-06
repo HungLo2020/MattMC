@@ -489,6 +489,19 @@ pub struct FfiWorldDistantHorizonsGenericBoxRecord {
     pub shading: [f32; 6],
 }
 
+/// ABI v69: one off-camera static-terrain shadow caster. Java copies only the
+/// section's resident mesh identity, integer origin and layer depth policy;
+/// Rust expands it into a shadow-only terrain instance against the frame's
+/// terrain camera. No transform, flags or per-instance record is transported.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiStaticTerrainShadowCaster {
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub origin: [i32; 3],
+    pub depth_policy: u32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldExperienceOrbInstanceRecord {

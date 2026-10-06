@@ -5,7 +5,7 @@ use super::*;
 /// Private key for the real lowered-source set-zero data ABI. It is distinct
 /// from the older internal-fixture source variant above: this key owns the
 /// fixed source vertex stream and never aliases ordinary mesh buffers.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub(crate) struct LoweredSourceTerrainDataKey {
     pub(in crate::render::worldrender) mesh_key: u64,
     pub(in crate::render::worldrender) mesh_generation: u64,
@@ -15,7 +15,7 @@ pub(crate) struct LoweredSourceTerrainDataKey {
 /// The fixed source vertex record is shared only by writers that agree on
 /// every semantic lane. Shader program selection is deliberately absent:
 /// it affects pipeline and descriptor state, never immutable geometry bytes.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub(crate) enum SourceGeometryAbi {
     Terrain,
     LocalTextured,
@@ -189,7 +189,7 @@ pub(crate) struct SourceTerrainRangeKey {
 #[derive(Clone)]
 pub(crate) struct SourceTerrainRangeSelection {
     pub(in crate::render::worldrender) mesh: Arc<SourceTerrainMeshAsset>,
-    pub(in crate::render::worldrender) section_indices: Vec<u32>,
+    pub(in crate::render::worldrender) section_indices: Arc<[u32]>,
     pub(in crate::render::worldrender) index_subrange: Option<(u32, u32)>,
 }
 
@@ -203,6 +203,10 @@ pub(crate) struct LoweredSourceTerrainFrameData {
     /// `Some` when the batch is multi-drawn: its instance records start at
     /// this `firstInstance` of a set bound from stream offset zero.
     pub(in crate::render::worldrender) multidraw_first_instance: Option<u32>,
+    /// Resolved with the payload so per-batch callers need no map lookups.
+    pub(in crate::render::worldrender) resource_set: Handle,
+    pub(in crate::render::worldrender) index_buffer: Handle,
+    pub(in crate::render::worldrender) index_base: u64,
 }
 
 impl LoweredSourceTerrainFrameData {
@@ -397,14 +401,14 @@ impl SourceTerrainPrograms {
 /// contains only lowered selected-source programs and has no route policy.
 #[derive(Clone)]
 pub(crate) struct LoweredSourceTerrainPrograms {
-    pub(in crate::render::worldrender) opaque: LoweredTerrainSourceProgram,
-    pub(in crate::render::worldrender) cutout: LoweredTerrainSourceProgram,
-    pub(in crate::render::worldrender) shadow: LoweredTerrainSourceProgram,
+    pub(in crate::render::worldrender) opaque: std::sync::Arc<LoweredTerrainSourceProgram>,
+    pub(in crate::render::worldrender) cutout: std::sync::Arc<LoweredTerrainSourceProgram>,
+    pub(in crate::render::worldrender) shadow: std::sync::Arc<LoweredTerrainSourceProgram>,
     /// The source-derived translucent stage is deliberately optional until a
     /// frame actually contains translucent terrain. Its absence cannot block
     /// ordinary vanilla terrain or Distant Horizons, but a translucent batch
     /// must fail before any route is selected.
-    pub(in crate::render::worldrender) translucent: Option<LoweredTerrainSourceProgram>,
+    pub(in crate::render::worldrender) translucent: Option<std::sync::Arc<LoweredTerrainSourceProgram>>,
 }
 
 impl LoweredSourceTerrainPrograms {
@@ -412,7 +416,7 @@ impl LoweredSourceTerrainPrograms {
         match material_mode {
             WORLD_MATERIAL_MODE_OPAQUE => Ok(&self.opaque),
             WORLD_MATERIAL_MODE_CUTOUT => Ok(&self.cutout),
-            WORLD_MATERIAL_MODE_TRANSLUCENT => self.translucent.as_ref().ok_or_else(|| {
+            WORLD_MATERIAL_MODE_TRANSLUCENT => self.translucent.as_deref().ok_or_else(|| {
                 GalError::unsupported_feature(
                     "lowered source terrain preparation has no admitted translucent program",
                 )

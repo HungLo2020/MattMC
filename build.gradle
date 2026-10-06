@@ -1,3 +1,6 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
 plugins {
     id 'java'
     id 'application'
@@ -474,10 +477,20 @@ tasks.register('buildRustNative', Exec) {
             throw new GradleException("Cargo did not produce expected Rust native library: ${cargoLibrary}")
         }
 
-        copy {
-            from cargoLibrary
-            into rustBuiltNativesDir.get().asFile
-            rename { rustNativeFileName }
+        // A running client can still map the previous library. Copying over
+        // its inode can corrupt those mappings or fault while the file is
+        // truncated. Publish a complete replacement in the same directory;
+        // existing clients retain their original mapping until they exit.
+        def nativeDirectory = rustBuiltNativesDir.get().asFile.toPath()
+        Files.createDirectories(nativeDirectory)
+        def stagedLibrary = Files.createTempFile(nativeDirectory, ".${rustNativeFileName}.", '.tmp')
+        try {
+            Files.copy(cargoLibrary.toPath(), stagedLibrary,
+                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+            Files.move(stagedLibrary, nativeDirectory.resolve(rustNativeFileName),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(stagedLibrary)
         }
 
         delete fileTree(rustBuiltNativesDir.get().asFile) {

@@ -510,12 +510,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		var cameraEntities = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
 		for (EntityRenderState state : this.levelRenderState.entityRenderStates) cameraEntities.add(state.entityId);
 		var tickRates = this.level.tickRateManager();
+		var dispatcherCamera = this.entityRenderDispatcher.camera;
 		for (Entity entity : this.level.entitiesForRendering()) {
 			if (cameraEntities.contains(entity.getId())) continue;
 			float delta = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(!tickRates.isEntityFrozen(entity));
 			if (entity.tickCount == 0) {
 				entity.xOld=entity.getX(); entity.yOld=entity.getY(); entity.zOld=entity.getZ();
 			}
+			// Only ELIGIBLE states are kept below; skip extracting the rest.
+			if (dispatcherCamera != null
+				&& !this.entityRenderDispatcher.getRenderer(entity).rustShadowCullingEligible(entity, dispatcherCamera.getPosition()))
+				continue;
 			EntityRenderState state = this.entityRenderDispatcher.extractEntity(entity,delta);
 			var inputs = state.rustEntityCulling;
 			if (inputs != null && (inputs.flags() & net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.ELIGIBLE) != 0)
@@ -2042,12 +2047,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		int centerChunkX = SectionPos.blockToSectionCoord(Mth.floor(camera.getPosition().x));
 		int centerChunkZ = SectionPos.blockToSectionCoord(Mth.floor(camera.getPosition().z));
 		int radius = this.minecraft.options.getEffectiveRenderDistance() + 1;
+		// Each block entity belongs to one chunk, so the scan can only repeat
+		// positions the section pass already extracted.
+		boolean deduplicate = !extractedBlockEntityPositions.isEmpty();
 		for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
 			for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
 				LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 				if (chunk == null) continue;
 				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-					if (!extractedBlockEntityPositions.add(blockEntity.getBlockPos().asLong())) continue;
+					if (deduplicate && extractedBlockEntityPositions.contains(blockEntity.getBlockPos().asLong())) continue;
 					this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
 				}
 			}

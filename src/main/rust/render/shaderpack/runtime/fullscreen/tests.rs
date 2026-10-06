@@ -1090,3 +1090,62 @@ fn rejects_sparse_source_output_locations_before_staging() {
         .unwrap_err();
     assert!(error.to_string().contains("sparse gl_FragData locations"));
 }
+
+#[test]
+fn stage_cache_reuses_frame_invariant_objects_for_one_live_plan_at_a_time() {
+    let source = source(
+        "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+    );
+    let program = program(&source);
+    let mut gal = crate::render::vulkanic::test_support::mock_gal();
+    let (manifest, targets, mut targets_cache) = staged(&source, &mut gal, true);
+    let pipelines = FullscreenPipelineCache::default();
+    let extent = Extent3d { width: 16, height: 16, depth: 1 };
+    let mut stage = |gal: &mut VulkanicGal| {
+        FullscreenSourceExecutionPlan::stage_cached(
+            gal,
+            &program,
+            &manifest,
+            &targets,
+            std::iter::once(empty_source_resource_snapshot(&source)),
+            extent,
+            Some((&pipelines, (1, 1))),
+        )
+        .unwrap()
+    };
+
+    let first = stage(&mut gal);
+    // A second plan while the first is live must not share its uniforms.
+    let concurrent = stage(&mut gal);
+    assert_ne!(first.compiled.target, concurrent.compiled.target);
+    assert_ne!(first.bound.texture_transform_buffer, concurrent.bound.texture_transform_buffer);
+    let (target, uniforms, source_set, pack_set) = (
+        first.compiled.target,
+        first.bound.texture_transform_buffer,
+        first.bound.source_data_set,
+        first.bound.pack_resources_set,
+    );
+    first.destroy(&mut gal);
+    concurrent.destroy(&mut gal);
+
+    let next = stage(&mut gal);
+    assert!(next.stage_lease.is_some());
+    assert_eq!(target, next.compiled.target);
+    assert_eq!(uniforms, next.bound.texture_transform_buffer);
+    assert_eq!(source_set, next.bound.source_data_set);
+    assert_ne!(pack_set, next.bound.pack_resources_set);
+    let next_pack_set = next.bound.pack_resources_set;
+
+    // Released while leased: destroyed only once the plan returns it.
+    pipelines.release_stages(&mut gal);
+    assert_eq!(1, pipelines.retired_stages.borrow().len());
+    next.destroy(&mut gal);
+    assert!(gal.destroy(next_pack_set).is_err());
+    pipelines.retire_stages(&mut gal, []);
+    assert!(pipelines.retired_stages.borrow().is_empty());
+    assert!(gal.destroy(target).is_err());
+    assert!(gal.destroy(source_set).is_err());
+
+    pipelines.destroy(&mut gal);
+    targets_cache.destroy(&mut gal);
+}

@@ -273,6 +273,12 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
                 .count
                 .saturating_mul(size_of::<FfiWorldDistantHorizonsGenericBoxRecord>() as u64),
         )
+        .saturating_add(
+            request
+                .world_static_terrain_shadow_casters
+                .count
+                .saturating_mul(size_of::<FfiStaticTerrainShadowCaster>() as u64),
+        )
         .saturating_add(request.post_effect_id.len)
 }
 

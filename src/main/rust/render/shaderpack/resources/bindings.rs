@@ -455,14 +455,35 @@ pub struct TerrainSourceOwnedStorageResource {
 /// source parsing and from backend lowering: a later runtime can create a GAL
 /// resource set from this table only after it has owned every referenced
 /// texture, view, sampler, and lifetime.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TerrainSourceOwnedResourceSet {
+///
+/// Immutable after construction and shared: per-draw material preparation
+/// clones and compares the same frame set many times, so clones share one
+/// allocation and equality first checks identity.
+#[derive(Clone, Debug)]
+pub struct TerrainSourceOwnedResourceSet(std::sync::Arc<OwnedResourceSetFields>);
+
+#[derive(Debug, Eq, PartialEq)]
+struct OwnedResourceSetFields {
     availability: TerrainSourceResourceAvailabilitySet,
     samplers: BTreeMap<TerrainSourceResourceRole, Handle>,
     storage_views: BTreeMap<TerrainSourceResourceRole, Handle>,
 }
 
+impl PartialEq for TerrainSourceOwnedResourceSet {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0) || *self.0 == *other.0
+    }
+}
+
+impl Eq for TerrainSourceOwnedResourceSet {}
+
 impl TerrainSourceOwnedResourceSet {
+    /// Whether both name the same snapshot object. Memos keyed by a held
+    /// snapshot use this; equal content in another object simply misses.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+
     pub fn new(
         availability: TerrainSourceResourceAvailabilitySet,
         resources: impl IntoIterator<Item = TerrainSourceOwnedResource>,
@@ -538,27 +559,27 @@ impl TerrainSourceOwnedResourceSet {
                 )));
             }
         }
-        Ok(Self {
+        Ok(Self(std::sync::Arc::new(OwnedResourceSetFields {
             availability,
             samplers,
             storage_views,
-        })
+        })))
     }
 
     pub fn availability(&self) -> &TerrainSourceResourceAvailabilitySet {
-        &self.availability
+        &self.0.availability
     }
 
     pub fn combined_sampler_for(&self, role: TerrainSourceResourceRole) -> Option<Handle> {
-        self.samplers.get(&role).copied()
+        self.0.samplers.get(&role).copied()
     }
 
     pub fn storage_texture_for(&self, role: TerrainSourceResourceRole) -> Option<Handle> {
-        self.storage_views.get(&role).copied()
+        self.0.storage_views.get(&role).copied()
     }
 
     pub fn len(&self) -> usize {
-        self.samplers.len() + self.storage_views.len()
+        self.0.samplers.len() + self.0.storage_views.len()
     }
 
     /// Stable semantic cache identity for one owned source-resource table.
@@ -567,7 +588,7 @@ impl TerrainSourceOwnedResourceSet {
     /// A frontend may use this to retain a compatible source resource set
     /// across frames while making pack/world replacement invalidate it.
     pub fn generation_signature(&self) -> Vec<(TerrainSourceResourceRole, u64)> {
-        self.availability
+        self.0.availability
             .resources()
             .map(|resource| (resource.role, resource.resource_generation))
             .collect()
@@ -596,20 +617,20 @@ impl TerrainSourceOwnedResourceSet {
                 role.semantic_name()
             )));
         }
-        let Some(existing) = self.availability.resource_for(role.clone()) else {
+        let Some(existing) = self.0.availability.resource_for(role.clone()) else {
             return Err(GalError::invalid_argument(format!(
                 "terrain source override references unavailable role '{}'",
                 role.semantic_name()
             )));
         };
-        if self.storage_views.contains_key(&role) || !self.samplers.contains_key(&role) {
+        if self.0.storage_views.contains_key(&role) || !self.0.samplers.contains_key(&role) {
             return Err(GalError::invalid_argument(format!(
                 "terrain source override requires sampled role '{}'",
                 role.semantic_name()
             )));
         }
         let availability = self
-            .availability
+            .0.availability
             .resources()
             .map(|available| TerrainSourceResourceAvailability {
                 role: available.role.clone(),
@@ -623,7 +644,7 @@ impl TerrainSourceOwnedResourceSet {
             .collect::<Vec<_>>();
         debug_assert!(existing.resource_generation > 0);
         let resources = self
-            .samplers
+            .0.samplers
             .iter()
             .map(|(available_role, sampler)| TerrainSourceOwnedResource {
                 role: available_role.clone(),
@@ -635,7 +656,7 @@ impl TerrainSourceOwnedResourceSet {
             })
             .collect::<Vec<_>>();
         let storage_resources = self
-            .storage_views
+            .0.storage_views
             .iter()
             .map(
                 |(available_role, texture_view)| TerrainSourceOwnedStorageResource {
@@ -646,8 +667,8 @@ impl TerrainSourceOwnedResourceSet {
             .collect::<Vec<_>>();
         Self::with_storage_resources(
             TerrainSourceResourceAvailabilitySet::new(
-                self.availability.shader_pack_generation(),
-                self.availability.world_generation(),
+                self.0.availability.shader_pack_generation(),
+                self.0.availability.world_generation(),
                 availability,
             )?,
             resources,
@@ -665,12 +686,12 @@ impl TerrainSourceOwnedResourceSet {
     ) -> GalResult<Self> {
         let exclusions = exclusions.into_iter().collect::<BTreeSet<_>>();
         let availability = self
-            .availability
+            .0.availability
             .resources()
             .filter(|resource| !exclusions.contains(&resource.role))
             .collect::<Vec<_>>();
         let resources = self
-            .samplers
+            .0.samplers
             .iter()
             .filter(|(role, _)| !exclusions.contains(*role))
             .map(|(role, &combined_sampler)| TerrainSourceOwnedResource {
@@ -679,7 +700,7 @@ impl TerrainSourceOwnedResourceSet {
             })
             .collect::<Vec<_>>();
         let storage_resources = self
-            .storage_views
+            .0.storage_views
             .iter()
             .filter(|(role, _)| !exclusions.contains(*role))
             .map(|(role, &texture_view)| TerrainSourceOwnedStorageResource {
@@ -689,8 +710,8 @@ impl TerrainSourceOwnedResourceSet {
             .collect::<Vec<_>>();
         Self::with_storage_resources(
             TerrainSourceResourceAvailabilitySet::new(
-                self.availability.shader_pack_generation(),
-                self.availability.world_generation(),
+                self.0.availability.shader_pack_generation(),
+                self.0.availability.world_generation(),
                 availability,
             )?,
             resources,
@@ -707,16 +728,16 @@ impl TerrainSourceOwnedResourceSet {
         &self,
         colors: &TerrainSourceOwnedResourceSet,
     ) -> GalResult<Self> {
-        if self.availability.shader_pack_generation() != colors.availability.shader_pack_generation()
-            || self.availability.world_generation() != colors.availability.world_generation()
+        if self.0.availability.shader_pack_generation() != colors.0.availability.shader_pack_generation()
+            || self.0.availability.world_generation() != colors.0.availability.world_generation()
         {
             return Err(GalError::invalid_argument(
                 "stage color bindings must match the snapshot's world and shader-pack generations",
             ));
         }
-        let roles = colors.availability.resources().map(|resource| resource.role).collect::<Vec<_>>();
+        let roles = colors.0.availability.resources().map(|resource| resource.role).collect::<Vec<_>>();
         if roles.iter().any(|role| !matches!(role, TerrainSourceResourceRole::ShaderPackColor(_)))
-            || !colors.storage_views.is_empty()
+            || !colors.0.storage_views.is_empty()
         {
             return Err(GalError::invalid_argument(
                 "stage color replacement accepts only owned color sampler roles",
@@ -735,17 +756,17 @@ impl TerrainSourceOwnedResourceSet {
         &self,
         existing: &TerrainSourceOwnedResourceSet,
     ) -> GalResult<Self> {
-        if self.availability.shader_pack_generation()
-            != existing.availability.shader_pack_generation()
-            || self.availability.world_generation() != existing.availability.world_generation()
+        if self.0.availability.shader_pack_generation()
+            != existing.0.availability.shader_pack_generation()
+            || self.0.availability.world_generation() != existing.0.availability.world_generation()
         {
             return Err(GalError::invalid_argument(
                 "cannot compare terrain source resources from different shader-pack or world generations",
             ));
         }
         let mut exclusions = BTreeSet::new();
-        for resource in self.availability.resources() {
-            let Some(previous) = existing.availability.resource_for(resource.role.clone()) else {
+        for resource in self.0.availability.resources() {
+            let Some(previous) = existing.0.availability.resource_for(resource.role.clone()) else {
                 continue;
             };
             if previous != resource
@@ -778,8 +799,8 @@ impl TerrainSourceOwnedResourceSet {
         let mut resources = Vec::new();
         let mut storage_resources = Vec::new();
         for set in sets {
-            let source_generation = set.availability.shader_pack_generation();
-            let world_generation = set.availability.world_generation();
+            let source_generation = set.0.availability.shader_pack_generation();
+            let world_generation = set.0.availability.world_generation();
             if let Some(expected) = expected_generation {
                 if source_generation != expected {
                     return Err(GalError::invalid_argument(format!(
@@ -798,14 +819,14 @@ impl TerrainSourceOwnedResourceSet {
             } else {
                 expected_world_generation = Some(world_generation);
             }
-            availability.extend(set.availability.resources());
-            resources.extend(set.samplers.iter().map(|(role, combined_sampler)| {
+            availability.extend(set.0.availability.resources());
+            resources.extend(set.0.samplers.iter().map(|(role, combined_sampler)| {
                 TerrainSourceOwnedResource {
                     role: role.clone(),
                     combined_sampler: *combined_sampler,
                 }
             }));
-            storage_resources.extend(set.storage_views.iter().map(|(role, texture_view)| {
+            storage_resources.extend(set.0.storage_views.iter().map(|(role, texture_view)| {
                 TerrainSourceOwnedStorageResource {
                     role: role.clone(),
                     texture_view: *texture_view,

@@ -64,6 +64,13 @@ parent and cleanup restores it. Rust owns pack selection and geometry creation.
 Rebuild before running `WorldEntityCullingEncodingTest`; its native checks cover
 large camera origins, exact double values and dirty storage.
 
+ABI 69 appends `world_static_terrain_shadow_casters` (struct 112, 32-byte
+records: mesh key, generation, section origin, depth policy) and the frame's
+`static_terrain_camera` to the whole-frame request (struct 53, fields 47–48).
+The camera is required whenever casters are present. Java copies the caster
+arrays once per frame; Rust validates them, sorts them by key and expands
+resident casters. Rebuild Java and native code together.
+
 Typed orb placements name a boundary in the collected mesh stream. When the
 shadow-only CPU capture removes foil or outline meshes, map those boundaries
 through its kept-mesh prefix before the later source-admission mapping.
@@ -105,3 +112,26 @@ counter measures validated reads (including repeated reads), not unique Java
 allocation size. Java must still supply live memory for the duration of the call.
 Failed resource creation batches release successful creates before reporting
 failure, and result alignment/capacity are checked before execution.
+
+## Pipelined frames
+
+By default (disable with `MATTMC_PIPELINED_FRAMES=0` or
+`-Dmattmc.rustGal.pipelinedFrames=false`),
+`mattmc_vulkanic_gal_whole_frame_submit_pipelined` copies the request on the
+render thread, then executes and presents the frame on a per-context worker
+thread ([`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)).
+Java returns to collect the next frame while native work runs.
+
+- Every bridge entry point joins pending work first (`with_registry*`), so the
+  render thread and the worker never use a context at the same time. Do not
+  add an entry point that bypasses the registry accessors.
+- `mattmc_vulkanic_gal_whole_frame_join` returns the frame's submit and present
+  results. `RustGalFrameCoordinator.completePendingPipelinedFrame` runs the
+  same post-submit work (`completeSubmittedFrame`) when the next frame starts.
+- A failed pipelined frame is cancelled on the worker and its error is thrown at
+  the join. A retryable selected-source failure drops that frame instead of
+  resubmitting it.
+- Attachment captures, screenshots and RenderDoc captures stay synchronous.
+  Atlas pumps during an in-flight frame are deferred to the next frame.
+- The worker restricts itself to the highest-frequency CPUs; on hybrid CPUs an
+  efficiency core lengthened every frame by ~10%.

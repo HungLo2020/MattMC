@@ -118,7 +118,9 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v67 appends the copied user shadow-distance setting to shader frames and
 /// expands the layout-query offset table to 72 fields (312 bytes).
 /// v68 appends bounded copied entity culling bounds and extraction roles.
-pub const FFI_ABI_VERSION: u32 = 68;
+/// v69 appends compact off-camera static-terrain shadow casters and the
+/// frame's terrain camera; Rust expands them into shadow-only instances.
+pub const FFI_ABI_VERSION: u32 = 69;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

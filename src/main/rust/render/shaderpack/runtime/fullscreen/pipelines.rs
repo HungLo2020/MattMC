@@ -19,6 +19,8 @@ pub(crate) struct CompiledFullscreenSourcePass {
     /// When set, the layouts, shaders, and pipeline above are owned by a
     /// [`FullscreenPipelineCache`] entry and outlive this frame's pass.
     pub(super) shared: Option<std::sync::Arc<FullscreenPipelineObjects>>,
+    /// False when a stage cache owns `target` and `pass`.
+    pub(super) owns_target: bool,
 }
 
 /// View-independent GAL objects for one compiled fullscreen source stage.
@@ -80,12 +82,98 @@ pub(crate) struct FullscreenPipelineCache {
     pub(super) entries: std::cell::RefCell<
         std::collections::HashMap<FullscreenPipelineKey, Vec<CachedFullscreenPipeline>>,
     >,
+    /// Frame-invariant objects of recently staged stages, by stage path.
+    pub(super) stages: std::cell::RefCell<
+        std::collections::HashMap<String, Vec<CachedFullscreenStage>>,
+    >,
+    /// Released stages still leased to a live plan; destroyed once returned.
+    pub(super) retired_stages: std::cell::RefCell<Vec<CachedFullscreenStage>>,
 }
 
 pub(super) const FULLSCREEN_PIPELINE_CACHE_ENTRIES: usize = 128;
+/// Target sets a stage alternates between (feedback targets swap images).
+pub(super) const FULLSCREEN_STAGE_CACHE_VARIANTS: usize = 2;
+
+/// Everything a staged fullscreen pass creates except its pack-resources
+/// set, which binds the frame's inputs: color samplers, render target and
+/// pass, uniform buffers and source-data set. They depend only on the
+/// program, its pipeline and the exact color target images, so a stage
+/// re-staged against the same targets reuses them instead of recreating
+/// about five GAL objects per stage per frame. The uniform buffers are
+/// rewritten by each draw; `lease` admits one live plan at a time so a
+/// stage staged twice in one frame never shares them.
+#[derive(Debug)]
+pub(super) struct CachedFullscreenStage {
+    pub(super) program_identity: String,
+    pub(super) shader_pack_generation: u64,
+    pub(super) epochs: (u64, u64),
+    pub(super) targets: ShaderPackColorTargets,
+    pub(super) color_resources: ShaderPackSourceColorResources,
+    pub(super) target: Handle,
+    pub(super) pass: Handle,
+    pub(super) objects: std::sync::Arc<FullscreenPipelineObjects>,
+    pub(super) texture_transform_buffer: Handle,
+    pub(super) scalar_uniform_buffer: Option<Handle>,
+    pub(super) source_data_set: Handle,
+    pub(super) lease: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl CachedFullscreenStage {
+    pub(super) fn matches(
+        &self,
+        program: &LoweredFullscreenSourceProgram,
+        targets: &ShaderPackColorTargets,
+        epochs: (u64, u64),
+    ) -> bool {
+        self.epochs == epochs
+            && self.shader_pack_generation == program.shader_pack_generation
+            && self.program_identity == program.identity.as_str()
+            && self.targets.identity == targets.identity
+            && self.targets.same_images(targets)
+    }
+
+    pub(super) fn destroy(self, gal: &mut VulkanicGal) {
+        // Dependents first: sets and passes reference buffers, targets and views.
+        for handle in [self.source_data_set, self.pass, self.target, self.texture_transform_buffer]
+            .into_iter()
+            .chain(self.scalar_uniform_buffer)
+        {
+            let _ = gal.destroy(handle);
+        }
+        self.color_resources.destroy(gal);
+        if let Ok(objects) = std::sync::Arc::try_unwrap(self.objects) {
+            objects.destroy(gal);
+        }
+    }
+}
 
 impl FullscreenPipelineCache {
+    /// Drops every cached stage. Required before the color targets they
+    /// reference are retired. A stage leased to a live plan is destroyed when
+    /// that plan returns it.
+    pub(crate) fn release_stages(&self, gal: &mut VulkanicGal) {
+        let stages = std::mem::take(&mut *self.stages.borrow_mut());
+        self.retire_stages(gal, stages.into_values().flatten());
+    }
+
+    pub(super) fn retire_stages(
+        &self,
+        gal: &mut VulkanicGal,
+        stages: impl IntoIterator<Item = CachedFullscreenStage>,
+    ) {
+        let mut retired = self.retired_stages.borrow_mut();
+        retired.extend(stages);
+        for stage in std::mem::take(&mut *retired) {
+            if stage.lease.load(std::sync::atomic::Ordering::Acquire) {
+                retired.push(stage);
+            } else {
+                stage.destroy(gal);
+            }
+        }
+    }
+
     pub(super) fn release_all(&self, gal: &mut VulkanicGal) {
+        self.release_stages(gal);
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
         for cached in entries.into_values().flatten() {
             if let Ok(objects) = std::sync::Arc::try_unwrap(cached.objects) {
@@ -96,6 +184,9 @@ impl FullscreenPipelineCache {
 
     pub(crate) fn destroy(&self, gal: &mut VulkanicGal) {
         self.release_all(gal);
+        for stage in std::mem::take(&mut *self.retired_stages.borrow_mut()) {
+            stage.destroy(gal);
+        }
         self.epochs.set(None);
     }
 }
@@ -103,8 +194,10 @@ impl FullscreenPipelineCache {
 impl CompiledFullscreenSourcePass {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(shared) = self.shared {
-            let _ = gal.destroy(self.pass);
-            let _ = gal.destroy(self.target);
+            if self.owns_target {
+                let _ = gal.destroy(self.pass);
+                let _ = gal.destroy(self.target);
+            }
             if let Ok(objects) = std::sync::Arc::try_unwrap(shared) {
                 objects.destroy(gal);
             }

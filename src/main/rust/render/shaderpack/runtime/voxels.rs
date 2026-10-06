@@ -371,10 +371,10 @@ impl ShaderPackRuntimeExecutor {
         mapping: Option<VoxelLightVolumeMapping>,
         view_direction: Option<VoxelLightVolumeViewDirection>,
         puddle_descriptor: Option<PuddleOccupancyDescriptor>,
-        meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
+        meshes: impl Into<std::sync::Arc<[TerrainVoxelSourceMesh]>>,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<()> {
-        let meshes = meshes.into_iter().collect::<Vec<_>>();
+        let meshes = meshes.into();
         if let Some(colored_light) = self.terrain_colored_light.as_mut() {
             let mapping = mapping.ok_or_else(|| {
                 GalError::invalid_argument(
@@ -385,7 +385,7 @@ impl ShaderPackRuntimeExecutor {
                 frame_counter,
                 mapping,
                 view_direction,
-                meshes.iter().cloned(),
+                std::sync::Arc::clone(&meshes),
                 operations,
             )?;
         } else if let Some(occupancy) = self.terrain_occupancy.as_mut() {
@@ -396,7 +396,7 @@ impl ShaderPackRuntimeExecutor {
             })?;
             occupancy.append_terrain_source_snapshot_for_mapping(
                 mapping,
-                meshes.iter().cloned(),
+                std::sync::Arc::clone(&meshes),
                 operations,
             )?;
         }
@@ -406,7 +406,7 @@ impl ShaderPackRuntimeExecutor {
                     "puddle occupancy preparation requires a semantic shadow-scene descriptor",
                 )
             })?;
-            puddle.append_terrain_source_snapshot(descriptor, meshes, operations)?;
+            puddle.append_terrain_source_snapshot(descriptor, meshes.iter().cloned(), operations)?;
         }
         Ok(())
     }

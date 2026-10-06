@@ -10,4 +10,5 @@ pub(crate) mod header;
 pub(crate) mod limits;
 pub(crate) mod material_quads;
 pub(crate) mod requests;
+pub(crate) mod shadow_casters;
 pub(crate) mod validation;

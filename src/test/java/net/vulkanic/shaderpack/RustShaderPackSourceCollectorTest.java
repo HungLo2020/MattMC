@@ -61,6 +61,22 @@ class RustShaderPackSourceCollectorTest {
 	}
 
 	@Test
+	void cachedIrisSettingsFollowSameSizeRewritesAfterInvalidation() throws Exception {
+		Path config = temporaryDirectory.resolve("iris.properties");
+		Files.writeString(config, "enableShaders=true\nshaderPack=PackA\n");
+		assertEquals("PackA", RustShaderPackSourceCollector.configuredPackNameFromProperties(config).orElseThrow());
+		assertEquals("PackA", RustShaderPackSourceCollector.configuredPackNameFromProperties(config).orElseThrow());
+		var modified = Files.getLastModifiedTime(config);
+		Files.writeString(config, "enableShaders=true\nshaderPack=PackB\n");
+		// Model a coarse timestamp: identical size and mtime.
+		Files.setLastModifiedTime(config, modified);
+		RustShaderPackSourceCollector.invalidateIrisProperties();
+		assertEquals("PackB", RustShaderPackSourceCollector.configuredPackNameFromProperties(config).orElseThrow());
+		Files.delete(config);
+		assertTrue(RustShaderPackSourceCollector.configuredPackNameFromProperties(config).isEmpty());
+	}
+
+	@Test
 	void diskPackOptionsAreBoundedAndFilteredToScalarRustOptions() throws Exception {
 		Files.writeString(temporaryDirectory.resolve("ExamplePack.txt"),
 			"shadowQuality=2\nprofile.fast=PROFILE\ninvalid.option=drop\nempty=\n");

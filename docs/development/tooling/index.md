@@ -7,4 +7,5 @@ World-generation drivers and their Java agent helpers live in
 for commands and prerequisites.
 
 - [Developer Tips and Tools](DEV-TIPS-TOOLS.md): Git workflows for investigating changes.
+- [Native builds and running clients](NATIVE-BUILDS.md): atomic library staging, shared-build constraints and isolated verification.
 - [Shared Agent Skills](AGENT-SKILLS.md): skill locations, invocation, and maintaining shared skills.

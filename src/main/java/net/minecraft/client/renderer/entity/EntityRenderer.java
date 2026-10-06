@@ -112,6 +112,22 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 		return true;
 	}
 
+	/**
+	 * The {@code ELIGIBLE} culling fact alone, before any render-state
+	 * extraction: in render distance (or carrying the player) and in a
+	 * compiled section or outside build height.
+	 */
+	public final boolean rustShadowCullingEligible(T entity, Vec3 camera) {
+		return rustShadowCullingEligible(entity, camera, entity.hasIndirectPassenger(Minecraft.getInstance().player));
+	}
+
+	private static boolean rustShadowCullingEligible(Entity entity, Vec3 camera, boolean passenger) {
+		BlockPos position = entity.blockPosition();
+		return (entity.shouldRender(camera.x,camera.y,camera.z) || passenger)
+			&& (entity.level().isOutsideBuildHeight(position.getY())
+				|| Minecraft.getInstance().levelRenderer.isSectionCompiled(position));
+	}
+
 	/** Copies gameplay culling facts without constructing or querying a shadow frustum. */
 	public final net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord copyEntityCulling(T entity, Vec3 camera) {
 		var client = Minecraft.getInstance();
@@ -123,9 +139,7 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 				entity.getX()+2,entity.getY()+2,entity.getZ()+2);
 		}
 		int flags = 0;
-		BlockPos position = entity.blockPosition();
-		if ((entity.shouldRender(camera.x,camera.y,camera.z) || passenger)
-			&& (entity.level().isOutsideBuildHeight(position.getY()) || client.levelRenderer.isSectionCompiled(position)))
+		if (rustShadowCullingEligible(entity, camera, passenger))
 			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.ELIGIBLE;
 		if (passenger || !affected) flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.BYPASS_FRUSTUM;
 		if (client.player != null && (entity == client.player || entity == client.player.getVehicle()))

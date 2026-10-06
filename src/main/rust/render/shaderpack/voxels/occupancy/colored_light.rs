@@ -681,9 +681,10 @@ impl TerrainColoredLightRuntime {
         frame_counter: u64,
         mapping: VoxelLightVolumeMapping,
         view_direction: Option<VoxelLightVolumeViewDirection>,
-        meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
+        meshes: impl Into<Arc<[TerrainVoxelSourceMesh]>>,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<TerrainOccupancyUpdateStats> {
+        let meshes: Arc<[TerrainVoxelSourceMesh]> = meshes.into();
         if self.submission_pending {
             return Err(GalError::invalid_argument(
                 "colored-light runtime already has a submission awaiting confirmation",

@@ -1284,7 +1284,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
         texture.field_offsets[15]
     );
-    assert_eq!(47, whole_frame.field_count);
+    assert_eq!(49, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
         whole_frame.field_offsets[45]
@@ -1296,6 +1296,15 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         ) as u32,
         whole_frame.field_offsets[46]
     );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_static_terrain_shadow_casters) as u32,
+        whole_frame.field_offsets[47]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, static_terrain_camera) as u32,
+        whole_frame.field_offsets[48]
+    );
+    assert_eq!(size_of::<FfiStaticTerrainShadowCaster>(), 32);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
         whole_frame.field_offsets[37]
@@ -2179,6 +2188,11 @@ fn whole_frame_request(
             ptr: std::ptr::null(),
             count: 0,
         },
+        world_static_terrain_shadow_casters: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        static_terrain_camera: [0.0; 3],
         world_lod_instances: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
@@ -2859,6 +2873,42 @@ fn entity_shadow_culling_orb_transport_keeps_shadow_role_outside_camera_domain()
     orb.entity_culling_mode = 0;
     orb.entity_culling_flags = 0;
     assert!(merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).is_err());
+}
+
+#[test]
+fn orb_merge_in_place_matches_ordered_reference_merge() {
+    let template = merge_experience_orb_instances(Vec::new(), &[semantic_orb_instance()], [128, 128])
+        .unwrap()
+        .remove(0);
+    for (mesh_count, indices) in [
+        (0usize, vec![0usize, 0]),
+        (5, vec![0, 0, 2, 5, 5]),
+        (6, vec![6]),
+        (6, vec![3]),
+        (4, vec![1, 1, 1]),
+    ] {
+        let meshes: Vec<_> = (0..mesh_count).map(|i| {
+            let mut mesh = template.clone();
+            mesh.mesh_key = 1_000 + i as u64;
+            mesh
+        }).collect();
+        let orbs: Vec<_> = indices.iter().enumerate().map(|(n, &index)| {
+            let mut orb = semantic_orb_instance();
+            orb.mesh_index = index as u32;
+            orb.mesh_key = 2_000 + n as u64;
+            orb
+        }).collect();
+        let mut expected = Vec::new();
+        let mut cursor = 0;
+        for (n, &index) in indices.iter().enumerate() {
+            expected.extend((cursor..index).map(|i| 1_000 + i as u64));
+            cursor = index;
+            expected.push(2_000 + n as u64);
+        }
+        expected.extend((cursor..mesh_count).map(|i| 1_000 + i as u64));
+        let merged = merge_experience_orb_instances(meshes, &orbs, [128, 128]).unwrap();
+        assert_eq!(merged.iter().map(|m| m.mesh_key).collect::<Vec<_>>(), expected, "{indices:?}");
+    }
 }
 
 #[test]

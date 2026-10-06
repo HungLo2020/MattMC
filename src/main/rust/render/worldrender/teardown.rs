@@ -25,6 +25,12 @@ impl WorldPrimitiveFrontend {
         self.material_asset_update_failures = 0;
         self.mesh_asset_generation = 0;
         self.mesh_assets.clear();
+        self.mesh_asset_drawable_generations.clear();
+        self.mesh_assets_lacking_source_semantics.clear();
+        self.mesh_range_memo.borrow_mut().clear();
+        // Generations may restart with the assets; drop per-generation memos.
+        self.terrain_voxel_mesh_bounds.clear();
+        self.terrain_voxel_source_memo = None;
         self.source_terrain_validated_identities.clear();
         self.mesh_batch_plan_cache.clear();
         self.mesh_texture_assets.clear();

@@ -8,7 +8,7 @@ use super::*;
 /// program-local and may choose the previous feedback image or mip sampling.
 /// No Java/Iris sampler, texture unit, framebuffer, or native handle crosses
 /// this boundary.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ShaderPackSourceColorResources {
     pub(super) resources: TerrainSourceOwnedResourceSet,
     pub(super) combined_samplers: Vec<Handle>,

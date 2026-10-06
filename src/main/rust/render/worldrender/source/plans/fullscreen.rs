@@ -283,10 +283,11 @@ impl WorldPrimitiveFrontend {
         let inputs = self.candidate_source_resource_snapshot_for_frame(
             targets.identity.shader_pack_generation, targets.identity.world_generation, frame.frame_id,
         )?.resources.clone();
-        let programs = self.shader_runtime.as_ref().ok_or_else(||
-            GalError::backend("shader runtime vanished before pre-terrain fullscreen staging"))?
+        let runtime = self.shader_runtime.as_ref().ok_or_else(||
+            GalError::backend("shader runtime vanished before pre-terrain fullscreen staging"))?;
+        let programs = runtime
             .prepared_lowered_pre_terrain_fullscreen_programs(source_frame_includes_distant_horizons(frame))?
-            .into_iter().map(|program| Arc::new(program.clone())).collect::<Vec<_>>();
+            .into_iter().map(|program| runtime.shared_fullscreen_program(program)).collect::<Vec<_>>();
         let mut uniforms = self.source_uniform_frame_for_owned_resources(frame)?;
         if source_frame_includes_distant_horizons(frame) {
             apply_distant_horizons_fullscreen_projection(&mut uniforms, &frame.lod_render_frame)?;
@@ -337,10 +338,10 @@ impl WorldPrimitiveFrontend {
             // skylit dimension). Custom dimensions require separate semantic
             // admission; End and Nether must not acquire this geometry.
             if source_horizon_initializer_requested(frame) {
-                programs.extend(runtime.prepared_lowered_pre_terrain_horizon_program()?.cloned());
+                programs.extend(runtime.prepared_lowered_pre_terrain_horizon_program()?.map(|program| runtime.shared_fullscreen_program(program)));
             }
             if source_sky_initializer_requested(frame) {
-                programs.extend(runtime.prepared_lowered_pre_terrain_sky_program()?.cloned());
+                programs.extend(runtime.prepared_lowered_pre_terrain_sky_program()?.map(|program| runtime.shared_fullscreen_program(program)));
             }
             programs
         };
@@ -377,7 +378,7 @@ impl WorldPrimitiveFrontend {
         let mut consumers = Vec::with_capacity(programs.len());
         for (program, pass_frame) in programs.into_iter().zip(frames) {
             match runtime.stage_pre_terrain_fullscreen_execution_plan(gal, &program, color_targets, &inputs) {
-                Ok(plan) => consumers.push(PreparedNamedSourceFullscreenConsumer { program: Arc::new(program), plan, frame: pass_frame }),
+                Ok(plan) => consumers.push(PreparedNamedSourceFullscreenConsumer { program, plan, frame: pass_frame }),
                 Err(error) => {
                     destroy_named_source_fullscreen_consumers(gal, consumers);
                     return Err(error);
@@ -423,7 +424,7 @@ impl WorldPrimitiveFrontend {
                 GalError::backend("shader runtime vanished before source celestial staging")
             })?;
             let program = runtime.prepared_lowered_pre_terrain_celestial_program()?;
-            (program.cloned(), program.is_some())
+            (program.map(|program| runtime.shared_fullscreen_program(program)), program.is_some())
         };
         if !has_program {
             return Ok(Vec::new());
@@ -506,7 +507,7 @@ impl WorldPrimitiveFrontend {
                     color_attachment_before: Vec::new(),
                     clear_targets_this_pass: None,
                 },
-                program: Arc::new(program.clone()),
+                program: Arc::clone(&program),
                 plan,
             });
         }

@@ -5,6 +5,7 @@ pub(crate) use lowering::set_gpu_timestamps_requested;
 pub(in crate::render::vulkanic) mod renderdoc;
 mod resources;
 pub mod shaderc_spirv_compiler;
+mod spirv_disk_cache;
 mod swapchain;
 mod trace;
 
@@ -191,6 +192,14 @@ impl VulkanBackend {
     #[cfg(test)]
     pub(super) fn completed_host_reads_for_test(&self) -> Vec<lowering::CompletedHostRead> {
         self.completed_host_reads_snapshot()
+    }
+
+    #[cfg(test)]
+    pub(in crate::render::vulkanic) fn staging_chunks_created_for_test(&self) -> u64 {
+        self.lowerer
+            .lock()
+            .map(|lowerer| lowerer.metrics().staging_chunks_created)
+            .unwrap_or_default()
     }
 
     #[cfg(test)]
@@ -1148,5 +1157,97 @@ mod tests {
             .retire_through_for_test(last)
             .expect("stress resources should retire cleanly");
         assert_eq!(24, retired.len());
+    }
+
+    #[test]
+    fn vulkan_large_host_writes_reuse_retired_staging_chunks() {
+        use crate::render::vulkanic::commands::{ResourceBarrier, TextureUsageState};
+        use crate::render::vulkanic::resources::QueueClass;
+        let backend = match VulkanBackend::new("MattMC staging reuse test") {
+            Ok(backend) => backend,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("Vulkan")
+                        || error.to_string().contains("physical device"),
+                    "unexpected Vulkan bootstrap failure: {error}"
+                );
+                return;
+            }
+        };
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
+        // Above the 64 KiB inline-update limit, so the payload is staged.
+        const SIZE: u64 = 300 * 1024;
+        let device = gal
+            .create_buffer(BufferDesc {
+                label: "staging-reuse.device".to_string(),
+                size: SIZE,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::TransferDst, BufferUsage::TransferSrc, BufferUsage::HostWrite],
+            })
+            .expect("device buffer");
+        let readback = gal
+            .create_buffer(BufferDesc {
+                label: "staging-reuse.readback".to_string(),
+                size: SIZE,
+                memory: MemoryDomain::Readback,
+                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+            })
+            .expect("readback buffer");
+        let barrier = |resource, before, after| {
+            CommandOp::Barrier(ResourceBarrier {
+                resource,
+                subresources: None,
+                before,
+                after,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            })
+        };
+        let mut created_after_first = 0;
+        for round in 0..6_u8 {
+            // An aligned large write and an unaligned tail share one chunk.
+            let body: Vec<u8> = (0..SIZE as usize - 3)
+                .map(|index| (index as u8).wrapping_mul(31).wrapping_add(round))
+                .collect();
+            let tail = vec![round ^ 0xa5; 3];
+            let list = gal
+                .create_command_list(CommandListDesc {
+                    label: format!("staging-reuse.{round}"),
+                    operations: vec![
+                        CommandOp::HostWriteBuffer { buffer: device, offset: 0, data: body.clone() },
+                        CommandOp::HostWriteBuffer { buffer: device, offset: SIZE - 3, data: tail.clone() },
+                        barrier(device, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+                        CommandOp::CopyBuffer { src: device, dst: readback, size: SIZE },
+                        barrier(device, TextureUsageState::TransferSrc, TextureUsageState::TransferDst),
+                        barrier(readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
+                        CommandOp::HostReadBuffer { buffer: readback, offset: 0, size: SIZE },
+                    ],
+                })
+                .expect("staged upload list validates");
+            let token = gal
+                .submit(SubmissionBatch {
+                    label: format!("staging-reuse.submit.{round}"),
+                    command_lists: vec![list],
+                })
+                .expect("staged upload submits");
+            gal.retire_through_for_test(token.submission)
+                .expect("staged upload retires");
+            let read = gal
+                .completed_host_reads()
+                .into_iter()
+                .rev()
+                .find(|read| read.submission == token.submission && read.buffer == readback)
+                .expect("readback completed");
+            let mut expected = body;
+            expected.extend_from_slice(&tail);
+            assert!(read.bytes == expected, "round {round} staged bytes differ");
+            let created = gal.vulkan_backend().expect("vulkan GAL").staging_chunks_created_for_test();
+            if round == 0 {
+                created_after_first = created;
+                assert!(created >= 1, "large writes must use staging");
+            } else {
+                assert_eq!(created_after_first, created, "retired staging must be reused");
+            }
+        }
     }
 }

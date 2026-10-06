@@ -25,6 +25,7 @@ fn frame_with_instances(instances: Vec<WorldMeshInstanceRequest>) -> WorldPrimit
         text_quads: Vec::new(),
         lod_instances: Vec::new(),
         lod_render_frame: WorldLodRenderFrame::default(),
+        static_terrain_shadow_casters: StaticTerrainShadowCasters::default(),
     }
 }
 
@@ -129,6 +130,7 @@ fn entity_outline_geometry_resolution_expands_all_sections_from_owned_asset() {
             translucent_order: Default::default(),
             section_ranges_cache: Default::default(),
             texture_animation_signature_cache: Default::default(),
+            optical_stencil_sections: Default::default(),
             mesh_generation: 1,
             index_generation: 1,
             vertex_layout_version: 0,
@@ -618,6 +620,7 @@ fn entity_outline_mask_gpu_preparation_owns_stream_and_resource_sets() {
             translucent_order: Default::default(),
             section_ranges_cache: Default::default(),
             texture_animation_signature_cache: Default::default(),
+            optical_stencil_sections: Default::default(),
             mesh_generation: asset.mesh_generation,
             index_generation: 1,
             vertex_layout_version: asset.vertex_layout_version,

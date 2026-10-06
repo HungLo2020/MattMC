@@ -26,6 +26,7 @@ pub(crate) mod frame;
 pub(crate) mod gui;
 pub(crate) mod layout;
 pub(crate) mod memory;
+pub(crate) mod pipeline;
 pub(crate) mod resources;
 pub(crate) mod shader_pack;
 pub(crate) mod sprite_animation;
@@ -42,6 +43,7 @@ pub(crate) use self::capabilities::*;
 pub(crate) use self::context::*;
 pub(crate) use self::gui::*;
 pub(crate) use self::memory::*;
+pub(crate) use self::pipeline::*;
 #[cfg(test)]
 pub(crate) use self::resources::*;
 pub(crate) use self::status::*;

@@ -5,12 +5,16 @@ mod entities;
 mod casters;
 mod materials;
 mod voxels;
+mod retained_terrain;
+mod scene_terrain;
 
 pub(crate) use self::terrain::*;
 pub(crate) use self::entities::*;
 pub(crate) use self::casters::*;
 pub(crate) use self::materials::*;
 pub(crate) use self::voxels::*;
+pub(crate) use self::retained_terrain::*;
+pub(crate) use self::scene_terrain::*;
 
 use super::*;
 

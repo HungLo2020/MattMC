@@ -206,7 +206,66 @@ pub(crate) struct SourceTerrainBatchScope {
     /// Whether the audit-only scalar uniform receipt is enabled, read once.
     pub(in crate::render::worldrender) scalar_uniform_receipts: bool,
     pub(in crate::render::worldrender) validated_programs: Vec<usize>,
-    pub(in crate::render::worldrender) pack_keys: Vec<(usize, usize, LoweredSourceTerrainPackKey)>,
+    pub(in crate::render::worldrender) pack_keys: Vec<(usize, usize, LoweredSourceTerrainPackKey, Handle)>,
+    /// Pass-invariant bindings resolved once per frame instead of per batch.
+    pub(in crate::render::worldrender) pipelines: Vec<(SourceTerrainPipelineMemoKey, Handle, Handle)>,
+    /// Multi-draw set-zero per (program, page, stream, range).
+    pub(in crate::render::worldrender) multidraw_frame_data: Vec<(SourceTerrainFrameDataMemoKey, LoweredSourceTerrainFrameDataKey, Handle)>,
+    /// Retained-write facts shared by every batch of one pass.
+    pub(in crate::render::worldrender) retained_passes: std::cell::RefCell<Vec<super::frames::RetainedSourceTerrainPass>>,
+    /// Pipeline and pack set of each retained draw state seen this frame.
+    pub(in crate::render::worldrender) retained_draw_states: std::cell::RefCell<Vec<super::frames::RetainedSourceTerrainDrawState>>,
+}
+
+#[derive(Clone, PartialEq)]
+pub(crate) struct SourceTerrainPipelineMemoKey {
+    pub(in crate::render::worldrender) program: usize,
+    pub(in crate::render::worldrender) material_mode: u32,
+    pub(in crate::render::worldrender) cull_policy: u32,
+    pub(in crate::render::worldrender) winding: u32,
+    pub(in crate::render::worldrender) color_formats: SmallVec<[TextureFormat; 8]>,
+    pub(in crate::render::worldrender) raster_y_direction: crate::render::vulkanic::resources::RasterYDirection,
+    pub(in crate::render::worldrender) shadow_alpha_cutoff_bits: Option<u32>,
+}
+
+#[derive(Clone, PartialEq)]
+pub(crate) struct LocalSourcePipelineMemoKey {
+    pub(in crate::render::worldrender) program: usize,
+    pub(in crate::render::worldrender) shader_pack_generation: u64,
+    pub(in crate::render::worldrender) material_mode: u32,
+    pub(in crate::render::worldrender) depth_policy: u32,
+    pub(in crate::render::worldrender) cull_policy: u32,
+    pub(in crate::render::worldrender) winding: u32,
+    pub(in crate::render::worldrender) depth_format: TextureFormat,
+    pub(in crate::render::worldrender) color_formats: SmallVec<[TextureFormat; 8]>,
+    pub(in crate::render::worldrender) shadow_caster: Option<Option<u32>>,
+}
+
+/// The resource snapshot is held, so its identity cannot be reused while
+/// the memo entry exists; it is compared by identity.
+#[derive(Clone)]
+pub(crate) struct LocalSourcePackMemoKey {
+    pub(in crate::render::worldrender) program: usize,
+    pub(in crate::render::worldrender) shader_pack_generation: u64,
+    pub(in crate::render::worldrender) resources: TerrainSourceOwnedResourceSet,
+    pub(in crate::render::worldrender) local_texture: (u32, u64),
+}
+
+impl PartialEq for LocalSourcePackMemoKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.program == other.program
+            && self.shader_pack_generation == other.shader_pack_generation
+            && self.local_texture == other.local_texture
+            && self.resources.same_snapshot(&other.resources)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct SourceTerrainFrameDataMemoKey {
+    pub(in crate::render::worldrender) program: usize,
+    pub(in crate::render::worldrender) page: Handle,
+    pub(in crate::render::worldrender) stream_buffer: Handle,
+    pub(in crate::render::worldrender) instance_bytes: u64,
 }
 
 /// Byte budget for converted source terrain streams kept across frames.
@@ -511,11 +570,7 @@ impl SourceEntityMeshAsset {
                 "source entity mesh asset requires non-zero key and generation",
             ));
         }
-        if canonical_resource_location(&self.entity_identity)
-            .ok()
-            .as_deref()
-            != Some(self.entity_identity.as_str())
-        {
+        if !is_canonical_resource_location(&self.entity_identity) {
             return Err(GalError::invalid_argument(format!(
                 "source entity mesh {} requires a canonical entity identity",
                 self.mesh_key
@@ -1122,11 +1177,7 @@ pub(crate) fn prepare_source_entity_mesh_asset(
 pub(crate) fn prepare_source_entity_mesh_asset_view<V: EntitySourceVertex>(
     mesh: &SourceMeshAssetView<'_, V>,
 ) -> GalResult<SourceEntityMeshAsset> {
-    if canonical_resource_location(&mesh.entity_identity)
-        .ok()
-        .as_deref()
-        != Some(mesh.entity_identity)
-    {
+    if !is_canonical_resource_location(mesh.entity_identity) {
         return Err(GalError::unsupported_feature(format!(
             "world mesh {} has no canonical entity identity for a source entity pass",
             mesh.mesh_key

@@ -36145,6 +36145,30 @@ def validate_fixture_combinations(args: argparse.Namespace) -> None:
         )
 
 
+
+def benchmark_terrain_queue_options(backend: str, workload_profile: str, jvm_args: Sequence[str]) -> list[str]:
+    """Terrain-queue readiness properties for a Current frame benchmark row.
+
+    A performance sample must represent the settled renderer, not the
+    asynchronous near-field builder, so Current waits for its source-owned
+    queue-drain witness before static and moving samples. A rotating camera
+    keeps exposing sections (cave networks advance one portal hop per rotation
+    in both Sodium implementations) and Frozen builds them inside its measured
+    window too, so moving rows start from a drained queue and then count that
+    streaming instead of restarting. Explicit --jvm-arg values always win.
+    """
+    if backend != "rust-vulkan" or workload_profile not in {"settled-static", "moving-camera"}:
+        return []
+    prefix = "-Dmattmc.dev.graphicsFrameBenchmark."
+    def overridden(name: str) -> bool:
+        return any(value.startswith(f"{prefix}{name}=") for value in jvm_args)
+    if overridden("requireTerrainQueueDrain"):
+        return []
+    options = [f"{prefix}requireTerrainQueueDrain=true"]
+    if workload_profile == "moving-camera" and not overridden("terrainQueueDrainDuringMeasurement"):
+        options.append(f"{prefix}terrainQueueDrainDuringMeasurement=false")
+    return options
+
 def build_capture_command(
     target: RepoTarget,
     mode: ModeSpec,
@@ -38447,22 +38471,9 @@ def build_capture_command(
                 # independent DH semantic column stream has stopped publishing.
                 # Require a quiet DH window for a settled performance sample.
                 java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.requireDhQuiescence=true")
-        if (
-            mode.backend == "rust-vulkan"
-            and workload_profile in {"settled-static", "moving-camera"}
-            and not any(
-                value.startswith("-Dmattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=")
-                for value in (getattr(args, "jvm_arg", []) or [])
-            )
-        ):
-            # A performance sample must represent the settled renderer, not
-            # the asynchronous near-field builder.  The source owns the
-            # queue-drain readiness witness; wait for it before both static
-            # and moving samples so Current and Frozen compare the same
-            # fully populated vanilla terrain domain.  This gate changes no
-            # rendering or ownership behavior and remains overrideable for
-            # intentional streaming probes.
-            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=true")
+        java_options.extend(
+            benchmark_terrain_queue_options(mode.backend, workload_profile, getattr(args, "jvm_arg", []) or [])
+        )
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsFrameBenchmark=true",

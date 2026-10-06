@@ -42,6 +42,23 @@ impl TerrainSectionPlacement {
         }
         Ok(transform)
     }
+
+    /// Sodium's camera-side face selection for one section: bit 6 is the
+    /// unassigned facing, bits 0-2 the positive and 3-5 the negative axes.
+    pub fn visible_facing_mask(self) -> u8 {
+        let camera = self.camera.map(|axis| axis.floor() as i64);
+        let origin = self.origin.map(i64::from);
+        let mut mask = 1u8 << 6;
+        for axis in 0..3 {
+            if camera[axis] > origin[axis] - 3 {
+                mask |= 1 << axis;
+            }
+            if camera[axis] < origin[axis] + 19 {
+                mask |= 1 << (axis + 3);
+            }
+        }
+        mask
+    }
 }
 
 #[cfg(test)]

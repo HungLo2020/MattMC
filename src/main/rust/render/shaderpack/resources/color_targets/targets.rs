@@ -125,6 +125,11 @@ pub(super) fn color_resource_generation(
 }
 
 impl ShaderPackColorTargets {
+    /// True when both sets name the same images and views per target.
+    pub(crate) fn same_images(&self, other: &Self) -> bool {
+        self.targets == other.targets
+    }
+
     pub(crate) fn target(&self, name: &str) -> Option<ShaderPackColorTarget> {
         self.targets.get(name).copied()
     }

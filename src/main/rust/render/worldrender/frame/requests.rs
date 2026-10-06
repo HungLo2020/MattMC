@@ -622,6 +622,26 @@ pub struct WorldPrimitiveFrame {
     /// preserves the real producer ordering without borrowing legacy GL state.
     pub lod_instances: Vec<WorldLodColumnInstanceRequest>,
     pub lod_render_frame: WorldLodRenderFrame,
+    /// Off-camera terrain shadow casters. The frontend expands them into
+    /// `mesh_instances` before validation; see `frame::shadow_casters`.
+    pub static_terrain_shadow_casters: StaticTerrainShadowCasters,
+}
+
+/// One copied off-camera static-terrain section layer: resident mesh
+/// identity, integer section origin and the layer's depth policy.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StaticTerrainShadowCaster {
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub origin: [i32; 3],
+    pub depth_policy: u32,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StaticTerrainShadowCasters {
+    /// Full-precision terrain camera shared by every caster placement.
+    pub camera: [f64; 3],
+    pub casters: Vec<StaticTerrainShadowCaster>,
 }
 
 #[derive(Clone, Copy, Debug)]

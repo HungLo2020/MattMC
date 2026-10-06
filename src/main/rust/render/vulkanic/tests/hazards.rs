@@ -908,3 +908,195 @@ fn dispatch_accesses_are_tracked_without_rebinding_and_barriers_are_typed() {
     assert!(submit(vec![dispatch.clone(), barrier(TextureUsageState::ShaderWrite, TextureUsageState::ShaderRead), dispatch.clone()]).is_err());
     submit(vec![dispatch.clone(), barrier(TextureUsageState::ShaderWrite, TextureUsageState::ShaderWrite), dispatch]).unwrap();
 }
+
+#[test]
+fn consecutive_draws_reuse_read_bindings_but_still_reject_repeated_storage_writes() {
+    for (access, expect_conflict) in [(AccessFlags::READ, false), (AccessFlags::WRITE, true)] {
+        let mut gal = gal();
+        let (color_view, target, pass, _, _) = simple_graphics_scene(&mut gal);
+        let storage = gal
+            .create_buffer(buffer("draw-storage", vec![BufferUsage::Storage]))
+            .unwrap();
+        let resource_layout = gal
+            .create_resource_layout(ResourceLayoutDesc {
+                label: "draw-storage-layout".to_owned(),
+                bindings: vec![layout_binding(
+                    0,
+                    ResourceBindingKind::StorageBuffer,
+                    PipelineStageFlags::DRAW,
+                )],
+            })
+            .unwrap();
+        let set = gal
+            .create_resource_set(ResourceSetDesc {
+                label: "draw-storage-set".to_owned(),
+                layout: resource_layout,
+                bindings: vec![resource_binding(0, storage, ResourceBindingKind::StorageBuffer, access)],
+            })
+            .unwrap();
+        let pipeline_layout = gal
+            .create_pipeline_layout(PipelineLayoutDesc {
+                label: "draw-storage-pipeline-layout".to_owned(),
+                resource_layouts: vec![resource_layout],
+            })
+            .unwrap();
+        let vertex_shader = gal.create_shader_module(shader("v", ShaderStage::Vertex)).unwrap();
+        let fragment_shader = gal.create_shader_module(shader("f", ShaderStage::Fragment)).unwrap();
+        let pipeline = gal
+            .create_graphics_pipeline(GraphicsPipelineDesc {
+                label: "draw-storage-pipeline".to_owned(),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::Back,
+                front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
+                blend: BlendMode::Disabled,
+                depth_compare: None,
+                depth_write: false,
+                depth_bias: None,
+                color_formats: vec![TextureFormat::Rgba8Unorm],
+                depth_format: None,
+                stencil: None,
+            })
+            .unwrap();
+        let draw = CommandOp::Draw { vertices: 3, instances: 1 };
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "consecutive-draws".to_owned(),
+                operations: vec![
+                    CommandOp::BeginPass {
+                        pass,
+                        target,
+                        colors: vec![color_attachment(color_view)],
+                        depth_stencil: None,
+                    },
+                    CommandOp::BindGraphicsPipeline(pipeline),
+                    CommandOp::BindResourceSet {
+                        pipeline_layout,
+                        set_index: 0,
+                        set,
+                        dynamic_offsets: Vec::new(),
+                    },
+                    draw.clone(),
+                    draw.clone(),
+                    draw,
+                    CommandOp::EndPass,
+                ],
+            })
+            .unwrap();
+        let result = gal.submit(SubmissionBatch {
+            label: "consecutive-draws".to_owned(),
+            command_lists: vec![list],
+        });
+        if expect_conflict {
+            assert_code(result, super::StatusCode::InvalidArgument);
+        } else {
+            result.unwrap();
+        }
+    }
+}
+
+#[test]
+fn rebinding_one_set_still_checks_unchanged_reads_against_new_writes() {
+    for (second_access, second_targets_first_buffer, expect_conflict) in [
+        (AccessFlags::READ, false, false),
+        (AccessFlags::WRITE, true, true),
+    ] {
+        let mut gal = gal();
+        let (color_view, target, pass, _, _) = simple_graphics_scene(&mut gal);
+        let shared = gal.create_buffer(buffer("shared", vec![BufferUsage::Storage])).unwrap();
+        let other = gal.create_buffer(buffer("other", vec![BufferUsage::Storage])).unwrap();
+        let layout = |gal: &mut VulkanicGal, label: &str| {
+            gal.create_resource_layout(ResourceLayoutDesc {
+                label: label.to_owned(),
+                bindings: vec![layout_binding(0, ResourceBindingKind::StorageBuffer, PipelineStageFlags::DRAW)],
+            })
+            .unwrap()
+        };
+        let first_layout = layout(&mut gal, "first-layout");
+        let second_layout = layout(&mut gal, "second-layout");
+        let set = |gal: &mut VulkanicGal, layout, resource, access| {
+            gal.create_resource_set(ResourceSetDesc {
+                label: "set".to_owned(),
+                layout,
+                bindings: vec![resource_binding(0, resource, ResourceBindingKind::StorageBuffer, access)],
+            })
+            .unwrap()
+        };
+        let first = set(&mut gal, first_layout, shared, AccessFlags::READ);
+        let second_initial = set(&mut gal, second_layout, other, AccessFlags::READ);
+        let second_rebound = set(
+            &mut gal,
+            second_layout,
+            if second_targets_first_buffer { shared } else { other },
+            second_access,
+        );
+        let pipeline_layout = gal
+            .create_pipeline_layout(PipelineLayoutDesc {
+                label: "two-set-layout".to_owned(),
+                resource_layouts: vec![first_layout, second_layout],
+            })
+            .unwrap();
+        let vertex_shader = gal.create_shader_module(shader("v", ShaderStage::Vertex)).unwrap();
+        let fragment_shader = gal.create_shader_module(shader("f", ShaderStage::Fragment)).unwrap();
+        let pipeline = gal
+            .create_graphics_pipeline(GraphicsPipelineDesc {
+                label: "two-set-pipeline".to_owned(),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::Back,
+                front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
+                blend: BlendMode::Disabled,
+                depth_compare: None,
+                depth_write: false,
+                depth_bias: None,
+                color_formats: vec![TextureFormat::Rgba8Unorm],
+                depth_format: None,
+                stencil: None,
+            })
+            .unwrap();
+        let bind = |set_index, set| CommandOp::BindResourceSet {
+            pipeline_layout,
+            set_index,
+            set,
+            dynamic_offsets: Vec::new(),
+        };
+        let draw = CommandOp::Draw { vertices: 3, instances: 1 };
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "rebind-one-set".to_owned(),
+                operations: vec![
+                    CommandOp::BeginPass {
+                        pass,
+                        target,
+                        colors: vec![color_attachment(color_view)],
+                        depth_stencil: None,
+                    },
+                    CommandOp::BindGraphicsPipeline(pipeline),
+                    bind(0, first),
+                    bind(1, second_initial),
+                    draw.clone(),
+                    bind(1, second_rebound),
+                    draw,
+                    CommandOp::EndPass,
+                ],
+            })
+            .unwrap();
+        let result = gal.submit(SubmissionBatch {
+            label: "rebind-one-set".to_owned(),
+            command_lists: vec![list],
+        });
+        if expect_conflict {
+            assert_code(result, super::StatusCode::InvalidArgument);
+        } else {
+            result.unwrap();
+        }
+    }
+}

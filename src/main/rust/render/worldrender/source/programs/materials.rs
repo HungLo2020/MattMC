@@ -569,7 +569,7 @@ impl WorldPrimitiveFrontend {
         let group = groups.iter().find(|group| {
             group.shader_pack_generation == shader_pack_generation
                 && &group.program == program
-                && &group.base == base
+                && group.base.same_snapshot(base)
         })?;
         let (resources, local_texture, combined_sampler) =
             group.entries.get(&(texture_id, texture_generation))?;
@@ -607,7 +607,7 @@ impl WorldPrimitiveFrontend {
         let index = match groups.iter().position(|group| {
             group.shader_pack_generation == shader_pack_generation
                 && &group.program == program
-                && &group.base == base
+                && group.base.same_snapshot(base)
         }) {
             Some(index) => index,
             None => {
@@ -1386,12 +1386,16 @@ impl WorldPrimitiveFrontend {
         _program: &P,
         mesh: &SourceEntityMeshAsset,
     ) -> GalResult<LoweredSourceTerrainDataKey> {
-        mesh.validate()?;
         let key = LoweredSourceTerrainDataKey {
             mesh_key: mesh.mesh_key,
             mesh_generation: mesh.mesh_generation,
             abi: SourceGeometryAbi::LocalTextured,
         };
+        // Constructors validate assets; re-check only before the one upload
+        // instead of scanning every index on every draw.
+        if !self.lowered_source_terrain_geometry_resources.contains_key(&key) {
+            mesh.validate()?;
+        }
         self.ensure_lowered_source_mesh_geometry_resources(
             gal,
             key,
@@ -1421,7 +1425,11 @@ impl WorldPrimitiveFrontend {
         SourceTerrainFrameStreamAllocation,
     )> {
         let interface = program.execution_interface();
-        interface.validate()?;
+        let validated_key = (program as *const P as *const () as usize, program.shader_pack_generation());
+        if self.local_source_validated_interfaces.get(frame_id, &validated_key).is_none() {
+            interface.validate()?;
+            self.local_source_validated_interfaces.insert(frame_id, validated_key, ());
+        }
         // `mesh` is an immutable asset validated by its constructor.
         let geometry_key =
             self.ensure_lowered_local_source_geometry_resources(gal, program, mesh)?;
@@ -1618,6 +1626,7 @@ impl WorldPrimitiveFrontend {
         frame_id: u64,
         mesh: &Arc<SourceEntityMeshAsset>,
         section_index: u32,
+        section_count: u32,
         texture_id: u32,
         material_mode: u32,
         depth_policy: u32,
@@ -1650,18 +1659,41 @@ impl WorldPrimitiveFrontend {
                 "source entity draw preparation requires at least one instance",
             ));
         }
-        let section = mesh.sections.get(section_index as usize).ok_or_else(|| {
-            GalError::invalid_argument("source entity draw selects a missing section")
-        })?;
-        if section.texture_id != texture_id
-            || section.material_mode != material_mode
-            || section.cull_policy != cull_policy
-            || section.winding != winding
-        {
+        let section_end = section_index
+            .checked_add(section_count)
+            .filter(|_| section_count != 0)
+            .ok_or_else(|| GalError::invalid_argument("source entity draw selects an empty section run"))?;
+        let sections = mesh
+            .sections
+            .get(section_index as usize..section_end as usize)
+            .ok_or_else(|| GalError::invalid_argument("source entity draw selects a missing section"))?;
+        if sections.iter().any(|section| {
+            section.texture_id != texture_id
+                || section.material_mode != material_mode
+                || section.cull_policy != cull_policy
+                || section.winding != winding
+        }) {
             return Err(GalError::invalid_argument(
                 "source entity draw semantic group no longer matches its immutable mesh section",
             ));
         }
+        let index_offset = sections[0].index_offset;
+        if crate::render::worldrender::source::frames::source_entity_section_run_end(
+            mesh,
+            section_index,
+            section_count,
+        )?
+        .is_none()
+        {
+            return Err(GalError::invalid_argument(
+                "source entity draw section run is not index-contiguous",
+            ));
+        }
+        let index_count = sections.iter().try_fold(0u32, |total, section| {
+            total
+                .checked_add(section.index_count)
+                .ok_or_else(|| GalError::invalid_argument("source entity section run index count overflows"))
+        })?;
         let (resources, local_texture) = self.source_resources_for_local_material(
             gal,
             program,
@@ -1679,15 +1711,12 @@ impl WorldPrimitiveFrontend {
                 scalar_uniforms,
                 instance_transforms,
             )?;
-        let pack_key = self.ensure_lowered_local_source_pack_resources(
+        let pack_resource_set =
+            self.resolve_lowered_local_source_pack(gal, program, frame_id, resources, local_texture)?;
+        let (pipeline, pipeline_layout) = self.resolve_lowered_local_source_pipeline(
             gal,
             program,
-            &resources,
-            local_texture,
-        )?;
-        let pipeline_key = self.ensure_lowered_local_source_pipeline_resources(
-            gal,
-            program,
+            frame_id,
             material_mode,
             depth_policy,
             cull_policy,
@@ -1706,16 +1735,6 @@ impl WorldPrimitiveFrontend {
             .get(&frame_data_key)
             .map(|resources| resources.resource_set)
             .ok_or_else(|| GalError::backend("source entity frame data resources vanished"))?;
-        let pack_resource_set = self
-            .lowered_entity_source_pack_resources
-            .get(&pack_key)
-            .map(|resources| resources.resource_set)
-            .ok_or_else(|| GalError::backend("source entity pack resources vanished"))?;
-        let (pipeline, pipeline_layout) = self
-            .lowered_entity_source_pipeline_resources
-            .get(&pipeline_key)
-            .map(|resources| (resources.pipeline, resources.pipeline_layout))
-            .ok_or_else(|| GalError::backend("source entity pipeline resources vanished"))?;
         let mut dynamic_offsets = vec![stream.legacy_transform_offset];
         if stream.scalar_uniform_offset.is_some() {
             dynamic_offsets.push(stream.scalar_uniform_offset.expect("checked scalar offset"));
@@ -1731,11 +1750,95 @@ impl WorldPrimitiveFrontend {
                 set: pack_resource_set,
             },
             index_buffer,
-            index_offset: section.index_offset,
+            index_offset,
             index_type: IndexType::U32,
-            index_count: section.index_count,
+            index_count,
             instance_count,
         })
+    }
+
+    /// Set-one bindings for one resource snapshot and local texture, shared
+    /// by every draw of the frame that uses them.
+    pub(crate) fn resolve_lowered_local_source_pack<P: LocalTexturedSourceProgram>(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &P,
+        frame_id: u64,
+        resources: TerrainSourceOwnedResourceSet,
+        local_texture: (u32, u64),
+    ) -> GalResult<Handle> {
+        let memo_key = LocalSourcePackMemoKey {
+            program: program as *const P as *const () as usize,
+            shader_pack_generation: program.shader_pack_generation(),
+            resources,
+            local_texture,
+        };
+        if let Some(set) = self.local_source_pack_memo.get(frame_id, &memo_key) {
+            return Ok(set);
+        }
+        let key = self.ensure_lowered_local_source_pack_resources(
+            gal,
+            program,
+            &memo_key.resources,
+            local_texture,
+        )?;
+        let set = self
+            .lowered_entity_source_pack_resources
+            .get(&key)
+            .map(|resources| resources.resource_set)
+            .ok_or_else(|| GalError::backend("source entity pack resources vanished"))?;
+        self.local_source_pack_memo.insert(frame_id, memo_key, set);
+        Ok(set)
+    }
+
+    /// Pipeline and layout for one local-textured draw configuration,
+    /// resolved once per frame.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn resolve_lowered_local_source_pipeline<P: LocalTexturedSourceProgram>(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &P,
+        frame_id: u64,
+        material_mode: u32,
+        depth_policy: u32,
+        cull_policy: u32,
+        winding: u32,
+        depth_format: TextureFormat,
+        color_formats: Vec<TextureFormat>,
+        shadow_caster: Option<Option<f32>>,
+    ) -> GalResult<(Handle, Handle)> {
+        let memo_key = LocalSourcePipelineMemoKey {
+            program: program as *const P as *const () as usize,
+            shader_pack_generation: program.shader_pack_generation(),
+            material_mode,
+            depth_policy,
+            cull_policy,
+            winding,
+            depth_format,
+            color_formats: color_formats.iter().copied().collect(),
+            shadow_caster: shadow_caster.map(|cutoff| cutoff.map(f32::to_bits)),
+        };
+        if let Some(resolved) = self.local_source_pipeline_memo.get(frame_id, &memo_key) {
+            return Ok(resolved);
+        }
+        let key = self.ensure_lowered_local_source_pipeline_resources(
+            gal,
+            program,
+            material_mode,
+            depth_policy,
+            cull_policy,
+            winding,
+            depth_format,
+            color_formats,
+            shadow_caster,
+        )?;
+        let resolved = self
+            .lowered_entity_source_pipeline_resources
+            .get(&key)
+            .map(|resources| (resources.pipeline, resources.pipeline_layout))
+            .ok_or_else(|| GalError::backend("source entity pipeline resources vanished"))?;
+        self.local_source_pipeline_memo.insert(frame_id, memo_key, resolved);
+        Ok(resolved)
     }
 
     pub(crate) fn ensure_lowered_local_source_program_layouts<P: LocalTexturedSourceProgram>(

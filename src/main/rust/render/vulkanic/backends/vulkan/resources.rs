@@ -1329,6 +1329,7 @@ impl VulkanObjects {
         token: BackendToken,
     ) -> GalResult<ShaderModuleObject> {
         trace_glibc_allocator_checkpoint(&format!("shader.begin.{}", desc.label));
+        let compile_started = std::time::Instant::now();
         let code = if desc.code_format == ShaderCodeFormat::Glsl {
             let source = std::str::from_utf8(&desc.code).map_err(|error| {
                 GalError::backend(format!(
@@ -1355,12 +1356,16 @@ impl VulkanObjects {
                         source.len()
                     ));
                 }
-                let compiled = compile_glsl_for_backend(
-                    shaderc_kind(desc.stage)?,
-                    source,
-                    &desc.label,
+                let kind = shaderc_kind(desc.stage)?;
+                let disk_cache = super::spirv_disk_cache::cache_dir();
+                let compiled = super::spirv_disk_cache::compile_with_disk_cache(
+                    disk_cache.as_deref(),
+                    kind,
                     &desc.entry_point,
+                    source,
+                    || compile_glsl_for_backend(kind, source, &desc.label, &desc.entry_point),
                 )
+                .map(|(spirv, _hit)| spirv)
                 .map_err(|error| {
                     GalError::backend(format!(
                         "failed to compile GLSL shader '{}' for Vulkan backend: {error}",
@@ -1380,7 +1385,11 @@ impl VulkanObjects {
         if desc.code_format == ShaderCodeFormat::Glsl
             && std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some()
         {
-            trace::stdout(format_args!("vulkan.shader.compile.end label={}", desc.label));
+            trace::stdout(format_args!(
+                "vulkan.shader.compile.end label={} elapsed_us={}",
+                desc.label,
+                compile_started.elapsed().as_micros()
+            ));
         }
         if desc.code_format != ShaderCodeFormat::Spirv && desc.code_format != ShaderCodeFormat::Glsl
             || code.len() % 4 != 0
@@ -1833,6 +1842,7 @@ impl VulkanObjects {
         if let Some(depth_state) = depth_state.as_ref() {
             create_info = create_info.depth_stencil_state(depth_state);
         }
+        let pipeline_started = std::time::Instant::now();
         let pipeline = unsafe {
             self.context.device.create_graphics_pipelines(
                 vk::PipelineCache::null(),
@@ -1847,6 +1857,13 @@ impl VulkanObjects {
             ))
         })?
         .remove(0);
+        if std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some() {
+            trace::stdout(format_args!(
+                "vulkan.pipeline.create label={} elapsed_us={}",
+                desc.label,
+                pipeline_started.elapsed().as_micros()
+            ));
+        }
         self.context.set_object_name(
             pipeline,
             &debug_name("graphics-pipeline", handle, &desc.label),

@@ -10,6 +10,8 @@ use super::*;
 /// requirements.
 pub(crate) struct PreparedNamedSourceTerrainFramePlan {
     pub(in crate::render::worldrender) terrain: PreparedLoweredSourceTerrainFramePlan,
+    /// Index totals the scene path drew (its share of terrain coverage).
+    pub(in crate::render::worldrender) scene_coverage: SceneTerrainCoverage,
     /// Caster geometry outside the camera color domain. These draws are
     /// admitted only to the Rust-owned shadow pass and cannot reach the
     /// G-buffer or translucent color writers.
@@ -471,6 +473,7 @@ impl WorldPrimitiveFrontend {
         graph_generation: u64,
         frame: &WorldPrimitiveFrame,
         batches: &[MeshBatch],
+        scene: &SceneTerrainFrame,
         shadow_batches: &[MeshBatch],
         extent: Extent3d,
         depth_texture: Handle,
@@ -593,12 +596,16 @@ impl WorldPrimitiveFrontend {
             // stage that writer only when this exact frame actually contains
             // translucent terrain, so an incomplete water/transparency
             // contract cannot block ordinary vanilla terrain or DH.
-            let has_translucent_batches = batches.iter().any(|batch| {
+            let scene_kinds = self.scene_terrain_kinds(frame, &scene.camera);
+            let has_translucent_batches = scene_kinds[SCENE_TERRAIN_KIND_TRANSLUCENT as usize]
+                || batches.iter().any(|batch| {
                 is_source_terrain_mesh_stratum(batch.key.stratum)
                     && batch.key.g_buffer
                     && batch.key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT
             });
-            let has_bootstrap_batches = batches.iter().any(|batch| {
+            let has_bootstrap_batches = scene_kinds[SCENE_TERRAIN_KIND_OPAQUE as usize]
+                || scene_kinds[SCENE_TERRAIN_KIND_CUTOUT as usize]
+                || batches.iter().any(|batch| {
                 is_source_terrain_mesh_stratum(batch.key.stratum)
                     && batch.key.g_buffer
                     && matches!(
@@ -613,13 +620,13 @@ impl WorldPrimitiveFrontend {
                 .filter(|policy| policy.generation() == shader_pack_generation)
                 .ok_or_else(|| GalError::invalid_argument("named source shadow policy generation is missing or stale"))?;
             let render_translucent_shadows = shadow_policy.render_translucent();
-            let selected_shadow_batches = if shadow_batches.is_empty()
-                || terrain_program_scope_for_sky_type(frame.background.sky_type)?
-                    != Some(TerrainProgramScope::Overworld)
+            // The light frustum of the overworld shadow pass, shared by the
+            // batch path and the scene path.
+            let shadow_frustum = if terrain_program_scope_for_sky_type(frame.background.sky_type)?
+                == Some(TerrainProgramScope::Overworld)
+                && (!shadow_batches.is_empty() || !scene.camera.is_empty() || !scene.casters.is_empty())
             {
-                Vec::new()
-            } else {
-                let frustum = crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame_with_distances(
+                Some(crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame_with_distances(
                     shadow_policy,
                     frame.shader_environment.time_of_day,
                     frame.projection_matrix,
@@ -629,8 +636,33 @@ impl WorldPrimitiveFrontend {
                         configured_shadow_distance_chunks: frame.shader_environment.configured_shadow_distance_chunks,
                     },
                     crate::render::shaderpack::properties::shadow::ShadowCasterKind::Terrain,
-                )?;
-                shadow_batches
+                )?)
+            } else {
+                None
+            };
+            let scene_casters = match shadow_frustum.as_ref() {
+                Some(frustum) => scene
+                    .casters
+                    .iter()
+                    .copied()
+                    .filter(|&index| {
+                        source_shadow_instance_intersects(
+                            frustum,
+                            &frame.mesh_instances[index],
+                            Some(frame.shader_environment.far_plane),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+                None => Vec::new(),
+            };
+            let scene_supplement = shadow_frustum.is_some()
+                && scene
+                    .camera
+                    .iter()
+                    .any(|&index| frame.mesh_instances[index].terrain_visible_facing_mask != 0x7f);
+            let mut selected_shadow_batches = match shadow_frustum.as_ref().filter(|_| !shadow_batches.is_empty()) {
+                None => Vec::new(),
+                Some(frustum) => shadow_batches
                     .iter()
                     .filter_map(|batch| {
                         let mut selected = batch.clone();
@@ -644,8 +676,9 @@ impl WorldPrimitiveFrontend {
                         });
                         (!selected.indices.is_empty()).then_some(selected)
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>(),
             };
+            self.order_source_terrain_batches_for_multidraw(&mut selected_shadow_batches);
             // Iris shadow-pass entity casters (`ShadowRenderer`): with
             // `shadowEntities` every rendered entity (and the local player)
             // casts; otherwise only the local player when `shadowPlayer`.
@@ -660,6 +693,7 @@ impl WorldPrimitiveFrontend {
                     Vec::new()
                 };
             let has_shadow_casters = !selected_shadow_batches.is_empty() || has_bootstrap_batches
+                || !scene_casters.is_empty() || scene_supplement
                 || (has_translucent_batches && render_translucent_shadows)
                 || !entity_shadow_casters.is_empty();
             let shadow_alpha_cutoff = shadow_policy.cutout_alpha_cutoff();
@@ -1140,10 +1174,14 @@ impl WorldPrimitiveFrontend {
             // Keep the terrain stream reservation and terrain draw preparation
             // scoped to the terrain strata so a combined frame never attempts
             // to interpret entity sections as terrain batches.
-            let terrain_batches = batches
+            let mut terrain_batches = batches
                 .iter()
                 .filter(|batch| is_source_terrain_mesh_stratum(batch.key.stratum))
                 .collect::<Vec<_>>();
+            self.order_source_terrain_batches_for_multidraw(&mut terrain_batches);
+            // Each program's immutable interface is validated once for the
+            // whole sizing pass rather than once per batch.
+            let mut validated = ValidatedSourceInterfaces::default();
             let required_stream_bytes = terrain_batches.iter().try_fold(0_u64, |total, batch| {
                 let program = match batch.key.material_mode {
                     WORLD_MATERIAL_MODE_OPAQUE => &programs.opaque,
@@ -1164,14 +1202,16 @@ impl WorldPrimitiveFrontend {
                         "named source terrain batch instance count exceeds u64",
                     )
                 })?;
-                let color_bytes =
-                    Self::source_terrain_frame_stream_payload_bytes(program, instance_count)?;
+                let color_bytes = Self::validated_source_terrain_frame_stream_payload_bytes(
+                    validated.get(&program.execution_interface)?,
+                    instance_count,
+                )?;
                 let shadow_bytes = (source_shadow_required_for_material_mode(batch.key.material_mode)
                     && (batch.key.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
                         || render_translucent_shadows))
                 .then(|| {
-                    Self::source_terrain_frame_stream_payload_bytes(
-                        &programs.shadow,
+                    Self::validated_source_terrain_frame_stream_payload_bytes(
+                        validated.get(&programs.shadow.execution_interface)?,
                         instance_count,
                     )
                 })
@@ -1205,7 +1245,10 @@ impl WorldPrimitiveFrontend {
                 let count = u64::try_from(batch.indices.len()).map_err(|_| {
                     GalError::invalid_argument("shadow-only batch instance count exceeds u64")
                 })?;
-                let bytes = Self::source_terrain_frame_stream_payload_bytes(&programs.shadow, count)?;
+                let bytes = Self::validated_source_terrain_frame_stream_payload_bytes(
+                    validated.get(&programs.shadow.execution_interface)?,
+                    count,
+                )?;
                 total.checked_add(bytes).ok_or_else(|| {
                     GalError::invalid_argument("shadow-only source stream reservation overflows")
                 })
@@ -1270,7 +1313,10 @@ impl WorldPrimitiveFrontend {
                     )
                     .map_err(|_| GalError::invalid_argument("glint instance count exceeds u64"))?;
                     glint_stream_bytes = glint_stream_bytes
-                        .checked_add(Self::source_entity_frame_stream_payload_bytes(program, instances)?)
+                        .checked_add(Self::validated_source_frame_stream_payload_bytes(
+                            validated.get(program.execution_interface())?,
+                            instances,
+                        )?)
                         .ok_or_else(|| GalError::invalid_argument("glint stream reservation overflows"))?;
                 }
             }
@@ -1281,7 +1327,10 @@ impl WorldPrimitiveFrontend {
                     )
                     .map_err(|_| GalError::invalid_argument("glint instance count exceeds u64"))?;
                     glint_stream_bytes = glint_stream_bytes
-                        .checked_add(Self::source_hand_frame_stream_payload_bytes(program, instances)?)
+                        .checked_add(Self::validated_source_frame_stream_payload_bytes(
+                            validated.get(program.execution_interface())?,
+                            instances,
+                        )?)
                         .ok_or_else(|| GalError::invalid_argument("glint stream reservation overflows"))?;
                 }
             }
@@ -1293,8 +1342,10 @@ impl WorldPrimitiveFrontend {
                     .map_err(|_| {
                         GalError::invalid_argument("entity source instance count exceeds u64")
                     })?;
-                    let payload =
-                        Self::source_entity_frame_stream_payload_bytes(program, instance_count)?;
+                    let payload = Self::validated_source_frame_stream_payload_bytes(
+                        validated.get(program.execution_interface())?,
+                        instance_count,
+                    )?;
                     total.checked_add(payload).ok_or_else(|| {
                         GalError::invalid_argument(
                             "entity source frame stream reservation overflows",
@@ -1366,8 +1417,10 @@ impl WorldPrimitiveFrontend {
                     .map_err(|_| {
                         GalError::invalid_argument("hand source instance count exceeds u64")
                     })?;
-                    let payload =
-                        Self::source_hand_frame_stream_payload_bytes(program, instance_count)?;
+                    let payload = Self::validated_source_frame_stream_payload_bytes(
+                        validated.get(program.execution_interface())?,
+                        instance_count,
+                    )?;
                     total.checked_add(payload).ok_or_else(|| {
                         GalError::invalid_argument("hand source frame stream reservation overflows")
                     })
@@ -1382,8 +1435,10 @@ impl WorldPrimitiveFrontend {
                     .map_err(|_| {
                         GalError::invalid_argument("entity shadow instance count exceeds u64")
                     })?;
-                    let payload =
-                        Self::source_entity_frame_stream_payload_bytes(program, instance_count)?;
+                    let payload = Self::validated_source_frame_stream_payload_bytes(
+                        validated.get(program.execution_interface())?,
+                        instance_count,
+                    )?;
                     total.checked_add(payload).ok_or_else(|| {
                         GalError::invalid_argument(
                             "entity shadow frame stream reservation overflows",
@@ -1410,6 +1465,29 @@ impl WorldPrimitiveFrontend {
                 .ok_or_else(|| {
                     GalError::invalid_argument("combined source frame stream reservation overflows")
                 })?;
+            // Scene sections: one shared instance block, plus the uniform
+            // blocks of every pass that may draw them.
+            let scene_sections = (scene.camera.len() + scene_casters.len()) as u64;
+            let scene_stream_bytes = if scene_sections == 0 {
+                0
+            } else {
+                let mut bytes = Self::validated_source_terrain_frame_stream_payload_bytes(
+                    validated.get(&programs.opaque.execution_interface)?,
+                    scene_sections,
+                )?;
+                for program in [&*programs.cutout, &*programs.shadow].into_iter().chain(translucent_program.as_deref()) {
+                    bytes = bytes
+                        .checked_add(Self::validated_source_terrain_frame_stream_payload_bytes(
+                            validated.get(&program.execution_interface)?,
+                            1,
+                        )?)
+                        .ok_or_else(|| GalError::invalid_argument("scene terrain stream reservation overflows"))?;
+                }
+                bytes
+            };
+            let required_stream_bytes = required_stream_bytes
+                .checked_add(scene_stream_bytes)
+                .ok_or_else(|| GalError::invalid_argument("scene terrain stream reservation overflows"))?;
             self.reserve_source_terrain_frame_stream_capacity(
                 gal,
                 frame.frame_id,
@@ -1425,7 +1503,8 @@ impl WorldPrimitiveFrontend {
                         .get(&mesh_key)
                         .map_or(1, |asset| asset.sections.len().max(1)) as u64
                 })
-                .sum::<u64>();
+                .sum::<u64>()
+                + self.scene_terrain_command_bound(frame, scene);
             self.reserve_source_terrain_multidraw_commands(gal, frame.frame_id, multidraw_commands)?;
             let mut draws = Vec::new();
             // Each pass packs one immutable uniform block for this frame.
@@ -1434,14 +1513,96 @@ impl WorldPrimitiveFrontend {
             shadow_uniform_frame.render_stage = Some(self.source_shadow_render_stage()?);
             let mut camera_uniforms: Vec<(u32, PreparedSourceTerrainUniforms<'_>)> = Vec::new();
             let mut shadow_uniforms = None;
-            let mut scope_programs = vec![&programs.opaque, &programs.cutout, &programs.shadow];
-            scope_programs.extend(translucent_program.as_ref());
+            let mut scope_programs: Vec<&LoweredTerrainSourceProgram> =
+                vec![&programs.opaque, &programs.cutout, &programs.shadow];
+            scope_programs.extend(translucent_program.as_deref());
             self.open_source_terrain_batch_scope(frame.frame_id, &scope_programs)?;
             let source_draw_trace = matches!(
                 crate::core::environment::var("MATTMC_RUST_SOURCE_DRAW_TRACE").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
             let mut transform_probes = Vec::new();
+            let mut scene_coverage = SceneTerrainCoverage::default();
+            let mut scene_shadow_only = Vec::new();
+            if !scene.camera.is_empty() || !scene_casters.is_empty() {
+                // Camera uniforms of every kind the scene draws, shared with
+                // the batch loop below (it finds them by material mode).
+                for (kind, mode, program) in [
+                    (SCENE_TERRAIN_KIND_OPAQUE, WORLD_MATERIAL_MODE_OPAQUE, Some(&*programs.opaque)),
+                    (SCENE_TERRAIN_KIND_CUTOUT, WORLD_MATERIAL_MODE_CUTOUT, Some(&*programs.cutout)),
+                    (SCENE_TERRAIN_KIND_TRANSLUCENT, WORLD_MATERIAL_MODE_TRANSLUCENT, translucent_program.as_deref()),
+                ] {
+                    let Some(program) = program.filter(|_| scene_kinds[kind as usize]) else { continue };
+                    if camera_uniforms.iter().any(|(existing, _)| *existing == mode) {
+                        continue;
+                    }
+                    let mut uniform_frame = base_uniform_frame.clone();
+                    uniform_frame.render_stage = Some(self.source_render_stage_for_material_mode(mode)?);
+                    let packed = self.prepare_source_terrain_uniforms(
+                        program, frame.frame_id, &texture_transforms, &uniform_frame,
+                    )?;
+                    camera_uniforms.push((mode, packed));
+                }
+                let casts = [true, true, render_translucent_shadows];
+                let needs_shadow = shadow_resources.is_some()
+                    && ((0..3).any(|kind| scene_kinds[kind] && casts[kind])
+                        || !scene_casters.is_empty()
+                        || scene_supplement);
+                if needs_shadow && shadow_uniforms.is_none() {
+                    shadow_uniforms = Some(self.prepare_source_terrain_uniforms(
+                        &programs.shadow, frame.frame_id, &texture_transforms, &shadow_uniform_frame,
+                    )?);
+                }
+                let uniforms_for = |mode: u32| camera_uniforms.iter().find(|(existing, _)| *existing == mode).map(|(_, packed)| packed);
+                let opaque_pass = uniforms_for(WORLD_MATERIAL_MODE_OPAQUE).map(|uniforms| SceneTerrainPass {
+                    program: &programs.opaque,
+                    resources: &opaque_resources,
+                    color_formats: &opaque_formats,
+                    uniforms,
+                });
+                let cutout_pass = uniforms_for(WORLD_MATERIAL_MODE_CUTOUT).map(|uniforms| SceneTerrainPass {
+                    program: &programs.cutout,
+                    resources: &cutout_resources,
+                    color_formats: &opaque_formats,
+                    uniforms,
+                });
+                let translucent_pass = match (
+                    uniforms_for(WORLD_MATERIAL_MODE_TRANSLUCENT),
+                    translucent_program.as_deref(),
+                    translucent_resources.as_ref(),
+                    translucent_formats.as_deref(),
+                ) {
+                    (Some(uniforms), Some(program), Some(resources), Some(color_formats)) => Some(SceneTerrainPass {
+                        program,
+                        resources,
+                        color_formats,
+                        uniforms,
+                    }),
+                    _ => None,
+                };
+                let shadow_pass = match (shadow_uniforms.as_ref(), shadow_resources.as_ref()) {
+                    (Some(uniforms), Some(resources)) if needs_shadow => Some(SceneTerrainShadowPass {
+                        program: &programs.shadow,
+                        resources,
+                        uniforms,
+                        alpha_cutoff: shadow_alpha_cutoff,
+                        casting_kinds: casts,
+                        supplement: shadow_frustum.is_some(),
+                    }),
+                    _ => None,
+                };
+                let scene_draws = self.prepare_scene_terrain_draws(
+                    gal,
+                    frame,
+                    &scene.camera,
+                    &scene_casters,
+                    [opaque_pass.as_ref(), cutout_pass.as_ref(), translucent_pass.as_ref()],
+                    shadow_pass.as_ref(),
+                )?;
+                scene_coverage = scene_draws.coverage;
+                scene_shadow_only = scene_draws.shadow_only;
+                draws.extend(scene_draws.camera);
+            }
             for batch in terrain_batches {
                 if !batch.key.g_buffer {
                     return Err(GalError::unsupported_feature(
@@ -1521,7 +1682,8 @@ impl WorldPrimitiveFrontend {
                         &camera_uniforms.last().expect("just pushed").1
                     }
                 };
-                let prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+                let retained = self.write_retained_source_terrain_batch(
+                    gal,
                     program,
                     frame.frame_id,
                     batch.key.mesh_key,
@@ -1529,25 +1691,58 @@ impl WorldPrimitiveFrontend {
                     batch.index_offset,
                     batch.index_count,
                     &instances,
-                    SourceTerrainFrameUniforms::Packed(uniforms),
+                    uniforms.legacy_texture_transforms(),
+                    uniforms.scalar_uniforms(),
                 )?;
-                collect_selected_source_terrain_transform_probes(
-                    &mut transform_probes,
-                    frame,
-                    batch,
-                    &prepared,
-                )?;
-                let mut terrain_draws = self
-                    .prepare_lowered_source_terrain_draws_for_color_formats(
+                let mut terrain_draws = match retained.as_ref() {
+                    Some(write) => self.retained_source_terrain_color_draws(
                         gal,
                         program,
-                        &prepared,
+                        write,
                         resources,
                         batch.key.material_mode,
                         batch.key.cull_policy,
                         batch.key.winding,
-                        color_formats.clone(),
-                    )?;
+                        color_formats,
+                        frame.frame_id,
+                    )?,
+                    None => {
+                        let prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+                            program,
+                            frame.frame_id,
+                            batch.key.mesh_key,
+                            batch.key.mesh_generation,
+                            batch.index_offset,
+                            batch.index_count,
+                            &instances,
+                            SourceTerrainFrameUniforms::Packed(uniforms),
+                        )?;
+                        collect_selected_source_terrain_transform_probes(
+                            &mut transform_probes,
+                            frame,
+                            batch,
+                            &prepared,
+                        )?;
+                        let draws = self.prepare_lowered_source_terrain_draws_for_color_formats(
+                            gal,
+                            program,
+                            &prepared,
+                            resources,
+                            batch.key.material_mode,
+                            batch.key.cull_policy,
+                            batch.key.winding,
+                            color_formats,
+                        )?;
+                        self.remember_retained_source_terrain_range(
+                            program,
+                            batch.key.mesh_key,
+                            batch.key.mesh_generation,
+                            batch.index_offset,
+                            batch.index_count,
+                        );
+                        draws
+                    }
+                };
                 // Source lowering is shared across semantic mesh families;
                 // retain the batch's producer stratum on every lowered draw
                 // so moving-block coverage cannot be misclassified as an
@@ -1561,30 +1756,95 @@ impl WorldPrimitiveFrontend {
                             &programs.shadow, frame.frame_id, &texture_transforms, &shadow_uniform_frame,
                         )?);
                     }
-                    let shadow_prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
-                        &programs.shadow,
-                        frame.frame_id,
-                        batch.key.mesh_key,
-                        batch.key.mesh_generation,
-                        batch.index_offset,
-                        batch.index_count,
-                        &instances,
-                        SourceTerrainFrameUniforms::Packed(shadow_uniforms.as_ref().expect("shadow uniforms prepared")),
-                    )?;
-                    let shadow_draws = self.prepare_lowered_source_shadow_draws(
-                        gal,
-                        &programs.shadow,
-                        &shadow_prepared,
-                        shadow_resources.as_ref().ok_or_else(|| {
-                            GalError::backend(
-                                "named source terrain frame lost its opaque/cutout shadow resource snapshot",
-                            )
-                        })?,
-                        batch.key.material_mode,
-                        batch.key.cull_policy,
-                        batch.key.winding,
-                        shadow_alpha_cutoff,
-                    )?;
+                    let packed_shadow = shadow_uniforms.as_ref().expect("shadow uniforms prepared");
+                    let shadow_pack_resources = shadow_resources.as_ref().ok_or_else(|| {
+                        GalError::backend(
+                            "named source terrain frame lost its opaque/cutout shadow resource snapshot",
+                        )
+                    })?;
+                    // Twins replay the camera draws' indirect commands; only
+                    // when every camera draw is indirect can the shadow binding
+                    // skip staging its own copy of the instance records.
+                    let all_indirect = terrain_draws.iter().all(|draw| draw.indexed_indirect.is_some());
+                    let derived_twin = retained.as_ref().filter(|_| all_indirect).and_then(|camera_write| {
+                        self.retained_source_terrain_shadow_twin_of(
+                            &programs.shadow,
+                            frame.frame_id,
+                            camera_write,
+                            packed_shadow.legacy_texture_transforms(),
+                            packed_shadow.scalar_uniforms(),
+                        )
+                    });
+                    let retained_shadow = if derived_twin.is_some() {
+                        derived_twin
+                    } else if all_indirect {
+                        self.bind_retained_source_terrain_shadow_twin(
+                            &programs.shadow,
+                            frame.frame_id,
+                            batch.key.mesh_key,
+                            batch.key.mesh_generation,
+                            batch.index_offset,
+                            batch.index_count,
+                            &instances,
+                            packed_shadow.legacy_texture_transforms(),
+                            packed_shadow.scalar_uniforms(),
+                        )?
+                    } else {
+                        self.write_retained_source_terrain_batch(
+                            gal,
+                            &programs.shadow,
+                            frame.frame_id,
+                            batch.key.mesh_key,
+                            batch.key.mesh_generation,
+                            batch.index_offset,
+                            batch.index_count,
+                            &instances,
+                            packed_shadow.legacy_texture_transforms(),
+                            packed_shadow.scalar_uniforms(),
+                        )?
+                    };
+                    let shadow_draws = match retained_shadow {
+                        Some(write) => self.retained_source_terrain_shadow_draws(
+                            gal,
+                            &programs.shadow,
+                            &write,
+                            shadow_pack_resources,
+                            batch.key.material_mode,
+                            batch.key.cull_policy,
+                            batch.key.winding,
+                            shadow_alpha_cutoff,
+                        )?,
+                        None => {
+                            let shadow_prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+                                &programs.shadow,
+                                frame.frame_id,
+                                batch.key.mesh_key,
+                                batch.key.mesh_generation,
+                                batch.index_offset,
+                                batch.index_count,
+                                &instances,
+                                SourceTerrainFrameUniforms::Packed(packed_shadow),
+                            )?;
+                            let draws = self.prepare_lowered_source_shadow_draws(
+                                gal,
+                                &programs.shadow,
+                                &shadow_prepared,
+                                shadow_pack_resources,
+                                batch.key.material_mode,
+                                batch.key.cull_policy,
+                                batch.key.winding,
+                                shadow_alpha_cutoff,
+                            )?;
+                            self.remember_retained_source_terrain_range(
+                                &programs.shadow,
+                                batch.key.mesh_key,
+                                batch.key.mesh_generation,
+                                batch.index_offset,
+                                batch.index_count,
+                            );
+                            draws
+                        }
+                    };
                     if terrain_draws.len() != shadow_draws.len() {
                         return Err(GalError::invalid_argument(
                             "named source terrain and shadow programs selected different mesh section counts",
@@ -1600,7 +1860,7 @@ impl WorldPrimitiveFrontend {
                 }
                 draws.extend(terrain_draws);
             }
-            let mut shadow_only_draws = Vec::new();
+            let mut shadow_only_draws = scene_shadow_only;
             for batch in selected_shadow_batches {
                 if batch.key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT
                     && !render_translucent_shadows
@@ -1625,7 +1885,12 @@ impl WorldPrimitiveFrontend {
                         &programs.shadow, frame.frame_id, &texture_transforms, &shadow_uniform_frame,
                     )?);
                 }
-                let prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+                let packed_shadow = shadow_uniforms.as_ref().expect("shadow uniforms prepared");
+                let shadow_pack_resources = shadow_resources.as_ref().ok_or_else(|| {
+                    GalError::backend("shadow-only terrain lost its source resource snapshot")
+                })?;
+                let retained = self.write_retained_source_terrain_batch(
+                    gal,
                     &programs.shadow,
                     frame.frame_id,
                     batch.key.mesh_key,
@@ -1633,20 +1898,51 @@ impl WorldPrimitiveFrontend {
                     batch.index_offset,
                     batch.index_count,
                     &instances,
-                    SourceTerrainFrameUniforms::Packed(shadow_uniforms.as_ref().expect("shadow uniforms prepared")),
+                    packed_shadow.legacy_texture_transforms(),
+                    packed_shadow.scalar_uniforms(),
                 )?;
-                shadow_only_draws.extend(self.prepare_lowered_source_shadow_only_draws(
-                    gal,
-                    &programs.shadow,
-                    &prepared,
-                    shadow_resources.as_ref().ok_or_else(|| {
-                        GalError::backend("shadow-only terrain lost its source resource snapshot")
-                    })?,
-                    batch.key.material_mode,
-                    batch.key.cull_policy,
-                    batch.key.winding,
-                    shadow_alpha_cutoff,
-                )?);
+                match retained {
+                    Some(write) => shadow_only_draws.extend(self.retained_source_terrain_shadow_only_draws(
+                        gal,
+                        &programs.shadow,
+                        &write,
+                        shadow_pack_resources,
+                        batch.key.material_mode,
+                        batch.key.cull_policy,
+                        batch.key.winding,
+                        shadow_alpha_cutoff,
+                        frame.frame_id,
+                    )?),
+                    None => {
+                        let prepared = self.prepare_source_terrain_frame_for_mesh_range_using_uniforms(
+                            &programs.shadow,
+                            frame.frame_id,
+                            batch.key.mesh_key,
+                            batch.key.mesh_generation,
+                            batch.index_offset,
+                            batch.index_count,
+                            &instances,
+                            SourceTerrainFrameUniforms::Packed(packed_shadow),
+                        )?;
+                        shadow_only_draws.extend(self.prepare_lowered_source_shadow_only_draws(
+                            gal,
+                            &programs.shadow,
+                            &prepared,
+                            shadow_pack_resources,
+                            batch.key.material_mode,
+                            batch.key.cull_policy,
+                            batch.key.winding,
+                            shadow_alpha_cutoff,
+                        )?);
+                        self.remember_retained_source_terrain_range(
+                            &programs.shadow,
+                            batch.key.mesh_key,
+                            batch.key.mesh_generation,
+                            batch.index_offset,
+                            batch.index_count,
+                        );
+                    }
+                }
             }
             self.source_terrain_batch_scope = None;
             self.write_selected_source_terrain_transform_receipt(frame, &transform_probes);
@@ -1990,6 +2286,7 @@ impl WorldPrimitiveFrontend {
                         prepared.frame_id,
                         &prepared.mesh,
                         prepared.section_index,
+                        prepared.section_count,
                         prepared.texture_id,
                         prepared.material_mode,
                         WORLD_DEPTH_POLICY_TEST_WRITE,
@@ -2218,6 +2515,7 @@ impl WorldPrimitiveFrontend {
                     &mut bootstrap_operations,
                 )?;
             Ok(PreparedNamedSourceTerrainFramePlan {
+                scene_coverage,
                 terrain,
                 shadow_only_draws,
                 entity_shadow_draws,

@@ -260,16 +260,9 @@ pub(crate) fn terrain_visible_facing_mask(instance: &FfiWorldMeshInstanceRecord)
     if instance.terrain_placement_mode != 1 {
         return 0x7f;
     }
-    let camera = instance.terrain_camera.map(|axis| axis.floor() as i64);
-    let origin = instance.terrain_origin.map(i64::from);
-    let mut mask = 1u8 << 6;
-    for axis in 0..3 {
-        if camera[axis] > origin[axis] - 3 {
-            mask |= 1 << axis;
-        }
-        if camera[axis] < origin[axis] + 19 {
-            mask |= 1 << (axis + 3);
-        }
+    crate::render::worldrender::terrain::placement::TerrainSectionPlacement {
+        origin: instance.terrain_origin,
+        camera: instance.terrain_camera,
     }
-    mask
+    .visible_facing_mask()
 }

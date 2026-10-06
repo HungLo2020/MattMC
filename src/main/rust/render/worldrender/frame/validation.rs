@@ -3,6 +3,11 @@
 use crate::render::worldrender::*;
 
 pub(in crate::render::worldrender) fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
+    if !frame.static_terrain_shadow_casters.casters.is_empty() {
+        return Err(GalError::invalid_argument(
+            "static terrain shadow casters must be admitted before frame validation",
+        ));
+    }
     frame::header::validate_frame_header(frame)?;
     validate_shader_environment(&frame.shader_environment)?;
     validate_first_person_frame(&frame.first_person)?;

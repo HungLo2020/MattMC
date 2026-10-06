@@ -609,7 +609,16 @@ impl ShaderPackRuntimeExecutor {
     }
 
     pub(crate) fn confirm_source_color_targets_submission(&mut self, gal: &mut VulkanicGal) {
+        self.release_fullscreen_stages_before_target_retirement(gal);
         self.source_color_targets.confirm_submission(gal);
+    }
+
+    /// Cached fullscreen stages reference the target views; they must go
+    /// before a promotion or discard retires those views.
+    fn release_fullscreen_stages_before_target_retirement(&mut self, gal: &mut VulkanicGal) {
+        if self.source_color_targets.has_pending_targets() {
+            self.fullscreen_pipeline_cache.release_stages(gal);
+        }
     }
 
     /// Promotes program-local named-color sampler tables only after the same
@@ -661,6 +670,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
         frame: ShaderPackColorFramePlan,
     ) -> GalResult<()> {
+        self.release_fullscreen_stages_before_target_retirement(gal);
         self.source_color_targets
             .confirm_frame_submission(gal, frame)
     }
@@ -684,6 +694,7 @@ impl ShaderPackRuntimeExecutor {
     }
 
     pub(crate) fn discard_source_color_targets_submission(&mut self, gal: &mut VulkanicGal) {
+        self.release_fullscreen_stages_before_target_retirement(gal);
         self.source_color_resources.discard_submission(gal);
         self.source_color_targets.discard_submission(gal);
     }

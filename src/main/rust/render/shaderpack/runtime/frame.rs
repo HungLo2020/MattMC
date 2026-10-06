@@ -79,6 +79,8 @@ pub(crate) struct TerrainMeshDraw {
 pub(crate) struct TerrainIndexedIndirect {
     pub buffer: Handle,
     pub offset: u64,
+    /// Consecutive 20-byte commands starting at `offset`.
+    pub draw_count: u32,
 }
 
 /// A direct world-material batch which must be composed after deferred terrain

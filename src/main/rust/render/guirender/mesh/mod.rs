@@ -42,8 +42,6 @@ pub use self::composite::*;
 use self::uniforms::*;
 pub use self::offscreen::*;
 
-use ch::Hasher;
-use core::hash as ch;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::render::vulkanic::commands::{

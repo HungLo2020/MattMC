@@ -26,6 +26,9 @@ pub(super) struct TerrainOccupancyMeshSnapshot {
     /// the referenced indexed vertices rather than approximating the source
     /// with a CPU triangle-volume rasterizer.
     pub(super) samples: Arc<Vec<TerrainVoxelSample>>,
+    /// `world_block_center` of each sample, derived once; `None` where it
+    /// fails. Patch staging reuses it instead of re-transforming every sample.
+    pub(super) world_centers: Arc<Vec<Option<[f32; 3]>>>,
     /// Inclusive min/max world block (floored sample block centre) over every
     /// finite sample. Incremental voxel updates use it to find the meshes a
     /// dirty region depends on; it is derived from `samples` and adds no
@@ -187,10 +190,10 @@ pub(super) fn static_terrain_mesh_entry(
 
 /// Floored block-centre bounds of the finite samples (non-finite samples are
 /// rejected when voxelized, so they never contribute a cell).
-pub(super) fn sample_world_bounds(samples: &[TerrainVoxelSample]) -> Option<[[i32; 3]; 2]> {
+fn centers_world_bounds(centers: &[Option<[f32; 3]>]) -> Option<[[i32; 3]; 2]> {
     let mut bounds: Option<[[i32; 3]; 2]> = None;
-    for sample in samples {
-        let Ok(center) = sample.world_block_center() else {
+    for center in centers {
+        let Some(center) = *center else {
             continue;
         };
         if center.iter().any(|value| !value.is_finite()) {
@@ -322,10 +325,13 @@ pub(super) fn indexed_terrain_snapshot(
         .zip(referenced)
         .filter_map(|(sample, referenced)| referenced.then_some(sample))
         .collect();
-    let world_bounds = sample_world_bounds(&samples);
+    let world_centers: Vec<Option<[f32; 3]>> =
+        samples.iter().map(|sample| sample.world_block_center().ok()).collect();
+    let world_bounds = centers_world_bounds(&world_centers);
     Ok(TerrainOccupancyMeshSnapshot {
         mesh_generation,
         samples: Arc::new(samples),
+        world_centers: Arc::new(world_centers),
         world_bounds,
         source_identity,
     })

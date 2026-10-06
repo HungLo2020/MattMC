@@ -79,6 +79,10 @@ pub struct FfiWholeFrameSubmitRequest {
     /// into its cached material-instance topology; Java never constructs a
     /// per-face vertex record for this stream.
     pub world_distant_horizons_generic_boxes: FfiSlice<FfiWorldDistantHorizonsGenericBoxRecord>,
+    /// ABI v69: off-camera static-terrain shadow casters and the frame's
+    /// full-precision terrain camera (required only when casters are present).
+    pub world_static_terrain_shadow_casters: FfiSlice<FfiStaticTerrainShadowCaster>,
+    pub static_terrain_camera: [f64; 3],
 }
 
 #[repr(C)]

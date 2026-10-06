@@ -20,6 +20,7 @@ mod source_pack_probe;
 mod pre_terrain;
 mod legacy_samplers;
 mod legacy_images;
+mod prepared_programs;
 
 fn gal() -> VulkanicGal {
     crate::render::vulkanic::test_support::mock_gal_with_capabilities(presentation_capabilities(
@@ -3481,6 +3482,7 @@ fn indexed_indirect_emission_coalesces_contiguous_compatible_records() {
             Some(TerrainIndexedIndirect {
                 buffer: indirect,
                 offset,
+                draw_count: 1,
             }),
         );
     }
@@ -3523,6 +3525,7 @@ fn indexed_indirect_emission_splits_runs_at_backend_limit() {
             Some(TerrainIndexedIndirect {
                 buffer: indirect,
                 offset,
+                draw_count: 1,
             }),
         );
     }
@@ -3815,4 +3818,44 @@ fn main_depth_history_rejects_non_2d_extent() {
     )
     .unwrap_err();
     assert!(error.to_string().contains("non-zero 2D extent"));
+}
+
+#[test]
+fn indexed_indirect_runs_merge_and_split_like_single_commands() {
+    let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+    let layout = test_handle(HandleKind::PipelineLayout, 2);
+    let set = test_handle(HandleKind::ResourceSet, 3);
+    let index = test_handle(HandleKind::Buffer, 4);
+    let indirect = test_handle(HandleKind::Buffer, 5);
+    let mut ops = Vec::new();
+    let mut state = IndexedDrawState::with_indirect_limit(4);
+    // Runs of 3 and 4 contiguous commands, then a gap.
+    for (offset, draw_count) in [(0, 3), (60, 4), (200, 1)] {
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            set,
+            &[0, 0],
+            None,
+            index,
+            0,
+            IndexType::U32,
+            6,
+            1,
+            Some(TerrainIndexedIndirect { buffer: indirect, offset, draw_count }),
+        );
+    }
+    assert_eq!(
+        vec![(0, 4), (80, 3), (200, 1)],
+        ops.iter()
+            .filter_map(|op| match op {
+                CommandOp::DrawIndexedIndirect { buffer, offset, draw_count } if *buffer == indirect => {
+                    Some((*offset, *draw_count))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    );
 }
