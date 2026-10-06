@@ -450,6 +450,12 @@ impl ShaderPackColorFramePlan {
             } else {
                 state.mipmaps_initialized
             };
+            // Every level-zero write, clear and copy resets this flag, so set
+            // descendants already match level zero and a new chain would
+            // reproduce them exactly.
+            if mips_initialized {
+                continue;
+            }
             let all_mips = TextureSubresourceRange {
                 base_mip: 0,
                 mip_count: target.mip_levels,
@@ -479,11 +485,7 @@ impl ShaderPackColorFramePlan {
             operations.push(CommandOp::Barrier(ResourceBarrier {
                 resource: texture,
                 subresources: Some(descendants),
-                before: if mips_initialized {
-                    TextureUsageState::ShaderRead
-                } else {
-                    TextureUsageState::Undefined
-                },
+                before: TextureUsageState::Undefined,
                 after: TextureUsageState::TransferDst,
                 src_queue: QueueClass::Graphics,
                 dst_queue: QueueClass::Graphics,

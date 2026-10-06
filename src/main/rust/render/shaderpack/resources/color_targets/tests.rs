@@ -641,6 +641,32 @@ fn mipmapped_source_sampling_requires_and_records_explicit_generation() {
             if *texture == targets.target("primary").unwrap().current_texture
                 && subresources.mip_count > 1
     )));
+    let generations = |operations: &[CommandOp]| {
+        operations
+            .iter()
+            .filter(|operation| matches!(operation, CommandOp::GenerateMipmaps { .. }))
+            .count()
+    };
+    let before_repeat = generations(&operations);
+    frame
+        .append_mipmaps(&targets, std::slice::from_ref(&primary), &mut operations)
+        .unwrap();
+    assert_eq!(
+        before_repeat,
+        generations(&operations),
+        "unchanged level zero must keep its existing chain"
+    );
+    frame
+        .record_external_outputs(std::slice::from_ref(&primary))
+        .unwrap();
+    frame
+        .append_mipmaps(&targets, std::slice::from_ref(&primary), &mut operations)
+        .unwrap();
+    assert_eq!(
+        before_repeat + 1,
+        generations(&operations),
+        "a level-zero write must regenerate the chain"
+    );
     gal.submit(SubmissionBatch {
         label: "shader-pack-color-mips".to_string(),
         command_lists: vec![CommandList::from(CommandListDesc {
