@@ -86,8 +86,11 @@ Static chunk sections whose meshes are resident are drawn by
   (`SourceTerrainDrawCoverage::without_scene`); the scene covers its own by
   construction (`scene_terrain` and `indexed_indirect_runs_*` tests).
 
-Still per frame and next to remove: Java sends full instance records for every
-visible section and caster, which Rust decodes, expands, validates and scans.
+Since ABI 70, Java sends visible sections and casters as compact entries (see
+[Java Bridge](JAVA-BRIDGE.md)); Rust expands them into instances during
+admission (`frame/static_terrain.rs`). The expansion and the passes that scan
+it (partition, validation, shadow selection, coverage) are next to remove, after
+the vanilla route also draws terrain from the scene.
 
 ## Phases
 

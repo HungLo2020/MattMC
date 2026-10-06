@@ -4138,6 +4138,7 @@ pub(crate) fn frame(segments: Vec<WorldLineSegmentRequest>) -> WorldPrimitiveFra
         lod_instances: Vec::new(),
         lod_render_frame: WorldLodRenderFrame::default(),
         static_terrain_shadow_casters: StaticTerrainShadowCasters::default(),
+        static_terrain_sections: StaticTerrainSections::default(),
     }
 }
 

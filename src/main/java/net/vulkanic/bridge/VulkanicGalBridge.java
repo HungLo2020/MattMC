@@ -120,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 69;
+	public static final int ABI_VERSION = 70;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -1705,7 +1705,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldParticleQuadRecord> worldParticles, List<WorldExperienceOrbInstanceRecord> worldOrbs,
 		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
 		TerrainFrameCamera terrainFrameCamera,
-		StaticTerrainShadowCasters staticTerrainShadowCasters
+		StaticTerrainShadowCasters staticTerrainShadowCasters,
+		StaticTerrainSections staticTerrainSections
 	) {
 		return submitWorldFrame(generation, frameId, correlationId, frameTarget, guiWidth, guiHeight,
 			viewportWidth, viewportHeight, viewMatrix, projectionMatrix, worldBackground, worldSegments,
@@ -1714,7 +1715,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads, firstPersonFrame,
 			firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId, true,
 			guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
-			worldDistantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters);
+			worldDistantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters,
+			staticTerrainSections);
 	}
 
 	private WholeFrameSubmitResult submitWorldFrame(
@@ -1840,7 +1842,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads,
 			firstPersonFrame, firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId,
 			wholeFrame, guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
-			worldDistantHorizonsGenericBoxes, null, StaticTerrainShadowCasters.EMPTY
+			worldDistantHorizonsGenericBoxes, null, StaticTerrainShadowCasters.EMPTY, StaticTerrainSections.EMPTY
 		);
 	}
 
@@ -1883,7 +1885,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldExperienceOrbInstanceRecord> worldOrbs,
 		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
 		TerrainFrameCamera terrainFrameCamera,
-		StaticTerrainShadowCasters staticTerrainShadowCasters
+		StaticTerrainShadowCasters staticTerrainShadowCasters,
+		StaticTerrainSections staticTerrainSections
 	) {
 		if (pipelinedRequestArena != null) {
 			// The worker still decodes the previous request, which shares the
@@ -2317,6 +2320,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			encodeDistantHorizonsGenericBoxes(arena, worldDistantHorizonsGenericBoxes),
 			worldDistantHorizonsGenericBoxes.size());
 		writeStaticTerrainShadowCasters(arena, request, staticTerrainShadowCasters, terrainFrameCamera);
+		writeStaticTerrainSections(arena, request, staticTerrainSections, terrainFrameCamera);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-particles-and-orbs");
 		MemorySegment firstPerson = request.asSlice(
 			Struct.WHOLE_FRAME_SUBMIT.offset(29),
@@ -5960,6 +5964,66 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		request.set(ValueLayout.JAVA_DOUBLE, cameraOffset + 2L * Double.BYTES, camera == null ? 0.0D : camera.z());
 	}
 
+	/**
+	 * Camera-visible static-terrain section layers in draw order (translucent
+	 * back to front) as compact copied arrays: mesh identity, aligned section
+	 * origin, layer depth policy and camera-sort flag. Rust places each with
+	 * the frame's terrain camera and draws the generation it acknowledged for
+	 * the key; no per-section Java instance record is built.
+	 */
+	public record StaticTerrainSections(
+		long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] depthPolicies, int[] flags, int count
+	) {
+		public static final StaticTerrainSections EMPTY =
+			new StaticTerrainSections(new long[0], new long[0], new int[0], new int[0], new int[0], 0);
+
+		public StaticTerrainSections {
+			Objects.requireNonNull(meshKeys, "meshKeys");
+			Objects.requireNonNull(meshGenerations, "meshGenerations");
+			Objects.requireNonNull(sectionOrigins, "sectionOrigins");
+			Objects.requireNonNull(depthPolicies, "depthPolicies");
+			Objects.requireNonNull(flags, "flags");
+			if (count < 0 || count > meshKeys.length || count > meshGenerations.length
+				|| count > depthPolicies.length || count > flags.length
+				|| (long) count * 3L > sectionOrigins.length) {
+				throw new IllegalArgumentException("static terrain sections are not bounded");
+			}
+		}
+	}
+
+	private static void writeStaticTerrainSections(
+		Arena arena, MemorySegment request, StaticTerrainSections sections, TerrainFrameCamera camera
+	) {
+		int count = sections.count();
+		if (count != 0 && camera == null) {
+			throw new IllegalStateException("static terrain sections require the frame terrain camera");
+		}
+		var layout = Struct.STATIC_TERRAIN_SECTION;
+		MemorySegment records = layout.array(arena, count);
+		long keyOffset = layout.offset(0);
+		long generationOffset = layout.offset(1);
+		long originOffset = layout.offset(2);
+		long depthOffset = layout.offset(3);
+		long flagsOffset = layout.offset(4);
+		long stride = layout.byteSize();
+		long[] keys = sections.meshKeys();
+		long[] generations = sections.meshGenerations();
+		int[] origins = sections.sectionOrigins();
+		int[] depths = sections.depthPolicies();
+		int[] flags = sections.flags();
+		for (int i = 0; i < count; i++) {
+			long base = i * stride;
+			records.set(ValueLayout.JAVA_LONG, base + keyOffset, keys[i]);
+			records.set(ValueLayout.JAVA_LONG, base + generationOffset, generations[i]);
+			records.set(ValueLayout.JAVA_INT, base + originOffset, origins[i * 3]);
+			records.set(ValueLayout.JAVA_INT, base + originOffset + Integer.BYTES, origins[i * 3 + 1]);
+			records.set(ValueLayout.JAVA_INT, base + originOffset + 2L * Integer.BYTES, origins[i * 3 + 2]);
+			records.set(ValueLayout.JAVA_INT, base + depthOffset, depths[i]);
+			records.set(ValueLayout.JAVA_INT, base + flagsOffset, flags[i]);
+		}
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 49, records, count);
+	}
+
 	/** Immutable semantic section origin; frame camera and Rust matrix lowering remain separate. */
 	public record TerrainSectionPlacement(int x, int y, int z) {
 		public TerrainSectionPlacement {
@@ -7415,6 +7479,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WORLD_EXPERIENCE_ORB_INSTANCE(110),
 			WORLD_DH_GENERIC_BOX(111),
 			STATIC_TERRAIN_SHADOW_CASTER(112),
+			STATIC_TERRAIN_SECTION(113),
 			WORLD_CRACK_QUAD_REQUEST(51),
 			WORLD_BORDER_QUAD_REQUEST(52),
 			WHOLE_FRAME_SUBMIT(53),

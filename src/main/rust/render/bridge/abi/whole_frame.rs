@@ -83,6 +83,9 @@ pub struct FfiWholeFrameSubmitRequest {
     /// full-precision terrain camera (required only when casters are present).
     pub world_static_terrain_shadow_casters: FfiSlice<FfiStaticTerrainShadowCaster>,
     pub static_terrain_camera: [f64; 3],
+    /// ABI v70: camera-visible static-terrain section layers, in draw order
+    /// (translucent back to front), placed with `static_terrain_camera`.
+    pub world_static_terrain_sections: FfiSlice<FfiStaticTerrainSection>,
 }
 
 #[repr(C)]

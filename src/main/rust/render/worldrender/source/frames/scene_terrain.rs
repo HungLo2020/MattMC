@@ -94,21 +94,38 @@ pub(crate) fn is_scene_terrain_caster(instance: &WorldMeshInstanceRequest) -> bo
         && instance.flags & (WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS | WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY) == 0
 }
 
-/// The frame instances (frame indices, ascending) the scene path draws.
+/// One frame instance the scene path draws, with the facts of its record
+/// resolved once (the frame stays read-only while they are used).
+#[derive(Clone, Debug)]
+pub(crate) struct SceneTerrainEntry {
+    /// Index into `frame.mesh_instances`.
+    pub(crate) index: usize,
+    groups: Arc<[SceneTerrainGroup]>,
+    page: Handle,
+    index_buffer: Handle,
+}
+
+/// The frame instances (ascending frame indices) the scene path draws.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct SceneTerrainFrame {
     /// Camera-visible sections.
-    pub(crate) camera: Vec<usize>,
+    pub(crate) camera: Vec<SceneTerrainEntry>,
     /// Off-camera shadow casters, before the light-frustum test.
-    pub(crate) casters: Vec<usize>,
+    pub(crate) casters: Vec<SceneTerrainEntry>,
+    /// Material kinds the camera sections draw (facing-selected), indexed by
+    /// `SCENE_TERRAIN_KIND_*`.
+    pub(crate) camera_kinds: [bool; 3],
+    /// Upper bound on the indirect commands the scene path appends: camera
+    /// groups twice (camera and supplement faces) and every caster group.
+    pub(crate) command_bound: u64,
 }
 
 impl SceneTerrainFrame {
-    /// Whether `index` is drawn by the scene path; `cursor` walks a sorted
-    /// index sequence, so a caller iterating in frame order pays O(1) each.
+    /// Whether `index` is drawn by the scene path; the cursors walk sorted
+    /// indices, so a caller iterating in frame order pays O(1) each.
     pub(crate) fn excludes(&self) -> impl FnMut(usize) -> bool + '_ {
-        let mut camera = self.camera.iter().copied().peekable();
-        let mut casters = self.casters.iter().copied().peekable();
+        let mut camera = self.camera.iter().map(|entry| entry.index).peekable();
+        let mut casters = self.casters.iter().map(|entry| entry.index).peekable();
         move |index| {
             while camera.peek().is_some_and(|&next| next < index) {
                 camera.next();
@@ -212,25 +229,38 @@ impl RunBuilder {
 }
 
 impl WorldPrimitiveFrontend {
-    /// Whether this mesh is described and resident, so the scene path can
-    /// draw it this frame without the general path.
-    pub(crate) fn scene_terrain_mesh_ready(&self, instance: &WorldMeshInstanceRequest, material_ids: bool) -> bool {
-        let Some(record) = self.retained_source_terrain_meshes.get(&instance.mesh_key) else {
-            return false;
-        };
-        record.generation == instance.mesh_generation
-            && record.material_ids == material_ids
-            && record.groups.is_some()
-            && (self.pending_lowered_source_terrain_geometry_uploads.is_empty()
-                || !self.pending_lowered_source_terrain_geometry_uploads.contains_key(&LoweredSourceTerrainDataKey {
-                    mesh_key: instance.mesh_key,
-                    mesh_generation: instance.mesh_generation,
-                    abi: SourceGeometryAbi::Terrain,
-                }))
+    /// The described, resident record of an instance's mesh, if the scene
+    /// path can draw it this frame without the general path.
+    fn scene_terrain_entry(
+        &self,
+        index: usize,
+        instance: &WorldMeshInstanceRequest,
+        material_ids: bool,
+    ) -> Option<SceneTerrainEntry> {
+        let record = self.retained_source_terrain_meshes.get(&instance.mesh_key)?;
+        if record.generation != instance.mesh_generation || record.material_ids != material_ids {
+            return None;
+        }
+        let groups = record.groups.as_ref()?;
+        if !self.pending_lowered_source_terrain_geometry_uploads.is_empty()
+            && self.pending_lowered_source_terrain_geometry_uploads.contains_key(&LoweredSourceTerrainDataKey {
+                mesh_key: instance.mesh_key,
+                mesh_generation: instance.mesh_generation,
+                abi: SourceGeometryAbi::Terrain,
+            })
+        {
+            return None;
+        }
+        Some(SceneTerrainEntry {
+            index,
+            groups: Arc::clone(groups),
+            page: record.page,
+            index_buffer: record.index_buffer,
+        })
     }
 
-    /// The instances the scene path draws this frame. Everything else stays
-    /// with the general batch path.
+    /// The instances the scene path draws this frame, each with its record
+    /// resolved once. Everything else stays with the general batch path.
     pub(crate) fn partition_scene_terrain_instances(
         &self,
         gal: &VulkanicGal,
@@ -245,57 +275,30 @@ impl WorldPrimitiveFrontend {
         }
         let material_ids = self.source_terrain_material_ids_active();
         for (index, instance) in frame.mesh_instances.iter().enumerate() {
-            let list = if is_scene_terrain_instance(instance) {
-                &mut scene.camera
-            } else if is_scene_terrain_caster(instance) {
-                &mut scene.casters
-            } else {
+            let camera = is_scene_terrain_instance(instance);
+            if !camera && !is_scene_terrain_caster(instance) {
+                continue;
+            }
+            if !instance.transform.iter().all(|component| component.is_finite()) {
+                continue;
+            }
+            let Some(entry) = self.scene_terrain_entry(index, instance, material_ids) else {
                 continue;
             };
-            if instance.transform.iter().all(|component| component.is_finite())
-                && self.scene_terrain_mesh_ready(instance, material_ids)
-            {
-                list.push(index);
+            if camera {
+                scene.command_bound += 2 * entry.groups.len() as u64;
+                for group in entry.groups.iter() {
+                    if instance.terrain_visible_facing_mask & group.facing_mask != 0 {
+                        scene.camera_kinds[group.kind as usize] = true;
+                    }
+                }
+                scene.camera.push(entry);
+            } else {
+                scene.command_bound += entry.groups.len() as u64;
+                scene.casters.push(entry);
             }
         }
         scene
-    }
-
-    fn scene_terrain_groups_of(&self, instance: &WorldMeshInstanceRequest) -> Option<&Arc<[SceneTerrainGroup]>> {
-        self.retained_source_terrain_meshes
-            .get(&instance.mesh_key)
-            .and_then(|record| record.groups.as_ref())
-    }
-
-    /// Material kinds whose groups the camera sections draw this frame
-    /// (facing-selected), indexed by `SCENE_TERRAIN_KIND_*`.
-    pub(crate) fn scene_terrain_kinds(&self, frame: &WorldPrimitiveFrame, camera: &[usize]) -> [bool; 3] {
-        let mut kinds = [false; 3];
-        for &index in camera {
-            let instance = &frame.mesh_instances[index];
-            if let Some(groups) = self.scene_terrain_groups_of(instance) {
-                for group in groups.iter().filter(|group| instance.terrain_visible_facing_mask & group.facing_mask != 0) {
-                    kinds[group.kind as usize] = true;
-                }
-            }
-            if kinds == [true; 3] {
-                break;
-            }
-        }
-        kinds
-    }
-
-    /// Upper bound on the indirect commands the scene path appends: camera
-    /// groups twice (camera and supplement faces) and every caster group.
-    pub(crate) fn scene_terrain_command_bound(&self, frame: &WorldPrimitiveFrame, scene: &SceneTerrainFrame) -> u64 {
-        let groups = |indices: &[usize]| -> u64 {
-            indices
-                .iter()
-                .filter_map(|&index| self.scene_terrain_groups_of(&frame.mesh_instances[index]))
-                .map(|groups| groups.len() as u64)
-                .sum()
-        };
-        2 * groups(&scene.camera) + groups(&scene.casters)
     }
 
     /// Draws the scene's sections: one instance record each (camera sections,
@@ -306,13 +309,14 @@ impl WorldPrimitiveFrontend {
         &mut self,
         gal: &mut VulkanicGal,
         frame: &WorldPrimitiveFrame,
-        camera: &[usize],
-        casters: &[usize],
+        camera: &[SceneTerrainEntry],
+        casters: &[&SceneTerrainEntry],
         passes: [Option<&SceneTerrainPass<'_>>; 3],
         shadow: Option<&SceneTerrainShadowPass<'_>>,
     ) -> GalResult<SceneTerrainDraws> {
         let mut drawn = SceneTerrainDraws::default();
         let casters = if shadow.is_some_and(|shadow| shadow.supplement) { casters } else { &[] };
+        let entries = || camera.iter().chain(casters.iter().copied());
         if camera.is_empty() && casters.is_empty() {
             return Ok(drawn);
         }
@@ -357,8 +361,8 @@ impl WorldPrimitiveFrontend {
         let mut records = std::mem::take(&mut self.retained_source_terrain_instance_scratch);
         records.clear();
         records.reserve((camera.len() + casters.len()) * TERRAIN_SOURCE_INSTANCE_BYTES);
-        for &index in camera.iter().chain(casters) {
-            let instance = &frame.mesh_instances[index];
+        for entry in entries() {
+            let instance = &frame.mesh_instances[entry.index];
             for component in instance.transform {
                 push_f32(&mut records, component);
             }
@@ -384,13 +388,8 @@ impl WorldPrimitiveFrontend {
         let mut shadow_runs = RunBuilder::default();
         let casting_kinds = shadow.map_or([false; 3], |shadow| shadow.casting_kinds);
         let supplement = shadow.is_some_and(|shadow| shadow.supplement);
-        for (ordinal, &index) in camera.iter().chain(casters).enumerate() {
-            let instance = &frame.mesh_instances[index];
-            let record = self
-                .retained_source_terrain_meshes
-                .get(&instance.mesh_key)
-                .ok_or_else(|| GalError::backend("scene terrain mesh record vanished during the frame"))?;
-            let groups = record.groups.as_ref().expect("partition admits only described meshes");
+        for (ordinal, entry) in entries().enumerate() {
+            let instance = &frame.mesh_instances[entry.index];
             let first_instance = base_instance + ordinal as u32;
             let is_caster = ordinal >= camera.len();
             let (camera_mask, shadow_mask) = if is_caster {
@@ -400,13 +399,13 @@ impl WorldPrimitiveFrontend {
             } else {
                 (instance.terrain_visible_facing_mask, 0)
             };
-            for group in groups.iter() {
+            for group in entry.groups.iter() {
                 let key = RunKey {
                     kind: group.kind,
                     cull_policy: group.cull_policy,
                     winding: group.winding,
-                    page: record.page,
-                    index_buffer: record.index_buffer,
+                    page: entry.page,
+                    index_buffer: entry.index_buffer,
                 };
                 let command = PageIndexedDrawCommand {
                     index_count: group.index_count,

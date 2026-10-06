@@ -26,6 +26,7 @@ fn frame_with_instances(instances: Vec<WorldMeshInstanceRequest>) -> WorldPrimit
         lod_instances: Vec::new(),
         lod_render_frame: WorldLodRenderFrame::default(),
         static_terrain_shadow_casters: StaticTerrainShadowCasters::default(),
+        static_terrain_sections: StaticTerrainSections::default(),
     }
 }
 

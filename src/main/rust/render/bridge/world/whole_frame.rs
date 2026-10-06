@@ -1142,6 +1142,10 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     }
     let static_terrain_shadow_casters =
         decode_static_terrain_shadow_casters(&request, mesh_instances.len())?;
+    let static_terrain_sections = decode_static_terrain_sections(
+        &request,
+        mesh_instances.len() + static_terrain_shadow_casters.casters.len(),
+    )?;
     let raw_text_quads = read_slice(request.world_text_quads, true, "world text quads")?;
     if raw_text_quads.len() > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
@@ -1357,6 +1361,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             lod_instances,
             lod_render_frame,
             static_terrain_shadow_casters,
+            static_terrain_sections,
         },
         gui_sprites,
         gui_affine_quads,
@@ -1370,6 +1375,64 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
 
 /// Copies the compact caster stream. Expansion into shadow-only instances
 /// needs the frontend's acknowledged mesh generations, so it happens there.
+fn decode_static_terrain_sections(
+    request: &FfiWholeFrameSubmitRequest,
+    instance_count: usize,
+) -> GalResult<crate::render::worldrender::StaticTerrainSections> {
+    if request.world_static_terrain_sections.count
+        > FFI_MAX_BATCH_ITEMS.saturating_sub(instance_count) as u64
+    {
+        return Err(GalError::invalid_argument(
+            "combined mesh/static-terrain frame bound exceeded",
+        ));
+    }
+    let raw = unsafe {
+        read_slice(
+            request.world_static_terrain_sections,
+            true,
+            "static terrain sections",
+        )?
+    };
+    if raw.is_empty() {
+        return Ok(Default::default());
+    }
+    let camera = request.static_terrain_camera;
+    if camera.iter().any(|axis| !axis.is_finite()) {
+        return Err(GalError::invalid_argument(
+            "static terrain sections require a finite terrain camera",
+        ));
+    }
+    let mut sections = Vec::with_capacity(raw.len());
+    for section in raw {
+        if section.mesh_key == 0 || section.mesh_generation == 0 {
+            return Err(GalError::invalid_argument(
+                "static terrain section key and generation must be non-zero",
+            ));
+        }
+        if section.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+            && section.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown static terrain section depth policy {}", section.depth_policy),
+            ));
+        }
+        if section.flags & !WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 || section.reserved != 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("static terrain section has unsupported flags {:#x}", section.flags),
+            ));
+        }
+        sections.push(crate::render::worldrender::StaticTerrainSection {
+            mesh_key: section.mesh_key,
+            depth_policy: section.depth_policy,
+            origin: section.origin,
+            flags: section.flags,
+        });
+    }
+    Ok(crate::render::worldrender::StaticTerrainSections { camera, sections })
+}
+
 fn decode_static_terrain_shadow_casters(
     request: &FfiWholeFrameSubmitRequest,
     mesh_instance_count: usize,

@@ -316,7 +316,7 @@ pub(super) fn execute_whole_frame(
     let frontend_started = std::time::Instant::now();
     context
         .world_primitive_frontend
-        .admit_static_terrain_shadow_casters(&mut world_frame)?;
+        .admit_static_terrain(&mut world_frame)?;
     // Capture short menu transitions without sampling past the
     // requested frame. Bound diagnostics across the process.
     static TILED_RECEIPTS: std::sync::atomic::AtomicUsize =
@@ -513,7 +513,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_primitives_submit(
             |(generation, frame_target, mut world_frame)| {
                 context
                     .world_primitive_frontend
-                    .admit_static_terrain_shadow_casters(&mut world_frame)?;
+                    .admit_static_terrain(&mut world_frame)?;
                 let world_stats = context.world_primitive_frontend.submit_partial_frame(
                     &mut context.gal,
                     generation,

@@ -779,7 +779,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_experience_orbs,
                 world_distant_horizons_generic_boxes,
                 world_static_terrain_shadow_casters,
-                static_terrain_camera
+                static_terrain_camera,
+                world_static_terrain_sections
             ]
         ),
         89 => layout!(
@@ -1627,6 +1628,11 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             112,
             FfiStaticTerrainShadowCaster,
             [mesh_key, mesh_generation, origin, depth_policy]
+        ),
+        113 => layout!(
+            113,
+            FfiStaticTerrainSection,
+            [mesh_key, mesh_generation, origin, depth_policy, flags, reserved]
         ),
         _ => {
             return Err(GalError::ffi(

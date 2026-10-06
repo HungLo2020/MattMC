@@ -502,6 +502,23 @@ pub struct FfiStaticTerrainShadowCaster {
     pub depth_policy: u32,
 }
 
+/// ABI v70: one camera-visible static-terrain section layer. Rust places it
+/// with the frame's terrain camera and draws the generation it has
+/// acknowledged for `mesh_key`; Java builds no per-section instance record.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiStaticTerrainSection {
+    pub mesh_key: u64,
+    /// The newest copied generation (diagnostic; Rust draws its own
+    /// acknowledged generation for the key).
+    pub mesh_generation: u64,
+    pub origin: [i32; 3],
+    pub depth_policy: u32,
+    /// `WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS` or zero.
+    pub flags: u32,
+    pub reserved: u32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldExperienceOrbInstanceRecord {

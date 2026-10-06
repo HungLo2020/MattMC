@@ -71,6 +71,16 @@ The camera is required whenever casters are present. Java copies the caster
 arrays once per frame; Rust validates them, sorts them by key and expands
 resident casters. Rebuild Java and native code together.
 
+ABI 70 appends `world_static_terrain_sections` (struct 113, 40-byte records:
+mesh key, newest copied generation, section origin, depth policy, flags) as
+field 49. Ordinary frames send every camera-visible section layer this way, in
+draw order (translucent back to front); only the camera-sort flag is allowed.
+Rust draws the generation it has acknowledged for each key, so the previous
+generation keeps drawing while a replacement uploads, and places the sections
+before every other mesh instance. Diagnostic, fault-injection and
+resource-reload frames still send per-section instance records;
+`-Dmattmc.dev.perRecordStaticTerrain=true` forces that path for A/B checks.
+
 Typed orb placements name a boundary in the collected mesh stream. When the
 shadow-only CPU capture removes foil or outline meshes, map those boundaries
 through its kept-mesh prefix before the later source-admission mapping.

@@ -120,7 +120,9 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v68 appends bounded copied entity culling bounds and extraction roles.
 /// v69 appends compact off-camera static-terrain shadow casters and the
 /// frame's terrain camera; Rust expands them into shadow-only instances.
-pub const FFI_ABI_VERSION: u32 = 69;
+/// v70 appends compact camera-visible static-terrain sections; Java no
+/// longer sends a per-section terrain instance record.
+pub const FFI_ABI_VERSION: u32 = 70;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

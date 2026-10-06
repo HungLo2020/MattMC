@@ -1025,7 +1025,8 @@ public final class RustGalFrameCoordinator {
 							primitiveFrame.orbInstances(),
 							primitiveFrame.distantHorizonsGenericBoxes(),
 							primitiveFrame.terrainFrameCamera(),
-							primitiveFrame.staticTerrainShadowCasters()
+							primitiveFrame.staticTerrainShadowCasters(),
+							primitiveFrame.staticTerrainSections()
 						);
 						break;
 					} catch (IllegalStateException failure) {
@@ -1342,7 +1343,7 @@ public final class RustGalFrameCoordinator {
 		// before a final-output capture can acknowledge its presented image.
 		if (wholeFrameResult != null) {
 			RustGalTerrainRenderer.recordExecutedStaticTerrainInstances(
-				primitiveFrame.meshInstances(), frameId, submissionId
+				primitiveFrame.meshInstances(), primitiveFrame.staticTerrainSections().count(), frameId, submissionId
 			);
 			RustGalWorldPrimitiveRenderer.recordWholeFrameShaderEnvironmentExecution(
 				frameId, submissionId, primitiveFrame.shaderEnvironmentFrame()

@@ -1284,7 +1284,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
         texture.field_offsets[15]
     );
-    assert_eq!(49, whole_frame.field_count);
+    assert_eq!(50, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
         whole_frame.field_offsets[45]
@@ -1305,6 +1305,11 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         whole_frame.field_offsets[48]
     );
     assert_eq!(size_of::<FfiStaticTerrainShadowCaster>(), 32);
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_static_terrain_sections) as u32,
+        whole_frame.field_offsets[49]
+    );
+    assert_eq!(size_of::<FfiStaticTerrainSection>(), 40);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
         whole_frame.field_offsets[37]
@@ -2193,6 +2198,10 @@ fn whole_frame_request(
             count: 0,
         },
         static_terrain_camera: [0.0; 3],
+        world_static_terrain_sections: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         world_lod_instances: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,

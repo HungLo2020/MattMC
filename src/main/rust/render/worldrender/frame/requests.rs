@@ -625,6 +625,7 @@ pub struct WorldPrimitiveFrame {
     /// Off-camera terrain shadow casters. The frontend expands them into
     /// `mesh_instances` before validation; see `frame::shadow_casters`.
     pub static_terrain_shadow_casters: StaticTerrainShadowCasters,
+    pub static_terrain_sections: StaticTerrainSections,
 }
 
 /// One copied off-camera static-terrain section layer: resident mesh
@@ -642,6 +643,25 @@ pub struct StaticTerrainShadowCasters {
     /// Full-precision terrain camera shared by every caster placement.
     pub camera: [f64; 3],
     pub casters: Vec<StaticTerrainShadowCaster>,
+}
+
+/// One camera-visible static-terrain section layer: copied mesh identity,
+/// integer section origin, the layer's depth policy and camera-sort flag.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StaticTerrainSection {
+    pub mesh_key: u64,
+    pub depth_policy: u32,
+    pub origin: [i32; 3],
+    /// `WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS` or zero.
+    pub flags: u32,
+}
+
+/// The frame's camera-visible static terrain, in draw order.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StaticTerrainSections {
+    /// Full-precision terrain camera shared by every section placement.
+    pub camera: [f64; 3],
+    pub sections: Vec<StaticTerrainSection>,
 }
 
 #[derive(Clone, Copy, Debug)]

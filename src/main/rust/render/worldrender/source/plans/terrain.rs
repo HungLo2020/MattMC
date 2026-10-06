@@ -596,7 +596,7 @@ impl WorldPrimitiveFrontend {
             // stage that writer only when this exact frame actually contains
             // translucent terrain, so an incomplete water/transparency
             // contract cannot block ordinary vanilla terrain or DH.
-            let scene_kinds = self.scene_terrain_kinds(frame, &scene.camera);
+            let scene_kinds = scene.camera_kinds;
             let has_translucent_batches = scene_kinds[SCENE_TERRAIN_KIND_TRANSLUCENT as usize]
                 || batches.iter().any(|batch| {
                 is_source_terrain_mesh_stratum(batch.key.stratum)
@@ -644,11 +644,10 @@ impl WorldPrimitiveFrontend {
                 Some(frustum) => scene
                     .casters
                     .iter()
-                    .copied()
-                    .filter(|&index| {
+                    .filter(|entry| {
                         source_shadow_instance_intersects(
                             frustum,
-                            &frame.mesh_instances[index],
+                            &frame.mesh_instances[entry.index],
                             Some(frame.shader_environment.far_plane),
                         )
                     })
@@ -659,7 +658,7 @@ impl WorldPrimitiveFrontend {
                 && scene
                     .camera
                     .iter()
-                    .any(|&index| frame.mesh_instances[index].terrain_visible_facing_mask != 0x7f);
+                    .any(|entry| frame.mesh_instances[entry.index].terrain_visible_facing_mask != 0x7f);
             let mut selected_shadow_batches = match shadow_frustum.as_ref().filter(|_| !shadow_batches.is_empty()) {
                 None => Vec::new(),
                 Some(frustum) => shadow_batches
@@ -1504,7 +1503,7 @@ impl WorldPrimitiveFrontend {
                         .map_or(1, |asset| asset.sections.len().max(1)) as u64
                 })
                 .sum::<u64>()
-                + self.scene_terrain_command_bound(frame, scene);
+                + scene.command_bound;
             self.reserve_source_terrain_multidraw_commands(gal, frame.frame_id, multidraw_commands)?;
             let mut draws = Vec::new();
             // Each pass packs one immutable uniform block for this frame.

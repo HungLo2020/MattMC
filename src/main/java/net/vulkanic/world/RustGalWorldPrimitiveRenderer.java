@@ -500,19 +500,24 @@ public final class RustGalWorldPrimitiveRenderer {
 	// 4096 sections x 3 layers) are retained together. A smaller cap evicted
 	// live instances every frame and forced their records to be rebuilt.
 	private static final int MAX_ACTIVE_STATIC_TERRAIN_INSTANCES = 2 * 4096 * 3;
-	private static final StaticTerrainShadowCasterBlock PENDING_SHADOW_CASTERS = new StaticTerrainShadowCasterBlock();
+	private static final StaticTerrainBlock PENDING_SHADOW_CASTERS = new StaticTerrainBlock();
+	/** Camera-visible static terrain of the compact path, in draw order. */
+	private static final StaticTerrainBlock PENDING_TERRAIN_SECTIONS = new StaticTerrainBlock();
 
 	/** Reusable producer-side caster arrays; copied exactly once per consumed frame. */
-	private static final class StaticTerrainShadowCasterBlock {
+	/** Compact static-terrain section layers: identity, origin, policy and flags per entry. */
+	private static final class StaticTerrainBlock {
 		private long[] keys = new long[0];
 		private long[] generations = new long[0];
 		private int[] origins = new int[0];
 		private int[] depthPolicies = new int[0];
+		private int[] flags = new int[0];
 		private int count;
 
-		void append(long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] policies, int added) {
+		void append(long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] policies,
+				int[] entryFlags, int added) {
 			if (added > MAX_RUST_WORLD_MESH_INSTANCES - count) {
-				throw new IllegalStateException("static terrain shadow caster capacity exceeded");
+				throw new IllegalStateException("static terrain section capacity exceeded");
 			}
 			int required = count + added;
 			if (required > keys.length) {
@@ -521,19 +526,37 @@ public final class RustGalWorldPrimitiveRenderer {
 				generations = java.util.Arrays.copyOf(generations, capacity);
 				origins = java.util.Arrays.copyOf(origins, capacity * 3);
 				depthPolicies = java.util.Arrays.copyOf(depthPolicies, capacity);
+				flags = java.util.Arrays.copyOf(flags, capacity);
 			}
 			System.arraycopy(meshKeys, 0, keys, count, added);
 			System.arraycopy(meshGenerations, 0, generations, count, added);
 			System.arraycopy(sectionOrigins, 0, origins, count * 3, added * 3);
 			System.arraycopy(policies, 0, depthPolicies, count, added);
+			if (entryFlags == null) {
+				java.util.Arrays.fill(flags, count, required, 0);
+			} else {
+				System.arraycopy(entryFlags, 0, flags, count, added);
+			}
 			count = required;
 		}
 
-		VulkanicGalBridge.StaticTerrainShadowCasters snapshot() {
+		int count() {
+			return count;
+		}
+
+		VulkanicGalBridge.StaticTerrainShadowCasters casters() {
 			if (count == 0) return VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY;
 			return new VulkanicGalBridge.StaticTerrainShadowCasters(
 				java.util.Arrays.copyOf(keys, count), java.util.Arrays.copyOf(generations, count),
 				java.util.Arrays.copyOf(origins, count * 3), java.util.Arrays.copyOf(depthPolicies, count), count);
+		}
+
+		VulkanicGalBridge.StaticTerrainSections sections() {
+			if (count == 0) return VulkanicGalBridge.StaticTerrainSections.EMPTY;
+			return new VulkanicGalBridge.StaticTerrainSections(
+				java.util.Arrays.copyOf(keys, count), java.util.Arrays.copyOf(generations, count),
+				java.util.Arrays.copyOf(origins, count * 3), java.util.Arrays.copyOf(depthPolicies, count),
+				java.util.Arrays.copyOf(flags, count), count);
 		}
 
 		void clear() {
@@ -1481,6 +1504,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				registerWorldSkyTextureAssetsLocked(resourceManager);
 				PENDING_MESH_INSTANCES.clear();
 				PENDING_SHADOW_CASTERS.clear();
+				PENDING_TERRAIN_SECTIONS.clear();
 				ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
 				PENDING_MESH_PRODUCERS.clear();
 				pendingStaticTerrainCamera = null;
@@ -2158,6 +2182,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			worldTextDiagnostic = WorldTextDiagnostic.empty(semanticFrameSequence);
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_SHADOW_CASTERS.clear();
+			PENDING_TERRAIN_SECTIONS.clear();
 			PENDING_MESH_PRODUCERS.clear();
 			pendingStaticTerrainCamera = null;
 			PENDING_BLOCK_MODEL_MESH_KEYS.clear();
@@ -3159,6 +3184,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_TEXT_QUADS.clear();
 				PENDING_MESH_INSTANCES.clear();
 				PENDING_SHADOW_CASTERS.clear();
+				PENDING_TERRAIN_SECTIONS.clear();
 			PENDING_MESH_PRODUCERS.clear();
 				PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
 				pendingFirstPersonFrame = false;
@@ -3190,6 +3216,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingUnsupportedWorldTextSubmits = 0;
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_SHADOW_CASTERS.clear();
+			PENDING_TERRAIN_SECTIONS.clear();
 			PENDING_MESH_PRODUCERS.clear();
 			PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
 			pendingFirstPersonFrame = false;
@@ -10938,7 +10965,36 @@ public final class RustGalWorldPrimitiveRenderer {
 				|| Double.compare(frameCamera.z(), cameraZ) != 0) {
 				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
 			}
-			PENDING_SHADOW_CASTERS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, count);
+			PENDING_SHADOW_CASTERS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, null, count);
+		}
+	}
+
+	/**
+	 * Appends one frame's camera-visible static terrain as compact copied
+	 * arrays, in draw order. Rust draws the generation it has acknowledged for
+	 * each key, so the previous generation keeps drawing while a replacement
+	 * uploads; Java builds no per-section record and replays no active state.
+	 */
+	public static void enqueueStaticTerrainSections(
+		long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] depthPolicies, int[] flags,
+		int count, double cameraX, double cameraY, double cameraZ
+	) {
+		if (count < 0 || count > meshKeys.length || count > meshGenerations.length
+			|| count > depthPolicies.length || count > flags.length || (long) count * 3L > sectionOrigins.length) {
+			throw new IllegalArgumentException("static terrain section batch is not bounded");
+		}
+		synchronized (LOCK) {
+			VulkanicGalBridge.TerrainFrameCamera frameCamera = pendingStaticTerrainCamera;
+			if (frameCamera == null
+				|| Double.compare(frameCamera.x(), cameraX) != 0
+				|| Double.compare(frameCamera.y(), cameraY) != 0
+				|| Double.compare(frameCamera.z(), cameraZ) != 0) {
+				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
+			}
+			// The compact stream owns this frame's terrain; retained records of
+			// the per-record path must not replay alongside it.
+			ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
+			PENDING_TERRAIN_SECTIONS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, flags, count);
 		}
 	}
 
@@ -17905,10 +17961,13 @@ public final class RustGalWorldPrimitiveRenderer {
 			// loading frame) they are dropped exactly like retained-section replay.
 			VulkanicGalBridge.StaticTerrainShadowCasters shadowCasters = pendingStaticTerrainCamera == null
 				? VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY
-				: PENDING_SHADOW_CASTERS.snapshot();
-			if (shadowCasters.count() > MAX_RUST_WORLD_MESH_INSTANCES
+				: PENDING_SHADOW_CASTERS.casters();
+			VulkanicGalBridge.StaticTerrainSections terrainSections = pendingStaticTerrainCamera == null
+				? VulkanicGalBridge.StaticTerrainSections.EMPTY
+				: PENDING_TERRAIN_SECTIONS.sections();
+			if ((long) shadowCasters.count() + terrainSections.count() > MAX_RUST_WORLD_MESH_INSTANCES
 				- admittedMeshInstances.size() - orbInstances.size()) {
-				throw new IllegalStateException("combined mesh/shadow-caster frame capacity exceeded");
+				throw new IllegalStateException("combined mesh/static-terrain frame capacity exceeded");
 			}
 			PrimitiveFrame frame = new PrimitiveFrame(
 				pendingViewportWidth,
@@ -17935,7 +17994,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				orbInstances,
 				admittedDistantHorizonsGenericBoxes,
 				pendingStaticTerrainCamera,
-				shadowCasters
+				shadowCasters,
+				terrainSections
 			);
 			worldTextDiagnostic = worldTextDiagnostic.withConsumed(semanticFrameSequence, frame.textQuads().size());
 			ORB_SEMANTICS.clearFrame();
@@ -17949,6 +18009,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					PENDING_TEXT_QUADS.clear();
 					PENDING_MESH_INSTANCES.clear();
 					PENDING_SHADOW_CASTERS.clear();
+					PENDING_TERRAIN_SECTIONS.clear();
 					PENDING_MESH_PRODUCERS.clear();
 					pendingStaticTerrainCamera = null;
 					PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
@@ -18179,7 +18240,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			frame.orbInstances(),
 			frame.distantHorizonsGenericBoxes(),
 			frame.terrainFrameCamera(),
-			frame.staticTerrainShadowCasters()
+			frame.staticTerrainShadowCasters(),
+			frame.staticTerrainSections()
 		);
 	}
 
@@ -18221,11 +18283,15 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
 		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes,
 		VulkanicGalBridge.TerrainFrameCamera terrainFrameCamera,
-		VulkanicGalBridge.StaticTerrainShadowCasters staticTerrainShadowCasters
+		VulkanicGalBridge.StaticTerrainShadowCasters staticTerrainShadowCasters,
+		VulkanicGalBridge.StaticTerrainSections staticTerrainSections
 	) {
 		public PrimitiveFrame {
 			if (staticTerrainShadowCasters == null) {
 				staticTerrainShadowCasters = VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY;
+			}
+			if (staticTerrainSections == null) {
+				staticTerrainSections = VulkanicGalBridge.StaticTerrainSections.EMPTY;
 			}
 			particleQuads = List.copyOf(particleQuads);
 			orbInstances = List.copyOf(orbInstances);
@@ -18261,7 +18327,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				borderQuads, materialQuads, textQuads, meshInstances, meshProducerLabels, voxelVolumeFrame,
 				shaderEnvironmentFrame, featureCoverage, lodInstances, lodRenderFrame, entityFlameQuadCount,
 				firstPersonFrame, firstPersonMeshInstances, particleQuads, orbInstances,
-				distantHorizonsGenericBoxes, null, VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY);
+				distantHorizonsGenericBoxes, null, VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY,
+				VulkanicGalBridge.StaticTerrainSections.EMPTY);
 		}
 	public PrimitiveFrame(
 		int viewportWidth,
