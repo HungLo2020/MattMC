@@ -394,8 +394,9 @@ impl VulkanicGal {
     }
 }
 
-pub(super) fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
-    let mut handles = BTreeSet::new();
+/// Every handle the batch names directly, sorted and deduplicated.
+pub(super) fn referenced_handles(batch: &SubmissionBatch) -> Vec<Handle> {
+    let mut handles = ReferencedHandles(Vec::with_capacity(batch.command_lists.iter().map(|list| list.operations.len() * 2).sum()));
     for list in &batch.command_lists {
         for op in &list.operations {
             match op {
@@ -475,7 +476,19 @@ pub(super) fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
             }
         }
     }
+    let mut handles = handles.0;
+    handles.sort_unstable();
+    handles.dedup();
     handles
+}
+
+/// Collects handles; `insert` keeps the call sites of the former set.
+struct ReferencedHandles(Vec<Handle>);
+
+impl ReferencedHandles {
+    fn insert(&mut self, handle: Handle) {
+        self.0.push(handle);
+    }
 }
 
 /// Diagnostic tracing selected by label: the environment variable holds a

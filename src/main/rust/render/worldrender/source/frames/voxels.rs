@@ -145,14 +145,26 @@ impl WorldPrimitiveFrontend {
             }));
         for instance in candidates {
             if let Some(cull) = cull {
+                let pure_translation = instance.transform[..12] == IDENTITY_WORLD_TRANSFORM[..12]
+                    && instance.transform[15] == 1.0;
+                // Section geometry stays within one block-width of its 16³
+                // box (model elements span -16..32 sixteenths), so a section
+                // whose padded box misses the volume needs no bounds lookup.
+                if pure_translation {
+                    let origin = Self::world_translation_only(instance.transform, camera_world_position);
+                    let padded_min = [0, 1, 2].map(|axis| origin[12 + axis] - 16.0);
+                    let padded_max = [0, 1, 2].map(|axis| origin[12 + axis] + 32.0);
+                    if !terrain_voxel_world_box_may_touch(padded_min, padded_max, cull) {
+                        continue;
+                    }
+                }
                 let Some(bounds) = self.terrain_voxel_mesh_bounds(&instance)? else {
                     continue;
                 };
                 // Static sections are pure translations: test their box from
                 // the world translation alone (the same arithmetic as the full
                 // transform below) and build the matrix only for survivors.
-                if instance.transform[..12] == IDENTITY_WORLD_TRANSFORM[..12]
-                    && instance.transform[15] == 1.0
+                if pure_translation
                     && !terrain_voxel_bounds_may_touch(
                         bounds,
                         Self::world_translation_only(instance.transform, camera_world_position),
