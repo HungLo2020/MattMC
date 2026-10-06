@@ -181,3 +181,28 @@ also share persistent instance arrays.
   Atlas pumps during an in-flight frame are deferred to the next frame.
 - The worker restricts itself to the highest-frequency CPUs; on hybrid CPUs an
   efficiency core lengthened every frame by ~10%.
+
+### Queued frames
+
+On top of pipelining (disable with `MATTMC_QUEUED_FRAMES=0` or
+`-Dmattmc.rustGal.queuedFrames=false`), Java no longer waits for frame N before
+handing over frame N+1. The worker runs a FIFO of jobs
+([`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)):
+
+- `mattmc_vulkanic_gal_whole_frame_submit_queued` queues a frame whose job
+  acquires the swapchain image itself, executes the request with that image's
+  frame id and target, and presents. `..._whole_frame_join_queued` returns the
+  oldest queued frame (acquire, submit and present results) and waits only for
+  the jobs up to it.
+- `..._world_mesh_update_assets_queued` and `..._atlas_animation_tick_queued`
+  copy and decode on the calling thread and apply in a job, in submission
+  order. A failure is reported by the next queued-frame join (fail closed).
+- Queued entry points use `with_queue`, which never joins; every other entry
+  point still joins all queued work first, so rare calls stay correct.
+
+`RustGalFrameCoordinator` keeps at most one frame queued ahead of the one it
+prepares, so the worker always has the next frame waiting. Capture,
+screenshot and RenderDoc frames drain the queue and run synchronously. While a
+frame is queued, completion takes retirement from the present result instead
+of querying the bridge. Java keeps each queued request's arena (and one of two
+alternating sets of persistent record staging) until that frame is joined.

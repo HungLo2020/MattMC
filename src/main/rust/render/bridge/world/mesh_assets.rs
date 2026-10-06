@@ -608,3 +608,65 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets(
         }
     })
 }
+
+/// Queued form of `mattmc_vulkanic_gal_world_mesh_update_assets`: the update
+/// is copied and decoded on the calling thread and applied by the frame
+/// worker after the jobs already queued, without joining them. A failure to
+/// apply is reported by the next queued-frame join, which fails closed.
+///
+/// # Safety
+/// `request` must address a valid request for the duration of the call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets_queued(
+    context_id: u64,
+    request: *const FfiWorldMeshAssetUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    let queued = with_queue(context_id, |pipeline| {
+        let checked = read_world_mesh_asset_update_request(request)?;
+        let input_bytes = input_bytes_for_world_mesh_asset_update(&checked);
+        let (generation, meshes, textures, sorted_indices, retirements) =
+            decode_world_mesh_asset_update(&checked, pipeline.capabilities().clone())?;
+        let handoff = pipeline.context_handoff();
+        pipeline.enqueue(move |queue| {
+            let handoff = handoff;
+            // SAFETY: queued jobs run on the worker, which owns the context
+            // until a bridge entry point joins (see `bridge::pipeline`).
+            let context = unsafe { &mut *handoff.0 };
+            context.ffi_calls += 1;
+            context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+            let result = context
+                .gui_frontend
+                .invalidate_atlas_texture_views(
+                    &mut context.gal,
+                    textures.iter().map(|texture| texture.texture_id),
+                )
+                .and_then(|()| {
+                    context
+                        .world_primitive_frontend
+                        .apply_world_mesh_asset_update_with_sorted_and_retirements(
+                            &mut context.gal,
+                            generation,
+                            meshes,
+                            textures,
+                            sorted_indices,
+                            retirements,
+                        )
+                });
+            if let Err(error) = result {
+                set_last_error(context, &error);
+                record_queued_error(queue, &error);
+            }
+        })
+    });
+    match queued {
+        Ok(()) => {
+            write_status_out(status_out, FfiStatusResult { status: StatusCode::Ok as i32, ..FfiStatusResult::default() });
+            StatusCode::Ok as i32
+        }
+        Err(error) => {
+            write_status_out(status_out, status_result_from_error(&error));
+            error.code as i32
+        }
+    }
+}

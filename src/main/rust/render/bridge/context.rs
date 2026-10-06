@@ -147,6 +147,28 @@ pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> 
     })
 }
 
+/// Gives a queued entry point its context's pipeline without joining queued
+/// work. `f` may only copy its input and queue jobs; it must not use the
+/// context, which a job may be using.
+pub(crate) fn with_queue<T>(
+    context_id: u64,
+    f: impl FnOnce(&FramePipeline) -> GalResult<T>,
+) -> GalResult<T> {
+    let _budget = memory::RequestBudget::begin();
+    BRIDGE_REGISTRY.with(|registry| {
+        let mut registry = registry.borrow_mut();
+        if !registry.pipelines.contains_key(&context_id) {
+            // Without a pipeline nothing is queued, so the context is free.
+            let context = registry.contexts.get_mut(&context_id).ok_or_else(|| {
+                GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"))
+            })?;
+            let pipeline = FramePipeline::new(context)?;
+            registry.pipelines.insert(context_id, pipeline);
+        }
+        f(registry.pipelines.get(&context_id).expect("pipeline inserted above"))
+    })
+}
+
 pub(crate) fn with_registry<T>(f: impl FnOnce(&BridgeRegistry) -> T) -> T {
     BRIDGE_REGISTRY.with(|registry| {
         let registry = registry.borrow();

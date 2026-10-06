@@ -70,7 +70,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit_pipelined(
                 return Err(GalError::invalid_argument("pipelined whole-frame request is null"));
             }
             if !registry.pipelines.contains_key(&context_id) {
-                registry.pipelines.insert(context_id, FramePipeline::new()?);
+                registry.pipelines.insert(context_id, FramePipeline::new(context)?);
             }
             Ok(present)
         })();
@@ -186,6 +186,161 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_join(
         let _ = write_out(present_out, present, "frame present result");
         StatusCode::Ok as i32
     })
+}
+
+/// Queues a whole frame behind the jobs already queued, without joining
+/// them. Its job acquires the presentable image itself, executes the request
+/// with that image's frame id and target, and presents it; Java keeps the
+/// request memory alive until `mattmc_vulkanic_gal_whole_frame_join_queued`
+/// returns this frame. A frame whose acquire yields no image (minimized or
+/// resized surface) only records the acquire.
+///
+/// # Safety
+/// `request` must stay valid and unmodified until this frame is joined.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit_queued(
+    context_id: u64,
+    request: *const FfiWholeFrameSubmitRequest,
+    correlation_id: u64,
+    width: u32,
+    height: u32,
+) -> i32 {
+    let queued = with_queue(context_id, |pipeline| {
+        if request.is_null() || width == 0 || height == 0 {
+            return Err(GalError::invalid_argument("queued whole-frame request is incomplete"));
+        }
+        let request = RequestHandoff(request);
+        let handoff = pipeline.context_handoff();
+        pipeline.enqueue(move |queue| {
+            let (handoff, request) = (handoff, request);
+            // SAFETY: queued jobs run on the worker, which owns the context
+            // until a bridge entry point joins (see `bridge::pipeline`).
+            let context = unsafe { &mut *handoff.0 };
+            let outcome = run_queued_frame(context, request.0, correlation_id, width, height);
+            if let Ok(mut queue) = queue.lock() {
+                queue.frames.push_back(outcome);
+            }
+        })
+    });
+    match queued {
+        Ok(()) => StatusCode::Ok as i32,
+        Err(error) => error.code as i32,
+    }
+}
+
+/// Acquire, execute and present one queued frame on the worker.
+fn run_queued_frame(
+    context: &mut BridgeContext,
+    request: *const FfiWholeFrameSubmitRequest,
+    correlation_id: u64,
+    width: u32,
+    height: u32,
+) -> QueuedFrameOutcome {
+    let _budget = crate::render::bridge::memory::RequestBudget::begin();
+    let extent = crate::render::vulkanic::resources::Extent3d { width, height, depth: 1 };
+    let acquire = match crate::render::bridge::frame::acquire_frame_target(context, correlation_id, extent) {
+        Ok(acquire) => acquire,
+        Err(error) => {
+            set_last_error(context, &error);
+            return QueuedFrameOutcome {
+                acquire_status: error.code as i32,
+                acquire: FfiFrameAcquireResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    correlation_id,
+                    ..FfiFrameAcquireResult::default()
+                },
+                frame: PipelinedFrameOutcome::default(),
+            };
+        }
+    };
+    let mut outcome = QueuedFrameOutcome {
+        acquire_status: StatusCode::Ok as i32,
+        acquire,
+        frame: PipelinedFrameOutcome::default(),
+    };
+    if Handle::from(acquire.frame_target).is_null() {
+        return outcome;
+    }
+    // SAFETY: Java keeps the request alive until this frame is joined.
+    let result = unsafe { read_struct(request, "queued whole-frame request") }.and_then(|mut copy| {
+        copy.frame_id = acquire.frame_id;
+        copy.correlation_id = correlation_id;
+        copy.frame_target = acquire.frame_target;
+        // SAFETY: the copy's nested slices still address Java memory, which
+        // stays valid until the join.
+        unsafe { decode_whole_frame_request(context, &copy) }
+    })
+    .and_then(|decoded| execute_whole_frame(context, decoded));
+    let (submit_status, submit) = whole_frame_status(context, result);
+    let present = if submit_status == StatusCode::Ok as i32 {
+        let result = crate::render::bridge::frame::present_frame_and_retire(
+            context,
+            acquire.frame_id,
+            correlation_id,
+            submit.submission_id,
+        );
+        Some(match result {
+            Ok(presented) => (StatusCode::Ok as i32, presented),
+            Err(error) => {
+                set_last_error(context, &error);
+                (
+                    error.code as i32,
+                    FfiFramePresentResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        ..FfiFramePresentResult::default()
+                    },
+                )
+            }
+        })
+    } else {
+        let _ = crate::render::bridge::frame::cancel_acquired_frame(context, acquire.frame_id);
+        None
+    };
+    outcome.frame = PipelinedFrameOutcome { submit_status, submit, present };
+    outcome
+}
+
+/// Waits for the oldest queued frame (and the jobs queued before it) and
+/// returns its acquire, submit and present results. `has_outcome` is zero
+/// when no queued frame is outstanding. A queued asset update or animation
+/// tick that failed before it is reported here as this call's status.
+///
+/// # Safety
+/// The out pointers must be writable.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_join_queued(
+    context_id: u64,
+    acquire_out: *mut FfiFrameAcquireResult,
+    submit_out: *mut FfiWholeFrameSubmitResult,
+    present_out: *mut FfiFramePresentResult,
+    has_outcome: *mut u32,
+) -> i32 {
+    let joined = with_queue(context_id, |pipeline| {
+        let outcome = pipeline.next_queued_frame();
+        Ok((outcome, pipeline.take_queued_error()))
+    });
+    let (outcome, error) = match joined {
+        Ok(joined) => joined,
+        Err(error) => return error.code as i32,
+    };
+    let Some(outcome) = outcome else {
+        let _ = write_out(has_outcome, 0u32, "queued frame presence");
+        return error.map_or(StatusCode::Ok as i32, |(status, _)| status);
+    };
+    let _ = write_out(has_outcome, 1u32, "queued frame presence");
+    let _ = write_out(acquire_out, outcome.acquire, "frame acquire result");
+    let _ = write_out(submit_out, outcome.frame.submit, "whole-frame submit result");
+    let present = outcome.frame.present.map_or(
+        FfiFramePresentResult {
+            status: outcome.frame.submit_status,
+            ..FfiFramePresentResult::default()
+        },
+        |(_, present)| present,
+    );
+    let _ = write_out(present_out, present, "frame present result");
+    error.map_or(StatusCode::Ok as i32, |(status, _)| status)
 }
 
 /// A Java request pointer read by the frame worker before Java joins it.

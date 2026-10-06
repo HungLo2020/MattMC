@@ -687,6 +687,8 @@ public final class RustGalFrameCoordinator {
 		synchronized (LOCK) {
 			int cancelled = SCHEDULER.cancelAll("shutdown");
 			existing = bridge;
+			// Closing the bridge joins and frees queued native work.
+			QUEUED_FRAME_RECORDS.clear();
 			retireOutstanding(true);
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 				auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted, true));
@@ -741,7 +743,27 @@ public final class RustGalFrameCoordinator {
 		String postEffectId,
 		VulkanicGalBridge.EngineGlobalsRecord engineGlobals
 	) {
-		completePendingPipelinedFrame();
+		// Claimed before deciding how this frame runs: a capture frame is synchronous.
+		long attachmentCaptureFrameIndex = allowEmpty
+			? net.minecraft.client.dev.DeterministicCameraCapture.claimWholeFrameAttachmentCaptureRenderedFrameIndex()
+			: -1L;
+		boolean queued = allowEmpty && QUEUED_FRAMES && PIPELINED_FRAMES
+			&& attachmentCaptureFrameIndex <= 0L
+			&& pendingScreenshot == null
+			&& !RENDERDOC_CAPTURE_CONFIGURED;
+		if (queued && bridge != null) {
+			// Keep at most one frame queued ahead of the one being prepared, so
+			// the native worker always has the next frame waiting.
+			completeQueuedFrames(1);
+			bridge.setQueuedFrames(true);
+		} else {
+			queued = false;
+			completeQueuedFrames(0);
+			if (bridge != null) {
+				bridge.setQueuedFrames(false);
+			}
+			completePendingPipelinedFrame();
+		}
 		if (atlasPumpDeferred) {
 			atlasPumpDeferred = false;
 			synchronized (LOCK) {
@@ -831,19 +853,27 @@ public final class RustGalFrameCoordinator {
 					);
 				}
 			}
-			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.acquire");
-			acquireStarted = System.nanoTime();
-			recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
-			VulkanicGalBridge.AcquiredFrame frame = bridge.acquireFrame(correlationId, window.getWidth(), window.getHeight());
-			acquireEnded = System.nanoTime();
-			METRICS.frameAcquireNanos += Math.max(0L, acquireEnded - acquireStarted);
-			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
-			frameId = frame.frameId();
-			if (wholeFrameVulkan) {
-				lastAcquiredWholeFrameFrame = frameId;
-				recordWholeFrameAcquire(frame, correlationId);
+			VulkanicGalBridge.AcquiredFrame frame;
+			if (queued) {
+				// The queued frame's native job acquires the image itself; its
+				// identity is known when the frame is joined.
+				frame = new VulkanicGalBridge.AcquiredFrame(0L, correlationId, 0, 0L, 0L,
+					window.getWidth(), window.getHeight(), 0);
+			} else {
+				GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.acquire");
+				acquireStarted = System.nanoTime();
+				recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
+				frame = bridge.acquireFrame(correlationId, window.getWidth(), window.getHeight());
+				acquireEnded = System.nanoTime();
+				METRICS.frameAcquireNanos += Math.max(0L, acquireEnded - acquireStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
+				frameId = frame.frameId();
+				if (wholeFrameVulkan) {
+					lastAcquiredWholeFrameFrame = frameId;
+					recordWholeFrameAcquire(frame, correlationId);
+				}
 			}
-			if (frame.status() == 4 || frame.frameTarget() == 0L) {
+			if (!queued && (frame.status() == 4 || frame.frameTarget() == 0L)) {
 				int cancelled;
 				synchronized (LOCK) {
 					cancelled = SCHEDULER.cancelFrame(frameId, "acquire-skipped");
@@ -862,10 +892,7 @@ public final class RustGalFrameCoordinator {
 				);
 				GraphicsFrameBenchmark.endPhase("rust-gal.frame.viewport-seed");
 			}
-			long attachmentCaptureFrameIndex = -1L;
-			if (wholeFrameVulkan) {
-				attachmentCaptureFrameIndex = net.minecraft.client.dev.DeterministicCameraCapture
-					.claimWholeFrameAttachmentCaptureRenderedFrameIndex();
+			if (wholeFrameVulkan && !queued) {
 				writeWholeFrameAttachmentCaptureRequest(frame, correlationId, attachmentCaptureFrameIndex);
 			}
 
@@ -975,7 +1002,9 @@ public final class RustGalFrameCoordinator {
 					&& attachmentCaptureFrameIndex <= 0L
 					&& pendingScreenshot == null
 					&& !renderdocFrameCaptureStarted;
-				if (pipelinedFrame) {
+				if (queued) {
+					bridge.armQueuedSubmit(correlationId, frame.width(), frame.height());
+				} else if (pipelinedFrame) {
 					if (!pipelinedFramesAnnounced) {
 						pipelinedFramesAnnounced = true;
 						LOGGER.info("Rust VulkanicGAL pipelined frames active: native execution overlaps the next frame");
@@ -1036,6 +1065,18 @@ public final class RustGalFrameCoordinator {
 						}
 						throw failure;
 					}
+				}
+				if (queued) {
+					// Queued behind the native worker; joined by a later frame.
+					submitEnded = System.nanoTime();
+					METRICS.abiPackingNanos += Math.max(0L, submitEnded - packingStarted);
+					GraphicsFrameBenchmark.endPhase("rust-gal.frame.submit-call");
+					QUEUED_FRAME_RECORDS.addLast(new SubmittedFrame(window, frame, primitiveFrame, 0L, correlationId,
+						true, requests.size(), affineQuadRequests.size(), guiTextAffineQuadCount,
+						guiItemAffineQuadCount, false, executeStarted, submitStarted, submitStarted,
+						submitStarted, submitEnded));
+					executeCounted = true;
+					return;
 				}
 				if (pipelinedFrame) {
 					// The native frame worker now owns this frame through present;
@@ -1117,6 +1158,62 @@ public final class RustGalFrameCoordinator {
 		long submitStarted,
 		long submitEnded
 	) {}
+
+	/** Queued frames handed to the native worker, oldest first; joined by later frames. */
+	private static final java.util.ArrayDeque<SubmittedFrame> QUEUED_FRAME_RECORDS = new java.util.ArrayDeque<>();
+
+	/**
+	 * Queued frames: per-frame asset updates and the frame itself queue behind
+	 * the native worker, which acquires and presents, so Java never waits for
+	 * the previous frame before handing over the next. On by default;
+	 * {@code -Dmattmc.rustGal.queuedFrames=false} or {@code MATTMC_QUEUED_FRAMES=0} disables it.
+	 */
+	private static final boolean QUEUED_FRAMES = Boolean.parseBoolean(System.getProperty(
+		"mattmc.rustGal.queuedFrames", String.valueOf(!"0".equals(System.getenv("MATTMC_QUEUED_FRAMES")))));
+	private static final boolean RENDERDOC_CAPTURE_CONFIGURED = Boolean.getBoolean("mattmc.dev.renderdocCapture");
+
+	/**
+	 * Joins queued frames, oldest first, until at most {@code keep} remain,
+	 * completing each one's bookkeeping. A frame dropped by a retryable source
+	 * failure is skipped, as a pipelined one is.
+	 */
+	private static void completeQueuedFrames(int keep) {
+		while (bridge != null && bridge.queuedFrameCount() > keep) {
+			SubmittedFrame pending = QUEUED_FRAME_RECORDS.pollFirst();
+			VulkanicGalBridge.QueuedFrameResult result;
+			try {
+				result = bridge.joinQueuedFrame();
+			} catch (IllegalStateException failure) {
+				if (failure.getMessage() != null && failure.getMessage().contains("retryable selected-source failure")) {
+					LOGGER.warn("Rust VulkanicGAL dropped queued frame {} after a retryable source failure",
+						pending == null ? -1L : pending.correlationId());
+					METRICS.cancellations++;
+					continue;
+				}
+				throw failure;
+			}
+			if (pending == null || result == null) {
+				throw new IllegalStateException("queued Rust VulkanicGAL frame records are out of step");
+			}
+			VulkanicGalBridge.AcquiredFrame acquired = result.acquired();
+			lastAcquiredWholeFrameFrame = acquired.frameId();
+			recordWholeFrameAcquire(acquired, pending.correlationId());
+			if (acquired.status() == 4 || acquired.frameTarget() == 0L) {
+				int cancelled;
+				synchronized (LOCK) {
+					cancelled = SCHEDULER.cancelFrame(acquired.frameId(), "acquire-skipped");
+				}
+				METRICS.cancellations++;
+				METRICS.batchesCancelled += cancelled;
+				continue;
+			}
+			completeSubmittedFrame(new SubmittedFrame(pending.window(), acquired, pending.primitiveFrame(),
+				acquired.frameId(), pending.correlationId(), pending.wholeFrameVulkan(), pending.requestCount(),
+				pending.affineQuadCount(), pending.guiTextAffineQuadCount(), pending.guiItemAffineQuadCount(),
+				false, pending.executeStarted(), pending.acquireStarted(), pending.acquireEnded(),
+				pending.submitStarted(), pending.submitEnded()), result.submit(), null, result.presented());
+		}
+	}
 
 	/** A pipelined frame handed to the native worker, completed by the next frame. */
 	private static SubmittedFrame pendingPipelinedFrame;
@@ -1441,7 +1538,14 @@ public final class RustGalFrameCoordinator {
 			recordGuiMetrics(guiResult);
 		}
 		GraphicsFrameBenchmark.beginPhase("rust-gal.frame.retire-outstanding");
-		retireOutstanding(forceDeterministicCaptureRetirement());
+		if (bridge != null && bridge.queuedFrameCount() > 0 && pipelinedPresented != null) {
+			// A later frame is still queued: querying or retiring through the
+			// bridge would wait for it. The worker retires completed work after
+			// each present and reports how far it got.
+			lastRetiredSubmission = Math.max(lastRetiredSubmission, pipelinedPresented.completedSubmissionId());
+		} else {
+			retireOutstanding(forceDeterministicCaptureRetirement());
+		}
 		GraphicsFrameBenchmark.endPhase("rust-gal.frame.retire-outstanding");
 		// Check the consumer before formatting: ordinary gameplay has no audit
 		// sink. The benchmark records metrics directly during measurement.

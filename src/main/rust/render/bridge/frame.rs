@@ -76,43 +76,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
         let result = (|| -> GalResult<FfiFrameAcquireResult> {
             let request = read_struct(request, "frame acquire request")?;
             validate_header::<FfiFrameAcquireRequest>(request.header)?;
-            let acquired = context.gal.acquire_frame(FrameAcquireDesc {
-                correlation_id: FrameCorrelationId(request.correlation_id),
-                expected_extent: request.expected_extent.into(),
-            })?;
-            let frame_target = if matches!(
-                acquired.status,
-                FrameAcquireStatus::Minimized | FrameAcquireStatus::Resized
-            ) {
-                Handle::NULL
-            } else if let Some(cached) = context.frame_targets.get(&acquired.render_target) {
-                cached.handle
-            } else {
-                let handle = context.gal.create_frame_target(FrameTargetDesc {
-                    label: format!("ffi.frame-target.{}", acquired.frame.0),
-                    frame_id: acquired.frame.0,
-                    render_target: acquired.render_target,
-                    extent: acquired.extent,
-                    color_format: acquired.color_format,
-                })?;
-                context
-                    .frame_targets
-                    .insert(acquired.render_target, CachedFrameTarget { handle });
-                handle
-            };
-            Ok(FfiFrameAcquireResult {
-                status: StatusCode::Ok as i32,
-                error_domain: 0,
-                frame_id: acquired.frame.0,
-                correlation_id: acquired.correlation_id.0,
-                acquire_status: acquire_status_raw(acquired.status),
-                frame_target: FfiHandle::from(frame_target),
-                frame_target_identity: acquired.render_target.0,
-                extent: acquired.extent.into(),
-                color_format: acquired.color_format as u32,
-                metrics: context_metrics(context),
-                ..FfiFrameAcquireResult::default()
-            })
+            acquire_frame_target(context, request.correlation_id, request.expected_extent.into())
         })();
         match result {
             Ok(value) => {
@@ -241,6 +205,52 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
 
 /// Presents an acquired frame after `wait_submission_id` and polls completed
 /// timeline work; shared by the synchronous and pipelined present paths.
+/// Acquires the next presentable image and its cached frame target; the
+/// target is null when the surface is minimized or was resized.
+pub(crate) fn acquire_frame_target(
+    context: &mut BridgeContext,
+    correlation_id: u64,
+    expected_extent: crate::render::vulkanic::resources::Extent3d,
+) -> GalResult<FfiFrameAcquireResult> {
+    let acquired = context.gal.acquire_frame(FrameAcquireDesc {
+        correlation_id: FrameCorrelationId(correlation_id),
+        expected_extent,
+    })?;
+    let frame_target = if matches!(
+        acquired.status,
+        FrameAcquireStatus::Minimized | FrameAcquireStatus::Resized
+    ) {
+        Handle::NULL
+    } else if let Some(cached) = context.frame_targets.get(&acquired.render_target) {
+        cached.handle
+    } else {
+        let handle = context.gal.create_frame_target(FrameTargetDesc {
+            label: format!("ffi.frame-target.{}", acquired.frame.0),
+            frame_id: acquired.frame.0,
+            render_target: acquired.render_target,
+            extent: acquired.extent,
+            color_format: acquired.color_format,
+        })?;
+        context
+            .frame_targets
+            .insert(acquired.render_target, CachedFrameTarget { handle });
+        handle
+    };
+    Ok(FfiFrameAcquireResult {
+        status: StatusCode::Ok as i32,
+        error_domain: 0,
+        frame_id: acquired.frame.0,
+        correlation_id: acquired.correlation_id.0,
+        acquire_status: acquire_status_raw(acquired.status),
+        frame_target: FfiHandle::from(frame_target),
+        frame_target_identity: acquired.render_target.0,
+        extent: acquired.extent.into(),
+        color_format: acquired.color_format as u32,
+        metrics: context_metrics(context),
+        ..FfiFrameAcquireResult::default()
+    })
+}
+
 pub(crate) fn present_frame_and_retire(
     context: &mut BridgeContext,
     frame_id: u64,
