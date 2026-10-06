@@ -1185,3 +1185,79 @@ fn feedback_target_must_be_declared_before_any_private_resource_is_created() {
     assert!(cache.stage(&mut gal, identity, &manifest).is_err());
     assert_eq!(0, gal.metrics().resource_creates);
 }
+
+#[test]
+fn feedback_copies_skip_clear_enabled_targets_once_their_history_is_cleared() {
+    let source = source(settings());
+    let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let manifest = ShaderPackColorTargetManifest::from_source(&source, &bindings).unwrap();
+    let identity = ShaderPackColorTargetIdentity::new(
+        41,
+        source.generation(),
+        Extent3d {
+            width: 320,
+            height: 180,
+            depth: 1,
+        },
+        ["primary".to_string(), "temporal_aa".to_string()],
+        std::iter::empty::<String>(),
+    )
+    .unwrap();
+    let mut gal = gal();
+    let mut cache = ShaderPackColorTargetCache::default();
+    let targets = cache.stage(&mut gal, identity, &manifest).unwrap();
+    let primary = targets.target("primary").unwrap();
+    let temporal = targets.target("temporal_aa").unwrap();
+    assert!(primary.clear_each_frame && !temporal.clear_each_frame);
+    let clear_values = ShaderPackColorClearValues {
+        fog_color: ClearColor {
+            r: 0.2,
+            g: 0.3,
+            b: 0.4,
+            a: 0.0,
+        },
+    };
+    let copies = |operations: &[CommandOp]| {
+        operations
+            .iter()
+            .filter_map(|operation| match operation {
+                CommandOp::CopyTexture(copy) => Some((copy.src_texture, copy.dst_texture)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let mut frame = cache.begin_frame(&targets).unwrap();
+    let mut operations = Vec::new();
+    frame
+        .append_frame_start_clears(&targets, clear_values, &mut operations)
+        .unwrap();
+    operations.clear();
+    frame
+        .append_feedback_copies(&targets, &mut operations)
+        .unwrap();
+    // The next frame clears both primary images before any stage samples
+    // them, so only clear=false history needs its end-of-frame copy.
+    assert_eq!(
+        vec![(temporal.current_texture, temporal.previous_texture.unwrap())],
+        copies(&operations)
+    );
+    cache.confirm_frame_submission(&mut gal, frame).unwrap();
+
+    let mut next = cache.begin_frame(&targets).unwrap();
+    let mut operations = Vec::new();
+    next.append_frame_start_clears(&targets, clear_values, &mut operations)
+        .unwrap();
+    assert!(operations.iter().any(|operation| matches!(
+        operation,
+        CommandOp::BeginPass { colors, .. }
+            if colors.first().map(|color| color.view)
+                == Some(primary.previous_attachment_view.or(primary.previous_view).unwrap())
+    )));
+    next.require_sample(
+        &TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+        true,
+    )
+    .expect("the cleared feedback image remains valid history");
+    cache.destroy(&mut gal);
+}

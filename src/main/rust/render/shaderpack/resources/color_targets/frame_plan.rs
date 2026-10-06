@@ -530,6 +530,13 @@ impl ShaderPackColorFramePlan {
                     "shader-pack feedback target '{name}' was not initialized by the complete source frame"
                 )));
             }
+            // The next source frame clears both sides of a clear-enabled
+            // target before any stage can sample its history, so this copy
+            // would be dead. Only an already-initialized feedback image may
+            // skip it; its layout and mips stay exactly as they are.
+            if target.clear_each_frame && state.previous_initialized {
+                continue;
+            }
             operations.push(CommandOp::Barrier(texture_barrier(
                 target.current_texture,
                 TextureUsageState::ShaderRead,

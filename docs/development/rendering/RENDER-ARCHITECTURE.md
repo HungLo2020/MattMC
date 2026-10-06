@@ -446,6 +446,12 @@ Program-local descriptor ordinals can give opaque, translucent, entity, hand,
 textured-material and DH writers different combined handles for the same role.
 Replace only the local writer's color subset in its cloned admission table;
 retain the original snapshot and all non-color ownership checks.
+Feedback history follows the color frame plan
+([`frame_plan.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/resources/color_targets/frame_plan.rs)):
+self-feedback stages snapshot same-frame writes, and the end-of-frame
+current-to-previous copy runs only for `clear=false` targets, because the next
+frame clears both images of a clear-enabled target first. Mip chains are
+regenerated only after a level-zero write, clear or copy.
 Fullscreen stages additionally choose feedback and mip policy. A geometry
 snapshot cannot choose those stages' sampled images. Validate snapshot
 generations before excluding the stage-owned color
