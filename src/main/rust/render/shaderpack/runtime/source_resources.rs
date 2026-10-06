@@ -476,7 +476,8 @@ impl ShaderPackRuntimeExecutor {
     ) -> Vec<TerrainSourceResourceRole> {
         let declared_outputs = declared_outputs.into_iter().collect::<BTreeSet<_>>();
         self.source_required_resource_roles_for_frame(includes_distant_horizons)
-            .into_iter()
+            .iter()
+            .cloned()
             .filter(|role| {
                 !declared_outputs.contains(role)
                     && prepared

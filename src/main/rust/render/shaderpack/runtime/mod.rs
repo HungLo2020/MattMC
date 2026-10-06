@@ -156,6 +156,9 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// that prepared them. A dimension whose terrain program samples no
     /// shadow map can still ship a writer that declares one.
     writer_required_roles: std::cell::RefCell<(u64, BTreeSet<TerrainSourceResourceRole>)>,
+    /// Required source roles per DH flag, keyed by both candidate epochs and
+    /// the noted writer roles (which only grow within an epoch).
+    required_roles_memo: std::cell::RefCell<[Option<((u64, u64, usize), std::sync::Arc<BTreeSet<TerrainSourceResourceRole>>)>; 2]>,
     /// Discovery expands a whole pack and lowers several independent source
     /// families. Keep that work generation-and-scope keyed: source discovery
     /// is immutable until either input changes and must not recur on every
@@ -264,6 +267,7 @@ impl ShaderPackRuntimeExecutor {
             source_candidate_epoch: 0,
             prepared_program_memos: PreparedSourceProgramMemos::default(),
             writer_required_roles: Default::default(),
+            required_roles_memo: Default::default(),
             source_candidate_scope: None,
             distant_horizons_source_candidate: DistantHorizonsSourceCandidateState::Unavailable,
             distant_horizons_source_candidate_epoch: 0,
