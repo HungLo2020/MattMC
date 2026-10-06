@@ -14,6 +14,9 @@ pub(crate) struct FullscreenSourceExecutionPlan {
     pub(super) bound: BoundFullscreenSourcePass,
     /// Set while this plan uses a cached stage's objects; cleared on destroy.
     pub(super) stage_lease: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// Where a cache-staged plan returns at the end of its frame, so the next
+    /// frame with identical inputs reuses it instead of staging again.
+    pub(super) parking: Option<PlanParking>,
 }
 
 impl FullscreenSourceExecutionPlan {
@@ -58,17 +61,41 @@ impl FullscreenSourceExecutionPlan {
         };
         cache.retire_stages(gal, []);
         let external_inputs = external_inputs.into_iter().collect::<Vec<_>>();
+        let key = FullscreenPlanKey {
+            program_identity: program.identity.as_str().to_string(),
+            shader_pack_generation: program.shader_pack_generation,
+            source_stage_path: program.source_stage_path.clone(),
+            epochs,
+            extent,
+            targets: targets.clone(),
+            external_inputs,
+        };
         if cache.epochs.get() == Some(epochs) {
-            if let Some(plan) =
-                Self::stage_from_cached_stage(gal, program, manifest, targets, &external_inputs, extent, cache, epochs)?
-            {
+            if let Some(mut plan) = cache.unpark(&key) {
+                plan.parking = cache.parking(key);
                 return Ok(plan);
             }
         }
-        let plan = Self::stage_uncached(
-            gal, program, manifest, targets, external_inputs, extent, Some((cache, epochs)),
-        )?;
-        Ok(Self::adopt_into_stage_cache(gal, plan, program, targets, cache, epochs))
+        let mut plan = 'staged: {
+            if cache.epochs.get() == Some(epochs) {
+                if let Some(plan) = Self::stage_from_cached_stage(
+                    gal, program, manifest, targets, &key.external_inputs, extent, cache, epochs,
+                )? {
+                    break 'staged plan;
+                }
+            }
+            let plan = Self::stage_uncached(
+                gal, program, manifest, targets, key.external_inputs.iter().cloned(), extent,
+                Some((cache, epochs)),
+            )?;
+            Self::adopt_into_stage_cache(gal, plan, program, targets, cache, epochs)
+        };
+        // Only plans backed by a cached stage are parked: they own nothing
+        // that a later stage of the same path could need at the same time.
+        if plan.stage_lease.is_some() {
+            plan.parking = cache.parking(key);
+        }
+        Ok(plan)
     }
 
     /// Stages against a matching unleased cache entry, creating only the
@@ -131,7 +158,7 @@ impl FullscreenSourceExecutionPlan {
             }
         };
         lease.store(true, std::sync::atomic::Ordering::Release);
-        Ok(Some(Self { prepared, compiled, bound, stage_lease: Some(lease) }))
+        Ok(Some(Self { prepared, compiled, bound, stage_lease: Some(lease), parking: None }))
     }
 
     /// Moves a freshly staged plan's frame-invariant objects into the stage
@@ -229,6 +256,7 @@ impl FullscreenSourceExecutionPlan {
             compiled,
             bound,
             stage_lease: None,
+            parking: None,
         })
     }
 
@@ -282,7 +310,16 @@ impl FullscreenSourceExecutionPlan {
         color_frame.record_pass(&self.prepared.color_targets, &self.prepared.outputs, &clear_mask)
     }
 
-    pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
+    /// Ends this frame's use. A cache-staged plan is parked for reuse by
+    /// the next frame with identical inputs; the cache destroys parked plans
+    /// whenever it releases its stages.
+    pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) {
+        if let Some(parking) = self.parking.take() {
+            match parking.park(self) {
+                Ok(()) => return,
+                Err(plan) => self = plan,
+            }
+        }
         self.bound.destroy(gal);
         self.compiled.destroy(gal);
         self.prepared.destroy(gal);

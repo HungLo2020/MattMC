@@ -88,6 +88,79 @@ pub(crate) struct FullscreenPipelineCache {
     >,
     /// Released stages still leased to a live plan; destroyed once returned.
     pub(super) retired_stages: std::cell::RefCell<Vec<CachedFullscreenStage>>,
+    /// Plans returned at the end of their frame, reused while their inputs
+    /// are unchanged. Shared with the plans so ending a frame parks them.
+    pub(super) parked: ParkedFullscreenPlans,
+}
+
+pub(super) type ParkedFullscreenPlans = std::sync::Arc<std::sync::Mutex<ParkedPlans>>;
+
+#[derive(Debug, Default)]
+pub(super) struct ParkedPlans {
+    /// Advanced whenever the cache releases its stages; a plan staged before
+    /// that must not come back.
+    pub(super) release: u64,
+    pub(super) plans: Vec<(FullscreenPlanKey, FullscreenSourceExecutionPlan)>,
+}
+
+/// Everything a staged plan was built from. Equal keys (and unchanged cache
+/// epochs) mean staging again would rebuild the same plan.
+#[derive(Debug)]
+pub(super) struct FullscreenPlanKey {
+    pub(super) program_identity: String,
+    pub(super) shader_pack_generation: u64,
+    pub(super) source_stage_path: String,
+    pub(super) epochs: (u64, u64),
+    pub(super) extent: crate::render::vulkanic::resources::Extent3d,
+    pub(super) targets: ShaderPackColorTargets,
+    pub(super) external_inputs: Vec<TerrainSourceOwnedResourceSet>,
+}
+
+impl FullscreenPlanKey {
+    fn same_plan(&self, other: &Self) -> bool {
+        self.epochs == other.epochs
+            && self.shader_pack_generation == other.shader_pack_generation
+            && self.extent == other.extent
+            && self.program_identity == other.program_identity
+            && self.source_stage_path == other.source_stage_path
+            && self.targets.identity == other.targets.identity
+            && self.targets.same_images(&other.targets)
+            && self.external_inputs == other.external_inputs
+    }
+}
+
+/// A plan's way back into its cache's parked plans.
+#[derive(Debug)]
+pub(crate) struct PlanParking {
+    pub(super) store: ParkedFullscreenPlans,
+    pub(super) release: u64,
+    pub(super) key: FullscreenPlanKey,
+}
+
+impl PlanParking {
+    /// Parks `plan`, or hands it back when its stage already has the bounded
+    /// number of parked variants (or the store is poisoned).
+    pub(super) fn park(
+        self,
+        plan: FullscreenSourceExecutionPlan,
+    ) -> Result<(), FullscreenSourceExecutionPlan> {
+        let Ok(mut parked) = self.store.lock() else {
+            return Err(plan);
+        };
+        if parked.release != self.release {
+            return Err(plan);
+        }
+        let variants = parked
+            .plans
+            .iter()
+            .filter(|(key, _)| key.source_stage_path == self.key.source_stage_path)
+            .count();
+        if variants >= FULLSCREEN_STAGE_CACHE_VARIANTS {
+            return Err(plan);
+        }
+        parked.plans.push((self.key, plan));
+        Ok(())
+    }
 }
 
 pub(super) const FULLSCREEN_PIPELINE_CACHE_ENTRIES: usize = 128;
@@ -148,10 +221,41 @@ impl CachedFullscreenStage {
 }
 
 impl FullscreenPipelineCache {
+    /// Takes the parked plan staged from exactly `key`'s inputs.
+    pub(super) fn unpark(&self, key: &FullscreenPlanKey) -> Option<FullscreenSourceExecutionPlan> {
+        let mut parked = self.parked.lock().ok()?;
+        let index = parked.plans.iter().position(|(parked_key, _)| parked_key.same_plan(key))?;
+        Some(parked.plans.swap_remove(index).1)
+    }
+
+    /// Where a plan staged now may park at the end of its frame.
+    pub(super) fn parking(&self, key: FullscreenPlanKey) -> Option<PlanParking> {
+        let release = self.parked.lock().ok()?.release;
+        Some(PlanParking { store: self.parked.clone(), release, key })
+    }
+
+    /// Destroys every parked plan, returning their stage leases, and refuses
+    /// plans staged before now.
+    fn destroy_parked(&self, gal: &mut VulkanicGal) {
+        let parked = {
+            let mut parked = match self.parked.lock() {
+                Ok(parked) => parked,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            parked.release += 1;
+            std::mem::take(&mut parked.plans)
+        };
+        for (_, plan) in parked {
+            // Parking is cleared on unpark, so this destroys rather than re-parks.
+            plan.destroy(gal);
+        }
+    }
+
     /// Drops every cached stage. Required before the color targets they
     /// reference are retired. A stage leased to a live plan is destroyed when
     /// that plan returns it.
     pub(crate) fn release_stages(&self, gal: &mut VulkanicGal) {
+        self.destroy_parked(gal);
         let stages = std::mem::take(&mut *self.stages.borrow_mut());
         self.retire_stages(gal, stages.into_values().flatten());
     }

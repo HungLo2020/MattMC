@@ -1128,12 +1128,13 @@ fn stage_cache_reuses_frame_invariant_objects_for_one_live_plan_at_a_time() {
     first.destroy(&mut gal);
     concurrent.destroy(&mut gal);
 
+    // Identical inputs reuse the parked plan whole, inputs set included.
     let next = stage(&mut gal);
     assert!(next.stage_lease.is_some());
     assert_eq!(target, next.compiled.target);
     assert_eq!(uniforms, next.bound.texture_transform_buffer);
     assert_eq!(source_set, next.bound.source_data_set);
-    assert_ne!(pack_set, next.bound.pack_resources_set);
+    assert_eq!(pack_set, next.bound.pack_resources_set);
     let next_pack_set = next.bound.pack_resources_set;
 
     // Released while leased: destroyed only once the plan returns it.

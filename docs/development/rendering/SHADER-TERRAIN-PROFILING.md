@@ -210,9 +210,13 @@ changing it:
   repeated meshes still key the full frame.
 - Fullscreen stages reuse their frame-invariant GAL objects (color samplers,
   render target and pass, uniform buffers, source-data set) through the stage
-  cache in `FullscreenPipelineCache`; only the pack-resources set is created
-  per frame. An entry is leased to one live plan, and the runtime releases all
-  entries before a color-target promotion or discard retires their views
+  cache in `FullscreenPipelineCache`. A staged plan parks at the end of its
+  frame (`FullscreenSourceExecutionPlan::destroy`) and the next frame whose
+  program, epochs, extent, color targets and input snapshots are equal reuses
+  it whole, pack-resources set included; at most two variants park per stage.
+  An entry is leased to one live plan, and the runtime releases all entries
+  (destroying parked plans and refusing later parking) before a color-target
+  promotion or discard retires their views
   ([`fullscreen/pipelines.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/runtime/fullscreen/pipelines.rs)).
 
 Equivalence tests pin each rule (`lazy_mesh_batch_index_*`,
