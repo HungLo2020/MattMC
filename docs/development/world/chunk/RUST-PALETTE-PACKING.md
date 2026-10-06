@@ -7,6 +7,9 @@ container lock, resolves used object identities, and builds the returned
 list/stream. This is save packing; [block palette growth](RUST-PALETTE-RESIZE.md)
 is a separate migration. Ordinary storage reads/writes, network serialization,
 unpacking and 64-entry biome packing remain their existing implementations.
+Chunk saves no longer call this path: the
+[section serializer](RUST-CHUNK-SECTIONS.md) packs inside its own Rust call. This
+path still serves other `pack()` and codec callers.
 
 The kernels and FFI live in
 [`world/level/chunk/palette/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette).

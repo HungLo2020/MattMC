@@ -10,3 +10,5 @@
   block/fluid counter reconstruction with focused parity/performance checks.
 - [Rust palette packing](RUST-PALETTE-PACKING.md): block-section save packing,
   exact serialization compatibility, and focused performance verification.
+- [Rust chunk section serialization](RUST-CHUNK-SECTIONS.md): saving a chunk's
+  sections list as NBT tape in Rust, exact key order and the save path.

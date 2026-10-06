@@ -419,7 +419,33 @@ public record SerializableChunkData(
 		}
 	}
 
+	/** A saved chunk's tape for its region file, with the tag built only if a
+	 * pending read asks for it. */
+	public record Encoded(byte[] tape, java.util.function.Supplier<CompoundTag> tag) {
+	}
+
+	/** {@code NativeNbtRegionAccess.writeTape(write())}, with the sections list
+	 * encoded by Rust ({@link net.minecraft.world.level.chunk.NativeChunkSections})
+	 * and spliced into the tape. */
+	public Encoded encode() {
+		try {
+			byte[] sections = net.minecraft.world.level.chunk.NativeChunkSections.encode(this.sectionData, this.containerFactory);
+			if (sections == null) {
+				return new Encoded(net.minecraft.nbt.NativeNbtRegionAccess.writeTape(this.write()), this::write);
+			}
+			ListTag placeholder = new ListTag();
+			return new Encoded(net.minecraft.nbt.NativeNbtRegionAccess.writeTape(this.write(placeholder), placeholder, sections), this::write);
+		} catch (java.io.IOException exception) {
+			throw new java.io.UncheckedIOException(exception);
+		}
+	}
+
 	public CompoundTag write() {
+		return this.write(null);
+	}
+
+	/** With a placeholder, the sections list is that (empty) tag instead. */
+	private CompoundTag write(@Nullable ListTag sectionsPlaceholder) {
 		CompoundTag compoundTag = NbtUtils.addCurrentDataVersion(new CompoundTag());
 		compoundTag.putInt("xPos", this.chunkPos.x);
 		compoundTag.putInt("yPos", this.minSectionY);
@@ -433,11 +459,11 @@ public record SerializableChunkData(
 			compoundTag.put("UpgradeData", this.upgradeData.write());
 		}
 
-		ListTag listTag = new ListTag();
+		ListTag listTag = sectionsPlaceholder != null ? sectionsPlaceholder : new ListTag();
 		Codec<PalettedContainer<BlockState>> codec = this.containerFactory.blockStatesContainerCodec();
 		Codec<PalettedContainerRO<Holder<Biome>>> codec2 = this.containerFactory.biomeContainerCodec();
 
-		for (SerializableChunkData.SectionData sectionData : this.sectionData) {
+		for (SerializableChunkData.SectionData sectionData : sectionsPlaceholder != null ? List.<SerializableChunkData.SectionData>of() : this.sectionData) {
 			CompoundTag compoundTag2 = new CompoundTag();
 			LevelChunkSection levelChunkSection = sectionData.chunkSection;
 			if (levelChunkSection != null) {

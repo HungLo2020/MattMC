@@ -769,8 +769,8 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				Profiler.get().incrementCounter("chunkSave");
 				this.activeChunkWrites.incrementAndGet();
 				SerializableChunkData serializableChunkData = SerializableChunkData.copyOf(this.level, chunkAccess);
-				CompletableFuture<CompoundTag> completableFuture = CompletableFuture.supplyAsync(serializableChunkData::write, Util.backgroundExecutor());
-				this.write(chunkPos, completableFuture::join).handle((void_, throwable) -> {
+				CompletableFuture<SerializableChunkData.Encoded> completableFuture = CompletableFuture.supplyAsync(serializableChunkData::encode, Util.backgroundExecutor());
+				this.writeEncoded(chunkPos, completableFuture::join).handle((void_, throwable) -> {
 					if (throwable != null) {
 						this.level.getServer().reportChunkSaveFailure(throwable, this.storageInfo(), chunkPos);
 					}

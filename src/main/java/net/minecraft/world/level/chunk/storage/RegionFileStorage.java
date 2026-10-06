@@ -89,6 +89,13 @@ public final class RegionFileStorage implements AutoCloseable {
 		}
 	}
 
+	/** {@link #write} of a chunk already encoded to NBT tape. */
+	protected void writeTape(ChunkPos chunkPos, byte[] tape) throws IOException {
+		if (!SharedConstants.DEBUG_DONT_SAVE_WORLD) {
+			this.getRegionFile(chunkPos).writeChunkTape(chunkPos, tape);
+		}
+	}
+
 	protected NativePoiStorage.WriteResult writePoiChunk(ChunkPos chunkPos, byte[] tape) throws IOException {
 		if (SharedConstants.DEBUG_DONT_SAVE_WORLD) {
 			return new NativePoiStorage.WriteResult(0, 0, 0, false, -1, false, 0, 0, 0L, 0L, 0L, 0L, 0L);

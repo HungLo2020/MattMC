@@ -1,0 +1,15 @@
+{
+ "regions": [
+  {
+   "path": "r.-1.-1.mca",
+   "sha256": "44fe41fda3e0411bff3292bbedd7703307b271e7e1da51213f33fbb1d619ef9b"
+  }
+ ],
+ "statuses": {
+  "minecraft:full": 24,
+  "minecraft:initialize_light": 4,
+  "minecraft:carvers": 4,
+  "minecraft:biomes": 4,
+  "minecraft:structure_starts": 4
+ }
+}

@@ -251,8 +251,11 @@ public class RegionFile implements AutoCloseable {
 		RegionFileRustValidation.recordDelete(this.path, chunkPos, result.timestamp());
 	}
 
-	public synchronized void writeChunk(ChunkPos chunkPos, CompoundTag compoundTag) throws IOException {
-		byte[] tape = NativeNbtRegionAccess.writeTape(compoundTag);
+	public void writeChunk(ChunkPos chunkPos, CompoundTag compoundTag) throws IOException {
+		this.writeChunkTape(chunkPos, NativeNbtRegionAccess.writeTape(compoundTag));
+	}
+
+	public synchronized void writeChunkTape(ChunkPos chunkPos, byte[] tape) throws IOException {
 		NativeRegionFileBridge.WriteResult result;
 		long started = StoragePerfDiagnostics.start();
 		try {

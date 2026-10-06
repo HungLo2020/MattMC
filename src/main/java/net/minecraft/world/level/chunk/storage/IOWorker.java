@@ -125,6 +125,26 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 					IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites
 						.computeIfAbsent(chunkPos, chunkPosxx -> new IOWorker.PendingStore(compoundTag));
 					pendingStore.data = compoundTag;
+					pendingStore.tape = null;
+					pendingStore.lazyData = null;
+					return pendingStore.result;
+				}
+			)
+			.thenCompose(Function.identity());
+	}
+
+	/** {@link #store(ChunkPos, Supplier)} for a chunk already encoded to tape:
+	 * the region write uses the tape, and the tag is built only if a pending
+	 * read needs it. */
+	public CompletableFuture<Void> storeEncoded(ChunkPos chunkPos, Supplier<SerializableChunkData.Encoded> supplier) {
+		return this.submitTask(
+				() -> {
+					SerializableChunkData.Encoded encoded = supplier.get();
+					IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites
+						.computeIfAbsent(chunkPos, chunkPosxx -> new IOWorker.PendingStore(null));
+					pendingStore.data = null;
+					pendingStore.tape = encoded.tape();
+					pendingStore.lazyData = encoded.tag();
 					return pendingStore.result;
 				}
 			)
@@ -180,8 +200,9 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 			try {
 				IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);
 				if (pendingStore != null) {
-					if (pendingStore.data != null) {
-						pendingStore.data.acceptAsRoot(streamTagVisitor);
+					CompoundTag data = pendingStore.data();
+					if (data != null) {
+						data.acceptAsRoot(streamTagVisitor);
 					}
 				} else {
 					this.storage.scanChunk(chunkPos, streamTagVisitor);
@@ -233,7 +254,11 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	private void runStore(ChunkPos chunkPos, IOWorker.PendingStore pendingStore) {
 		try {
-			this.storage.write(chunkPos, pendingStore.data);
+			if (pendingStore.tape != null) {
+				this.storage.writeTape(chunkPos, pendingStore.tape);
+			} else {
+				this.storage.write(chunkPos, pendingStore.data);
+			}
 			pendingStore.result.complete(null);
 		} catch (Exception var4) {
 			LOGGER.error("Failed to store chunk {}", chunkPos, var4);
@@ -265,6 +290,11 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	static class PendingStore {
 		@Nullable
 		CompoundTag data;
+		// An encoded chunk: the tape to write and the tag, built on first read.
+		@Nullable
+		byte[] tape;
+		@Nullable
+		Supplier<CompoundTag> lazyData;
 		final CompletableFuture<Void> result = new CompletableFuture();
 
 		public PendingStore(@Nullable CompoundTag compoundTag) {
@@ -272,8 +302,17 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 		}
 
 		@Nullable
+		CompoundTag data() {
+			if (this.data == null && this.lazyData != null) {
+				this.data = this.lazyData.get();
+				this.lazyData = null;
+			}
+			return this.data;
+		}
+
+		@Nullable
 		CompoundTag copyData() {
-			CompoundTag compoundTag = this.data;
+			CompoundTag compoundTag = this.data();
 			return compoundTag == null ? null : compoundTag.copy();
 		}
 	}
