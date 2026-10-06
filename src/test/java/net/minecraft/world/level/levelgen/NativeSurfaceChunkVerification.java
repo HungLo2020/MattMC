@@ -57,7 +57,7 @@ public final class NativeSurfaceChunkVerification {
     public static void main(String[] args) throws Exception {
         String mode = args[0], name = args[1];
         boolean quick = args.length > 2 && args[2].equals("quick");
-        if (!mode.equals("native") && !mode.equals("java")) throw new IllegalArgumentException(mode);
+        if (!List.of("native", "java", "javaconditions").contains(mode)) throw new IllegalArgumentException(mode);
         NativeNoiseFillTest.load();
         try {
             var registries = NativeNoiseFillTest.registries;
@@ -70,7 +70,12 @@ public final class NativeSurfaceChunkVerification {
             var random = RandomState.create(config, registries.lookupOrThrow(Registries.NOISE), 7_340_013L);
             ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(5, -3), new ChunkPos(-41, 17), new ChunkPos(160, 90),
                 new ChunkPos(-1200, -800), new ChunkPos(3000, 4100), new ChunkPos(-9, -9), new ChunkPos(77, -512)};
-            NativeSurfaceChunk.setEnabled(mode.equals("native"));
+            // javaconditions: Rust storage with Java answering conditions and surface
+            // inputs and compiling each chunk's program (the previous production path).
+            NativeSurfaceChunk.setEnabled(!mode.equals("java"));
+            NativeSurfaceChunk.nativeConditions = mode.equals("native");
+            // The previous production path also compiled each chunk's rule program.
+            NativeSurface.cacheCompiled = mode.equals("native");
             long before = NativeSurfaceChunk.CHUNKS.get();
             PlayerChunkDistancesVerification.measure(mode, name, quick, () -> {
                 List<Prepared> chunks = new ArrayList<>();
@@ -96,10 +101,12 @@ public final class NativeSurfaceChunkVerification {
                 return checksum;
             });
             long owned = NativeSurfaceChunk.CHUNKS.get() - before;
-            if (mode.equals("native") == (owned == 0)) throw new IllegalStateException("Route not taken: " + owned + " owned chunks");
+            if (mode.equals("java") != (owned == 0)) throw new IllegalStateException("Route not taken: " + owned + " owned chunks");
             System.out.println("SURFACE_CHUNK_ROUTE case=" + name + " mode=" + mode + " owned=" + owned);
         } finally {
             NativeSurfaceChunk.setEnabled(true);
+            NativeSurfaceChunk.nativeConditions = true;
+            NativeSurface.cacheCompiled = true;
             NativeNoiseFillTest.close();
         }
     }

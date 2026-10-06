@@ -52,11 +52,21 @@ final class NativeNoiseFill {
     private static final MethodHandle UPLOAD = bind("upload", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     // A whole column of cells: an ordinary downcall with off-heap buffers.
+    // The traversal takes the aquifer's state once and returns its caches after the fill.
+    private static final MethodHandle AQUIFER = bind("aquifer", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+        ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+    private static final MethodHandle AQUIFER_CACHES = bind("aquifer_caches", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle CELLS = bind("cells", false, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     // Tests compare traversals in one JVM; production reads the property once.
     private static volatile boolean nativeTraversal = !Boolean.getBoolean("mattmc.worldgen.javaCellTraversal");
     // Chunks whose cells Rust traversed, so tests can prove the gate engaged.
+    // Traversals whose aquifer materials Rust prepared itself, so tests can prove the route engaged.
+    static final java.util.concurrent.atomic.AtomicLong AQUIFER_FILLS = new java.util.concurrent.atomic.AtomicLong();
+    // Tests compare Rust-owned aquifer materials with Java-prepared ones in one JVM.
+    static volatile boolean nativeAquifer = !Boolean.getBoolean("mattmc.worldgen.javaFillMaterials");
     static final java.util.concurrent.atomic.AtomicLong TRAVERSALS = new java.util.concurrent.atomic.AtomicLong();
     // Fills of chunks instantiated natively, without a wrapped Java graph.
     static final java.util.concurrent.atomic.AtomicLong INSTANCES = new java.util.concurrent.atomic.AtomicLong();
@@ -433,9 +443,37 @@ final class NativeNoiseFill {
         }
     }
 
-    /** doFill's cell loop run by Rust; Java prepares aquifer materials on request. */
+    /** Gives the traversal this chunk's aquifer state when its decisions can run
+     * entirely in Rust; null keeps Java preparing cell materials on request. */
+    @Nullable
+    private NativeAquifer.NativeBinding bindAquifer(long handle) throws Throwable {
+        NativeAquifer.NativeBinding binding = this.aquifer == null || !nativeAquifer ? null : this.aquifer.nativeBinding();
+        if (binding == null) return null;
+        int[] ints = new int[27];
+        System.arraycopy(binding.shape(), 0, ints, 0, 5);
+        ints[5] = binding.skipY();
+        ints[6] = binding.locationKind();
+        System.arraycopy(binding.policy(), 0, ints, 7, 8);
+        System.arraycopy(binding.surfaceRect(), 0, ints, 15, 4);
+        System.arraycopy(binding.grid(), 0, ints, 19, 3);
+        ints[22] = net.minecraft.world.level.dimension.DimensionType.WAY_BELOW_MIN_Y;
+        ints[23] = Block.getId(Blocks.WATER.defaultBlockState());
+        ints[24] = Block.getId(Blocks.LAVA.defaultBlockState());
+        long[] longs = {binding.seedA(), binding.seedB(), Double.doubleToRawLongBits(binding.barrierXz()), Double.doubleToRawLongBits(binding.barrierY())};
+        int status = (int)AQUIFER.invokeExact(handle, MemorySegment.ofArray(ints), ints.length, MemorySegment.ofArray(longs),
+            MemorySegment.ofArray(binding.locations()), binding.locations().length, MemorySegment.ofArray(binding.cache()),
+            MemorySegment.ofArray(binding.surface()), binding.surface().length, MemorySegment.ofArray(binding.memo()), MemorySegment.ofArray(binding.present()),
+            binding.memo().length, binding.sources().handle(), binding.levels().handle(), binding.barrierState());
+        if (status != 0) throw new IllegalStateException("Native noise fill aquifer rejected: " + status);
+        AQUIFER_FILLS.incrementAndGet();
+        return binding;
+    }
+
+    /** doFill's cell loop run by Rust; Java prepares aquifer materials on request
+     * unless Rust owns the aquifer's state for the fill. */
     private void traverse(long handle, NativeNoiseRouter router, int cellCountY, double[] cellDensities) throws Throwable {
         int cells = 16 / this.chunk.cellWidth, cellSize = this.chunk.cellWidth * this.chunk.cellWidth * this.chunk.cellHeight;
+        NativeAquifer.NativeBinding aquiferBinding = this.bindAquifer(handle);
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment materials = arena.allocate(cellSize * 8L, 8), density = arena.allocate(cellSize * 8L, 8), request = arena.allocate(12, 4);
             MemorySegment gapMemory = this.gap == null ? MemorySegment.NULL : this.gap.state();
@@ -447,7 +485,7 @@ final class NativeNoiseFill {
                 for (;;) {
                     int status = (int)CELLS.invokeExact(handle, cellX, given, gapMemory, density, request);
                     if (status == 0) break;
-                    if (status != 1) throw new IllegalStateException("Native noise fill cells failed: " + status);
+                    if (status != 1 || aquiferBinding != null) throw new IllegalStateException("Native noise fill cells failed: " + status);
                     // The cell cache holds this cell's densities, as after selectCellYZ.
                     MemorySegment.copy(density, ValueLayout.JAVA_DOUBLE, 0, cellDensities, 0, cellSize);
                     int[] prepared = this.aquifer.prepareCellMaterials(request.get(ValueLayout.JAVA_INT, 0), request.get(ValueLayout.JAVA_INT, 4),
@@ -458,8 +496,15 @@ final class NativeNoiseFill {
                 this.chunk.skipNativeCells(cells * cellCountY);
             }
             this.chunk.stopInterpolation();
+            if (aquiferBinding != null) {
+                // The aquifer's caches are pure memos; keep what Rust filled.
+                int status = (int)AQUIFER_CACHES.invokeExact(handle, MemorySegment.ofArray(aquiferBinding.locations()), MemorySegment.ofArray(aquiferBinding.cache()),
+                    MemorySegment.ofArray(aquiferBinding.surface()), MemorySegment.ofArray(aquiferBinding.memo()), MemorySegment.ofArray(aquiferBinding.present()));
+                if (status != 0) throw new IllegalStateException("Native noise fill aquifer caches failed: " + status);
+            }
         } finally {
             Reference.reachabilityFence(router);
+            Reference.reachabilityFence(aquiferBinding);
         }
     }
 

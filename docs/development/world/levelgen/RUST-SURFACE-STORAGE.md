@@ -14,12 +14,26 @@ moves the chunk to [shared chunk storage](#shared-chunk-storage) when
   corners can select, filled once from the stage's `BiomeManager`;
 - which rule condition slots are `steep`.
 
-Rust then scans each column, selects its rule-evaluation biomes from the table,
-runs the [surface evaluator](RUST-SURFACE.md), commits completed blocks and
-answers `steep` from its own heightmap. Java still drives the X/Z column loop,
-updates the context and looks up each column's biome for the extensions. Java still answers noise, temperature and
-vertical-gradient conditions, the band offset, secondary noise and the minimum
-surface level. The eroded badlands and frozen ocean extensions read and write
+Rust then scans each column, selects its rule-evaluation biomes from the
+table, runs the [surface evaluator](RUST-SURFACE.md), commits completed blocks
+and answers the evaluator's requests itself:
+
+- `steep` from its own heightmap, once per column (one lazy condition shared by
+  every steep slot, as in Java);
+- vertical gradients inside their band: `Mth.map(y, low, high, 1, 0)` against
+  `nextFloat()` of the condition's positional random (Xoroshiro or Legacy) at
+  the block;
+- noise thresholds, the secondary surface noise and the terracotta band offset
+  (`(int)Math.round(noise * 4.0)`, Java's rounding ported bit for bit) from
+  the noises' native states;
+- the minimum surface level from the noise chunk's native preliminary surface
+  program at the surface cell's corners (kept across columns, as the context's
+  cache keeps them), `Mth.lerp2`, `Mth.floor`, plus surface depth − 8.
+
+Java still drives the X/Z column loop, updates the context and looks up each
+column's biome for the extensions. It answers only temperature and extension
+conditions, and any of the above whose noise, random factory or noise chunk is
+not the built-in kind. The eroded badlands and frozen ocean extensions read and write
 through a block column backed by the Rust storage. At the end Java installs
 the modified sections (`installGenerated`), both heightmaps and the fluid
 post-processing marks, in write order.
@@ -43,6 +57,40 @@ writes, unless:
   exactly the primed world-generation pair;
 - every section is a plain `LevelChunkSection` with a modelled palette
   (single, linear, hash map or global) and storage.
+
+## Compiled rule programs
+
+A batched rule program depends only on the rule, the surface system's bands,
+the biome registry, whether biomes are native and the generation height range.
+`NativeSurface` compiles and validates it once per surface system (one per
+`RandomState`) and caches it by the rule's identity; each context then only
+applies the program's condition sources. Programs with extension rules or
+continuations are compiled per context as before.
+`-Dmattmc.worldgen.surfaceCompileEachChunk=true` compiles every context's
+program, and `-Dmattmc.worldgen.javaSurfaceConditions=true` keeps Java
+answering the requests above, for comparisons.
+
+```sh
+python3 DevUtils/tests/worldgen/VerifyRustSurfaceConditions.py --parity-only
+python3 DevUtils/tests/worldgen/VerifyRustSurfaceConditions.py --forks 3 --cpu 5 --background-cpus 0,1
+```
+
+`NativeSurfaceChunkTest` counts the requests Java answers by kind: on its
+corpus Java's route answers thousands of gradients, noise thresholds, band
+offsets, secondary noises, minimum surface levels and steep checks, and Rust
+storage answers none of them in Java. `cachedRuleProgramsMatchFreshCompilation`
+surfaces chunks of one `RandomState` (cached programs) against chunks compiled
+fresh with Java's answers. Mutations of the gradient's orientation, the
+minimum surface offset and the secondary noise's coordinates fail it; Rust's
+rounding in place of Java's fails `band_offset_rounds_halves_like_java`
+(`surface/chunk.rs`); `<=` in place of the gradient's `<` survives (equal only
+when `nextFloat()` hits the probability exactly). Measured on 2026-10-05/06 (same laptop and driver
+method as below), per chunk, Java answers and per-chunk compilation versus Rust
+answers and cached programs: overworld 4.08 → 3.55 ms (paired ratios 0.87,
+0.89, 0.85; 95% interval 0.83–0.91), amplified 4.90 → 4.41 ms (0.89, 0.90,
+0.92; 0.87–0.93), nether 3.85 → 3.53 ms (0.92, 0.93, 0.89; 0.88–0.95, its
+upper bound 0.953 just above the driver's 0.95 gate). Raw rounds are under
+`build/surface-conditions-migration/` (not bundled with the wiki).
 
 ## Gate
 

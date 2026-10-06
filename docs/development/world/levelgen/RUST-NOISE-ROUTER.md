@@ -10,8 +10,8 @@ compiles all of a chunk's interpolators into one program for
 [`router/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/router).
 Rust fills a whole slice — every column, interpolator and Y — in one ordinary
 downcall. With [native cell traversal](RUST-NOISE-FILL.md#cell-traversal), both
-slices stay in Rust and feed the native cell program; Java prepares requested
-aquifer materials and installs the fill results. The Java per-cell route
+slices stay in Rust and feed the native cell program; Java prepares the
+aquifer materials Rust does not own and installs the fill results. The Java per-cell route
 instead copies slice values into the interpolators' arrays. Java retains the
 `NoiseChunk`, graph compilation and compatibility paths; each router instance
 exists for one `NativeNoiseFill.run`. The same
@@ -189,8 +189,8 @@ At that reviewed snapshot, Java compiled graphs, copied slice output, traversed
 cells, prepared cell caches and requested aquifer materials, and installed the
 fill results. Current [cell traversal](RUST-NOISE-FILL.md#cell-traversal) and
 [chunk-noise templates](RUST-CHUNK-NOISE.md) move more of that work into Rust,
-while Java retains compilation, requested aquifer-material preparation and
-result installation. These bounded migrations do not establish native
+while Java retains compilation, material preparation for aquifers off the
+native route and result installation. These bounded migrations do not establish native
 ownership of the complete world-generation pipeline. Retain explicit acceptance work for custom/blended
 contexts, failure and cancellation recovery, concurrency, native memory bounds
 and FULL-chunk generation before extending scope. The migration does not close

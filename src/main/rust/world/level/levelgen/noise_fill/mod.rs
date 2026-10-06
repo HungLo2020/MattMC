@@ -98,6 +98,8 @@ pub(crate) enum Error {
     OutOfChunk,
     /// The cell density program rejected its frame (bind validation prevents it).
     CellProgram,
+    /// The Rust-owned aquifer failed to prepare a cell's materials.
+    Aquifer(i32),
 }
 
 /// Interpolated values of one cell, from `NoiseInterpolator.copyCellCorners`

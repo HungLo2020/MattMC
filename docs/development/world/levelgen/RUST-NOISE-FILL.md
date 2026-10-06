@@ -9,10 +9,10 @@ writes and counters, both world-generation heightmaps and fluid post-processing
 marks. Java installs the sections, heightmaps and marks once.
 
 The [noise router](RUST-NOISE-ROUTER.md) fills the interpolation slices and,
-when the cell traversal is native (below), Rust also walks every cell. Java
-prepares aquifer cell materials on request (including fluid-status requests)
-and owns the generator, the `NoiseChunk` and every chunk object. Ineligible
-chunks run the unchanged Java loop.
+when the cell traversal is native (below), Rust also walks every cell and, for
+aquifers on the native route, prepares their cell materials too. Java owns the
+generator, the `NoiseChunk` and every chunk object, and prepares materials
+only for other aquifers. Ineligible chunks run the unchanged Java loop.
 
 ## Cell traversal
 
@@ -23,17 +23,61 @@ Rust then keeps both slices, builds each cell's interpolator corners as
 `selectCellYZ` and `copyCellCorners` do, evaluates the cell density cache with
 the same validated program `NativeCellDensity` runs, copies the ore vein
 corners and fills the cell: one ordinary downcall per slice and one per column
-of cells. When a cell needs aquifer materials, Rust stops before writing it;
-Java copies the cell's densities into the cell cache, prepares the materials
-and resumes the call. A slice the router declines is filled by Java and
-uploaded. For a router compiled from a wrapped chunk, the traversal needs the
-finalDensity cell cache to be the chunk's only cell cache and a
-`NativeCellDensity` over this chunk's interpolators; otherwise Java's
-per-cell loop runs with Rust slices. A native chunk-noise template supplies
-its own cell program and can also bind [structure Beardifier
+of cells. When a cell needs aquifer materials, the
+[Rust-owned aquifer](#rust-owned-aquifer-materials) prepares them; otherwise
+Rust stops before writing the cell, Java copies its densities into the cell
+cache, prepares the materials and resumes the call. A slice the router
+declines is filled by Java and uploaded. For a router compiled from a wrapped
+chunk, the traversal needs the finalDensity cell cache to be the chunk's only
+cell cache and a `NativeCellDensity` over this chunk's interpolators;
+otherwise Java's per-cell loop runs with Rust slices. A native chunk-noise
+template supplies its own cell program and can also bind [structure Beardifier
 cells](RUST-CHUNK-NOISE.md#structure-terrain-adjustment). Afterwards `NoiseChunk`
 has stopped interpolating; its interpolator corners and cell counters are not
 read again.
+
+## Rust-owned aquifer materials
+
+When the chunk's aquifer is on the fully native route
+(`NativeAquifer.nativeBinding`: built-in pure sources and positional
+randomness, a water, lava or air fluid picker, a native barrier noise),
+`NativeNoiseFill` hands its state to the traversal once: copies of the
+centre, fluid status, preliminary surface and FlatCache caches, its policy and
+programs. A cell needing batch materials then gets them from
+[`aquifer/substance.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/aquifer/substance.rs)
+(`OwnedAquifer::cell_materials`): `NativeAquifer.prepareMaterials`' batch
+decision with every fluid status computed natively instead of asked of Java.
+The caches are pure memos; Java copies them back after the traversal. The
+aquifer's `shouldScheduleFluidUpdate` is not touched, as with Java-prepared
+batches. `-Dmattmc.worldgen.javaFillMaterials=true` keeps Java preparing
+materials, for comparisons.
+
+The same aquifer path decides substances for the
+[carvers stage](carver/RUST-CARVERS.md).
+
+```sh
+python3 DevUtils/tests/worldgen/VerifyRustFillAquifer.py --parity-only
+python3 DevUtils/tests/worldgen/VerifyRustFillAquifer.py --forks 3 --cpu 5 --background-cpus 0,1
+```
+
+`NativeNoiseFillTest.rustAquiferMaterialsMatchJavaPreparedMaterials` fills
+every vanilla setting (three seeds, four positions) with Rust-owned materials
+and with Java-prepared ones and compares sections, heightmaps,
+post-processing and later aquifer reads, plus an overworld variant with a lava
+sea; every aquifer-enabled fill must take the Rust route. The other fill tests
+compare the default route with Java's pure loop. Mutations of the batch's
+fluid-kind code or air id fail them; using the fluid level instead of
+`min(-54, fluid level)` for the batch's lava boundary survives, because the
+fill's own substance rule answers every block below a sea before the batch. The driver benchmarks `NoiseFillVerification` in `javamaterials`
+against `native` mode.
+
+Measurements (2026-10-05, the same laptop and method as the cell traversal):
+4.96 → 4.97 ms per overworld fill (paired ratios 0.96, 0.93, 1.02), 4.78 →
+4.74 ms amplified (0.96, 0.99, 1.03) and 0.93 → 0.95 ms nether, which has no
+aquifer (1.03, 0.99, 0.95). No 95% interval excludes 1: the material
+decisions were already native, so the move removes the per-cell handoff and
+Java's status requests (Java↔Rust chatter) rather than compute. Raw rounds
+were recorded under `build/fill-aquifer-migration/` (not bundled with the wiki).
 
 ## Eligibility
 

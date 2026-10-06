@@ -52,7 +52,7 @@ The chunk keeps Java's carvers when any of these fail:
   Y, constant, uniform or trapezoid floats, no debug settings; and its height
   range resolves non-empty (Java logs an empty one);
 - the aquifer is disabled with a plain fluid picker, or noise-based on its fully
-  native route (`NativeAquifer.carverBinding`);
+  native route (`NativeAquifer.nativeBinding`);
 - the storage accepts the chunk ([`NativeProtoChunk`](../RUST-SURFACE-STORAGE.md#shared-chunk-storage)).
 
 Java's loop reseeds its random per carver, so a fallback draws what Rust would

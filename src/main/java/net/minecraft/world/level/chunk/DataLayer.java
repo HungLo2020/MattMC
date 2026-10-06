@@ -30,6 +30,16 @@ public class DataLayer {
 		}
 	}
 
+	// Raw view for the Rust light bridge; never allocates.
+	@Nullable
+	public byte[] dataForNativeLight() {
+		return this.data;
+	}
+
+	public int defaultValueForNativeLight() {
+		return this.defaultValue;
+	}
+
 	public int get(int i, int j, int k) {
 		return this.get(getIndex(i, j, k));
 	}

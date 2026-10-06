@@ -57,38 +57,69 @@ pub unsafe extern "C" fn mattmc_surface_step(
     }
 }
 
-use super::chunk::{Biomes, SurfaceChunk};
+use super::chunk::{Biomes, Inputs, Slot, SurfaceChunk};
+use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::router::Program;
+use crate::world::level::levelgen::synth::State;
 use crate::world::level::levelgen::proto_chunk::ProtoStorage;
 
 /// The SURFACE stage over a chunk storage (`mattmc_proto_chunk_create`).
 /// `ints`: [defaultBlock, usesBiomes, quart origin x, y, z, quart sizes x, y,
-/// z, steepSlots, then steep flags per condition slot, then quart biome ids].
+/// z, slotCount, then per condition slot (kind: 0 Java, 1 steep, 2 vertical
+/// gradient, 3 noise threshold; gradient low, high; positional random kind),
+/// then quart biome ids]. Per slot `slot_longs` holds two values (a gradient's
+/// seeds, or a noise threshold's state address) and `slot_doubles` two (a
+/// noise threshold's min and max). `inputs`: [band noise state, secondary
+/// noise state, preliminary surface program], each 0 when Java answers it.
 /// `seed` is the biome zoom seed. Returns 0 if invalid.
 /// # Safety
-/// `ints` holds `int_count` values for this call; `storage` is live, outlives
-/// the stage and is used only through it while the stage runs.
+/// `ints` holds `int_count` values and the slot arrays `ints[8]` pairs, all
+/// borrowed for this call; `storage` is live, outlives the stage and is used
+/// only through it while the stage runs; every noise state and program in
+/// the slots and `inputs` stays live while the stage runs.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_surface_chunk_create(storage: u64, ints: *const i32, int_count: i32, seed: i64) -> u64 {
-    if storage == 0 || ints.is_null() || int_count < 9 {
+pub unsafe extern "C" fn mattmc_surface_chunk_create(storage: u64, ints: *const i32, int_count: i32, seed: i64, slot_longs: *const i64,
+    slot_doubles: *const f64, inputs: *const i64) -> u64 {
+    if storage == 0 || ints.is_null() || int_count < 9 || slot_longs.is_null() || slot_doubles.is_null() || inputs.is_null() {
         return 0;
     }
     let i = unsafe { std::slice::from_raw_parts(ints, int_count as usize) };
-    let Some((default_block, biomes, steep)) = parse(i, seed) else { return 0 };
-    match unsafe { SurfaceChunk::new(storage as *mut ProtoStorage, default_block, biomes, steep) } {
+    let Ok(slots) = usize::try_from(i[8]) else { return 0 };
+    if slots > 65536 {
+        return 0;
+    }
+    let l = unsafe { std::slice::from_raw_parts(slot_longs, slots * 2) };
+    let d = unsafe { std::slice::from_raw_parts(slot_doubles, slots * 2) };
+    let n = unsafe { std::slice::from_raw_parts(inputs, 3) };
+    let Some((default_block, biomes, slots)) = parse(i, seed, l, d) else { return 0 };
+    let inputs = Inputs { band: n[0] as *const State, secondary: n[1] as *const State, levels: n[2] as *const Program };
+    match unsafe { SurfaceChunk::new(storage as *mut ProtoStorage, default_block, biomes, slots, inputs) } {
         Ok(chunk) => Box::into_raw(Box::new(chunk)) as u64,
         Err(_) => 0,
     }
 }
 
-fn parse(i: &[i32], seed: i64) -> Option<(i32, Option<Biomes>, Vec<bool>)> {
+fn parse(i: &[i32], seed: i64, l: &[i64], d: &[f64]) -> Option<(i32, Option<Biomes>, Vec<Slot>)> {
     let (default_block, uses_biomes) = (i[0], i[1] != 0);
-    let (sizes, slots) = ([usize::try_from(i[5]).ok()?, usize::try_from(i[6]).ok()?, usize::try_from(i[7]).ok()?], usize::try_from(i[8]).ok()?);
-    if slots > 65536 || sizes.iter().any(|s| *s > 4096) {
+    let (sizes, count) = ([usize::try_from(i[5]).ok()?, usize::try_from(i[6]).ok()?, usize::try_from(i[7]).ok()?], usize::try_from(i[8]).ok()?);
+    if sizes.iter().any(|s| *s > 4096) {
         return None;
     }
     let mut at = 9;
-    let steep: Vec<bool> = i.get(at..at + slots)?.iter().map(|v| *v != 0).collect();
-    at += slots;
+    let mut slots = Vec::with_capacity(count);
+    for k in 0..count {
+        let h = i.get(at..at + 4)?;
+        slots.push(match h[0] {
+            0 => Slot::Java,
+            1 => Slot::Steep,
+            // Without a band the evaluator's bounds answer every Y.
+            2 if h[1] >= h[2] => Slot::Java,
+            2 => Slot::Gradient { low: h[1], high: h[2], random: Positional::from_abi(h[3], l[k * 2], l[k * 2 + 1])? },
+            3 if l[k * 2] != 0 => Slot::Noise { state: l[k * 2] as *const State, min: d[k * 2], max: d[k * 2 + 1] },
+            _ => return None,
+        });
+        at += 4;
+    }
     let biomes = if uses_biomes {
         let count = sizes[0] * sizes[1] * sizes[2];
         let ids = i.get(at..at + count)?.to_vec();
@@ -97,7 +128,7 @@ fn parse(i: &[i32], seed: i64) -> Option<(i32, Option<Biomes>, Vec<bool>)> {
     } else {
         None
     };
-    (at == i.len()).then_some((default_block, biomes, steep))
+    (at == i.len()).then_some((default_block, biomes, slots))
 }
 
 unsafe fn chunk<'a>(handle: u64) -> &'a mut SurfaceChunk {

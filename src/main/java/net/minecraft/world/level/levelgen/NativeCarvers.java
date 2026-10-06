@@ -264,7 +264,7 @@ final class NativeCarvers {
             replaceable.addElements(replaceable.size(), ids);
             System.arraycopy(new int[]{kind, config.lavaLevel.resolveY(context), min, max, widthSmoothness, ids.length}, 0, configInts, index * 6, 6);
         }
-        NativeAquifer.CarverBinding binding = null;
+        NativeAquifer.NativeBinding binding = null;
         int[] disabledPolicy = null;
         if (needsAquifer) {
             if (aquifer instanceof Aquifer.Disabled disabled) {
@@ -276,7 +276,7 @@ final class NativeCarvers {
                     picker.disabled.fluidLevel(), Block.getId(Blocks.AIR.defaultBlockState())};
                 for (int id : disabledPolicy) if (id == -1) return false;
             } else if (aquifer instanceof Aquifer.NoiseBasedAquifer noiseAquifer) {
-                binding = noiseAquifer.nativeAquifer().carverBinding();
+                binding = noiseAquifer.nativeAquifer().nativeBinding();
                 if (binding == null) return false;
             } else {
                 return false;

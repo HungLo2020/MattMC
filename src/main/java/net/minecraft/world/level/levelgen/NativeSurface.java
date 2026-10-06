@@ -9,6 +9,7 @@ import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.Registry;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.biome.Biome;
@@ -44,8 +45,8 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
     private final int[] program, cache;
     private final SurfaceRules.Condition[] conditions;
     private final SurfaceRules.SurfaceRule[] rules;
-    // Condition slots holding the context's shared steep condition.
-    private final boolean[] steepSlots;
+    // Each condition slot's source, for slots Rust can answer itself.
+    private final SurfaceRules.ConditionSource[] conditionSources;
     private final int[] frame = new int[24];
     private int[] flags = new int[1], output = new int[1], biomes = new int[1], biomeCache = new int[1];
     private final boolean usesBiomes;
@@ -57,22 +58,68 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
     NativeSurface(SurfaceRules.RuleSource source, SurfaceRules.Context context, Registry<Biome> registry, BiomeManager biomeManager) {
         this.context = context; this.registry = registry;
         this.biomeManager = biomeManager != null && biomeManager.getClass() == BiomeManager.class ? biomeManager : null;
-        Compiler compiler = new Compiler(); compiler.rule(source, 0); compiler.emit(0, 0, 0, 0, 0);
-        int end = compiler.words.size(); compiler.words.set(0, end);
-        for (var data : compiler.biomeData) {
-            compiler.words.set(data[0] + 1, compiler.words.size());
-            for (int i = 1; i < data.length; i++) compiler.words.add(data[i]);
+        // A batched program depends only on the rule, the system's bands, the
+        // biome registry, native biomes and the generation height range: it is
+        // compiled and validated once per surface system, and each context only
+        // applies its condition sources.
+        Key key = new Key(source, registry, this.biomeManager != null, context.context.getMinGenY(), context.context.getGenDepth());
+        Compiled compiled = context.system.getClass() == SurfaceSystem.class && cacheCompiled
+            ? COMPILED.computeIfAbsent(context.system, system -> new ConcurrentHashMap<>()).get(key) : null;
+        if (compiled == null) {
+            Compiler compiler = new Compiler(); compiler.rule(source, 0); compiler.emit(0, 0, 0, 0, 0);
+            int end = compiler.words.size(); compiler.words.set(0, end);
+            for (var data : compiler.biomeData) {
+                compiler.words.set(data[0] + 1, compiler.words.size());
+                for (int i = 1; i < data.length; i++) compiler.words.add(data[i]);
+            }
+            program = compiler.words.stream().mapToInt(Integer::intValue).toArray();
+            conditions = compiler.conditions.toArray(SurfaceRules.Condition[]::new);
+            rules = compiler.rules.toArray(SurfaceRules.SurfaceRule[]::new);
+            conditionSources = compiler.sources.toArray(SurfaceRules.ConditionSource[]::new);
+            usesBiomes = compiler.usesBiomes;
+            validate(program);
+            if (compiler.canBatch && context.system.getClass() == SurfaceSystem.class && cacheCompiled) {
+                COMPILED.computeIfAbsent(context.system, system -> new ConcurrentHashMap<>()).put(key, new Compiled(program, conditionSources, usesBiomes));
+            }
+            canBatch = compiler.canBatch && this.biomeManager != null
+                && context.system.getClass() == SurfaceSystem.class
+                && context.chunk.getClass() == net.minecraft.world.level.chunk.ProtoChunk.class;
+        } else {
+            program = compiled.program();
+            conditionSources = compiled.sources();
+            conditions = new SurfaceRules.Condition[conditionSources.length];
+            for (int slot = 0; slot < conditions.length; slot++) conditions[slot] = conditionSources[slot].apply(context);
+            rules = new SurfaceRules.SurfaceRule[0];
+            usesBiomes = compiled.usesBiomes();
+            canBatch = this.biomeManager != null && context.chunk.getClass() == net.minecraft.world.level.chunk.ProtoChunk.class;
         }
-        program = compiler.words.stream().mapToInt(Integer::intValue).toArray();
-        conditions = compiler.conditions.toArray(SurfaceRules.Condition[]::new);
-        rules = compiler.rules.toArray(SurfaceRules.SurfaceRule[]::new);
-        steepSlots = new boolean[conditions.length];
-        for (int i = 0; i < steepSlots.length; i++) steepSlots[i] = compiler.steep.contains(i);
-        usesBiomes = compiler.usesBiomes;
-        canBatch = compiler.canBatch && this.biomeManager != null
-            && context.system.getClass() == SurfaceSystem.class
-            && context.chunk.getClass() == net.minecraft.world.level.chunk.ProtoChunk.class;
-        cache = new int[end / 8];
+        cache = new int[program[0] / 8];
+    }
+
+    /** The rule and registry by identity (hashing a rule tree would walk it), with the inputs compiling reads. */
+    private record Key(SurfaceRules.RuleSource source, Registry<Biome> registry, boolean biomes, int minY, int height) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Key key && key.source == this.source && key.registry == this.registry && key.biomes == this.biomes
+                && key.minY == this.minY && key.height == this.height;
+        }
+
+        @Override
+        public int hashCode() {
+            return ((System.identityHashCode(this.source) * 31 + System.identityHashCode(this.registry)) * 31 + (this.biomes ? 1 : 0)) * 31
+                + this.minY * 7919 + this.height;
+        }
+    }
+
+    private record Compiled(int[] program, SurfaceRules.ConditionSource[] sources, boolean usesBiomes) {}
+
+    // Comparison runs compile every context's program, as before the cache.
+    static volatile boolean cacheCompiled = !Boolean.getBoolean("mattmc.worldgen.surfaceCompileEachChunk");
+    // Batched programs per surface system; weak keys do not retain old RandomStates.
+    private static final java.util.Map<SurfaceSystem, ConcurrentHashMap<Key, Compiled>> COMPILED =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    private static void validate(int[] program) {
         try {
             int status;
             if (program.length <= 131072) {
@@ -93,7 +140,7 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         final List<int[]> biomeData = new ArrayList<>();
         final List<SurfaceRules.Condition> conditions = new ArrayList<>();
         final List<SurfaceRules.SurfaceRule> rules = new ArrayList<>();
-        final java.util.Set<Integer> steep = new java.util.HashSet<>();
+        final List<SurfaceRules.ConditionSource> sources = new ArrayList<>();
         boolean canBatch = true, usesBiomes;
         int emit(int op, int a, int b, int c, int d) {
             int pc = words.size(); for (int v : new int[]{op,a,b,c,d,0,0,0}) words.add(v); return pc;
@@ -147,7 +194,7 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
             } else if (source instanceof SurfaceRules.VerticalGradientConditionSource gradient) {
                 // Most blocks lie outside the random transition band. Preserve
                 // Java's ordered bounds checks without a callback per block.
-                int slot = conditions.size(); conditions.add(source.apply(context));
+                int slot = conditions.size(); conditions.add(source.apply(context)); sources.add(source);
                 pc = emit(11, slot, gradient.trueAtAndBelow().resolveY(context.context),
                     gradient.falseAtAndAbove().resolveY(context.context), 0);
             } else if (source instanceof SurfaceRules.BiomeConditionSource biome && biomeManager != null) {
@@ -164,8 +211,7 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
                 boolean xz = source instanceof SurfaceRules.NoiseThresholdConditionSource || source == SurfaceRules.Steep.INSTANCE;
                 boolean known = xz || source == SurfaceRules.Temperature.INSTANCE || source instanceof SurfaceRules.VerticalGradientConditionSource || source instanceof SurfaceRules.BiomeConditionSource;
                 if (!known) canBatch = false;
-                if (source == SurfaceRules.Steep.INSTANCE) steep.add(conditions.size());
-                int slot = conditions.size(); conditions.add(source.apply(context)); pc = emit(2, slot, xz ? 1 : 0, 0, 0);
+                int slot = conditions.size(); conditions.add(source.apply(context)); sources.add(source); pc = emit(2, slot, xz ? 1 : 0, 0, 0);
             }
             words.set(pc + 6, inverse ? 1 : 0); return pc;
         }
@@ -277,8 +323,64 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         return usesBiomes;
     }
 
-    boolean[] steepSlots() {
-        return steepSlots.clone();
+    /** How Rust answers each condition slot: per slot [kind (0 Java, 1 steep,
+     * 2 vertical gradient, 3 noise threshold), low, high, positional random
+     * kind] ints, two longs (gradient seeds or the noise state's address) and
+     * two doubles (threshold bounds); {@code keep} holds what must stay live. */
+    record Slots(int[] ints, long[] longs, double[] doubles, List<Object> keep) {}
+
+    /** Every slot answered by Java except steep (comparison runs). */
+    Slots javaSlots() {
+        int[] ints = new int[conditionSources.length * 4];
+        for (int slot = 0; slot < conditionSources.length; slot++) if (conditionSources[slot] == SurfaceRules.Steep.INSTANCE) ints[slot * 4] = 1;
+        return new Slots(ints, new long[conditionSources.length * 2], new double[conditionSources.length * 2], List.of());
+    }
+
+    Slots nativeSlots() {
+        int count = conditionSources.length;
+        int[] ints = new int[count * 4];
+        long[] longs = new long[count * 2];
+        double[] doubles = new double[count * 2];
+        List<Object> keep = new ArrayList<>();
+        for (int slot = 0; slot < count; slot++) {
+            var source = conditionSources[slot];
+            if (source == SurfaceRules.Steep.INSTANCE) {
+                ints[slot * 4] = 1;
+            } else if (source instanceof SurfaceRules.VerticalGradientConditionSource gradient) {
+                // The condition's own bounds and factory, as apply() resolves them.
+                var factory = context.randomState.getOrCreateRandomFactory(gradient.randomName());
+                if (factory.getClass() == XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class) {
+                    var xoroshiro = (XoroshiroRandomSource.XoroshiroPositionalRandomFactory)factory;
+                    System.arraycopy(new int[]{2, gradient.trueAtAndBelow().resolveY(context.context), gradient.falseAtAndAbove().resolveY(context.context), 1},
+                        0, ints, slot * 4, 4);
+                    longs[slot * 2] = xoroshiro.seedLo();
+                    longs[slot * 2 + 1] = xoroshiro.seedHi();
+                } else if (factory.getClass() == LegacyRandomSource.LegacyPositionalRandomFactory.class) {
+                    System.arraycopy(new int[]{2, gradient.trueAtAndBelow().resolveY(context.context), gradient.falseAtAndAbove().resolveY(context.context), 2},
+                        0, ints, slot * 4, 4);
+                    longs[slot * 2] = ((LegacyRandomSource.LegacyPositionalRandomFactory)factory).seed();
+                }
+            } else if (source instanceof SurfaceRules.NoiseThresholdConditionSource threshold) {
+                var state = context.randomState.getOrCreateNoise(threshold.noise()).nativeState();
+                if (state != null && state.state().isNative()) {
+                    ints[slot * 4] = 3;
+                    longs[slot * 2] = state.state().address();
+                    doubles[slot * 2] = threshold.minThreshold();
+                    doubles[slot * 2 + 1] = threshold.maxThreshold();
+                    keep.add(state);
+                }
+            }
+        }
+        return new Slots(ints, longs, doubles, keep);
+    }
+
+    /** The context's noise chunk, for its preliminary surface levels. */
+    NoiseChunk noiseChunk() {
+        return context.noiseChunk();
+    }
+
+    SurfaceSystem system() {
+        return context.system;
     }
 
     /** {@link #column} over Rust-owned storage: Rust scans the column, selects its
@@ -313,7 +415,24 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
             return status;
         } catch (Throwable t) { throw failure(t); }
     }
+    // Requests Java answered, by kind: band offset, secondary noise, minimum
+    // surface level, steep, vertical gradient, noise threshold, other conditions.
+    static final java.util.concurrent.atomic.AtomicLongArray JAVA_ANSWERS = new java.util.concurrent.atomic.AtomicLongArray(7);
+
+    private void count(int request) {
+        int kind;
+        if (request < 0) {
+            kind = request == -1 ? 0 : request == -2 ? 1 : request == -3 ? 2 : 6;
+        } else {
+            var source = conditionSources[request];
+            kind = source == SurfaceRules.Steep.INSTANCE ? 3 : source instanceof SurfaceRules.VerticalGradientConditionSource ? 4
+                : source instanceof SurfaceRules.NoiseThresholdConditionSource ? 5 : 6;
+        }
+        JAVA_ANSWERS.incrementAndGet(kind);
+    }
+
     private void respond(int x, int z) {
+        if (frame[17] >= -3 && frame[17] < conditionSources.length) count(frame[17]);
         int y = frame[12] + frame[0];
         if (syncedY != y) {
             context.updateY(frame[1], frame[10], frame[2], x, y, z);

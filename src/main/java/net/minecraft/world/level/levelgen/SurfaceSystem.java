@@ -374,6 +374,15 @@ public class SurfaceSystem {
 		return this.clayBands[(j + l + this.clayBands.length) % this.clayBands.length];
 	}
 
+	/** The band offset and secondary surface noises, for native surface stages. */
+	NormalNoise clayBandsOffsetNoise() {
+		return this.clayBandsOffsetNoise;
+	}
+
+	NormalNoise surfaceSecondaryNoise() {
+		return this.surfaceSecondaryNoise;
+	}
+
 	int bandOffset(int x, int z) {
 		return (int)Math.round(this.clayBandsOffsetNoise.getValue(x, 0.0, z) * 4.0);
 	}

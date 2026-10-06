@@ -171,11 +171,16 @@ The repository-wide Rust suite encountered 80 renderer failures, beginning with
 an OpenGL shader compilation error and followed by poisoned graphics locks.
 Rendering was not changed; the focused world-generation suite passed separately.
 
-## Carver substance decisions
+## Native stage decisions
+
+The NOISE fill's cell traversal prepares cell materials with the same path
+([Rust-owned aquifer materials](RUST-NOISE-FILL.md#rust-owned-aquifer-materials)).
+
+### Carver substance decisions
 
 The [Rust carvers stage](carver/RUST-CARVERS.md) decides
 `computeSubstance(SinglePointContext, 0.0)` entirely in Rust
 ([`aquifer/substance.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/aquifer/substance.rs))
 for aquifers on the fully native route: native centres, ranking and decision,
 fluid statuses from the native sources and surface programs, and the barrier
-noise, over the aquifer's own caches (`NativeAquifer.carverBinding`).
+noise, over the aquifer's own caches (`NativeAquifer.nativeBinding`).

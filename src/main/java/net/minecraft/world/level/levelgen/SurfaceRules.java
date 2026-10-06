@@ -340,6 +340,10 @@ public class SurfaceRules {
 			return i << 4;
 		}
 
+		NoiseChunk noiseChunk() {
+			return this.noiseChunk;
+		}
+
 		protected int getMinSurfaceLevel() {
 			if (this.lastMinSurfaceLevelUpdate != this.lastUpdateXZ) {
 				this.lastMinSurfaceLevelUpdate = this.lastUpdateXZ;

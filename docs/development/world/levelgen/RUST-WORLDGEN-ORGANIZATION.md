@@ -96,8 +96,9 @@ shared point programs for [preliminary levels](RUST-PRELIMINARY-SURFACE.md) and
 [aquifer fluid sources](RUST-AQUIFER.md#native-fluid-sources).
 [Chunk-noise templates](RUST-CHUNK-NOISE.md) are compiled once per `RandomState`
 and instantiated per eligible chunk. [NOISE fill](RUST-NOISE-FILL.md) keeps
-slices and cell traversal in Rust on that route, yielding requested aquifer
-materials to Java before continuing.
+slices and cell traversal in Rust on that route. Rust prepares aquifer materials
+itself for aquifers on the native route and yields other aquifers' requests
+to Java before continuing.
 
 [Biome fill](../biome/RUST-BIOME-FILL.md) combines climate sampling, ordered
 search and container replay; Java installs the containers and previous leaf.

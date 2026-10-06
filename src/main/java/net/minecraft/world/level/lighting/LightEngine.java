@@ -31,6 +31,8 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 	private static final int CACHE_SIZE = 2;
 	private final long[] lastChunkPos = new long[2];
 	private final LightChunk[] lastChunk = new LightChunk[2];
+	@Nullable
+	private final NativeLightPropagation nativePropagation = NativeLightPropagation.create(this);
 
 	protected LightEngine(LightChunkGetter lightChunkGetter, S layerLightSectionStorage) {
 		this.chunkSource = lightChunkGetter;
@@ -144,9 +146,12 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 
 		this.blockNodesToCheck.clear();
 		this.blockNodesToCheck.trim(512);
-		int i = 0;
-		i += this.propagateDecreases();
-		i += this.propagateIncreases();
+		int i = this.nativePropagation == null ? -1 : this.nativePropagation.run(this.storage, this.decreaseQueue, this.increaseQueue);
+		if (i < 0) {
+			i = 0;
+			i += this.propagateDecreases();
+			i += this.propagateIncreases();
+		}
 		this.clearChunkCache();
 		this.storage.markNewInconsistencies(this);
 		this.storage.swapSectionMap();

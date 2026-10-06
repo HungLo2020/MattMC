@@ -311,11 +311,18 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 		int j = this.storage.getBottomSectionY();
 		int k = SectionPos.sectionToBlockCoord(chunkPos.x);
 		int m = SectionPos.sectionToBlockCoord(chunkPos.z);
+		NativeLightPropagation.SkySeed seed = NativeLightPropagation.skySeed(
+			chunkSkyLightSources, chunkSkyLightSources2, chunkSkyLightSources3, chunkSkyLightSources4, chunkSkyLightSources5
+		);
 
 		for (int n = i - 1; n >= j; n--) {
 			long o = SectionPos.asLong(chunkPos.x, n, chunkPos.z);
 			DataLayer dataLayer = this.storage.getDataLayerToWrite(o);
-			if (dataLayer != null) {
+			if (seed != null && dataLayer != null && dataLayer.getClass() == DataLayer.class) {
+				if (!seed.section(this, dataLayer, SectionPos.sectionToBlockCoord(n), k, m)) {
+					break;
+				}
+			} else if (dataLayer != null) {
 				int p = SectionPos.sectionToBlockCoord(n);
 				int q = p + 15;
 				boolean bl = false;

@@ -258,13 +258,13 @@ final class NativeAquifer {
         catch(Throwable t) { throw new IllegalStateException("Native aquifer cell failed",t); }
     }
 
-    /** This aquifer's buffers for a native CARVERS stage, whose substance decisions
-     * run entirely in Rust: built-in pure sources and positional randomness, a
-     * plain fluid picker of water, lava or air, and a native barrier noise. Null
-     * keeps Java's carving. The caches are this aquifer's own; the stage copies
-     * them back. */
+    /** This aquifer's buffers for a native stage whose substance and material
+     * decisions run entirely in Rust (the NOISE fill's cell traversal, CARVERS):
+     * built-in pure sources and positional randomness, a plain fluid picker of
+     * water, lava or air, and a native barrier noise. Null keeps Java's
+     * decisions. The caches are this aquifer's own; the stage copies them back. */
     @org.jetbrains.annotations.Nullable
-    CarverBinding carverBinding() {
+    NativeBinding nativeBinding() {
         if(sources==null || levels==null || barrier==null || locationKind==0 || net.minecraft.SharedConstants.DEBUG_DISABLE_FLUID_GENERATION) return null;
         BlockState fluidType=global.fluid.fluidType();
         if(global.lava.fluidType()!=Blocks.LAVA.defaultBlockState() || fluidType!=Blocks.WATER.defaultBlockState()
@@ -283,13 +283,13 @@ final class NativeAquifer {
             sourceGrid=new int[]{chunk.firstNoiseX,chunk.firstNoiseZ,size};
             sourceMemo=new double[sources.slots()*size*size];sourcePresent=new byte[sourceMemo.length];
         }
-        return new CarverBinding(locations,shape,cache,locationKind,locationSeedA,locationSeedB,skipY,fluidPolicy,
+        return new NativeBinding(locations,shape,cache,locationKind,locationSeedA,locationSeedB,skipY,fluidPolicy,
             new int[]{surfaceMinX,surfaceMinZ,surfaceWidth,surfaceHeight},surfaceCache,sources,levels,sourceGrid,sourceMemo,sourcePresent,
             noise==null?MemorySegment.NULL:noise.state(),barrier.xzScale(),barrier.yScale(),noise);
     }
 
     /** Arrays are this aquifer's live caches; {@code noise} keeps the barrier state reachable. */
-    record CarverBinding(long[] locations,int[] shape,int[] cache,int locationKind,long seedA,long seedB,int skipY,int[] policy,
+    record NativeBinding(long[] locations,int[] shape,int[] cache,int locationKind,long seedA,long seedB,int skipY,int[] policy,
                          int[] surfaceRect,int[] surface,NativeFluidSources sources,NativeSurfaceLevel levels,int[] grid,double[] memo,byte[] present,
                          MemorySegment barrierState,double barrierXz,double barrierY,@org.jetbrains.annotations.Nullable NativeNoiseState noise) {}
 

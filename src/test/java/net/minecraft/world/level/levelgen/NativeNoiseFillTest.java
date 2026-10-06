@@ -175,6 +175,63 @@ class NativeNoiseFillTest {
         }
     }
 
+    /** The cell traversal with Rust-owned aquifer materials against the same
+     * traversal asking Java for them, for every vanilla setting: sections,
+     * heightmaps, post-processing and later aquifer reads must match, and every
+     * aquifer on the native route must take it. */
+    @Test void rustAquiferMaterialsMatchJavaPreparedMaterials() {
+        long[] seeds = {0, 42, -7_340_013_412_337L};
+        ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(37, -91), new ChunkPos(-6250, 4321)};
+        long before = NativeNoiseFill.AQUIFER_FILLS.get();
+        int pairs = 0, aquifers = 0;
+        for (var setting : settings) {
+            for (long seed : seeds) {
+                var noises = registries.lookupOrThrow(Registries.NOISE);
+                for (ChunkPos pos : positions) {
+                    String context = setting.key().location() + " seed " + seed + " " + pos + " aquifer materials";
+                    NativeNoiseFill.nativeAquifer = false;
+                    Filled java;
+                    try {
+                        java = fill(setting, RandomState.create(setting.value(), noises, seed), pos, true);
+                    } finally {
+                        NativeNoiseFill.nativeAquifer = true;
+                    }
+                    long native0 = NativeNoiseFill.AQUIFER_FILLS.get();
+                    var candidate = fill(setting, RandomState.create(setting.value(), noises, seed), pos, true);
+                    if (setting.value().aquifersEnabled()) {
+                        assertEquals(native0 + 1, NativeNoiseFill.AQUIFER_FILLS.get(), () -> context + " must prepare materials in Rust");
+                        aquifers++;
+                    }
+                    compare(java, candidate, context);
+                    pairs++;
+                }
+            }
+        }
+        // A lava sea: aquifer statuses below the sea are lava, which only an
+        // aquifer-enabled setting with a lava default fluid exercises.
+        var overworld = settings.stream().filter(h -> h.is(NoiseGeneratorSettings.OVERWORLD)).findFirst().orElseThrow().value();
+        Holder<NoiseGeneratorSettings> lavaSea = Holder.direct(new NoiseGeneratorSettings(overworld.noiseSettings(), overworld.defaultBlock(),
+            net.minecraft.world.level.block.Blocks.LAVA.defaultBlockState(), overworld.noiseRouter(), overworld.surfaceRule(), overworld.spawnTarget(),
+            overworld.seaLevel(), overworld.disableMobGeneration(), true, overworld.oreVeinsEnabled(), overworld.useLegacyRandomSource()));
+        for (ChunkPos pos : positions) {
+            var noises = registries.lookupOrThrow(Registries.NOISE);
+            NativeNoiseFill.nativeAquifer = false;
+            Filled java;
+            try {
+                java = fill(lavaSea, RandomState.create(lavaSea.value(), noises, 5), pos, true);
+            } finally {
+                NativeNoiseFill.nativeAquifer = true;
+            }
+            long native0 = NativeNoiseFill.AQUIFER_FILLS.get();
+            var candidate = fill(lavaSea, RandomState.create(lavaSea.value(), noises, 5), pos, true);
+            assertEquals(native0 + 1, NativeNoiseFill.AQUIFER_FILLS.get(), () -> "lava sea " + pos + " must prepare materials in Rust");
+            compare(java, candidate, "lava sea " + pos);
+            pairs++;
+        }
+        assertTrue(aquifers > 0);
+        System.out.println("FILL_AQUIFER_PARITY pairs=" + pairs + " rust_aquifers=" + (NativeNoiseFill.AQUIFER_FILLS.get() - before));
+    }
+
     @Test void nativeFillMatchesJavaLoopForEveryVanillaSetting() {
         long[] seeds = {0, 42, -7_340_013_412_337L};
         ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(37, -91), new ChunkPos(-6250, 4321), new ChunkPos(131_000, -131_000)};

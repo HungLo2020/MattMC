@@ -44,7 +44,12 @@ class NativeSurfaceChunkTest {
 
     static NativeNoiseFillTest.Filled surface(Holder<NoiseGeneratorSettings> setting, long seed, ChunkPos pos, int salt, boolean owned,
                                               SurfaceRules.RuleSource rule) {
-        var random = RandomState.create(setting.value(), NativeNoiseFillTest.registries.lookupOrThrow(Registries.NOISE), seed);
+        return surface(setting, RandomState.create(setting.value(), NativeNoiseFillTest.registries.lookupOrThrow(Registries.NOISE), seed), seed, pos, salt,
+            owned, rule);
+    }
+
+    static NativeNoiseFillTest.Filled surface(Holder<NoiseGeneratorSettings> setting, RandomState random, long seed, ChunkPos pos, int salt, boolean owned,
+                                              SurfaceRules.RuleSource rule) {
         var filled = NativeNoiseFillTest.fill(setting, random, pos, true);
         var chunk = filled.chunk();
         // As at the SURFACE stage: the NOISE status persisted, its heightmaps primed.
@@ -62,25 +67,76 @@ class NativeSurfaceChunkTest {
         return filled;
     }
 
+    static long[] answers() {
+        long[] out = new long[7];
+        for (int kind = 0; kind < 7; kind++) out[kind] = NativeSurface.JAVA_ANSWERS.get(kind);
+        return out;
+    }
+
     @Test void ownedSurfaceMatchesJavaStorageForEveryVanillaSetting() {
         long[] seeds = {0, -7_340_013_412_337L};
         ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(-6250, 4321), new ChunkPos(131_000, -131_000)};
         long before = NativeSurfaceChunk.CHUNKS.get();
+        long[] javaRoute = new long[7], ownedRoute = new long[7];
         int pairs = 0;
         for (var setting : NativeNoiseFillTest.settings) {
             for (long seed : seeds) {
                 for (int index = 0; index < positions.length; index++) {
                     String context = setting.key().location() + " seed " + seed + " " + positions[index];
+                    long[] start = answers();
                     var java = surface(setting, seed, positions[index], index, false);
+                    long[] middle = answers();
                     long owned = NativeSurfaceChunk.CHUNKS.get();
                     var candidate = surface(setting, seed, positions[index], index, true);
+                    long[] end = answers();
+                    for (int kind = 0; kind < 7; kind++) {
+                        javaRoute[kind] += middle[kind] - start[kind];
+                        ownedRoute[kind] += end[kind] - middle[kind];
+                    }
                     assertEquals(owned + 1, NativeSurfaceChunk.CHUNKS.get(), () -> context + " must run on Rust storage");
                     NativeNoiseFillTest.compare(java, candidate, context);
                     pairs++;
                 }
             }
         }
-        System.out.println("SURFACE_CHUNK_PARITY pairs=" + pairs + " owned=" + (NativeSurfaceChunk.CHUNKS.get() - before));
+        // Rust answers band offsets, secondary noise, minimum surface levels,
+        // steep, vertical gradients and noise thresholds on Rust storage; the Java
+        // route shows the corpus asks for each of them.
+        for (int kind = 0; kind < 6; kind++) {
+            int k = kind;
+            assertTrue(javaRoute[kind] > 0, () -> "the corpus must request kind " + k);
+            assertEquals(0, ownedRoute[kind], () -> "Rust storage must answer kind " + k + " natively");
+        }
+        System.out.println("SURFACE_CHUNK_PARITY pairs=" + pairs + " owned=" + (NativeSurfaceChunk.CHUNKS.get() - before)
+            + " java_route_answers=" + java.util.Arrays.toString(javaRoute) + " owned_route_answers=" + java.util.Arrays.toString(ownedRoute));
+    }
+
+    /** Chunks of one RandomState reuse its compiled rule program: they must
+     * match chunks whose programs were compiled fresh, Java's answers included. */
+    @Test void cachedRuleProgramsMatchFreshCompilation() {
+        ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(37, -91), new ChunkPos(-6250, 4321)};
+        int pairs = 0;
+        for (var setting : NativeNoiseFillTest.settings) {
+            var noises = NativeNoiseFillTest.registries.lookupOrThrow(Registries.NOISE);
+            var fresh = RandomState.create(setting.value(), noises, 11);
+            var shared = RandomState.create(setting.value(), noises, 11);
+            for (int index = 0; index < positions.length; index++) {
+                String context = setting.key().location() + " " + positions[index] + " cached program";
+                NativeSurface.cacheCompiled = false;
+                NativeSurfaceChunk.nativeConditions = false;
+                NativeNoiseFillTest.Filled java;
+                try {
+                    java = surface(setting, fresh, 11, positions[index], index, true, setting.value().surfaceRule());
+                } finally {
+                    NativeSurface.cacheCompiled = true;
+                    NativeSurfaceChunk.nativeConditions = true;
+                }
+                var candidate = surface(setting, shared, 11, positions[index], index, true, setting.value().surfaceRule());
+                NativeNoiseFillTest.compare(java, candidate, context);
+                pairs++;
+            }
+        }
+        System.out.println("SURFACE_PROGRAM_CACHE_PARITY pairs=" + pairs);
     }
 
     /** buildSurface over a fixture with either storage; the fingerprint covers

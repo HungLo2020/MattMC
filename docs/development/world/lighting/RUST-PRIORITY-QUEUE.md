@@ -7,7 +7,7 @@ original `LeveledPriorityQueue` semantics plus the graph's compound scheduling
 (`reschedule`, `cancel_computed`, `enqueue_computed`). It is Rust-internal: the
 Java adapter, `DynamicGraphMinFixedPoint`, `ChunkTracker` and `SectionTracker`
 were removed once every distance tracker moved to Rust. Block-light and
-skylight propagation use other queues.
+skylight propagation use their own FIFO queues ([Rust light propagation](RUST-LIGHT-PROPAGATION.md)).
 
 ## Preserve these contracts
 

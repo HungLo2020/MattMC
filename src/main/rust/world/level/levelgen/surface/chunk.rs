@@ -1,14 +1,51 @@
 //! The SURFACE stage over Rust-owned chunk storage ([`ProtoStorage`]): columns
 //! run the existing evaluator over the storage, and each completed block is
 //! written as `BlockColumn.setBlock` writes it (the chunk's `setBlockState`,
-//! then a post-processing mark for fluids). Java callbacks still answer
-//! non-native conditions; `steep` is answered here from the storage's
-//! heightmap, once per column, as its shared lazy Java condition caches it.
+//! then a post-processing mark for fluids). The evaluator's requests are
+//! answered here when their inputs are native: `steep` from the storage's
+//! heightmap (once per column, as its shared lazy Java condition caches it),
+//! vertical gradients with their positional random, noise thresholds, the
+//! secondary noise, the terracotta band offset and the minimum surface level.
+//! Java answers the rest (temperature, extension conditions).
 use super::evaluator::surface_step;
 use super::frame::*;
 use crate::world::level::levelgen::noise_fill::section::ENTRIES;
 use crate::world::level::levelgen::noise_fill::{FLAG_AIR, FLAG_FLUID};
+use crate::world::level::levelgen::math::{java_round, lerp2};
 use crate::world::level::levelgen::proto_chunk::{self, ProtoStorage};
+use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::router::{with_frame, Program};
+use crate::world::level::levelgen::synth::{noise_eval, State};
+
+/// How the stage answers a rule condition slot.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Slot {
+    /// A Java condition (temperature, extensions).
+    Java,
+    /// `SurfaceRules.Steep`: the context's shared lazy steep condition.
+    Steep,
+    /// A vertical gradient between its resolved bounds, with its positional random.
+    Gradient { low: i32, high: i32, random: Positional },
+    /// A noise threshold: `NormalNoise.getValue(x, 0, z)` in [min, max].
+    Noise { state: *const State, min: f64, max: f64 },
+}
+
+/// `SurfaceSystem.bandOffset` from its noise value: `(int)Math.round(noise * 4.0)`.
+pub(crate) fn band_offset(noise: f64) -> i32 {
+    java_round(noise * 4.0) as i32
+}
+
+/// The surface system's own inputs, each native when Java could provide it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Inputs {
+    /// `clayBandsOffsetNoise` for `bandOffset`, or null.
+    pub band: *const State,
+    /// `surfaceSecondaryNoise` for `getSurfaceSecondary`, or null.
+    pub secondary: *const State,
+    /// The noise chunk's preliminary surface level program for
+    /// `getMinSurfaceLevel`, or null.
+    pub levels: *const Program,
+}
 
 pub(crate) struct Biomes {
     pub seed: i64,
@@ -26,7 +63,13 @@ pub(crate) struct SurfaceChunk {
     storage: *mut ProtoStorage,
     default_block: i32,
     biomes: Option<Biomes>,
-    steep: Vec<bool>,
+    slots: Vec<Slot>,
+    inputs: Inputs,
+    /// The column's secondary surface noise once answered natively.
+    secondary: f64,
+    /// The preliminary surface levels at the last surface cell's corners, as
+    /// the context's `preliminarySurfaceCache` keeps them across columns.
+    corners: Option<((i32, i32), [i32; 4])>,
     // The current column.
     x: i32,
     z: i32,
@@ -58,7 +101,7 @@ impl From<proto_chunk::Error> for Error {
 impl SurfaceChunk {
     /// # Safety
     /// `storage` is live and used only through this stage while it runs.
-    pub(crate) unsafe fn new(storage: *mut ProtoStorage, default_block: i32, biomes: Option<Biomes>, steep: Vec<bool>) -> Result<Self, Error> {
+    pub(crate) unsafe fn new(storage: *mut ProtoStorage, default_block: i32, biomes: Option<Biomes>, slots: Vec<Slot>, inputs: Inputs) -> Result<Self, Error> {
         if storage.is_null() {
             return Err(Error::Input);
         }
@@ -71,7 +114,10 @@ impl SurfaceChunk {
             storage,
             default_block,
             biomes,
-            steep,
+            slots,
+            inputs,
+            secondary: 0.0,
+            corners: None,
             x: 0,
             z: 0,
             count: 0,
@@ -131,6 +177,7 @@ impl SurfaceChunk {
         self.column_biomes.clear();
         self.column_biomes.resize(count, 0);
         self.steep_answer = -1;
+        self.secondary = 0.0;
         let default_flags = storage.flag(self.default_block)?;
         let default_flag = if default_flags & FLAG_AIR != 0 { 0 } else if default_flags & FLAG_FLUID != 0 { 1 } else { 3 };
         let mut y = 0;
@@ -190,6 +237,8 @@ impl SurfaceChunk {
     /// committing completed blocks first, as `NativeSurface.column` does.
     pub(crate) fn run(&mut self, program: &[i32], frame: &mut [i32], cache: &mut [i32], secondary: f64) -> Result<i32, Error> {
         loop {
+            // A natively answered secondary noise is the column's; Java's otherwise.
+            let secondary = if self.inputs.secondary.is_null() { secondary } else { self.secondary };
             let status = unsafe {
                 surface_step(program.as_ptr(), program.len() as i32, self.column_flags.as_ptr(), self.output.as_mut_ptr(),
                     self.column_biomes.as_ptr(), self.count as i32, frame.as_mut_ptr(), cache.as_mut_ptr(), secondary)
@@ -211,20 +260,87 @@ impl SurfaceChunk {
             match status {
                 1 => return Ok(1),
                 2 => {
-                    let request = frame[REQUEST];
-                    if request >= 0 && self.steep.get(request as usize).copied().unwrap_or(false) {
-                        if self.steep_answer < 0 {
-                            self.steep_answer = self.steep() as i8;
-                        }
-                        frame[ANSWER] = self.steep_answer as i32;
-                        frame[ANSWER_READY] = 1;
-                        continue;
+                    if !self.answer(frame)? {
+                        return Ok(2);
                     }
-                    return Ok(2);
                 }
                 _ => continue,
             }
         }
+    }
+
+    /// Answers the evaluator's request natively when its inputs are native;
+    /// false leaves it to Java.
+    fn answer(&mut self, frame: &mut [i32]) -> Result<bool, Error> {
+        let (x, z) = (self.x, self.z);
+        let y = frame[MIN_Y].wrapping_add(frame[Y_INDEX]);
+        let request = frame[REQUEST];
+        let condition = |value: bool, frame: &mut [i32]| {
+            frame[ANSWER] = value as i32;
+            frame[ANSWER_READY] = 1;
+        };
+        match request {
+            -1 if !self.inputs.band.is_null() => {
+                // SurfaceSystem.bandOffset: (int)Math.round(noise * 4.0).
+                let noise = unsafe { noise_eval(self.inputs.band, x as f64, 0.0, z as f64, 0.0, 0.0, 0) };
+                frame[BAND_OFFSET] = band_offset(noise);
+                frame[BAND_OFFSET_READY] = 1;
+            }
+            -2 if !self.inputs.secondary.is_null() => {
+                self.secondary = unsafe { noise_eval(self.inputs.secondary, x as f64, 0.0, z as f64, 0.0, 0.0, 0) };
+                frame[SECONDARY_READY] = 1;
+            }
+            -3 if !self.inputs.levels.is_null() => {
+                frame[MIN_SURFACE] = self.min_surface_level(frame[SURFACE_DEPTH])?;
+                frame[MIN_SURFACE_READY] = 1;
+            }
+            slot if slot >= 0 => match self.slots.get(slot as usize).copied().unwrap_or(Slot::Java) {
+                Slot::Java => return Ok(false),
+                Slot::Steep => {
+                    if self.steep_answer < 0 {
+                        self.steep_answer = self.steep() as i8;
+                    }
+                    condition(self.steep_answer != 0, frame);
+                }
+                Slot::Gradient { low, high, random } => {
+                    // The evaluator asks only inside the band: map(y, low, high, 1, 0).
+                    let (yd, lo, hi) = (y as f64, low as f64, high as f64);
+                    let d = crate::world::level::levelgen::math::lerp((yd - lo) / (hi - lo), 1.0, 0.0);
+                    condition(((random.at(x, y, z).next_float()) as f64) < d, frame);
+                }
+                Slot::Noise { state, min, max } => {
+                    let value = unsafe { noise_eval(state, x as f64, 0.0, z as f64, 0.0, 0.0, 0) };
+                    condition(value >= min && value <= max, frame);
+                }
+            },
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    /// `SurfaceRules.Context.getMinSurfaceLevel`: the preliminary surface levels
+    /// at the column's surface cell corners, interpolated, plus surface depth - 8.
+    fn min_surface_level(&mut self, surface_depth: i32) -> Result<i32, Error> {
+        let (i, j) = (self.x >> 4, self.z >> 4);
+        let corners = match self.corners {
+            Some((cell, corners)) if cell == (i, j) => corners,
+            _ => {
+                let levels = unsafe { &*self.inputs.levels };
+                let xs = [i << 4, (i + 1) << 4, i << 4, (i + 1) << 4];
+                let zs = [j << 4, j << 4, (j + 1) << 4, (j + 1) << 4];
+                let mut corners = [0i32; 4];
+                with_frame(levels, |frame| levels.surface_levels(frame, &xs, &zs, &mut corners)).map_err(|_| Error::Evaluation(-5))?;
+                self.corners = Some(((i, j), corners));
+                corners
+            }
+        };
+        let fx = ((self.x & 15) as f32 / 16.0f32) as f64;
+        let fz = ((self.z & 15) as f32 / 16.0f32) as f64;
+        let level = lerp2(fx, fz, corners[0] as f64, corners[1] as f64, corners[2] as f64, corners[3] as f64);
+        // Mth.floor, then + surfaceDepth - 8.
+        let k = level as i32;
+        let k = if level < k as f64 { k.wrapping_sub(1) } else { k };
+        Ok(k.wrapping_add(surface_depth).wrapping_sub(8))
     }
 
     /// `SurfaceRules.Context.SteepMaterialCondition.compute` on the storage's heightmap.
@@ -238,5 +354,18 @@ impl SurfaceChunk {
         }
         let (o, p) = ((i - 1).max(0), (i + 1).min(15));
         height(o, j) >= height(p, j) + 4
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::band_offset;
+
+    #[test]
+    fn band_offset_rounds_halves_like_java() {
+        // Java's Math.round takes halves up: -2.5 -> -2, 2.5 -> 3.
+        assert_eq!(band_offset(-0.625), -2);
+        assert_eq!(band_offset(0.625), 3);
+        assert_eq!(band_offset(f64::NAN), 0);
     }
 }

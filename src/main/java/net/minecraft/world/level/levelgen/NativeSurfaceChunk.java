@@ -5,7 +5,10 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.util.NativeLibraryLoader;
@@ -25,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * heightmaps and fluid post-processing marks. */
 final class NativeSurfaceChunk implements AutoCloseable {
     private static final MethodHandle CREATE = bind("create", true, FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle BEGIN = bind("begin", false, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     // Bounded per call like the surface step; borrows the frame and cache.
@@ -34,6 +37,8 @@ final class NativeSurfaceChunk implements AutoCloseable {
     private static final MethodHandle RELEASE = bind("release", false, FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     // Tests compare both routes in one JVM; production reads the property once.
     private static volatile boolean enabled = !Boolean.getBoolean("mattmc.worldgen.javaSurfaceStorage");
+    // Comparison runs keep Java answering conditions and surface inputs on Rust storage.
+    static volatile boolean nativeConditions = !Boolean.getBoolean("mattmc.worldgen.javaSurfaceConditions");
     // Chunks whose surface stage ran on Rust storage, so tests can prove the route engaged.
     static final AtomicLong CHUNKS = new AtomicLong();
 
@@ -49,10 +54,21 @@ final class NativeSurfaceChunk implements AutoCloseable {
 
     final long handle;
     private final NativeProtoChunk storage;
+    // The noise states and programs Rust reads; they stay reachable with the stage.
+    private final List<Object> keep;
 
-    private NativeSurfaceChunk(long handle, NativeProtoChunk storage) {
+    private NativeSurfaceChunk(long handle, NativeProtoChunk storage, List<Object> keep) {
         this.handle = handle;
         this.storage = storage;
+        this.keep = keep;
+    }
+
+    /** A noise's native state address for Rust, or 0 to keep Java answering. */
+    private static long address(NormalNoise noise, List<Object> keep) {
+        var state = noise.nativeState();
+        if (state == null || !state.state().isNative()) return 0L;
+        keep.add(state);
+        return state.state().address();
     }
 
     /** Moves a chunk's surface stage to Rust storage; null keeps setBlockState
@@ -66,10 +82,20 @@ final class NativeSurfaceChunk implements AutoCloseable {
         int qx = (chunk.getPos().getMinBlockX() >> 2) - 1, qz = (chunk.getPos().getMinBlockZ() >> 2) - 1, qy = (minY - 2) >> 2;
         // The tallest column starts at minY + height (one above the top block).
         int sizeX = 6, sizeZ = 6, sizeY = ((minY + height - 2) >> 2) + 1 - qy + 1;
-        boolean[] steep = rule.steepSlots();
+        NativeSurface.Slots slots = nativeConditions ? rule.nativeSlots() : rule.javaSlots();
+        List<Object> keep = new ArrayList<>(slots.keep());
         it.unimi.dsi.fastutil.ints.IntArrayList ints = new it.unimi.dsi.fastutil.ints.IntArrayList();
-        ints.addElements(0, new int[]{Block.getId(defaultBlock), rule.usesBiomes() ? 1 : 0, qx, qy, qz, sizeX, sizeY, sizeZ, steep.length});
-        for (boolean slot : steep) ints.add(slot ? 1 : 0);
+        ints.addElements(0, new int[]{Block.getId(defaultBlock), rule.usesBiomes() ? 1 : 0, qx, qy, qz, sizeX, sizeY, sizeZ, slots.ints().length / 4});
+        ints.addElements(ints.size(), slots.ints());
+        // The system's band offset and secondary noises, and the noise chunk's
+        // preliminary surface program for minimum surface levels.
+        SurfaceSystem system = rule.system();
+        NoiseChunk noise = rule.noiseChunk();
+        NativeSurfaceLevel levels = noise != null && noise.getClass() == NoiseChunk.class ? noise.nativeSurfaceLevel() : null;
+        if (levels != null) keep.add(levels);
+        long[] inputs = nativeConditions
+            ? new long[]{address(system.clayBandsOffsetNoise(), keep), address(system.surfaceSecondaryNoise(), keep), levels == null ? 0L : levels.handle()}
+            : new long[3];
         if (rule.usesBiomes()) {
             for (int x = 0; x < sizeX; x++) {
                 for (int z = 0; z < sizeZ; z++) {
@@ -85,7 +111,8 @@ final class NativeSurfaceChunk implements AutoCloseable {
         int[] intArray = ints.toIntArray();
         long handle;
         try {
-            handle = (long)CREATE.invokeExact(storage.handle, MemorySegment.ofArray(intArray), intArray.length, biomes == null ? 0L : biomes.biomeZoomSeed);
+            handle = (long)CREATE.invokeExact(storage.handle, MemorySegment.ofArray(intArray), intArray.length, biomes == null ? 0L : biomes.biomeZoomSeed,
+                MemorySegment.ofArray(slots.longs()), MemorySegment.ofArray(slots.doubles()), MemorySegment.ofArray(inputs));
         } catch (Throwable error) {
             storage.close();
             throw new IllegalStateException("Cannot create native surface stage", error);
@@ -94,7 +121,7 @@ final class NativeSurfaceChunk implements AutoCloseable {
             storage.close();
             return null;
         }
-        return new NativeSurfaceChunk(handle, storage);
+        return new NativeSurfaceChunk(handle, storage, keep);
     }
 
     /** {@code getHeight(WORLD_SURFACE_WG, x, z)} on the Rust heightmap. */
@@ -133,6 +160,7 @@ final class NativeSurfaceChunk implements AutoCloseable {
             throw new IllegalStateException("Cannot release native surface stage", error);
         } finally {
             this.storage.close();
+            java.lang.ref.Reference.reachabilityFence(this.keep);
         }
     }
 }

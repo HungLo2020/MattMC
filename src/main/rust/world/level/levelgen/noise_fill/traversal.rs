@@ -4,6 +4,7 @@
 //! validated cell program `NativeCellDensity` runs, copies the ore vein corners
 //! and fills the cell, in `doFill`'s order. Java answers only aquifer material
 //! requests and fills a slice the router declines.
+use crate::world::level::levelgen::aquifer::substance::OwnedAquifer;
 use super::{Cell, Corners, Error, NoiseFill};
 use crate::world::level::levelgen::density::cell::density_cell_array;
 use crate::world::level::levelgen::router::Router;
@@ -38,6 +39,10 @@ pub(crate) struct Traversal {
     cursor: usize,
     /// The cursor's cell stopped for materials; its densities are current.
     pending: bool,
+    /// The chunk's aquifer, when Rust owns its state for the fill: cells
+    /// needing batch materials get them here instead of from Java.
+    aquifer: Option<OwnedAquifer>,
+    native_materials: Vec<i32>,
 }
 
 /// Where a column of cells stopped.
@@ -57,7 +62,16 @@ impl Traversal {
         let cell = (layout.width * layout.width * layout.height) as usize;
         let frame = vec![0.; inputs.len() * 8];
         Traversal { router, program, inputs, ore, layout, slices: [vec![0.; size], vec![0.; size]], density: vec![0.; cell], frame, beardifier: None, beard: vec![0.; cell],
-            cursor: 0, pending: false }
+            cursor: 0, pending: false, aquifer: None, native_materials: vec![0; cell * 2] }
+    }
+
+    /// Hands the chunk's aquifer state to the traversal for the rest of the fill.
+    pub(crate) fn set_aquifer(&mut self, aquifer: OwnedAquifer) {
+        self.aquifer = Some(aquifer);
+    }
+
+    pub(crate) fn aquifer(&self) -> Option<&OwnedAquifer> {
+        self.aquifer.as_ref()
     }
 
     /// # Safety
@@ -157,10 +171,16 @@ impl Traversal {
             let z = self.layout.min_z.wrapping_add((cell_z as i32).wrapping_mul(width));
             let cell = Cell { x, y, z, density: &self.density, materials: materials.unwrap_or(&[]), toggle, ridged_a, ridged_b, gap };
             if materials.is_none() && fill.needs_materials(&cell) {
-                self.pending = true;
-                return Ok(Step::Materials([x, y, z]));
+                let Some(aquifer) = self.aquifer.as_mut() else {
+                    self.pending = true;
+                    return Ok(Step::Materials([x, y, z]));
+                };
+                // The batch the cell's first such block would prepare, decided natively.
+                aquifer.cell_materials(x, y, z, width, height, &self.density, &mut self.native_materials).map_err(Error::Aquifer)?;
+                fill.fill_cell(&Cell { materials: &self.native_materials, ..cell })?;
+            } else {
+                fill.fill_cell(&cell)?;
             }
-            fill.fill_cell(&cell)?;
             materials = None;
             self.cursor += 1;
         }

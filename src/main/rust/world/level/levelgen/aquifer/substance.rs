@@ -54,7 +54,7 @@ impl Substance<'_> {
     }
 
     /// The fluid status at a grid index's centre (`getAquiferStatus`).
-    fn status(&mut self, index: usize) -> Result<(), i32> {
+    pub(crate) fn status(&mut self, index: usize) -> Result<(), i32> {
         let pos = self.grid[index];
         let mut f = [0i32; 26];
         f[1] = (pos >> 38) as i32;
@@ -112,6 +112,112 @@ impl Substance<'_> {
                     };
                     f[15] = 1;
                 }
+                other => return Err(other.min(-1)),
+            }
+        }
+    }
+}
+
+/// An aquifer's native state owned by Rust for a whole NOISE fill: copies of
+/// Java's caches (centres, statuses, surface levels, FlatCache corners) that
+/// Java copies back afterwards, and its policy, programs and barrier noise.
+pub(crate) struct OwnedAquifer {
+    pub grid: Vec<i64>,
+    pub shape: [i32; 5],
+    pub cache: Vec<i32>,
+    pub random: Positional,
+    pub skip_y: i32,
+    pub policy: [i32; 8],
+    pub surface_rect: [i32; 4],
+    pub surface: Vec<i32>,
+    /// The sources and preliminary surface programs Java keeps alive for the fill.
+    pub sources: *const Program,
+    pub levels: *const Program,
+    /// The chunk's FlatCache grid [first quart X, first quart Z, size] and its memo.
+    pub flat: [i32; 3],
+    pub memo: Vec<f64>,
+    pub present: Vec<u8>,
+    pub barrier: *const State,
+    pub barrier_xz: f64,
+    pub barrier_y: f64,
+    pub water: i32,
+    pub lava: i32,
+    pub way_below: i32,
+    // The batch frame and values `NativeAquifer.prepareMaterials` keeps.
+    frame: [i32; 32],
+    values: [f64; 2],
+}
+
+impl OwnedAquifer {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(grid: Vec<i64>, shape: [i32; 5], cache: Vec<i32>, random: Positional, skip_y: i32, policy: [i32; 8], surface_rect: [i32; 4],
+        surface: Vec<i32>, sources: *const Program, levels: *const Program, flat: [i32; 3], memo: Vec<f64>, present: Vec<u8>,
+        barrier: *const State, barrier_xz: f64, barrier_y: f64, water: i32, lava: i32, way_below: i32) -> Self {
+        OwnedAquifer { grid, shape, cache, random, skip_y, policy, surface_rect, surface, sources, levels, flat, memo, present, barrier, barrier_xz,
+            barrier_y, water, lava, way_below, frame: [0; 32], values: [0.0; 2] }
+    }
+
+    /// A substance evaluator over this state.
+    pub(crate) fn substance(&mut self) -> Substance<'_> {
+        Substance {
+            grid: &mut self.grid,
+            shape: self.shape,
+            cache: &mut self.cache,
+            random: self.random,
+            skip_y: self.skip_y,
+            policy: self.policy,
+            surface_rect: self.surface_rect,
+            surface: &mut self.surface,
+            sources: unsafe { &*self.sources },
+            levels: unsafe { &*self.levels },
+            binding: Binding { first_x: self.flat[0], first_z: self.flat[1], size: self.flat[2], memo: &mut self.memo, present: &mut self.present },
+            barrier: self.barrier,
+            barrier_xz: self.barrier_xz,
+            barrier_y: self.barrier_y,
+            water: self.water,
+            lava: self.lava,
+            way_below: self.way_below,
+        }
+    }
+
+    /// `NativeAquifer.prepareMaterials` for the cell at block (x, y, z) of
+    /// `width` x `width` x `height` with its densities: (state, schedule) per
+    /// block into `out`, statuses computed natively instead of asked of Java.
+    pub(crate) fn cell_materials(&mut self, x: i32, y: i32, z: i32, width: i32, height: i32, density: &[f64], out: &mut [i32]) -> Result<(), i32> {
+        if !fill_cell_locations(&mut self.grid, &self.shape, self.random, x, y, z, width, height) {
+            return Err(-3);
+        }
+        let p = self.policy;
+        let f = &mut self.frame;
+        f[14] = p[7];
+        f[16] = 0;
+        f[17] = 0;
+        f[18] = x;
+        f[19] = y;
+        f[20] = z;
+        f[21] = width;
+        f[22] = height;
+        f[23] = self.skip_y;
+        f[24] = (-54i32).min(p[2]);
+        f[25] = p[0];
+        f[26] = p[1];
+        f[27] = p[2];
+        f[28] = p[3];
+        f[29] = if p[3] == self.lava { 2 } else if p[3] == self.water { 1 } else { 0 };
+        f[30] = p[5];
+        f[31] = p[6];
+        loop {
+            let status = unsafe {
+                cell::materials(&mut self.frame, &mut self.values, density, out, &self.grid, &self.shape, &self.cache, self.barrier, self.barrier_xz,
+                    self.barrier_y)
+            };
+            match status {
+                0 => return Ok(()),
+                1 => {
+                    let index = self.frame[9] as usize;
+                    self.substance().status(index)?;
+                }
+                4 => {}
                 other => return Err(other.min(-1)),
             }
         }

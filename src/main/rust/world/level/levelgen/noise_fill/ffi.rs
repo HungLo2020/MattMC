@@ -6,7 +6,8 @@
 use super::traversal::{Layout, Step, Traversal};
 use super::{Cell, Config, Corners, NoiseFill, OreVeins, Picker, Substance};
 use crate::world::level::levelgen::density::validation::density_validate;
-use crate::world::level::levelgen::router::Router;
+use crate::world::level::levelgen::aquifer::substance::OwnedAquifer;
+use crate::world::level::levelgen::router::{Program, Router};
 use crate::world::level::levelgen::random::Positional;
 use crate::world::level::levelgen::synth::State;
 
@@ -146,6 +147,7 @@ pub unsafe extern "C" fn mattmc_noise_fill_cell(
         Err(super::Error::UnknownState(_)) => -2,
         Err(super::Error::OutOfChunk) => -3,
         Err(super::Error::CellProgram) => -4,
+        Err(super::Error::Aquifer(_)) => -5,
     }
 }
 
@@ -382,6 +384,7 @@ pub unsafe extern "C" fn mattmc_noise_fill_cells(id: u64, cell_x: i32, materials
         Err(super::Error::UnknownState(_)) => -2,
         Err(super::Error::OutOfChunk) => -3,
         Err(super::Error::CellProgram) => -4,
+        Err(super::Error::Aquifer(_)) => -5,
     }
 }
 
@@ -399,5 +402,84 @@ pub unsafe extern "C" fn mattmc_noise_fill_beardifier(id: u64, geometry: *const 
     }
     let data = unsafe { std::slice::from_raw_parts(geometry, count as usize) }.to_vec();
     unsafe { traversal.set_beardifier(data, kernel) };
+    0
+}
+
+/// Hands the chunk's aquifer state to the bound traversal, which then prepares
+/// cell materials itself. `ints`: [shape (5), skipY, location kind (1
+/// Xoroshiro, 2 Legacy), policy (8), surface rect (4), FlatCache grid (3),
+/// wayBelow, water id, lava id]; `longs` [seed a, seed b, barrier xz scale and
+/// y scale as raw bits]; the caches are copied (`grid` and `cache` with
+/// `grid_len` entries, `cache` three per entry). Returns 0 or negative.
+/// # Safety
+/// Buffers hold their stated counts for this call; `sources` and `levels`
+/// are programs and `barrier` null or a noise state that Java keeps alive for
+/// the fill.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_aquifer(id: u64, ints: *const i32, int_count: i32, longs: *const i64, grid: *const i64, grid_len: i32,
+    cache: *const i32, surface: *const i32, surface_len: i32, memo: *const f64, present: *const u8, memo_len: i32, sources: u64, levels: u64,
+    barrier: *const State) -> i32 {
+    let Some(traversal) = unsafe { handle(id) }.traversal.as_mut() else { return -1 };
+    if ints.is_null() || longs.is_null() || grid.is_null() || cache.is_null() || surface.is_null() || memo.is_null() || present.is_null()
+        || int_count != 27 || grid_len <= 0 || surface_len <= 0 || memo_len < 0 || sources == 0 || levels == 0
+    {
+        return -1;
+    }
+    let i = unsafe { std::slice::from_raw_parts(ints, 27) };
+    let l = unsafe { std::slice::from_raw_parts(longs, 4) };
+    let Some(random) = Positional::from_abi(i[6], l[0], l[1]) else { return -1 };
+    let shape = [i[0], i[1], i[2], i[3], i[4]];
+    let rect = [i[15], i[16], i[17], i[18]];
+    let flat = [i[19], i[20], i[21]];
+    let program = unsafe { &*(sources as *const Program) };
+    if shape[3] <= 0 || shape[4] <= 0 || grid_len as usize % (shape[3] as usize * shape[4] as usize) != 0 || surface_len != rect[2] * rect[3] * 2
+        || !(1..=64).contains(&flat[2]) || program.root_count() != 5 || memo_len as usize != program.point_slots() * (flat[2] * flat[2]) as usize
+    {
+        return -2;
+    }
+    let mut policy = [0; 8];
+    policy.copy_from_slice(&i[7..15]);
+    let copy = |p: *const i32, n: usize| unsafe { std::slice::from_raw_parts(p, n) }.to_vec();
+    traversal.set_aquifer(OwnedAquifer::new(
+        unsafe { std::slice::from_raw_parts(grid, grid_len as usize) }.to_vec(),
+        shape,
+        copy(cache, grid_len as usize * 3),
+        random,
+        i[5],
+        policy,
+        rect,
+        copy(surface, surface_len as usize),
+        program,
+        levels as *const Program,
+        flat,
+        unsafe { std::slice::from_raw_parts(memo, memo_len as usize) }.to_vec(),
+        unsafe { std::slice::from_raw_parts(present, memo_len as usize) }.to_vec(),
+        barrier,
+        f64::from_bits(l[2] as u64),
+        f64::from_bits(l[3] as u64),
+        i[23],
+        i[24],
+        i[22],
+    ));
+    0
+}
+
+/// Copies the Rust-owned aquifer's caches back into Java's arrays (their
+/// lengths as given to `mattmc_noise_fill_aquifer`). Returns 0 or negative.
+/// # Safety
+/// Buffers are writable for their counts and borrowed for this call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_aquifer_caches(id: u64, grid: *mut i64, cache: *mut i32, surface: *mut i32, memo: *mut f64, present: *mut u8) -> i32 {
+    let Some(aquifer) = unsafe { handle(id) }.traversal.as_ref().and_then(|t| t.aquifer()) else { return -1 };
+    if grid.is_null() || cache.is_null() || surface.is_null() || memo.is_null() || present.is_null() {
+        return -1;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(aquifer.grid.as_ptr(), grid, aquifer.grid.len());
+        std::ptr::copy_nonoverlapping(aquifer.cache.as_ptr(), cache, aquifer.cache.len());
+        std::ptr::copy_nonoverlapping(aquifer.surface.as_ptr(), surface, aquifer.surface.len());
+        std::ptr::copy_nonoverlapping(aquifer.memo.as_ptr(), memo, aquifer.memo.len());
+        std::ptr::copy_nonoverlapping(aquifer.present.as_ptr(), present, aquifer.present.len());
+    }
     0
 }

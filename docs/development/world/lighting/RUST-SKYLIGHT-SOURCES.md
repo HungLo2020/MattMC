@@ -2,7 +2,8 @@
 
 `ChunkSkyLightSources.fillFrom()` now uses `world/level/lighting/skylight_sources/`
 for normal packed chunks. This reconstructs the lowest unblocked skylight entry
-in each column. Light propagation queues and incremental `update()` stay Java.
+in each column. Incremental `update()` stays Java; propagation itself is described in
+[Rust light propagation](RUST-LIGHT-PROPAGATION.md).
 The bridge lives beside Java chunk storage to borrow its package-private data.
 
 ## Constraints when changing this code
