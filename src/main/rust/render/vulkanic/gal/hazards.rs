@@ -101,10 +101,14 @@ impl hashing::Hasher for AccessHasher {
 
 pub type AccessHashBuilder = hashing::BuildHasherDefault<AccessHasher>;
 
+/// Per-submission access state. The GAL keeps one tracker between
+/// submissions and resets it, so buckets and destination lists keep their
+/// allocations instead of being rebuilt every frame.
 #[derive(Default)]
 pub(super) struct AccessTracker {
     pub(super) resources: HashMap<AccessResourceKey, AccessBucket, AccessHashBuilder>,
     destinations: PendingDestinations,
+    spare_buckets: Vec<AccessBucket>,
 }
 
 /// Barrier destinations not yet consumed by an access. Overlap only exists
@@ -113,6 +117,8 @@ pub(super) struct AccessTracker {
 #[derive(Default)]
 pub(super) struct PendingDestinations(
     HashMap<AccessResourceKey, Vec<(AccessTarget, TextureUsageState)>, AccessHashBuilder>,
+    /// Emptied lists kept for reuse.
+    Vec<Vec<(AccessTarget, TextureUsageState)>>,
 );
 
 impl PendingDestinations {
@@ -130,7 +136,7 @@ impl PendingDestinations {
                 })
                 .collect();
             if entries.is_empty() {
-                self.0.remove(&key);
+                self.release(key);
             }
         }
     }
@@ -140,13 +146,31 @@ impl PendingDestinations {
         if let Some(entries) = self.0.get_mut(&key) {
             entries.retain(|(prior, _)| !targets_overlap(*prior, target));
             if entries.is_empty() {
-                self.0.remove(&key);
+                self.release(key);
             }
         }
     }
 
     fn push(&mut self, target: AccessTarget, state: TextureUsageState) {
-        self.0.entry(target.resource_key()).or_default().push((target, state));
+        let spare = &mut self.1;
+        self.0
+            .entry(target.resource_key())
+            .or_insert_with(|| spare.pop().unwrap_or_default())
+            .push((target, state));
+    }
+
+    fn release(&mut self, key: AccessResourceKey) {
+        if let Some(mut entries) = self.0.remove(&key) {
+            entries.clear();
+            self.1.push(entries);
+        }
+    }
+
+    fn reset(&mut self) {
+        for (_, mut entries) in self.0.drain() {
+            entries.clear();
+            self.1.push(entries);
+        }
     }
 }
 
@@ -170,11 +194,26 @@ impl AccessTracker {
     }
 
     pub(super) fn push_write(&mut self, event: AccessEvent) {
+        self.bucket_mut(event.target).writes.push(event);
+    }
+
+    /// The bucket of `target`'s resource, created (from a spare) if absent.
+    pub(super) fn bucket_mut(&mut self, target: AccessTarget) -> &mut AccessBucket {
+        let spare = &mut self.spare_buckets;
         self.resources
-            .entry(event.target.resource_key())
-            .or_default()
-            .writes
-            .push(event);
+            .entry(target.resource_key())
+            .or_insert_with(|| spare.pop().unwrap_or_default())
+    }
+
+    /// Empties the tracker for the next submission, keeping allocations.
+    pub(super) fn reset(&mut self) {
+        for (_, mut bucket) in self.resources.drain() {
+            bucket.reads.clear();
+            bucket.read_membership.clear();
+            bucket.writes.clear();
+            self.spare_buckets.push(bucket);
+        }
+        self.destinations.reset();
     }
 
     pub(super) fn bucket(&self, target: AccessTarget) -> Option<&AccessBucket> {
@@ -228,10 +267,22 @@ impl VulkanicGal {
     pub(super) fn validate_submission_hazards(
         &mut self,
         batch: &SubmissionBatch,
+        profile: Option<&mut SubmitProfile>,
+    ) -> GalResult<()> {
+        let mut accesses = std::mem::take(&mut self.hazard_tracker);
+        accesses.reset();
+        let result = self.validate_submission_hazards_with(batch, profile, &mut accesses);
+        self.hazard_tracker = accesses;
+        result
+    }
+
+    fn validate_submission_hazards_with(
+        &mut self,
+        batch: &SubmissionBatch,
         mut profile: Option<&mut SubmitProfile>,
+        accesses: &mut AccessTracker,
     ) -> GalResult<()> {
         self.buffer_upload_capture.begin();
-        let mut accesses = AccessTracker::default();
         // Bound-set accesses depend only on the immutable set and its dynamic
         // offsets, so each distinct binding is resolved once per submission.
         let mut set_events = HashMap::<
@@ -287,7 +338,7 @@ impl VulkanicGal {
                         let mut reads_only = true;
                         for event in events.iter() {
                             reads_only &= event.mode == AccessMode::Read;
-                            self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                            self.record_access(accesses, *event, profile.as_deref_mut())?;
                         }
                         if reads_only {
                             recorded_sets.push(*key);
@@ -298,7 +349,7 @@ impl VulkanicGal {
                     if draw {
                         if !vertices_recorded {
                             for event in vertices.values() {
-                                self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                                self.record_access(accesses, *event, profile.as_deref_mut())?;
                             }
                             vertices_recorded = true;
                         }
@@ -308,7 +359,7 @@ impl VulkanicGal {
                         ) && !indices_recorded
                         {
                             if let Some(event) = indices {
-                                self.record_access(&mut accesses, event, profile.as_deref_mut())?;
+                                self.record_access(accesses, event, profile.as_deref_mut())?;
                                 indices_recorded = true;
                             }
                         }
@@ -359,7 +410,7 @@ impl VulkanicGal {
                                 attachment_load_op: Some(color.load_op),
                                 attachment_store_op: Some(color.store_op),
                             };
-                            self.record_access(&mut accesses, event, profile.as_deref_mut())?;
+                            self.record_access(accesses, event, profile.as_deref_mut())?;
                         }
                         if let Some(depth) = depth_stencil {
                             let target = self.texture_view_access_target(depth.view)?;
@@ -379,7 +430,7 @@ impl VulkanicGal {
                                 attachment_load_op: Some(depth.load_op),
                                 attachment_store_op: Some(depth.store_op),
                             };
-                            self.record_access(&mut accesses, event, profile.as_deref_mut())?;
+                            self.record_access(accesses, event, profile.as_deref_mut())?;
                         }
                     }
                     CommandOp::BindResourceSet {
@@ -462,7 +513,7 @@ impl VulkanicGal {
                     | CommandOp::DispatchIndirect { buffer, offset } => {
                         let target = self.buffer_access_target(*buffer, *offset, None)?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target,
                                 mode: AccessMode::Read,
@@ -488,7 +539,7 @@ impl VulkanicGal {
                         let dst_target =
                             self.buffer_access_target(*dst, dst_offset, Some(*size))?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: src_target,
                                 mode: AccessMode::Read,
@@ -499,7 +550,7 @@ impl VulkanicGal {
                             profile.as_deref_mut(),
                         )?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: dst_target,
                                 mode: AccessMode::Write,
@@ -519,7 +570,7 @@ impl VulkanicGal {
                             Some(self.buffer_texture_copy_size(region)?),
                         )?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: buffer_target,
                                 mode: AccessMode::Read,
@@ -530,7 +581,7 @@ impl VulkanicGal {
                             profile.as_deref_mut(),
                         )?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: self.texture_copy_target(region)?,
                                 mode: AccessMode::Write,
@@ -543,7 +594,7 @@ impl VulkanicGal {
                     }
                     CommandOp::CopyTextureToBuffer(region) => {
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: self.texture_copy_target(region)?,
                                 mode: AccessMode::Read,
@@ -559,7 +610,7 @@ impl VulkanicGal {
                             Some(self.buffer_texture_copy_size(region)?),
                         )?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: buffer_target,
                                 mode: AccessMode::Write,
@@ -572,7 +623,7 @@ impl VulkanicGal {
                     }
                     CommandOp::CopyTexture(region) => {
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: self.texture_image_copy_target(
                                     region.src_texture,
@@ -587,7 +638,7 @@ impl VulkanicGal {
                             profile.as_deref_mut(),
                         )?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: self.texture_image_copy_target(
                                     region.dst_texture,
@@ -611,7 +662,7 @@ impl VulkanicGal {
                         // opaque FrameTarget handle would violate that boundary.
                         accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *src });
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: AccessTarget::FrameTarget { handle: *src },
                                 mode: AccessMode::Read,
@@ -627,7 +678,7 @@ impl VulkanicGal {
                         // transition being exposed to the frontend.
                         accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *src });
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: self.texture_image_copy_target(*dst, 0, 0)?,
                                 mode: AccessMode::Write,
@@ -641,7 +692,7 @@ impl VulkanicGal {
                     CommandOp::CopyTextureToFrameTarget { src, dst, .. } => {
                         accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *dst });
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: self.texture_image_copy_target(*src, 0, 0)?,
                                 mode: AccessMode::Read,
@@ -652,7 +703,7 @@ impl VulkanicGal {
                             profile.as_deref_mut(),
                         )?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: AccessTarget::FrameTarget { handle: *dst },
                                 mode: AccessMode::Write,
@@ -687,7 +738,7 @@ impl VulkanicGal {
                                 ..*subresources
                             };
                             self.record_access(
-                                &mut accesses,
+                                accesses,
                                 AccessEvent {
                                     target: AccessTarget::Texture {
                                         texture: *texture,
@@ -725,7 +776,7 @@ impl VulkanicGal {
                         let target =
                             self.buffer_access_target(*buffer, *offset, Some(data.len() as u64))?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target,
                                 mode: AccessMode::Write,
@@ -745,7 +796,7 @@ impl VulkanicGal {
                     } => {
                         let target = self.buffer_access_target(*buffer, *offset, Some(*size))?;
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target,
                                 mode: AccessMode::Read,
@@ -761,7 +812,7 @@ impl VulkanicGal {
                         subresources,
                     } => {
                         self.record_access(
-                            &mut accesses,
+                            accesses,
                             AccessEvent {
                                 target: AccessTarget::Texture {
                                     texture: *texture,
@@ -980,7 +1031,7 @@ impl VulkanicGal {
         match event.mode {
             AccessMode::Read => {
                 // One bucket lookup serves the conflict scan and the insert.
-                let bucket = accesses.resources.entry(event.target.resource_key()).or_default();
+                let bucket = accesses.bucket_mut(event.target);
                 {
                     for previous in bucket.writes.iter().copied() {
                         if let Some(profile) = profile.as_deref_mut() {

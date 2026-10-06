@@ -121,6 +121,9 @@ pub struct VulkanicGal {
     next_submission: u64,
     latest_accepted_submission: SubmissionId,
     buffer_upload_capture: super::buffer_upload_capture::BufferUploadCapture,
+    /// Reused per-submission hazard state and in-flight marking set.
+    hazard_tracker: hazards::AccessTracker,
+    in_flight_scratch: std::collections::HashSet<Handle>,
     completed_submission: SubmissionId,
     metrics: Metrics,
     /// Frontend policy tagging passes/pipelines with GPU profiling scopes.
@@ -159,6 +162,8 @@ impl VulkanicGal {
             next_submission: 1,
             latest_accepted_submission: SubmissionId(0),
             buffer_upload_capture: Default::default(),
+            hazard_tracker: Default::default(),
+            in_flight_scratch: Default::default(),
             completed_submission: SubmissionId(0),
             metrics: Metrics::default(),
             gpu_profile_classifier: None,

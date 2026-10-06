@@ -201,10 +201,12 @@ impl VulkanicGal {
         self.metrics.submissions += 1;
         // Shared dependencies (layouts, samplers, textures behind several
         // sets) are marked once per submission instead of once per referrer.
-        let mut marked = HashSet::new();
+        let mut marked = std::mem::take(&mut self.in_flight_scratch);
+        marked.clear();
         for handle in referenced {
             self.mark_in_flight(handle, id, &mut marked)?;
         }
+        self.in_flight_scratch = marked;
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_submit_total_nanos = profile
                 .gal_submit_total_nanos
