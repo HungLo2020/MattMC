@@ -157,9 +157,7 @@ blocks. A different save may put the same coordinate in air.
 The independent CPU terrain producer must match Frozen's occlusion policy:
 disable portal and angle masks when smart culling is disabled, or when the player
 is a spectator and the camera's block is solid-rendering. Keep frustum, distance,
-outward traversal and build-height/window checks. Include the policy in the
-visibility identity so a stationary change rebuilds the frontier and settled
-selection. Use the camera's block position, including eye height; player feet
+outward traversal and build-height/window checks. The graph is searched again every frame, so a policy change applies at once. Use the camera's block position, including eye height; player feet
 can occupy a different block. See
 [`RustGalWholeFrameTerrainSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java).
 
@@ -336,15 +334,10 @@ The client is gone and the fixture/Frozen state are unchanged. This verifies
 the console fix in this bounded run; terrain readiness, the independent SIGSEGV
 and broader stability still need work.
 
-The CPU source regressions check dispatch priority, immediate loaded-air portal
-connectivity, queued cancellation and running-build ownership. After preparing
-the release native library, run the focused Java checks without the native GPU
-suite:
+Camera-pass selection is checked by the Rust section-graph unit tests:
 
 ```sh
-./gradlew -PmattmcRustProfile=release test -x testRustNative \
-  --tests net.vulkanic.world.TerrainBuildPriorityTest \
-  --tests net.vulkanic.world.TerrainAirFrontierTest
+(cd src/main/rust && cargo test --lib section_graph)
 ```
 
 Run driver/ownership regression checks without a GPU client:

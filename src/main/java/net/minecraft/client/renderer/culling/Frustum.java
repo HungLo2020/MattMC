@@ -71,6 +71,23 @@ public class Frustum implements ViewportProvider {
 		return this;
 	}
 
+	/** Copies the column-major culling matrix (projection * model-view). */
+	public void copyCullingMatrix(float[] out) {
+		this.matrix.get(out);
+	}
+
+	public double cameraX() {
+		return this.camX;
+	}
+
+	public double cameraY() {
+		return this.camY;
+	}
+
+	public double cameraZ() {
+		return this.camZ;
+	}
+
 	public void prepare(double d, double e, double f) {
 		this.camX = d;
 		this.camY = e;

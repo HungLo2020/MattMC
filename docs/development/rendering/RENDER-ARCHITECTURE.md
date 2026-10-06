@@ -126,29 +126,27 @@ them; an out-of-bounds root previously crashed the client during world load.
 
 ## Resource ownership and retries
 
-The independent CPU terrain source shares its bounded meshing workers between
-camera portal traversal and shader shadow casters. Dispatch resident block/light
-replacements first. Give one of every four ordinary dispatch choices to the
-nearest unbuilt section in any direction and three to the nearest current portal
-frontier. Use three-dimensional camera distance and prefer current portals on
-ties. The portal domain is rebuilt after camera turns. FIFO queues delay
-newly visible terrain behind the shadow sweep; absolute portal priority can also
-leave close surfaces behind the player waiting for distant current-view sections.
-Distance-only prefetch can also delay visible water behind closer buried sections.
-The reserved nearest slot prepares nearby terrain in every direction while the
-foreground slots keep visible surfaces advancing.
-Keep the existing worker and publication bounds, portal/frustum
-culling, immutable mesh ownership and background work. See
-[`RustGalWholeFrameTerrainSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java)
-and its `TerrainBuildPriorityTest` regression cases.
+Camera-pass terrain visibility is Frozen's Sodium search, ported exactly to
+Rust: [`chunk/section_graph.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/section_graph.rs)
+(occlusion BFS waves, angle and outward masks, distance cylinder, ±9.125
+frustum boxes, the nearby pass, and tree traversal when the camera section is
+unbuilt). [`RustGalWholeFrameTerrainSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java)
+mirrors Sodium's `ChunkTracker` column readiness and each accepted build's flags
+and visibility data into the graph through a standalone handle
+([`RustSectionGraph`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustSectionGraph.java)),
+which is outside any bridge context so selecting never joins a pipelined frame.
 
-Install all-open portal connectivity immediately for a packet-backed section
-whose real chunk data reports only air, as Frozen does. Queueing air behind mesh
-work limits a newly turned visibility search to a few waves per frame and hides
-already-built terrain. Air has no mesh payload; keep normal height/window/frustum
-checks and never infer air from an unloaded chunk or supersede an in-flight build.
-`TerrainAirFrontierTest` covers connectivity, queued-work cancellation and running
-build/invalidation ownership.
+- Visible sections are visited sections that are built with geometry.
+- Builds are requested in visit order; block-edit rebuilds go first. In-flight
+  builds are capped at twice the worker count.
+- All-air sections of a ready column are built as empty at once, as in Frozen,
+  so the search crosses them immediately.
+- Shader shadow casters are built geometry sections the camera did not select.
+  The shadow pass never schedules builds; Rust applies the shadow-pass test.
+
+Keep the graph's behaviour identical to Frozen: its unit tests in
+`section_graph/tests.rs` pin each rule, so run
+`cargo test --lib section_graph` in `src/main/rust` after any change.
 
 Source shadow terrain applies its existing dimension, distance and light-frustum
 policy before constructing batches. Validate every shadow candidate's asset

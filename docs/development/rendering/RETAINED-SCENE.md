@@ -116,6 +116,11 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
 3. **Visibility in Rust.** Port Frozen's Sodium occlusion search exactly onto
    the scene's section graph; Java sends only camera and frustum. Removes the
    Java terrain enqueue (~1.2 ms).
+   *Status:* the search runs in Rust (`chunk/section_graph.rs`) with
+   Frozen-identical camera selection. Java still copies the visited list back
+   to build its visible list and schedule builds; render-list region order,
+   Iris's non-culling frustum and moving the visible list into the scene
+   remain.
 4. **Static instance data.** World origins become persistent per-section data
    and the camera a per-frame uniform, so nothing per-section is written while
    only the camera moves.
