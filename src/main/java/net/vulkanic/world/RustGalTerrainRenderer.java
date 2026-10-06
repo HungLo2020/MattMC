@@ -794,7 +794,7 @@ public final class RustGalTerrainRenderer {
 				// Candidate sections are distinct and mesh keys are unique per
 				// section layer, so no key here can repeat a visible or earlier one.
 				long[] identities = scratch.seenPositions.contains(sectionPos)
-					? null : SECTION_SHADOW_IDENTITIES.get(sectionPos);
+					? null : SECTION_SHADOW_IDENTITIES.get(rowKey(sectionPos));
 				if (identities != null) {
 					for (int slot = 0; slot < SHADOW_CANDIDATE_LAYERS.length; slot++) {
 						long meshKey = identities[slot * 2];
@@ -4836,11 +4836,11 @@ public final class RustGalTerrainRenderer {
 		if (slot < 0) {
 			return;
 		}
-		SECTION_ASSET_ROWS.compute(layerKey.sectionPos(), (sectionPos, row) -> {
+		SECTION_ASSET_ROWS.compute(rowKey(layerKey.sectionPos()), (rowKey, row) -> {
 			TerrainSectionAsset[] next = row == null ? new TerrainSectionAsset[3] : row.clone();
 			next[slot] = SECTION_ASSETS.get(layerKey);
 			if (next[0] == null && next[1] == null && next[2] == null) {
-				SECTION_SHADOW_IDENTITIES.remove(sectionPos);
+				SECTION_SHADOW_IDENTITIES.remove(rowKey);
 				return null;
 			}
 			long[] identities = new long[6];
@@ -4851,20 +4851,34 @@ public final class RustGalTerrainRenderer {
 				}
 			}
 			// Written inside the row's compute so both views change together.
-			SECTION_SHADOW_IDENTITIES.put(sectionPos, identities);
+			SECTION_SHADOW_IDENTITIES.put(rowKey, identities);
 			return next;
 		});
 	}
 
 	/** Solid, cutout, and translucent assets of one section (slots per {@link #rowSlot}); null if none. */
 	private static TerrainSectionAsset[] sectionAssetRow(long sectionPos) {
-		return SECTION_ASSET_ROWS.get(sectionPos);
+		return SECTION_ASSET_ROWS.get(rowKey(sectionPos));
+	}
+
+	/**
+	 * Key of {@link #SECTION_ASSET_ROWS} and {@link #SECTION_SHADOW_IDENTITIES}.
+	 * {@code Long.hashCode} of a packed section position keeps almost none of
+	 * its X bits in the low bits a hash table indexes, so nearby sections share
+	 * buckets; this bijective mix spreads them.
+	 */
+	private static long rowKey(long sectionPos) {
+		return it.unimi.dsi.fastutil.HashCommon.mix(sectionPos);
+	}
+
+	private static int layerAddressHash(long sectionPos, ChunkSectionLayer layer) {
+		return 31 * Long.hashCode(it.unimi.dsi.fastutil.HashCommon.mix(sectionPos)) + layer.ordinal();
 	}
 
 	private static TerrainSectionAsset sectionAsset(long sectionPos, ChunkSectionLayer layer) {
 		int slot = rowSlot(layer);
 		if (slot >= 0) {
-			TerrainSectionAsset[] row = SECTION_ASSET_ROWS.get(sectionPos);
+			TerrainSectionAsset[] row = SECTION_ASSET_ROWS.get(rowKey(sectionPos));
 			return row == null ? null : row[slot];
 		}
 		LayerLookup lookup = SECTION_ASSET_LOOKUP.get();
@@ -4887,7 +4901,7 @@ public final class RustGalTerrainRenderer {
 
 		@Override
 		public int hashCode() {
-			return 31 * Long.hashCode(sectionPos) + layer.hashCode();
+			return layerAddressHash(sectionPos, layer);
 		}
 	}
 
@@ -4919,7 +4933,7 @@ public final class RustGalTerrainRenderer {
 
 		@Override
 		public int hashCode() {
-			return 31 * Long.hashCode(sectionPos) + layer.hashCode();
+			return layerAddressHash(sectionPos, layer);
 		}
 	}
 

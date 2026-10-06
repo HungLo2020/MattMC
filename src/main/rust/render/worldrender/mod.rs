@@ -417,6 +417,9 @@ pub struct WorldPrimitiveFrontend {
     /// Last voxel source mesh list, keyed by the exact terrain instances
     /// (key, generation, world transform bits) and cull box it was built for.
     terrain_voxel_source_memo: Option<TerrainVoxelSourceMemo>,
+    /// Reused per-frame voxel candidates and their (mesh key, index) order.
+    terrain_voxel_relevant_scratch: Vec<(TerrainVoxelCandidate, [f32; 16])>,
+    terrain_voxel_order_scratch: Vec<(u64, u32)>,
     /// mesh key -> (generation, model-space voxel bounds): the compact
     /// classification used to reject instances outside the voxel volume.
     terrain_voxel_mesh_bounds: HashMap<u64, (u64, Option<[[f32; 3]; 2]>), MeshKeyBuildHasher>,

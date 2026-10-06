@@ -125,10 +125,28 @@ impl WorldPrimitiveFrontend {
                 "terrain voxel source frame has a non-finite camera world position",
             ));
         }
+        let mut relevant = std::mem::take(&mut self.terrain_voxel_relevant_scratch);
+        relevant.clear();
+        let mut order = std::mem::take(&mut self.terrain_voxel_order_scratch);
+        order.clear();
+        let result = self.select_terrain_voxel_source_meshes(frame, cull, scene, &mut relevant, &mut order);
+        self.terrain_voxel_relevant_scratch = relevant;
+        self.terrain_voxel_order_scratch = order;
+        result
+    }
+
+    fn select_terrain_voxel_source_meshes(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+        cull: Option<[[i32; 3]; 2]>,
+        scene: &SceneTerrainFrame,
+        relevant: &mut Vec<(TerrainVoxelCandidate, [f32; 16])>,
+        order: &mut Vec<(u64, u32)>,
+    ) -> GalResult<Arc<[TerrainVoxelSourceMesh]>> {
+        let camera_world_position = frame.voxel_volume.camera_world_position;
         // Select the static instances that can touch the volume first. Their
         // classification comes from a compact per-mesh table, so instances
         // outside the volume never touch their (cold) asset.
-        let mut relevant = Vec::new();
         let candidates = frame
             .mesh_instances
             .iter()
@@ -192,7 +210,16 @@ impl WorldPrimitiveFrontend {
         // Frame order moves a section between the camera and shadow-candidate
         // groups as visibility changes; every consumer keys meshes by
         // identity, so select them in key order and let reuse see a set.
-        relevant.sort_unstable_by_key(|(instance, _)| instance.mesh_key);
+        // Sorting compact (key, index) pairs avoids moving wide candidates,
+        // and a reused list is confirmed without copying them at all.
+        order.extend(
+            relevant
+                .iter()
+                .enumerate()
+                .map(|(index, (instance, _))| (instance.mesh_key, index as u32)),
+        );
+        order.sort_unstable();
+        let sorted = || order.iter().map(|&(_, index)| &relevant[index as usize]);
         // DH meshes join the list only through a pack `dh_shadow` program;
         // without one (e.g. Complementary) the list is static-only and
         // depends only on the relevant instances' identities and world
@@ -204,21 +231,22 @@ impl WorldPrimitiveFrontend {
                 None => false,
             };
         let runtime_generation = self.shader_runtime.as_ref().map(|runtime| runtime.generation());
-        let memo_instances = (!distant_horizons_voxelized).then(|| {
-            relevant
-                .iter()
-                .map(|(instance, world)| (instance.mesh_key, instance.mesh_generation, world.map(f32::to_bits)))
-                .collect::<Vec<_>>()
-        });
-        if let (Some(instances), Some(memo)) = (&memo_instances, &self.terrain_voxel_source_memo) {
+        let memo_entry = |(instance, world): &(TerrainVoxelCandidate, [f32; 16])| {
+            (instance.mesh_key, instance.mesh_generation, world.map(f32::to_bits))
+        };
+        if let (false, Some(memo)) = (distant_horizons_voxelized, &self.terrain_voxel_source_memo) {
             if memo.runtime_generation == runtime_generation
                 && memo.cull == cull
-                && memo.instances == *instances
+                && memo.instances.len() == order.len()
+                && memo.instances.iter().copied().eq(sorted().map(memo_entry))
             {
                 return Ok(Arc::clone(&memo.meshes));
             }
         }
-        let mut meshes = self.build_terrain_voxel_source_meshes(&relevant)?;
+        let sorted_relevant = sorted().copied().collect::<Vec<_>>();
+        let memo_instances = (!distant_horizons_voxelized)
+            .then(|| sorted_relevant.iter().map(memo_entry).collect::<Vec<_>>());
+        let mut meshes = self.build_terrain_voxel_source_meshes(&sorted_relevant)?;
         if distant_horizons_voxelized {
             let mut seen = meshes.iter().map(|mesh| mesh.mesh_key).collect::<MeshKeySet<u64>>();
             for mesh in self.distant_horizons_voxel_source_meshes(frame)? {
