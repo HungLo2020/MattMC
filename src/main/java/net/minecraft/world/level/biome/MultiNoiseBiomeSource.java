@@ -37,6 +37,11 @@ public class MultiNoiseBiomeSource extends BiomeSource {
 		return new MultiNoiseBiomeSource(Either.right(holder));
 	}
 
+	/** The resolved parameter list, for a chunk-wide native biome fill. */
+	public Climate.ParameterList<Holder<Biome>> nativeParameters() {
+		return this.parameters();
+	}
+
 	private Climate.ParameterList<Holder<Biome>> parameters() {
 		return this.parameters.map(parameterList -> parameterList, holder -> ((MultiNoiseBiomeSourceParameterList)holder.value()).parameters());
 	}

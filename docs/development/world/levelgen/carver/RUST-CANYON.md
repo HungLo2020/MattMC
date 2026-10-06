@@ -3,7 +3,9 @@
 ## Ownership and correctness
 
 `world/level/levelgen/carver/canyon/` evaluates the built-in canyon
-shape predicate for one chunk-clipped ellipsoid. Java retains tunnel creation,
+shape predicate for one chunk-clipped ellipsoid. On chunks the
+[Rust carvers stage](RUST-CARVERS.md) takes, canyons are carved there instead,
+whole; this path serves the chunks that keep Java's carvers. Java retains tunnel creation,
 random draws, bounds, live carving masks, biome/aquifer calls, block writes and
 postprocessing. Output columns preserve X/Z/descending-Y traversal.
 

@@ -6,6 +6,7 @@
 //! heightmaps and fluid post-processing marks. Java installs the results.
 mod ffi;
 pub(crate) mod section;
+pub(crate) mod traversal;
 #[cfg(test)]
 mod tests;
 
@@ -95,6 +96,8 @@ pub(crate) enum Error {
     UnknownState(i32),
     /// A write outside the chunk's sections.
     OutOfChunk,
+    /// The cell density program rejected its frame (bind validation prevents it).
+    CellProgram,
 }
 
 /// Interpolated values of one cell, from `NoiseInterpolator.copyCellCorners`

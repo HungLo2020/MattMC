@@ -52,14 +52,48 @@ final class NativeNoiseRouter implements AutoCloseable {
     private final MemorySegment output;
     private final int columns, points;
     private final long handle;
+    // A template instance keeps its per-seed programs reachable.
+    @Nullable
+    private final NativeChunkNoise template;
 
     private NativeNoiseRouter(List<NoiseChunk.NoiseInterpolator> interpolators, NativeNoiseState[] states, int columns, int points, long handle) {
+        this(interpolators, states, columns, points, handle, null, interpolators.size());
+    }
+
+    private NativeNoiseRouter(List<NoiseChunk.NoiseInterpolator> interpolators, NativeNoiseState[] states, int columns, int points, long handle,
+                              @Nullable NativeChunkNoise template, int roots) {
+        this.template = template;
         this.interpolators = interpolators;
         this.states = states;
         this.columns = columns;
         this.points = points;
         this.handle = handle;
-        this.output = this.arena.allocate((long)interpolators.size() * columns * points * 8L, 8);
+        this.output = this.arena.allocate((long)roots * columns * points * 8L, 8);
+    }
+
+    long handle() {
+        return this.handle;
+    }
+
+    /** A per-chunk instance of a per-seed template; its slices go only to a
+     * bound native traversal, never into Java interpolators. */
+    static NativeNoiseRouter instance(long handle, NativeChunkNoise template, int columns, int points) {
+        return new NativeNoiseRouter(List.of(), template.states(), columns, points, handle, template, template.roots);
+    }
+
+    /** Verification only: one slice's raw values (root, column, Y), or null when declined. */
+    @Nullable
+    double[] sliceValues(int blockX) {
+        int status;
+        try {
+            status = (int)SLICE.invokeExact(this.handle, blockX, this.output, this.output.byteSize() / 8);
+        } catch (Throwable error) {
+            throw new IllegalStateException("Native noise router slice failed", error);
+        } finally {
+            Reference.reachabilityFence(this.states);
+            Reference.reachabilityFence(this.template);
+        }
+        return status == 0 ? this.output.toArray(ValueLayout.JAVA_DOUBLE) : null;
     }
 
     static void setEnabled(boolean value) {
@@ -69,11 +103,13 @@ final class NativeNoiseRouter implements AutoCloseable {
     /** Compiles every interpolator of a fresh chunk; null keeps Java's slice fill. */
     @Nullable
     static NativeNoiseRouter create(NoiseChunk chunk) {
+        // Compiles the chunk's wrapped graph; a native chunk builds it now.
+        chunk.ensureWrapped();
         if (!enabled || chunk.getClass() != NoiseChunk.class || chunk.getBlender() != Blender.empty() || chunk.interpolating
             || chunk.interpolators.isEmpty() || chunk.interpolators.size() > 64) {
             return null;
         }
-        Compiler compiler = new Compiler();
+        Compiler compiler = new Compiler(false);
         int[] roots = new int[chunk.interpolators.size()];
         for (int index = 0; index < roots.length; index++) {
             NoiseChunk.NoiseInterpolator interpolator = chunk.interpolators.get(index);
@@ -88,32 +124,17 @@ final class NativeNoiseRouter implements AutoCloseable {
             if (!compiler.cannotObserve(cache.wrapped(), visited, 0)) return null;
         }
         int columns = chunk.cellCountXZ + 1, points = chunk.cellCountY + 1, flatSize = chunk.noiseSizeXZ + 1;
-        DoubleArrayList doubles = compiler.params;
         for (NoiseChunk.FlatCache cache : compiler.flats) {
             if (cache.values.length != flatSize * flatSize) return null;
-            doubles.addElements(doubles.size(), cache.values);
+            compiler.params.addElements(compiler.params.size(), cache.values);
         }
-        IntArrayList ints = new IntArrayList();
-        ints.addElements(0, new int[]{compiler.nodes.size() / 5, roots.length, compiler.splineHeaders.size() / 9, compiler.splineNodes.size() / 4,
-            compiler.splineKnots.size() / 3, compiler.states.size(), compiler.flats.size(), columns, points, chunk.cellWidth, chunk.cellHeight,
-            chunk.firstCellZ(), chunk.cellNoiseMinY, chunk.firstNoiseX, chunk.firstNoiseZ, flatSize});
-        ints.addAll(compiler.nodes);
-        ints.addElements(ints.size(), roots);
-        ints.addAll(compiler.splineHeaders);
-        ints.addAll(compiler.splineNodes);
-        ints.addAll(compiler.splineKnots);
-        long[] longs = new long[compiler.states.size() * 2];
-        NativeNoiseState[] states = compiler.states.toArray(NativeNoiseState[]::new);
-        for (int index = 0; index < states.length; index++) {
-            longs[index * 2] = states[index].state().address();
-            longs[index * 2 + 1] = states[index].state().byteSize();
-        }
-        int[] intArray = ints.toIntArray();
-        double[] doubleArray = doubles.toDoubleArray();
+        Packed packed = compiler.pack(roots, columns, points, chunk.cellWidth, chunk.cellHeight, chunk.firstCellZ(), chunk.cellNoiseMinY,
+            chunk.firstNoiseX, chunk.firstNoiseZ, flatSize);
+        NativeNoiseState[] states = packed.states();
         long handle;
         try {
-            handle = (long)CREATE.invokeExact(MemorySegment.ofArray(intArray), intArray.length, MemorySegment.ofArray(doubleArray), doubleArray.length,
-                MemorySegment.ofArray(longs), longs.length);
+            handle = (long)CREATE.invokeExact(MemorySegment.ofArray(packed.ints()), packed.ints().length, MemorySegment.ofArray(packed.doubles()),
+                packed.doubles().length, MemorySegment.ofArray(packed.longs()), packed.longs().length);
         } catch (Throwable error) {
             throw new IllegalStateException("Cannot create native noise router", error);
         } finally {
@@ -155,13 +176,63 @@ final class NativeNoiseRouter implements AutoCloseable {
             throw new IllegalStateException("Cannot release native noise router", error);
         } finally {
             Reference.reachabilityFence(this.states);
+            Reference.reachabilityFence(this.template);
             this.arena.close();
         }
     }
 
-    /** Builds the router program. Every accepted node computes exactly what its
-     * Java compute does with this chunk as context during a slice fill. */
-    private static final class Compiler {
+    /** A program in the create ABI, with the noise states it references. */
+    record Packed(int[] ints, double[] doubles, long[] longs, NativeNoiseState[] states) {}
+
+    /** Builds a router program. Slice programs compute exactly what each
+     * chunk-wrapped node's compute does with the chunk as context during a
+     * slice fill. Point programs compile a RandomState's unwrapped router for
+     * point contexts at quart-aligned columns, where every chunk cache marker
+     * reads through to its input: interpolators, CacheOnce and cell caches
+     * evaluate directly, and FlatCache and Cache2D markers give their
+     * Y-independent input's value (Rust validates the independence). */
+    /** FlatCache markers of a RandomState's unwrapped router, numbered in the
+     * order compilers first meet them: the slots of per-chunk FlatCache tables. */
+    static final class FlatSlots {
+        final List<DensityFunctions.Marker> markers = new ArrayList<>();
+        private final IdentityHashMap<DensityFunctions.Marker, Integer> ids = new IdentityHashMap<>();
+
+        int slot(DensityFunctions.Marker marker) {
+            return this.ids.computeIfAbsent(marker, key -> {
+                this.markers.add(key);
+                return this.markers.size() - 1;
+            });
+        }
+    }
+
+    static final class Compiler {
+        private final boolean point, flatPoints;
+        // Template slice programs and their FlatCache inputs share these slots.
+        @Nullable
+        private final FlatSlots slots;
+        // FlatCache markers compiled as exact chunk FlatCache points, by memo slot.
+        int flatPointSlots;
+        // A template's FlatCache slot count for pack(); otherwise the chunk tables'.
+        int packedFlatSlots = -1;
+
+        Compiler(boolean point) {
+            this(point, false);
+        }
+
+        /** With {@code flatPoints}, point programs evaluate FlatCache markers as a
+         * chunk's FlatCache does at any point, through a per-chunk binding. */
+        Compiler(boolean point, boolean flatPoints) {
+            this(point, flatPoints, null);
+        }
+
+        /** With {@code slots}: a slice program over a RandomState's unwrapped graph
+         * (a per-seed template; FlatCache markers read per-chunk tables), or a point
+         * program of FlatCache inputs whose nested FlatCaches use the same slots. */
+        Compiler(boolean point, boolean flatPoints, @Nullable FlatSlots slots) {
+            this.point = point;
+            this.flatPoints = flatPoints;
+            this.slots = slots;
+        }
         final IntArrayList nodes = new IntArrayList();
         final DoubleArrayList params = new DoubleArrayList();
         final IntArrayList splineHeaders = new IntArrayList(), splineNodes = new IntArrayList(), splineKnots = new IntArrayList();
@@ -171,6 +242,37 @@ final class NativeNoiseRouter implements AutoCloseable {
         private final IdentityHashMap<NativeNoiseState, Integer> stateIds = new IdentityHashMap<>();
         private final IdentityHashMap<NoiseChunk.FlatCache, Integer> flatIds = new IdentityHashMap<>();
         private final Set<DensityFunction> cacheOnce = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        /** Packs with the root list and the 9 slice geometry values (unused by point programs). */
+        Packed pack(int[] roots, int... geometry) {
+            IntArrayList ints = new IntArrayList();
+            ints.addElements(0, new int[]{this.nodes.size() / 5, roots.length, this.splineHeaders.size() / 9, this.splineNodes.size() / 4,
+                this.splineKnots.size() / 3, this.states.size(), this.packedFlatSlots >= 0 ? this.packedFlatSlots : this.flats.size()});
+            ints.addElements(ints.size(), geometry);
+            ints.addAll(this.nodes);
+            ints.addElements(ints.size(), roots);
+            ints.addAll(this.splineHeaders);
+            ints.addAll(this.splineNodes);
+            ints.addAll(this.splineKnots);
+            NativeNoiseState[] states = this.states.toArray(NativeNoiseState[]::new);
+            long[] longs = new long[states.length * 2];
+            for (int index = 0; index < states.length; index++) {
+                longs[index * 2] = states[index].state().address();
+                longs[index * 2 + 1] = states[index].state().byteSize();
+            }
+            return new Packed(ints.toIntArray(), this.params.toDoubleArray(), longs, states);
+        }
+
+        /** A point program's root; FindTopSurface is accepted only here. */
+        int addRoot(DensityFunction function) {
+            DensityFunction f = resolve(function);
+            if (this.point && f != null && f.getClass() == DensityFunctions.FindTopSurface.class) {
+                var n = (DensityFunctions.FindTopSurface)f;
+                int density = add(n.density(), 1), upper = add(n.upperBound(), 1);
+                return density < 0 || upper < 0 ? -1 : node(36, density, upper, 0, null, n.lowerBound(), n.cellHeight(), 0, 0);
+            }
+            return add(function, 0);
+        }
 
         int add(DensityFunction function, int depth) {
             if (depth > MAX_DEPTH) return -1;
@@ -200,6 +302,15 @@ final class NativeNoiseRouter implements AutoCloseable {
                     f = holder.value();
                 } else if (type == DensityFunctions.BlendDensity.class) {
                     f = ((DensityFunctions.BlendDensity)f).input();
+                } else if (this.point && type == DensityFunctions.Marker.class) {
+                    var marker = (DensityFunctions.Marker)f;
+                    var kind = marker.type();
+                    if (kind == DensityFunctions.Marker.Type.FlatCache || kind == DensityFunctions.Marker.Type.Cache2D) return f;
+                    f = marker.wrapped();
+                } else if (this.slots != null && type == DensityFunctions.Marker.class
+                    && ((DensityFunctions.Marker)f).type() == DensityFunctions.Marker.Type.CacheOnce) {
+                    // A chunk's CacheOnce reads through during slice fills, as above.
+                    f = ((DensityFunctions.Marker)f).wrapped();
                 } else {
                     return f;
                 }
@@ -268,7 +379,7 @@ final class NativeNoiseRouter implements AutoCloseable {
                 int spline = spline(((DensityFunctions.Spline)f).spline(), depth);
                 return spline < 0 ? -1 : node(33, spline, 0, 0, null, 0, 0, 0, 0);
             }
-            if (type == NoiseChunk.FlatCache.class) {
+            if (!this.point && type == NoiseChunk.FlatCache.class) {
                 var cache = (NoiseChunk.FlatCache)f;
                 Integer slot = this.flatIds.get(cache);
                 if (slot == null) {
@@ -278,7 +389,26 @@ final class NativeNoiseRouter implements AutoCloseable {
                 }
                 return node(34, slot, 0, 0, null, 0, 0, 0, 0);
             }
-            if (type == NoiseChunk.Cache2D.class) {
+            if (!this.point && this.slots != null && type == DensityFunctions.Marker.class) {
+                // Template: FlatCache reads this chunk's table; Cache2D as for chunks.
+                var marker = (DensityFunctions.Marker)f;
+                if (marker.type() == DensityFunctions.Marker.Type.FlatCache) return node(34, this.slots.slot(marker), 0, 0, null, 0, 0, 0, 0);
+                if (marker.type() != DensityFunctions.Marker.Type.Cache2D) return -1;
+                int a = add(marker.wrapped(), depth + 1);
+                return a < 0 ? -1 : node(35, a, 0, 0, null, 0, 0, 0, 0);
+            }
+            if (this.point && type == DensityFunctions.Marker.class) {
+                var marker = (DensityFunctions.Marker)f;
+                int a = add(marker.wrapped(), depth + 1);
+                if (a < 0) return -1;
+                if (this.flatPoints && marker.type() == DensityFunctions.Marker.Type.FlatCache) {
+                    int slot = this.slots != null ? this.slots.slot(marker) : this.flatPointSlots++;
+                    return node(37, a, slot, 0, null, 0, 0, 0, 0);
+                }
+                // FlatCache and Cache2D: the value of a Y-independent input.
+                return node(35, a, 0, 0, null, 0, 0, 0, 0);
+            }
+            if (!this.point && type == NoiseChunk.Cache2D.class) {
                 // Rust accepts it only over a Y-independent input.
                 int a = add(((NoiseChunk.Cache2D)f).wrapped(), depth + 1);
                 return a < 0 ? -1 : node(35, a, 0, 0, null, 0, 0, 0, 0);

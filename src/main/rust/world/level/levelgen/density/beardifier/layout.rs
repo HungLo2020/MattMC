@@ -1,4 +1,4 @@
-pub(super) const KERNEL_SIZE: usize = 24 * 24 * 24;
+pub(crate) const KERNEL_SIZE: usize = 24 * 24 * 24;
 pub(super) const MAX_ENTRIES: usize = 65536;
 pub(super) struct Geometry<'a> {
     pub bounds: &'a [i32],

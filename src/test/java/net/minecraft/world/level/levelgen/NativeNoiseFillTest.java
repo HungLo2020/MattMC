@@ -52,7 +52,19 @@ class NativeNoiseFillTest {
 
     record Filled(ProtoChunk chunk, NoiseChunk noise) {}
 
+    /** Native fills by cell traversal: Rust-owned, Rust-owned with Java-filled slices, or Java's per-cell loop. */
+    enum Traversal { NATIVE, UPLOADED, JAVA }
+
     static Filled fill(Holder<NoiseGeneratorSettings> setting, RandomState random, ChunkPos pos, boolean nativeFill) {
+        return fill(setting, random, pos, nativeFill, Traversal.NATIVE);
+    }
+
+    static Filled fill(Holder<NoiseGeneratorSettings> setting, RandomState random, ChunkPos pos, boolean nativeFill, Traversal traversal) {
+        return fill(setting, random, pos, nativeFill, traversal, DensityFunctions.BeardifierMarker.INSTANCE);
+    }
+
+    static Filled fill(Holder<NoiseGeneratorSettings> setting, RandomState random, ChunkPos pos, boolean nativeFill, Traversal traversal,
+                       DensityFunctions.BeardifierOrMarker beardifier) {
         var config = setting.value();
         var noise = config.noiseSettings();
         var biome = registries.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS);
@@ -60,13 +72,31 @@ class NativeNoiseFillTest {
         var chunk = new ProtoChunk(pos, UpgradeData.EMPTY, LevelHeightAccessor.create(noise.minY(), noise.height()),
             PalettedContainerFactory.create(registries), null);
         // The generator's own NoiseChunk inputs, with no structures and no blending.
-        var noiseChunk = chunk.getOrCreateNoiseChunk(access -> NoiseChunk.forChunk(access, random, DensityFunctions.BeardifierMarker.INSTANCE,
-            config, new AquiferFluidPicker(config.seaLevel(), config.defaultFluid()), Blender.empty()));
+        // The Java route also keeps Java preliminary surface levels and aquifer sources;
+        // only the native traversal route instantiates chunk noise natively.
+        NativeSurfaceLevel.setEnabled(nativeFill);
+        NativeFluidSources.setEnabled(nativeFill);
+        NativeChunkNoise.setEnabled(nativeFill && traversal == Traversal.NATIVE);
+        NoiseChunk noiseChunk;
+        try {
+            noiseChunk = chunk.getOrCreateNoiseChunk(access -> NoiseChunk.forChunk(access, random, beardifier,
+                config, new AquiferFluidPicker(config.seaLevel(), config.defaultFluid()), Blender.empty()));
+        } finally {
+            NativeSurfaceLevel.setEnabled(true);
+            NativeChunkNoise.setEnabled(true);
+        }
+        // Aquifers bind their sources when first used, during the fill.
+        NativeFluidSources.setEnabled(nativeFill);
         NativeNoiseFill.setEnabled(nativeFill);
+        NativeNoiseFill.setNativeTraversal(traversal != Traversal.JAVA);
+        NativeNoiseFill.uploadSlices = traversal == Traversal.UPLOADED;
         try {
             generator.fillFromNoise(Blender.empty(), random, null, chunk).join();
         } finally {
             NativeNoiseFill.setEnabled(true);
+            NativeNoiseFill.setNativeTraversal(true);
+            NativeNoiseFill.uploadSlices = false;
+            NativeFluidSources.setEnabled(true);
         }
         return new Filled(chunk, noiseChunk);
     }
@@ -149,6 +179,7 @@ class NativeNoiseFillTest {
         long[] seeds = {0, 42, -7_340_013_412_337L};
         ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(37, -91), new ChunkPos(-6250, 4321), new ChunkPos(131_000, -131_000)};
         long before = NativeNoiseFill.RUNS.get(), slicesBefore = NativeNoiseRouter.SLICES.get(), slices = 0;
+        long traversalsBefore = NativeNoiseFill.TRAVERSALS.get(), instancesBefore = NativeNoiseFill.INSTANCES.get();
         int pairs = 0;
         for (var setting : settings) {
             for (long seed : seeds) {
@@ -165,11 +196,66 @@ class NativeNoiseFillTest {
         }
         assertTrue(oreBlocks > 0 && rawOreBlocks > 0, "ore veins and raw ore blocks must be exercised: " + oreBlocks + "/" + rawOreBlocks);
         long runs = NativeNoiseFill.RUNS.get() - before;
-        long nativeSlices = NativeNoiseRouter.SLICES.get() - slicesBefore;
-        System.out.println("NOISE_FILL_PARITY pairs=" + pairs + " native_runs=" + runs + " native_slices=" + nativeSlices + " ore_blocks=" + oreBlocks
+        long nativeSlices = NativeNoiseRouter.SLICES.get() - slicesBefore, traversals = NativeNoiseFill.TRAVERSALS.get() - traversalsBefore;
+        assertEquals(pairs, traversals, "every native fill must take the Rust cell traversal");
+        long instances = NativeNoiseFill.INSTANCES.get() - instancesBefore;
+        assertEquals(pairs, instances, "every native fill must instantiate chunk noise natively");
+        System.out.println("NOISE_FILL_PARITY pairs=" + pairs + " native_runs=" + runs + " native_slices=" + nativeSlices + " traversals=" + traversals + " instances=" + instances
+            + " ore_blocks=" + oreBlocks
             + " raw_ore_blocks=" + rawOreBlocks);
         assertEquals(pairs, runs, "every vanilla setting must take the native fill");
         assertEquals(slices, nativeSlices, "every native fill must take native interpolation slices");
+    }
+
+    /** Chunks beside villages, outposts, ancient cities and trial chambers: the
+     * recorded structure geometry adjusts terrain through the native Beardifier
+     * term of a natively instantiated chunk, as Java's cell cache adds it. */
+    @Test void structureChunksMatchJavaLoop() throws Exception {
+        var settingsByName = new java.util.HashMap<String, Holder.Reference<NoiseGeneratorSettings>>();
+        for (var setting : settings) settingsByName.put(setting.key().location().getPath(), setting);
+        long instances = NativeNoiseFill.INSTANCES.get();
+        int pairs = 0;
+        for (var fixture : NativeBeardifierVerification.fixtures()) {
+            var cell = fixture.full().get(0);
+            var pos = new ChunkPos(cell.x() >> 4, cell.z() >> 4);
+            for (String name : new String[]{"overworld", "amplified"}) {
+                var setting = settingsByName.get(name);
+                var noises = registries.lookupOrThrow(Registries.NOISE);
+                String context = name + " " + fixture.name();
+                var java = fill(setting, RandomState.create(setting.value(), noises, 42), pos, false, Traversal.NATIVE,
+                    Beardifier.forGeometry(fixture.pieces(), fixture.junctions(), fixture.bounds()));
+                var candidate = fill(setting, RandomState.create(setting.value(), noises, 42), pos, true, Traversal.NATIVE,
+                    Beardifier.forGeometry(fixture.pieces(), fixture.junctions(), fixture.bounds()));
+                assertNotNull(candidate.noise().nativeBeardifier(), context + " has native structure cells");
+                compare(java, candidate, context);
+                pairs++;
+            }
+        }
+        assertTrue(pairs >= 20, "structure fixtures");
+        assertEquals(pairs, NativeNoiseFill.INSTANCES.get() - instances, "structure chunks must instantiate natively");
+        System.out.println("STRUCTURE_FILL_PARITY pairs=" + pairs);
+    }
+
+    /** Java-filled uploaded slices and Java's per-cell loop give the same chunks. */
+    @Test void cellTraversalsMatchJavaLoop() {
+        long[] seeds = {0, -7_340_013_412_337L};
+        ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(37, -91), new ChunkPos(-6250, 4321)};
+        long traversals = NativeNoiseFill.TRAVERSALS.get();
+        int pairs = 0;
+        for (var setting : settings) {
+            for (long seed : seeds) {
+                var noises = registries.lookupOrThrow(Registries.NOISE);
+                for (ChunkPos pos : positions) {
+                    String context = setting.key().location() + " seed " + seed + " " + pos;
+                    var java = fill(setting, RandomState.create(setting.value(), noises, seed), pos, false);
+                    compare(java, fill(setting, RandomState.create(setting.value(), noises, seed), pos, true, Traversal.UPLOADED), context + " uploaded");
+                    compare(java, fill(setting, RandomState.create(setting.value(), noises, seed), pos, true, Traversal.JAVA), context + " java cells");
+                    pairs++;
+                }
+            }
+        }
+        assertEquals(pairs, NativeNoiseFill.TRAVERSALS.get() - traversals, "uploaded slices keep the Rust traversal; the Java loop does not");
+        System.out.println("CELL_TRAVERSAL_PARITY pairs=" + pairs);
     }
 
     /** Palette growth beyond what NOISE-stage sections reach: every resize

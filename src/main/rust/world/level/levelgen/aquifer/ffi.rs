@@ -1,3 +1,4 @@
+use crate::world::level::levelgen::router::{Binding, Program};
 fn valid_shape(shape: &[i32], len: i32) -> bool {
     let row = shape[3] as i64 * shape[4] as i64;
     shape[3] > 0 && shape[4] > 0 && row <= len as i64 && len as i64 % row == 0
@@ -81,6 +82,57 @@ pub unsafe extern "C" fn mattmc_aquifer_fluid_pure(
         noise,
         unsafe { std::slice::from_raw_parts(policy, 8) },
         unsafe { std::slice::from_raw_parts(surface, size) },
+    )
+}
+
+/// `mattmc_aquifer_fluid_pure` with no requests: the sources and surface
+/// programs answer them. `grid` is the chunk's FlatCache grid [firstQuartX,
+/// firstQuartZ, size]; `memo`/`present` hold `memo_len` corner values and flags
+/// (the sources program's slots times size squared), kept by Java per chunk.
+/// Surface is written back as Java's binding writes it. Returns 0 or negative.
+/// # Safety
+/// As `mattmc_aquifer_fluid_pure`, with surface writable; handles are live
+/// programs from `mattmc_fluid_sources_create` and `mattmc_surface_program_create`.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_aquifer_fluid_native(
+    frame: *mut i32,
+    policy: *const i32,
+    surface: *mut i32,
+    sources: u64,
+    levels: u64,
+    grid: *const i32,
+    memo: *mut f64,
+    present: *mut u8,
+    memo_len: i32,
+) -> i32 {
+    if frame.is_null() || policy.is_null() || surface.is_null() || sources == 0 || levels == 0 || grid.is_null() || memo.is_null()
+        || present.is_null() || memo_len < 0
+    {
+        return -1;
+    }
+    let f = unsafe { std::slice::from_raw_parts_mut(frame, 26) };
+    let g = unsafe { std::slice::from_raw_parts(grid, 3) };
+    let sources = unsafe { &*(sources as *const Program) };
+    if !(1..=128).contains(&f[24]) || !(1..=128).contains(&f[25]) || !(1..=64).contains(&g[2])
+        || memo_len as usize != sources.point_slots() * (g[2] * g[2]) as usize || sources.root_count() != 5
+    {
+        return -1;
+    }
+    let size = (f[24] * f[25] * 2) as usize;
+    let mut binding = Binding {
+        first_x: g[0],
+        first_z: g[1],
+        size: g[2],
+        memo: unsafe { std::slice::from_raw_parts_mut(memo, memo_len as usize) },
+        present: unsafe { std::slice::from_raw_parts_mut(present, memo_len as usize) },
+    };
+    super::fluid::native_step(
+        f,
+        unsafe { std::slice::from_raw_parts(policy, 8) },
+        unsafe { std::slice::from_raw_parts_mut(surface, size) },
+        sources,
+        unsafe { &*(levels as *const Program) },
+        &mut binding,
     )
 }
 

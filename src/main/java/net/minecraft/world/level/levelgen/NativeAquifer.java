@@ -5,6 +5,7 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.lang.ref.Reference;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -26,6 +27,10 @@ final class NativeAquifer {
         ValueLayout.ADDRESS,ValueLayout.JAVA_DOUBLE));
     private static final MethodHandle FLUID_PURE = bind("fluid_pure", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS,ValueLayout.JAVA_DOUBLE,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    // A whole fluid status: sources and surface levels evaluated natively.
+    private static final MethodHandle FLUID_NATIVE = bind("fluid_native", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle MATERIALS = bind("materials",FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,
         ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,
@@ -65,6 +70,15 @@ final class NativeAquifer {
     private final MemorySegment fluidPolicyMemory,surfaceMemory;
     private final int surfaceMinX,surfaceMinZ,surfaceWidth,surfaceHeight;
 
+    // Native sources and this chunk's FlatCache binding: grid, corner values, flags.
+    @org.jetbrains.annotations.Nullable
+    private final NativeFluidSources sources;
+    @org.jetbrains.annotations.Nullable
+    private final NativeSurfaceLevel levels;
+    private int[] sourceGrid;
+    private double[] sourceMemo;
+    private byte[] sourcePresent;
+
     // Built-in positional factories draw aquifer centres natively: 1 Xoroshiro, 2 Legacy, 0 Java.
     private final int locationKind;
     private final long locationSeedA,locationSeedB;
@@ -100,6 +114,10 @@ final class NativeAquifer {
             encode(global.fluid.fluidType()),global.fluid.fluidType().isAir()?1:0,
             net.minecraft.SharedConstants.DEBUG_DISABLE_FLUID_GENERATION?1:0,global.disabled.fluidLevel(),encode(Blocks.AIR.defaultBlockState())}:new int[0];
         fluidPolicyMemory=MemorySegment.ofArray(fluidPolicy);
+        // Native sources need the native surface levels the chunk itself uses.
+        NativeSurfaceLevel chunkLevels=pureSources?chunk.nativeSurfaceLevel():null;
+        sources=chunkLevels==null?null:chunk.randomState().nativeFluidSources();
+        levels=sources==null?null:chunkLevels;
     }
     private java.util.IdentityHashMap<BlockState,Integer> extraIds;
     private java.util.ArrayList<BlockState> extraStates;
@@ -184,7 +202,7 @@ final class NativeAquifer {
         if(!materialsReady || materialX!=sx || materialY!=sy || materialZ!=sz || materialEpoch!=chunk.arrayInterpolationCounter) {
             NativeNoiseState noise=barrier.noise().noise()==null?null:barrier.noise().noise().nativeState();
             if(noise!=null && !noise.critical())return false;
-            prepareMaterials(sx,sy,sz,noise);
+            prepareMaterials(sx,sy,sz,noise,chunk.aquiferDensity.values);
         }
         return true;
     }
@@ -193,7 +211,7 @@ final class NativeAquifer {
         lastSchedule=materials[index+1]!=0;int state=materials[index];return state==-1?null:decode(state);
     }
 
-    private void prepareMaterials(int sx,int sy,int sz,NativeNoiseState noise) throws Throwable {
+    private void prepareMaterials(int sx,int sy,int sz,NativeNoiseState noise,double[] cellDensities) throws Throwable {
             if(materials==null) {materials=new int[chunk.cellWidth*chunk.cellWidth*chunk.cellHeight*2];materialMemory=MemorySegment.ofArray(materials);}
             cellLocations(sx,sy,sz);
             batchFrame[14]=encode(Blocks.AIR.defaultBlockState());batchFrame[16]=0;batchFrame[17]=0;
@@ -203,7 +221,7 @@ final class NativeAquifer {
             batchFrame[27]=global.fluid.fluidLevel();batchFrame[28]=encode(global.fluid.fluidType());
             batchFrame[29]=global.fluid.fluidType().is(Blocks.LAVA)?2:global.fluid.fluidType().is(Blocks.WATER)?1:0;
             batchFrame[30]=net.minecraft.SharedConstants.DEBUG_DISABLE_FLUID_GENERATION?1:0;batchFrame[31]=global.disabled.fluidLevel();
-            var densities=MemorySegment.ofArray(chunk.aquiferDensity.values);
+            var densities=MemorySegment.ofArray(cellDensities);
             var noiseMemory=noise==null?MemorySegment.NULL:noise.state();
             for(;;) {
                 int result=(int)MATERIALS.invokeExact(batchFrameMemory,valuesMemory,densities,materialMemory,locationsMemory,
@@ -224,21 +242,59 @@ final class NativeAquifer {
 
     /** Whether the native NOISE fill can take this aquifer's per-cell material batch. */
     boolean nativeFillReady() {
-        if(!pureSources || barrier==null || chunk.aquiferDensity==null)return false;
+        if(!pureSources || barrier==null || chunk.aquiferDensity==null && chunk.nativeNoise()==null)return false;
         NativeNoiseState noise=barrier.noise().noise()==null?null:barrier.noise().noise().nativeState();
         return noise==null || noise.critical();
     }
 
     /** The cell's (state, schedule) materials, as the first in-cell block's
      * computeMaterial would prepare them; the cell caches must be selected. */
-    int[] prepareCellMaterials(int sx,int sy,int sz) {
+    int[] prepareCellMaterials(int sx,int sy,int sz,double[] cellDensities) {
         try {
             NativeNoiseState noise=barrier.noise().noise()==null?null:barrier.noise().noise().nativeState();
-            prepareMaterials(sx,sy,sz,noise);
+            prepareMaterials(sx,sy,sz,noise,cellDensities);
             return materials;
         } catch(RuntimeException | Error e) { throw e; }
         catch(Throwable t) { throw new IllegalStateException("Native aquifer cell failed",t); }
     }
+
+    /** This aquifer's buffers for a native CARVERS stage, whose substance decisions
+     * run entirely in Rust: built-in pure sources and positional randomness, a
+     * plain fluid picker of water, lava or air, and a native barrier noise. Null
+     * keeps Java's carving. The caches are this aquifer's own; the stage copies
+     * them back. */
+    @org.jetbrains.annotations.Nullable
+    CarverBinding carverBinding() {
+        if(sources==null || levels==null || barrier==null || locationKind==0 || net.minecraft.SharedConstants.DEBUG_DISABLE_FLUID_GENERATION) return null;
+        BlockState fluidType=global.fluid.fluidType();
+        if(global.lava.fluidType()!=Blocks.LAVA.defaultBlockState() || fluidType!=Blocks.WATER.defaultBlockState()
+            && fluidType!=Blocks.LAVA.defaultBlockState() && fluidType!=Blocks.AIR.defaultBlockState()) return null;
+        NativeNoiseState noise=barrier.noise().noise()==null?null:barrier.noise().noise().nativeState();
+        if(barrier.noise().noise()!=null && (noise==null || !noise.state().isNative())) return null;
+        if(sourceGrid==null) {
+            // As fluid() prepares them on its first native status.
+            chunk.forEachPreliminarySurfaceLevel((sx,sz,level)->{
+                int qx=(sx>>2)-surfaceMinX,qz=(sz>>2)-surfaceMinZ;
+                if(qx>=0 && qz>=0 && qx<surfaceWidth && qz<surfaceHeight) {
+                    int offset=(qz*surfaceWidth+qx)*2;surfaceCache[offset]=level;surfaceCache[offset+1]=1;
+                }
+            });
+            int size=chunk.noiseSizeXZ+1;
+            sourceGrid=new int[]{chunk.firstNoiseX,chunk.firstNoiseZ,size};
+            sourceMemo=new double[sources.slots()*size*size];sourcePresent=new byte[sourceMemo.length];
+        }
+        return new CarverBinding(locations,shape,cache,locationKind,locationSeedA,locationSeedB,skipY,fluidPolicy,
+            new int[]{surfaceMinX,surfaceMinZ,surfaceWidth,surfaceHeight},surfaceCache,sources,levels,sourceGrid,sourceMemo,sourcePresent,
+            noise==null?MemorySegment.NULL:noise.state(),barrier.xzScale(),barrier.yScale(),noise);
+    }
+
+    /** Arrays are this aquifer's live caches; {@code noise} keeps the barrier state reachable. */
+    record CarverBinding(long[] locations,int[] shape,int[] cache,int locationKind,long seedA,long seedB,int skipY,int[] policy,
+                         int[] surfaceRect,int[] surface,NativeFluidSources sources,NativeSurfaceLevel levels,int[] grid,double[] memo,byte[] present,
+                         MemorySegment barrierState,double barrierXz,double barrierY,@org.jetbrains.annotations.Nullable NativeNoiseState noise) {}
+
+    /** The flag a native stage's last substance decision left. */
+    void setScheduleFluidUpdate(boolean schedule) { lastSchedule=schedule; }
 
     Aquifer.FluidStatus fluid(int x,int y,int z) {
         // Only a cache miss enters here. Separate frames preserve the suspended
@@ -250,6 +306,26 @@ final class NativeAquifer {
         double answer=0.0;
         DensityFunction.SinglePointContext context=null;
         try {
+            if(sources!=null) {
+                if(sourceGrid==null) {
+                    // Levels the chunk already holds: Rust would compute the same values.
+                    chunk.forEachPreliminarySurfaceLevel((sx,sz,level)->{
+                        int qx=(sx>>2)-surfaceMinX,qz=(sz>>2)-surfaceMinZ;
+                        if(qx>=0 && qz>=0 && qx<surfaceWidth && qz<surfaceHeight) {
+                            int offset=(qz*surfaceWidth+qx)*2;surfaceCache[offset]=level;surfaceCache[offset+1]=1;
+                        }
+                    });
+                    int size=chunk.noiseSizeXZ+1;
+                    sourceGrid=new int[]{chunk.firstNoiseX,chunk.firstNoiseZ,size};
+                    sourceMemo=new double[sources.slots()*size*size];sourcePresent=new byte[sourceMemo.length];
+                }
+                int status=(int)FLUID_NATIVE.invokeExact(memory,fluidPolicyMemory,surfaceMemory,sources.handle(),levels.handle(),
+                    MemorySegment.ofArray(sourceGrid),MemorySegment.ofArray(sourceMemo),MemorySegment.ofArray(sourcePresent),sourceMemo.length);
+                Reference.reachabilityFence(sources);Reference.reachabilityFence(levels);
+                if(status!=0)throw new IllegalStateException("Native aquifer fluid: "+status);
+                NativeFluidSources.STATUSES.incrementAndGet();
+                return new Aquifer.FluidStatus(state[12],decode(state[13]));
+            }
             for(;;) {
                 int request=pureSources?(int)FLUID_PURE.invokeExact(memory,answer,fluidPolicyMemory,surfaceMemory):(int)FLUID.invokeExact(memory,answer);
                 if(request==0)return new Aquifer.FluidStatus(state[12],decode(state[13]));

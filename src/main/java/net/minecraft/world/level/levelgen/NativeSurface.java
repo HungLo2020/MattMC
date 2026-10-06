@@ -44,6 +44,8 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
     private final int[] program, cache;
     private final SurfaceRules.Condition[] conditions;
     private final SurfaceRules.SurfaceRule[] rules;
+    // Condition slots holding the context's shared steep condition.
+    private final boolean[] steepSlots;
     private final int[] frame = new int[24];
     private int[] flags = new int[1], output = new int[1], biomes = new int[1], biomeCache = new int[1];
     private final boolean usesBiomes;
@@ -64,6 +66,8 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         program = compiler.words.stream().mapToInt(Integer::intValue).toArray();
         conditions = compiler.conditions.toArray(SurfaceRules.Condition[]::new);
         rules = compiler.rules.toArray(SurfaceRules.SurfaceRule[]::new);
+        steepSlots = new boolean[conditions.length];
+        for (int i = 0; i < steepSlots.length; i++) steepSlots[i] = compiler.steep.contains(i);
         usesBiomes = compiler.usesBiomes;
         canBatch = compiler.canBatch && this.biomeManager != null
             && context.system.getClass() == SurfaceSystem.class
@@ -89,6 +93,7 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         final List<int[]> biomeData = new ArrayList<>();
         final List<SurfaceRules.Condition> conditions = new ArrayList<>();
         final List<SurfaceRules.SurfaceRule> rules = new ArrayList<>();
+        final java.util.Set<Integer> steep = new java.util.HashSet<>();
         boolean canBatch = true, usesBiomes;
         int emit(int op, int a, int b, int c, int d) {
             int pc = words.size(); for (int v : new int[]{op,a,b,c,d,0,0,0}) words.add(v); return pc;
@@ -159,10 +164,47 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
                 boolean xz = source instanceof SurfaceRules.NoiseThresholdConditionSource || source == SurfaceRules.Steep.INSTANCE;
                 boolean known = xz || source == SurfaceRules.Temperature.INSTANCE || source instanceof SurfaceRules.VerticalGradientConditionSource || source instanceof SurfaceRules.BiomeConditionSource;
                 if (!known) canBatch = false;
+                if (source == SurfaceRules.Steep.INSTANCE) steep.add(conditions.size());
                 int slot = conditions.size(); conditions.add(source.apply(context)); pc = emit(2, slot, xz ? 1 : 0, 0, 0);
             }
             words.set(pc + 6, inverse ? 1 : 0); return pc;
         }
+    }
+
+    private static final java.util.Map<SurfaceRules.RuleSource, Boolean> HEIGHTMAP_ONLY =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /** Whether a rule reads its chunk only through the world-generation heightmaps
+     * (steep) when evaluated: built-in rules and conditions only. A native stage
+     * that owns the chunk's blocks may then evaluate it after syncing heightmaps. */
+    static boolean readsOnlyHeightmaps(SurfaceRules.RuleSource source) {
+        Boolean known = HEIGHTMAP_ONLY.get(source);
+        if (known == null) {
+            known = readsOnlyHeightmaps(source, 0);
+            HEIGHTMAP_ONLY.put(source, known);
+        }
+        return known;
+    }
+
+    private static boolean readsOnlyHeightmaps(SurfaceRules.RuleSource source, int depth) {
+        if (depth > 512) return false;
+        if (source instanceof SurfaceRules.SequenceRuleSource sequence) {
+            for (var rule : sequence.sequence()) if (!readsOnlyHeightmaps(rule, depth + 1)) return false;
+            return true;
+        }
+        if (source instanceof SurfaceRules.TestRuleSource test) {
+            return knownCondition(test.ifTrue()) && readsOnlyHeightmaps(test.thenRun(), depth + 1);
+        }
+        return source instanceof SurfaceRules.BlockRuleSource || source == SurfaceRules.Bandlands.INSTANCE;
+    }
+
+    private static boolean knownCondition(SurfaceRules.ConditionSource source) {
+        while (source instanceof SurfaceRules.NotConditionSource not) source = not.target();
+        return source instanceof SurfaceRules.StoneDepthCheck || source instanceof SurfaceRules.WaterConditionSource
+            || source instanceof SurfaceRules.YConditionSource || source == SurfaceRules.Hole.INSTANCE
+            || source == SurfaceRules.AbovePreliminarySurface.INSTANCE || source instanceof SurfaceRules.VerticalGradientConditionSource
+            || source instanceof SurfaceRules.BiomeConditionSource || source instanceof SurfaceRules.NoiseThresholdConditionSource
+            || source == SurfaceRules.Steep.INSTANCE || source == SurfaceRules.Temperature.INSTANCE;
     }
 
     private void capacity(int count) {
@@ -228,6 +270,32 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
             committed = boundary;
             if (status == 1) { context.lastUpdateY = updateBase + frame[6]; return; }
             if (status == 2) respond(x, z);
+        }
+    }
+
+    boolean usesBiomes() {
+        return usesBiomes;
+    }
+
+    boolean[] steepSlots() {
+        return steepSlots.clone();
+    }
+
+    /** {@link #column} over Rust-owned storage: Rust scans the column, selects its
+     * biomes, answers steep and commits blocks; Java answers its other requests. */
+    void column(NativeSurfaceChunk owned, int x, int z, int top) {
+        int count = owned.begin(x, z, top, usesBiomes);
+        if (count == 0) return;
+        reset(context.chunk.getMinY(), count);
+        for (;;) {
+            int status;
+            try {
+                status = (int)NativeSurfaceChunk.RUN.invokeExact(owned.handle, MemorySegment.ofArray(program), program.length,
+                    MemorySegment.ofArray(frame), MemorySegment.ofArray(cache), secondary);
+            } catch (Throwable t) { throw failure(t); }
+            if (status == 1) { context.lastUpdateY = updateBase + frame[6]; return; }
+            if (status != 2) throw new IllegalStateException("Native surface column: " + status);
+            respond(x, z);
         }
     }
 

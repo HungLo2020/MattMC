@@ -13,10 +13,48 @@ writes for eligible chunks; the remaining Java loop keeps them otherwise.
 For the built-in fluid picker and known pure density sources, Rust consumes the
 already-filled density cell and returns block choices plus update flags. Material calls
 process at most 128 positions before yielding. Missing aquifer statuses are
-resolved lazily; repeated preliminary-surface lookups stay in a native cache.
+resolved lazily; repeated preliminary-surface lookups stay in a native cache,
+and misses are computed by the [native surface program](RUST-PRELIMINARY-SURFACE.md).
 Barrier noise uses the existing native synthesis kernel directly.
 Native buffers are created only when a query needs aquifer sampling. Single-column
 height queries retain ordered requests instead of evaluating an entire cell.
+
+### Native fluid sources
+
+With pure sources and native [preliminary surface levels](RUST-PRELIMINARY-SURFACE.md),
+a fluid status is one native call: Rust also evaluates the aquifer's noise
+sources (erosion, depth, fluid level floodedness, fluid level spread, lava)
+instead of yielding each request to Java.
+[`NativeFluidSources`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeFluidSources.java)
+compiles them once per `RandomState` with the [noise router](RUST-NOISE-ROUTER.md)
+compiler. Java evaluates the chunk-wrapped sources at point contexts, where a
+`FlatCache` returns its quart-corner value (input at Y 0) inside the chunk's
+grid and its input at the point outside it; the router's FLAT_POINT node does
+the same through a per-chunk binding that `NativeAquifer` owns, computing each
+corner once. Before the first native status, `NativeAquifer` copies the
+chunk's cached surface levels into its surface window. Java still owns the
+status cache and its callers. `NativeFluidSourcesTest` compares every status
+of the fill's aquifer centres and points across the chunk grid's edge with
+Java's request path for every aquifer-enabled vanilla setting.
+
+A verification-only entry point also compares each source's value bit for bit
+(43,200 values across the grid edge); mutations of corner position, memo
+layout, the grid test, source order, surface quantization and the surface
+window seed each fail it.
+
+```sh
+python3 DevUtils/tests/worldgen/VerifyRustFluidSources.py --parity-only
+python3 DevUtils/tests/worldgen/VerifyRustFluidSources.py --forks 3 --cpu 5 --background-cpus 0,1
+```
+
+The driver audits every production edit since `da1109de6` and benchmarks
+`NoiseFillVerification` in `javasources` against `native` mode. Measured
+2026-10-05 (laptop as below): overworld 41.9 → 41.1 ms and amplified 40.5 →
+40.8 ms per eight fills (paired ratios 0.89–1.10, intervals spanning 1);
+same-JVM interleaved fills also measured no change (5.80 vs 5.81 ms, 5.32 vs
+5.33 ms). Rust computes FlatCache corners that Java reads from tables the chunk
+already holds. The move replaces about 180 Java request round trips per
+overworld chunk with one call per status.
 
 Custom sources, nonstandard contexts, and blended chunks use the ordered native
 request path. Java answers requests in the original order. Unknown block states
@@ -132,3 +170,12 @@ other machines.
 The repository-wide Rust suite encountered 80 renderer failures, beginning with
 an OpenGL shader compilation error and followed by poisoned graphics locks.
 Rendering was not changed; the focused world-generation suite passed separately.
+
+## Carver substance decisions
+
+The [Rust carvers stage](carver/RUST-CARVERS.md) decides
+`computeSubstance(SinglePointContext, 0.0)` entirely in Rust
+([`aquifer/substance.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/aquifer/substance.rs))
+for aquifers on the fully native route: native centres, ranking and decision,
+fluid statuses from the native sources and surface programs, and the barrier
+noise, over the aquifer's own caches (`NativeAquifer.carverBinding`).

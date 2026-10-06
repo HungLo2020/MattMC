@@ -29,6 +29,14 @@ public class UniformHeight extends HeightProvider {
 		this.maxInclusive = verticalAnchor2;
 	}
 
+	public VerticalAnchor minInclusive() {
+		return this.minInclusive;
+	}
+
+	public VerticalAnchor maxInclusive() {
+		return this.maxInclusive;
+	}
+
 	public static UniformHeight of(VerticalAnchor verticalAnchor, VerticalAnchor verticalAnchor2) {
 		return new UniformHeight(verticalAnchor, verticalAnchor2);
 	}

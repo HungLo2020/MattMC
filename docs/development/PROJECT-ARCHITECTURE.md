@@ -80,13 +80,18 @@ Shared engine primitives belong here. Use this for low-level types, algorithms, 
 
 World simulation and world data helpers belong here. Current code includes
 `world/level/color_map_color_util.rs` for Java color-map behavior,
-`world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md), [skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) under
+`world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md) (with the
+[biome fill](world/biome/RUST-BIOME-FILL.md) in `world/level/levelgen/biome_fill/`), [skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) under
 `world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
 under `world/level/chunk/palette/`, and `world/level/levelgen/` for
-noise synthesis, density evaluation, aquifers, surface evaluation, worldgen
+noise synthesis, density evaluation, aquifers, surface evaluation over
+[Rust-owned chunk storage](world/levelgen/RUST-SURFACE-STORAGE.md), the
+[carvers stage](world/levelgen/carver/RUST-CARVERS.md), worldgen
 randomness, the [NOISE fill](world/levelgen/RUST-NOISE-FILL.md) that owns
-base-terrain block writes and the [noise router](world/levelgen/RUST-NOISE-ROUTER.md)
-that fills its interpolation slices. See
+base-terrain block writes the [noise router](world/levelgen/RUST-NOISE-ROUTER.md)
+that fills its interpolation slices and computes
+[preliminary surface levels](world/levelgen/RUST-PRELIMINARY-SURFACE.md), from
+[per-seed chunk noise templates](world/levelgen/RUST-CHUNK-NOISE.md). See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.
 

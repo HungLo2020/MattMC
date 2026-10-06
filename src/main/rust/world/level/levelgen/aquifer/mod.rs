@@ -6,5 +6,6 @@ mod ffi;
 pub(crate) mod locations;
 mod fluid;
 mod nearest;
+pub(crate) mod substance;
 #[cfg(test)]
 mod tests;

@@ -99,6 +99,26 @@ impl Legacy {
     pub fn next_float(&mut self) -> f32 {
         self.next(24) as f32 * 5.960_464_5e-8_f32
     }
+
+    /// `setSeed`: the scrambled 48-bit seed.
+    pub fn set_seed(&mut self, seed: i64) {
+        *self = Legacy::new(seed);
+    }
+
+    /// `WorldgenRandom.setLargeFeatureSeed(seed, x, z)` over this source.
+    pub fn set_large_feature_seed(&mut self, seed: i64, x: i32, z: i32) {
+        self.set_seed(seed);
+        let m = self.next_long();
+        let n = self.next_long();
+        self.set_seed((x as i64).wrapping_mul(m) ^ (z as i64).wrapping_mul(n) ^ seed);
+    }
+
+    /// `BitRandomSource.nextLong`: two 32-bit draws, the low one sign-extended.
+    pub fn next_long(&mut self) -> i64 {
+        let high = self.next(32) as i64;
+        let low = self.next(32) as i64;
+        (high << 32).wrapping_add(low)
+    }
 }
 
 pub(crate) enum Random {

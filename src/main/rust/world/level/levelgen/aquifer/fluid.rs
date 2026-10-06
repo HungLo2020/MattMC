@@ -1,5 +1,6 @@
 //! Lazy aquifer-source evaluation. All integer operations follow Java wrapping
 //! semantics; float constants in the deep-dark predicate are widened from f32.
+use crate::world::level::levelgen::router::{with_frame, Binding, Program};
 const OFFSETS: [[i32; 2]; 13] = [
     [0, 0],
     [-2, -1],
@@ -211,6 +212,35 @@ pub(super) fn pure_step(f: &mut [i32], noise: f64, policy: &[i32], surface: &[i3
                 }
                 f[17] = surface[index];
             }
+            result => return result,
+        }
+    }
+}
+
+/// `pure_step` with every remaining request answered in Rust: surface misses
+/// by the preliminary surface program (cached as Java's binding does), and
+/// noise requests by the sources program at Java's context positions. Returns
+/// 0 when the status is in frame[12..14], negative on errors.
+pub(super) fn native_step(f: &mut [i32], policy: &[i32], surface: &mut [i32], sources: &Program, levels: &Program, binding: &mut Binding) -> i32 {
+    let mut noise = 0.;
+    loop {
+        match pure_step(f, noise, policy, surface) {
+            2 => {
+                // NoiseChunk.preliminarySurfaceLevel at the quart-aligned column.
+                let (x, z) = (f[14], f[16]);
+                let mut level = [0];
+                if with_frame(levels, |frame| levels.surface_levels(frame, &[(x >> 2) << 2], &[(z >> 2) << 2], &mut level)).is_err() {
+                    return -5;
+                }
+                let index = (((z >> 2).wrapping_sub(f[23])) * f[24] + (x >> 2).wrapping_sub(f[22])) as usize * 2;
+                surface[index] = level[0];
+                surface[index + 1] = 1;
+                f[17] = level[0];
+            }
+            kind @ 3..=7 => match with_frame(sources, |frame| sources.point_value(frame, (kind - 3) as usize, f[14], f[15], f[16], binding)) {
+                Ok(value) => noise = value,
+                Err(_) => return -5,
+            },
             result => return result,
         }
     }

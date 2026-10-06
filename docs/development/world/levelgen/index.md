@@ -15,8 +15,15 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
   ownership, eligibility gate and parity/performance checks.
 - [Noise Router](RUST-NOISE-ROUTER.md): native interpolation slices from compiled
   density graphs, short circuits, cache rules and parity/performance checks.
+- [Preliminary Surface Level](RUST-PRELIMINARY-SURFACE.md): per-RandomState native
+  surface programs, batched column searches and parity/performance checks.
+- [Chunk Noise Instantiation](RUST-CHUNK-NOISE.md): per-seed templates that replace
+  per-chunk Java graph wrapping, lazy wrapping and parity/performance checks.
 - [Aquifer Evaluation](RUST-AQUIFER.md): cell material decisions, fluid sources, and parity/performance checks.
 - [Surface Evaluation](RUST-SURFACE.md): column processing, callbacks, and compatibility limits.
+- [Surface Chunk Storage](RUST-SURFACE-STORAGE.md): Rust-owned sections and
+  heightmaps shared by the SURFACE and CARVERS stages, the install contract and
+  parity/performance checks.
 - [World-Generation Organization and Refactor Report](RUST-WORLDGEN-ORGANIZATION.md):
   module ownership and the recorded correctness/performance comparisons.
 

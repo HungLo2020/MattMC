@@ -78,6 +78,8 @@ public final class NativeDensityProgram {
         catch(Throwable t){throw failure(t);}
         Snapshot s=new Snapshot(data.asReadOnly(),current);snapshot=s;return s;
     }
+    /** The validated program memory; it stays valid while it is reachable. */
+    MemorySegment memory() { return state().state; }
     public double sample(double x,double y,double z) {
         Snapshot s=state();
         try{return (double)EVAL.invokeExact(s.state,x,y,z);}catch(Throwable t){throw failure(t);}

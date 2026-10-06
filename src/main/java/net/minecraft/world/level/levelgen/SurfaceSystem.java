@@ -100,6 +100,17 @@ public class SurfaceSystem {
 		};
 		SurfaceRules.Context context = new SurfaceRules.Context(this, randomState, chunkAccess, noiseChunk, biomeManager::getBiome, registry, worldGenerationContext);
 		NativeSurface surfaceRule = new NativeSurface(ruleSource, context, registry, biomeManager);
+		// Batched rules run over Rust-owned sections and heightmaps, installed once.
+		NativeSurfaceChunk owned = NativeSurfaceChunk.create(chunkAccess, surfaceRule, biomeManager, registry, this.defaultBlock);
+		if (owned != null) {
+			try {
+				this.buildOwnedSurface(owned, biomeManager, bl, chunkAccess, context, surfaceRule, mutableBlockPos);
+				owned.install();
+			} finally {
+				owned.close();
+			}
+			return;
+		}
 		BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
 
 		for (int k = 0; k < 16; k++) {
@@ -161,6 +172,41 @@ public class SurfaceSystem {
 					}
 
 				}
+				if (holder.is(Biomes.FROZEN_OCEAN) || holder.is(Biomes.DEEP_FROZEN_OCEAN)) {
+					this.frozenOceanExtension(context.getMinSurfaceLevel(), holder.value(), blockColumn, mutableBlockPos2, m, n, o);
+				}
+			}
+		}
+	}
+
+	/** buildSurface's column loop over {@link NativeSurfaceChunk}: the same
+	 * heights, extensions and rule evaluation, reading and writing Rust storage. */
+	private void buildOwnedSurface(
+		NativeSurfaceChunk owned,
+		BiomeManager biomeManager,
+		boolean bl,
+		ChunkAccess chunkAccess,
+		SurfaceRules.Context context,
+		NativeSurface surfaceRule,
+		BlockPos.MutableBlockPos mutableBlockPos
+	) {
+		ChunkPos chunkPos = chunkAccess.getPos();
+		BlockColumn blockColumn = owned.column(mutableBlockPos);
+		BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
+
+		for (int k = 0; k < 16; k++) {
+			for (int l = 0; l < 16; l++) {
+				int m = chunkPos.getMinBlockX() + k;
+				int n = chunkPos.getMinBlockZ() + l;
+				int o = owned.height(k, l) + 1;
+				mutableBlockPos.setX(m).setZ(n);
+				Holder<Biome> holder = biomeManager.getBiome(mutableBlockPos2.set(m, bl ? 0 : o, n));
+				if (holder.is(Biomes.ERODED_BADLANDS)) {
+					this.erodedBadlandsExtension(blockColumn, m, n, o, chunkAccess);
+				}
+
+				context.updateXZ(m, n);
+				surfaceRule.column(owned, m, n, owned.height(k, l) + 1);
 				if (holder.is(Biomes.FROZEN_OCEAN) || holder.is(Biomes.DEEP_FROZEN_OCEAN)) {
 					this.frozenOceanExtension(context.getMinSurfaceLevel(), holder.value(), blockColumn, mutableBlockPos2, m, n, o);
 				}

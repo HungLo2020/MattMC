@@ -12,7 +12,11 @@ Rust then fills a whole slice — every column, interpolator and Y — in one
 ordinary downcall into off-heap memory, and Java copies the values into the
 interpolators' slice arrays. Cell caches, aquifer materials and the block loop
 read those arrays as before. Java still owns the `NoiseChunk`, its caches and
-the density graphs; the router exists for one `NativeNoiseFill.run`.
+the density graphs; the router exists for one `NativeNoiseFill.run`. The same
+compiler builds the shared [preliminary surface level](RUST-PRELIMINARY-SURFACE.md)
+and [aquifer fluid source](RUST-AQUIFER.md#native-fluid-sources) programs in point mode,
+and per-seed [chunk noise templates](RUST-CHUNK-NOISE.md) that eligible chunks
+instantiate instead of compiling their wrapped graphs.
 
 ## Program
 
@@ -88,13 +92,14 @@ python3 DevUtils/tests/worldgen/VerifyRustNoiseRouter.py --parity-only
 python3 DevUtils/tests/worldgen/VerifyRustNoiseRouter.py --forks 3 --cpu 5 --background-cpus 0,1
 ```
 
-The current [driver](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/DevUtils/tests/worldgen/VerifyRustNoiseRouter.py)
+The router's [driver](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/DevUtils/tests/worldgen/VerifyRustNoiseRouter.py)
 audits modified production Java/Rust files against `858476969` with exact
 rewrites before building. New router files and test files are hashed; they are
 not reconstructed from an earlier Java oracle. The driver uses Linux affinity
 and native-library paths. Select available, distinct CPU IDs for `--cpu` and
 `--background-cpus` (at least two worker IDs); this validation also runs with
-`--parity-only`.
+`--parity-only`. Later edits to these files are audited by
+[the surface level driver](RUST-PRELIMINARY-SURFACE.md) and the drivers after it.
 
 [`NativeNoiseRouterTest`](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/test/java/net/minecraft/world/level/levelgen/NativeNoiseRouterTest.java)
 has four methods. Its bundled-setting fixture compares each slice value bit

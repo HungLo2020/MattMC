@@ -19,7 +19,9 @@ import net.minecraft.world.level.levelgen.blending.Blender;
 
 /** Production-path timing of the NOISE fill. One JVM runs one mode: {@code java}
  * (doFill's Java loop), {@code javaslices} (the Rust fill with Java's
- * interpolation slices) or {@code native} (the Rust fill and Rust slices). Each round fills fresh
+ * interpolation slices), {@code javacells} (Rust slices with Java's per-cell
+ * traversal), {@code javasources} (Java answering aquifer source requests) or
+ * {@code native} (the Rust fill, slices, cell traversal and fluid sources). Each round fills fresh
  * chunks through {@code NoiseBasedChunkGenerator.fillFromNoise}; chunk and
  * NoiseChunk construction are untimed and identical for both modes. */
 public final class NoiseFillVerification {
@@ -54,10 +56,13 @@ public final class NoiseFillVerification {
             System.out.println("PLAYER_DISTANCE_FIXTURE case=" + name + " ticks=" + positions.length + " moves=" + positions.length
                 + " trace=" + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest((setting + java.util.Arrays.toString(positions)).getBytes())));
-            if (!mode.equals("native") && !mode.equals("javaslices") && !mode.equals("java")) throw new IllegalArgumentException(mode);
+            if (!List.of("native", "javasources", "javacells", "javaslices", "java").contains(mode)) throw new IllegalArgumentException(mode);
+            NativeFluidSources.setEnabled(!mode.equals("javasources"));
+            long sourcesBefore = NativeFluidSources.STATUSES.get();
             NativeNoiseFill.setEnabled(!mode.equals("java"));
-            NativeNoiseRouter.setEnabled(mode.equals("native"));
-            long before = NativeNoiseFill.RUNS.get(), slicesBefore = NativeNoiseRouter.SLICES.get();
+            NativeNoiseRouter.setEnabled(mode.equals("native") || mode.equals("javacells") || mode.equals("javasources"));
+            NativeNoiseFill.setNativeTraversal(mode.equals("native") || mode.equals("javasources"));
+            long before = NativeNoiseFill.RUNS.get(), slicesBefore = NativeNoiseRouter.SLICES.get(), traversalsBefore = NativeNoiseFill.TRAVERSALS.get();
             PlayerChunkDistancesVerification.measure(mode, name, quick, () -> {
                 List<Job> jobs = new ArrayList<>();
                 for (ChunkPos pos : positions) {
@@ -79,8 +84,12 @@ public final class NoiseFillVerification {
                 return checksum;
             });
             long nativeRuns = NativeNoiseFill.RUNS.get() - before, nativeSlices = NativeNoiseRouter.SLICES.get() - slicesBefore;
-            if (mode.equals("java") != (nativeRuns == 0) || mode.equals("native") == (nativeSlices == 0))
-                throw new IllegalStateException("Unexpected route: native runs " + nativeRuns + ", native slices " + nativeSlices);
+            long traversals = NativeNoiseFill.TRAVERSALS.get() - traversalsBefore;
+            // Only native-source fills of aquifer settings compute statuses natively.
+            boolean nativeSources = NativeFluidSources.STATUSES.get() > sourcesBefore;
+            if (mode.equals("java") != (nativeRuns == 0) || mode.equals("javaslices") != (nativeSlices == 0) && !mode.equals("java")
+                || (mode.equals("native") || mode.equals("javasources")) == (traversals == 0) || nativeSources != (mode.equals("native") && config.aquifersEnabled()))
+                throw new IllegalStateException("Unexpected route: native runs " + nativeRuns + ", native slices " + nativeSlices + ", traversals " + traversals);
         }
     }
 }

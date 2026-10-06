@@ -40,6 +40,10 @@ public class TrapezoidFloat extends FloatProvider {
 		this.plateau = h;
 	}
 
+	public float plateau() {
+		return this.plateau;
+	}
+
 	@Override
 	public float sample(RandomSource randomSource) {
 		float f = this.max - this.min;

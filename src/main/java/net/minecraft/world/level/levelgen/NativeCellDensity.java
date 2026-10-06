@@ -27,14 +27,27 @@ final class NativeCellDensity implements DensityFunction {
     }
     static DensityFunction compile(DensityFunction source,Map<Key,NativeDensityProgram> programs) {
         if(source instanceof NativeCellDensity || source instanceof NativeDensity)return source;
-        var b=new Builder();
-        if(b.add(source,0)<0)return source;
-        boolean unaryCell=(b.nodes.size()==3 || b.nodes.size()==5 && b.nodes.get(3).op()==0 && b.nodes.get(4).op()==8) && b.nodes.get(0).op()==24
-            && b.nodes.get(1).op()==12 && b.nodes.get(2).op()==20;
-        if(!unaryCell && (b.inputs.size()<2 || b.operations<4))return source;
+        var b=new Builder(false);
+        if(!b.accepts(source))return source;
         var key=new Key(List.copyOf(b.nodes),b.inputs.size());
         return new NativeCellDensity(source,b,programs.computeIfAbsent(key,Key::create));
     }
+    /** The program {@link #compile} builds for a chunk's wrapped cell cache,
+     * from a RandomState's unwrapped graph: its inputs are the interpolated
+     * markers (in input order) the chunk's interpolators would wrap. */
+    record Template(NativeDensityProgram program,List<DensityFunctions.Marker> inputs) {}
+    @org.jetbrains.annotations.Nullable
+    static Template template(DensityFunction source,Map<Key,NativeDensityProgram> programs) {
+        var b=new Builder(true);
+        if(!b.accepts(source))return null;
+        var key=new Key(List.copyOf(b.nodes),b.inputs.size());
+        List<DensityFunctions.Marker> inputs=new ArrayList<>();
+        for(Object input:b.inputs)inputs.add((DensityFunctions.Marker)input);
+        return new Template(programs.computeIfAbsent(key,Key::create),List.copyOf(inputs));
+    }
+    NoiseChunk owner() { return owner; }
+    NoiseChunk.NoiseInterpolator[] inputs() { return inputs.clone(); }
+    NativeDensityProgram program() { return program; }
     private boolean active(Object context) {
         return context==owner && owner.getClass()==NoiseChunk.class && owner.interpolating && owner.fillingCell;
     }
@@ -76,9 +89,14 @@ final class NativeCellDensity implements DensityFunction {
             else return f;
         }
     }
+    private static boolean isInterpolated(DensityFunction f) {
+        return f.getClass()==DensityFunctions.Marker.class && ((DensityFunctions.Marker)f).type()==DensityFunctions.Marker.Type.Interpolated;
+    }
     private static boolean stableBounds(DensityFunction f,int depth) {
         if(depth>64)return false;
         f=unwrap(f);
+        if(f instanceof DensityFunctions.HolderHolder h)return h.function().isBound() && stableBounds(h.function().value(),depth+1);
+        if(isInterpolated(f))return stableBounds(((DensityFunctions.Marker)f).wrapped(),depth+1);
         if(f instanceof NativeDensity n)return stableBounds(NativeDensity.unwrap(n),depth+1);
         if(f instanceof DensityFunctions.Constant || f instanceof DensityFunctions.Ap2
             || f instanceof DensityFunctions.Mapped || f instanceof DensityFunctions.MulOrAdd
@@ -89,19 +107,37 @@ final class NativeCellDensity implements DensityFunction {
     }
     private static final class Builder {
         final ArrayList<NativeDensityProgram.Node> nodes=new ArrayList<>();
-        final ArrayList<NoiseChunk.NoiseInterpolator> inputs=new ArrayList<>();
+        // Chunk interpolators, or interpolated markers for a template.
+        final ArrayList<Object> inputs=new ArrayList<>();
+        final boolean template;
         NoiseChunk owner;int operations;
+        Builder(boolean template) { this.template=template; }
+        boolean accepts(DensityFunction source) {
+            if(add(source,0)<0)return false;
+            boolean unaryCell=(nodes.size()==3 || nodes.size()==5 && nodes.get(3).op()==0 && nodes.get(4).op()==8) && nodes.get(0).op()==24
+                && nodes.get(1).op()==12 && nodes.get(2).op()==20;
+            return unaryCell || inputs.size()>=2 && operations>=4;
+        }
         int add(DensityFunction source,int depth) {
             if(depth>48 || nodes.size()>=48)return -1;
             DensityFunction f=unwrap(source);
+            // A chunk-wrapped graph has no holders; a template resolves them as wrapping does.
+            for(int step=0;template && f instanceof DensityFunctions.HolderHolder h && step<64;step++) {
+                if(!h.function().isBound())return -1;
+                f=unwrap(h.function().value());
+            }
             int op,a=0,b=0,c=0;double p=0,q=0;
             if(f instanceof DensityFunctions.Constant n){op=0;p=n.value();}
             else if(f==DensityFunctions.BeardifierMarker.INSTANCE || f==Beardifier.EMPTY){op=0;}
-            else if(f.getClass()==NoiseChunk.NoiseInterpolator.class) {
+            else if(!template && f.getClass()==NoiseChunk.NoiseInterpolator.class) {
                 var n=(NoiseChunk.NoiseInterpolator)f;
                 if(owner!=null && owner!=n.cellOwner())return -1;
                 owner=n.cellOwner();op=24;a=inputs.indexOf(n);
                 if(a<0) {if(inputs.size()==8)return -1;a=inputs.size();inputs.add(n);}
+            } else if(template && isInterpolated(f)) {
+                // Chunk wrapping turns equal markers into one interpolator.
+                op=24;a=inputs.indexOf(f);
+                if(a<0) {if(inputs.size()==8)return -1;a=inputs.size();inputs.add(f);}
             } else if(f instanceof DensityFunctions.Mapped n){op=14+n.type().ordinal();a=add(n.input(),depth+1);}
             else if(f instanceof DensityFunctions.MulOrAdd n){op=n.specificType()==DensityFunctions.MulOrAdd.Type.MUL?12:13;a=add(n.input(),depth+1);p=n.argument();}
             else if(f instanceof DensityFunctions.Clamp n){op=21;a=add(n.input(),depth+1);p=n.minValue();q=n.maxValue();}

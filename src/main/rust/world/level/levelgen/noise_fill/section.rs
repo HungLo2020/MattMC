@@ -41,6 +41,34 @@ impl Section {
         }
     }
 
+    /// A container's current state: `kind` 0 single, 1 linear, 2 hash map,
+    /// 3 global; `palette` in id order (empty for global), one storage value
+    /// per entry, and the configuration bits Java requested for it.
+    pub fn load(kind: u32, storage_bits: u32, palette: Vec<i32>, storage: Vec<u32>, global_bits: u32, counts: [i32; 3]) -> Option<Self> {
+        let kind = match (kind, storage_bits) {
+            (0, 0) if palette.len() == 1 => Kind::Single,
+            (1, 4) if !palette.is_empty() && palette.len() <= 16 => Kind::Linear,
+            (2, 5..=8) if !palette.is_empty() && palette.len() <= 1 << storage_bits => Kind::Hash(storage_bits),
+            (3, bits) if bits == global_bits && palette.is_empty() => Kind::Global,
+            _ => return None,
+        };
+        if storage.len() != ENTRIES || (kind != Kind::Global && storage.iter().any(|id| *id as usize >= palette.len())) {
+            return None;
+        }
+        let requested = match kind {
+            Kind::Single => 0,
+            Kind::Linear => 4,
+            Kind::Hash(bits) => bits,
+            Kind::Global => global_bits,
+        };
+        Some(Self { kind, requested, palette, storage, global_bits, non_empty: counts[0], ticking: counts[1], fluid: counts[2] })
+    }
+
+    /// The state at a storage index.
+    pub fn get(&self, index: usize) -> i32 {
+        self.value_for(self.storage[index])
+    }
+
     /// `getAndSetUnchecked(index, state)` on a position not yet written.
     pub fn set(&mut self, index: usize, state: i32) {
         let id = self.id_for(state);

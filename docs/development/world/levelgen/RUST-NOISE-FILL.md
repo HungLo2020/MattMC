@@ -8,12 +8,29 @@ vein rule with native positional randomness, the default block, section palette
 writes and counters, both world-generation heightmaps and fluid post-processing
 marks. Java installs the sections, heightmaps and marks once.
 
-The [noise router](RUST-NOISE-ROUTER.md) fills eligible interpolation slices;
-Java fills slices that its separate router gate declines. Java still traverses
-cells, fills cell density caches and, on request, aquifer cell materials
-(including fluid-status requests), and owns the generator, the `NoiseChunk`
-and every chunk object. Chunks ineligible for native fill run the unchanged
-Java block loop.
+The [noise router](RUST-NOISE-ROUTER.md) fills the interpolation slices and,
+when the cell traversal is native (below), Rust also walks every cell. Java
+prepares aquifer cell materials on request (including fluid-status requests)
+and owns the generator, the `NoiseChunk` and every chunk object. Ineligible
+chunks run the unchanged Java loop.
+
+## Cell traversal
+
+With a router (a chunk's compiled router, or an instance of its seed's
+[chunk noise template](RUST-CHUNK-NOISE.md)), `NativeNoiseFill` binds it and
+the cell cache's program to the fill ([`traversal.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/noise_fill/traversal.rs)).
+Rust then keeps both slices, builds each cell's interpolator corners as
+`selectCellYZ` and `copyCellCorners` do, evaluates the cell density cache with
+the same validated program `NativeCellDensity` runs, copies the ore vein
+corners and fills the cell: one ordinary downcall per slice and one per column
+of cells. When a cell needs aquifer materials, Rust stops before writing it;
+Java copies the cell's densities into the cell cache, prepares the materials
+and resumes the call. A slice the router declines is filled by Java and
+uploaded. The traversal needs the finalDensity cell cache to be the chunk's
+only cell cache and a `NativeCellDensity` over this chunk's interpolators;
+otherwise Java's per-cell loop runs with Rust slices. Afterwards `NoiseChunk`
+has stopped interpolating; its interpolator corners and cell counters are not
+read again.
 
 ## Eligibility
 
@@ -52,12 +69,14 @@ fill; see the [separate router contract](RUST-NOISE-ROUTER.md#eligibility).
   before any write) only when some block reaches the batch — exactly the cells
   the Java loop prepares, so fluid-status requests and caches match too.
 - Section installs go through `LevelChunkSection.installGenerated`.
+- The native traversal visits cells in the same order as Java's (X, then Z,
+  then Y down) and requests materials for exactly the cells Java's loop would.
 
 ## Verify and measure
 
 For the current implementation, use the
-[router verification driver](RUST-NOISE-ROUTER.md#verify-and-measure), which runs
-both router and fill parity classes. The following commands reproduce the
+[cell traversal driver](#cell-traversal-verification), which runs the router,
+surface and fill parity classes. The following commands reproduce the
 historical fill migration in a separate checkout of `858476969`; they are not
 current-tree verification commands:
 
@@ -68,8 +87,37 @@ python3 DevUtils/tests/worldgen/VerifyRustNoiseFill.py --forks 3 --cpu 5 --backg
 
 This historical driver reconstructs the `858476969` production files from
 reference commit `5218ac875`. Its exact-rewrite audit rejects the later router
-changes to `NoiseChunk.java` before tests run. Use the current driver above on
-`da1109de6` rather than bypassing this audit.
+changes to `NoiseChunk.java` before tests run. Use the current driver below
+rather than bypassing this audit.
+
+### Cell traversal verification
+
+The cell traversal's driver is the current fill driver:
+
+```sh
+python3 DevUtils/tests/worldgen/VerifyRustCellTraversal.py --parity-only
+python3 DevUtils/tests/worldgen/VerifyRustCellTraversal.py --forks 3 --cpu 5 --background-cpus 0,1
+```
+
+It audits every production edit since `da1109de6`, runs the router, surface
+and fill parity suites, and benchmarks `NoiseFillVerification` in `javacells`
+(Rust slices, Java's per-cell loop) against `native` (Rust traversal) mode.
+`NativeNoiseFillTest` requires every vanilla fill to take the Rust traversal,
+and `cellTraversalsMatchJavaLoop` also compares fills whose slices Java fills
+and uploads, and fills by Java's per-cell loop, with the Java loop. Mutations
+of corner order, Y order, the material request position, the slice swap, the
+cell cache copy and the uploaded slice each fail a test.
+
+Cell traversal measurements (2026-10-05, same laptop and method as below):
+the separate-JVM driver run measured medians per eight fills of 42.2 → 41.3 ms
+(overworld, paired ratios 1.03, 0.88, 0.94), 40.1 → 39.1 ms (amplified, 0.95,
+0.98, 1.02) and 8.1 → 7.8 ms (nether, 1.03, 0.97, 0.94). No 95% interval
+excludes 1. A same-JVM interleaved probe of 2,000 fills per route measured
+1–3% less time per overworld and amplified fill. The Java per-cell loop already
+evaluated cell densities with the same Rust kernel, so the move removes
+Java↔Rust chatter (about 768 `selectCellYZ` and cell calls and every slice copy
+per chunk) rather than compute. Raw rounds were recorded under
+`build/cell-traversal-migration/` (not bundled with the wiki).
 
 At that historical snapshot, the driver rebuilds every edited production Java
 file from the reference commit with its exact audited rewrites and requires a

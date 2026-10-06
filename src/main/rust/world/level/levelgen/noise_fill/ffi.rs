@@ -3,13 +3,17 @@
 //! order, reads the results, and releases it in `finally`. The state flag
 //! table is a process-lifetime allocation Java never frees. Cell inputs are
 //! borrowed heap arrays (critical calls): each call is bounded to one cell.
+use super::traversal::{Layout, Step, Traversal};
 use super::{Cell, Config, Corners, NoiseFill, OreVeins, Picker, Substance};
+use crate::world::level::levelgen::density::validation::density_validate;
+use crate::world::level::levelgen::router::Router;
 use crate::world::level::levelgen::random::Positional;
 use crate::world::level::levelgen::synth::State;
 
 struct Handle {
     fill: NoiseFill<'static>,
     cell_size: usize,
+    traversal: Option<Traversal>,
 }
 
 /// `ints`: [minY, height, minSection, sectionCount, cellWidth, cellHeight, air,
@@ -75,7 +79,7 @@ pub unsafe extern "C" fn mattmc_noise_fill_create(
     };
     let flags: &'static [u8] = unsafe { std::slice::from_raw_parts(flags, flag_count as usize) };
     let cell_size = (width * width * height) as usize;
-    Box::into_raw(Box::new(Handle { fill: NoiseFill::new(config, flags), cell_size })) as u64
+    Box::into_raw(Box::new(Handle { fill: NoiseFill::new(config, flags), cell_size, traversal: None })) as u64
 }
 
 /// # Safety
@@ -141,6 +145,7 @@ pub unsafe extern "C" fn mattmc_noise_fill_cell(
         Ok(()) => 0,
         Err(super::Error::UnknownState(_)) => -2,
         Err(super::Error::OutOfChunk) => -3,
+        Err(super::Error::CellProgram) => -4,
     }
 }
 
@@ -271,4 +276,128 @@ pub unsafe extern "C" fn mattmc_noise_fill_replay_section(
         std::ptr::copy_nonoverlapping(packed.as_ptr(), raw, packed.len());
     }
     1
+}
+
+/// Hands the cell traversal to Rust. `ints`: [interpolators, columns, points,
+/// minCellY, minX, minZ, ore (0/1), toggle, ridgedA, ridgedB, inputs,
+/// input interpolator indices...]. `program` is the cell cache's density
+/// program (`bytes` long). Returns 0, or negative when rejected (Java keeps
+/// its own traversal).
+/// # Safety
+/// `router` is a live router handle that outlives this fill and is not used
+/// elsewhere while bound; `program` stays live and immutable for the fill;
+/// `ints` holds `count` i32s, borrowed for this call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_bind(id: u64, router: u64, program: *const u8, bytes: u64, ints: *const i32, count: i32) -> i32 {
+    let handle = unsafe { handle(id) };
+    if router == 0 || program.is_null() || ints.is_null() || count < 11 || handle.traversal.is_some() {
+        return -1;
+    }
+    let i = unsafe { std::slice::from_raw_parts(ints, count as usize) };
+    let index = |value: i32| usize::try_from(value).ok();
+    let (Some(interpolators), Some(columns), Some(points), Some(inputs)) = (index(i[0]), index(i[1]), index(i[2]), index(i[10])) else {
+        return -1;
+    };
+    let config = &handle.fill.config;
+    let width = config.cell_width;
+    let router_ref = unsafe { &*(router as *const Router) };
+    if count as usize != 11 + inputs || inputs == 0 || inputs > 8 || columns as i32 != 16 / width + 1 || points < 2
+        || router_ref.output_len() != interpolators * columns * points
+    {
+        return -2;
+    }
+    if unsafe { density_validate(program, bytes) } != 0 || unsafe { *program.cast::<u32>().add(2) } as usize != inputs {
+        return -3;
+    }
+    let mut cell_inputs = Vec::with_capacity(inputs);
+    for value in &i[11..] {
+        match index(*value).filter(|v| *v < interpolators) {
+            Some(v) => cell_inputs.push(v),
+            None => return -4,
+        }
+    }
+    let ore = match i[6] {
+        0 => None,
+        _ => match (index(i[7]), index(i[8]), index(i[9])) {
+            (Some(t), Some(a), Some(b)) if t < interpolators && a < interpolators && b < interpolators => Some([t, a, b]),
+            _ => return -4,
+        },
+    };
+    let layout = Layout { interpolators, columns, points, min_cell_y: i[3], min_x: i[4], min_z: i[5], width, height: config.cell_height };
+    handle.traversal = Some(unsafe { Traversal::new(router as *mut Router, program, cell_inputs, ore, layout) });
+    0
+}
+
+/// Fills the bound traversal's low (`high` 0) or high slice at block X.
+/// Returns 0, 1 when Java must upload the slice, -1 when unbound.
+/// # Safety
+/// A live handle used by one thread.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_slice(id: u64, high: i32, x: i32) -> i32 {
+    match unsafe { handle(id) }.traversal.as_mut() {
+        Some(traversal) => (!traversal.fill_slice(high != 0, x)) as i32,
+        None => -1,
+    }
+}
+
+/// A slice Java filled itself, in the router's output layout.
+/// # Safety
+/// `values` holds `count` readable doubles, borrowed for this call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_upload(id: u64, high: i32, values: *const f64, count: i32) -> i32 {
+    let Some(traversal) = unsafe { handle(id) }.traversal.as_mut() else { return -1 };
+    if values.is_null() || count < 0 || count as usize != traversal.slice_len() {
+        return -2;
+    }
+    traversal.upload(high != 0, unsafe { std::slice::from_raw_parts(values, count as usize) });
+    0
+}
+
+/// Runs the column of cells at cell X (0-based within the chunk). Returns 0
+/// when the column is done, 1 when the cell whose block position was written
+/// to `request` needs aquifer batch materials: its densities are in `density`
+/// and the next call passes the materials. Negative on errors.
+/// # Safety
+/// Off-heap buffers: `materials` null or cellSize*2 i32s; `density` cellSize
+/// writable doubles; `request` three writable i32s; `gap` null or a live
+/// validated noise state. The bound router and program are live.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_cells(id: u64, cell_x: i32, materials: *const i32, gap: *const State, density: *mut f64, request: *mut i32) -> i32 {
+    let handle = unsafe { handle(id) };
+    let size = handle.cell_size;
+    let Some(traversal) = handle.traversal.as_mut() else { return -1 };
+    if density.is_null() || request.is_null() {
+        return -1;
+    }
+    let materials = (!materials.is_null()).then(|| unsafe { std::slice::from_raw_parts(materials, size * 2) });
+    match traversal.cells(&mut handle.fill, cell_x, materials, gap) {
+        Ok(Step::Done) => 0,
+        Ok(Step::Materials(position)) => {
+            unsafe {
+                std::ptr::copy_nonoverlapping(traversal.density().as_ptr(), density, size);
+                std::ptr::copy_nonoverlapping(position.as_ptr(), request, 3);
+            }
+            1
+        }
+        Err(super::Error::UnknownState(_)) => -2,
+        Err(super::Error::OutOfChunk) => -3,
+        Err(super::Error::CellProgram) => -4,
+    }
+}
+
+/// Adds structure terrain adjustment to the bound traversal's cell densities:
+/// `geometry` is `NativeBeardifier`'s packed layout (`count` i32s, copied),
+/// `kernel` the shared kernel. Returns 0, or -1 when unbound or invalid.
+/// # Safety
+/// `geometry` holds `count` readable i32s for this call; `kernel` holds the
+/// kernel's floats for the process lifetime.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_beardifier(id: u64, geometry: *const i32, count: i32, kernel: *const f32) -> i32 {
+    let Some(traversal) = unsafe { handle(id) }.traversal.as_mut() else { return -1 };
+    if geometry.is_null() || kernel.is_null() || count < 8 {
+        return -1;
+    }
+    let data = unsafe { std::slice::from_raw_parts(geometry, count as usize) }.to_vec();
+    unsafe { traversal.set_beardifier(data, kernel) };
+    0
 }

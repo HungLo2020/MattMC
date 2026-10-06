@@ -17,6 +17,9 @@ owns the borrowed-buffer boundary.
   the original inverse-square-root formula. Do not reassociate sums or add FMA.
   The kernel table comes from the original Java initialization, preserving its
   exact float bits across math-library implementations.
+- The native NOISE fill evaluates the same cells inside its Rust cell traversal
+  for [natively instantiated chunks](RUST-CHUNK-NOISE.md#structure-terrain-adjustment),
+  from geometry packed once per fill.
 - Java retains structure discovery and scalar/custom-provider evaluation. The
   public constructor keeps live-collection behavior. Subclasses, custom boxes or
   junctions, non-cell providers, and irregular arrays retain their original path.

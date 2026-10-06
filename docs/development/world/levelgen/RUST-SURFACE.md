@@ -4,20 +4,24 @@
 
 `SurfaceSystem.buildSurface` compiles its rule tree into a private, forward-only
 native program once per chunk. Ordinary `ProtoChunk` columns are scanned and
-evaluated in Rust. Java prepares the column and commits the resulting block
-states in the original descending order. The native library is required; there
-is no benchmark selector or Java arithmetic fallback in this production path.
+evaluated in Rust. For those chunks Rust also owns the chunk's sections and
+world-generation heightmaps for the whole stage, commits blocks in the original
+descending order and installs the results once; see
+[surface chunk storage](RUST-SURFACE-STORAGE.md). The native library is
+required; there is no Java arithmetic fallback in this production path.
 
 The migrated operations are the solid/fluid/air column scan, stone-depth and
 water tracking, rule sequencing and negation, stone/water/Y/hole/preliminary
 surface predicates, vertical-gradient bounds, biome membership, and
 terracotta-band selection. Biome
 Voronoi corner selection runs once per column in Rust and reuses corner jitter
-within each group of four block heights. Java resolves the selected quart biome
-holders and their registry IDs.
+within each group of four block heights. On Rust-owned storage the selected
+quarts are read from a per-chunk table of registry IDs Java fills once;
+otherwise Java resolves the selected quart biome holders per column.
 
 Java still owns registry bindings, noise/random objects, temperature and custom
-callbacks, badlands and frozen-ocean extensions, and chunk storage. The existing
+callbacks, and the badlands and frozen-ocean extensions (which read and write
+Rust-owned storage through a block column on ordinary chunks). The existing
 `SurfaceRules` Java bindings remain available to extensions and provide a test
 oracle. Carvers' `topMaterial` uses the native rule evaluator through a scalar
 adapter; these contexts retain their supplied Java biome lookup and predicate.

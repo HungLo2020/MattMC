@@ -1,7 +1,8 @@
 # Native climate lookup
 
 Ordinary multi-noise biome selection searches the Java-built climate tree in
-Rust. Section generation batches its 64 queries when sampling uses known built-in
+Rust. The BIOMES stage of plain multi-noise chunks also samples and searches in
+Rust, in one call per chunk; see [biome fill](RUST-BIOME-FILL.md). Section generation batches its 64 queries when sampling uses known built-in
 density functions, packing each sample immediately without retaining a batch of
 temporary sample objects. Blending, retrogen, and extension callbacks keep their original
 call order; individual default climate searches still use Rust. Single-leaf trees

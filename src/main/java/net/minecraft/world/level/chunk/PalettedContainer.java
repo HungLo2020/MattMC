@@ -102,6 +102,52 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		return data.palette instanceof SingleValuePalette<T> && data.storage instanceof ZeroBitStorage && data.palette.valueFor(0) == value;
 	}
 
+	/** This container's exact state for a native stage that continues its writes:
+	 * palette kind (0 single, 1 linear, 2 hash map, 3 global), storage bits,
+	 * palette ids in id order and the raw storage (the container's own words:
+	 * copy them before it changes); null for other palettes or storage. */
+	@Nullable
+	GeneratedState exportGenerated(java.util.function.ToIntFunction<T> ids) {
+		PalettedContainer.Data<T> data = this.data;
+		Class<?> type = data.palette.getClass();
+		int kind = type == SingleValuePalette.class ? 0 : type == LinearPalette.class ? 1 : type == HashMapPalette.class ? 2 : type == GlobalPalette.class ? 3 : -1;
+		if (kind < 0) return null;
+		int bits;
+		long[] raw;
+		if (data.storage.getClass() == ZeroBitStorage.class) {
+			bits = 0;
+			raw = new long[0];
+		} else if (data.storage.getClass() == SimpleBitStorage.class) {
+			bits = data.storage.getBits();
+			raw = data.storage.getRaw();
+		} else {
+			return null;
+		}
+		int[] palette = new int[kind == 3 ? 0 : data.palette.getSize()];
+		for (int i = 0; i < palette.length; i++) palette[i] = ids.applyAsInt(data.palette.valueFor(i));
+		return new GeneratedState(kind, bits, palette, raw);
+	}
+
+	record GeneratedState(int kind, int bits, int[] palette, long[] raw) {}
+
+	/** Global palette bits of a 64-entry container whose strategy a native biome
+	 * fill replays (zero bits, then the 1..3 bit linear palettes, then the global
+	 * palette); -1 for other containers and strategies. */
+	int generatedBiomeGlobalBits() {
+		Strategy<T> strategy = this.strategy;
+		if (this.getClass() != PalettedContainer.class || strategy.entryCount() != 64
+			|| strategy.getConfigurationForBitCount(0) != Strategy.ZERO_BITS || strategy.getConfigurationForBitCount(1) != Strategy.ONE_BIT_LINEAR
+			|| strategy.getConfigurationForBitCount(2) != Strategy.TWO_BITS_LINEAR || strategy.getConfigurationForBitCount(3) != Strategy.THREE_BITS_LINEAR
+			|| !(strategy.getConfigurationForBitCount(4) instanceof Configuration.Global global) || global.bitsInStorage() != 4) {
+			return -1;
+		}
+		return global.bitsInMemory();
+	}
+
+	IdMap<T> globalIds() {
+		return this.strategy.globalMap();
+	}
+
 	/** Storage bits of this strategy's global palette. */
 	int globalPaletteBits() {
 		return this.strategy.getConfigurationForBitCount(32).bitsInMemory();

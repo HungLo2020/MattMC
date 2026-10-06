@@ -1,5 +1,7 @@
 package net.minecraft.world.level.levelgen;
 
+import java.util.ArrayList;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
@@ -16,6 +18,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.QuartPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -76,9 +79,11 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 		}, Util.backgroundExecutor().forName("init_biomes"));
 	}
 
-	private void doCreateBiomes(Blender blender, RandomState randomState, StructureManager structureManager, ChunkAccess chunkAccess) {
+	void doCreateBiomes(Blender blender, RandomState randomState, StructureManager structureManager, ChunkAccess chunkAccess) {
 		NoiseChunk noiseChunk = chunkAccess.getOrCreateNoiseChunk(chunkAccessx -> this.createNoiseChunk(chunkAccessx, structureManager, blender, randomState));
 		BiomeResolver biomeResolver = BelowZeroRetrogen.getBiomeResolver(blender.getBiomeResolver(this.biomeSource), chunkAccess);
+        // Rust samples, searches and fills plain multi-noise chunks (same sampler, same order).
+        if (NativeBiomeFill.fill(chunkAccess, biomeResolver, noiseChunk, randomState)) return;
 		chunkAccess.fillBiomesFromNoise(biomeResolver, noiseChunk.cachedClimateSampler(randomState.router(), this.settings.value().spawnTarget()));
 	}
 
@@ -267,40 +272,75 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 		WorldGenRegion worldGenRegion, long l, RandomState randomState, BiomeManager biomeManager, StructureManager structureManager, ChunkAccess chunkAccess
 	) {
 		if (!SharedConstants.DEBUG_DISABLE_CARVERS) {
-			BiomeManager biomeManager2 = biomeManager.withDifferentSource((ix, jx, kx) -> this.biomeSource.getNoiseBiome(ix, jx, kx, randomState.sampler()));
-			WorldgenRandom worldgenRandom = new WorldgenRandom(new LegacyRandomSource(RandomSupport.generateUniqueSeed()));
-			int i = 8;
-			ChunkPos chunkPos = chunkAccess.getPos();
 			NoiseChunk noiseChunk = chunkAccess.getOrCreateNoiseChunk(
 				chunkAccessx -> this.createNoiseChunk(chunkAccessx, structureManager, Blender.of(worldGenRegion), randomState)
 			);
-			Aquifer aquifer = noiseChunk.aquifer();
-			CarvingContext carvingContext = new CarvingContext(
-				this, worldGenRegion.registryAccess(), chunkAccess.getHeightAccessorForGeneration(), noiseChunk, randomState, this.settings.value().surfaceRule()
-			);
-			CarvingMask carvingMask = ((ProtoChunk)chunkAccess).getOrCreateCarvingMask();
+			this.carveChunk(worldGenRegion::getChunk, worldGenRegion.registryAccess(), l, randomState, biomeManager, chunkAccess, noiseChunk);
+		}
+	}
 
+	/** Chunks around the carved one, for their carver biomes. */
+	interface CarverChunks {
+		ChunkAccess getChunk(int x, int z);
+	}
+
+	/** applyCarvers after its noise chunk: the carvers of every chunk within 8 of this one. */
+	void carveChunk(
+		CarverChunks chunks, RegistryAccess registryAccess, long l, RandomState randomState, BiomeManager biomeManager, ChunkAccess chunkAccess, NoiseChunk noiseChunk
+	) {
+		BiomeManager biomeManager2 = biomeManager.withDifferentSource((ix, jx, kx) -> this.biomeSource.getNoiseBiome(ix, jx, kx, randomState.sampler()));
+		WorldgenRandom worldgenRandom = new WorldgenRandom(new LegacyRandomSource(RandomSupport.generateUniqueSeed()));
+		Aquifer aquifer = noiseChunk.aquifer();
+		CarvingContext carvingContext = new CarvingContext(
+			this, registryAccess, chunkAccess.getHeightAccessorForGeneration(), noiseChunk, randomState, this.settings.value().surfaceRule()
+		);
+		CarvingMask carvingMask = ((ProtoChunk)chunkAccess).getOrCreateCarvingMask();
+		if (NativeCarvers.eligible(chunkAccess, noiseChunk, carvingContext)) {
+			// Rust runs the carver loop; Java supplies each neighbour's carver biome's carvers.
+			ChunkPos chunkPos = chunkAccess.getPos();
+			List<NativeCarvers.Neighbour> neighbours = new ArrayList<>(289);
 			for (int j = -8; j <= 8; j++) {
 				for (int k = -8; k <= 8; k++) {
 					ChunkPos chunkPos2 = new ChunkPos(chunkPos.x + j, chunkPos.z + k);
-					ChunkAccess chunkAccess2 = worldGenRegion.getChunk(chunkPos2.x, chunkPos2.z);
-					BiomeGenerationSettings biomeGenerationSettings = chunkAccess2.carverBiome(
-						() -> this.getBiomeGenerationSettings(
-							this.biomeSource.getNoiseBiome(QuartPos.fromBlock(chunkPos2.getMinBlockX()), 0, QuartPos.fromBlock(chunkPos2.getMinBlockZ()), randomState.sampler())
-						)
-					);
-					Iterable<Holder<ConfiguredWorldCarver<?>>> iterable = biomeGenerationSettings.getCarvers();
-					int m = 0;
+					List<ConfiguredWorldCarver<?>> carvers = new ArrayList<>();
+					for (Holder<ConfiguredWorldCarver<?>> holder : this.carverBiome(chunks, randomState, chunkPos2).getCarvers()) carvers.add(holder.value());
+					neighbours.add(new NativeCarvers.Neighbour(chunkPos2.x, chunkPos2.z, carvers));
+				}
+			}
+			if (NativeCarvers.run(carvingContext, chunkAccess, aquifer, l, neighbours, biomeManager2::getBiome)) return;
+		}
+		this.carveAll(chunks, l, randomState, chunkAccess, worldgenRandom, carvingContext, biomeManager2, aquifer, carvingMask);
+	}
 
-					for (Holder<ConfiguredWorldCarver<?>> holder : iterable) {
-						ConfiguredWorldCarver<?> configuredWorldCarver = holder.value();
-						worldgenRandom.setLargeFeatureSeed(l + m, chunkPos2.x, chunkPos2.z);
-						if (configuredWorldCarver.isStartChunk(worldgenRandom)) {
-							configuredWorldCarver.carve(carvingContext, chunkAccess, biomeManager2::getBiome, worldgenRandom, aquifer, chunkPos2, carvingMask);
-						}
+	private BiomeGenerationSettings carverBiome(CarverChunks chunks, RandomState randomState, ChunkPos chunkPos2) {
+		return chunks.getChunk(chunkPos2.x, chunkPos2.z).carverBiome(
+			() -> this.getBiomeGenerationSettings(
+				this.biomeSource.getNoiseBiome(QuartPos.fromBlock(chunkPos2.getMinBlockX()), 0, QuartPos.fromBlock(chunkPos2.getMinBlockZ()), randomState.sampler())
+			)
+		);
+	}
 
-						m++;
+	/** The carver loop of applyCarvers. */
+	private void carveAll(
+		CarverChunks chunks, long l, RandomState randomState, ChunkAccess chunkAccess, WorldgenRandom worldgenRandom,
+		CarvingContext carvingContext, BiomeManager biomeManager2, Aquifer aquifer, CarvingMask carvingMask
+	) {
+		ChunkPos chunkPos = chunkAccess.getPos();
+		for (int j = -8; j <= 8; j++) {
+			for (int k = -8; k <= 8; k++) {
+				ChunkPos chunkPos2 = new ChunkPos(chunkPos.x + j, chunkPos.z + k);
+				BiomeGenerationSettings biomeGenerationSettings = this.carverBiome(chunks, randomState, chunkPos2);
+				Iterable<Holder<ConfiguredWorldCarver<?>>> iterable = biomeGenerationSettings.getCarvers();
+				int m = 0;
+
+				for (Holder<ConfiguredWorldCarver<?>> holder : iterable) {
+					ConfiguredWorldCarver<?> configuredWorldCarver = holder.value();
+					worldgenRandom.setLargeFeatureSeed(l + m, chunkPos2.x, chunkPos2.z);
+					if (configuredWorldCarver.isStartChunk(worldgenRandom)) {
+						configuredWorldCarver.carve(carvingContext, chunkAccess, biomeManager2::getBiome, worldgenRandom, aquifer, chunkPos2, carvingMask);
 					}
+
+					m++;
 				}
 			}
 		}

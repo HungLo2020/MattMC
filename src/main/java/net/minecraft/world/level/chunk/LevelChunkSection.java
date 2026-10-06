@@ -115,6 +115,41 @@ public class LevelChunkSection {
 		this.tickingFluidCount = (short)fluid;
 	}
 
+	/** The block container's exact state and this section's counters (non-empty,
+	 * ticking blocks, fluids), for a native stage; null for unmodelled containers. */
+	@org.jetbrains.annotations.Nullable
+	public GeneratedSection exportGenerated() {
+		var state = this.states.exportGenerated(net.minecraft.world.level.block.Block::getId);
+		return state == null ? null : new GeneratedSection(state.kind(), state.bits(), state.palette(), state.raw(),
+			this.nonEmptyBlockCount, this.tickingBlockCount, this.tickingFluidCount);
+	}
+
+	/** For a native biome fill: the recreated biome container's global palette
+	 * bits, or -1 when its container or strategy is not the modelled one. */
+	public int generatedBiomeGlobalBits() {
+		return this.biomes instanceof PalettedContainer<Holder<Biome>> container ? container.generatedBiomeGlobalBits() : -1;
+	}
+
+	/** The registry IDs the biome container's global palette uses. */
+	public net.minecraft.core.IdMap<Holder<Biome>> generatedBiomeIds() {
+		return ((PalettedContainer<Holder<Biome>>)this.biomes).globalIds();
+	}
+
+	/** The value {@code recreate()} starts the new biome container with. */
+	public Holder<Biome> generatedBiomeSeed() {
+		return this.biomes.recreate().get(0, 0, 0);
+	}
+
+	/** Installs a native biome fill: the container {@code fillBiomesFromNoise}'s
+	 * 64 writes into {@code recreate()} produce. */
+	public void installGeneratedBiomes(int requestedBits, List<Holder<Biome>> palette, long[] raw) {
+		PalettedContainer<Holder<Biome>> container = this.biomes.recreate();
+		container.installGenerated(requestedBits, palette, raw);
+		this.biomes = container;
+	}
+
+	public record GeneratedSection(int kind, int bits, int[] palette, long[] raw, int nonEmpty, int ticking, int fluid) {}
+
 	public boolean hasOnlyAir() {
 		return this.nonEmptyBlockCount == 0;
 	}

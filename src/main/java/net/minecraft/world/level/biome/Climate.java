@@ -192,6 +192,37 @@ public class Climate {
             else for (int i = 0; i < points.length; i++) output[i] = this.findValue(points[i]);
         }
 
+        // A chunk-wide native biome fill (levelgen NativeBiomeFill) searches this
+        // list's native tree itself; these expose the tree in node order and the
+        // calling thread's previous leaf. Only for the exact ParameterList class.
+
+        public java.lang.foreign.MemorySegment nativeNodes() {
+            return this.index.nativeTree.nodes();
+        }
+
+        public int nativeNodeCount() {
+            return this.index.nativeTree.nodeCount();
+        }
+
+        /** The value of the leaf at a node index; null for branches. */
+        @Nullable
+        public T nativeLeafValue(int node) {
+            var leaf = this.index.nativeTree.leaf(node);
+            return leaf == null ? null : leaf.value;
+        }
+
+        /** The node index of this thread's previous leaf, or -1. */
+        public int previousNativeLeaf() {
+            var leaf = this.index.lastResult.get();
+            return leaf == null ? -1 : leaf.nativeIndex;
+        }
+
+        /** Sets this thread's previous leaf to a leaf node, or clears it for -1. */
+        public void setPreviousNativeLeaf(int node) {
+            if (node < 0) this.index.lastResult.remove();
+            else this.index.lastResult.set(java.util.Objects.requireNonNull(this.index.nativeTree.leaf(node)));
+        }
+
         /** Internal route after MultiNoiseBiomeSource checks sampling and list eligibility. */
         void fillSection(Climate.Sampler sampler, int x, int y, int z, T[] output) {
             this.index.nativeTree.searchSection(sampler, x, y, z, output, this.index.lastResult);
