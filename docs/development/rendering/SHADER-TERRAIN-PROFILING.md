@@ -213,7 +213,10 @@ changing it:
   cache in `FullscreenPipelineCache`. A staged plan parks at the end of its
   frame (`FullscreenSourceExecutionPlan::destroy`) and the next frame whose
   program, epochs, extent, color targets and input snapshots are equal reuses
-  it whole, pack-resources set included; at most two variants park per stage.
+  it whole, pack-resources set included. Up to four variants are kept per
+  stage path (sky and horizon share a path; sun and moon draw the same stage;
+  colored voxel light alternates two images). A miss grows a new variant while
+  the path has room and only then evicts the longest-parked plan.
   An entry is leased to one live plan, and the runtime releases all entries
   (destroying parked plans and refusing later parking) before a color-target
   promotion or discard retires their views

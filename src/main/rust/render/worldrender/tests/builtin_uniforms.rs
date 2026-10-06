@@ -201,9 +201,9 @@ fn builtin_frame_uniforms_reach_entity_and_hand_writers_without_atlas_or_render_
     for (requirements, bytes) in [
         (
             &entity.scalar_uniform_requirements,
-            &entities[0].scalar_uniforms,
+            &entities[0].scalar_uniforms[..],
         ),
-        (&hand.scalar_uniform_requirements, &hands[0].scalar_uniforms),
+        (&hand.scalar_uniform_requirements, &hands[0].scalar_uniforms[..]),
     ] {
         assert!(!requirements.fields().iter().any(|r| matches!(
             r.semantic,

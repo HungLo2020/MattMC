@@ -164,8 +164,10 @@ impl PlanParking {
 }
 
 pub(super) const FULLSCREEN_PIPELINE_CACHE_ENTRIES: usize = 128;
-/// Target sets a stage alternates between (feedback targets swap images).
-pub(super) const FULLSCREEN_STAGE_CACHE_VARIANTS: usize = 2;
+/// Variants kept per stage path: one path can serve several programs (sky
+/// and horizon) or draws (sun and moon), and feedback targets alternate
+/// between two image sets.
+pub(super) const FULLSCREEN_STAGE_CACHE_VARIANTS: usize = 4;
 
 /// Everything a staged fullscreen pass creates except its pack-resources
 /// set, which binds the frame's inputs: color samplers, render target and
@@ -226,6 +228,27 @@ impl FullscreenPipelineCache {
         let mut parked = self.parked.lock().ok()?;
         let index = parked.plans.iter().position(|(parked_key, _)| parked_key.same_plan(key))?;
         Some(parked.plans.swap_remove(index).1)
+    }
+
+    /// Cached stage variants of `stage_path`.
+    pub(super) fn stage_variants(&self, stage_path: &str) -> usize {
+        self.stages.borrow().get(stage_path).map_or(0, Vec::len)
+    }
+
+    /// Destroys the longest-parked plan of `stage_path`, returning its stage
+    /// lease. Returns whether one was parked.
+    pub(super) fn evict_oldest_parked(&self, gal: &mut VulkanicGal, stage_path: &str) -> bool {
+        let evicted = {
+            let Ok(mut parked) = self.parked.lock() else {
+                return false;
+            };
+            let Some(index) = parked.plans.iter().position(|(key, _)| key.source_stage_path == stage_path) else {
+                return false;
+            };
+            parked.plans.remove(index).1
+        };
+        evicted.destroy(gal);
+        true
     }
 
     /// Where a plan staged now may park at the end of its frame.

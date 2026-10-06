@@ -83,6 +83,18 @@ impl FullscreenSourceExecutionPlan {
                 )? {
                     break 'staged plan;
                 }
+                // Parked plans keep their stages leased. Grow another
+                // variant while the path has room; once it is full, give
+                // back the longest-parked plan's stage instead.
+                if cache.stage_variants(&key.source_stage_path) >= FULLSCREEN_STAGE_CACHE_VARIANTS
+                    && cache.evict_oldest_parked(gal, &key.source_stage_path)
+                {
+                    if let Some(plan) = Self::stage_from_cached_stage(
+                        gal, program, manifest, targets, &key.external_inputs, extent, cache, epochs,
+                    )? {
+                        break 'staged plan;
+                    }
+                }
             }
             let plan = Self::stage_uncached(
                 gal, program, manifest, targets, key.external_inputs.iter().cloned(), extent,
@@ -328,3 +340,4 @@ impl FullscreenSourceExecutionPlan {
         }
     }
 }
+

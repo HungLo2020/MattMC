@@ -28,8 +28,9 @@ pub(crate) struct PreparedSourceEntityFrame {
     pub entity_id: i32,
     pub entity_id_generation: u64,
     pub entity_color: [f32; 4],
-    pub legacy_texture_transforms: Vec<u8>,
-    pub scalar_uniforms: Vec<u8>,
+    /// Shared by every group with the same uniform inputs.
+    pub legacy_texture_transforms: Arc<[u8]>,
+    pub scalar_uniforms: Arc<[u8]>,
     pub instance_transforms: Vec<u8>,
 }
 
@@ -295,15 +296,11 @@ impl WorldPrimitiveFrontend {
             // (Arc-owned) asset; re-scanning its indices per instance was a
             // hot-path cost with ~1k entity draws per frame.
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
-                (0..mesh.sections.len())
-                    .map(|index| {
-                        u32::try_from(index).map_err(|_| {
-                            GalError::invalid_argument("source entity section ordinal exceeds u32")
-                        })
-                    })
-                    .collect::<GalResult<Vec<_>>>()?
+                0..u32::try_from(mesh.sections.len()).map_err(|_| {
+                    GalError::invalid_argument("source entity section ordinal exceeds u32")
+                })?
             } else {
-                vec![instance.mesh_section_index]
+                instance.mesh_section_index..instance.mesh_section_index.saturating_add(1)
             };
             for section_index in section_indices {
                 let section = mesh.sections.get(section_index as usize).ok_or_else(|| {
@@ -406,8 +403,8 @@ impl WorldPrimitiveFrontend {
         #[allow(clippy::type_complexity)]
         let mut packed_uniforms: Vec<(
             (i32, i32, [u32; 4], Option<i32>, Option<(u8, u64, u64, u32)>),
-            Vec<u8>,
-            Vec<u8>,
+            Arc<[u8]>,
+            Arc<[u8]>,
         )> = Vec::new();
         let mut prepared: Vec<PreparedSourceEntityFrame> = Vec::with_capacity(grouped.len());
         let mut previous_group = None;
@@ -483,7 +480,7 @@ impl WorldPrimitiveFrontend {
                 .iter()
                 .find(|(key, _, _)| *key == uniform_key)
             {
-                Some((_, legacy, scalar)) => (legacy.clone(), scalar.clone()),
+                Some((_, legacy, scalar)) => (Arc::clone(legacy), Arc::clone(scalar)),
                 None => {
                     if base_uniforms.is_none() {
                         // Resolved on first use so a call without entity
@@ -508,10 +505,11 @@ impl WorldPrimitiveFrontend {
                     if current_rendered_item_id.is_some() {
                         uniforms.current_rendered_item_id = current_rendered_item_id;
                     }
-                    let legacy = program
-                        .pack_legacy_texture_transforms(&source_glint_texture_transforms(foil)?)?;
-                    let scalar = program.pack_scalar_uniforms(&uniforms)?;
-                    packed_uniforms.push((uniform_key, legacy.clone(), scalar.clone()));
+                    let legacy: Arc<[u8]> = program
+                        .pack_legacy_texture_transforms(&source_glint_texture_transforms(foil)?)?
+                        .into();
+                    let scalar: Arc<[u8]> = program.pack_scalar_uniforms(&uniforms)?.into();
+                    packed_uniforms.push((uniform_key, Arc::clone(&legacy), Arc::clone(&scalar)));
                     (legacy, scalar)
                 }
             };
