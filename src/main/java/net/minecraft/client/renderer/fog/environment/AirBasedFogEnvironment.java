@@ -22,20 +22,19 @@ public abstract class AirBasedFogEnvironment extends FogEnvironment {
 		BiomeManager biomeManager = clientLevel.getBiomeManager();
 		Vec3 vec3 = camera.getPosition().subtract(2.0, 2.0, 2.0).scale(0.25);
 		
-		// Allow hooks to provide custom fog color sampling
-		CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)biomeManager.getNoiseBiomeAtQuart(ix, jx, kx).value()).getFogColor());
-		Vec3 sampledColor = null;
-		for (FogColorHooks hook : HookRegistry.getFogColorHooks()) {
-			sampledColor = hook.sampleFogColor(biomeManager, vec3, rgbFetcher);
-			if (sampledColor != null) {
-				break;
+		Vec3 sampledColor = clientLevel.sampleFogColorBiomes(vec3, f, () -> {
+			// Allow hooks to provide custom fog color sampling
+			CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)biomeManager.getNoiseBiomeAtQuart(ix, jx, kx).value()).getFogColor());
+			for (FogColorHooks hook : HookRegistry.getFogColorHooks()) {
+				Vec3 hooked = hook.sampleFogColor(biomeManager, vec3, rgbFetcher);
+				if (hooked != null) {
+					return hooked;
+				}
 			}
-		}
-		
-		// Fall back to default implementation if no hook provided a result
-		if (sampledColor == null) {
-			sampledColor = CubicSampler.gaussianSampleVec3(vec3, rgbFetcher);
-		}
+
+			// Fall back to default implementation if no hook provided a result
+			return CubicSampler.gaussianSampleVec3(vec3, rgbFetcher);
+		});
 		
 		Vec3 vec32 = clientLevel.effects()
 			.getBrightnessDependentFogColor(sampledColor, g);
