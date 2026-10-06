@@ -124,7 +124,14 @@ impl StagingCursor {
             .last()
             .is_some_and(|chunk| aligned.checked_add(len).is_some_and(|end| end <= chunk.capacity));
         if !fits {
-            let reuse = self.idle.iter().position(|chunk| chunk.capacity >= len);
+            // Best fit, so a rare oversized chunk is not spent on small uploads.
+            let reuse = self
+                .idle
+                .iter()
+                .enumerate()
+                .filter(|(_, chunk)| chunk.capacity >= len)
+                .min_by_key(|(_, chunk)| chunk.capacity)
+                .map(|(index, _)| index);
             let chunk = match reuse {
                 Some(index) => self.idle.swap_remove(index),
                 None => {
@@ -152,10 +159,12 @@ impl StagingCursor {
 }
 
 /// Returns retired chunks to the idle list, freeing any beyond the bound.
+/// Smaller chunks are kept first: default-size chunks serve every frame,
+/// while an oversized one served a single large upload.
 pub(super) fn recycle_chunks(idle: &mut Vec<StagingChunk>, retired: Vec<StagingChunk>) {
     idle.extend(retired);
     let mut retained = 0_u64;
-    idle.sort_by_key(|chunk| std::cmp::Reverse(chunk.capacity));
+    idle.sort_by_key(|chunk| chunk.capacity);
     idle.retain(|chunk| {
         retained = retained.saturating_add(chunk.capacity);
         retained <= MAX_IDLE_STAGING_BYTES
