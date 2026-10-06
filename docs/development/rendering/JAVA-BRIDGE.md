@@ -143,29 +143,37 @@ request. Counts and byte limits are checked before constructing foreign slices;
 profiling does not dereference nested pointers ahead of decoding. The byte
 counter measures validated reads (including repeated reads), not unique Java
 allocation size. Java must supply live memory while native code can read it:
-through the call for synchronous requests, and through the join for a
-pipelined whole-frame request.
+through the call for synchronous and caller-decoded queued requests, and
+through the join for the single in-flight pipelined fallback described below.
 Failed resource creation batches release successful creates before reporting
 failure, and result alignment/capacity are checked before execution.
 
 ## Pipelined frames
 
-By default (disable with `MATTMC_PIPELINED_FRAMES=0` or
-`-Dmattmc.rustGal.pipelinedFrames=false`),
-`mattmc_vulkanic_gal_whole_frame_submit_pipelined` copies and validates the
+Ordinary whole frames use the [queued route](#queued-frames) by default when
+both pipelining and queuing are enabled. Queued submissions decode and copy on
+the calling thread; they do not retain borrowed Java request memory after the
+call. `MATTMC_PIPELINED_FRAMES=0` or
+`-Dmattmc.rustGal.pipelinedFrames=false` disables both asynchronous routes.
+
+### Single in-flight fallback
+
+When queuing is disabled but pipelining remains enabled, the older
+`mattmc_vulkanic_gal_whole_frame_submit_pipelined` route copies and validates the
 small present request on the calling thread, but hands the whole-frame request
 pointer to a per-context worker. That worker decodes the nested request, then
 executes and presents the frame. Java retains the request arena alive and
 unmodified until the join; acceptance is not completion or a deep copy of all
 request bytes. Java can collect the next frame while native work runs, but
 cannot pack another whole-frame request before joining because the requests
-also share persistent instance arrays.
+also share persistent instance arrays. This was the default at the earlier
+`54611cfc` checkpoint; it remains the fallback contract, not the queued route.
 [Native handoff and worker decode](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/bridge/world/exports.rs#L36-L110)
 · [Java retention and release after join](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2378-L2453)
 · [Java repacking guard](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L1892-L1900)
 · [`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)
 
-- Context-registry entry points join pending work first (`with_registry*`),
+- Non-queued context-registry entry points join pending work first (`with_registry*`),
   preventing concurrent access to a context. Keep context access behind these
   wrappers. Selection through the [standalone query handles](#standalone-query-handles)
   does not join an in-flight frame. Creating the entity-shadow query still
@@ -184,25 +192,34 @@ also share persistent instance arrays.
 
 ### Queued frames
 
-On top of pipelining (disable with `MATTMC_QUEUED_FRAMES=0` or
-`-Dmattmc.rustGal.queuedFrames=false`), Java no longer waits for frame N before
+With pipelining enabled, this is the default ordinary whole-frame route
+(disable just queuing with `MATTMC_QUEUED_FRAMES=0` or
+`-Dmattmc.rustGal.queuedFrames=false`). Java no longer waits for frame N before
 handing over frame N+1. The worker runs a FIFO of jobs
 ([`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)):
 
 - `mattmc_vulkanic_gal_whole_frame_submit_queued` decodes the request on the
-  calling thread (Java's memory is not read after the call) and queues a
+  calling thread (Java closes the request arena after the call) and queues a
   frame whose job acquires the swapchain image itself, executes the decoded
   frame with that image's frame id and target, and presents. `..._whole_frame_join_queued` returns the
   oldest queued frame (acquire, submit and present results) and waits only for
   the jobs up to it.
 - `..._world_mesh_update_assets_queued` and `..._atlas_animation_tick_queued`
   copy and decode on the calling thread and apply in a job, in submission
-  order. A failure is reported by the next queued-frame join (fail closed).
-- Queued entry points use `with_queue`, which never joins; every other entry
-  point still joins all queued work first, so rare calls stay correct.
+  order. The first non-frame job failure is reported by the next queued-frame
+  join (fail closed); it does not automatically cancel later queued jobs.
+- Queued entry points use `with_queue`, which never joins; other
+  context-registry entry points still join all queued work first, so rare
+  context operations cannot overlap the worker. Standalone query handles
+  remain independent.
 
 `RustGalFrameCoordinator` keeps at most one frame queued ahead of the one it
-prepares, so the worker always has the next frame waiting. Capture,
-screenshot and RenderDoc frames drain the queue and run synchronously. While a
+prepares. This is Java-side backpressure; the native FIFO channel itself is
+unbounded. Capture, screenshot and RenderDoc frames drain the queue and run synchronously. While a
 frame is queued, completion takes retirement from the present result instead
-of querying the bridge.
+of querying the bridge. Submission acceptance is not presentation completion.
+The caller-side decode and arena closure are visible in
+[`world/exports.rs`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/rust/render/bridge/world/exports.rs#L200-L239)
+and [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2394-L2437).
+Earlier queued worker-decode/double-staging descriptions are superseded by this
+caller-decode path; they do not require two live Java request arenas today.

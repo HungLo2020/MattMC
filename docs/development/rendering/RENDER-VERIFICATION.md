@@ -593,13 +593,26 @@ an expired startup deadline. The harness's overall run limit still applies.
 Run `GraphicsFrameBenchmarkReadinessTest` after changes to this lifecycle.
 
 To see where in the camera path time goes, pass
-`--jvm-arg=-Dmattmc.dev.benchmark.phaseSegments=6`: every phase in
-`graphics_frame_benchmark_*.json` then also lists `segmentMeans` (nanoseconds,
-recording order). Compare them with Frozen's per-segment means of
-`frameNanosSamples`; early segments include JIT warm-up and terrain streaming.
+`--jvm-arg=-Dmattmc.dev.benchmark.phaseSegments=6`: entries with at least six
+samples in `graphics_frame_benchmark_*.json` then also list `segmentMeans`.
+These divide each entry's samples into six nearly equal segments in recording
+order, independently of the sorted percentile copy. Phase values are
+nanoseconds; `counterSamples`
+uses each counter's own units. A segment is a slice of that entry's samples,
+not necessarily the same frame interval as another entry. Compare matching
+windows with Frozen's `frameNanosSamples`; early windows can include JIT warm-up
+and terrain streaming. A matching final 600-frame mean does not establish a
+matching full 1,800-frame result.
 
-Deterministic correctness captures force GPU retirement after presentation in
-`RustGalFrameCoordinator`. They can hide defects caused by overlapping frames.
+Release gameplay skips the GAL's per-frame op, handle and hazard checks unless
+`MATTMC_GAL_VALIDATION=1` is set before launch. The capture harness sets it for
+`--validation standard`; debug/test builds and watched buffer-upload captures
+also retain the checks. See [GAL validation](VULKANIC-GAL.md) for what remains
+active. Use separate validation-on correctness and validation-off timing runs.
+
+Deterministic correctness captures drain queued frames, run synchronously and
+force GPU retirement after presentation in `RustGalFrameCoordinator`. They can
+hide defects caused by overlapping frames.
 Also observe normal RunDev sessions or the gameplay frame benchmark, which
 polls completion without forcing retirement. Run synchronization validation on
 that workload; a clean static capture alone does not establish temporal stability.

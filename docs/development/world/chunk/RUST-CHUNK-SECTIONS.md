@@ -53,12 +53,15 @@ packing and tape records. Java supplies vocabulary built once:
   - missing palette entries, even unused ones
   - strategies with other entry counts
 
-  Java then fails exactly as before where the original would. Reading the
-  containers takes each container's lock and calls `DataLayer.getData()` on the
-  snapshot's light layers before a decline, as `write()` does; neither is
-  undone.
-- Status handling: a decline (`-2`) or an exception while gathering section
-  input falls back to Java encoding. A too-small output buffer (`1`) retries
+  Fallback invokes the retained Java encoder; this does not guarantee recovery
+  of native scratch or completion of the enclosing save future (see the tracked
+  limits below). Reading the containers takes each container's lock and calls
+  `DataLayer.getData()` on the snapshot's light layers before a decline, as
+  `write()` does; neither is undone.
+- Status handling: a decline (`-2`) or a `RuntimeException` caught inside
+  section-input gathering falls back to Java encoding. Strategy checks and
+  scratch setup outside that catch do not share this recovery rule. A
+  too-small output buffer (`1`) retries
   with the reported size. Invalid ABI input (`-1`) and downcall failures throw
   instead of falling back; see the
   [bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeChunkSections.java).
@@ -66,8 +69,9 @@ packing and tape records. Java supplies vocabulary built once:
   background executor (as `UncheckedIOException`), not from the IO thread's
   region write.
 - `-Dmattmc.storage.javaChunkSections=true` keeps Java encoding.
-  `NativeChunkSections.setEnabled` toggles this in tests. Entity, POI and other
-  region storage still use the generic tape writer.
+  `NativeChunkSections.setEnabled` toggles this in tests. This migration
+  changes chunk-section saves; other storage owners keep their existing paths.
+  In particular, [POI already has a separate native tape route](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/world/entity/ai/village/poi/PoiManager.java#L80-L119).
 
 ## Verify a change
 
@@ -86,10 +90,11 @@ python3 DevUtils/tests/storage/VerifyRustChunkSections.py --forks 3
   and biomes; sections without containers; absent, lazy and explicit light.
 - an all-empty section list and a palette that names one state twice
 
-It also stores encoded chunks through `IOWorker` and checks pending
-`loadAsync` and `scanChunk` results and the read-back from disk against
+It also stores eight encoded chunks through `IOWorker`, queues `scanChunk` and
+`loadAsync`, then synchronizes and reads back through the same worker against
 `write()` (tag equality, not region-file bytes; region headers carry write
-timestamps).
+timestamps). The test does not force or observe the pending-write branch, reopen
+storage, or exercise same-chunk coalescing and injected failures.
 
 These tests start from `SerializableChunkData` built by `parse` or directly.
 They do not run `ChunkMap.save`'s `copyOf` from live chunks, a full server, or
@@ -99,7 +104,11 @@ The benchmark (`NativeChunkSectionsVerification`) times the 40 saved chunks in
 two cases:
 
 - `encode`: chunk data to tape
-- `save`: `encode` plus the region file write
+- `save`: `encode` plus direct region file writes with `sync=false`
+
+Parsing, live snapshots, `IOWorker` scheduling and final close/flush are outside
+the measured operations. The `save` result is not durable end-to-end save/load
+throughput.
 
 Three independent JVM pairs alternate the route order on the same CPUs. Each
 case must save at least 5% in every pair and at the upper 95% bootstrap
@@ -141,4 +150,26 @@ write make up most of `save`'s remaining time.
 
 A few measured rounds overlapped JIT compilation (1 and 4 of 180 samples per
 case). These are warmed subsystem timings on this machine and corpus, not
-whole-server claims.
+whole-server claims. The benchmark's route guard requires some native chunks
+in native mode and zero in Java mode; the separate parity helper requires one
+native encoding per tested fixture. Those checks have different strength.
+
+## Current review and recovery limits
+
+[The source review for #774](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6027620399)
+matched nineteen declared rewrites across eight production Java files against
+`5c02fd82`. That checks the edit boundary; this maintenance review did not rerun
+Java/Rust tests, mutation checks, benchmarks or live saves. Thread-local scratch
+and output buffers and the process-lifetime vocabulary still need lifecycle and
+memory evidence.
+
+[#818](https://github.com/HungLo2020/MattMC/issues/818) tracks two source-derived
+recovery problems at `121ad13c`: malformed palette rejection after touching valid
+labels can leave native lookup entries that affect a later encode on the same
+thread, and an encode supplier that throws through `IOWorker.submitTask` can
+leave the returned save future pending. Ordinary setter-produced palettes do
+not create that malformed-input trigger. No runtime reproduction or world damage
+was observed in this review. Acceptance needs deterministic rejection-then-valid
+encoding and exceptional-completion regressions, alongside pending/coalescing,
+reopen and concurrent-save coverage; the successful fixtures above do not close
+those requirements.

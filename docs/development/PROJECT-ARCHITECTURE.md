@@ -40,6 +40,11 @@ src/main/rust/
 │       └── backends/
 │           ├── opengl/
 │           └── vulkan/
+├── storage/
+│   ├── chunk/
+│   ├── nbt/
+│   ├── poi/
+│   └── region/
 ├── tools/
 └── world/
     ├── phys/
@@ -191,6 +196,18 @@ Network protocols and wire codecs belong here. Current
 [bulk long-array conversion](network/codec/RUST-LONG-ARRAY.md) uses
 `network/codec/long_array/` for exact big-endian conversion. Java retains Netty
 buffer ownership, length prefixes, cursor updates and compatibility behavior.
+
+### `storage/`
+
+Persistent encodings and region storage belong here. The
+[chunk-section serializer](world/chunk/RUST-CHUNK-SECTIONS.md) uses `storage/chunk/`
+to encode eligible section palettes, packed values, light layers and section Y
+straight into NBT tape. Java still snapshots live chunks, supplies registry
+vocabulary and biome names, builds the remaining root compound and owns save
+scheduling. Pending writes retain tape and create Java tags lazily when read;
+unsupported section inputs keep the Java encoding route. This boundary does
+not migrate the complete chunk lifecycle or establish concurrent-save parity.
+The `nbt/`, `poi/` and `region/` modules retain their separate responsibilities.
 
 ### `platform/`
 

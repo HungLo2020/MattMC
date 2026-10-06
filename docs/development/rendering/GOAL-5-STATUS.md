@@ -1,8 +1,8 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current review covers retained-scene,
-pipelined-frame, compact-terrain and visibility work through
-[`54611cfc`](https://github.com/HungLo2020/MattMC/commit/54611cfc25dbdf60ae4b11dc17557d2bec77469d).
+queued-frame, compact-terrain, visibility and rendering-cost work through
+[`121ad13c`](https://github.com/HungLo2020/MattMC/commit/121ad13c84e45555c34814d54a8199194b37f39c).
 It adds substantial native ownership and author-recorded workload improvements;
 it does not establish broad visual/temporal parity, full scene migration,
 long-run resource bounds or resolution of the earlier independent native crash.
@@ -27,11 +27,13 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ### October 6 source review
 
-- **Pipelined whole frames:** the native worker decodes, executes and presents while Java can collect subsequent semantics. The initial handoff copies the small present request, but Java retains the whole-frame request arena unmodified until join. Context-registry access joins pending work; standalone query handles are separate. Captures use the documented synchronous route. This is a lifetime contract, not proof of all cancellation/failure recovery. [Bridge lifetime](JAVA-BRIDGE.md#pipelined-frames)
+- **Queued whole frames:** the calling thread decodes and copies the queued request before Java releases its arena. The native FIFO then acquires, executes and presents frames, ordered with queued mesh updates and atlas ticks. Java keeps at most one frame queued ahead; non-queued context-registry access joins pending work and standalone queries remain separate. Captures drain to the synchronous route. The earlier worker-decode/borrowed-arena contract remains only for the single in-flight fallback when queuing is disabled. This does not establish all cancellation/failure recovery. [Bridge lifetime](JAVA-BRIDGE.md#pipelined-frames)
 - **Compact and retained terrain:** ABI 69/70 carries compact shadow casters and camera sections. Admitted shader frames use current-generation retained records and per-facing scene groups; pending, undescribed or camera-sorted entries retain ordinary expansion. Vanilla, Fabulous and frames leaving that route expand compact terrain. Diagnostic/fault/reload paths still support per-record data. These are partial scene capabilities, not completion of every planned phase. [Current scene route](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route)
 - **Camera and shadow selection:** the Rust section graph follows Frozen-derived search rules, while Java mirrors readiness/build facts, consumes visited sections and schedules work. Shadow candidates use already-built geometry, with the leaf test also applied to camera-visible twins and supplement faces; no shadow-only build sweep is retained. Java's current limits remain 4,096 camera sections and 12,288 shadow-candidate sections, with different overflow handling. Region draw order, Iris's non-culling frustum and a scene-owned visible list remain outstanding. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 - **Entity shadow prefilter:** a standalone Rust query uses the active pack's copied shadow policy before Java extracts off-camera entities; unresolved policy keeps candidates. The frame plan applies admission again. Java still extracts poses/geometry for retained candidates, and this does not repair the Citadel geometry limitation in [#803](https://github.com/HungLo2020/MattMC/issues/803). [Query contract](JAVA-BRIDGE.md#standalone-query-handles)
-- **Costs and supporting tooling:** retained mesh records, compact residency/range caches, command grouping, fullscreen-stage object reuse and staging/SPIR-V caches reduce specific repeated work. Native-library staging and capture-artifact procedures have their own owners. Source presence and local benchmark changes do not certify broad acceptance. [Profiling](SHADER-TERRAIN-PROFILING.md) · [Native builds](../tooling/NATIVE-BUILDS.md) · [Artifact storage](ARTIFACT-STORAGE.md)
+- **Submission and reuse:** host-buffer writes with safe local ordering move to each command list's start; staging reuses best-fit chunks and keeps smaller idle chunks first. Fullscreen plans park and reuse complete matching inputs with up to four variants per stage path. Source-role, voxel-selection and shared entity-uniform memos avoid repeated work. [GAL](VULKANIC-GAL.md) · [Profiling](SHADER-TERRAIN-PROFILING.md)
+- **Source data and color history:** terrain/entity/hand source vertices now pack into 64 bytes and decode to the same eight semantic lanes. Initialized clear-enabled feedback targets skip dead end-of-frame copies, and valid mip chains survive until level-zero changes. Java raw biome sky/fog samples reuse exact position/partial-tick/game-time keys; Java still owns those semantic producers. [Architecture](RENDER-ARCHITECTURE.md)
+- **Validation and evidence:** normal release play skips per-frame GAL op/handle/hazard checks; debug builds, tests, watched uploads and explicit GAL-validation runs keep them. Standard validation captures enable the checks. Optional benchmark segment means describe sample-order slices, not broad parity. Source presence and local benchmark changes do not certify acceptance. [Verification](RENDER-VERIFICATION.md) · [Native builds](../tooling/NATIVE-BUILDS.md) · [Artifact storage](ARTIFACT-STORAGE.md)
 
 
 The earlier `2fff1ef` checkpoint established this scope:
@@ -52,7 +54,7 @@ Admission remains bounded. The source supports [at most eight color targets](htt
 
 ## What the recorded evidence establishes
 
-The following paragraphs retain the earlier October 3–4 evidence. Current retained-scene workload results are separated below; neither set is a universal runtime certificate.
+The following paragraphs retain the earlier October 3–4 evidence. Later retained-scene reports and the October 6 speed summary are separated below; none is a universal runtime certificate.
 
 The [earlier progress log](https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/PROGRESS.md) and [follow-up progress log](https://github.com/HungLo2020/MattMC/blob/37817e128b99b07456c0ee22a5d34eaf05c72150/PROGRESS.md) contain the implementation author's test and capture results. Those Java, Rust, native and gameplay runs were not rerun by this documentation review; their ignored capture artifacts are not bundled with the wiki. The earlier independent review passed 60 Python rendering-tool tests; the follow-up tracker review passed 79 isolated Python rendering-tool tests at `37817e1`. These verify tooling scope only.
 
@@ -69,6 +71,35 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 6 speed summary
+
+The [source-pinned `SUMMARY.md`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/SUMMARY.md)
+reports moving-camera workloads of 1,800 frames:
+
+| Reported workload | Rust/Vulkan | Frozen Java/OpenGL |
+| --- | --- | --- |
+| Complementary shader FPS / median frame | 271–288 FPS (latest 283–284) / 3.32–3.38 ms | 307 FPS / 2.99 ms |
+| Shader last 600 frames, mean frame time | 3.10–3.24 ms | 3.20 ms |
+| Shader GPU frame time | 3.18–3.23 ms | About 3.0 ms |
+| Vanilla FPS / median frame | 451–472 FPS / 1.80 ms | 937 FPS / 0.84 ms |
+
+These are implementation-author reports, not reruns by this documentation
+review. The last-600 row is a different slice from the full 1,800-frame FPS
+and median rows; it does not establish full-run performance parity. The summary
+attributes the shader gap to early warm-up/streaming and heavier terrain/shadow
+views, and the vanilla gap to CPU work. Its vanilla worker/GPU times (1.40/0.68 ms)
+are component timings, not additional independent frame costs.
+
+The [same revision's progress log](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/PROGRESS.md#L12-L13)
+retains author-reported scoped image comparisons and intermediate measurements,
+including no measurable gain from mip-chain reuse. Its earlier double-buffered
+Java staging description predates the current caller-decode
+implementation. Neither these notes nor the speed summary supply new
+independently inspected image/profile artifacts, long-run bounds or broad
+Goal 5 acceptance.
+
+#### Earlier retained-scene checkpoint
 
 The [source-pinned progress log](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/PROGRESS.md#L4-L11)
 records successive profiled moving-shader workloads, including 133 to 188 FPS
@@ -112,7 +143,15 @@ For source-input investigations use [RenderDoc observations](RENDERDOC-INPUTS.md
 
 ## Tracked follow-up
 
-The current source review records bounded progress without closing these issues:
+The latest [ownership review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6027569797)
+and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6027581285)
+cover `121ad13c` without closing either issue. They distinguish source/test
+inspection from the implementation author's measurements and captures; no
+runtime suite or benchmark was rerun during this maintenance review.
+
+The previously verified source-review comments record bounded progress without
+closing these issues. They keep their original checkpoint scope; the October 6
+source and speed-summary reconciliation above does not update tracker state:
 
 | Topic | Verified comment link |
 | --- | --- |

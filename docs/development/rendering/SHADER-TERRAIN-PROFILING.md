@@ -5,6 +5,9 @@ Java OpenGL. Static captures, validation, RenderDoc and temporary timers are
 correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
+The [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary)
+separates current reported timings from the historical profiles below; none of
+these rows is a substitute for rerunning the same workload on a new revision.
 
 ## Reproduce the workload
 
@@ -75,10 +78,12 @@ The bounded Oct 4 semantic probe records 17,408 mip-generation requests and
 zero requests for already-valid descendants before a failed warmup. It does not
 support an already-valid shortcut in this original-pack workload. The run has
 zero measured frames and crashes during concurrent native replacement; exclude
-it from throughput and clean-runtime evidence. The probe is removed and no
-mipmap optimization is retained. Frame-start generation before later writes
-remains a lead requiring clean consumer/cost measurements. The isolated native
-staging regression reproduces overwritten mappings and passes after atomic
+it from throughput and clean-runtime evidence. At that checkpoint the probe
+was removed and no mipmap optimization was retained. The later October 6 implementation now
+preserves valid mip descendants until a level-zero write, clear or copy;
+see [current color history rules](RENDER-ARCHITECTURE.md#shader-controls-at-startup).
+That later change does not turn this failed probe into measurement evidence.
+The isolated native staging regression reproduces overwritten mappings and passes after atomic
 publication; see [native build constraints](../tooling/NATIVE-BUILDS.md).
 Evidence: `artifacts/graphics-captures/goal5/source-mipmap-performance/`.
 
@@ -192,9 +197,10 @@ Evidence: `artifacts/graphics-captures/goal5/shadow-batch-cache-profile/`.
 
 ## Per-pass preparation rules
 
-The shader route prepares about 6,600 terrain instances and several hundred
-entity draws per frame, so per-item work dominates. Keep these structures when
-changing it:
+Earlier profiles prepared about 6,600 terrain instances and several hundred
+entity draws per frame. The [compact scene route](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route)
+now avoids ordinary expansion for eligible terrain. Keep these reuse rules when
+changing the remaining preparation work:
 
 - Resolve pass-invariant state once. Terrain pipelines, pack sets and the
   multi-draw set-zero are memoized in the frame's `SourceTerrainBatchScope`;
@@ -202,9 +208,17 @@ changing it:
   ([`worldrender/mod.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/mod.rs)).
   Code that destroys those resources must clear the memo (see
   `destroy_lowered_entity_source_pack_resources_for_keys`).
-- Voxel sources are selected by the volume cull before any asset is touched,
-  in mesh-key order, and returned as a shared `Arc` list. Occupancy consumers
-  must stay order-independent and may treat an identical list as unchanged.
+- Voxel sources are selected by the volume cull before asset loading, in
+  mesh-key order, and returned as a shared `Arc` list. Reused scratch storage
+  holds candidates and compact `(key, index)` sort entries. Translation-only
+  sections first test a conservative padded box before exact mesh bounds.
+  Occupancy consumers must stay order-independent and may treat an identical
+  list as unchanged.
+- Required source-resource roles use separate memo slots with and without DH,
+  keyed by the source/DH candidate epochs and the count of noted writer roles.
+  Binding plans are immutable within those epochs, and writer roles only grow;
+  changing either invariant requires changing the memo key. Entity uniform
+  byte blocks with equal inputs are shared through `Arc<[u8]>`.
 - A batch plan whose indices admit every eligible instance is keyed by those
   instances only (`mesh_batch_indices_cover_selection`); culled selections with
   repeated meshes still key the full frame.

@@ -1,8 +1,8 @@
 # VulkanicGAL
 
 VulkanicGAL is the graphics abstraction layer every renderer records into. It
-owns one device through a private backend (Vulkan or OpenGL), validates every
-request, and executes command lists. It knows nothing about the game. Source:
+owns one device through a private backend (Vulkan or OpenGL), validates resource
+creation, and executes command lists with optional per-submission checks. It knows nothing about the game. Source:
 [`render/vulkanic/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic), with the `VulkanicGal` API in
 [`vulkanic/gal/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/gal) (one module per concern).
 
@@ -24,14 +24,14 @@ cargo doc --no-deps --open    # then open mattmc_rust::render::vulkanic
    `BackendCapabilities` features and limits before the backend sees them.
    Check `capabilities().supports(...)` instead of assuming a backend.
 3. **Work is explicit command lists.** Record `CommandOp`s, wrap them with
-   `create_command_list`, and submit a `SubmissionBatch`. Submission validates
-   ops and handles, removes redundant binds, and runs hazard analysis.
-   Release play skips the op, handle and hazard checks; see the validation
-   notes below.
-4. **Hazards need explicit barriers.** The GAL tracks every access in a
-   batch. Overlapping accesses that conflict (a write and any other access
-   to the same range) must be separated by a `CommandOp::Barrier`, or the
-   submit is rejected. The barrier's `before` must cover the preceding access
+   `create_command_list`, and submit a `SubmissionBatch`. Submission removes
+   redundant binds and hoists eligible host-buffer writes. Op, handle and
+   hazard checks run in validation mode; release play skips those checks by
+   default. See the validation notes below.
+4. **Hazards need explicit barriers.** With validation enabled, the GAL
+   tracks accesses in a batch and rejects conflicting overlaps (a write and
+   any other access to the same range) without a `CommandOp::Barrier`.
+   Producers must satisfy this contract even when validation is disabled. The barrier's `before` must cover the preceding access
    and `after` must cover the next use. Clearing an attachment does not remove
    a preceding sampled-read dependency: transition from `ShaderRead`, not
    `Undefined`, when an earlier stage sampled it. The GAL does not insert
@@ -83,8 +83,12 @@ normal play. Debug builds, `cargo test`, buffer-upload captures and any run
 with `MATTMC_GAL_VALIDATION=1` keep them; the capture harness sets that
 variable whenever `--validation standard` is active
 ([`per_frame_validation`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/gal/submission.rs)).
-Creation-time descriptor checks always run. Run new rendering work under a
-validation capture before trusting it.
+Creation-time descriptor checks, batch/list limits, normalization, backend
+submission and in-flight lifetime tracking still run. The environment setting
+is read once per process (`1`, `true` and `on` enable it), so set it before
+launch. GAL checks are separate from Vulkan's validation layers; enable the
+appropriate checks for the run. Run new rendering work under a validation
+capture before trusting it.
 
 For CPU changes to hazard tracking, set `MATTMC_GAL_VALIDATION=1` and compare
 the gameplay benchmark's `gal-hazard-analysis` time alongside its
@@ -134,8 +138,21 @@ readback on both backends, alongside exact resource creation for other formats.
 The Vulkan lowerer copies large or unaligned `HostWriteBuffer` data through
 persistently mapped staging chunks (`backends/vulkan/lowering/staging.rs`).
 A submission owns its chunks until its timeline value retires; they then return
-to a bounded idle list (32 MiB). Do not reintroduce per-upload buffer and memory
-allocation: driver allocation churn cost about 2 ms per shader frame.
+to a bounded idle list (32 MiB). Allocation takes the smallest idle chunk large
+enough for the request; retirement retains smaller chunks first so a rare large
+upload cannot crowd out the usual 4 MiB chunks. The 32 MiB limit covers idle
+storage, not chunks owned by in-flight submissions. Do not reintroduce per-upload
+buffer and memory allocation: the earlier workload attributed about 2 ms per
+shader frame to driver allocation churn.
+
+Submission hoists a `HostWriteBuffer` with its adjacent, same-queue
+`TransferDst` entry/exit barriers only if no earlier command in that list
+references its buffer, including through a resource set. The Vulkan lowerer
+groups consecutive host writes to distinct buffers behind shared dependencies.
+Keep writes
+self-contained and preserve earlier-use ordering; this is a command-list
+transformation, not a batch-wide move across lists. See
+[`host_write_hoist.rs`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/rust/render/vulkanic/gal/host_write_hoist.rs).
 
 GLSL modules compile through Shaderc at 50–80 ms each, so the Vulkan backend
 keeps compiled SPIR-V on disk (`backends/vulkan/spirv_disk_cache.rs`), keyed by
