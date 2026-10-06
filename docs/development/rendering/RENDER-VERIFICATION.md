@@ -592,6 +592,12 @@ restart counters remain available. A short late queue change must not inherit
 an expired startup deadline. The harness's overall run limit still applies.
 Run `GraphicsFrameBenchmarkReadinessTest` after changes to this lifecycle.
 
+To see where in the camera path time goes, pass
+`--jvm-arg=-Dmattmc.dev.benchmark.phaseSegments=6`: every phase in
+`graphics_frame_benchmark_*.json` then also lists `segmentMeans` (nanoseconds,
+recording order). Compare them with Frozen's per-segment means of
+`frameNanosSamples`; early segments include JIT warm-up and terrain streaming.
+
 Deterministic correctness captures force GPU retirement after presentation in
 `RustGalFrameCoordinator`. They can hide defects caused by overlapping frames.
 Also observe normal RunDev sessions or the gameplay frame benchmark, which

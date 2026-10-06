@@ -175,6 +175,8 @@ public final class GraphicsFrameBenchmark {
 		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.phaseAllocationSamples");
 
 	private static final ArrayDeque<OpenPhase> PHASE_STACK = new ArrayDeque<>();
+	/** Dev diagnostic: when positive, each phase also reports its mean over this many equal sample segments, in recording order. */
+	private static final int PHASE_SEGMENTS = Integer.getInteger("mattmc.dev.benchmark.phaseSegments", 0);
 	private static final Map<String, PhaseStats> EXCLUSIVE_PHASES = new LinkedHashMap<>();
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
 	private static final Map<String, PhaseStats> COUNTER_SAMPLES = new LinkedHashMap<>();
@@ -2875,6 +2877,19 @@ public final class GraphicsFrameBenchmark {
 			json.append("\"p95\": ").append(PhaseStats.percentile(sorted, 0.95)).append(", ");
 			json.append("\"p99\": ").append(PhaseStats.percentile(sorted, 0.99)).append(", ");
 			json.append("\"max\": ").append(stats.worstNanos).append(", ");
+			if (PHASE_SEGMENTS > 0 && stats.sampleCount >= PHASE_SEGMENTS) {
+				json.append("\"segmentMeans\": [");
+				for (int segment = 0; segment < PHASE_SEGMENTS; segment++) {
+					int from = (int)((long)stats.sampleCount * segment / PHASE_SEGMENTS);
+					int to = (int)((long)stats.sampleCount * (segment + 1) / PHASE_SEGMENTS);
+					long sum = 0L;
+					for (int sample = from; sample < to; sample++) {
+						sum += stats.samples[sample];
+					}
+					json.append(segment > 0 ? ", " : "").append(to > from ? sum / (to - from) : 0L);
+				}
+				json.append("], ");
+			}
 			json.append("\"worst\": ").append(stats.worstNanos).append(" }");
 			index++;
 		}
