@@ -425,7 +425,7 @@ impl SourceTerrainMeshAsset {
     /// Validates the fixed source-mesh storage ABI before any later runtime
     /// turns this owned semantic artifact into GAL buffers. This is separate
     /// from ordinary mesh validation: source terrain always uses packed
-    /// 128-byte vertices and explicit u32 indices, regardless of the
+    /// 64-byte vertices and explicit u32 indices, regardless of the
     /// original indexed-mesh transport width.
     pub(crate) fn validate(&self) -> GalResult<()> {
         if self.mesh_key == 0 || self.mesh_generation == 0 {
@@ -1282,50 +1282,19 @@ pub(crate) fn pack_source_entity_vertices(vertices: &[SourceEntityVertex]) -> Ga
                 "source entity vertex {index} contains non-finite semantic data"
             )));
         }
-        let color = argb_to_rgba(vertex.color_argb);
-        let normal = unpack_normal_i8(vertex.normal_packed);
-        let [block_light, sky_light] = source_lightmap_coordinates(vertex.light);
-        for component in [
-            vertex.position[0],
-            vertex.position[1],
-            vertex.position[2],
-            1.0,
-        ] {
-            push_f32(&mut out, component);
-        }
-        for component in color {
-            push_f32(&mut out, component);
-        }
-        for component in [normal[0], normal[1], normal[2], 0.0] {
-            push_f32(&mut out, component);
-        }
-        for component in [
-            vertex.local_uv[0],
-            vertex.local_uv[1],
-            block_light,
-            sky_light,
-        ] {
-            push_f32(&mut out, component);
-        }
-        // Entity identity is a Rust-resolved draw semantic, not a per-vertex
-        // Minecraft terrain material lane.
-        for component in [0.0, 0.0, 0.0, 1.0] {
-            push_f32(&mut out, component);
-        }
-        for component in [
-            vertex.texture_midpoint[0],
-            vertex.texture_midpoint[1],
-            0.0,
-            1.0,
-        ] {
-            push_f32(&mut out, component);
-        }
-        for component in vertex.tangent {
-            push_f32(&mut out, component);
-        }
-        for component in [0.0, 0.0, 0.0, 0.0] {
-            push_f32(&mut out, component);
-        }
+        crate::render::shaderpack::programs::push_source_vertex_record(
+            &mut out,
+            vertex.position,
+            vertex.color_argb,
+            vertex.local_uv,
+            vertex.normal_packed,
+            vertex.light,
+            0,
+            0,
+            0,
+            vertex.texture_midpoint,
+            vertex.tangent,
+        );
     }
     debug_assert_eq!(out.len(), byte_count);
     Ok(out)
@@ -1342,21 +1311,21 @@ pub(crate) fn override_source_entity_vertex_light(
     mesh: &mut SourceEntityMeshAsset,
     packed_light: u32,
 ) -> GalResult<()> {
-    const LIGHT_OFFSET_IN_VERTEX: usize = 56;
-    const LIGHT_LANE_BYTES: usize = 8;
     if mesh.vertex_bytes.len() % TERRAIN_SOURCE_VERTEX_BYTES != 0 {
         return Err(GalError::invalid_argument(
             "source entity vertex payload is not aligned to the fixed source ABI",
         ));
     }
-    let [block_light, sky_light] = source_lightmap_coordinates(packed_light);
+    let offset = crate::render::shaderpack::programs::TERRAIN_SOURCE_VERTEX_LIGHT_OFFSET;
     for vertex in mesh
         .vertex_bytes
         .chunks_exact_mut(TERRAIN_SOURCE_VERTEX_BYTES)
     {
-        let light = &mut vertex[LIGHT_OFFSET_IN_VERTEX..LIGHT_OFFSET_IN_VERTEX + LIGHT_LANE_BYTES];
-        light[..4].copy_from_slice(&block_light.to_ne_bytes());
-        light[4..].copy_from_slice(&sky_light.to_ne_bytes());
+        let lane = &mut vertex[offset..offset + 4];
+        let word = u32::from_ne_bytes((&*lane).try_into().expect("four-byte light lane"));
+        // Replace the block and sky bytes; keep the render-type byte.
+        let word = (word & 0xff00_ff00) | (packed_light & 0x00ff_00ff);
+        lane.copy_from_slice(&word.to_ne_bytes());
     }
     Ok(())
 }
@@ -1401,55 +1370,22 @@ pub(crate) fn pack_source_terrain_vertices(mesh: &SourceTerrainMesh) -> GalResul
             )));
         }
 
-        let color = argb_to_rgba(vertex.color_argb);
-        let normal = unpack_normal_i8(vertex.normal_packed);
-        let [block_light, sky_light] = source_lightmap_coordinates(vertex.light);
-
-        // position
-        push_f32(&mut out, vertex.position[0]);
-        push_f32(&mut out, vertex.position[1]);
-        push_f32(&mut out, vertex.position[2]);
-        push_f32(&mut out, 1.0);
-        // color
-        for component in color {
-            push_f32(&mut out, component);
-        }
-        // normal_light: the lowered source currently consumes xyz as gl_Normal.
-        push_f32(&mut out, normal[0]);
-        push_f32(&mut out, normal[1]);
-        push_f32(&mut out, normal[2]);
-        push_f32(&mut out, 0.0);
-        // Preserve the vanilla UV2 values before the owned legacy texture
-        // matrix derives the shader-pack lightmap coordinate.
-        push_f32(&mut out, vertex.atlas_uv[0]);
-        push_f32(&mut out, vertex.atlas_uv[1]);
-        push_f32(&mut out, block_light);
-        push_f32(&mut out, sky_light);
-        // Complementary's terrain source consumes x as the block material ID
-        // and y as the render-type flag.
-        push_f32(&mut out, vertex.shader_block_id as f32);
-        push_f32(&mut out, vertex.shader_material_type as f32);
-        push_f32(&mut out, 0.0);
-        push_f32(&mut out, 1.0);
-        // mc_midTexCoord is a vec4 in the selected source. The semantic
-        // midpoint is atlas-space xy; zw follow the fixed-function defaults.
-        push_f32(&mut out, vertex.sprite_midpoint[0]);
-        push_f32(&mut out, vertex.sprite_midpoint[1]);
-        push_f32(&mut out, 0.0);
-        push_f32(&mut out, 1.0);
-        // at_tangent is already normalized and carries handedness in w.
-        for component in vertex.tangent {
-            push_f32(&mut out, component);
-        }
-        // Iris/Sodium expose at_midBlock as four unnormalized signed bytes:
-        // xyz are the source relative block-center offsets and w is block
-        // emission. Preserve each semantic byte as an exact numeric lane.
-        for shift in [0, 8, 16, 24] {
-            push_f32(
-                &mut out,
-                ((vertex.mid_block_packed >> shift) as u8 as i8) as f32,
-            );
-        }
+        // Lanes keep their exact source values; the vertex preamble decodes
+        // them to the semantic vec4s (normals /127, color /255, light bytes,
+        // mid-block signed bytes).
+        crate::render::shaderpack::programs::push_source_vertex_record(
+            &mut out,
+            vertex.position,
+            vertex.color_argb,
+            vertex.atlas_uv,
+            vertex.normal_packed,
+            vertex.light,
+            vertex.shader_material_type as u8,
+            vertex.shader_block_id,
+            vertex.mid_block_packed,
+            vertex.sprite_midpoint,
+            vertex.tangent,
+        );
     }
     debug_assert_eq!(out.len(), byte_count);
     Ok(out)

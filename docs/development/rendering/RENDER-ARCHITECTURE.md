@@ -361,6 +361,10 @@ disabled generic attribute observed on Frozen's particle draws. This is a fixed
 source input, with no new vertex lane or borrowed GL state. Mid-UV, tangent and
 mid-block reads remain unsupported; entity/hand/terrain streams keep their own
 per-vertex entity semantics.
+Terrain, entity and hand source vertices are 64-byte packed records
+([`TERRAIN_SOURCE_VERTEX_BYTES`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/programs/lowered/terrain.rs));
+the vertex preamble decodes them to the eight semantic vec4 lanes. Change the
+packer, the GLSL decode and the test decoder together.
 See [source lowering](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/shaderpack/lowering).
 
 The selected frame orders optional `begin` writers before shadows, then

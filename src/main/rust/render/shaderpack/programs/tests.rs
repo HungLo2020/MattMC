@@ -2167,7 +2167,7 @@ fn prepared_source_interface_rejects_mutated_fixed_abi_fields() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("128-byte ABI"));
+        .contains("64-byte ABI"));
 
     let mut wrong_lane = program.execution_interface.clone();
     wrong_lane.vertex_fields[3].offset = 64;

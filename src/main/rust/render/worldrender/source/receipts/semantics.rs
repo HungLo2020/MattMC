@@ -182,12 +182,15 @@ pub(in crate::render::worldrender) fn collect_selected_source_terrain_transform_
     let position_bytes = prepared
         .mesh
         .vertex_bytes
-        .get(vertex_offset..vertex_offset + 16)
+        .get(vertex_offset..vertex_offset + 12)
         .ok_or_else(|| {
             GalError::invalid_argument("selected-source terrain probe vertex is absent")
         })?;
     let source_position = std::array::from_fn(|component| {
         let offset = component * 4;
+        if component == 3 {
+            return 1.0;
+        }
         f32::from_ne_bytes(
             position_bytes[offset..offset + 4]
                 .try_into()

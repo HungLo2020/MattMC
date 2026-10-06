@@ -3,9 +3,86 @@
 use super::*;
 
 /// Fixed std430 source-terrain vertex record declared by the Rust source
-/// lowerer. Frontend staging may use this semantic ABI, but it is not a Java
-/// vertex layout or a native backend format.
-pub(crate) const TERRAIN_SOURCE_VERTEX_BYTES: usize = 8 * 4 * std::mem::size_of::<f32>();
+/// lowerer: four `uvec4` words that the vertex preamble decodes into the
+/// eight semantic lanes. Frontend staging may use this semantic ABI, but it
+/// is not a Java vertex layout or a native backend format.
+///
+/// | word | x | y | z | w |
+/// | --- | --- | --- | --- | --- |
+/// | 0 | position.x bits | position.y bits | position.z bits | color ARGB8 |
+/// | 1 | uv.x bits | uv.y bits | normal i8×3 | light: block, render type, sky bytes |
+/// | 2 | block id (i32) | mid-block i8×4 | mid-tex.x bits | mid-tex.y bits |
+/// | 3 | tangent.x bits | tangent.y bits | tangent.z bits | tangent.w bits |
+pub(crate) const TERRAIN_SOURCE_VERTEX_BYTES: usize = 4 * 4 * std::mem::size_of::<u32>();
+
+/// Test mirror of the vertex preamble's decode: the eight semantic vec4
+/// lanes of one packed record, in `EXPECTED_FIELDS` order.
+#[cfg(test)]
+pub(crate) fn decode_source_vertex_record(record: &[u8]) -> [[f32; 4]; 8] {
+    let word = |index: usize| u32::from_ne_bytes(record[index * 4..index * 4 + 4].try_into().unwrap());
+    let float = |index: usize| f32::from_bits(word(index));
+    let signed = |packed: u32, lane: u32| ((packed >> (lane * 8)) as u8 as i8) as f32;
+    let color = word(3);
+    let light = word(7);
+    [
+        [float(0), float(1), float(2), 1.0],
+        [16, 8, 0, 24].map(|shift| ((color >> shift) & 0xff) as f32 / 255.0),
+        [
+            (signed(word(6), 0) / 127.0).clamp(-1.0, 1.0),
+            (signed(word(6), 1) / 127.0).clamp(-1.0, 1.0),
+            (signed(word(6), 2) / 127.0).clamp(-1.0, 1.0),
+            0.0,
+        ],
+        [float(4), float(5), (light & 0xff) as f32, ((light >> 16) & 0xff) as f32],
+        [word(8) as i32 as f32, ((light >> 8) & 0xff) as f32, 0.0, 1.0],
+        [float(10), float(11), 0.0, 1.0],
+        [float(12), float(13), float(14), float(15)],
+        [0, 1, 2, 3].map(|lane| signed(word(9), lane)),
+    ]
+}
+
+/// Byte offsets of packed lanes inside one source vertex record.
+pub(crate) const TERRAIN_SOURCE_VERTEX_UV_OFFSET: usize = 16;
+pub(crate) const TERRAIN_SOURCE_VERTEX_NORMAL_OFFSET: usize = 24;
+pub(crate) const TERRAIN_SOURCE_VERTEX_LIGHT_OFFSET: usize = 28;
+
+/// Packs one source vertex record (see [`TERRAIN_SOURCE_VERTEX_BYTES`]).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn push_source_vertex_record(
+    out: &mut Vec<u8>,
+    position: [f32; 3],
+    color_argb: u32,
+    uv: [f32; 2],
+    normal_packed: u32,
+    light: u32,
+    render_type: u8,
+    block_id: i32,
+    mid_block_packed: u32,
+    mid_tex_coord: [f32; 2],
+    tangent: [f32; 4],
+) {
+    let words = [
+        position[0].to_bits(),
+        position[1].to_bits(),
+        position[2].to_bits(),
+        color_argb,
+        uv[0].to_bits(),
+        uv[1].to_bits(),
+        normal_packed & 0x00ff_ffff,
+        (light & 0x00ff_00ff) | (u32::from(render_type) << 8),
+        block_id as u32,
+        mid_block_packed,
+        mid_tex_coord[0].to_bits(),
+        mid_tex_coord[1].to_bits(),
+        tangent[0].to_bits(),
+        tangent[1].to_bits(),
+        tangent[2].to_bits(),
+        tangent[3].to_bits(),
+    ];
+    for word in words {
+        out.extend_from_slice(&word.to_ne_bytes());
+    }
+}
 
 /// One source terrain instance carries a copied semantic model transform and
 /// color modulation. This is deliberately independent of a Java vertex

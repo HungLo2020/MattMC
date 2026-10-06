@@ -159,19 +159,18 @@ impl WorldPrimitiveFrontend {
                 "source decal glint mesh is not aligned to the fixed source ABI",
             ));
         }
-        let read = |bytes: &[u8], offset: usize| {
-            f32::from_ne_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]])
+        let word = |bytes: &[u8], offset: usize| {
+            u32::from_ne_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]])
         };
+        let uv_offset = crate::render::shaderpack::programs::TERRAIN_SOURCE_VERTEX_UV_OFFSET;
+        let normal_offset = crate::render::shaderpack::programs::TERRAIN_SOURCE_VERTEX_NORMAL_OFFSET;
         for vertex in vertex_bytes.chunks_exact_mut(TERRAIN_SOURCE_VERTEX_BYTES) {
-            let position = [read(vertex, 0), read(vertex, 4), read(vertex, 8)];
-            // The record holds the exact signed-byte normal divided by 127.
-            let packed_normal = (0..3).fold(0u32, |packed, lane| {
-                let value = (read(vertex, 32 + lane * 4).clamp(-1.0, 1.0) * 127.0).round() as i8;
-                packed | u32::from(value as u8) << (lane * 8)
-            });
+            let position = [0, 4, 8].map(|offset| f32::from_bits(word(vertex, offset)));
+            // The record holds the exact signed-byte normal.
+            let packed_normal = word(vertex, normal_offset);
             let [u, v] = projection.texture_uv(position, packed_normal)?;
-            vertex[48..52].copy_from_slice(&u.to_ne_bytes());
-            vertex[52..56].copy_from_slice(&v.to_ne_bytes());
+            vertex[uv_offset..uv_offset + 4].copy_from_slice(&u.to_ne_bytes());
+            vertex[uv_offset + 4..uv_offset + 8].copy_from_slice(&v.to_ne_bytes());
         }
         let derived = Arc::new(SourceEntityMeshAsset {
             mesh_key: key,

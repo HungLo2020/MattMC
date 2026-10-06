@@ -7989,16 +7989,7 @@ fn source_entity_mesh_preparation_uses_local_uvs_and_canonical_identity() {
             .map(|bytes| u32::from_ne_bytes(bytes.try_into().unwrap()))
             .collect::<Vec<_>>()
     );
-    let lane = |vertex: usize, offset: usize| -> [f32; 4] {
-        let start = vertex * TERRAIN_SOURCE_VERTEX_BYTES + offset;
-        std::array::from_fn(|component| {
-            f32::from_ne_bytes(
-                prepared.vertex_bytes[start + component * 4..start + (component + 1) * 4]
-                    .try_into()
-                    .unwrap(),
-            )
-        })
-    };
+    let lane = |vertex: usize, offset: usize| source_lane(&prepared.vertex_bytes, vertex, offset);
     assert_eq!([0.10, 0.20, 0.0, 0.0], lane(0, 48));
     assert_eq!([0.40, 0.50, 0.0, 1.0], lane(0, 80));
 }
@@ -8027,14 +8018,8 @@ fn source_entity_normals_use_the_iris_face_normal_on_the_authored_side() {
         let prepared = prepare_source_entity_mesh_asset(&mesh).unwrap();
         let stored: Vec<[f32; 3]> = (0..4)
             .map(|vertex| {
-                let start = vertex * TERRAIN_SOURCE_VERTEX_BYTES + 32;
-                std::array::from_fn(|axis| {
-                    f32::from_ne_bytes(
-                        prepared.vertex_bytes[start + axis * 4..start + axis * 4 + 4]
-                            .try_into()
-                            .unwrap(),
-                    )
-                })
+                let normal = source_lane(&prepared.vertex_bytes, vertex, 32);
+                [normal[0], normal[1], normal[2]]
             })
             .collect();
         (face, stored)
@@ -9270,6 +9255,14 @@ pub(crate) fn mesh_instance(mesh_key: u64, generation: u64) -> WorldMeshInstance
         viewport_width: 128,
         viewport_height: 128,
     }
+}
+
+/// Decoded semantic lane (`offset` = 16 × lane) of one packed source vertex.
+fn source_lane(bytes: &[u8], vertex: usize, offset: usize) -> [f32; 4] {
+    let start = vertex * TERRAIN_SOURCE_VERTEX_BYTES;
+    crate::render::shaderpack::programs::decode_source_vertex_record(
+        &bytes[start..start + TERRAIN_SOURCE_VERTEX_BYTES],
+    )[offset / 16]
 }
 
 fn read_f32(bytes: &[u8], index: usize) -> f32 {
@@ -13945,16 +13938,7 @@ fn source_terrain_vertex_packing_preserves_lowered_source_semantics() {
     let bytes = pack_source_terrain_vertices(&source).unwrap();
 
     assert_eq!(4 * TERRAIN_SOURCE_VERTEX_BYTES, bytes.len());
-    let lane = |vertex: usize, offset: usize| -> [f32; 4] {
-        let start = vertex * TERRAIN_SOURCE_VERTEX_BYTES + offset;
-        std::array::from_fn(|component| {
-            f32::from_ne_bytes(
-                bytes[start + component * 4..start + component * 4 + 4]
-                    .try_into()
-                    .unwrap(),
-            )
-        })
-    };
+    let lane = |vertex: usize, offset: usize| source_lane(&bytes, vertex, offset);
     assert_eq!([-0.5, -0.5, -1.0, 1.0], lane(0, 0));
     assert_eq!([0.8784314, 0.1254902, 0.2509804, 1.0], lane(0, 16));
     // Iris's terrain writer replaces baked normals with the face normal.
@@ -14015,7 +13999,7 @@ fn source_terrain_material_resolution_accepts_explicit_pack_default() {
         prepare_source_terrain_mesh_asset_with_material_ids(&mesh, Some(&material_ids))
             .unwrap();
 
-    let first_material = f32::from_ne_bytes(prepared.vertex_bytes[64..68].try_into().unwrap());
+    let first_material = source_lane(&prepared.vertex_bytes, 0, 64)[0];
     assert_eq!(-1.0, first_material);
 
     let error =
@@ -19919,8 +19903,8 @@ fn first_person_source_preparation_keeps_hands_separate_and_uses_hand_matrices()
         .find(|value| value.mesh.mesh_key == source_entity_light_variant_key(0x4841_4e44, arm_light))
         .expect("lit arm must retain a distinct immutable mesh identity");
     let [block_light, sky_light] = source_lightmap_coordinates(arm_light);
-    assert_eq!(block_light, read_f32(&lit_arm.mesh.vertex_bytes, 56 / 4));
-    assert_eq!(sky_light, read_f32(&lit_arm.mesh.vertex_bytes, 60 / 4));
+    assert_eq!(block_light, source_lane(&lit_arm.mesh.vertex_bytes, 0, 48)[2]);
+    assert_eq!(sky_light, source_lane(&lit_arm.mesh.vertex_bytes, 0, 48)[3]);
     source_frame.first_person_mesh_instances[0].packed_light = 0;
 
     let base_resources = TerrainSourceOwnedResourceSet::new(

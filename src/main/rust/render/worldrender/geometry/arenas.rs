@@ -66,7 +66,7 @@ pub(in crate::render::worldrender) struct SourceMeshResources {
 /// vertex stream; indices are rebased to the page's vertex origin at upload.
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_GEOMETRY_PAGE_BYTES: u64 = 128 * 1024 * 1024;
 
-/// Page ranges keep 256-byte alignment (a multiple of the 128-byte source
+/// Page ranges keep 256-byte alignment (a multiple of the 64-byte source
 /// vertex and of the u32 index size).
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_GEOMETRY_ALIGNMENT: u64 = 256;
 

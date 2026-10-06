@@ -207,9 +207,30 @@ struct VulkanicSourceTerrainVertex {
     vec4 tangent;
     vec4 mid_block;
 };
+// Four packed words per vertex (TERRAIN_SOURCE_VERTEX_BYTES); decoded to the
+// exact semantic lanes the earlier float record carried.
 layout(set = 0, binding = 0, std430) readonly buffer VulkanicSourceTerrainVertices {
-    VulkanicSourceTerrainVertex vulkanic_source_vertices[];
+    uvec4 vulkanic_source_vertex_words[];
 };
+vec4 vulkanic_source_signed_bytes(uint word) {
+    return vec4(ivec4(word << 24u, word << 16u, word << 8u, word) >> 24);
+}
+VulkanicSourceTerrainVertex vulkanic_source_decode_vertex(int index) {
+    uvec4 a = vulkanic_source_vertex_words[index * 4];
+    uvec4 b = vulkanic_source_vertex_words[index * 4 + 1];
+    uvec4 c = vulkanic_source_vertex_words[index * 4 + 2];
+    uvec4 d = vulkanic_source_vertex_words[index * 4 + 3];
+    VulkanicSourceTerrainVertex vertex;
+    vertex.position = vec4(uintBitsToFloat(a.xyz), 1.0);
+    vertex.color = vec4((uvec4(a.w >> 16u, a.w >> 8u, a.w, a.w >> 24u) & 0xffu)) / 255.0;
+    vertex.normal_light = vec4(clamp(vulkanic_source_signed_bytes(b.z).xyz / 127.0, -1.0, 1.0), 0.0);
+    vertex.atlas_uv_lightmap = vec4(uintBitsToFloat(b.xy), float(b.w & 0xffu), float((b.w >> 16u) & 0xffu));
+    vertex.entity = vec4(float(int(c.x)), float((b.w >> 8u) & 0xffu), 0.0, 1.0);
+    vertex.mid_tex_coord = vec4(uintBitsToFloat(c.zw), 0.0, 1.0);
+    vertex.tangent = uintBitsToFloat(d);
+    vertex.mid_block = vulkanic_source_signed_bytes(c.y);
+    return vertex;
+}
 layout(set = 0, binding = 1, std140) uniform VulkanicSourceTerrainLegacyTransforms {
     mat4 vulkanic_source_texture_matrix[2];
     {hand_projection_field}
@@ -221,7 +242,7 @@ struct VulkanicSourceTerrainInstance {
 layout(set = 0, binding = 3, std430) readonly buffer VulkanicSourceTerrainInstances {
     VulkanicSourceTerrainInstance vulkanic_source_instances[];
 };
-#define vulkanic_source_vertex vulkanic_source_vertices[gl_VertexIndex]
+#define vulkanic_source_vertex vulkanic_source_decode_vertex(gl_VertexIndex)
 #define vulkanic_source_instance vulkanic_source_instances[gl_InstanceIndex]
 #define vulkanic_source_model_transform vulkanic_source_instance.model_transform
 #define vulkanic_source_model_view {model_view_expr}
