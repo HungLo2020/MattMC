@@ -189,9 +189,10 @@ On top of pipelining (disable with `MATTMC_QUEUED_FRAMES=0` or
 handing over frame N+1. The worker runs a FIFO of jobs
 ([`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)):
 
-- `mattmc_vulkanic_gal_whole_frame_submit_queued` queues a frame whose job
-  acquires the swapchain image itself, executes the request with that image's
-  frame id and target, and presents. `..._whole_frame_join_queued` returns the
+- `mattmc_vulkanic_gal_whole_frame_submit_queued` decodes the request on the
+  calling thread (Java's memory is not read after the call) and queues a
+  frame whose job acquires the swapchain image itself, executes the decoded
+  frame with that image's frame id and target, and presents. `..._whole_frame_join_queued` returns the
   oldest queued frame (acquire, submit and present results) and waits only for
   the jobs up to it.
 - `..._world_mesh_update_assets_queued` and `..._atlas_animation_tick_queued`
@@ -204,5 +205,4 @@ handing over frame N+1. The worker runs a FIFO of jobs
 prepares, so the worker always has the next frame waiting. Capture,
 screenshot and RenderDoc frames drain the queue and run synchronously. While a
 frame is queued, completion takes retirement from the present result instead
-of querying the bridge. Java keeps each queued request's arena (and one of two
-alternating sets of persistent record staging) until that frame is joined.
+of querying the bridge.

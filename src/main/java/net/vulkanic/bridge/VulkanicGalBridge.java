@@ -287,10 +287,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	/** Queued frames: per-frame asset updates and frame submits queue behind the native worker. */
 	private boolean queuedFrames;
 	private QueuedSubmit queuedSubmit;
-	/** Request arenas of queued frames, oldest first; each lives until its frame is joined. */
-	private final java.util.ArrayDeque<Arena> queuedRequestArenas = new java.util.ArrayDeque<>();
-	/** The other set of persistent record staging, for the frame packed while one is queued. */
-	private PersistentRecordStaging alternateStaging = new PersistentRecordStaging();
+	/** Queued frames not yet joined. Rust copies a queued request before the submit returns. */
+	private int queuedFrameCount;
 	/**
 	 * Reusable frame-local material partitioning scratch. These lists contain
 	 * only the caller's immutable semantic records; the native request remains
@@ -2392,10 +2390,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			int status = Native.wholeFrameSubmitQueued(contextId, request, queued.correlationId(), queued.width(), queued.height());
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 			checkStatus(status, "queued whole-frame submission");
-			// The native worker decodes this request when the frame runs; it
-			// lives until that frame is joined.
-			queuedRequestArenas.addLast(frameArena);
-			requestHandedOff = true;
+			// Rust copied the request during the call; the arena closes below.
+			queuedFrameCount++;
 			return null;
 		}
 		if (wholeFrame && pipelinedPresent != null) {
@@ -2484,85 +2480,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record QueuedFrameResult(AcquiredFrame acquired, WholeFrameSubmitResult submit, PresentedFrame presented) {}
 
 	/**
-	 * Persistent native record staging that a packed request references until
-	 * Rust decodes it. A queued frame may still be undecoded while the next
-	 * frame packs, so queued packing alternates between two sets.
-	 */
-	private static final class PersistentRecordStaging {
-		MemorySegment lodArray = MemorySegment.NULL;
-		int lodCapacity;
-		int lodCount = -1;
-		int[] lodLayers = new int[0];
-		int[] lodSegments = new int[0];
-		int[] lodOrders = new int[0];
-		long[] lodKeys = new long[0];
-		long[] lodGenerations = new long[0];
-		MemorySegment meshArray = MemorySegment.NULL;
-		int meshCapacity;
-		int meshCount;
-		WorldMeshInstanceRecord[] meshIdentities = new WorldMeshInstanceRecord[0];
-		MemorySegment materialArray = MemorySegment.NULL;
-		int materialCapacity;
-		int materialCount;
-		WorldMaterialQuadRecord[] materialRecords = new WorldMaterialQuadRecord[0];
-		int[] materialIndexes = new int[0];
-	}
-
-	/** Swaps the active persistent staging with the alternate set. */
-	private void swapPersistentRecordStaging() {
-		PersistentRecordStaging active = new PersistentRecordStaging();
-		active.lodArray = persistentWorldLodInstanceArray;
-		active.lodCapacity = persistentWorldLodInstanceCapacity;
-		active.lodCount = persistentWorldLodInstanceCount;
-		active.lodLayers = persistentWorldLodLayers;
-		active.lodSegments = persistentWorldLodSegments;
-		active.lodOrders = persistentWorldLodOrders;
-		active.lodKeys = persistentWorldLodKeys;
-		active.lodGenerations = persistentWorldLodGenerations;
-		active.meshArray = persistentWorldMeshInstanceArray;
-		active.meshCapacity = persistentWorldMeshInstanceCapacity;
-		active.meshCount = persistentWorldMeshInstanceCount;
-		active.meshIdentities = persistentWorldMeshInstanceIdentities;
-		active.materialArray = persistentCompactMaterialArray;
-		active.materialCapacity = persistentCompactMaterialCapacity;
-		active.materialCount = persistentCompactMaterialCount;
-		active.materialRecords = persistentCompactMaterialRecords;
-		active.materialIndexes = persistentCompactMaterialIndexes;
-		PersistentRecordStaging next = alternateStaging;
-		persistentWorldLodInstanceArray = next.lodArray;
-		persistentWorldLodInstanceCapacity = next.lodCapacity;
-		persistentWorldLodInstanceCount = next.lodCount;
-		persistentWorldLodLayers = next.lodLayers;
-		persistentWorldLodSegments = next.lodSegments;
-		persistentWorldLodOrders = next.lodOrders;
-		persistentWorldLodKeys = next.lodKeys;
-		persistentWorldLodGenerations = next.lodGenerations;
-		persistentWorldMeshInstanceArray = next.meshArray;
-		persistentWorldMeshInstanceCapacity = next.meshCapacity;
-		persistentWorldMeshInstanceCount = next.meshCount;
-		persistentWorldMeshInstanceIdentities = next.meshIdentities;
-		persistentCompactMaterialArray = next.materialArray;
-		persistentCompactMaterialCapacity = next.materialCapacity;
-		persistentCompactMaterialCount = next.materialCount;
-		persistentCompactMaterialRecords = next.materialRecords;
-		persistentCompactMaterialIndexes = next.materialIndexes;
-		alternateStaging = active;
-	}
-
-	/**
 	 * Turns queued frames on or off. While on, world mesh asset updates and
 	 * atlas animation ticks queue behind the native worker instead of joining
 	 * it. Turning it off requires every queued frame to have been joined.
 	 */
 	public void setQueuedFrames(boolean enabled) {
-		if (!enabled && !queuedRequestArenas.isEmpty()) {
+		if (!enabled && queuedFrameCount != 0) {
 			throw new IllegalStateException("queued frames are still outstanding");
 		}
 		queuedFrames = enabled;
 	}
 
 	public int queuedFrameCount() {
-		return queuedRequestArenas.size();
+		return queuedFrameCount;
 	}
 
 	/**
@@ -2574,8 +2504,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (!queuedFrames || width <= 0 || height <= 0) {
 			throw new IllegalStateException("queued submit requires queued frames and a positive extent");
 		}
-		// The previous frame's request may still be undecoded; pack into the other set.
-		swapPersistentRecordStaging();
 		queuedSubmit = new QueuedSubmit(correlationId, width, height);
 	}
 
@@ -2585,7 +2513,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * update or animation tick that failed before it) throws here.
 	 */
 	public QueuedFrameResult joinQueuedFrame() {
-		if (queuedRequestArenas.isEmpty()) {
+		if (queuedFrameCount == 0) {
 			return null;
 		}
 		try (Arena joinArena = Arena.ofConfined()) {
@@ -2597,11 +2525,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			try {
 				joined = Native.wholeFrameJoinQueued(contextId, acquire, submit, present, hasOutcome);
 			} finally {
-				// Joined: the worker no longer reads this frame's request.
-				Arena request = queuedRequestArenas.pollFirst();
-				if (request != null) {
-					request.close();
-				}
+				queuedFrameCount--;
 			}
 			checkStatus(joined, "queued frame join");
 			if (hasOutcome.get(ValueLayout.JAVA_INT, 0) == 0) {
@@ -4860,10 +4784,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			pipelinedRequestArena.close();
 			pipelinedRequestArena = null;
 		}
-		for (Arena queued : queuedRequestArenas) {
-			queued.close();
-		}
-		queuedRequestArenas.clear();
+		queuedFrameCount = 0;
 		persistentGuiMeshTopologies.clear();
 		arena.close();
 	}

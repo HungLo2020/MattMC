@@ -209,14 +209,21 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit_queued(
         if request.is_null() || width == 0 || height == 0 {
             return Err(GalError::invalid_argument("queued whole-frame request is incomplete"));
         }
-        let request = RequestHandoff(request);
+        // Decode now, on the calling thread: Java's memory is not read after
+        // this call returns. The image is acquired by the job, so the copy
+        // names a placeholder target and frame until then.
+        let mut copy = read_struct(request, "queued whole-frame request")?;
+        copy.frame_target = FfiHandle::from(Handle::new(HandleKind::FrameTarget, 0, 1)?);
+        copy.frame_id = correlation_id;
+        copy.correlation_id = correlation_id;
+        let decoded = decode_whole_frame_payload(&copy, pipeline.capabilities().clone())?;
         let handoff = pipeline.context_handoff();
         pipeline.enqueue(move |queue| {
-            let (handoff, request) = (handoff, request);
+            let handoff = handoff;
             // SAFETY: queued jobs run on the worker, which owns the context
             // until a bridge entry point joins (see `bridge::pipeline`).
             let context = unsafe { &mut *handoff.0 };
-            let outcome = run_queued_frame(context, request.0, correlation_id, width, height);
+            let outcome = run_queued_frame(context, decoded, correlation_id, width, height);
             if let Ok(mut queue) = queue.lock() {
                 queue.frames.push_back(outcome);
             }
@@ -231,7 +238,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit_queued(
 /// Acquire, execute and present one queued frame on the worker.
 fn run_queued_frame(
     context: &mut BridgeContext,
-    request: *const FfiWholeFrameSubmitRequest,
+    mut decoded: DecodedWholeFrame,
     correlation_id: u64,
     width: u32,
     height: u32,
@@ -262,16 +269,10 @@ fn run_queued_frame(
     if Handle::from(acquire.frame_target).is_null() {
         return outcome;
     }
-    // SAFETY: Java keeps the request alive until this frame is joined.
-    let result = unsafe { read_struct(request, "queued whole-frame request") }.and_then(|mut copy| {
-        copy.frame_id = acquire.frame_id;
-        copy.correlation_id = correlation_id;
-        copy.frame_target = acquire.frame_target;
-        // SAFETY: the copy's nested slices still address Java memory, which
-        // stays valid until the join.
-        unsafe { decode_whole_frame_request(context, &copy) }
-    })
-    .and_then(|decoded| execute_whole_frame(context, decoded));
+    charge_whole_frame_decode(context, decoded.input_bytes);
+    decoded.frame_target = Handle::from(acquire.frame_target);
+    decoded.world_frame.frame_id = acquire.frame_id;
+    let result = execute_whole_frame(context, decoded);
     let (submit_status, submit) = whole_frame_status(context, result);
     let present = if submit_status == StatusCode::Ok as i32 {
         let result = crate::render::bridge::frame::present_frame_and_retire(
@@ -363,6 +364,8 @@ pub(super) struct DecodedWholeFrame {
     post_effect_id: Vec<u8>,
     gui_tiled_quads: Vec<GuiTiledQuadRequest>,
     ffi_decode_nanos: u64,
+    /// Request bytes read, charged to the context that executes the frame.
+    input_bytes: u64,
 }
 
 /// Charges and copies one whole-frame request. Runs on the calling thread
@@ -371,15 +374,30 @@ pub(super) unsafe fn decode_whole_frame_request(
     context: &mut BridgeContext,
     request: *const FfiWholeFrameSubmitRequest,
 ) -> GalResult<DecodedWholeFrame> {
-    let input_bytes = read_whole_frame_request(request)
-        .as_ref()
-        .map(input_bytes_for_whole_frame)
-        .unwrap_or(0);
+    let decoded = decode_whole_frame_payload(request, context.gal.capabilities());
+    charge_whole_frame_decode(context, decoded.as_ref().map_or(0, |decoded| decoded.input_bytes));
+    decoded
+}
+
+/// Records one decoded request's FFI traffic on its context.
+fn charge_whole_frame_decode(context: &mut BridgeContext, input_bytes: u64) {
     context.ffi_calls += 1;
     context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
     context.ffi_output_bytes = context
         .ffi_output_bytes
         .saturating_add(size_of::<FfiWholeFrameSubmitResult>() as u64);
+}
+
+/// Copies one whole-frame request out of Java memory without touching a
+/// context, so a queued frame can be decoded on the calling thread.
+unsafe fn decode_whole_frame_payload(
+    request: *const FfiWholeFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<DecodedWholeFrame> {
+    let mut input_bytes = read_whole_frame_request(request)
+        .as_ref()
+        .map(input_bytes_for_whole_frame)
+        .unwrap_or(0);
     let decode_started = std::time::Instant::now();
     let (
         generation,
@@ -392,7 +410,7 @@ pub(super) unsafe fn decode_whole_frame_request(
         gui_blur_radius,
         post_effect_id,
         gui_tiled_quads,
-    ) = decode_whole_frame_submit_with_tiled_gui(request, context.gal.capabilities())?;
+    ) = decode_whole_frame_submit_with_tiled_gui(request, capabilities)?;
     if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
         // Observe decoded native item meshes, not Java producer
         // counts. A group is the real scheduler item identity.
@@ -404,7 +422,7 @@ pub(super) unsafe fn decode_whole_frame_request(
         }
     }
     let item_layer_count = gui_affine_quads.iter().map(|quad|quad.item_raster_layers.len()).sum::<usize>();
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(
+    input_bytes = input_bytes.saturating_add(
         item_layer_count as u64 * size_of::<FfiGuiItemRasterLayer>() as u64);
     if item_layer_count != 0 {
         whole_frame_trace(&format!("whole-frame.gui-item-layers groups={} layers={}",
@@ -434,6 +452,7 @@ pub(super) unsafe fn decode_whole_frame_request(
         post_effect_id,
         gui_tiled_quads,
         ffi_decode_nanos: crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started),
+        input_bytes,
     })
 }
 
@@ -455,6 +474,7 @@ pub(super) fn execute_whole_frame(
         post_effect_id,
         gui_tiled_quads,
         ffi_decode_nanos,
+        input_bytes: _,
     } = decoded;
     let world_frame_id = world_frame.frame_id;
     context
