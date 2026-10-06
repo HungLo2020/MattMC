@@ -72,6 +72,12 @@ and stop their servers. Add `--biome-oracle` to a native run without `--compare`
 to check every scalar and section lookup against original Java in the same thread
 and query order. Its `biome-oracle.json` must report zero mismatches and nonzero
 section queries. This test agent never participates in performance measurements.
+The oracle instruments Java climate-sampling/search entry points. The later
+[native BIOMES fill](RUST-BIOME-FILL.md) performs those operations inside Rust
+and bypasses those hooks, so `--biome-oracle` alone does not directly verify
+its internal samples or searches. Use `NativeBiomeFillTest` for focused stage-output
+and previous-leaf parity; stored-biome full-world hashes are a separate
+observable.
 See the [world-generation guide](../levelgen/RUST-WORLDGEN-ORGANIZATION.md)
 for standalone Rust tests without renderer dependencies. Finite test corpora establish
 exact agreement for tested cases, not a proof covering every possible world seed,

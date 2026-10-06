@@ -62,8 +62,18 @@ src/main/rust/
         └── levelgen/
             ├── synth/
             ├── density/
+            ├── router/
+            ├── noise_fill/
+            ├── biome_fill/
             ├── aquifer/
-            └── surface/
+            ├── surface/
+            ├── proto_chunk/
+            ├── carver/
+            ├── feature/
+            ├── blending/
+            ├── heightmap/
+            ├── math.rs
+            └── random.rs
 ```
 
 ## Directory Responsibilities
@@ -88,10 +98,13 @@ noise synthesis, density evaluation, aquifers, surface evaluation over
 [Rust-owned chunk storage](world/levelgen/RUST-SURFACE-STORAGE.md), the
 [carvers stage](world/levelgen/carver/RUST-CARVERS.md), worldgen
 randomness, the [NOISE fill](world/levelgen/RUST-NOISE-FILL.md) that owns
-base-terrain block writes the [noise router](world/levelgen/RUST-NOISE-ROUTER.md)
-that fills its interpolation slices and computes
-[preliminary surface levels](world/levelgen/RUST-PRELIMINARY-SURFACE.md), from
-[per-seed chunk noise templates](world/levelgen/RUST-CHUNK-NOISE.md). See
+base-terrain block writes and eligible cell traversal, and the
+[noise router](world/levelgen/RUST-NOISE-ROUTER.md) that fills interpolation
+slices and evaluates shared point programs for
+[preliminary surface levels](world/levelgen/RUST-PRELIMINARY-SURFACE.md) and
+[aquifer fluid sources](world/levelgen/RUST-AQUIFER.md#native-fluid-sources).
+[Per-seed chunk-noise templates](world/levelgen/RUST-CHUNK-NOISE.md) let eligible
+fills instantiate their programs without per-chunk Java graph wrapping. See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.
 
@@ -114,8 +127,10 @@ resolution and callback delivery.
 `world/level/levelgen/feature/geode/` for one grid batch; Java retains ordered
 random draws, placement decisions and world callbacks.
 [Canyon ellipsoids](world/levelgen/carver/RUST-CANYON.md) use
-`world/level/levelgen/carver/canyon/` for pure canyon candidate geometry;
-Java retains tunnel randomness, live carving masks and block operations.
+`world/level/levelgen/carver/canyon/` for pure canyon candidate geometry on
+chunks that retain Java carving. Eligible chunks instead use the
+[Rust carvers stage](world/levelgen/carver/RUST-CARVERS.md), including tunnel
+randomness, carving masks and block operations over native chunk storage.
 [Old-terrain height blending](world/levelgen/blending/RUST-HEIGHT-BLENDING.md) uses
 `world/level/levelgen/blending/` for current chunk-grid evaluation; Java retains
 direct lookup precedence, sample traversal and scalar/custom compatibility.

@@ -68,15 +68,18 @@ python3 DevUtils/tests/worldgen/VerifyRustChunkNoise.py --forks 3 --cpu 5 --back
 
 `NativeChunkNoiseTest` compares every slice value of every template root, bit
 for bit, with the slices the same chunk's wrapped Java interpolators fill, for
-every vanilla setting (three seeds, six positions). It also compares the
+every bundled setting (three seeds, six positions). It also compares the
 climate sampler a native chunk builds with a wrapped chunk's, and checks the
-gates and lazy wrapping. `NativeNoiseFillTest` requires every vanilla fill to
-instantiate natively and match the pure Java loop exactly, and fills chunks
+gates and lazy wrapping. `NativeNoiseFillTest` requires fills of every bundled setting to
+instantiate natively and match the Java fill loop exactly, and fills chunks
 with the recorded structure corpus (`structures.json`: villages, outposts,
 ancient cities, trial chambers) for overworld and amplified the same way. Mutations of
 FlatCache corner order, ore root order, cell input order, FlatCache handling
 in templates (caught by a router whose FlatCache input depends on Y) and the
-aquifer barrier each fail a test.
+aquifer barrier each fail a test, according to the implementation author.
+The Java comparator disables native fill, preliminary levels, fluid sources
+and chunk-noise instantiation; earlier native noise/density/aquifer helpers
+remain shared. See the [verification limits](RUST-WORLDGEN-ORGANIZATION.md#verification).
 
 ## Measurements
 

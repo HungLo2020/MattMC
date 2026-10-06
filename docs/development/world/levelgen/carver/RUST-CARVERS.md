@@ -81,15 +81,20 @@ python3 DevUtils/tests/worldgen/VerifyRustCarvers.py --forks 3 --cpu 5 --backgro
 ```
 
 `NativeCarversTest` prepares chunks through the production NOISE and SURFACE
-stages for every vanilla setting with its multi-noise biomes, then runs
-`carveChunk` both ways. Sections (network and saved forms, counters),
+stages for every bundled noise setting, using the Nether multi-noise preset
+for the Nether setting and the Overworld preset for every other setting, then
+runs `carveChunk` both ways. This fixture does not reproduce each dimension's
+actual generator and biome-source wiring. Sections (network and saved forms, counters),
 heightmaps, post-processing, later aquifer reads, the carving mask and the
-aquifer's schedule flag must match. It counts top-material upcalls and checks
-the gates. Mutations that reset the schedule flag at the lava level, mark
+aquifer's schedule flag must match. It prints the top-material upcall count
+and checks selected gates; the test does not require that count to be nonzero.
+The implementation author reports that mutations that reset the schedule flag at the lava level, mark
 fluids regardless of it, move rooms, turn the second branch the wrong way,
 change the thickness draw, the Nether lava height, the carver seed index or
 the upgrade margin, skip top materials, misclassify water statuses or reorder
-neighbours each fail it.
+neighbours each fail it. See the [shared verification
+limits](../RUST-WORLDGEN-ORGANIZATION.md#verification) before extending that
+fixture result to retrogen, custom generators or complete-world acceptance.
 
 ## Measurements
 

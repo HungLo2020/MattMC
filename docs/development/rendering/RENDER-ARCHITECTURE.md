@@ -91,16 +91,21 @@ identical sets missed Rust's batch-plan cache; opaque and shadow terrain do not
 depend on submission order, and translucent sections keep their camera-distance
 sort. Off-camera shadow casters cross as compact arrays (mesh key, generation,
 section origin, depth policy; ABI 69) instead of per-instance records. The
-frontend sorts them by mesh key and expands each resident one into a shadow-only
-terrain instance with the frame's terrain camera
-([`frame/shadow_casters.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/frame/shadow_casters.rs)).
+frontend retains compact entries on the armed shader route. Described resident
+sections become scene entries; only entries that cannot use that path expand
+into ordinary instances. Frames leaving the shader route, vanilla and Fabulous
+expand compact terrain before their ordinary paths. Placement uses the frame's
+terrain camera; see [retained scene terrain](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route)
+and [`frame/static_terrain.rs`](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/worldrender/frame/static_terrain.rs).
 A caster whose newer generation has not crossed yet keeps casting with the
 acknowledged one. Java keeps no active-instance state for casters.
 
-Whole frames execute on a native frame worker by default: Java hands over a
-copied request and collects the next frame while Rust prepares, submits and
-presents the previous one. Every bridge entry point joins the worker before
-touching a context; see [pipelined frames](JAVA-BRIDGE.md#pipelined-frames).
+Whole frames execute on a native frame worker by default: Java retains the
+whole-frame request arena until join while Rust decodes, prepares, submits and
+presents it. Only the small present request is copied during the initial
+handoff. Context-registry entry points join pending work before context access;
+standalone visibility/shadow queries remain separate. See
+[pipelined frames](JAVA-BRIDGE.md#pipelined-frames).
 With native work off the render thread, frame time is the larger of native
 work and Java collection, plus the short serial hand-off between them.
 
@@ -147,6 +152,15 @@ which is outside any bridge context so selecting never joins a pipelined frame.
 Keep the graph's behaviour identical to Frozen: its unit tests in
 `section_graph/tests.rs` pin each rule, so run
 `cargo test --lib section_graph` in `src/main/rust` after any change.
+
+The surrounding integration remains bounded: Java allows at most 4,096 camera
+sections (overflow throws) and 12,288 shadow-candidate sections (nearest candidates
+are retained when truncated). A port of the selection rules does not establish
+unbounded or end-to-end Frozen equivalence. Region draw order, Iris's
+non-culling frustum and moving the visible list into the scene remain work in
+the [retained-scene plan](RETAINED-SCENE.md#phases).
+[Capacity constants](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L109-L117)
+· [Overflow handling](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L1025-L1067)
 
 Source shadow terrain applies its existing dimension, distance and light-frustum
 policy before constructing batches. Validate every shadow candidate's asset

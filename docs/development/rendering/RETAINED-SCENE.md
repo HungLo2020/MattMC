@@ -1,23 +1,28 @@
 # Retained render scene
 
-**Status: phase 1 in progress (October 2026).** Sections marked *current*
-describe the code as it is today; the phase list is the target. Update this
-page as phases land.
+**Status: shader-route retained terrain and the Rust visibility search are
+implemented in part; the full scene target remains open (October 2026).**
+ABI 70 carries compact terrain, while diagnostic and other routes retain
+their documented expansion paths. The phase list separates remaining targets
+from the current implementation; it is not a declaration of parity completion.
 
 ## Why
 
-On the moving shader benchmark the renderer runs at ~119 FPS against Frozen's
+At the initial retained-scene checkpoint, the moving shader benchmark ran at ~119 FPS against Frozen's
 ~316. The GPU (~3.4 ms) is close to Frozen; the CPU is not. Both the Java render
 thread (~5.2 ms of work) and the Rust frame worker (~6.0 ms busy) individually
 exceed Frozen's whole 3.2 ms frame, and neither has a dominant hotspot.
 
-*Current:* every frame Java re-sends one record per visible section layer
+*Historical starting point, before ABI 70:* every frame Java re-sent one record per visible section layer
 (~6,800, ~1 MB), each carrying a camera-relative transform. Rust then
 re-validates every record, rebuilds batch plans keyed by the full instance list
 and the camera-dependent facing masks, re-selects shadow casters, rebuilds a
 ~1,600-op command list and re-validates it. Section geometry is already
 persistent on the GPU; the description of what to draw is not. Caches miss
 whenever the camera moves because their keys contain camera-dependent data.
+The [current compact/scene route](#current-scene-terrain-on-the-shader-route)
+below supersedes this per-section-record description; the original workload
+figures are retained as motivation, not current performance acceptance.
 
 Frozen (Sodium + Iris) keeps draw lists per region and per frame only walks
 visibility and issues a few multi-draws. Parity needs the same shape: the
@@ -111,8 +116,9 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
    both routes directly from the records. Removes per-frame terrain
    validation, batch plans and range memos.
 2. **Shadow casters from the scene**, with Frozen-identical shadow section
-   selection (Iris shadow traversal) instead of the current
-   "every built section in range" approximation.
+   selection (Iris shadow traversal). Current candidates use built geometry
+   without shadow-only builds and the shared leaf test described above;
+   complete scene-owned visibility remains part of the target.
 3. **Visibility in Rust.** Port Frozen's Sodium occlusion search exactly onto
    the scene's section graph; Java sends only camera and frustum. Removes the
    Java terrain enqueue (~1.2 ms).

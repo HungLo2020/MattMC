@@ -84,5 +84,8 @@ Every case passes all three pairs and its confidence bound. Worst individual
 paired saving: **5.81%**; minimum conservative saving: **5.57%**.
 Raw evidence and the detailed report are in
 `build/canyon-migration/acceptance/results.json` and `REPORT.md`.
-This is an intersecting-ellipsoid caller gain; complete carving/chunk generation,
-FPS and performance on other CPUs are unmeasured. Cave predicates remain Java.
+This historical result measures an intersecting-ellipsoid caller; it does not
+measure complete carving/chunk generation, FPS or performance on other CPUs.
+Cave predicates remained Java in that migration. The later
+[Rust carvers stage](RUST-CARVERS.md) now owns eligible cave, Nether-cave and
+canyon carving, with its own scoped measurements.

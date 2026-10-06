@@ -20,11 +20,14 @@ The Java bridges `NativeDensityProgram`, `NativeDensityMath`, and
 the sealed, read-only `synth.NativeNoiseState` view, which adds no allocation
 and preserves snapshot identity. See [module organization](RUST-WORLDGEN-ORGANIZATION.md).
 
-Java still owns graph construction, metadata bounds, serialization, seed/state
-construction, context traversal, caches and interpolation. Supported chunk-bound
-[terrain splines](RUST-SPLINE.md) use private Rust plans with fused coordinate
-transforms. Y-clamped gradients and unsupported spline contexts retain
-their Java implementations. Chunk alpha/offset initialization uses
+Java retains graph construction, metadata bounds, serialization and seed/state
+construction. General and compatibility paths still traverse Java contexts and
+caches; eligible [noise-router](RUST-NOISE-ROUTER.md) programs and
+[NOISE fills](RUST-NOISE-FILL.md) now evaluate slices, cell programs and block
+interpolation in Rust. Supported chunk-bound [terrain splines](RUST-SPLINE.md)
+use private Rust plans with fused coordinate transforms. Y-clamped gradients
+also have a native router node; their ordinary Java function and unsupported
+spline contexts retain Java implementations. Chunk alpha/offset initialization uses
 [batched height blending](blending/RUST-HEIGHT-BLENDING.md); density blending stays
 in Java. Extension-owned functions retain their own behavior.
 

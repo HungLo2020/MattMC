@@ -62,9 +62,11 @@ python3 DevUtils/tests/worldgen/VerifyRustBiomeFill.py --forks 3 --cpu 5 --backg
 ```
 
 `NativeBiomeFillTest` runs the production `doCreateBiomes` with both fills for
-every vanilla noise setting with the overworld and nether presets (two seeds,
+every bundled noise setting with the overworld and nether presets (two seeds,
 five positions, run as one sequence per route so the previous leaf carries from
-chunk to chunk). It compares every section's biome container (network bytes,
+chunk to chunk). These preset/setting combinations exercise the native
+multi-noise route, not every dimension's actual biome-source wiring or
+retrogen. It compares every section's biome container (network bytes,
 saved form, holders) and the previous leaf after each chunk. It also covers a
 one-leaf list, a list fine enough to need the global palette, a router whose
 temperature reads a Y-dependent FlatCache (chunk table semantics are observable
@@ -73,7 +75,9 @@ Rust tests in `biome_fill/tests.rs` pin the container replay and quantization
 (including a value whose float rounding crosses an integer). Mutations that
 quantize in double, swap the storage index or search order, drop the previous
 leaf between sections or after a one-leaf fill, ignore `recreate()`'s first
-value, or treat FlatCache as transparent each fail a test.
+value, or treat FlatCache as transparent each fail a test, according to the
+implementation author. See the [shared verification
+limits](../levelgen/RUST-WORLDGEN-ORGANIZATION.md#verification).
 
 ## Measurements
 

@@ -19,9 +19,11 @@ within each group of four block heights. On Rust-owned storage the selected
 quarts are read from a per-chunk table of registry IDs Java fills once;
 otherwise Java resolves the selected quart biome holders per column.
 
-Java still owns registry bindings, noise/random objects, temperature and custom
-callbacks, and the badlands and frozen-ocean extensions (which read and write
-Rust-owned storage through a block column on ordinary chunks). The existing
+Java still owns the 16×16 X/Z column loop, its per-column context update and
+biome lookup for extensions, registry bindings, noise/random objects,
+temperature and custom callbacks. The badlands and frozen-ocean extensions
+also remain Java (reading and writing Rust-owned storage through a block
+column on eligible chunks). The existing
 `SurfaceRules` Java bindings remain available to extensions and provide a test
 oracle. Carvers' `topMaterial` uses the native rule evaluator through a scalar
 adapter; these contexts retain their supplied Java biome lookup and predicate.

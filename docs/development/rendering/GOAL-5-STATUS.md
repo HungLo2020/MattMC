@@ -1,12 +1,38 @@
 # Goal 5 rendering checkpoint
 
-**Goal 5 remains incomplete.** The [2026-10-04 renderer follow-up `37817e1`](https://github.com/HungLo2020/MattMC/commit/37817e128b99b07456c0ee22a5d34eaf05c72150) changes 118 paths after the [2026-10-03 checkpoint `2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806ddedd4fb3c3b4fbc44716), which changed 254 paths. The follow-up repairs specific shader, DH lighting and shutdown cases and reduces measured component costs. Cold terrain readiness, an independent native crash, underground image differences, broad parity and the overall performance objective remain open.
+**Goal 5 remains incomplete.** The current review covers retained-scene,
+pipelined-frame, compact-terrain and visibility work through
+[`54611cfc`](https://github.com/HungLo2020/MattMC/commit/54611cfc25dbdf60ae4b11dc17557d2bec77469d).
+It adds substantial native ownership and author-recorded workload improvements;
+it does not establish broad visual/temporal parity, full scene migration,
+long-run resource bounds or resolution of the earlier independent native crash.
 
-The current migration retains Java configuration, CPU collection and terrain visibility work. Rust consumes copied semantics, and Rust/VulkanicGAL owns native rendering resources, command submission and presentation. The precise current boundaries are documented below; this checkpoint does not claim that every policy has migrated. The final project target is one Rust executable supporting both client and server, at most one separately loaded Rust library, and no Java. See [Project Architecture](../PROJECT-ARCHITECTURE.md) and [Render Architecture](RENDER-ARCHITECTURE.md).
+Java still supplies world/entity semantics, graph updates and build scheduling.
+Rust now performs camera section-graph selection and an off-camera entity-shadow
+prefilter, alongside native frame execution and GPU resource ownership. The
+visited terrain list still returns to Java. The final target remains one Rust
+executable supporting client and server, at most one separately loaded Rust
+library, and no Java. See [Project Architecture](../PROJECT-ARCHITECTURE.md),
+[Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The [current rendering tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5982772544) records the follow-up scope and remaining acceptance work. The [earlier checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5972378509) preserves the `2fff1ef` evidence; neither progress comment closes the remaining work.
+The earlier [October 4 tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5982772544)
+and [October 3 checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5972378509)
+retain their historical scope and acceptance limits. The older evidence below
+is preserved; it is not a measurement of the current implementation.
+Those source checkpoints are
+[`37817e1`](https://github.com/HungLo2020/MattMC/commit/37817e128b99b07456c0ee22a5d34eaf05c72150)
+and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806ddedd4fb3c3b4fbc44716).
 
 ## What changed
+
+### October 6 source review
+
+- **Pipelined whole frames:** the native worker decodes, executes and presents while Java can collect subsequent semantics. The initial handoff copies the small present request, but Java retains the whole-frame request arena unmodified until join. Context-registry access joins pending work; standalone query handles are separate. Captures use the documented synchronous route. This is a lifetime contract, not proof of all cancellation/failure recovery. [Bridge lifetime](JAVA-BRIDGE.md#pipelined-frames)
+- **Compact and retained terrain:** ABI 69/70 carries compact shadow casters and camera sections. Admitted shader frames use current-generation retained records and per-facing scene groups; pending, undescribed or camera-sorted entries retain ordinary expansion. Vanilla, Fabulous and frames leaving that route expand compact terrain. Diagnostic/fault/reload paths still support per-record data. These are partial scene capabilities, not completion of every planned phase. [Current scene route](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route)
+- **Camera and shadow selection:** the Rust section graph follows Frozen-derived search rules, while Java mirrors readiness/build facts, consumes visited sections and schedules work. Shadow candidates use already-built geometry, with the leaf test also applied to camera-visible twins and supplement faces; no shadow-only build sweep is retained. Java's current limits remain 4,096 camera sections and 12,288 shadow-candidate sections, with different overflow handling. Region draw order, Iris's non-culling frustum and a scene-owned visible list remain outstanding. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **Entity shadow prefilter:** a standalone Rust query uses the active pack's copied shadow policy before Java extracts off-camera entities; unresolved policy keeps candidates. The frame plan applies admission again. Java still extracts poses/geometry for retained candidates, and this does not repair the Citadel geometry limitation in [#803](https://github.com/HungLo2020/MattMC/issues/803). [Query contract](JAVA-BRIDGE.md#standalone-query-handles)
+- **Costs and supporting tooling:** retained mesh records, compact residency/range caches, command grouping, fullscreen-stage object reuse and staging/SPIR-V caches reduce specific repeated work. Native-library staging and capture-artifact procedures have their own owners. Source presence and local benchmark changes do not certify broad acceptance. [Profiling](SHADER-TERRAIN-PROFILING.md) · [Native builds](../tooling/NATIVE-BUILDS.md) · [Artifact storage](ARTIFACT-STORAGE.md)
+
 
 The earlier `2fff1ef` checkpoint established this scope:
 
@@ -26,6 +52,8 @@ Admission remains bounded. The source supports [at most eight color targets](htt
 
 ## What the recorded evidence establishes
 
+The following paragraphs retain the earlier October 3–4 evidence. Current retained-scene workload results are separated below; neither set is a universal runtime certificate.
+
 The [earlier progress log](https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/PROGRESS.md) and [follow-up progress log](https://github.com/HungLo2020/MattMC/blob/37817e128b99b07456c0ee22a5d34eaf05c72150/PROGRESS.md) contain the implementation author's test and capture results. Those Java, Rust, native and gameplay runs were not rerun by this documentation review; their ignored capture artifacts are not bundled with the wiki. The earlier independent review passed 60 Python rendering-tool tests; the follow-up tracker review passed 79 isolated Python rendering-tool tests at `37817e1`. These verify tooling scope only.
 
 The earlier log records passing scoped Complementary static comparisons, hidden/visible leaf-particle cutout comparisons, first selected-source frames for specific Complementary and MakeUp/DH-off workloads, and bounded DH movement repeats after repairing selected-column asset-ack pruning. It also records before/after observations for spectator terrain and dark-sky-disc fog. These results apply to the documented workloads and keep their original tolerances.
@@ -38,7 +66,35 @@ The follow-up's [recorded coast comparisons](RENDER-VERIFICATION.md#4-performanc
 
 The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still fails (RGB MAE 20.566/15.041/10.029). Null-depth and disabled-volumetric diagnostic comparisons are causal evidence only. Production fog and light shafts remain enabled, and the underground exception decision remains pending.
 
-[Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. The repeated-mesh Current runs remain about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
+[Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
+
+### Latest author-recorded workloads
+
+The [source-pinned progress log](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/PROGRESS.md#L4-L11)
+records successive profiled moving-shader workloads, including 133 to 188 FPS
+after shadow-selection changes. The section-graph step then records a regression
+from 187.8 to 175.7 FPS while more translucent sections become visible; the
+entity-shadow prefilter records 175.7 to 195.7 FPS. These are separate local
+comparisons with changing admitted work, not additive gains or a final
+Current-versus-Frozen parity result.
+
+The latest query checkpoint reports Iris+DH RGB error 3.683/4.188/3.866 with its
+DH check passing, vanilla 0.176/0.297/0.316, zero validation events, and 2,215
+native tests passing with three ignored. Earlier Java renderer checkpoints
+record known AtlasAnimation/ShieldAtlas failures and separately retried
+instrumentation flakes; they are not a clean independent Java-suite pass.
+These are implementation-author reports. This maintenance review did not rerun
+the native/Java suites, live comparisons or performance workloads, or inspect
+the unbundled image/profile artifacts. The coordinated review independently
+ran six focused Python tooling tests; that result verifies tooling only.
+
+Earlier failing image comparisons, cold-readiness observations and the
+independent disconnect SIGSEGV remain historical evidence with unresolved
+acceptance unless a specific later result addresses them. Atomic native-library
+staging prevents an overwritten mapping hazard; it is not demonstrated closure
+of that separate crash. A panic/waiter test establishes waiter release, not all
+frame-outcome or cancellation semantics. Follow the current
+[verification rules](RENDER-VERIFICATION.md) and retain failures alongside passes.
 
 ## Remaining work
 
@@ -48,7 +104,7 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 - First selected-source frames for other packs and real transitions, plus reloads, dimensions, resize/fullscreen and repeated entry/exit
 - Matching animated source clocks, repeated performance measurements and long-run/reload/large-radius CPU/GPU resource bounds
 
-Offscreen source preparation helps initialize the selected graph before presentation. The current [admission code](https://github.com/HungLo2020/MattMC/blob/37817e128b99b07456c0ee22a5d34eaf05c72150/src/main/rust/render/worldrender/source/admission.rs#L1538-L1618) still disarms incomplete frame coverage or unavailable DH depth and reports Rust-vanilla fallback. A fallback in a required shader frame is a failed Goal 5 workload, not evidence of selected-pack success. Follow [real-config checks](RENDER-VERIFICATION.md#3-real-config-session), capture stdout and stderr, and check actual presentation correlation.
+Offscreen source preparation helps initialize the selected graph before presentation. The current [admission code](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/worldrender/source/admission.rs#L1612-L1667) still disarms incomplete frame coverage or unavailable DH depth and reports Rust-vanilla fallback. A fallback in a required shader frame is a failed Goal 5 workload, not evidence of selected-pack success. Follow [real-config checks](RENDER-VERIFICATION.md#3-real-config-session), capture stdout and stderr, and check actual presentation correlation.
 
 Entity culling does not add Citadel model geometry transport. The conditional empty-model limitation tracked in [#803](https://github.com/HungLo2020/MattMC/issues/803) remains applicable; avoid converting source warnings into either universal crash claims or a declaration that imported mobs now render correctly.
 
@@ -56,7 +112,16 @@ For source-input investigations use [RenderDoc observations](RENDERDOC-INPUTS.md
 
 ## Tracked follow-up
 
-Current verified tracker updates:
+The current source review records bounded progress without closing these issues:
+
+| Topic | Verified comment link |
+| --- | --- |
+| Current rendering ownership, evidence and remaining Goal 5 acceptance | [#747](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6010252617) |
+| Pipelined/retained-scene performance scope and recorded regressions | [#709](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6010243435) |
+| Compact terrain, native section graph and shadow-query boundaries | [#520](https://github.com/HungLo2020/MattMC/issues/520#issuecomment-6010247010) |
+| DH iterator repair and continuing integration limits | [#745](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6010229884) |
+
+Earlier verified tracker updates (preserved for provenance):
 
 | Topic | Verified comment link |
 | --- | --- |

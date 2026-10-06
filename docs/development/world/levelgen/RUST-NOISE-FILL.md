@@ -26,9 +26,12 @@ corners and fills the cell: one ordinary downcall per slice and one per column
 of cells. When a cell needs aquifer materials, Rust stops before writing it;
 Java copies the cell's densities into the cell cache, prepares the materials
 and resumes the call. A slice the router declines is filled by Java and
-uploaded. The traversal needs the finalDensity cell cache to be the chunk's
-only cell cache and a `NativeCellDensity` over this chunk's interpolators;
-otherwise Java's per-cell loop runs with Rust slices. Afterwards `NoiseChunk`
+uploaded. For a router compiled from a wrapped chunk, the traversal needs the
+finalDensity cell cache to be the chunk's only cell cache and a
+`NativeCellDensity` over this chunk's interpolators; otherwise Java's
+per-cell loop runs with Rust slices. A native chunk-noise template supplies
+its own cell program and can also bind [structure Beardifier
+cells](RUST-CHUNK-NOISE.md#structure-terrain-adjustment). Afterwards `NoiseChunk`
 has stopped interpolating; its interpolator corners and cell counters are not
 read again.
 
@@ -37,14 +40,18 @@ read again.
 All must hold; otherwise the Java loop runs:
 
 - No `DEBUG_ORE_VEINS`, `DEBUG_AQUIFERS`, `DEBUG_DISABLE_FLUID_GENERATION` or void-terrain debugging.
-- A plain `NoiseChunk`, empty `Blender`, the finalDensity cell cache, 16-block cell rows.
+- A plain `NoiseChunk`, empty `Blender`, 16-block cell rows, and either a
+  [native chunk-noise template](RUST-CHUNK-NOISE.md) or the wrapped finalDensity
+  cell cache.
 - Every section the fill can write is still untouched air; both heightmaps unwritten.
 - Substance: a `NoiseBasedAquifer` whose native batch is ready (built-in factory,
   `AquiferFluidPicker`, pure sources, critical barrier noise), or `Aquifer.Disabled`
   with an `AquiferFluidPicker`.
-- Ore veins (if enabled): the vanilla shape — `veinToggle` a `NoiseInterpolator`,
-  `veinRidged` `MulOrAdd(ADD, c, Ap2(MAX, Mapped(ABS, interp), Mapped(ABS, interp)))`,
-  `veinGap` a `Noise` — and an Xoroshiro or Legacy ore factory.
+- Ore veins (if enabled): an Xoroshiro or Legacy ore factory, and the vanilla
+  ore shape validated either by the template on the unwrapped router or by
+  the wrapped-chunk gate (`veinToggle` a `NoiseInterpolator`, `veinRidged`
+  `MulOrAdd(ADD, c, Ap2(MAX, Mapped(ABS, interp), Mapped(ABS, interp)))`,
+  and `veinGap` a `Noise`).
 
 The bundled noise settings can qualify when these chunk-state and
 context checks also pass. Once native fill is selected, a failure throws rather
@@ -75,8 +82,8 @@ fill; see the [separate router contract](RUST-NOISE-ROUTER.md#eligibility).
 ## Verify and measure
 
 For the current implementation, use the
-[cell traversal driver](#cell-traversal-verification), which runs the router,
-surface and fill parity classes. The following commands reproduce the
+[cell traversal driver](#cell-traversal-verification), whose parity-only path
+runs the router, preliminary-surface and fill parity classes. The following commands reproduce the
 historical fill migration in a separate checkout of `858476969`; they are not
 current-tree verification commands:
 
@@ -92,23 +99,40 @@ rather than bypassing this audit.
 
 ### Cell traversal verification
 
-The cell traversal's driver is the current fill driver:
+The current driver's parity-only invocation is:
 
 ```sh
 python3 DevUtils/tests/worldgen/VerifyRustCellTraversal.py --parity-only
+```
+
+It audits the recorded production rewrites since `da1109de6` and runs the
+router, preliminary-surface and fill parity suites. The shared
+[verification limits](RUST-WORLDGEN-ORGANIZATION.md#verification) apply.
+
+The timing invocation below was used for the author-recorded comparison; it
+is not a working current-tree timing recommendation:
+
+```sh
 python3 DevUtils/tests/worldgen/VerifyRustCellTraversal.py --forks 3 --cpu 5 --background-cpus 0,1
 ```
 
-It audits every production edit since `da1109de6`, runs the router, surface
-and fill parity suites, and benchmarks `NoiseFillVerification` in `javacells`
-(Rust slices, Java's per-cell loop) against `native` (Rust traversal) mode.
-`NativeNoiseFillTest` requires every vanilla fill to take the Rust traversal,
-and `cellTraversalsMatchJavaLoop` also compares fills whose slices Java fills
-and uploads, and fills by Java's per-cell loop, with the Java loop. Mutations
-of corner order, Y order, the material request position, the slice swap, the
-cell cache copy and the uploaded slice each fail a test.
+At `54611cfc`, [`NoiseFillVerification`](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/test/java/net/minecraft/world/level/levelgen/NoiseFillVerification.java#L59-L92)
+disables the ordinary native-traversal switch in `javacells` mode but leaves
+chunk-noise templates enabled. An eligible template [runs Rust traversal
+unconditionally](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseFill.java#L290-L300),
+so the benchmark's route assertion is expected to fail instead of comparing
+Java cells with native cells. This is a static source finding, not a rerun;
+it does not establish a failure of the separate parity-only path.
 
-Cell traversal measurements (2026-10-05, same laptop and method as below):
+`NativeNoiseFillTest` requires fills of every bundled setting to take the Rust traversal,
+and `cellTraversalsMatchJavaLoop` also compares fills whose slices Java fills
+and uploads, and fills by Java's per-cell loop, with the Java loop. The
+implementation author reports that mutations of corner order, Y order, the
+material request position, the slice swap, the cell cache copy and the uploaded
+slice each fail a test.
+
+Author-recorded cell traversal measurements (2026-10-05, same laptop and
+method as below):
 the separate-JVM driver run measured medians per eight fills of 42.2 → 41.3 ms
 (overworld, paired ratios 1.03, 0.88, 0.94), 40.1 → 39.1 ms (amplified, 0.95,
 0.98, 1.02) and 8.1 → 7.8 ms (nether, 1.03, 0.97, 0.94). No 95% interval
@@ -119,9 +143,9 @@ Java↔Rust chatter (about 768 `selectCellYZ` and cell calls and every slice cop
 per chunk) rather than compute. Raw rounds were recorded under
 `build/cell-traversal-migration/` (not bundled with the wiki).
 
-At that historical snapshot, the driver rebuilds every edited production Java
-file from the reference commit with its exact audited rewrites and requires a
-byte-for-byte match. `NativeNoiseFillTest` fills each bundled noise setting at
+At the historical fill snapshot `858476969`, `VerifyRustNoiseFill.py` rebuilds
+its edited production Java files from the reference commit with exact audited
+rewrites and requires a byte-for-byte match. `NativeNoiseFillTest` fills each bundled noise setting at
 three seeds and five chunk positions through `fillFromNoise`
 with both routes and compares section network bytes, saved packs, counters,
 heightmaps, post-processing lists and later aquifer reads; every candidate fill
@@ -179,13 +203,16 @@ installation. Its checksum covers heightmap words and section air/non-air flags;
 it is narrower than the detailed parity assertions. The recorded reductions are
 fill-workload elapsed times, not per-chunk full-generation or whole-game gains.
 
-Java still owns cell traversal/cache preparation, generator and NoiseChunk
-lifetime, registry identity, chunk-object installation and later stage
-orchestration. Built-in ore/aquifer positional randomness moving here does not
+At the reviewed `858476969` snapshot, Java still owned cell traversal and
+cache preparation. The later [native traversal](#cell-traversal) moves those
+cell operations into Rust for eligible fills. Java retains the generator and
+`NoiseChunk` lifetime, requested aquifer-material preparation, registry
+identity, chunk-object installation and later-stage orchestration. Built-in ore/aquifer positional randomness moving here does not
 move every worldgen random owner. Keep custom/blended/prewritten-state fallback,
 cancellation/concurrency/failure recovery, native memory bounds and FULL-chunk
 acceptance explicit before extending the supported scope. This bounded migration
 does not close #775 or complete world-generation ownership. The later
 [router review](RUST-NOISE-ROUTER.md#maintenance-review-and-remaining-acceptance)
-records current slice ownership and evidence limits at `da1109de6`; the
-historical fill measurements above do not verify that later implementation.
+records slice ownership and evidence limits at `da1109de6`; the historical
+fill measurements above do not verify that later implementation or the
+[current native-stage changes](RUST-WORLDGEN-ORGANIZATION.md#verification).

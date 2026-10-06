@@ -14,9 +14,10 @@ moves the chunk to [shared chunk storage](#shared-chunk-storage) when
   corners can select, filled once from the stage's `BiomeManager`;
 - which rule condition slots are `steep`.
 
-Rust then scans each column, selects its biomes from the table, runs the
-[surface evaluator](RUST-SURFACE.md), commits completed blocks and answers
-`steep` from its own heightmap. Java still answers noise, temperature and
+Rust then scans each column, selects its rule-evaluation biomes from the table,
+runs the [surface evaluator](RUST-SURFACE.md), commits completed blocks and
+answers `steep` from its own heightmap. Java still drives the X/Z column loop,
+updates the context and looks up each column's biome for the extensions. Java still answers noise, temperature and
 vertical-gradient conditions, the band offset, secondary noise and the minimum
 surface level. The eroded badlands and frozen ocean extensions read and write
 through a block column backed by the Rust storage. At the end Java installs

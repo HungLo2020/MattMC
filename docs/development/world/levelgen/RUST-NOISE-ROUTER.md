@@ -8,11 +8,13 @@ once the block loop moved to Rust ([NOISE fill](RUST-NOISE-FILL.md)).
 [`NativeNoiseRouter`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseRouter.java)
 compiles all of a chunk's interpolators into one program for
 [`router/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/router).
-Rust then fills a whole slice — every column, interpolator and Y — in one
-ordinary downcall into off-heap memory, and Java copies the values into the
-interpolators' slice arrays. Cell caches, aquifer materials and the block loop
-read those arrays as before. Java still owns the `NoiseChunk`, its caches and
-the density graphs; the router exists for one `NativeNoiseFill.run`. The same
+Rust fills a whole slice — every column, interpolator and Y — in one ordinary
+downcall. With [native cell traversal](RUST-NOISE-FILL.md#cell-traversal), both
+slices stay in Rust and feed the native cell program; Java prepares requested
+aquifer materials and installs the fill results. The Java per-cell route
+instead copies slice values into the interpolators' arrays. Java retains the
+`NoiseChunk`, graph compilation and compatibility paths; each router instance
+exists for one `NativeNoiseFill.run`. The same
 compiler builds the shared [preliminary surface level](RUST-PRELIMINARY-SURFACE.md)
 and [aquifer fluid source](RUST-AQUIFER.md#native-fluid-sources) programs in point mode,
 and per-seed [chunk noise templates](RUST-CHUNK-NOISE.md) that eligible chunks
@@ -20,8 +22,10 @@ instantiate instead of compiling their wrapped graphs.
 
 ## Program
 
-The compiler walks each interpolator's chunk-wrapped graph (`wrapped()`) by
-identity, so a shared `CacheOnce` becomes one shared node:
+For the per-chunk compilation route, the compiler walks each interpolator's
+chunk-wrapped graph (`wrapped()`) by identity, so a shared `CacheOnce` becomes
+one shared node. [Chunk-noise templates](RUST-CHUNK-NOISE.md) compile the
+normalized unwrapped graph once per `RandomState` instead:
 
 | Java function | Router node |
 |---|---|
@@ -49,8 +53,10 @@ built only from those) run once per column per lane block.
 
 ## Eligibility
 
-`NativeNoiseRouter.create` returns null, and Java fills the slices within the
-otherwise eligible native fill, unless:
+The following gates apply to `NativeNoiseRouter.create`, the per-chunk
+wrapped-graph route. [Template instantiation](RUST-CHUNK-NOISE.md) has its own
+gates. `create` returns null, leaving Java to fill slices within an otherwise
+eligible native fill, unless:
 
 - the router is enabled (`-Dmattmc.worldgen.javaNoiseRouter=true` disables it);
 - the chunk is a plain `NoiseChunk` with the empty `Blender`, not yet
@@ -67,7 +73,10 @@ Java copies no native output into its slice arrays and fills that slice itself.
 Normal 16-block chunk traversal stays inside the grid; the fallback test
 explicitly requests an out-of-grid slice. Other nonzero slice statuses or
 failed downcalls throw, rather than restarting the whole fill in Java. See the
-[current slice handoff](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseRouter.java#L127-L147).
+[Java-traversal slice handoff](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseRouter.java#L148-L168).
+On the [native traversal](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/minecraft/world/level/levelgen/NativeNoiseFill.java#L466-L485),
+a declined wrapped-router slice is filled in Java and uploaded to Rust; a
+template instance declining an in-grid slice throws.
 The bundled noise settings are expected to take the router in the fresh,
 empty-blender test fixture; custom graphs and other chunk contexts must still
 pass every gate.
@@ -76,7 +85,7 @@ pass every gate.
 
 - Slices hold the same points as `fillSlice`: block X of the slice, Z at each
   cell column, Y at `(i + cellNoiseMinY) * cellHeight`.
-- After a native slice, `NoiseChunk` sets the fields the Java column loop
+- On the Java per-cell route, after a native slice `NoiseChunk` sets the fields the Java column loop
   leaves behind and advances both interpolation counters. Their exact steps are
   unobservable: every counter comparison is against a value recorded earlier.
 - The Y-independence rule for noises relies on samplers adding a non-negative
@@ -86,6 +95,16 @@ pass every gate.
   the batch path Java's array fills use.
 
 ## Verify and measure
+
+For current router and fill integration, use the
+[cell traversal driver](RUST-NOISE-FILL.md#cell-traversal-verification), which
+also runs `NativeNoiseRouterTest`. See the [shared verification
+limits](RUST-WORLDGEN-ORGANIZATION.md#verification).
+
+The commands below reproduce the router-only migration in a separate checkout
+of `da1109de6`; they are not current-tree verification commands. Its exact
+rewrite audit rejects the later production changes before building. Preserve
+that audit rather than bypassing it.
 
 ```sh
 python3 DevUtils/tests/worldgen/VerifyRustNoiseRouter.py --parity-only
@@ -101,7 +120,7 @@ and native-library paths. Select available, distinct CPU IDs for `--cpu` and
 `--parity-only`. Later edits to these files are audited by
 [the surface level driver](RUST-PRELIMINARY-SURFACE.md) and the drivers after it.
 
-[`NativeNoiseRouterTest`](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/test/java/net/minecraft/world/level/levelgen/NativeNoiseRouterTest.java)
+At that historical snapshot, [`NativeNoiseRouterTest`](https://github.com/HungLo2020/MattMC/blob/da1109de6fe84592bf75e32cffef0cb5506d2651/src/test/java/net/minecraft/world/level/levelgen/NativeNoiseRouterTest.java)
 has four methods. Its bundled-setting fixture compares each slice value bit
 for bit after each step across three seeds and six positions out to the world
 border. The synthetic fixture covers the supported operations, short circuits, shared `CacheOnce`,
@@ -166,10 +185,13 @@ and author-recorded results, not reruns by this review. No Java/Rust suite,
 mutation test, benchmark or live world was run, and the unbundled measurement
 files were not verified.
 
-Java still compiles graphs, copies slice output, traverses cells, prepares cell
-caches and requested aquifer materials, and installs the native fill results.
-This is a bounded interpolation-slice migration, not native ownership of the complete
-world-generation pipeline. Retain explicit acceptance work for custom/blended
+At that reviewed snapshot, Java compiled graphs, copied slice output, traversed
+cells, prepared cell caches and requested aquifer materials, and installed the
+fill results. Current [cell traversal](RUST-NOISE-FILL.md#cell-traversal) and
+[chunk-noise templates](RUST-CHUNK-NOISE.md) move more of that work into Rust,
+while Java retains compilation, requested aquifer-material preparation and
+result installation. These bounded migrations do not establish native
+ownership of the complete world-generation pipeline. Retain explicit acceptance work for custom/blended
 contexts, failure and cancellation recovery, concurrency, native memory bounds
 and FULL-chunk generation before extending scope. The migration does not close
 [#775](https://github.com/HungLo2020/MattMC/issues/775).

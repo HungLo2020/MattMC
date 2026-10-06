@@ -68,17 +68,21 @@ ABI 69 appends `world_static_terrain_shadow_casters` (struct 112, 32-byte
 records: mesh key, generation, section origin, depth policy) and the frame's
 `static_terrain_camera` to the whole-frame request (struct 53, fields 47–48).
 The camera is required whenever casters are present. Java copies the caster
-arrays once per frame; Rust validates them, sorts them by key and expands
-resident casters. Rebuild Java and native code together.
+arrays once per frame; Rust validates them and sorts them by key. Eligible
+resident casters stay compact for the shader-route scene; other resident
+casters expand into shadow-only instances. Rebuild Java and native code together.
 
 ABI 70 appends `world_static_terrain_sections` (struct 113, 40-byte records:
 mesh key, newest copied generation, section origin, depth policy, flags) as
 field 49. Ordinary frames send every camera-visible section layer this way, in
 draw order (translucent back to front); only the camera-sort flag is allowed.
 Rust draws the generation it has acknowledged for each key, so the previous
-generation keeps drawing while a replacement uploads, and places the sections
-before every other mesh instance. Diagnostic, fault-injection and
-resource-reload frames still send per-section instance records;
+generation keeps drawing while a replacement uploads. Eligible sections stay
+compact for the [shader-route scene](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route).
+Leftover sections, and compact terrain on ordinary routes, expand into instances:
+camera sections precede the existing instance list and shadow casters follow it.
+Keys with no acknowledged generation are skipped until upload. Diagnostic,
+fault-injection and resource-reload frames still send per-section instance records;
 `-Dmattmc.dev.perRecordStaticTerrain=true` forces that path for A/B checks.
 
 Typed orb placements name a boundary in the collected mesh stream. When the
@@ -138,7 +142,9 @@ Checked FFI readers charge all nested reads against a 512 MiB budget per bridge
 request. Counts and byte limits are checked before constructing foreign slices;
 profiling does not dereference nested pointers ahead of decoding. The byte
 counter measures validated reads (including repeated reads), not unique Java
-allocation size. Java must still supply live memory for the duration of the call.
+allocation size. Java must supply live memory while native code can read it:
+through the call for synchronous requests, and through the join for a
+pipelined whole-frame request.
 Failed resource creation batches release successful creates before reporting
 failure, and result alignment/capacity are checked before execution.
 
@@ -146,20 +152,31 @@ failure, and result alignment/capacity are checked before execution.
 
 By default (disable with `MATTMC_PIPELINED_FRAMES=0` or
 `-Dmattmc.rustGal.pipelinedFrames=false`),
-`mattmc_vulkanic_gal_whole_frame_submit_pipelined` copies the request on the
-render thread, then executes and presents the frame on a per-context worker
-thread ([`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)).
-Java returns to collect the next frame while native work runs.
+`mattmc_vulkanic_gal_whole_frame_submit_pipelined` copies and validates the
+small present request on the calling thread, but hands the whole-frame request
+pointer to a per-context worker. That worker decodes the nested request, then
+executes and presents the frame. Java retains the request arena alive and
+unmodified until the join; acceptance is not completion or a deep copy of all
+request bytes. Java can collect the next frame while native work runs, but
+cannot pack another whole-frame request before joining because the requests
+also share persistent instance arrays.
+[Native handoff and worker decode](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/bridge/world/exports.rs#L36-L110)
+· [Java retention and release after join](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2378-L2453)
+· [Java repacking guard](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L1892-L1900)
+· [`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)
 
-- Every bridge entry point joins pending work first (`with_registry*`), so the
-  render thread and the worker never use a context at the same time. Do not
-  add an entry point that bypasses the registry accessors.
+- Context-registry entry points join pending work first (`with_registry*`),
+  preventing concurrent access to a context. Keep context access behind these
+  wrappers. Selection through the [standalone query handles](#standalone-query-handles)
+  does not join an in-flight frame. Creating the entity-shadow query still
+  [uses the context registry](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/bridge/world/entity_shadow_query.rs#L17-L25).
 - `mattmc_vulkanic_gal_whole_frame_join` returns the frame's submit and present
   results. `RustGalFrameCoordinator.completePendingPipelinedFrame` runs the
   same post-submit work (`completeSubmittedFrame`) when the next frame starts.
-- A failed pipelined frame is cancelled on the worker and its error is thrown at
-  the join. A retryable selected-source failure drops that frame instead of
-  resubmitting it.
+- If worker decode or execution returns an error, the worker attempts frame
+  cancellation and Java throws the error at join. A retryable selected-source
+  failure drops that frame instead of resubmitting it. This does not establish
+  complete panic recovery or cancellation semantics.
 - Attachment captures, screenshots and RenderDoc captures stay synchronous.
   Atlas pumps during an in-flight frame are deferred to the next frame.
 - The worker restricts itself to the highest-frequency CPUs; on hybrid CPUs an

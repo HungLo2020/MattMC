@@ -64,12 +64,19 @@ second grid. 50 synthetic roots cover every router node and cache marker under
 `FindTopSurface` and as plain roots, searches longer than one lane frame, NaN
 and huge bounds. Gate tests cover Y-dependent caches, misplaced
 `FindTopSurface`, unsupported functions, subclasses and the property.
-`NativeNoiseFillTest` keeps the Java route fully Java. Rust tests compare the
-scan with Java's loop, batches with single columns and `Mth.floor` edge cases.
+`NativeNoiseFillTest` disables the newer fill, preliminary-level, fluid-source
+and chunk-noise routes for its Java comparator; earlier native worldgen
+helpers remain shared. Rust tests compare the scan with Java's loop, batches
+with single columns and `Mth.floor` edge cases. See the [verification
+limits](RUST-WORLDGEN-ORGANIZATION.md#verification).
 
 Benchmarks (`SurfaceLevelVerification`) time building fresh `NoiseChunk`s and
-filling them through `fillFromNoise`, Java against native levels, in separate
-JVMs.
+filling them through `fillFromNoise` in separate JVMs. In the current source,
+its level toggle also changes [chunk-template eligibility](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/minecraft/world/level/levelgen/NoiseChunk.java#L169-L179)
+and [native fluid-source binding](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/minecraft/world/level/levelgen/NativeAquifer.java#L117-L120).
+A new timing run therefore compares those combined routes, not the isolated
+preliminary-level change. The earlier measurements below retain the
+implementation author's recorded scope; they were not rerun by this review.
 
 ## Measurements
 
