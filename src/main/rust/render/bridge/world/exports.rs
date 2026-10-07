@@ -2,6 +2,17 @@
 
 use super::*;
 
+/// Emits phase boundaries only for an explicitly requested diagnostic run
+/// (`MATTMC_TRACE_WHOLE_FRAME`, read once); the message is formatted only then.
+macro_rules! whole_frame_trace {
+    ($($arg:tt)*) => {
+        if whole_frame_trace_enabled() {
+            crate::core::console::stderr(format_args!($($arg)*));
+        }
+    };
+}
+
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
     context_id: u64,
@@ -411,23 +422,23 @@ unsafe fn decode_whole_frame_payload(
         post_effect_id,
         gui_tiled_quads,
     ) = decode_whole_frame_submit_with_tiled_gui(request, capabilities)?;
-    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
+    if whole_frame_trace_enabled() {
         // Observe decoded native item meshes, not Java producer
         // counts. A group is the real scheduler item identity.
         let (groups, layers, nonidentity, distinct) =
             crate::render::guirender::mesh::flat_item_mesh_decode_counts(&gui_mesh_batches);
         if layers != 0 {
-            whole_frame_trace(&format!("whole-frame.gui-item-mesh-layers groups={} layers={}", groups, layers));
-            whole_frame_trace(&format!("whole-frame.gui-item-mesh-transforms layers={} nonidentity={} distinct={}", layers, nonidentity, distinct));
+            whole_frame_trace!("whole-frame.gui-item-mesh-layers groups={} layers={}", groups, layers);
+            whole_frame_trace!("whole-frame.gui-item-mesh-transforms layers={} nonidentity={} distinct={}", layers, nonidentity, distinct);
         }
     }
     let item_layer_count = gui_affine_quads.iter().map(|quad|quad.item_raster_layers.len()).sum::<usize>();
     input_bytes = input_bytes.saturating_add(
         item_layer_count as u64 * size_of::<FfiGuiItemRasterLayer>() as u64);
     if item_layer_count != 0 {
-        whole_frame_trace(&format!("whole-frame.gui-item-layers groups={} layers={}",
-            gui_affine_quads.iter().filter(|quad|!quad.item_raster_layers.is_empty()).count(),item_layer_count));
-        if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
+        whole_frame_trace!("whole-frame.gui-item-layers groups={} layers={}",
+            gui_affine_quads.iter().filter(|quad|!quad.item_raster_layers.is_empty()).count(),item_layer_count);
+        if whole_frame_trace_enabled() {
             let matrices=gui_affine_quads.iter().flat_map(|quad| &quad.item_raster_layers)
                 .map(|layer| layer.model_transform);
             let mut distinct=BTreeSet::new();
@@ -436,8 +447,8 @@ unsafe fn decode_whole_frame_payload(
                 nonidentity+=usize::from(matrix!=Default::default());
                 distinct.insert(matrix.0.map(|v| if v==0.0 {0} else {v.to_bits()}));
             }
-            whole_frame_trace(&format!("whole-frame.gui-item-transforms layers={} nonidentity={} distinct={}",
-                item_layer_count,nonidentity,distinct.len()));
+            whole_frame_trace!("whole-frame.gui-item-transforms layers={} nonidentity={} distinct={}",
+                item_layer_count,nonidentity,distinct.len());
         }
     }
     Ok(DecodedWholeFrame {
@@ -484,10 +495,10 @@ pub(super) fn execute_whole_frame(
             world_frame.engine_globals,
             context.gal.capabilities().shader_conventions,
         )?;
-    whole_frame_trace(&format!(
+    whole_frame_trace!(
         "whole-frame.frontend.begin generation={} frame={} decode_nanos={}",
         generation, world_frame_id, ffi_decode_nanos
-    ));
+    );
     let frontend_started = std::time::Instant::now();
     // The armed shader route draws resident terrain from its scene straight
     // from the compact entries; every other route needs instances.
@@ -500,7 +511,7 @@ pub(super) fn execute_whole_frame(
     static TILED_RECEIPTS: std::sync::atomic::AtomicUsize =
         std::sync::atomic::AtomicUsize::new(0);
     let tiled_receipt = if !gui_tiled_quads.is_empty()
-        && std::env::var_os("MATTMC_TRACE_GUI_TILES").is_some()
+        && gui_tile_trace_enabled()
         && TILED_RECEIPTS.fetch_update(
             std::sync::atomic::Ordering::Relaxed,
             std::sync::atomic::Ordering::Relaxed,
@@ -533,14 +544,14 @@ pub(super) fn execute_whole_frame(
     // post-submit ownership confirmation.
     let frontend_elapsed_nanos =
         crate::render::vulkanic::metrics::elapsed_nanos_u64(frontend_started);
-    whole_frame_trace(&format!(
+    whole_frame_trace!(
         "whole-frame.frontend.end generation={} frame={} elapsed_nanos={}",
         generation,
         world_frame_id,
         frontend_elapsed_nanos
-    ));
+    );
     let (mut world_stats, gui_stats) = frontend_result?;
-    whole_frame_trace(&format!(
+    whole_frame_trace!(
         "whole-frame.gal-profile frame={} validate_ops_nanos={} validate_handles_nanos={} hazard_nanos={} encode_nanos={} queue_nanos={} submit_total_nanos={} ops_before={} ops_after={} hazard_candidates={} hazard_reads={} hazard_writes={} set_binds_removed={}",
         world_frame_id,
         world_stats.profile.gal.gal_validate_ops_nanos,
@@ -555,8 +566,8 @@ pub(super) fn execute_whole_frame(
         world_stats.profile.gal.gal_hazard_read_events,
         world_stats.profile.gal.gal_hazard_write_events,
         world_stats.profile.gal.gal_redundant_resource_set_binds_removed,
-    ));
-    whole_frame_trace(&format!(
+    );
+    whole_frame_trace!(
         "whole-frame.graph-profile frame={} validate_nanos={} batching_nanos={} mesh_group_nanos={} resources_nanos={} mesh_assets_nanos={} mesh_resources_nanos={} command_nanos={} stream_pack_nanos={} draw_record_nanos={} mesh_batches={} mesh_instances={}",
         world_frame_id,
         world_stats.profile.world_validate_frame_nanos,
@@ -570,8 +581,8 @@ pub(super) fn execute_whole_frame(
         world_stats.profile.world_mesh_draw_record_nanos,
         world_stats.profile.world_prepare_mesh_batch_count,
         world_stats.mesh_instance_count,
-    ));
-    whole_frame_trace(&format!(
+    );
+    whole_frame_trace!(
         "whole-frame.draw-profile frame={} draw_indexed={} draw_direct={} page_batches={} page_runs={} dynamic_terrain={} dynamic_other={} translucent_terrain={} stream_bytes={} resource_creates={} gpu_nanos={} gpu_status={}",
         world_frame_id,
         world_stats.profile.gal.draw_indexed_ops,
@@ -585,8 +596,8 @@ pub(super) fn execute_whole_frame(
         world_stats.profile.gal.resource_creates_delta,
         world_stats.profile.gal.gpu_frame_total_nanos,
         world_stats.profile.gal.gpu_timestamp_status,
-    ));
-    whole_frame_trace(&format!(
+    );
+    whole_frame_trace!(
         "whole-frame.gpu-profile frame={} total_nanos={} dh_opaque_nanos={} terrain_opaque_nanos={} terrain_cutout_nanos={} shadow_nanos={} deferred_nanos={} composite0_nanos={} composite1_nanos={} final_nanos={}",
         world_frame_id,
         world_stats.profile.gal.gpu_frame_total_nanos,
@@ -598,7 +609,7 @@ pub(super) fn execute_whole_frame(
         world_stats.profile.gal.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::COMPOSITE_0)],
         world_stats.profile.gal.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::COMPOSITE_1)],
         world_stats.profile.gal.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::FINAL_OUTPUT)],
-    ));
+    );
     if let Some((parents, children)) = tiled_receipt {
         crate::core::console::stderr(format_args!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",
             world_frame_id, parents, children));
@@ -608,15 +619,15 @@ pub(super) fn execute_whole_frame(
     world_stats.profile.gui_frontend_nanos = gui_stats.frontend_nanos;
     world_stats.profile.gui_mesh_prepare_nanos = gui_stats.mesh_prepare_nanos;
     world_stats.profile.gui_mesh_lower_nanos = gui_stats.mesh_lower_nanos;
-    whole_frame_trace(&format!(
+    whole_frame_trace!(
         "whole-frame.stale-targets.begin generation={} frame={}",
         generation, world_frame_id
-    ));
+    );
     destroy_stale_frame_targets(context)?;
-    whole_frame_trace(&format!(
+    whole_frame_trace!(
         "whole-frame.stale-targets.end generation={} frame={}",
         generation, world_frame_id
-    ));
+    );
     world_stats.command_lists = 1;
     Ok((world_stats, gui_stats))
 }
@@ -646,13 +657,17 @@ pub(super) fn whole_frame_status(
     }
 }
 
-/// Emits phase boundaries only for an explicitly requested diagnostic run.
-/// The ABI deliberately remains one call; this distinguishes semantic/GAL
-/// work from stale-target retirement without changing rendering behavior.
-fn whole_frame_trace(message: &str) {
-    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
-        crate::core::console::stderr(format_args!("{message}"));
-    }
+/// Whether `MATTMC_TRACE_WHOLE_FRAME` requested phase tracing. The ABI stays
+/// one call; tracing distinguishes semantic/GAL work from stale-target
+/// retirement without changing rendering behavior.
+fn whole_frame_trace_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some())
+}
+
+fn gui_tile_trace_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_GUI_TILES").is_some())
 }
 
 #[no_mangle]
@@ -906,10 +921,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_lod_update_assets(
                         retirements,
                         material_provenance,
                     );
-                whole_frame_trace(&format!(
+                whole_frame_trace!(
                     "whole-frame.dh-assets.native generation={generation} columns={asset_count} retirements={retirement_count} provenance={provenance_count} decode_nanos={decode_nanos} apply_nanos={}",
                     crate::render::vulkanic::metrics::elapsed_nanos_u64(apply_started),
-                ));
+                );
                 result
             },
         );

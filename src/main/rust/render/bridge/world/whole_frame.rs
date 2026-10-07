@@ -1088,6 +1088,9 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     let raw_rig_poses = read_slice(request.world_model_rig_poses, true, "model rig poses")?;
     let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len() + appended_capacity);
     let mut rig_parts = Vec::new();
+    let mut rig_models = Vec::new();
+    // Locked once, on the frame's first rig instance.
+    let mut rig_table: Option<super::model_rigs::ModelRigTable> = None;
     for raw_instance in raw_mesh_instances {
         validate_item_size::<FfiWorldMeshInstanceRecord>(
             raw_instance.byte_size,
@@ -1096,7 +1099,12 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         // A model-rig instance stands for its drawn parts, in place.
         let expanded = if raw_instance.flags & super::model_rigs::WORLD_MESH_INSTANCE_FLAG_MODEL_RIG != 0 {
             rig_parts.clear();
-            super::model_rigs::expand_model_rig(raw_instance, raw_rig_poses, &mut rig_parts)?;
+            if rig_table.is_none() {
+                rig_table = Some(super::model_rigs::lock_model_rigs()?);
+            }
+            let rigs = rig_table.as_deref().expect("model rig table locked above");
+            super::model_rigs::expand_model_rig(rigs, raw_instance, raw_rig_poses, &mut rig_models, &mut rig_parts)?;
+            mesh_instances.reserve(rig_parts.len());
             if mesh_instances.len() + rig_parts.len() > FFI_MAX_BATCH_ITEMS {
                 return Err(GalError::invalid_argument("expanded model rig instances exceed the frame bound"));
             }

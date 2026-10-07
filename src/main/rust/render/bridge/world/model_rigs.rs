@@ -29,7 +29,7 @@ pub const MAX_MODEL_RIG_NODES: usize = 1024;
 const MAX_MODEL_RIGS: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct RigNode {
+pub(super) struct RigNode {
     parent: Option<usize>,
     mesh: Option<(u64, u64)>,
 }
@@ -75,13 +75,11 @@ fn release(id: u64) -> bool {
     rigs().lock().map(|mut rigs| rigs.remove(&id).is_some()).unwrap_or(false)
 }
 
-fn rig(id: u64) -> GalResult<Arc<[RigNode]>> {
-    rigs()
-        .lock()
-        .map_err(|_| GalError::invalid_argument("model rig registry poisoned"))?
-        .get(&id)
-        .cloned()
-        .ok_or_else(|| GalError::invalid_argument(format!("unknown model rig {id}")))
+/// The registered rigs, locked once for a frame's expansions.
+pub(super) type ModelRigTable = std::sync::MutexGuard<'static, HashMap<u64, Arc<[RigNode]>>>;
+
+pub(super) fn lock_model_rigs() -> GalResult<ModelRigTable> {
+    rigs().lock().map_err(|_| GalError::invalid_argument("model rig registry poisoned"))
 }
 
 /// Registers (or replaces) a rig. Returns 0, or -2 for an invalid rig.
@@ -110,7 +108,7 @@ pub extern "C" fn mattmc_vulkanic_world_model_rig_release(id: u64) -> i32 {
     i32::from(release(id))
 }
 
-type Matrix = [f32; 16];
+pub(super) type Matrix = [f32; 16];
 
 const IDENTITY: Matrix = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
 
@@ -150,7 +148,7 @@ fn cos_from_sin(sin: f32, angle: f32) -> f32 {
     }
 }
 
-/// `ModelPart.translateAndRotate` applied to `pose`.
+/// `ModelPart.translateAndRotate` applied to `pose` (an affine matrix).
 fn translate_and_rotate(mut pose: Matrix, part: &FfiModelRigPose) -> Matrix {
     let [x, y, z] = part.offset;
     if x != 0.0 || y != 0.0 || z != 0.0 {
@@ -163,10 +161,23 @@ fn translate_and_rotate(mut pose: Matrix, part: &FfiModelRigPose) -> Matrix {
     if x_rot != 0.0 || y_rot != 0.0 || z_rot != 0.0 {
         let (sin_x, sin_y, sin_z) = (sin(x_rot), sin(y_rot), sin(z_rot));
         let (cos_x, cos_y, cos_z) = (cos_from_sin(sin_x, x_rot), cos_from_sin(sin_y, y_rot), cos_from_sin(sin_z, z_rot));
-        let rotate_z: Matrix = [cos_z, sin_z, 0.0, 0.0, -sin_z, cos_z, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
-        let rotate_y: Matrix = [cos_y, 0.0, -sin_y, 0.0, 0.0, 1.0, 0.0, 0.0, sin_y, 0.0, cos_y, 0.0, 0.0, 0.0, 0.0, 1.0];
-        let rotate_x: Matrix = [1.0, 0.0, 0.0, 0.0, 0.0, cos_x, sin_x, 0.0, 0.0, -sin_x, cos_x, 0.0, 0.0, 0.0, 0.0, 1.0];
-        pose = mul(&mul(&mul(&pose, &rotate_z), &rotate_y), &rotate_x);
+        // Rz * Ry * Rx (JOML rotateZYX), as its three columns.
+        let rotation = [
+            [cos_z * cos_y, sin_z * cos_y, -sin_y],
+            [cos_z * sin_y * sin_x - sin_z * cos_x, sin_z * sin_y * sin_x + cos_z * cos_x, cos_y * sin_x],
+            [cos_z * sin_y * cos_x + sin_z * sin_x, sin_z * sin_y * cos_x - cos_z * sin_x, cos_y * cos_x],
+        ];
+        let basis = [
+            [pose[0], pose[1], pose[2], pose[3]],
+            [pose[4], pose[5], pose[6], pose[7]],
+            [pose[8], pose[9], pose[10], pose[11]],
+        ];
+        for (column, factors) in rotation.iter().enumerate() {
+            for row in 0..4 {
+                pose[column * 4 + row] =
+                    basis[0][row] * factors[0] + basis[1][row] * factors[1] + basis[2][row] * factors[2];
+            }
+        }
     }
     let [x_scale, y_scale, z_scale] = part.scale;
     if x_scale != 1.0 || y_scale != 1.0 || z_scale != 1.0 {
@@ -182,18 +193,22 @@ fn translate_and_rotate(mut pose: Matrix, part: &FfiModelRigPose) -> Matrix {
 /// Expands a model-rig instance into one ordinary instance per drawn part,
 /// in `visitRenderable` order, appending to `out`.
 pub(super) fn expand_model_rig(
+    rigs: &HashMap<u64, Arc<[RigNode]>>,
     instance: &FfiWorldMeshInstanceRecord,
     poses: &[FfiModelRigPose],
+    models: &mut Vec<Option<Matrix>>,
     out: &mut Vec<FfiWorldMeshInstanceRecord>,
 ) -> GalResult<()> {
-    let nodes = rig(instance.mesh_key)?;
+    let nodes = rigs
+        .get(&instance.mesh_key)
+        .ok_or_else(|| GalError::invalid_argument(format!("unknown model rig {}", instance.mesh_key)))?;
     let first = usize::try_from(instance.mesh_generation.wrapping_sub(1))
         .map_err(|_| GalError::invalid_argument("model rig pose index out of range"))?;
     let poses = first
         .checked_add(nodes.len())
         .and_then(|end| poses.get(first..end))
         .ok_or_else(|| GalError::invalid_argument("model rig poses out of range"))?;
-    let mut models = Vec::with_capacity(nodes.len());
+    models.clear();
     for (node, pose) in nodes.iter().zip(poses) {
         if pose.flags & !(MODEL_RIG_POSE_VISIBLE | MODEL_RIG_POSE_SKIP_DRAW) != 0 {
             return Err(GalError::invalid_argument("unknown model rig pose flags"));
@@ -251,7 +266,11 @@ pub unsafe extern "C" fn mattmc_vulkanic_world_model_rig_expand_transforms(
     instance.mesh_generation = 1;
     instance.transform = std::ptr::read_unaligned(entity.cast());
     let mut parts = Vec::new();
-    if expand_model_rig(&instance, std::slice::from_raw_parts(poses, pose_count as usize), &mut parts).is_err() {
+    let Ok(rigs) = lock_model_rigs() else {
+        return -2;
+    };
+    let poses = std::slice::from_raw_parts(poses, pose_count as usize);
+    if expand_model_rig(&rigs, &instance, poses, &mut Vec::new(), &mut parts).is_err() {
         return -2;
     }
     for (index, part) in parts.iter().take(capacity as usize).enumerate() {

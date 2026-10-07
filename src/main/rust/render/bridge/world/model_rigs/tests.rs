@@ -1,5 +1,13 @@
 use super::*;
 
+fn expand_rig(
+    instance: &FfiWorldMeshInstanceRecord,
+    poses: &[FfiModelRigPose],
+    out: &mut Vec<FfiWorldMeshInstanceRecord>,
+) -> GalResult<()> {
+    expand_model_rig(&lock_model_rigs().unwrap(), instance, poses, &mut Vec::new(), out)
+}
+
 fn node(parent: i32, mesh_key: u64) -> FfiModelRigNode {
     FfiModelRigNode {
         parent,
@@ -50,7 +58,7 @@ fn parts_compose_parent_poses_in_visit_order() {
         pose([16.0, 0.0, 0.0], [0.0; 3], VISIBLE),
     ];
     let mut out = Vec::new();
-    expand_model_rig(&instance(9001, 0, entity), &poses, &mut out).unwrap();
+    expand_rig(&instance(9001, 0, entity), &poses, &mut out).unwrap();
     assert_eq!(vec![10, 11, 12], out.iter().map(|part| part.mesh_key).collect::<Vec<_>>());
     assert_eq!(vec![1010, 1011, 1012], out.iter().map(|part| part.mesh_generation).collect::<Vec<_>>());
     assert!(out.iter().all(|part| part.flags == 4 && part.packed_light == 0x00f0_00f0));
@@ -72,7 +80,7 @@ fn hidden_parts_hide_their_subtree_and_skip_draw_keeps_children() {
         pose([0.0; 3], [0.0; 3], VISIBLE),
         pose([0.0; 3], [0.0; 3], VISIBLE),
     ];
-    expand_model_rig(&instance(9002, 0, IDENTITY), &hidden_body, &mut out).unwrap();
+    expand_rig(&instance(9002, 0, IDENTITY), &hidden_body, &mut out).unwrap();
     assert_eq!(vec![12], out.iter().map(|part| part.mesh_key).collect::<Vec<_>>());
 
     out.clear();
@@ -82,7 +90,7 @@ fn hidden_parts_hide_their_subtree_and_skip_draw_keeps_children() {
         pose([0.0; 3], [0.0; 3], VISIBLE),
         pose([0.0; 3], [0.0; 3], VISIBLE),
     ];
-    expand_model_rig(&instance(9002, 0, IDENTITY), &skipped_body, &mut out).unwrap();
+    expand_rig(&instance(9002, 0, IDENTITY), &skipped_body, &mut out).unwrap();
     assert_eq!(vec![11, 12], out.iter().map(|part| part.mesh_key).collect::<Vec<_>>());
     release(9002);
 }
@@ -92,10 +100,10 @@ fn poses_are_read_from_the_instance_offset_and_bounds_are_enforced() {
     register(9003, &[node(-1, 20)]).unwrap();
     let poses = [pose([0.0; 3], [0.0; 3], 0), pose([16.0, 0.0, 0.0], [0.0; 3], VISIBLE)];
     let mut out = Vec::new();
-    expand_model_rig(&instance(9003, 1, IDENTITY), &poses, &mut out).unwrap();
+    expand_rig(&instance(9003, 1, IDENTITY), &poses, &mut out).unwrap();
     assert!(close(&out[0].transform, &translation(1.0, 0.0, 0.0)));
-    assert!(expand_model_rig(&instance(9003, 2, IDENTITY), &poses, &mut out).is_err());
-    assert!(expand_model_rig(&instance(9999, 0, IDENTITY), &poses, &mut out).is_err());
+    assert!(expand_rig(&instance(9003, 2, IDENTITY), &poses, &mut out).is_err());
+    assert!(expand_rig(&instance(9999, 0, IDENTITY), &poses, &mut out).is_err());
     assert!(release(9003));
     assert!(!release(9003));
 }
