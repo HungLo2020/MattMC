@@ -189,6 +189,12 @@ which is outside any bridge context so selecting never joins a pipelined frame.
   outside level height and checks without an active frame search bypass this
   additional rejection. The hook declares that it does not affect the shadow
   pass; Java still extracts retained entities and their geometry.
+- Without a shader pack, block entities are extracted as Frozen's Sodium does
+  (`RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity`): the culled
+  block entities of each visited built section, then the global ones of every
+  built section. Moving pistons arrive the same way. Shader frames still scan
+  every loaded chunk in range, because the shadow pass takes its block
+  entities from that list (vanilla A/B 455→516 FPS once the scan was gone).
 
 Keep the graph's behaviour identical to Frozen: its unit tests in
 `section_graph/tests.rs` pin each rule, so run

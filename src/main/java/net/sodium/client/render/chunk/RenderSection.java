@@ -290,6 +290,16 @@ public class RenderSection {
         return this.visibilityData;
     }
 
+    /** Block entities drawn only while this section is visible. */
+    public BlockEntity @Nullable[] getCulledBlockEntities() {
+        return this.culledBlockEntities;
+    }
+
+    /** Block entities drawn whenever this section is built (render off screen). */
+    public BlockEntity @Nullable[] getGlobalBlockEntities() {
+        return this.globalBlockEntities;
+    }
+
     /**
      * Returns the collection of animated sprites contained by this rendered chunk section.
      */

@@ -168,6 +168,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
 	private final LongOpenHashSet rustExtractedBlockEntityPositions = new LongOpenHashSet(512);
+	/** This frame's block entities came from the section graph (no fallback scans). */
+	private boolean frozenBlockEntityExtraction;
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
 	@Nullable
 	private ViewArea viewArea;
@@ -2050,6 +2052,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		LongOpenHashSet extractedBlockEntityPositions = this.rustExtractedBlockEntityPositions;
 		extractedBlockEntityPositions.clear();
 		PoseStack poseStack = new PoseStack();
+		// Without a shader pack, extract exactly as Frozen's Sodium does from this
+		// frame's section-graph search (moving pistons included: they are section
+		// block entities). Shader frames keep the range scan below, whose
+		// off-camera block entities also feed the shadow pass.
+		this.frozenBlockEntityExtraction = !net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()
+			&& net.vulkanic.world.RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity(
+				blockEntity -> this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState));
+		if (this.frozenBlockEntityExtraction) {
+			return;
+		}
 		for (SectionRenderDispatcher.RenderSection section : this.visibleSections) {
 			if (!(section.getSectionMesh() instanceof CompiledSectionMesh compiled)) continue;
 			for (BlockEntity blockEntity : compiled.getRenderableBlockEntities()) {
@@ -2130,7 +2142,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				visiblePistonStates++;
 			}
 		}
-		if (visiblePistonStates > 0) {
+		if (visiblePistonStates > 0 || this.frozenBlockEntityExtraction) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan(
 				"rust-vulkan-whole-frame",
 				visiblePistonStates,

@@ -75,6 +75,9 @@ public final class RustGalWholeFrameTerrainSource {
 	private final Long2ObjectOpenHashMap<RenderSection> sections = new Long2ObjectOpenHashMap<>();
 	/** The subset of {@link #sections} with geometry (flags != 0). */
 	private final Long2ObjectOpenHashMap<RenderSection> geometrySections = new Long2ObjectOpenHashMap<>();
+	/** Built sections with off-screen block entities, in first-build order (Sodium's set). */
+	private final it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<RenderSection> globalBlockEntitySections =
+		new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
 	/** Sections of ready columns whose current build is missing or stale. */
 	private final LongOpenHashSet needsBuild = new LongOpenHashSet();
 	/** Rebuilds of already-built sections (block edits): dispatched first. */
@@ -239,6 +242,7 @@ public final class RustGalWholeFrameTerrainSource {
 			long key = SectionPos.asLong(chunkX, sectionY, chunkZ);
 			RenderSection section = this.sections.remove(key);
 			this.geometrySections.remove(key);
+			this.globalBlockEntitySections.remove(key);
 			if (section != null || RustGalTerrainRenderer.hasSectionAsset(key)) {
 				RustGalTerrainRenderer.removeSection(chunkX, sectionY, chunkZ, "cpu-source-column-unready");
 			}
@@ -263,6 +267,11 @@ public final class RustGalWholeFrameTerrainSource {
 			this.geometrySections.put(key, section);
 		} else {
 			this.geometrySections.remove(key);
+		}
+		if (section.getGlobalBlockEntities() != null) {
+			this.globalBlockEntitySections.put(key, section);
+		} else {
+			this.globalBlockEntitySections.remove(key);
 		}
 		this.graph.setInfo(section.getChunkX(), section.getChunkY(), section.getChunkZ(), true,
 			section.getFlags(), section.getVisibilityData());
@@ -356,6 +365,43 @@ public final class RustGalWholeFrameTerrainSource {
 			return true;
 		}
 		return source.isBoxVisible(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ);
+	}
+
+	/**
+	 * Frozen's block-entity extraction ({@code SodiumWorldRenderer.extractBlockEntities})
+	 * over this frame's camera search: the culled block entities of each visited
+	 * built section, then the global ones of every built section. False when
+	 * no search belongs to the frame being extracted.
+	 */
+	public static boolean forEachVisibleBlockEntity(java.util.function.Consumer<net.minecraft.world.level.block.entity.BlockEntity> consumer) {
+		RustGalWholeFrameTerrainSource source = entityCullingSource;
+		if (source == null || source.level == null) {
+			return false;
+		}
+		RustSectionGraph graph = source.graph;
+		for (int index = 0, count = graph.visitCount(); index < count; index++) {
+			if (!graph.visitBuilt(index)
+					|| (graph.visitFlags(index) & net.sodium.client.render.chunk.RenderSectionFlags.MASK_HAS_BLOCK_ENTITIES) == 0) {
+				continue;
+			}
+			RenderSection section = source.sections.get(
+				SectionPos.asLong(graph.visitX(index), graph.visitY(index), graph.visitZ(index)));
+			var blockEntities = section == null ? null : section.getCulledBlockEntities();
+			if (blockEntities != null) {
+				for (var blockEntity : blockEntities) {
+					consumer.accept(blockEntity);
+				}
+			}
+		}
+		for (RenderSection section : source.globalBlockEntitySections.values()) {
+			var blockEntities = section.getGlobalBlockEntities();
+			if (blockEntities != null) {
+				for (var blockEntity : blockEntities) {
+					consumer.accept(blockEntity);
+				}
+			}
+		}
+		return true;
 	}
 
 	/** Ends the frame's entity extraction; later checks keep the frustum test. */
@@ -597,6 +643,7 @@ public final class RustGalWholeFrameTerrainSource {
 		this.readyColumns.clear();
 		this.sections.clear();
 		this.geometrySections.clear();
+		this.globalBlockEntitySections.clear();
 		this.needsBuild.clear();
 		this.urgentRebuilds.clear();
 		this.inFlight.clear();
