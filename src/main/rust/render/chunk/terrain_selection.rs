@@ -4,11 +4,12 @@
 //! translucent) into the graph. After a camera selection, the graph turns
 //! the visited sections into the frame's compact terrain stream, its
 //! off-camera shadow casters and the sections whose animated sprites the
-//! frame uses, in exactly the order Java's compact producer used:
+//! frame uses, in this order:
 //!
-//! - camera layers: visible sections (built, flags != 0) in ascending section
-//!   key, each solid then cutout, then translucent back to front by section
-//!   centre (stable, so equal distances keep key order);
+//! - camera layers: visible sections (built, flags != 0) in the graph's
+//!   near-to-far visit order (so opaque layers reject hidden fragments
+//!   early), each solid then cutout, then translucent back to front by
+//!   section centre (stable, so equal distances keep visit order);
 //! - every mesh key appears once;
 //! - shadow candidates: every other section with geometry, nearest
 //!   `max_shadow_candidates` by (centre distance, key) when over the limit.
@@ -162,7 +163,8 @@ impl SectionGraph {
                 out.visible.push((key, visit.position, info.flags));
             }
         }
-        out.visible.sort_unstable_by_key(|(key, _, _)| *key);
+        // Keep the graph's breadth-first visit order: it is near-to-far from
+        // the camera, so solid and cutout layers get early depth rejection.
 
         let visible = std::mem::take(&mut out.visible);
         for &(key, position, flags) in &visible {

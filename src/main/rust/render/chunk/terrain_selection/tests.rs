@@ -42,7 +42,7 @@ fn meshes(base: u64, translucent: bool) -> SectionMeshes {
 }
 
 #[test]
-fn camera_layers_follow_key_order_then_translucent_back_to_front() {
+fn camera_layers_follow_visit_order_then_translucent_back_to_front() {
     let near = [0, 0, 0];
     let far = [3, 0, 0];
     let unbuilt = [1, 0, 0];
@@ -51,15 +51,16 @@ fn camera_layers_follow_key_order_then_translucent_back_to_front() {
     graph.set_meshes(near, Some(meshes(100, true)));
     graph.set_meshes(far, Some(meshes(200, true)));
     graph.set_meshes(unbuilt, Some(meshes(300, false)));
-    // Visit order differs from key order; unbuilt and empty sections never draw.
+    // Opaque layers keep visit order (not key order); unbuilt and empty
+    // sections never draw.
     let visits = [far, unbuilt, near, empty].map(|position| visit(&graph, position));
     let mut out = TerrainSelection::default();
     graph.select_terrain(&visits, &params(false, 0), &mut out);
 
     let keys = out.sections.iter().map(|section| section.mesh_key).collect::<Vec<_>>();
-    assert_eq!(vec![100, 101, 200, 201, 202, 102], keys);
-    assert_eq!([0, 0, 0], out.sections[0].origin);
-    assert_eq!([48, 0, 0], out.sections[2].origin);
+    assert_eq!(vec![200, 201, 100, 101, 202, 102], keys);
+    assert_eq!([48, 0, 0], out.sections[0].origin);
+    assert_eq!([0, 0, 0], out.sections[2].origin);
     assert_eq!(vec![10, 11, 10, 11, 12, 12], out.sections.iter().map(|s| s.depth_policy).collect::<Vec<_>>());
     assert_eq!(CAMERA_SORTED_QUADS, out.sections[4].flags);
     assert_eq!(0, out.sections[0].flags);

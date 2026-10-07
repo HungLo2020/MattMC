@@ -95,12 +95,14 @@ their lifetime; this does not transfer semantic color ownership to Rust.
 See [`ClientLevel`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L952-L1004)
 and [`AirBasedFogEnvironment`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/renderer/fog/environment/AirBasedFogEnvironment.java#L20-L41).
 
-Ordinary frames select camera-visible terrain layers in the Rust section graph,
-in ascending section-key order with translucent layers sorted back to front.
-The retained Java producer uses the same ordering (`SectionKeyOrder`) for
-ineligible diagnostic, fault, reload and readiness-receipt frames. Canonical
-ordering avoids cache misses caused by changing hash-map iteration order as
-sections stream; opaque and shadow terrain do not depend on submission order.
+Ordinary frames select camera-visible terrain layers in the Rust section graph.
+Solid and cutout layers keep the graph's near-to-far visit order, which is
+stable for a still camera and lets the GPU reject hidden fragments early (with
+shaders this measured 2.93 ms GPU against 3.18 ms in key order); translucent
+layers are sorted back to front. The retained Java producer emits ascending
+section-key order (`SectionKeyOrder`) for ineligible diagnostic, fault, reload
+and readiness-receipt frames, because hash-map iteration order shifted as
+sections streamed and identical sets missed Rust's batch-plan cache.
 Camera layers and off-camera shadow casters cross as packed compact records
 (mesh key, generation, section origin, depth policy; camera layers also carry
 flags), rather than per-instance records. The
@@ -163,7 +165,8 @@ which is outside any bridge context so selecting never joins a pipelined frame.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
   Java mirrors each section's published layer meshes into the graph, and Rust
-  emits the compact camera layers (key order, translucent back to front),
+  emits the compact camera layers (near-to-far visit order, translucent back
+  to front),
   shader shadow casters and animated-sprite sections in the frame records'
   native layout. Java copies these records without rebuilding each section's
   record. It still mirrors readiness and published mesh rows, schedules builds,
