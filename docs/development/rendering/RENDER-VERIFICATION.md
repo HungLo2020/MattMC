@@ -634,6 +634,11 @@ windows with Frozen's `frameNanosSamples`; early windows can include JIT warm-up
 and terrain streaming. A matching final 600-frame mean does not establish a
 matching full 1,800-frame result.
 
+Per-item producer phases (GUI sprite `*.java-producer`, `world.model.java-extraction`
+and `world.model.rust-enqueue`) run many times per frame, so they are recorded
+only with `--jvm-arg=-Dmattmc.dev.benchmark.detailedPhases=true`. Leave the flag
+off for timing comparisons; enable it to attribute Java producer time.
+
 Release gameplay skips the GAL's per-frame op, handle and hazard checks unless
 `MATTMC_GAL_VALIDATION=1` is set before launch. The capture harness sets it for
 `--validation standard`; debug/test builds and watched buffer-upload captures

@@ -684,6 +684,19 @@ public final class GraphicsFrameBenchmark {
 		lastDhSemanticColumnsReplaced = route.semanticColumnsReplaced();
 	}
 
+	/** Per-item phases (one per sprite or model mesh) only with {@code -Dmattmc.dev.benchmark.detailedPhases=true}. */
+	private static final boolean DETAILED_PHASES = Boolean.getBoolean("mattmc.dev.benchmark.detailedPhases");
+
+	/** {@link #beginPhase} for phases entered per item; off unless detailed phases are requested. */
+	public static void beginDetailedPhase(String name) {
+		if (DETAILED_PHASES) beginPhase(name);
+	}
+
+	/** {@link #endPhase} for a phase begun with {@link #beginDetailedPhase}. */
+	public static void endDetailedPhase(String name) {
+		if (DETAILED_PHASES) endPhase(name);
+	}
+
 	public static void beginPhase(String name) {
 		if (!ENABLED || !frameActive) {
 			return;

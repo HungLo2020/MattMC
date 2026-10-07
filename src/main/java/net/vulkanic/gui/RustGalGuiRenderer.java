@@ -2746,13 +2746,13 @@ public final class RustGalGuiRenderer {
 		int height
 	) {
 		long started = System.nanoTime();
-		GraphicsFrameBenchmark.beginPhase("rust-gal." + sprite.phaseName + ".java-producer");
+		GraphicsFrameBenchmark.beginDetailedPhase(sprite.producerPhase);
         boolean fullscreenPostEffect = sprite == GuiSprite.POST_EFFECT_INVERT
             || sprite == GuiSprite.POST_EFFECT_CREEPER
             || sprite == GuiSprite.POST_EFFECT_SPIDER;
         if (width <= 0 || height <= 0 || (!fullscreenPostEffect && (width > sprite.width || height > sprite.height))
             || (fullscreenPostEffect && (width > 16384 || height > 16384))) {
-			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
+			GraphicsFrameBenchmark.endDetailedPhase(sprite.producerPhase);
 			throw new IllegalArgumentException("GUI sprite destination extent is outside " + sprite.name() + ": " + width + "x" + height);
 		}
 		try {
@@ -2788,7 +2788,7 @@ public final class RustGalGuiRenderer {
 				)
 			);
 		} finally {
-			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
+			GraphicsFrameBenchmark.endDetailedPhase(sprite.producerPhase);
 		}
 	}
 
@@ -3824,6 +3824,8 @@ public final class RustGalGuiRenderer {
 
 		final GuiRenderStratum stratum;
 		final String phaseName;
+		/** Benchmark phase name, built once (it is entered for every sprite every frame). */
+		final String producerPhase;
 		final String cacheKind;
 		final String semanticSuffix;
 		final String textureResource;
@@ -3834,6 +3836,7 @@ public final class RustGalGuiRenderer {
 		GuiSprite(GuiRenderStratum stratum, String phaseName, String cacheKind, String textureResource, int width, int height, boolean invertBlend) {
 			this.stratum = stratum;
 			this.phaseName = phaseName;
+			this.producerPhase = "rust-gal." + phaseName + ".java-producer";
 			this.cacheKind = cacheKind;
 			this.semanticSuffix = semanticSuffix(cacheKind);
 			this.textureResource = textureResource;

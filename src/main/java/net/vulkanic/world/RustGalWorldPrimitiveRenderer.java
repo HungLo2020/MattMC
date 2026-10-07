@@ -9881,7 +9881,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (entityPose == null || !entityPose.pose().isFinite()) {
 			throw new IllegalArgumentException("Rust model mesh route received a non-finite copied entity transform");
 		}
-		GraphicsFrameBenchmark.beginPhase("world.model.java-extraction");
+		GraphicsFrameBenchmark.beginDetailedPhase("world.model.java-extraction");
 		List<ModelPoseMeshExtraction> extractions;
 		try {
 			model.setupAnim(state);
@@ -9897,12 +9897,12 @@ public final class RustGalWorldPrimitiveRenderer {
 					semantics.cullPolicy()
 				);
 		} finally {
-			GraphicsFrameBenchmark.endPhase("world.model.java-extraction");
+			GraphicsFrameBenchmark.endDetailedPhase("world.model.java-extraction");
 		}
 		if (extractions.isEmpty()) {
 			throw new IllegalStateException("Rust model mesh route selected but copied ModelPart extraction produced no mesh");
 		}
-		GraphicsFrameBenchmark.beginPhase("world.model.rust-enqueue");
+		GraphicsFrameBenchmark.beginDetailedPhase("world.model.rust-enqueue");
 		try {
 			synchronized (LOCK) {
 				int viewportWidth = pendingViewportWidth;
@@ -9977,7 +9977,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				);
 			}
 		} finally {
-			GraphicsFrameBenchmark.endPhase("world.model.rust-enqueue");
+			GraphicsFrameBenchmark.endDetailedPhase("world.model.rust-enqueue");
 		}
 		return true;
 	}
