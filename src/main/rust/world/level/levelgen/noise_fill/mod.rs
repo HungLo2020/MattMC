@@ -15,12 +15,53 @@ use super::density::math::{math, needs_right};
 use super::random::Positional;
 use super::synth::State;
 use section::Section;
+use std::sync::OnceLock;
 
-/// Per-state flags supplied by Java, indexed by block-state registry id.
+use crate::content::block::{BlockRegistry, StateFlags};
+use crate::world::level::levelgen::proto_chunk::FLAG_AIR_BLOCK;
+
+/// Per-state flags, indexed by block-state registry id (see [`state_flags`]).
 pub(crate) const FLAG_AIR: u8 = 1;
 pub(crate) const FLAG_BLOCKS_MOTION: u8 = 2;
 pub(crate) const FLAG_FLUID: u8 = 4;
 pub(crate) const FLAG_RANDOM_TICKS: u8 = 8;
+
+/// The flags of every state in `registry`: `isAir`, `blocksMotion`, a
+/// non-empty fluid state, `isRandomlyTicking` and `is(Blocks.AIR)`.
+pub(crate) fn state_flags(registry: &BlockRegistry) -> Vec<u8> {
+    let air = registry.air();
+    registry
+        .flag_column()
+        .iter()
+        .zip(registry.block_column())
+        .map(|(&f, &block)| {
+            let mut flags = 0;
+            if f.contains(StateFlags::AIR) {
+                flags |= FLAG_AIR;
+            }
+            if f.contains(StateFlags::BLOCKS_MOTION) {
+                flags |= FLAG_BLOCKS_MOTION;
+            }
+            if f.contains(StateFlags::HAS_FLUID) {
+                flags |= FLAG_FLUID;
+            }
+            if f.contains(StateFlags::RANDOM_TICKS) {
+                flags |= FLAG_RANDOM_TICKS;
+            }
+            if Some(block) == air {
+                flags |= FLAG_AIR_BLOCK;
+            }
+            flags
+        })
+        .collect()
+}
+
+/// [`state_flags`] of the installed registry; `None` until it is installed.
+pub(crate) fn installed_state_flags() -> Option<&'static [u8]> {
+    static FLAGS: OnceLock<Vec<u8>> = OnceLock::new();
+    let registry = crate::content::block::installed()?;
+    Some(FLAGS.get_or_init(|| state_flags(registry)))
+}
 
 /// The generator's `AquiferFluidPicker`: lava below `min(-54, sea level)`.
 #[derive(Clone, Copy, Debug, PartialEq)]

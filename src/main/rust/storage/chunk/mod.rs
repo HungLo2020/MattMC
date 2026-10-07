@@ -2,10 +2,11 @@
 //! `SerializableChunkData.write()` (block states and biomes packed as
 //! `PalettedContainer`'s codec does, block and sky light, `Y`), written
 //! directly as NBT tape records in Java's `CompoundTag` key order. Java
-//! supplies raw container storage and registry vocabulary; see
-//! `NativeChunkSections`.
+//! supplies raw container storage; the block-state vocabulary comes from the
+//! block registry. See `NativeChunkSections`.
 pub(crate) mod ffi;
 pub(crate) mod load;
+pub(crate) mod vocabulary;
 #[cfg(test)]
 mod tests;
 
@@ -135,8 +136,8 @@ fn pack_words(indices: &[u32], bits: usize, out: &mut Vec<i64>) {
     }
 }
 
-/// Immutable block-state vocabulary: each state id's canonical label and the
-/// tape of its `BlockState.CODEC` compound as a list element, plus
+/// Immutable block-state vocabulary: each state id's label (the id itself)
+/// and the tape of its `BlockState.CODEC` compound as a list element, plus
 /// `bitsInStorage` for every block palette size.
 pub(crate) struct Vocabulary {
     pub labels: Vec<u32>,

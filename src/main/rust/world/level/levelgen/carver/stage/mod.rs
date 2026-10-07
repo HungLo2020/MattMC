@@ -10,6 +10,7 @@ mod ffi;
 #[cfg(test)]
 mod tests;
 
+use crate::content::block::BlockId;
 use crate::world::level::levelgen::aquifer::substance::{picked, Substance};
 use crate::world::level::levelgen::noise_fill::FLAG_FLUID;
 use crate::world::level::levelgen::proto_chunk::{self, ProtoStorage};
@@ -144,7 +145,7 @@ pub(crate) struct Stage<'a> {
     pub upgrading: bool,
     pub sin: &'a [f32],
     /// Each block state's block registry id.
-    pub block_of: &'a [u32],
+    pub block_of: &'a [BlockId],
     /// Per block id: grass or mycelium, dirt, and each configuration's replaceable bit.
     pub blocks: &'a [u32],
     pub ids: Ids,
@@ -176,7 +177,7 @@ impl Stage<'_> {
 
     fn block(&self, state: i32) -> u32 {
         let Some(&block) = self.block_of.get(state as usize) else { return 0 };
-        self.blocks.get(block as usize).copied().unwrap_or(0)
+        self.blocks.get(block.0 as usize).copied().unwrap_or(0)
     }
 
     /// `ProtoChunk.getBlockState` inside the chunk's sections.

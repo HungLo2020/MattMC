@@ -1,13 +1,15 @@
-//! Java bridge: immutable block-state tables, one engine per Java light
-//! engine, and a pass with a section callback. See `NativeLightPropagation`.
-use super::{Blocks, Engine, Error, Source, Tables, Type, LAYER};
+//! Java bridge: the light tables derived from the block registry, one engine
+//! per Java light engine, and a pass with a section callback. See
+//! `NativeLightPropagation`.
+use super::{Blocks, Engine, Error, Source, Tables, LAYER};
 
 /// Java's section callback: (mode, section, buffer). Mode 0 reports the
 /// stored layer (0 absent, 1 stored); mode 1 the block states (0). Negative
 /// values report failures.
 pub(crate) type SectionCallback = unsafe extern "C" fn(i32, i64, *mut u8) -> i32;
 
-// Callback buffer: header ints, layer bytes, palette types, packed words, full types.
+// Callback buffer: header ints, layer bytes, palette state ids, packed words,
+// full state ids. Rust maps the state ids to light types in place.
 const HEADER: usize = 0;
 const LAYER_AT: usize = 64;
 const PALETTE_AT: usize = LAYER_AT + LAYER;
@@ -26,6 +28,7 @@ pub(crate) struct Handle {
 struct Callback<'a> {
     call: SectionCallback,
     buffer: &'a mut [u64],
+    tables: &'a Tables,
 }
 
 impl Callback<'_> {
@@ -68,60 +71,44 @@ impl Source for Callback<'_> {
             _ => return Err(Error::Callback),
         }
         let (kind, a, b) = (self.header(0), self.header(1), self.header(2));
-        let base = self.buffer.as_ptr() as *const u8;
+        let tables = self.tables;
+        let base = self.buffer.as_mut_ptr() as *mut u8;
+        let to_types = |at: usize, n: usize| unsafe {
+            for id in std::slice::from_raw_parts_mut(base.add(at) as *mut u16, n) {
+                *id = tables.state_type(*id);
+            }
+        };
         match kind {
-            0 if (0..=u16::MAX as i32).contains(&a) => Ok(Blocks::Uniform(a as u16)),
+            0 if (0..=u16::MAX as i32).contains(&a) => Ok(Blocks::Uniform(tables.state_type(a as u16))),
             1 | 2 if (1..=32).contains(&a) => {
                 let words = 4096usize.div_ceil(64 / a as usize);
                 if words > WORDS_MAX || (kind == 1 && !(1..=PALETTE_MAX as i32).contains(&b)) {
                     return Err(Error::Unsupported);
+                }
+                if kind == 1 {
+                    to_types(PALETTE_AT, b as usize);
                 }
                 unsafe {
                     let palette = (kind == 1).then(|| std::slice::from_raw_parts(base.add(PALETTE_AT) as *const u16, b as usize));
                     Ok(Blocks::Packed { bits: a as u32, palette, words: std::slice::from_raw_parts(base.add(WORDS_AT) as *const u64, words) })
                 }
             }
-            3 => Ok(Blocks::Full(unsafe { std::slice::from_raw_parts(base.add(FULL_AT) as *const u16, 4096) })),
+            3 => {
+                to_types(FULL_AT, 4096);
+                Ok(Blocks::Full(unsafe { std::slice::from_raw_parts(base.add(FULL_AT) as *const u16, 4096) }))
+            }
             _ => Err(Error::Unsupported),
         }
     }
 }
 
-/// Builds the immutable tables: `state_types` per state id (u16::MAX for
-/// states Rust must not see), 9 values per type (opacity, emission, empty,
-/// six face IDs), the `faces`² occlusion matrix and AIR's type. Returns 0
-/// on invalid input. The tables are never freed.
-/// # Safety
-/// Each pointer addresses its stated count of values for this call.
+/// The light tables of the installed block registry: a state's type is
+/// (`max(1, getLightBlock())`, emission, `isEmptyShape`, six light occlusion
+/// faces), numbered in state order. Returns 0 when the registry is not
+/// installed or its types do not fit. The tables are never freed.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_light_tables_create(state_types: *const u16, state_count: i32, types: *const u16, type_count: i32,
-    occludes: *const u8, faces: i32, air: i32) -> u64 {
-    if state_types.is_null() || types.is_null() || occludes.is_null() || state_count <= 0 || type_count <= 0
-        || !(1..=4096).contains(&faces) || !(0..type_count).contains(&air) || type_count >= u16::MAX as i32
-    {
-        return 0;
-    }
-    let raw = std::slice::from_raw_parts(types, type_count as usize * 9);
-    let mut parsed = Vec::with_capacity(type_count as usize);
-    for t in raw.chunks_exact(9) {
-        if !(1..=15).contains(&t[0]) || t[1] > 15 || t[2] > 1 || t[3..].iter().any(|&f| f as i32 >= faces) {
-            return 0;
-        }
-        parsed.push(Type { opacity: t[0] as u8, emission: t[1] as u8, empty: t[2] == 1, faces: [t[3], t[4], t[5], t[6], t[7], t[8]] });
-    }
-    let state_types = std::slice::from_raw_parts(state_types, state_count as usize).to_vec();
-    if state_types.iter().any(|&t| t != u16::MAX && t as i32 >= type_count) {
-        return 0;
-    }
-    let faces = faces as usize;
-    let tables = Tables {
-        state_types,
-        types: parsed,
-        faces,
-        occludes: std::slice::from_raw_parts(occludes, faces * faces).to_vec(),
-        air: air as u16,
-    };
-    Box::into_raw(Box::new(tables)) as u64
+pub extern "C" fn mattmc_light_tables_create() -> u64 {
+    super::installed_tables().map_or(0, |tables| tables as *const Tables as u64)
 }
 
 #[no_mangle]
@@ -157,7 +144,7 @@ pub unsafe extern "C" fn mattmc_light_run(handle: u64, tables: u64, decreases: *
     let handle = &mut *(handle as *mut Handle);
     let tables = &*(tables as *const Tables);
     let slice = |p: *const i64, n: i32| if n == 0 { &[][..] } else { std::slice::from_raw_parts(p, n as usize) };
-    let mut source = Callback { call, buffer: &mut handle.buffer };
+    let mut source = Callback { call, buffer: &mut handle.buffer, tables };
     match handle.engine.run(tables, &mut source, slice(decreases, decrease_len), slice(increases, increase_len), lowest) {
         Ok(outcome) => {
             *out = outcome.processed;
@@ -223,4 +210,17 @@ pub unsafe extern "C" fn mattmc_light_sky_section(layer: *mut u8, default: i32, 
     *out.add(1) = wrote as i32;
     *out.add(2) = below as i32;
     0
+}
+
+/// Verification: copies the installed tables' type of each state when `out`
+/// holds enough values. Returns the state count, or -1 without tables.
+/// # Safety
+/// A non-null `out` addresses `out_len` values.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_state_types(out: *mut u16, out_len: i32) -> i32 {
+    let Some(tables) = super::installed_tables() else { return -1 };
+    if !out.is_null() && out_len as usize >= tables.state_types.len() {
+        std::slice::from_raw_parts_mut(out, tables.state_types.len()).copy_from_slice(&tables.state_types);
+    }
+    tables.state_types.len() as i32
 }

@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -30,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 final class NativeNoiseFill {
     // Copies its configuration from borrowed heap arrays; one small allocation.
     private static final MethodHandle CREATE = bind("create", true, FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE = bind("release", false, FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     // Bounded to one cell; borrows heap arrays for that call only.
     private static final MethodHandle CELL = bind("cell", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
@@ -73,18 +74,10 @@ final class NativeNoiseFill {
     // Verification only: replays section writes without a fill.
     private static final MethodHandle REPLAY = bind("replay_section", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
-    private static final int FLAG_AIR = 1, FLAG_BLOCKS_MOTION = 2, FLAG_FLUID = 4, FLAG_RANDOM_TICKS = 8, FLAG_AIR_BLOCK = 16;
     // Tests compare both routes in one JVM; production reads the property once.
     private static volatile boolean enabled = !Boolean.getBoolean("mattmc.worldgen.javaNoiseFill");
     // Completed native fills, so tests can prove the gate engaged.
     static final java.util.concurrent.atomic.AtomicLong RUNS = new java.util.concurrent.atomic.AtomicLong();
-    private static volatile MemorySegment flagTable;
-    private static volatile int flagCount;
-
-    /** The state flag table's length, after {@link #flags()}. */
-    static int flagCount() {
-        return flagCount;
-    }
 
     private static MethodHandle bind(String suffix, boolean critical, FunctionDescriptor descriptor) {
         return critical
@@ -102,29 +95,6 @@ final class NativeNoiseFill {
 
     // Verification only: Java fills and uploads every slice, as for a slice the router declines.
     static volatile boolean uploadSlices;
-
-    /** Per block-state flags, built once from the frozen block-state registry. */
-    static synchronized MemorySegment flags() {
-        int size = Block.BLOCK_STATE_REGISTRY.size();
-        if (flagTable == null || flagCount != size) {
-            MemorySegment table = Arena.global().allocate(size);
-            for (int id = 0; id < size; id++) {
-                BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
-                int flags = 0;
-                if (state != null) {
-                    if (state.isAir()) flags |= FLAG_AIR;
-                    if (state.blocksMotion()) flags |= FLAG_BLOCKS_MOTION;
-                    if (!state.getFluidState().isEmpty()) flags |= FLAG_FLUID;
-                    if (state.isRandomlyTicking()) flags |= FLAG_RANDOM_TICKS;
-                    if (state.is(Blocks.AIR)) flags |= FLAG_AIR_BLOCK;
-                }
-                table.set(ValueLayout.JAVA_BYTE, id, (byte)flags);
-            }
-            flagTable = table;
-            flagCount = size;
-        }
-        return flagTable;
-    }
 
     private static int id(BlockState state) {
         return Block.BLOCK_STATE_REGISTRY.getId(state);
@@ -161,7 +131,8 @@ final class NativeNoiseFill {
     @Nullable
     static NativeNoiseFill prepare(NoiseGeneratorSettings settings, NoiseChunk chunk, ChunkAccess chunkAccess, Heightmap oceanFloor, Heightmap worldSurface,
                                    int minCellY, int cellCountY) {
-        if (!enabled || SharedConstants.DEBUG_ORE_VEINS || SharedConstants.DEBUG_AQUIFERS || SharedConstants.DEBUG_DISABLE_FLUID_GENERATION
+        // Rust reads per-state flags from its block registry.
+        if (!enabled || !NativeBlockRegistry.ready() || SharedConstants.DEBUG_ORE_VEINS || SharedConstants.DEBUG_AQUIFERS || SharedConstants.DEBUG_DISABLE_FLUID_GENERATION
             || SharedConstants.debugVoidTerrain(chunkAccess.getPos()) || chunk.getClass() != NoiseChunk.class || chunk.getBlender() != Blender.empty()
             || chunk.cellCountXZ * chunk.cellWidth != 16) {
             return null;
@@ -289,8 +260,7 @@ final class NativeNoiseFill {
     void run(int minCellY, int cellCountY) {
         long handle;
         try {
-            handle = (long)CREATE.invokeExact(MemorySegment.ofArray(this.ints), MemorySegment.ofArray(this.longs), MemorySegment.ofArray(this.doubles),
-                flags(), flagCount);
+            handle = (long)CREATE.invokeExact(MemorySegment.ofArray(this.ints), MemorySegment.ofArray(this.longs), MemorySegment.ofArray(this.doubles));
         } catch (Throwable error) {
             throw new IllegalStateException("Cannot start native noise fill", error);
         }

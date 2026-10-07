@@ -24,6 +24,7 @@ import net.minecraft.util.valueproviders.FloatProvider;
 import net.minecraft.util.valueproviders.UniformFloat;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.CarvingMask;
@@ -60,8 +61,6 @@ final class NativeCarvers {
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MemorySegment TOP;
     private static final MemorySegment SIN;
-    private static final MemorySegment BLOCK_OF;
-    private static final int STATES;
     // The stage running on this thread, for the top-material upcall.
     private static final ThreadLocal<Top> CURRENT = new ThreadLocal<>();
     // Tests compare both routes in one JVM; production reads the property once.
@@ -81,13 +80,6 @@ final class NativeCarvers {
             throw new ExceptionInInitializerError(error);
         }
         SIN = Arena.global().allocateFrom(ValueLayout.JAVA_FLOAT, Mth.sinTable());
-        STATES = Block.BLOCK_STATE_REGISTRY.size();
-        int[] blockOf = new int[STATES];
-        for (int id = 0; id < STATES; id++) {
-            BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
-            blockOf[id] = state == null ? 0 : BuiltInRegistries.BLOCK.getId(state.getBlock());
-        }
-        BLOCK_OF = Arena.global().allocateFrom(ValueLayout.JAVA_INT, blockOf);
     }
 
     static void setEnabled(boolean value) {
@@ -141,7 +133,8 @@ final class NativeCarvers {
      * at the CARVERS stage with an unblended noise chunk and its own carving mask,
      * no carver debugging, and a top-material rule that reads only heightmaps. */
     static boolean eligible(ChunkAccess chunk, NoiseChunk noise, CarvingContext context) {
-        return enabled && chunk.getClass() == ProtoChunk.class && !SharedConstants.DEBUG_CARVERS && !SharedConstants.debugVoidTerrain(chunk.getPos())
+        // Rust reads each state's block from its block registry.
+        return enabled && NativeBlockRegistry.ready() && chunk.getClass() == ProtoChunk.class && !SharedConstants.DEBUG_CARVERS && !SharedConstants.debugVoidTerrain(chunk.getPos())
             && noise.getBlender() == Blender.empty() && ((ProtoChunk)chunk).getOrCreateCarvingMask().hasOnlyOwnBits()
             && context.randomState().surfaceSystem().getClass() == SurfaceSystem.class && NativeSurface.readsOnlyHeightmaps(context.surfaceRule());
     }
@@ -318,12 +311,10 @@ final class NativeCarvers {
                 int[] intArray = ints.toIntArray();
                 MemorySegment intMemory = arena.allocateFrom(ValueLayout.JAVA_INT, intArray);
                 MemorySegment maskMemory = arena.allocateFrom(ValueLayout.JAVA_LONG, maskWords);
-                long[] pointers = new long[20];
+                long[] pointers = new long[18];
                 pointers[0] = maskMemory.address();
                 pointers[1] = maskWords.length;
                 pointers[2] = SIN.address();
-                pointers[3] = BLOCK_OF.address();
-                pointers[4] = STATES;
                 MemorySegment grid = null, cache = null, surface = null, memo = null, present = null;
                 if (binding != null) {
                     grid = arena.allocateFrom(ValueLayout.JAVA_LONG, binding.locations());
@@ -331,21 +322,21 @@ final class NativeCarvers {
                     surface = arena.allocateFrom(ValueLayout.JAVA_INT, binding.surface());
                     memo = arena.allocateFrom(ValueLayout.JAVA_DOUBLE, binding.memo());
                     present = arena.allocateFrom(ValueLayout.JAVA_BYTE, binding.present());
-                    pointers[5] = grid.address();
-                    pointers[6] = binding.locations().length;
-                    pointers[7] = cache.address();
-                    pointers[8] = surface.address();
-                    pointers[9] = binding.surface().length;
-                    pointers[10] = binding.sources().handle();
-                    pointers[11] = binding.levels().handle();
-                    pointers[12] = memo.address();
-                    pointers[13] = present.address();
-                    pointers[14] = binding.memo().length;
-                    pointers[15] = binding.barrierState().address();
-                    pointers[16] = binding.seedA();
-                    pointers[17] = binding.seedB();
-                    pointers[18] = Double.doubleToRawLongBits(binding.barrierXz());
-                    pointers[19] = Double.doubleToRawLongBits(binding.barrierY());
+                    pointers[3] = grid.address();
+                    pointers[4] = binding.locations().length;
+                    pointers[5] = cache.address();
+                    pointers[6] = surface.address();
+                    pointers[7] = binding.surface().length;
+                    pointers[8] = binding.sources().handle();
+                    pointers[9] = binding.levels().handle();
+                    pointers[10] = memo.address();
+                    pointers[11] = present.address();
+                    pointers[12] = binding.memo().length;
+                    pointers[13] = binding.barrierState().address();
+                    pointers[14] = binding.seedA();
+                    pointers[15] = binding.seedB();
+                    pointers[16] = Double.doubleToRawLongBits(binding.barrierXz());
+                    pointers[17] = Double.doubleToRawLongBits(binding.barrierY());
                 }
                 CURRENT.set(top);
                 try {

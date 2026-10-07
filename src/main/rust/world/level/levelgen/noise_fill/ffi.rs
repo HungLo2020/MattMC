@@ -24,19 +24,18 @@ struct Handle {
 /// factory seeds. `doubles`: ridged constant, ridged bound, gap xz scale, gap y
 /// scale. Returns 0 for invalid arguments.
 /// # Safety
-/// `ints` has 25 i32s, `longs` 2 i64s, `doubles` 4 f64s (borrowed); `flags` has
-/// `flag_count` bytes that stay valid and unchanged for the process lifetime.
+/// `ints` has 25 i32s, `longs` 2 i64s, `doubles` 4 f64s (borrowed). State
+/// flags come from the installed block registry; 0 when it is not installed.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_noise_fill_create(
     ints: *const i32,
     longs: *const i64,
     doubles: *const f64,
-    flags: *const u8,
-    flag_count: i32,
 ) -> u64 {
-    if ints.is_null() || longs.is_null() || doubles.is_null() || flags.is_null() || flag_count <= 0 {
+    if ints.is_null() || longs.is_null() || doubles.is_null() {
         return 0;
     }
+    let Some(flags) = super::installed_state_flags() else { return 0 };
     let i = unsafe { std::slice::from_raw_parts(ints, 25) };
     let l = unsafe { std::slice::from_raw_parts(longs, 2) };
     let d = unsafe { std::slice::from_raw_parts(doubles, 4) };
@@ -78,7 +77,6 @@ pub unsafe extern "C" fn mattmc_noise_fill_create(
         substance,
         ore,
     };
-    let flags: &'static [u8] = unsafe { std::slice::from_raw_parts(flags, flag_count as usize) };
     let cell_size = (width * width * height) as usize;
     Box::into_raw(Box::new(Handle { fill: NoiseFill::new(config, flags), cell_size, traversal: None })) as u64
 }
@@ -482,4 +480,18 @@ pub unsafe extern "C" fn mattmc_noise_fill_aquifer_caches(id: u64, grid: *mut i6
         std::ptr::copy_nonoverlapping(aquifer.present.as_ptr(), present, aquifer.present.len());
     }
     0
+}
+
+/// Verification: copies the installed registry's noise flags (one per state)
+/// when `out` holds enough bytes. Returns the state count, or -1 without a
+/// registry.
+/// # Safety
+/// A non-null `out` addresses `out_len` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_state_flags(out: *mut u8, out_len: i32) -> i32 {
+    let Some(flags) = super::installed_state_flags() else { return -1 };
+    if !out.is_null() && out_len as usize >= flags.len() {
+        std::slice::from_raw_parts_mut(out, flags.len()).copy_from_slice(flags);
+    }
+    flags.len() as i32
 }

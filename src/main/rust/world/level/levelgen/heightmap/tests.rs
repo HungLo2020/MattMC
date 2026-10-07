@@ -89,7 +89,7 @@ fn validates_lengths_and_bad_ids_without_out_of_bounds_access() {
         std::ptr::copy_nonoverlapping(h.as_ptr() as *const u8, frame.as_mut_ptr() as *mut u8, 32);
         std::ptr::write_bytes((frame.as_mut_ptr() as *mut u8).add(32), 63, 256);
         assert_eq!(
-            ffi::mattmc_heightmap_section(
+            ffi::section(
                 words.as_ptr(),
                 255,
                 flags.as_ptr(),
@@ -100,7 +100,7 @@ fn validates_lengths_and_bad_ids_without_out_of_bounds_access() {
             -1
         );
         assert_eq!(
-            ffi::mattmc_heightmap_section(
+            ffi::section(
                 words.as_ptr(),
                 256,
                 flags.as_ptr(),
@@ -112,7 +112,7 @@ fn validates_lengths_and_bad_ids_without_out_of_bounds_access() {
         );
         words[240] = 15;
         assert_eq!(
-            ffi::mattmc_heightmap_section(
+            ffi::section(
                 words.as_ptr(),
                 256,
                 flags.as_ptr(),
@@ -123,7 +123,7 @@ fn validates_lengths_and_bad_ids_without_out_of_bounds_access() {
             -2
         );
         assert_eq!(
-            ffi::mattmc_heightmap_section(
+            ffi::section(
                 std::ptr::null(),
                 0,
                 flags.as_ptr(),
@@ -134,4 +134,21 @@ fn validates_lengths_and_bad_ids_without_out_of_bounds_access() {
             -1
         );
     }
+}
+
+#[test]
+fn masks_follow_each_heightmap_predicate() {
+    use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
+    let state = |flags: u8| StateFacts { flags: StateFlags(flags), light_block: 0, emission: 0, light_faces: [FaceId(0); 6] };
+    let (air, motion, fluid, leaves, custom) = (StateFlags::AIR.0, StateFlags::BLOCKS_MOTION.0, StateFlags::HAS_FLUID.0, StateFlags::LEAVES.0,
+        StateFlags::CUSTOM.0);
+    let mut b = Builder::new();
+    for (name, flags) in [("minecraft:air", air), ("minecraft:cave_air", air), ("minecraft:stone", motion), ("minecraft:water", fluid),
+        ("minecraft:oak_leaves", motion | leaves), ("minecraft:waterlogged_leaves", fluid | leaves), ("minecraft:torch", 0), ("custom", custom)]
+    {
+        b.block(name, &[], 0, vec![state(flags)]).unwrap();
+    }
+    let view = super::masks(&b.finish(1, vec![0]).unwrap());
+    assert_eq!(view.masks, vec![0, 0, 0b111111, 0b110011, 0b011111, 0b010011, 0b000011, super::CUSTOM]);
+    assert!(view.custom);
 }

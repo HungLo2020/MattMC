@@ -6,21 +6,14 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import net.minecraft.core.Direction;
 import net.minecraft.util.BitStorage;
 import net.minecraft.util.Mth;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.ZeroBitStorage;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.lighting.LightEngine;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
 
 /** Packed section bridge for server-side skylight sources. */
 public final class NativeSkyLightSources {
@@ -30,74 +23,26 @@ public final class NativeSkyLightSources {
     private static final MethodHandle SECTION = NativeLibraryLoader.downcallHandle(
         "mattmc_rust", "mattmc_skylight_sources_section",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-            ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle EMPTY = NativeLibraryLoader.downcallHandle(
         "mattmc_rust", "mattmc_skylight_sources_empty",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.JAVA_INT), Linker.Option.critical(true));
 
-    // BlockState light properties and occlusion faces are immutable after bootstrap.
-    private record Tables(int[] descriptors, int faces, MemorySegment flags, MemorySegment edges) {}
-    private static final Tables TABLES = tables();
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
 
     private NativeSkyLightSources() {}
 
-    private static int face(VoxelShape shape, HashMap<List<AABB>, Integer> ids, ArrayList<VoxelShape> shapes) {
-        // Exact box lists; no coordinate quantization or shape approximation.
-        var key = List.copyOf(shape.toAabbs());
-        var id = ids.get(key);
-        if (id != null) return id;
-        int next = shapes.size();
-        ids.put(key, next);
-        shapes.add(shape);
-        return next;
-    }
-
-    private static Tables tables() {
-        var shapes = new ArrayList<VoxelShape>();
-        var ids = new HashMap<List<AABB>, Integer>();
-        face(Shapes.empty(), ids, shapes); // AIR's face ID is zero.
-        int[] descriptors = new int[Block.BLOCK_STATE_REGISTRY.size()];
-        for (int i = 0; i < descriptors.length; i++) {
-            var state = Block.BLOCK_STATE_REGISTRY.byId(i);
-            if (state.getClass() != BlockState.class) {
-                descriptors[i] = -1;
-                continue;
-            }
-            int up = face(LightEngine.getOcclusionShape(state, Direction.UP), ids, shapes);
-            int down = face(LightEngine.getOcclusionShape(state, Direction.DOWN), ids, shapes);
-            if (shapes.size() > 512) {
-                return new Tables(new int[0], 0, MemorySegment.NULL, MemorySegment.NULL);
-            }
-            descriptors[i] = (state.getLightBlock() != 0 ? 1 : 0) | (up << 1) | (down << 16);
-        }
-        int count = shapes.size();
-        byte[] edges = new byte[count * count];
-        // Original Java shape operation supplies the immutable truth table.
-        for (int down = 0; down < count; down++) {
-            for (int up = 0; up < count; up++) {
-                edges[down * count + up] = (byte)(Shapes.faceShapeOccludes(shapes.get(down), shapes.get(up)) ? 1 : 0);
-            }
-        }
-        var arena = Arena.ofAuto();
-        var flags = arena.allocate(descriptors.length * 4L, 4);
-        var matrix = arena.allocate(edges.length, 1);
-        MemorySegment.copy(MemorySegment.ofArray(descriptors), 0, flags, 0, flags.byteSize());
-        MemorySegment.copy(MemorySegment.ofArray(edges), 0, matrix, 0, matrix.byteSize());
-        return new Tables(descriptors, count, flags.asReadOnly(), matrix.asReadOnly());
-    }
-
     private static final class Scratch {
         final MemorySegment frame = Arena.ofAuto().allocate(HEIGHTS_OFFSET + 256 * 8, 8);
         final MemorySegment words = Arena.ofAuto().allocate(2048 * 8, 8);
-        final MemorySegment flags = Arena.ofAuto().allocate(256 * 4, 4);
+        final MemorySegment ids = Arena.ofAuto().allocate(256 * 4, 4);
     }
 
     /** False leaves the destination untouched so the caller can use its original reader. */
     public static boolean fill(ChunkAccess chunk, int minSourceY, BitStorage destination) {
-        if (chunk == null || TABLES.faces == 0 || destination.getClass() != SimpleBitStorage.class
+        // Rust derives state descriptors and face edges from its block registry.
+        if (chunk == null || !NativeBlockRegistry.ready() || destination.getClass() != SimpleBitStorage.class
             || destination.getSize() != 256) return false;
         if (chunk.getClass() != ProtoChunk.class && chunk.getClass() != LevelChunk.class) return false;
         int minY = chunk.getMinY(), height = chunk.getHeight();
@@ -119,16 +64,15 @@ public final class NativeSkyLightSources {
         frame.asSlice(PENDING_OFFSET, 256).fill((byte)1);
         frame.asSlice(UPPER_FACES_OFFSET, 1024).fill((byte)0);
         // Header: storage bits, height bits, stride, section base, sentinel Y,
-        // exclusive max Y, face count, descriptor count.
+        // exclusive max Y, face count (Rust's), palette size.
         frame.setAtIndex(ValueLayout.JAVA_INT, 1, destination.getBits());
         frame.setAtIndex(ValueLayout.JAVA_INT, 2, stride);
         frame.setAtIndex(ValueLayout.JAVA_INT, 4, minSourceY);
         frame.setAtIndex(ValueLayout.JAVA_INT, 5, minY + height);
-        frame.setAtIndex(ValueLayout.JAVA_INT, 6, TABLES.faces);
         for (int sectionIndex = highest; sectionIndex >= 0; sectionIndex--) {
             var section = sections[sectionIndex];
             int bits = -1, len = 0, count = 1;
-            MemorySegment flags = scratch.flags;
+            MemorySegment ids = scratch.ids;
             if (!section.hasOnlyAir()) {
                 var container = section.getStates();
                 if (container.getClass() != PalettedContainer.class) return false;
@@ -141,9 +85,9 @@ public final class NativeSkyLightSources {
                 bits = storage.getBits();
                 if (palette.getClass() == GlobalPalette.class) {
                     if (container.registryForNativeScan() != Block.BLOCK_STATE_REGISTRY
-                        || count != TABLES.descriptors.length) return false;
-                    // Unsupported subclasses are rejected if encountered by Rust.
-                    flags = TABLES.flags;
+                        || count != Block.BLOCK_STATE_REGISTRY.size()) return false;
+                    // Palette ids are state ids; Rust declines custom subclasses.
+                    ids = MemorySegment.NULL;
                 } else {
                     if (palette.getClass() != SingleValuePalette.class && palette.getClass() != LinearPalette.class
                         && palette.getClass() != HashMapPalette.class) return false;
@@ -152,8 +96,8 @@ public final class NativeSkyLightSources {
                         var state = palette.valueFor(i);
                         if (state == null || state.getClass() != BlockState.class) return false;
                         int id = Block.BLOCK_STATE_REGISTRY.getId(state);
-                        if (id < 0 || id >= TABLES.descriptors.length || TABLES.descriptors[id] < 0) return false;
-                        flags.setAtIndex(ValueLayout.JAVA_INT, i, TABLES.descriptors[id]);
+                        if (id < 0) return false;
+                        ids.setAtIndex(ValueLayout.JAVA_INT, i, id);
                     }
                 }
                 var raw = storage.getRaw();
@@ -163,7 +107,7 @@ public final class NativeSkyLightSources {
             frame.setAtIndex(ValueLayout.JAVA_INT, 0, bits);
             frame.setAtIndex(ValueLayout.JAVA_INT, 3, minY + sectionIndex * 16);
             frame.setAtIndex(ValueLayout.JAVA_INT, 7, count);
-            int remaining = scan(scratch.words, len, flags, count, frame);
+            int remaining = scan(scratch.words, len, ids, count, frame);
             if (remaining < 0) return false;
             if (remaining == 0) break;
         }
@@ -171,10 +115,9 @@ public final class NativeSkyLightSources {
         return true;
     }
 
-    private static int scan(MemorySegment words, int length, MemorySegment flags, int count, MemorySegment frame) {
+    private static int scan(MemorySegment words, int length, MemorySegment ids, int count, MemorySegment frame) {
         try {
-            return (int)SECTION.invokeExact(words, length, flags, count, TABLES.edges,
-                (int)TABLES.edges.byteSize(), frame, (int)frame.byteSize());
+            return (int)SECTION.invokeExact(words, length, ids, count, frame, (int)frame.byteSize());
         } catch (RuntimeException | Error e) {
             throw e;
         } catch (Throwable e) {

@@ -169,11 +169,18 @@ class NativeLightPropagationTest {
         assertEquals(rejected + 1, NativeLightPropagation.REJECTED.get());
     }
 
-    @Test void lightPropertyTablesMatchEveryStateAndFacePair() throws Exception {
-        var tables = Class.forName(NativeLightPropagation.class.getName() + "$Tables");
-        var typesField = tables.getDeclaredField("TYPES");
-        typesField.setAccessible(true);
-        char[] types = (char[])typesField.get(null);
+    @Test void lightPropertyTablesMatchEveryStateAndFacePair() throws Throwable {
+        // Rust derives each state's light type from its block registry.
+        assertTrue(net.minecraft.world.level.block.NativeBlockRegistry.ready());
+        var call = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_state_types",
+            java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.ADDRESS,
+                java.lang.foreign.ValueLayout.JAVA_INT));
+        char[] types = new char[Block.BLOCK_STATE_REGISTRY.size()];
+        try (var arena = java.lang.foreign.Arena.ofConfined()) {
+            var out = arena.allocate(types.length * 2L, 2);
+            assertEquals(types.length, (int)call.invokeExact(out, types.length));
+            java.lang.foreign.MemorySegment.copy(out, java.lang.foreign.ValueLayout.JAVA_CHAR, 0, types, 0, types.length);
+        }
         assertEquals(Block.BLOCK_STATE_REGISTRY.size(), types.length);
         // Distinct states per type: equal types must have equal properties and faces.
         var representative = new java.util.HashMap<Character, BlockState>();

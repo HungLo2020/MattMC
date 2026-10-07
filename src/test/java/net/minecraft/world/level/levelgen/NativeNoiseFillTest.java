@@ -387,4 +387,26 @@ class NativeNoiseFillTest {
         System.out.println("AQUIFER_LOCATION_PARITY locations=" + checked);
         assertTrue(checked > 10_000);
     }
+
+    /** Rust derives each state's fill flags from its block registry; check every state against Java. */
+    @Test void stateFlagsMatchEveryState() throws Throwable {
+        assertTrue(net.minecraft.world.level.block.NativeBlockRegistry.ready());
+        var call = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_noise_fill_state_flags",
+            java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.ADDRESS,
+                java.lang.foreign.ValueLayout.JAVA_INT));
+        int states = net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.size();
+        byte[] flags = new byte[states];
+        try (var arena = java.lang.foreign.Arena.ofConfined()) {
+            var out = arena.allocate(states);
+            assertEquals(states, (int)call.invokeExact(out, states));
+            java.lang.foreign.MemorySegment.copy(out, java.lang.foreign.ValueLayout.JAVA_BYTE, 0, flags, 0, states);
+        }
+        for (int id = 0; id < states; id++) {
+            var state = net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.byId(id);
+            int expected = (state.isAir() ? 1 : 0) | (state.blocksMotion() ? 2 : 0) | (!state.getFluidState().isEmpty() ? 4 : 0)
+                | (state.isRandomlyTicking() ? 8 : 0) | (state.is(net.minecraft.world.level.block.Blocks.AIR) ? 16 : 0);
+            assertEquals(expected, flags[id], "flags of " + state);
+        }
+        System.out.println("NOISE_FLAGS_PARITY states=" + states);
+    }
 }

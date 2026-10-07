@@ -1,4 +1,4 @@
-use super::{ffi::mattmc_skylight_sources_section, scan};
+use super::{ffi::section as mattmc_skylight_sources_section, scan};
 #[test]
 fn packed_scan_matches_voxel_edges() {
     for bits in [0usize, 4, 5, 6, 7, 8, 9, 12, 15, 16, 32] {
@@ -147,4 +147,52 @@ fn empty_clear_preserves_every_padding_bit() {
         unsafe { super::ffi::mattmc_skylight_sources_empty(std::ptr::null_mut(), 1, 9) },
         -1
     );
+}
+
+#[test]
+fn tables_intern_up_and_down_faces_in_state_order() {
+    use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
+    // Registry faces: 0 empty, 1 full, 2 bottom slab top, 3 a side face.
+    let state = |light_block: u8, faces: [u16; 6], flags: u8| StateFacts {
+        flags: StateFlags(flags),
+        light_block,
+        emission: 0,
+        light_faces: faces.map(FaceId),
+    };
+    let mut b = Builder::new();
+    b.block("minecraft:air", &[], 0, vec![state(0, [0; 6], 0)]).unwrap();
+    // Down face 3 is seen before any up face uses it.
+    b.block("side", &[], 0, vec![state(0, [3, 0, 3, 3, 3, 3], 0)]).unwrap();
+    b.block("slab", &[], 0, vec![state(0, [1, 2, 0, 0, 0, 0], 0)]).unwrap();
+    b.block("stone", &[], 0, vec![state(15, [1; 6], 0)]).unwrap();
+    b.block("custom", &[], 0, vec![state(15, [1; 6], StateFlags::CUSTOM.0)]).unwrap();
+    let mut occludes = vec![0u8; 16];
+    for (from, to) in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 2), (3, 0)] {
+        occludes[from * 4 + to] = 1;
+    }
+    let t = super::tables(&b.finish(4, occludes).unwrap()).unwrap();
+    // Local faces in first-use order (up before down): 0, 3, 2, 1.
+    assert_eq!(t.faces, 4);
+    assert_eq!(t.descriptors, vec![0, 1 << 16, 2 << 1 | 3 << 16, 1 | 3 << 1 | 3 << 16, super::CUSTOM]);
+    let registry_face = [0usize, 3, 2, 1];
+    for (d, &rd) in registry_face.iter().enumerate() {
+        for (u, &ru) in registry_face.iter().enumerate() {
+            let expected = [(1, 0), (1, 1), (1, 2), (1, 3), (2, 2), (3, 0)].contains(&(rd, ru));
+            assert_eq!(t.edges[d * 4 + u] != 0, expected, "{rd} over {ru}");
+        }
+    }
+    assert!(t.custom);
+}
+
+#[test]
+fn tables_decline_too_many_faces() {
+    use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
+    let mut b = Builder::new();
+    let states = (0..300u16)
+        .map(|i| StateFacts { flags: StateFlags(0), light_block: 0, emission: 0, light_faces: [FaceId(2 * i + 1), FaceId(2 * i + 2), FaceId(0), FaceId(0), FaceId(0), FaceId(0)] })
+        .collect::<Vec<_>>();
+    let values: Vec<String> = (0..300).map(|i| i.to_string()).collect();
+    let p = b.property("i", &values.iter().map(String::as_str).collect::<Vec<_>>()).unwrap();
+    b.block("many", &[p], 0, states).unwrap();
+    assert!(super::tables(&b.finish(601, vec![0; 601 * 601]).unwrap()).is_none());
 }

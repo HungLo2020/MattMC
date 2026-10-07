@@ -1,6 +1,5 @@
 package net.minecraft.world.level.chunk;
 
-import java.io.ByteArrayOutputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
@@ -11,13 +10,12 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.Holder;
 import net.minecraft.core.IdMap;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.NativeNbtRegionAccess;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.ZeroBitStorage;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import org.jetbrains.annotations.Nullable;
@@ -30,8 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * chunk storage to borrow its package-private palette data. */
 public final class NativeChunkSections {
     private static final MethodHandle VOCABULARY = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_vocabulary",
-        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG));
     private static final MethodHandle ENCODE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_encode",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
@@ -68,58 +65,25 @@ public final class NativeChunkSections {
         return enabled;
     }
 
-    /** Every block state's canonical label (equal for identical states), its
-     * {@code BlockState.CODEC} compound as list-element tape, and the block
-     * strategy's storage bits per palette size. Built on first use. */
+    /** Rust's block-state vocabulary, built from its block registry: each
+     * state's {@code BlockState.CODEC} compound as list-element tape (labels
+     * are state IDs) and the block strategy's storage bits per palette size.
+     * Built on first use; 0 without one. */
     private static final class Vocabulary {
-        static final int[] LABELS;
-        // The state of each label (its first registry ID's state).
-        static final BlockState[] BY_LABEL;
+        static final int STATES = Block.BLOCK_STATE_REGISTRY.size();
         static final long HANDLE;
         @Nullable
         static final Strategy<BlockState> STRATEGY;
 
         static {
-            int count = Block.BLOCK_STATE_REGISTRY.size();
-            int[] labels = new int[count];
             long handle = 0;
             Strategy<BlockState> strategy = null;
             try {
                 strategy = Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY);
-                var identities = new IdentityHashMap<BlockState, Integer>();
-                var fragments = new ByteArrayOutputStream();
-                var offsets = new java.util.ArrayList<Integer>();
-                offsets.add(0);
-                for (int id = 0; id < count; id++) {
-                    BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
-                    if (state == null || state.getClass() != BlockState.class) throw new IllegalStateException("Unsupported state " + id);
-                    Integer label = identities.get(state);
-                    if (label == null) {
-                        label = identities.size();
-                        identities.put(state, label);
-                        fragments.write(NativeNbtRegionAccess.elementTape(BlockState.CODEC.encodeStart(NbtOps.INSTANCE, state).getOrThrow()));
-                        offsets.add(fragments.size());
-                    }
-                    labels[id] = label;
-                }
-                byte[] bits = new byte[4097];
-                for (int size = 1; size <= 4096; size++) bits[size] = (byte)strategy.getConfigurationForPaletteSize(size).bitsInStorage();
-                byte[] blob = fragments.toByteArray();
-                int[] ends = offsets.stream().mapToInt(Integer::intValue).toArray();
-                try (Arena arena = Arena.ofConfined()) {
-                    handle = (long)VOCABULARY.invokeExact(arena.allocateFrom(ValueLayout.JAVA_INT, labels), labels.length,
-                        arena.allocateFrom(ValueLayout.JAVA_BYTE, blob), blob.length, arena.allocateFrom(ValueLayout.JAVA_INT, ends), ends.length,
-                        arena.allocateFrom(ValueLayout.JAVA_BYTE, bits), bits.length);
-                }
+                if (NativeBlockRegistry.ready()) handle = (long)VOCABULARY.invokeExact();
             } catch (Throwable error) {
                 handle = 0;
             }
-            LABELS = labels;
-            int distinct = 0;
-            for (int label : labels) distinct = Math.max(distinct, label + 1);
-            BlockState[] byLabel = new BlockState[distinct];
-            for (int id = labels.length - 1; id >= 0; id--) byLabel[labels[id]] = Block.BLOCK_STATE_REGISTRY.byId(id);
-            BY_LABEL = byLabel;
             HANDLE = handle;
             STRATEGY = strategy;
         }
@@ -258,7 +222,7 @@ public final class NativeChunkSections {
         if (words == null || !modelledPalette(palette)) return false;
         int size = palette.getSize();
         if (palette.getClass() == GlobalPalette.class) {
-            if (container.registryForNativeScan() != Block.BLOCK_STATE_REGISTRY || size != Vocabulary.LABELS.length) return false;
+            if (container.registryForNativeScan() != Block.BLOCK_STATE_REGISTRY || size != Vocabulary.STATES) return false;
             out.addInt(1);
             out.addInt(data.storage().getBits());
             out.addInt(size);
@@ -273,8 +237,8 @@ public final class NativeChunkSections {
                 BlockState state = palette.valueFor(i);
                 if (state == null || state.getClass() != BlockState.class) return false;
                 int id = Block.BLOCK_STATE_REGISTRY.getId(state);
-                if (id < 0 || id >= Vocabulary.LABELS.length) return false;
-                out.addInt(Vocabulary.LABELS[id]);
+                if (id < 0 || id >= Vocabulary.STATES) return false;
+                out.addInt(id);
             }
         }
         out.addLongs(words);
@@ -421,7 +385,7 @@ public final class NativeChunkSections {
      * container its palette size, word count (-1 without data) and entries. */
     public record Decoded(byte[] root, int[] ints, long[] longs, byte[] bytes, IdMap<Holder<Biome>> biomes) {
         public BlockState state(int label) {
-            return Vocabulary.BY_LABEL[label];
+            return Block.BLOCK_STATE_REGISTRY.byId(label);
         }
     }
 

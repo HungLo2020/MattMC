@@ -5,6 +5,7 @@ import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.ZeroBitStorage;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -47,11 +48,13 @@ final class NativePalettePacking {
                             ValueLayout.JAVA_INT,
                             ValueLayout.ADDRESS,
                             ValueLayout.JAVA_INT));
-    private static final MemorySegment LOCAL_LABELS = createLocalLabels();
+    // Identity labels: local palette ids, and global ones, which are state ids of
+    // distinct states once NativeBlockRegistry has verified the registry.
+    private static final MemorySegment LABELS = createLabels(32768);
 
-    private static MemorySegment createLocalLabels() {
-        var labels = Arena.ofAuto().allocate(256 * 4, 4);
-        for (int i = 0; i < 256; i++) labels.setAtIndex(ValueLayout.JAVA_INT, i, i);
+    private static MemorySegment createLabels(int count) {
+        var labels = Arena.ofAuto().allocate(count * 4L, 4);
+        for (int i = 0; i < count; i++) labels.setAtIndex(ValueLayout.JAVA_INT, i, i);
         return labels.asReadOnly();
     }
 
@@ -60,30 +63,6 @@ final class NativePalettePacking {
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
 
     private NativePalettePacking() {}
-
-    private static final class BlockLabels {
-        static final int COUNT = Block.BLOCK_STATE_REGISTRY.size();
-        static final MemorySegment VALUES = create();
-
-        private static MemorySegment create() {
-            var labels = Arena.ofAuto().allocate(Math.max(COUNT, 1) * 4L, 4);
-            var identities = new IdentityHashMap<Object, Integer>();
-            for (int i = 0; i < COUNT; i++) {
-                var state = Block.BLOCK_STATE_REGISTRY.byId(i);
-                if (state == null)
-                    labels.setAtIndex(ValueLayout.JAVA_INT, i, COUNT); // rejected if encountered
-                else {
-                    var label = identities.get(state);
-                    if (label == null) {
-                        label = identities.size();
-                        identities.put(state, label);
-                    }
-                    labels.setAtIndex(ValueLayout.JAVA_INT, i, label);
-                }
-            }
-            return labels.asReadOnly();
-        }
-    }
 
     private static final class Scratch {
         final MemorySegment words = Arena.ofAuto().allocate(2048 * 8, 8);
@@ -117,7 +96,7 @@ final class NativePalettePacking {
                         || palette != owner.globalPalette())) return null;
         int count = palette.getSize();
         if (count < 1 || count > (global ? 32768 : 256)) return null;
-        if (global && count != BlockLabels.COUNT) return null;
+        if (global && (count != Block.BLOCK_STATE_REGISTRY.size() || !NativeBlockRegistry.ready())) return null;
         var scratch = SCRATCH.get();
         if (scratch.inUse) return null;
         scratch.inUse = true;
@@ -136,7 +115,6 @@ final class NativePalettePacking {
             int count,
             Scratch scratch) {
         // Compact used source IDs first. Do not inspect unused palette entries.
-        MemorySegment labels = global ? BlockLabels.VALUES : LOCAL_LABELS;
         var raw = storage.getRaw();
         MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, raw.length * 8L);
         int unique;
@@ -147,7 +125,7 @@ final class NativePalettePacking {
                                     scratch.words,
                                     raw.length,
                                     storage.getBits(),
-                                    labels,
+                                    LABELS,
                                     count,
                                     scratch.lookup,
                                     count,

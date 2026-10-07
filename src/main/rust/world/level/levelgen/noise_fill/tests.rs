@@ -176,3 +176,17 @@ fn random_sources_follow_java_rules() {
     assert_eq!(a.next_float(), b.next_float());
     assert!((0.0..1.0).contains(&a.next_float()));
 }
+
+#[test]
+fn state_flags_follow_the_registry() {
+    use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
+    use crate::world::level::levelgen::proto_chunk::FLAG_AIR_BLOCK;
+    let state = |flags: u8| StateFacts { flags: StateFlags(flags), light_block: 0, emission: 0, light_faces: [FaceId(0); 6] };
+    let mut b = Builder::new();
+    b.block("minecraft:air", &[], 0, vec![state(StateFlags::AIR.0)]).unwrap();
+    b.block("minecraft:cave_air", &[], 0, vec![state(StateFlags::AIR.0)]).unwrap();
+    b.block("minecraft:water", &[], 0, vec![state(StateFlags::HAS_FLUID.0 | StateFlags::RANDOM_TICKS.0)]).unwrap();
+    b.block("minecraft:stone", &[], 0, vec![state(StateFlags::BLOCKS_MOTION.0 | StateFlags::LEAVES.0 | StateFlags::LIGHT_EMPTY_SHAPE.0)]).unwrap();
+    let flags = state_flags(&b.finish(1, vec![0]).unwrap());
+    assert_eq!(flags, vec![FLAG_AIR | FLAG_AIR_BLOCK, FLAG_AIR, FLAG_FLUID | FLAG_RANDOM_TICKS, FLAG_BLOCKS_MOTION]);
+}

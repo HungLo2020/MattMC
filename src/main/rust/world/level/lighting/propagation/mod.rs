@@ -8,7 +8,9 @@ mod seed;
 #[cfg(test)]
 mod tests;
 
+use crate::content::block::{BlockRegistry, StateFlags, StateId};
 use std::collections::{HashMap, VecDeque};
+use std::sync::OnceLock;
 use std::hash::{BuildHasherDefault, Hasher};
 
 const LAYER: usize = 2048;
@@ -31,7 +33,7 @@ pub(crate) enum Error {
 /// Light properties of a block state: `max(1, getLightBlock())`,
 /// `getLightEmission()`, `isEmptyShape()` and the face ID of
 /// `getOcclusionShape(state, direction)` for each direction.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct Type {
     pub opacity: u8,
     pub emission: u8,
@@ -49,10 +51,66 @@ pub(crate) struct Tables {
     pub air: u16,
 }
 
+/// The type of states Rust must not see (custom `BlockState` subclasses).
+pub(crate) const UNSUPPORTED: u16 = u16::MAX;
+/// Most distinct faces the tables accept.
+const MAX_FACES: usize = 4096;
+
 impl Tables {
+    /// The light types of `registry`'s states, numbered in state order.
+    /// `None` when there are too many types or faces.
+    pub(crate) fn from_registry(registry: &BlockRegistry) -> Option<Tables> {
+        let faces = registry.face_count();
+        if faces > MAX_FACES {
+            return None;
+        }
+        let mut ids: HashMap<Type, u16> = HashMap::new();
+        let mut types = Vec::new();
+        let mut state_types = Vec::with_capacity(registry.state_count());
+        for s in 0..registry.state_count() {
+            let state = StateId(s as u16);
+            let flags = registry.flags(state);
+            if flags.contains(StateFlags::CUSTOM) {
+                state_types.push(UNSUPPORTED);
+                continue;
+            }
+            let t = Type {
+                opacity: registry.light_block(state).max(1),
+                emission: registry.emission(state),
+                empty: flags.contains(StateFlags::LIGHT_EMPTY_SHAPE),
+                faces: registry.light_face_column()[s].map(|f| f.0),
+            };
+            let next = types.len();
+            let id = *ids.entry(t).or_insert_with(|| {
+                types.push(t);
+                next as u16
+            });
+            if types.len() >= UNSUPPORTED as usize {
+                return None;
+            }
+            state_types.push(id);
+        }
+        let air = registry.block(registry.air()?).default_state();
+        let air = *state_types.get(air.index()).filter(|&&t| t != UNSUPPORTED)?;
+        Some(Tables { state_types, types, faces, occludes: registry.face_matrix().to_vec(), air })
+    }
+
+    /// The type of a state id from Java, [`UNSUPPORTED`] for unknown ids.
+    pub(crate) fn state_type(&self, id: u16) -> u16 {
+        self.state_types.get(id as usize).copied().unwrap_or(UNSUPPORTED)
+    }
+
     fn occludes(&self, from: u16, to: u16) -> bool {
         self.occludes[from as usize * self.faces + to as usize] != 0
     }
+}
+
+/// [`Tables::from_registry`] of the installed registry; `None` until it is
+/// installed or when its types do not fit.
+pub(crate) fn installed_tables() -> Option<&'static Tables> {
+    static TABLES: OnceLock<Option<Tables>> = OnceLock::new();
+    let registry = crate::content::block::installed()?;
+    TABLES.get_or_init(|| Tables::from_registry(registry)).as_ref()
 }
 
 /// A section's block states as Java's `LightChunk.getBlockState` sees them.

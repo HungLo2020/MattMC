@@ -9,35 +9,12 @@ thread_local! {
     static DECODED: RefCell<Option<Decoded>> = const { RefCell::new(None) };
 }
 
-/// The block-state vocabulary: canonical label per state id, each label's
-/// list-element tape in `fragments` (label `i` spans `offsets[i]..offsets[i + 1]`)
-/// and `bitsInStorage` per block palette size. Returns 0 on invalid input.
-/// Never freed.
-/// # Safety
-/// Each pointer addresses its stated count of values for this call.
+/// The block-state vocabulary built from the installed block registry
+/// (labels are state ids). Returns 0 when the registry is not installed or
+/// Java must encode its states. Never freed.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_chunk_sections_vocabulary(labels: *const u32, label_len: i32, fragments: *const u8, fragment_len: i32,
-    offsets: *const u32, offset_len: i32, bits: *const u8, bits_len: i32) -> u64 {
-    if labels.is_null() || fragments.is_null() || offsets.is_null() || bits.is_null() || label_len <= 0 || fragment_len < 0
-        || offset_len < 2 || bits_len < 2
-    {
-        return 0;
-    }
-    let offsets = std::slice::from_raw_parts(offsets, offset_len as usize).to_vec();
-    let labels = std::slice::from_raw_parts(labels, label_len as usize).to_vec();
-    if offsets.windows(2).any(|w| w[0] > w[1]) || *offsets.last().unwrap() as i32 != fragment_len
-        || labels.iter().any(|&l| l as usize + 1 >= offsets.len())
-    {
-        return 0;
-    }
-    let vocabulary = Vocabulary {
-        labels,
-        fragments: std::slice::from_raw_parts(fragments, fragment_len as usize).to_vec(),
-        offsets,
-        bits: std::slice::from_raw_parts(bits, bits_len as usize).to_vec(),
-        lookup: std::sync::OnceLock::new(),
-    };
-    Box::into_raw(Box::new(vocabulary)) as u64
+pub extern "C" fn mattmc_chunk_sections_vocabulary() -> u64 {
+    super::vocabulary::installed().map_or(0, |v| v as *const Vocabulary as u64)
 }
 
 struct Reader<'a> {
@@ -246,4 +223,21 @@ pub unsafe extern "C" fn mattmc_chunk_sections_take(ints: *mut i32, longs: *mut 
     copy(decoded.bytes.as_ptr(), bytes, decoded.bytes.len());
     copy(decoded.root.as_ptr(), root, decoded.root.len());
     0
+}
+
+/// Verification: copies state `state`'s fragment from the installed
+/// vocabulary when `out` holds enough bytes. Returns its length, or -1
+/// without a vocabulary or for an unknown state.
+/// # Safety
+/// A non-null `out` addresses `out_len` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_sections_fragment(state: i32, out: *mut u8, out_len: i32) -> i32 {
+    let Some(v) = super::vocabulary::installed() else { return -1 };
+    let Some(&start) = usize::try_from(state).ok().and_then(|s| v.offsets.get(s)) else { return -1 };
+    let Some(&end) = v.offsets.get(state as usize + 1) else { return -1 };
+    let fragment = &v.fragments[start as usize..end as usize];
+    if !out.is_null() && out_len as usize >= fragment.len() {
+        std::slice::from_raw_parts_mut(out, fragment.len()).copy_from_slice(fragment);
+    }
+    fragment.len() as i32
 }

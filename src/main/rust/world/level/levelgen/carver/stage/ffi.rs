@@ -13,24 +13,22 @@ pub(crate) type TopCallback = unsafe extern "C" fn(i32, i32, i32, i32, *const i6
 const MASK: usize = 0;
 const MASK_WORDS: usize = 1;
 const SIN: usize = 2;
-const BLOCK_OF: usize = 3;
-const STATE_COUNT: usize = 4;
-const GRID: usize = 5;
-const GRID_LEN: usize = 6;
-const CACHE: usize = 7;
-const SURFACE: usize = 8;
-const SURFACE_LEN: usize = 9;
-const SOURCES: usize = 10;
-const LEVELS: usize = 11;
-const MEMO: usize = 12;
-const PRESENT: usize = 13;
-const MEMO_LEN: usize = 14;
-const BARRIER: usize = 15;
-const SEED_A: usize = 16;
-const SEED_B: usize = 17;
-const BARRIER_XZ: usize = 18;
-const BARRIER_Y: usize = 19;
-const POINTERS: usize = 20;
+const GRID: usize = 3;
+const GRID_LEN: usize = 4;
+const CACHE: usize = 5;
+const SURFACE: usize = 6;
+const SURFACE_LEN: usize = 7;
+const SOURCES: usize = 8;
+const LEVELS: usize = 9;
+const MEMO: usize = 10;
+const PRESENT: usize = 11;
+const MEMO_LEN: usize = 12;
+const BARRIER: usize = 13;
+const SEED_A: usize = 14;
+const SEED_B: usize = 15;
+const BARRIER_XZ: usize = 16;
+const BARRIER_Y: usize = 17;
+const POINTERS: usize = 18;
 
 // Fixed int slots before the configurations and operations.
 const HEADER: usize = 39;
@@ -56,8 +54,8 @@ fn provider(v: &[f64]) -> Option<FloatProvider> {
 /// block ids, then per configuration (kind, lava level, height min, height
 /// max, width smoothness, replaceable block count), the neighbour count and
 /// per neighbour (x, z, carver count, configuration indices), then each
-/// configuration's replaceable block ids]; `pointers[BLOCK_OF]` maps each state
-/// id to its block id; `doubles` per configuration (probability, then the Y
+/// configuration's replaceable block ids]; state to block ids come from the
+/// installed block registry; `doubles` per configuration (probability, then the Y
 /// scale and four shape providers as [kind, a, b, c]: cave horizontal radius,
 /// vertical radius, floor level, unused; canyon vertical rotation, thickness,
 /// distance factor, horizontal radius; then the canyon's vertical default and
@@ -85,10 +83,11 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
     let seed = unsafe { *longs };
     let Ok(config_count) = usize::try_from(i[9]) else { return -1 };
     if config_count > 30 || i.len() < HEADER + config_count * CONFIG_INTS + 1 || d.len() != config_count * CONFIG_DOUBLES
-        || p[MASK] == 0 || p[SIN] == 0 || p[BLOCK_OF] == 0 || p[MASK_WORDS] <= 0 || p[STATE_COUNT] <= 0
+        || p[MASK] == 0 || p[SIN] == 0 || p[MASK_WORDS] <= 0
     {
         return -1;
     }
+    let Some(registry) = crate::content::block::installed() else { return -1 };
     let mut configs = Vec::with_capacity(config_count);
     for k in 0..config_count {
         let c = &i[HEADER + k * CONFIG_INTS..HEADER + (k + 1) * CONFIG_INTS];
@@ -134,9 +133,8 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
     if i.len() != at + replaceable {
         return -1;
     }
-    let block_of = unsafe { std::slice::from_raw_parts(p[BLOCK_OF] as *const u32, p[STATE_COUNT] as usize) };
-    let block_count = block_of.iter().copied().max().unwrap_or(0) as usize + 1;
-    let mut blocks = vec![0u32; block_count];
+    let block_of = registry.block_column();
+    let mut blocks = vec![0u32; registry.blocks().len()];
     let mut set = |block: i32, bit: u32| -> bool {
         match usize::try_from(block).ok().and_then(|b| blocks.get_mut(b)) {
             Some(bits) => {

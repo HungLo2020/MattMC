@@ -5,19 +5,19 @@ use crate::world::level::levelgen::noise_fill::FLAG_FLUID;
 /// sectionCount, globalBits, then per section kind, storage bits, palette
 /// length, raw length, three counters, then palette ids]. `longs`: [per section
 /// raw storage..., WORLD_SURFACE_WG raw, OCEAN_FLOOR_WG raw] (`heightmap_words`
-/// each). Returns 0 if invalid.
+/// each). State flags come from the installed block registry. Returns 0 if
+/// invalid or the registry is not installed.
 /// # Safety
-/// Arrays hold the stated counts for this call; `flags` holds `flag_count`
-/// bytes for the process lifetime.
+/// Arrays hold the stated counts for this call.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_proto_chunk_create(ints: *const i32, int_count: i32, longs: *const i64, long_count: i32,
-    heightmap_words: i32, flags: *const u8, flag_count: i32) -> u64 {
-    if ints.is_null() || longs.is_null() || flags.is_null() || int_count < 4 || long_count < 0 || flag_count <= 0 || heightmap_words <= 0 {
+    heightmap_words: i32) -> u64 {
+    let Some(flags) = crate::world::level::levelgen::noise_fill::installed_state_flags() else { return 0 };
+    if ints.is_null() || longs.is_null() || int_count < 4 || long_count < 0 || heightmap_words <= 0 {
         return 0;
     }
     let i = unsafe { std::slice::from_raw_parts(ints, int_count as usize) };
     let l = unsafe { std::slice::from_raw_parts(longs, long_count as usize) };
-    let flags: &'static [u8] = unsafe { std::slice::from_raw_parts(flags, flag_count as usize) };
     match parse(i, l, heightmap_words as usize, flags) {
         Some(storage) => Box::into_raw(Box::new(storage)) as u64,
         None => 0,

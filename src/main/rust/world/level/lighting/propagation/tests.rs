@@ -91,3 +91,34 @@ fn sky_section_fills_above_sources_and_enqueues_edges() {
     assert_eq!(source(25), None);
     assert_eq!(entries.len(), 5);
 }
+
+#[test]
+fn registry_tables_number_types_in_state_order() {
+    use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
+    let state = |flags: u8, light_block: u8, emission: u8, face: u16| StateFacts {
+        flags: StateFlags(flags),
+        light_block,
+        emission,
+        light_faces: [FaceId(face); 6],
+    };
+    let empty = StateFlags::LIGHT_EMPTY_SHAPE.0;
+    let mut b = Builder::new();
+    b.block("minecraft:stone", &[], 0, vec![state(0, 15, 0, 1)]).unwrap();
+    b.block("minecraft:air", &[], 0, vec![state(StateFlags::AIR.0 | empty, 0, 0, 0)]).unwrap();
+    b.block("minecraft:cave_air", &[], 0, vec![state(StateFlags::AIR.0 | empty, 0, 0, 0)]).unwrap();
+    b.block("minecraft:glowstone", &[], 0, vec![state(0, 15, 15, 1)]).unwrap();
+    b.block("custom", &[], 0, vec![state(StateFlags::CUSTOM.0, 15, 0, 1)]).unwrap();
+    b.block("minecraft:deepslate", &[], 0, vec![state(0, 15, 0, 1)]).unwrap();
+    let registry = b.finish(2, vec![0, 0, 1, 1]).unwrap();
+    let t = Tables::from_registry(&registry).unwrap();
+    assert_eq!(t.state_types, vec![0, 1, 1, 2, super::UNSUPPORTED, 0]);
+    assert_eq!(t.types[0], Type { opacity: 15, emission: 0, empty: false, faces: [1; 6] });
+    // getLightBlock 0 still blocks one level.
+    assert_eq!(t.types[1], Type { opacity: 1, emission: 0, empty: true, faces: [0; 6] });
+    assert_eq!(t.types[2].emission, 15);
+    assert_eq!(t.air, 1);
+    assert_eq!((t.faces, t.occludes.clone()), (2, vec![0, 0, 1, 1]));
+    assert_eq!(t.state_type(5), 0);
+    assert_eq!(t.state_type(6), super::UNSUPPORTED);
+    assert_eq!(t.state_type(u16::MAX), super::UNSUPPORTED);
+}

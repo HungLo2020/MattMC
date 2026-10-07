@@ -10,22 +10,12 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.ref.Cleaner;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.NativeLibraryLoader;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.NativeLightBlocks;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 /** Rust propagation for {@link LightEngine#runLightUpdates()}: the decrease
@@ -36,8 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * queues untouched for the Java propagation. */
 final class NativeLightPropagation {
     private static final MethodHandle TABLES_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tables_create",
-        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG));
     private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_engine_create",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_engine_release",
@@ -75,86 +64,14 @@ final class NativeLightPropagation {
         }
     }
 
-    /** Light properties of every registered state, built on first use. */
+    /** Rust's light tables, derived from its block registry on first use; 0 without one. */
     private static final class Tables {
-        static final char[] TYPES;
-        static final long HANDLE;
+        static final long HANDLE = create();
 
-        static {
-            char[] types = new char[Block.BLOCK_STATE_REGISTRY.size()];
-            long handle = 0;
+        private static long create() {
+            if (!NativeBlockRegistry.ready()) return 0;
             try {
-                handle = build(types);
-            } catch (RuntimeException error) {
-                handle = 0;
-            }
-            TYPES = types;
-            HANDLE = handle;
-        }
-
-        private static int face(VoxelShape shape, IdentityHashMap<VoxelShape, Integer> seen, HashMap<List<AABB>, Integer> ids, ArrayList<VoxelShape> shapes) {
-            Integer known = seen.get(shape);
-            if (known != null) return known;
-            // Exact box lists; no coordinate quantization or shape approximation.
-            var key = List.copyOf(shape.toAabbs());
-            Integer id = ids.get(key);
-            if (id == null) {
-                id = shapes.size();
-                ids.put(key, id);
-                shapes.add(shape);
-            }
-            seen.put(shape, id);
-            return id;
-        }
-
-        private static long build(char[] stateTypes) throws RuntimeException {
-            var shapes = new ArrayList<VoxelShape>();
-            var ids = new HashMap<List<AABB>, Integer>();
-            var seen = new IdentityHashMap<VoxelShape, Integer>();
-            face(Shapes.empty(), seen, ids, shapes); // Empty shapes are face 0.
-            var typeIds = new HashMap<List<Integer>, Integer>();
-            var types = new ArrayList<List<Integer>>();
-            Direction[] directions = Direction.values();
-            for (int id = 0; id < stateTypes.length; id++) {
-                BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
-                if (state == null || state.getClass() != BlockState.class) {
-                    stateTypes[id] = NativeLightBlocks.UNSUPPORTED;
-                    continue;
-                }
-                var type = new ArrayList<Integer>(9);
-                // LightEngine.getOpacity, getLightEmission, isEmptyShape, then getOcclusionShape per direction.
-                type.add(Math.max(1, state.getLightBlock()));
-                type.add(state.getLightEmission());
-                type.add(LightEngine.isEmptyShape(state) ? 1 : 0);
-                for (Direction direction : directions) {
-                    type.add(face(LightEngine.getOcclusionShape(state, direction), seen, ids, shapes));
-                }
-                Integer typeId = typeIds.get(type);
-                if (typeId == null) {
-                    typeId = types.size();
-                    typeIds.put(type, typeId);
-                    types.add(type);
-                }
-                if (typeId >= NativeLightBlocks.UNSUPPORTED) return 0;
-                stateTypes[id] = (char)(int)typeId;
-            }
-            int faces = shapes.size();
-            if (faces > 4096) return 0;
-            byte[] occludes = new byte[faces * faces];
-            // The original shape operation supplies the immutable truth table.
-            for (int from = 0; from < faces; from++) {
-                for (int to = 0; to < faces; to++) {
-                    occludes[from * faces + to] = (byte)(Shapes.faceShapeOccludes(shapes.get(from), shapes.get(to)) ? 1 : 0);
-                }
-            }
-            char[] flat = new char[types.size() * 9];
-            for (int t = 0; t < types.size(); t++) {
-                for (int k = 0; k < 9; k++) flat[t * 9 + k] = (char)(int)types.get(t).get(k);
-            }
-            int air = stateTypes[Block.BLOCK_STATE_REGISTRY.getId(Blocks.AIR.defaultBlockState())];
-            try (Arena arena = Arena.ofConfined()) {
-                return (long)TABLES_CREATE.invokeExact(arena.allocateFrom(ValueLayout.JAVA_CHAR, stateTypes), stateTypes.length,
-                    arena.allocateFrom(ValueLayout.JAVA_CHAR, flat), types.size(), arena.allocateFrom(ValueLayout.JAVA_BYTE, occludes), faces, air);
+                return (long)TABLES_CREATE.invokeExact();
             } catch (RuntimeException | Error error) {
                 throw error;
             } catch (Throwable error) {
@@ -341,7 +258,7 @@ final class NativeLightPropagation {
                 return layer == null ? 0 : NativeLightBlocks.layer(layer, storage.lightOnInSection(section), buffer);
             }
             int x = SectionPos.x(section), z = SectionPos.z(section);
-            return NativeLightBlocks.blocks(current.engine.chunkSource.getChunkForLighting(x, z), x, SectionPos.y(section), z, Tables.TYPES, buffer);
+            return NativeLightBlocks.blocks(current.engine.chunkSource.getChunkForLighting(x, z), x, SectionPos.y(section), z, buffer);
         } catch (Throwable error) {
             return -2;
         }

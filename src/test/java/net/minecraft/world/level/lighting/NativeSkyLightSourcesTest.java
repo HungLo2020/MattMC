@@ -29,10 +29,20 @@ class NativeSkyLightSourcesTest {
         assertEquals(a.getHighestLowestSourceY(),b.getHighestLowestSourceY());
         b.fillFrom(chunk);assertArrayEquals(SkyLightSourcesFixtures.storage(a).getRaw(),SkyLightSourcesFixtures.storage(b).getRaw());
     }
-    @Test void exactOcclusionCatalogForEveryShapePair() throws Exception {
-        var field=NativeSkyLightSources.class.getDeclaredField("TABLES");field.setAccessible(true);var tables=field.get(null);
-        var methods=tables.getClass();var d=methods.getDeclaredMethod("descriptors");d.setAccessible(true);var f=methods.getDeclaredMethod("faces");f.setAccessible(true);var e=methods.getDeclaredMethod("edges");e.setAccessible(true);
-        int[] descriptors=(int[])d.invoke(tables);int count=(int)f.invoke(tables);var edges=(MemorySegment)e.invoke(tables);
+    @Test void exactOcclusionCatalogForEveryShapePair() throws Throwable {
+        // Rust derives the catalog from its block registry; compare it with Java's shapes.
+        var tablesCall=net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_skylight_sources_tables",
+            java.lang.foreign.FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+        assertTrue(net.minecraft.world.level.block.NativeBlockRegistry.ready());
+        int states=Block.BLOCK_STATE_REGISTRY.size();
+        int count=(int)tablesCall.invokeExact(MemorySegment.NULL,0,MemorySegment.NULL,0);
+        int[] descriptors=new int[states];MemorySegment edges;
+        try(var arena=java.lang.foreign.Arena.ofConfined()){
+            var d=arena.allocate(states*4L,4);var e=arena.allocate(Math.max(1,(long)count*count));
+            assertEquals(count,(int)tablesCall.invokeExact(d,states,e,count*count));
+            MemorySegment.copy(d,ValueLayout.JAVA_INT,0,descriptors,0,states);
+            edges=java.lang.foreign.Arena.ofAuto().allocate(e.byteSize());edges.copyFrom(e);
+        }
         assertTrue(count>0);
         var ups=new IdentityHashMap<VoxelShape,Integer>();var downs=new IdentityHashMap<VoxelShape,Integer>();
         for(int id=0;id<descriptors.length;id++) {

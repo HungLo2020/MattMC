@@ -61,3 +61,70 @@ fn rejected_container_leaves_the_lookup_clean_for_the_next_one() {
     assert_eq!(order, vec![1, 0]);
     assert_eq!(&indices[..3], &[0, 1, 1]);
 }
+
+#[test]
+fn block_storage_bits_follow_the_block_strategy() {
+    use super::vocabulary::block_storage_bits;
+    let expected = |size: usize| -> u8 {
+        match size {
+            0 | 1 => 0,
+            2..=16 => 4,
+            17..=32 => 5,
+            33..=64 => 6,
+            65..=128 => 7,
+            129..=256 => 8,
+            _ => (size as f64).log2().ceil() as u8,
+        }
+    };
+    for size in 0..=4096 {
+        assert_eq!(block_storage_bits(size), expected(size), "size {size}");
+    }
+}
+
+#[test]
+fn vocabulary_fragments_omit_default_properties_and_keep_hash_order() {
+    use crate::content::block::{Builder, FaceId, StateFacts, StateFlags, StateId};
+    let facts = StateFacts { flags: StateFlags(0), light_block: 0, emission: 0, light_faces: [FaceId(0); 6] };
+    let mut b = Builder::new();
+    let lit = b.property("lit", &["true", "false"]).unwrap();
+    let facing = b.property("facing", &["north", "south"]).unwrap();
+    b.block("minecraft:stone", &[], 0, vec![facts]).unwrap();
+    // Properties in name order: facing, lit. Default is facing=north, lit=false.
+    b.block("minecraft:furnace", &[facing, lit], 1, vec![facts; 4]).unwrap();
+    let registry = b.finish(1, vec![0]).unwrap();
+    let v = super::vocabulary::vocabulary(&registry).unwrap();
+    assert_eq!(v.labels, vec![0, 1, 2, 3, 4]);
+    let fragment = |s: usize| &v.fragments[v.offsets[s] as usize..v.offsets[s + 1] as usize];
+
+    let string = |tape: &mut Tape, key: &str, value: &str| {
+        tape.record(TAG_STRING, 0, &u(key), value.len(), 0);
+        for unit in u(value) {
+            tape.out.extend_from_slice(&unit.to_le_bytes());
+        }
+    };
+    let mut stone = Tape { out: Vec::new() };
+    stone.record(TAG_COMPOUND, 0, &[], 1, 0);
+    string(&mut stone, "Name", "minecraft:stone");
+    assert_eq!(fragment(0), stone.out.as_slice());
+    let mut default = Tape { out: Vec::new() };
+    default.record(TAG_COMPOUND, 0, &[], 1, 0);
+    string(&mut default, "Name", "minecraft:furnace");
+    assert_eq!(fragment(2), default.out.as_slice());
+    // facing=north, lit=true: {Name, Properties{facing, lit}} in HashMap order.
+    let outer = hash_map_order(&[&u("Properties"), &u("Name")]);
+    let inner = hash_map_order(&[&u("lit"), &u("facing")]);
+    let mut lit_north = Tape { out: Vec::new() };
+    lit_north.record(TAG_COMPOUND, 0, &[], 2, 0);
+    for i in outer {
+        if i == 1 {
+            string(&mut lit_north, "Name", "minecraft:furnace");
+        } else {
+            lit_north.record(TAG_COMPOUND, 0, &u("Properties"), 2, 0);
+            for j in &inner {
+                if *j == 0 { string(&mut lit_north, "lit", "true") } else { string(&mut lit_north, "facing", "north") }
+            }
+        }
+    }
+    assert_eq!(registry.state(registry.by_name("minecraft:furnace").unwrap(), &[0, 0]), Some(StateId(1)));
+    assert_eq!(fragment(1), lit_north.out.as_slice());
+}

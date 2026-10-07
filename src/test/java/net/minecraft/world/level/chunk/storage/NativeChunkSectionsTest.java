@@ -381,4 +381,27 @@ class NativeChunkSectionsTest {
         assertTrue(Files.list(dir).findAny().isPresent());
         System.out.println("CHUNK_SECTIONS_IO_ROUND_TRIP chunks=8");
     }
+
+    /** Rust builds every state's {@code BlockState.CODEC} fragment from its block registry. */
+    @Test void everyStateFragmentMatchesTheCodec() throws Throwable {
+        assertTrue(net.minecraft.world.level.block.NativeBlockRegistry.ready());
+        var call = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_fragment",
+            java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.JAVA_INT,
+                java.lang.foreign.ValueLayout.ADDRESS, java.lang.foreign.ValueLayout.JAVA_INT));
+        int states = Block.BLOCK_STATE_REGISTRY.size();
+        long bytes = 0;
+        try (var arena = java.lang.foreign.Arena.ofConfined()) {
+            var out = arena.allocate(4096);
+            for (int id = 0; id < states; id++) {
+                BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
+                byte[] expected = NativeNbtRegionAccess.elementTape(BlockState.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, state).getOrThrow());
+                int length = (int)call.invokeExact(id, out, 4096);
+                assertEquals(expected.length, length, "fragment length of " + state);
+                assertArrayEquals(expected, out.asSlice(0, length).toArray(java.lang.foreign.ValueLayout.JAVA_BYTE), "fragment of " + state);
+                bytes += length;
+            }
+        }
+        assertEquals(-1, (int)call.invokeExact(states, java.lang.foreign.MemorySegment.NULL, 0));
+        System.out.println("CHUNK_SECTIONS_VOCABULARY_PARITY states=" + states + " bytes=" + bytes);
+    }
 }

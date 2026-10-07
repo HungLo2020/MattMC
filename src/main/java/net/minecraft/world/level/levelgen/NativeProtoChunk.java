@@ -13,6 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.BlockColumn;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -29,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * install once at the end. Stages borrow the storage's handle. */
 final class NativeProtoChunk implements AutoCloseable {
     private static final MethodHandle CREATE = bind("create", true, FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle HEIGHT = bind("height", false, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle GET = bind("get", false, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
@@ -64,7 +65,8 @@ final class NativeProtoChunk implements AutoCloseable {
      * heightmaps to update are the primed world-generation pair, and modelled sections. */
     @Nullable
     static NativeProtoChunk create(ChunkAccess chunk) {
-        if (chunk.getClass() != ProtoChunk.class || ((ProtoChunk)chunk).getPersistedStatus().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)
+        // Rust reads per-state flags from its block registry.
+        if (!NativeBlockRegistry.ready() || chunk.getClass() != ProtoChunk.class || ((ProtoChunk)chunk).getPersistedStatus().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)
             || !((ProtoChunk)chunk).getPersistedStatus().heightmapsAfter().equals(GENERATION)
             || !chunk.hasPrimedHeightmap(Heightmap.Types.WORLD_SURFACE_WG) || !chunk.hasPrimedHeightmap(Heightmap.Types.OCEAN_FLOOR_WG)) {
             return null;
@@ -109,12 +111,10 @@ final class NativeProtoChunk implements AutoCloseable {
         }
         System.arraycopy(surface, 0, longArray, raw, surface.length);
         System.arraycopy(floor, 0, longArray, raw + surface.length, floor.length);
-        // The flag table covers every state id a section or stage can hold.
-        MemorySegment flags = NativeNoiseFill.flags();
         long handle;
         try {
             handle = (long)CREATE.invokeExact(MemorySegment.ofArray(intArray), intArray.length, MemorySegment.ofArray(longArray), longArray.length,
-                surface.length, flags, NativeNoiseFill.flagCount());
+                surface.length);
         } catch (Throwable error) {
             throw new IllegalStateException("Cannot create native chunk storage", error);
         }
