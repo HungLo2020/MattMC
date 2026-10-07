@@ -189,6 +189,11 @@ also share persistent instance arrays. This was the default at the earlier
   upper bits carry the store generation (advanced whenever the store is
   cleared); Rust then identifies the unchanged mesh by address instead of
   rehashing its vertices. Never rewrite persistent GUI geometry in place.
+- Generic DH boxes (up to 10,000 per frame, mostly clouds) travel as
+  `PackedDhGenericBoxes` primitive arrays rather than a record per box. The
+  pending buffer rotates through a ring of three; a consumed frame takes the
+  buffer itself (frames complete before their buffer is reused), and the
+  encoder writes the arrays straight into the native layout.
 - Non-queued context-registry entry points join pending work first (`with_registry*`),
   preventing concurrent access to a context. Keep context access behind these
   wrappers. Selection through the [standalone query handles](#standalone-query-handles)

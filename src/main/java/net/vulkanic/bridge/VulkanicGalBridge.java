@@ -4175,6 +4175,114 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Generic DH boxes held in primitive arrays: producers append without a
+	 * record per box, consumers hand the buffer along, and encoding writes the
+	 * arrays straight into the native layout. {@link #get} materializes a
+	 * record for diagnostics and tests.
+	 */
+	public static final class PackedDhGenericBoxes extends java.util.AbstractList<WorldDistantHorizonsGenericBoxRecord>
+			implements java.util.RandomAccess {
+		private static final int FLOATS = 12; // min xyz, max xyz, shading N S E W top bottom
+		private static final int INTS = 3; // color, light, flags (ssao | material << 8 | group << 16)
+		private float[] floats = new float[0];
+		private int[] ints = new int[0];
+		private int size;
+
+		@Override public int size() { return size; }
+
+		@Override public void clear() { size = 0; }
+
+		private void reserve(int added) {
+			int required = size + added;
+			if (required * FLOATS > floats.length) {
+				int capacity = Math.max(required, Math.max(16, size * 2));
+				floats = Arrays.copyOf(floats, capacity * FLOATS);
+				ints = Arrays.copyOf(ints, capacity * INTS);
+			}
+		}
+
+		/** Appends one box, validated exactly like {@link WorldDistantHorizonsGenericBoxRecord}. */
+		public void addBox(float minX, float minY, float minZ, float maxX, float maxY, float maxZ,
+				int colorArgb, int packedLight, float northShading, float southShading, float eastShading,
+				float westShading, float topShading, float bottomShading, boolean ssaoEnabled, int material,
+				int groupOrdinal) {
+			if (material < 0 || material > 0xff) {
+				throw new IllegalArgumentException("DH generic box material index must fit one byte");
+			}
+			if (groupOrdinal < 0 || groupOrdinal > 0xffff) {
+				throw new IllegalArgumentException("DH generic box group ordinal must fit two bytes");
+			}
+			if (!Float.isFinite(minX) || !Float.isFinite(minY) || !Float.isFinite(minZ)
+				|| !Float.isFinite(maxX) || !Float.isFinite(maxY) || !Float.isFinite(maxZ)
+				|| minX > maxX || minY > maxY || minZ > maxZ
+				|| !Float.isFinite(northShading) || !Float.isFinite(southShading)
+				|| !Float.isFinite(eastShading) || !Float.isFinite(westShading)
+				|| !Float.isFinite(topShading) || !Float.isFinite(bottomShading)) {
+				throw new IllegalArgumentException("invalid copied DH generic box semantics");
+			}
+			reserve(1);
+			int f = size * FLOATS;
+			floats[f] = minX; floats[f + 1] = minY; floats[f + 2] = minZ;
+			floats[f + 3] = maxX; floats[f + 4] = maxY; floats[f + 5] = maxZ;
+			floats[f + 6] = northShading; floats[f + 7] = southShading; floats[f + 8] = eastShading;
+			floats[f + 9] = westShading; floats[f + 10] = topShading; floats[f + 11] = bottomShading;
+			int i = size * INTS;
+			ints[i] = colorArgb;
+			ints[i + 1] = packedLight;
+			ints[i + 2] = (ssaoEnabled ? 1 : 0) | (material << 8) | (groupOrdinal << 16);
+			size++;
+		}
+
+		@Override public boolean add(WorldDistantHorizonsGenericBoxRecord box) {
+			Objects.requireNonNull(box, "DH generic box");
+			addBox(box.minX(), box.minY(), box.minZ(), box.maxX(), box.maxY(), box.maxZ(), box.colorArgb(),
+				box.packedLight(), box.northShading(), box.southShading(), box.eastShading(), box.westShading(),
+				box.topShading(), box.bottomShading(), box.ssaoEnabled(), box.material(), box.groupOrdinal());
+			return true;
+		}
+
+		/** Appends every box of {@code other}, which was validated on its own append. */
+		public void addAllPacked(PackedDhGenericBoxes other) {
+			reserve(other.size);
+			System.arraycopy(other.floats, 0, floats, size * FLOATS, other.size * FLOATS);
+			System.arraycopy(other.ints, 0, ints, size * INTS, other.size * INTS);
+			size += other.size;
+		}
+
+		@Override public WorldDistantHorizonsGenericBoxRecord get(int index) {
+			Objects.checkIndex(index, size);
+			int f = index * FLOATS;
+			int i = index * INTS;
+			int flags = ints[i + 2];
+			return new WorldDistantHorizonsGenericBoxRecord(floats[f], floats[f + 1], floats[f + 2],
+				floats[f + 3], floats[f + 4], floats[f + 5], ints[i], ints[i + 1], floats[f + 6], floats[f + 7],
+				floats[f + 8], floats[f + 9], floats[f + 10], floats[f + 11], (flags & 1) != 0,
+				(flags >>> 8) & 0xff, flags >>> 16);
+		}
+
+		private MemorySegment encode(Arena arena) {
+			var layout = Struct.WORLD_DH_GENERIC_BOX;
+			MemorySegment records = layout.array(arena, size);
+			long minOffset = layout.offset(2);
+			long maxOffset = layout.offset(3);
+			long shadingOffset = layout.offset(6);
+			for (int index = 0; index < size; index++) {
+				MemorySegment item = Abi.item(records, layout, index);
+				int f = index * FLOATS;
+				int i = index * INTS;
+				layout.setInt(item, 0, layout.byteSize());
+				layout.setInt(item, 1, ints[i + 2]);
+				MemorySegment.copy(floats, f, item, ValueLayout.JAVA_FLOAT, minOffset, 3);
+				MemorySegment.copy(floats, f + 3, item, ValueLayout.JAVA_FLOAT, maxOffset, 3);
+				layout.setInt(item, 4, ints[i]);
+				layout.setInt(item, 5, ints[i + 1]);
+				MemorySegment.copy(floats, f + 6, item, ValueLayout.JAVA_FLOAT, shadingOffset, 6);
+			}
+			return records;
+		}
+	}
+
 	static MemorySegment encodeExperienceOrbInstances(Arena arena, List<WorldExperienceOrbInstanceRecord> orbs, int meshCount) {
 		if (meshCount < 0 || (long) meshCount + orbs.size() > 65_536)
 			throw new IllegalArgumentException("combined mesh/orb frame bound exceeded");
@@ -4206,6 +4314,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	) {
 		if (boxes.size() > 10_000) {
 			throw new IllegalArgumentException("too many DH generic-box semantics");
+		}
+		if (boxes instanceof PackedDhGenericBoxes packed) {
+			return packed.encode(arena);
 		}
 		var layout = Struct.WORLD_DH_GENERIC_BOX;
 		MemorySegment records = layout.array(arena, boxes.size());

@@ -463,8 +463,24 @@ public final class RustGalWorldPrimitiveRenderer {
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MATERIAL_QUADS, "material-quad");
 	private static final BoundedSemanticQueue<VulkanicGalBridge.WorldParticleQuadRecord> PENDING_PARTICLE_QUADS =
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MATERIAL_QUADS, "particle-quad");
-	private static final List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> PENDING_DH_GENERIC_BOXES =
-		new ArrayList<>();
+	// Generic DH boxes (often thousands of cloud cells) stay in packed
+	// buffers. A consumed frame takes the pending buffer itself; three
+	// buffers rotate so a frame's boxes outlive its queued completion.
+	private static final VulkanicGalBridge.PackedDhGenericBoxes[] DH_GENERIC_BOX_RING = {
+		new VulkanicGalBridge.PackedDhGenericBoxes(), new VulkanicGalBridge.PackedDhGenericBoxes(),
+		new VulkanicGalBridge.PackedDhGenericBoxes()
+	};
+	private static int dhGenericBoxSlot;
+	private static VulkanicGalBridge.PackedDhGenericBoxes PENDING_DH_GENERIC_BOXES = DH_GENERIC_BOX_RING[0];
+
+	/** Hands the pending boxes to a consumed frame and starts the next buffer. */
+	private static VulkanicGalBridge.PackedDhGenericBoxes takePendingDistantHorizonsGenericBoxes() {
+		VulkanicGalBridge.PackedDhGenericBoxes taken = PENDING_DH_GENERIC_BOXES;
+		dhGenericBoxSlot = (dhGenericBoxSlot + 1) % DH_GENERIC_BOX_RING.length;
+		PENDING_DH_GENERIC_BOXES = DH_GENERIC_BOX_RING[dhGenericBoxSlot];
+		PENDING_DH_GENERIC_BOXES.clear();
+		return taken;
+	}
 	private static boolean pendingDistantHorizonsPrivateClouds;
 	// Capture-only provenance stays beside the coarse generic material records.
 	// It never crosses the FFI boundary or changes material/GAL policy.
@@ -980,12 +996,16 @@ public final class RustGalWorldPrimitiveRenderer {
 					- PENDING_MATERIAL_QUADS.size() - PENDING_PARTICLE_QUADS.size()) {
 				throw new IllegalStateException("Rust DH generic-box material capacity exceeded");
 			}
-			for (VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord box : boxes) {
-				if (box == null) {
-					throw new IllegalArgumentException("Rust DH generic-box list contains null semantics");
+			if (boxes instanceof VulkanicGalBridge.PackedDhGenericBoxes packed) {
+				PENDING_DH_GENERIC_BOXES.addAllPacked(packed);
+			} else {
+				for (VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord box : boxes) {
+					if (box == null) {
+						throw new IllegalArgumentException("Rust DH generic-box list contains null semantics");
+					}
 				}
+				PENDING_DH_GENERIC_BOXES.addAll(boxes);
 			}
-			PENDING_DH_GENERIC_BOXES.addAll(boxes);
 		}
 		DeterministicCameraCapture.recordSubmittedWorkIdentity(
 			"distant-horizons-generic-boxes",
@@ -18022,7 +18042,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					& DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0;
 			List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> admittedDistantHorizonsGenericBoxes =
 				consumedDistantHorizonsRouteSelected
-					? List.copyOf(PENDING_DH_GENERIC_BOXES)
+					? takePendingDistantHorizonsGenericBoxes()
 					: List.of();
 			// Casters are placed with the frame's terrain camera; without one (a
 			// loading frame) they are dropped exactly like retained-section replay.
@@ -18362,7 +18382,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			particleQuads = List.copyOf(particleQuads);
 			orbInstances = List.copyOf(orbInstances);
-		distantHorizonsGenericBoxes = List.copyOf(distantHorizonsGenericBoxes);
+			// A packed buffer from the pending ring is not modified while frames
+			// that reference it can still run; copying it would build a record
+			// per box.
+			if (!(distantHorizonsGenericBoxes instanceof VulkanicGalBridge.PackedDhGenericBoxes)) {
+				distantHorizonsGenericBoxes = List.copyOf(distantHorizonsGenericBoxes);
+			}
 		}
 
 		public PrimitiveFrame(

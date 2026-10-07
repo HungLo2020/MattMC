@@ -83,7 +83,8 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	 * Rust boundary and are cleared before the next collection.
 	 */
 	private final ArrayList<Long> rustSemanticGroupIds = new ArrayList<>();
-	private final ArrayList<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> rustSemanticBoxes = new ArrayList<>();
+	private final VulkanicGalBridge.PackedDhGenericBoxes rustSemanticBoxes =
+		new VulkanicGalBridge.PackedDhGenericBoxes();
 	private final ArrayList<RenderableBoxGroup> rustSemanticGroupsToPostRender = new ArrayList<>();
 	
 	
@@ -235,7 +236,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		ids.clear();
 		ids.addAll(this.boxGroupById.keySet());
 		ids.sort(Long::compare);
-		ArrayList<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> semanticBoxes = this.rustSemanticBoxes;
+		VulkanicGalBridge.PackedDhGenericBoxes semanticBoxes = this.rustSemanticBoxes;
 		semanticBoxes.clear();
 		ArrayList<RenderableBoxGroup> groupsToPostRender = this.rustSemanticGroupsToPostRender;
 		groupsToPostRender.clear();
@@ -303,7 +304,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 					{
 						return false;
 					}
-					semanticBoxes.add(new VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord(
+					semanticBoxes.addBox(
 						(float)(box.minPos.x + origin.x - camPos.x),
 						(float)(box.minPos.y + origin.y - camPos.y),
 						(float)(box.minPos.z + origin.z - camPos.z),
@@ -313,7 +314,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 						box.color.getRGB(), LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight),
 						shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom,
 						boxGroup.ssaoEnabled, box.material & 0xff, (activeGroups - 1) & 0xffff
-					));
+					);
 					if (boxGroup.ssaoEnabled)
 					{
 						ssaoBoxes++;
