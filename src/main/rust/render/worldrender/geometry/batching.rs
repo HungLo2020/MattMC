@@ -244,32 +244,71 @@ fn page_draw_key(draw: &PendingMeshDraw) -> PageDrawKey {
 }
 
 /// Same order as a stable sort by `page_indirect_draw_order` then distance,
-/// but sorts compact keys and moves each (large) draw along one permutation.
+/// but ranks the run's few distinct binding keys once and sorts compact
+/// `(rank, distance, index)` keys, moving each (large) draw along one
+/// permutation.
 fn sort_page_run(draws: &mut [PendingMeshDraw]) {
-    let mut keys: Vec<(PageDrawKey, f32, u32)> = draws
-        .iter()
-        .enumerate()
-        .map(|(index, draw)| (page_draw_key(draw), draw.front_to_back_distance_squared, index as u32))
-        .collect();
-    keys.sort_unstable_by(|left, right| {
-        left.0
-            .cmp(&right.0)
-            .then_with(|| left.1.total_cmp(&right.1))
-            .then_with(|| left.2.cmp(&right.2))
-    });
-    // Position i receives the draw originally at keys[i].2. Apply the
-    // permutation in place by following each cycle with swaps.
-    let mut source: Vec<u32> = keys.into_iter().map(|key| key.2).collect();
-    for start in 0..source.len() {
-        let mut current = start;
-        while source[current] as usize != start {
-            let next = source[current] as usize;
-            draws.swap(current, next);
-            source[current] = current as u32;
-            current = next;
-        }
-        source[current] = current as u32;
+    thread_local! {
+        static SCRATCH: std::cell::RefCell<PageSortScratch> = Default::default();
     }
+    SCRATCH.with(|scratch| {
+        let scratch = &mut *scratch.borrow_mut();
+        scratch.class_of.clear();
+        scratch.classes.clear();
+        scratch.keys.clear();
+        for (index, draw) in draws.iter().enumerate() {
+            let key = page_draw_key(draw);
+            let classes = &mut scratch.classes;
+            let class = *scratch.class_of.entry(key).or_insert_with(|| {
+                classes.push(key);
+                (classes.len() - 1) as u32
+            });
+            // `total_cmp` order as unsigned bits.
+            let bits = draw.front_to_back_distance_squared.to_bits();
+            let distance = if bits & 0x8000_0000 != 0 { !bits } else { bits ^ 0x8000_0000 };
+            scratch.keys.push((u128::from(class) << 64) | (u128::from(distance) << 32) | index as u128);
+        }
+        // Rank the distinct keys by their full order, then key by rank.
+        scratch.order.clear();
+        scratch.order.extend(0..scratch.classes.len() as u32);
+        let classes = &scratch.classes;
+        scratch.order.sort_unstable_by(|left, right| classes[*left as usize].cmp(&classes[*right as usize]));
+        scratch.rank.clear();
+        scratch.rank.resize(classes.len(), 0);
+        for (rank, class) in scratch.order.iter().enumerate() {
+            scratch.rank[*class as usize] = rank as u128;
+        }
+        let rank = &scratch.rank;
+        for key in &mut scratch.keys {
+            *key = (rank[(*key >> 64) as usize] << 64) | (*key & u128::from(u64::MAX));
+        }
+        scratch.keys.sort_unstable();
+        // Position i receives the draw originally at keys[i]'s index. Apply
+        // the permutation in place by following each cycle with swaps.
+        let source = &mut scratch.source;
+        source.clear();
+        source.extend(scratch.keys.iter().map(|key| *key as u32));
+        for start in 0..source.len() {
+            let mut current = start;
+            while source[current] as usize != start {
+                let next = source[current] as usize;
+                draws.swap(current, next);
+                source[current] = current as u32;
+                current = next;
+            }
+            source[current] = current as u32;
+        }
+    });
+}
+
+#[derive(Default)]
+struct PageSortScratch {
+    class_of: std::collections::HashMap<PageDrawKey, u32, crate::render::vulkanic::gal::AccessHashBuilder>,
+    classes: Vec<PageDrawKey>,
+    order: Vec<u32>,
+    rank: Vec<u128>,
+    keys: Vec<u128>,
+    source: Vec<u32>,
 }
 
 pub(in crate::render::worldrender) fn page_indirect_draw_order(left: &PendingMeshDraw, right: &PendingMeshDraw) -> std::cmp::Ordering {
