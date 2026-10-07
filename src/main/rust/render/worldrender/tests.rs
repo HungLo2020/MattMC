@@ -207,6 +207,44 @@ fn page_indirect_order_sorts_compatible_draws_front_to_back() {
 }
 
 #[test]
+fn page_draw_key_sort_matches_the_stable_comparator_sort() {
+    // Deterministic pseudo-random runs with repeated keys and distances.
+    let mut seed = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    for _ in 0..50 {
+        let count = (next() % 40) as usize + 1;
+        let params: Vec<(u32, u32, f32)> = (0..count)
+            .map(|index| (index as u32 + 1, (next() % 4) as u32 + 1, (next() % 5) as f32 * 100.0))
+            .collect();
+        let build = || {
+            params
+                .iter()
+                .map(|&(identity, pipeline, distance)| {
+                    pending_page_draw(identity, pipeline, TerrainMaterialPassMode::Opaque, true, distance)
+                })
+                .collect::<Vec<_>>()
+        };
+        let draws = build();
+        let mut expected = build();
+        expected.sort_by(|left, right| {
+            page_indirect_draw_order(left, right).then_with(|| {
+                left.front_to_back_distance_squared
+                    .total_cmp(&right.front_to_back_distance_squared)
+            })
+        });
+        let mut actual = draws;
+        order_compatible_page_indirect_draws(&mut actual);
+        let counts = |draws: &[PendingMeshDraw]| draws.iter().map(|draw| draw.draw.index_count).collect::<Vec<_>>();
+        assert_eq!(counts(&expected), counts(&actual));
+    }
+}
+
+#[test]
 fn translucent_page_draws_keep_camera_order_across_pipeline_changes() {
     let mut draws = vec![
         pending_page_draw(30, 3, TerrainMaterialPassMode::Translucent, true, 900.0),
@@ -27482,3 +27520,4 @@ fn resource_creation_failures_restore_world_upload_mode() {
         assert!(!frontend.defer_world_uploads, "creation failure at offset {offset} stranded upload mode");
     }
 }
+

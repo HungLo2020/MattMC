@@ -628,6 +628,40 @@ pub struct WorldPrimitiveFrame {
     pub static_terrain_sections: StaticTerrainSections,
 }
 
+impl WorldPrimitiveFrame {
+    /// The frame's scalar state and static terrain with every per-frame
+    /// geometry list empty, for a derived pass (the first-person hand) that
+    /// supplies its own instances. Lists by field so a new field must choose.
+    pub(crate) fn clone_without_geometry(&self) -> Self {
+        Self {
+            engine_globals: self.engine_globals.clone(),
+            frame_id: self.frame_id,
+            correlation_id: self.correlation_id,
+            viewport_width: self.viewport_width,
+            viewport_height: self.viewport_height,
+            view_matrix: self.view_matrix,
+            projection_matrix: self.projection_matrix,
+            voxel_volume: self.voxel_volume.clone(),
+            shader_environment: self.shader_environment.clone(),
+            feature_coverage: self.feature_coverage.clone(),
+            first_person: self.first_person.clone(),
+            first_person_mesh_instances: Vec::new(),
+            background: self.background.clone(),
+            segments: Vec::new(),
+            crack_quads: Vec::new(),
+            border_quads: Vec::new(),
+            material_quads: Vec::new(),
+            dh_generic_boxes: Vec::new(),
+            mesh_instances: Vec::new(),
+            text_quads: Vec::new(),
+            lod_instances: Vec::new(),
+            lod_render_frame: self.lod_render_frame.clone(),
+            static_terrain_shadow_casters: self.static_terrain_shadow_casters.clone(),
+            static_terrain_sections: self.static_terrain_sections.clone(),
+        }
+    }
+}
+
 /// One copied off-camera static-terrain section layer: resident mesh
 /// identity, integer section origin and the layer's depth policy.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

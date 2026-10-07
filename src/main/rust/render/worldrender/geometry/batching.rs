@@ -208,14 +208,67 @@ pub(in crate::render::worldrender) fn order_compatible_page_indirect_draws(draws
             mode,
             TerrainMaterialPassMode::Opaque | TerrainMaterialPassMode::Cutout
         ) {
-            draws[start..end].sort_by(|left, right| {
-                page_indirect_draw_order(left, right).then_with(|| {
-                    left.front_to_back_distance_squared
-                        .total_cmp(&right.front_to_back_distance_squared)
-                })
-            });
+            sort_page_run(&mut draws[start..end]);
         }
         start = end;
+    }
+}
+
+/// The fields `page_indirect_draw_order` compares, in its order.
+type PageDrawKey = (
+    Handle,
+    Handle,
+    Handle,
+    Option<(u32, Handle)>,
+    Handle,
+    u32,
+    Option<(Handle, Handle, Handle)>,
+    Option<(u32, Handle)>,
+);
+
+fn page_draw_key(draw: &PendingMeshDraw) -> PageDrawKey {
+    let draw = &draw.draw;
+    let shadow = draw.shadow.as_ref();
+    (
+        draw.pipeline,
+        draw.pipeline_layout,
+        draw.resource_set,
+        draw.shader_resource_set.map(|binding| (binding.set_index, binding.set)),
+        draw.index_buffer,
+        draw.index_type as u32,
+        shadow.map(|shadow| (shadow.pipeline, shadow.pipeline_layout, shadow.resource_set)),
+        shadow
+            .and_then(|shadow| shadow.shader_resource_set)
+            .map(|binding| (binding.set_index, binding.set)),
+    )
+}
+
+/// Same order as a stable sort by `page_indirect_draw_order` then distance,
+/// but sorts compact keys and moves each (large) draw along one permutation.
+fn sort_page_run(draws: &mut [PendingMeshDraw]) {
+    let mut keys: Vec<(PageDrawKey, f32, u32)> = draws
+        .iter()
+        .enumerate()
+        .map(|(index, draw)| (page_draw_key(draw), draw.front_to_back_distance_squared, index as u32))
+        .collect();
+    keys.sort_unstable_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+    // Position i receives the draw originally at keys[i].2. Apply the
+    // permutation in place by following each cycle with swaps.
+    let mut source: Vec<u32> = keys.into_iter().map(|key| key.2).collect();
+    for start in 0..source.len() {
+        let mut current = start;
+        while source[current] as usize != start {
+            let next = source[current] as usize;
+            draws.swap(current, next);
+            source[current] = current as u32;
+            current = next;
+        }
+        source[current] = current as u32;
     }
 }
 

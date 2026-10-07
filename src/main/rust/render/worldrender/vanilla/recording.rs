@@ -2935,7 +2935,8 @@ impl WorldPrimitiveFrontend {
                 }
             }
         }
-        let mut hand_frame = parent_frame.clone();
+        // Every geometry list below is replaced or cleared; skip copying them.
+        let mut hand_frame = parent_frame.clone_without_geometry();
         hand_frame.frame_id = parent_frame.frame_id;
         hand_frame.view_matrix = hand.model_view_matrix;
         hand_frame.projection_matrix = hand.projection_matrix;
