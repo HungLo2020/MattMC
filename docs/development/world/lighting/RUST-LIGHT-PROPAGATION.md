@@ -17,9 +17,10 @@ package, for palette data). Java still owns everything else: section statuses,
 2. One callback function supplies two separately cached snapshots per section:
    the updating `DataLayer` (bytes, or the default value of a lazy layer) and
    `lightOnInSection` on the first layer request, then block states only when
-   first needed. The block snapshot contains palette types plus packed words,
-   or one type per block for chunk kinds the bridge does not model. A section
-   needing both snapshots makes two callback invocations.
+   first needed. The block snapshot contains palette state IDs plus packed
+   words, or one state ID per block for chunk kinds the bridge does not model;
+   Rust maps state IDs to light types in place. A section needing both
+   snapshots makes two callback invocations.
 3. Rust writes levels into its own copies. At the end Java installs each
    written section with the original copy-on-write: the first write in a pass
    copies the layer. Java then adds the `sectionsAffectedByLightUpdates`
@@ -42,10 +43,12 @@ throws; it does not use the propagation pass's Java replay path.
 - Keep FIFO order, the returned work count, entry bits
   (`LightEngine.QueueEntry`) and every `setStoredLevel`, including writes of an
   unchanged value. A lazy layer must allocate exactly when the original would.
-- Block properties come from immutable tables built from the original methods:
+- Block properties are light types that Rust derives from the
+  [block registry](../../game-model/RUST-BLOCK-REGISTRY.md):
   `max(1, getLightBlock())`, emission, `isEmptyShape` and each direction's
-  occlusion face. Faces are merged only by exact box lists. Occlusion is a
-  truth table of `Shapes.faceShapeOccludes`, so never approximate geometry.
+  occlusion face, numbered in state order. Faces are merged only by exact box
+  lists. Occlusion is a truth table of `Shapes.faceShapeOccludes`, so never
+  approximate geometry.
 - Only exact `BlockLightEngine`/`SkyLightEngine` with their vanilla storages
   use Rust queue propagation. `ProtoChunk`, `LevelChunk` and `ImposterProtoChunk` (non-debug)
   sections are read packed. Other `LightChunk`s answer per block through
@@ -114,6 +117,11 @@ Inspect `results.json` → `performance` → each case's `passes` value: the
 so exit success alone is not performance acceptance.
 
 ## Status
+
+The results below are historical: they measured the original slice, when Java
+built the light types. The move to the block registry was checked against the
+slice's previous code by
+[block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
 
 The implementation author recorded release acceptance on 2026-10-06:
 Ryzen 5 5600G, Linux x86_64, OpenJDK 25. The author reported eight Java tests

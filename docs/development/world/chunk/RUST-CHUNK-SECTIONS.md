@@ -19,7 +19,7 @@ that flattening was the largest Java cost of saving. The Java bridge is
 1. `ChunkMap.save` copies the chunk (`SerializableChunkData.copyOf`, unchanged).
    It then runs `SerializableChunkData.encode()` on the background executor.
 2. `encode()` passes each section's raw containers to Rust: storage words, bits
-   and palette labels. It also passes light bytes and the chunk's biome names.
+   and palette state IDs. It also passes light bytes and the chunk's biome names.
    Rust returns the tape of the complete `sections` record.
 3. Java builds the rest of the root compound as before, with an empty
    placeholder list at `sections`. The tape writer splices Rust's record in
@@ -31,11 +31,16 @@ that flattening was the largest Java cost of saving. The Java bridge is
    completes the store exceptionally before any region write.
 
 Rust owns the section layout: which keys exist, `CompoundTag` key order,
-packing and tape records. Java supplies vocabulary built once:
+packing and tape records. Its block-state vocabulary is built once from the
+[block registry](../../game-model/RUST-BLOCK-REGISTRY.md):
 
-- every block state's `BlockState.CODEC` compound as tape
-- the storage bits of each palette size, taken from the strategies themselves
-- biome names as `holderByNameCodec` writes them, sent with each chunk
+- every block state's `BlockState.CODEC` compound as tape: `Name`, and
+  `Properties` unless it is the default state, in `HashMap` order (the codec
+  inserts `Properties` before `Name`, and the last property first)
+- the storage bits of each block palette size, from `Strategy.createForBlockStates`
+
+Java checks that the containers' strategies give the same storage bits, and
+sends biome names as `holderByNameCodec` writes them with each chunk.
 
 ## How a load flows
 
@@ -188,6 +193,10 @@ driver records a failed performance gate without failing its process, so exit
 success alone is not performance acceptance.
 
 ## Status
+
+These results are historical: the vocabulary was then built in Java. Its move
+to the block registry was checked by
+[block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
 
 The implementation author recorded the following release acceptance on
 2026-10-06, before the later `8db0fd82` recovery changes: Ryzen 5

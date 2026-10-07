@@ -14,6 +14,7 @@ src/main/rust/
 ├── assets/
 ├── compat/
 ├── content/
+│   └── block/
 ├── core/
 ├── gameplay/
 ├── network/
@@ -171,7 +172,7 @@ Gameplay systems belong here. This is the intended home for native implementatio
 
 ### `content/`
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata.
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, from which world and storage subsystems derive their tables. `content` must not depend on its consumers.
 
 ### `render/`
 

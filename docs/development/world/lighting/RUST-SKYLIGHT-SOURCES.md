@@ -9,18 +9,21 @@ The bridge lives beside Java chunk storage to borrow its package-private data.
 ## Constraints when changing this code
 
 - Preserve `getLightBlock() != 0` and the original downward/upward face-union
-  decision. The bridge builds a truth table with the original Java shape operation
-  from immutable cached block-state faces. Exact box lists share face IDs;
-  coordinates are never quantized. Rust uses the table, not approximate geometry.
+  decision. Rust derives each state's descriptor (light block, up and down light
+  faces) and the edge table from the [block registry](../../game-model/RUST-BLOCK-REGISTRY.md).
+  Its faces share IDs by exact box list, and its truth table comes from the
+  original Java shape operation. Coordinates are never quantized; Rust uses the
+  table, not approximate geometry.
 - Carry the previous block's downward face across nonempty section boundaries.
   An all-air section resets that face without testing an edge, matching the
   original shortcut. A fully open column resets to the below-world sentinel;
   unlike heightmap priming, it does not keep its old value.
 - Preserve every packed padding bit, including padding in complete words.
   Java publishes ordinary scan results only after successful evaluation.
-- Use ordinary FFM calls for section scans, with copied words, refreshed local
-  palette mappings, immutable global descriptors and thread-owned scratch.
-  Rust borrows buffers, allocates nothing and retains no pointers.
+- Use ordinary FFM calls for section scans, with copied words and thread-owned
+  scratch. Java passes local palette entries as state IDs, which Rust maps to
+  descriptors; a global palette passes none. Rust borrows buffers, allocates
+  nothing and retains no pointers.
 - Empty chunks use a separate Rust bulk clear through critical heap access.
   This call validates at most 128 words and performs no allocations, blocking
   operations or callbacks. Do not extend it with unbounded work.
@@ -65,6 +68,11 @@ hashes and a report live under `build/skylight-sources-migration/acceptance/`.
 Results measure this reconstruction slice, not full lighting or chunk generation.
 
 ## Status
+
+The results below are historical: they measured the original slice, when Java
+built the descriptor table. The move to the block registry was checked against
+the slice's previous code by
+[block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,
 OpenJDK 25.0.4.1. Ten Java tests and three Rust tests passed with zero differences.

@@ -1,29 +1,20 @@
 # Registries and IDs (proposal)
 
-> Proposal; not implemented. See the [game model index](index.md).
+> Partly implemented: the block registry exists (see below). The rest is a
+> proposal. See the [game model index](index.md).
 
 ## Today
 
-Rust has **no block, block-state, property or item types**. `content/` is
-empty, and Java owns all definitions (`Blocks.java`, `BlockState`,
-`StateDefinition`, the block classes). Rust only owns parts of the systems
-that *read* blocks: lighting, chunk saving and worldgen.
+The [Rust block registry](RUST-BLOCK-REGISTRY.md) holds every block, property
+and block state with typed IDs (`BlockId`, `StateId(u16)`, `PropertyId`,
+`FaceId`) and per-state columns. Java still defines the blocks and exports
+them once at startup. Lighting, heightmaps, worldgen and chunk saving derive
+their tables from it.
 
-Rust has no shared registry either. Each migrated slice gets its own per-state table
-from its own Java bridge class, keyed by raw `i32`/`u16` state IDs, each with a
-different lifetime. Examples:
-- light types and occlusion faces (lighting)
-- skylight descriptors
-- heightmap masks
-- air/fluid/motion flags (noise fill)
-- state→block IDs (carvers)
-- canonical encodings (chunk storage)
-- meshing state records (rendering)
-- a text snapshot of state names (shader packs)
-
-The same facts (air, fluid, opacity, emission, occlusion faces, state identity,
-biome identity) are encoded two to five times. Java computes occlusion-face
-deduplication twice.
+Still separate:
+- items, entity types, tags and biomes: no Rust registry yet
+- rendering's meshing-state records and shader-pack state-name snapshot,
+  which still come from rendering's own bridges
 
 ## Proposal
 

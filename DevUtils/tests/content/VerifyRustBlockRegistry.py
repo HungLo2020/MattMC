@@ -82,6 +82,7 @@ def main():
     parser.add_argument('--forks', type=int, default=3)
     parser.add_argument('--startup-samples', type=int, default=8, help='fresh JVMs per tree per comparison')
     parser.add_argument('--cpu', type=int, default=5)
+    parser.add_argument('--background-cpus', default='0,1', help='CPUs for JIT and GC threads')
     parser.add_argument('--case', default='all', help='comma-separated hot-path keys, "none", or "all"')
     parser.add_argument('--parity-only', action='store_true')
     parser.add_argument('--skip-parity', action='store_true')
@@ -92,8 +93,9 @@ def main():
         parser.error('Unknown case')
     if not args.pilot and not args.parity_only and args.forks < 3:
         parser.error('At least three independent comparisons required')
-    if args.cpu not in os.sched_getaffinity(0):
-        parser.error('Worker CPU unavailable')
+    background = [int(cpu) for cpu in args.background_cpus.split(',')]
+    if len(background) < 2 or args.cpu in background or not {args.cpu, *background}.issubset(os.sched_getaffinity(0)):
+        parser.error('Separate available worker CPUs required')
     out = (ROOT / args.output).resolve()
     if not out.is_relative_to(ROOT / 'build'):
         parser.error('Output must be under build/')
@@ -124,7 +126,7 @@ def main():
                         '(reference: eight Java builders; candidate: one export, Rust install and derived views). Bootstrap, the native '
                         'library load and handle linking excluded. Hot paths: each consumer\'s existing native-mode benchmark in both trees, '
                         'whose per-row checksums must match.'),
-              'cpu': args.cpu, 'pilot': args.pilot, 'cases': keys,
+              'cpu': args.cpu, 'background_cpus': background, 'pilot': args.pilot, 'cases': keys,
               'java_version': subprocess.check_output(['java', '--version'], text=True),
               'rust_version': subprocess.check_output(['rustc', '--version'], text=True),
               'hardware': json.loads(subprocess.check_output(['lscpu', '-J'], text=True)),
@@ -142,11 +144,13 @@ def main():
     reference = reference_tree(out)
     reference_cp = classpath(reference, out, 'reference')
     trees = {'reference': (reference, reference_cp), 'candidate': (ROOT, candidate_cp)}
-    jvm = ['-Xbatch', '-Xms512m', '-Xmx3g', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders', '--enable-native-access=ALL-UNNAMED']
+    jvm = ['-Xbatch', '-Xms512m', '-Xmx3g', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders', '--enable-native-access=ALL-UNNAMED',
+           '-XX:ActiveProcessorCount=' + str(1 + len(background))]
+    cpus = ','.join(str(cpu) for cpu in [args.cpu, *background])
 
     def java(tree, arguments, log):
         root, cp = trees[tree]
-        return run(['taskset', '-c', str(args.cpu), 'java', *jvm, '-Dmattmc.rust.natives.dir=' + str(root / 'build/rust/native'),
+        return run(['taskset', '-c', cpus, 'java', *jvm, '-Dmattmc.rust.natives.dir=' + str(root / 'build/rust/native'),
                     '-cp', cp, *arguments], log, root)
 
     for fork in range(args.forks):

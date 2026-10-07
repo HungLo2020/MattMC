@@ -29,9 +29,11 @@ The Java bridge is
   allocates nothing and retains no pointers. Never use critical heap access
   for this full-section work.
 - Resolve local identities from used palette entries afresh each call; never
-  cache their object references or inspect unused entries. Global labels refer only to the
-  immutable canonical block-state registry after bootstrap; registry growth
-  selects the original path. Do not mutate that registry after bootstrap.
+  cache their object references or inspect unused entries. Global labels are
+  state IDs, used only once the [block registry](../../game-model/RUST-BLOCK-REGISTRY.md)
+  is installed, which guarantees every state is a distinct object at its own
+  ID; registry growth selects the original path. Do not mutate that registry
+  after bootstrap.
 - Custom containers, strategies, palettes/storage, noncanonical global maps,
   malformed IDs, used null entries and unsupported sizes/widths retain the
   original compatibility path before publishing a result. Avoid additional
@@ -78,6 +80,11 @@ The container source audit additionally permits only the separately pinned
 remain unchanged.
 
 ## Verified status
+
+The results below are historical: they measured the original slice, when Java
+built the global label table. Global palettes now pass no table (each state
+ID is its own label); that change was checked against the slice's previous
+code by [block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,
 OpenJDK 25.0.4.1. Eleven Java tests and three Rust tests passed with zero

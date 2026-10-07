@@ -10,8 +10,10 @@ unchanged.
 ## Compatibility and ownership
 
 - Preserve the original explicit `Blocks.AIR` rejection and all six opacity
-  predicates. Canonical block-state air/solid/fluid properties are immutable;
-  their type masks are shared. Local palette mappings are refreshed on each call.
+  predicates. Rust derives each state's type mask from the
+  [block registry](../../../game-model/RUST-BLOCK-REGISTRY.md) (air, blocks motion,
+  fluid, leaves). Java passes local palette entries as state IDs on each call,
+  and none for a global palette.
 - A column with no matching block **keeps its previous height**. Existing packed
   padding bits and unrequested maps also remain unchanged. Do not clear maps or
   simplify fluid/leaf predicates when working on this code.
@@ -66,6 +68,11 @@ environment details are under `build/heightmap-migration/acceptance/`.
 These are complete priming timings, not a full chunk-generation speedup claim.
 
 ## Status
+
+The results below are historical: they measured the original slice, when Java
+built the mask table. The move to the block registry was checked against the
+slice's previous code by
+[block registry verification](../../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
 
 Release acceptance passed on 2026-10-01 (Linux x86_64, Ryzen 5 5600G,
 OpenJDK 25.0.4.1). Eight focused Java tests and two Rust tests passed with zero

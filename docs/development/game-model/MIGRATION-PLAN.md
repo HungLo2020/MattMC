@@ -1,35 +1,37 @@
 # Migration plan (proposal)
 
-> Proposal; not implemented. See the [game model index](index.md).
+> Phase 1 is implemented ([Rust block registry](RUST-BLOCK-REGISTRY.md)).
+> Later phases are proposals. See the [game model index](index.md).
 
 Each phase is a normal migration slice: parity tests against Java, a
 production-path benchmark, and docs.
 
-## Phase 1: one registry snapshot from Java
+## Phase 1: one block registry from Java (implemented)
 
-- Build `content::Registries` in Rust from **one Java export** at startup:
+- Rust's [`content::block`](RUST-BLOCK-REGISTRY.md) is built from **one Java
+  export** at startup:
   - blocks, properties and every state's columns
-  - interned shapes and faces
-  - items with default components
-  - entity types, tags and biomes per server
-- Java walks its registries once and sends a compact description.
-- **Replace the per-slice tables** with views of this registry, one slice at a
-  time:
+  - the light occlusion faces, interned, with Java's truth table
+- These per-slice tables were replaced by views of it, and each Java bridge
+  lost its private builder:
   - lighting types and faces
   - skylight descriptors
   - heightmap masks
   - noise-fill flags
   - the carvers' `BLOCK_OF`
-  - chunk-section labels
-  - palette labels
-  - rendering's meshing-state columns
+  - chunk-section labels and the save vocabulary, which Rust now generates
+  - palette-packing labels
+- Parity: `NativeBlockRegistryTest` checks every column, property value and
+  `setValue` result against Java's live `BlockState`. Each consumer keeps its
+  own parity tests. Evidence is in
+  [block registry verification](BLOCK-REGISTRY-VERIFICATION.md).
 
-  Each Java `Native*` bridge loses its private table builder.
-- Parity: a test compares every column against Java's live `BlockState`
-  answers.
-
-This is the highest-value first step. It removes the duplication found in the
-inventory, gives every later slice typed IDs, and needs no gameplay changes.
+Not done in Phase 1, by design:
+- Rendering's meshing-state columns wait for the plan to be reconciled with
+  the rendering work.
+- Items with default components, entity types, tags and biomes have no Rust
+  consumer yet. Each joins the registry with its first consumer; items
+  arrive with Phase 2's definitions. Adding them earlier would be unused code.
 
 ## Phase 2: Rust defines the registries
 

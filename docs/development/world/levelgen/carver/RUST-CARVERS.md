@@ -27,6 +27,8 @@ over:
 - the chunk's [Rust-owned storage](../RUST-SURFACE-STORAGE.md#shared-chunk-storage)
   (`ProtoChunk.setBlockState` semantics, both world-generation heightmaps);
 - the chunk's carving mask, as words;
+- each state's block, from the [block registry](../../../game-model/RUST-BLOCK-REGISTRY.md)
+  (the stage needs it installed);
 - the chunk's aquifer: a noise-based aquifer's substance decision runs in
   [`aquifer/substance.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/aquifer/substance.rs)
   (centres, ranking, decision, native fluid statuses and barrier noise, over

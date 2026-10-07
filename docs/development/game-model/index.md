@@ -1,9 +1,10 @@
 # Rust game model (proposal)
 
-> **Status: proposal, not implemented.** These pages describe how blocks,
+> **Status: proposal; Phase 1 implemented.** These pages describe how blocks,
 > block states, items, block entities and entities should be represented in
-> Rust. Nothing here exists yet. The surveys behind the proposal are dated
-> 2026-10-07. Comment on and change these pages before any of it is built.
+> Rust. Phase 1, the [Rust block registry](RUST-BLOCK-REGISTRY.md), is current
+> behavior; everything else is a proposal. The surveys behind the proposal are
+> dated 2026-10-07.
 
 ## End state
 
@@ -73,11 +74,16 @@ one set of systems.
   compared with today.
 - [Migration plan](MIGRATION-PLAN.md): the order to build this alongside Java,
   parity checks, and open decisions.
+- [Rust block registry](RUST-BLOCK-REGISTRY.md) (current): how Phase 1 works,
+  how to add a column or consumer, constraints and tests.
+- [Block registry verification](BLOCK-REGISTRY-VERIFICATION.md) (current):
+  Phase 1's parity and benchmark results.
 
 ## Where it lives in the crate
 
 `content/` (registries and definitions) and `gameplay/` (behavior and systems)
-are already reserved for this in the
-[project architecture](../PROJECT-ARCHITECTURE.md). Both are empty today.
-`world/`, `render/` and `storage/` would consume `content/` instead of each
-receiving its own tables from Java.
+are reserved for this in the
+[project architecture](../PROJECT-ARCHITECTURE.md). `content/block/` holds the
+block registry; `gameplay/` has no block behavior yet. `world/` and `storage/`
+read their block tables from `content/`; `render/` will once its tables are
+reconciled.
