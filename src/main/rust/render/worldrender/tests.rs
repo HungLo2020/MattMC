@@ -27521,3 +27521,45 @@ fn resource_creation_failures_restore_world_upload_mode() {
     }
 }
 
+
+#[test]
+fn merged_static_and_sorted_batches_match_a_stable_sort_of_their_concatenation() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let mut assets = Vec::new();
+    for key in 0..6u64 {
+        let mut asset = mesh_asset(300 + key, 1, IndexType::U16);
+        if key % 3 == 2 {
+            asset.sections[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
+            asset.sections[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+        }
+        assets.push(asset);
+    }
+    frontend.apply_world_mesh_asset_update(&mut gal, 1, assets, Vec::new()).unwrap();
+    let mut frame = frame(Vec::new());
+    for key in [305u64, 300, 302, 301, 304, 303] {
+        let mut instance = mesh_instance(300 + (key - 300), 1);
+        if key % 3 == 2 {
+            instance.depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
+        }
+        frame.mesh_instances.push(instance);
+    }
+    let batches = mesh_batches(&frame, &frontend, ColorFormat::Bgra8Unorm, RasterYDirection::Up, false, false)
+        .expect("semantic mesh assets must batch");
+    let identity = |batches: &[MeshBatch]| {
+        batches.iter().map(|batch| (batch.key.mesh_key, batch.indices.to_vec())).collect::<Vec<_>>()
+    };
+    let expected = |head: &[MeshBatch], tail: &[MeshBatch]| {
+        let mut all = head.to_vec();
+        all.extend(tail.iter().cloned());
+        sort_mesh_batches(&mut all, &frame);
+        identity(&all)
+    };
+    // Both parts sorted: the linear merge path.
+    let head: Vec<_> = batches.iter().step_by(2).cloned().collect();
+    let tail: Vec<_> = batches.iter().skip(1).step_by(2).cloned().collect();
+    assert_eq!(expected(&head, &tail), identity(&merge_sorted_mesh_batches(&head, tail.clone(), &frame)));
+    // An unsorted part falls back to sorting.
+    let reversed: Vec<_> = tail.iter().rev().cloned().collect();
+    assert_eq!(expected(&head, &reversed), identity(&merge_sorted_mesh_batches(&head, reversed, &frame)));
+}

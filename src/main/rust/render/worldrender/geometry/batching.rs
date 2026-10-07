@@ -1360,6 +1360,37 @@ pub(in crate::render::worldrender) fn sort_mesh_batches(batches: &mut [MeshBatch
     batches.sort_by_cached_key(|batch| mesh_batch_order_key(batch, frame));
 }
 
+/// `head` followed by `tail`, ordered exactly as `sort_mesh_batches` would
+/// order the concatenation. When both parts are already in order this is a
+/// linear stable merge (ties keep `head` first); otherwise it sorts.
+pub(in crate::render::worldrender) fn merge_sorted_mesh_batches(
+    head: &[MeshBatch],
+    tail: Vec<MeshBatch>,
+    frame: &WorldPrimitiveFrame,
+) -> Vec<MeshBatch> {
+    let head_keys: Vec<_> = head.iter().map(|batch| mesh_batch_order_key(batch, frame)).collect();
+    let tail_keys: Vec<_> = tail.iter().map(|batch| mesh_batch_order_key(batch, frame)).collect();
+    let mut combined = Vec::with_capacity(head.len() + tail.len());
+    if !head_keys.is_sorted() || !tail_keys.is_sorted() {
+        combined.extend(head.iter().cloned());
+        combined.extend(tail);
+        sort_mesh_batches(&mut combined, frame);
+        return combined;
+    }
+    let mut head_index = 0;
+    let mut tail_iter = tail.into_iter().zip(tail_keys).peekable();
+    while let Some((_, tail_key)) = tail_iter.peek() {
+        while head_index < head.len() && head_keys[head_index] <= *tail_key {
+            combined.push(head[head_index].clone());
+            head_index += 1;
+        }
+        let (batch, _) = tail_iter.next().expect("peeked");
+        combined.push(batch);
+    }
+    combined.extend(head[head_index..].iter().cloned());
+    combined
+}
+
 fn mesh_batch_order_key(batch: &MeshBatch, frame: &WorldPrimitiveFrame) -> (u16, u8, i32, u8) {
     let phase = if batch.key.standard_item_foil {
         4

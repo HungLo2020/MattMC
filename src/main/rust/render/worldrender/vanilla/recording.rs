@@ -304,18 +304,7 @@ impl WorldPrimitiveFrontend {
         self.mesh_batch_identity_scratch = mesh_identity_scratch;
         let mut sorted_index_payload = Vec::new();
         let mesh_batch_plan = if has_camera_sorted_meshes {
-            let mut combined = Vec::with_capacity(
-                static_mesh_batch_plan.len()
-                    + frame
-                        .mesh_instances
-                        .iter()
-                        .filter(|instance| {
-                            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
-                        })
-                        .count(),
-            );
-            combined.extend(static_mesh_batch_plan.iter().cloned());
-            combined.extend(mesh_batches_selected_with_sorted_indices(
+            let sorted_batches = mesh_batches_selected_with_sorted_indices(
                 &frame,
                 self,
                 color_format,
@@ -324,9 +313,10 @@ impl WorldPrimitiveFrontend {
                 false,
                 MeshBatchSelection::CameraSorted,
                 (!use_g_buffer_mesh_path).then_some(&mut sorted_index_payload),
-            )?);
-            sort_mesh_batches(&mut combined, &frame);
-            Arc::new(combined)
+            )?;
+            // Both parts are already in batch order: merge instead of
+            // re-sorting the whole frame's batches.
+            Arc::new(merge_sorted_mesh_batches(&static_mesh_batch_plan, sorted_batches, &frame))
         } else {
             static_mesh_batch_plan
         };
