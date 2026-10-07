@@ -159,6 +159,35 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 		return this.submitThrowingTask(() -> this.storage.readPoiChunk(chunkPos));
 	}
 
+	/** A chunk {@link #loadForParse} found: its tape (from the region file or a
+	 * pending encoded write) or a pending write's tag copy. */
+	public record Loaded(@Nullable byte[] tape, @Nullable CompoundTag tag) {
+		/** The tag {@link #loadAsync} would have returned. */
+		public CompoundTag fullTag() throws java.io.IOException {
+			return this.tag != null ? this.tag : net.minecraft.nbt.NativeNbtRegionAccess.readTape(this.tape);
+		}
+	}
+
+	/** {@link #loadAsync}, leaving region and encoded pending chunks as tape so
+	 * loading can decode them directly. */
+	public CompletableFuture<Optional<Loaded>> loadForParse(ChunkPos chunkPos) {
+		return this.submitThrowingTask(() -> {
+			IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);
+			if (pendingStore != null) {
+				if (pendingStore.tape != null) return Optional.of(new Loaded(pendingStore.tape, null));
+				return Optional.ofNullable(pendingStore.copyData()).map(tag -> new Loaded(null, tag));
+			} else {
+				try {
+					byte[] tape = this.storage.readTape(chunkPos);
+					return Optional.ofNullable(tape).map(bytes -> new Loaded(bytes, null));
+				} catch (Exception var4) {
+					LOGGER.warn("Failed to read chunk {}", chunkPos, var4);
+					throw var4;
+				}
+			}
+		});
+	}
+
 	public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos chunkPos) {
 		return this.submitThrowingTask(() -> {
 			IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);

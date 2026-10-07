@@ -107,8 +107,100 @@ public record SerializableChunkData(
 	public static final String BLOCK_LIGHT_TAG = "BlockLight";
 	public static final String SKY_LIGHT_TAG = "SkyLight";
 
+	/** Parses a loaded chunk: a current-version tape has its sections decoded
+	 * by Rust ({@link net.minecraft.world.level.chunk.NativeChunkSections#decode})
+	 * and the rest read as a tag; anything else is upgraded and parsed as before. */
+	@Nullable
+	public static SerializableChunkData parseLoaded(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory,
+		IOWorker.Loaded loaded, java.util.function.UnaryOperator<CompoundTag> upgrade) {
+		try {
+			if (loaded.tape() != null) {
+				var decoded = net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.tape(), palettedContainerFactory,
+					levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY());
+				if (decoded != null) {
+					CompoundTag root = net.minecraft.nbt.NativeNbtRegionAccess.readTape(decoded.root());
+					// upgradeChunkTag leaves a current-version tag untouched.
+					if (ChunkStorage.getVersion(root) == net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version()) {
+						List<SerializableChunkData.SectionData> sections = sections(decoded, palettedContainerFactory);
+						if (sections != null) {
+							net.minecraft.world.level.chunk.NativeChunkSections.LOADED.incrementAndGet();
+							return parse(levelHeightAccessor, palettedContainerFactory, root, sections);
+						}
+					}
+				}
+			}
+			return parse(levelHeightAccessor, palettedContainerFactory, upgrade.apply(loaded.fullTag()));
+		} catch (java.io.IOException exception) {
+			throw new java.io.UncheckedIOException(exception);
+		}
+	}
+
+	/** Sections as parse builds them from Rust's decode, or null when a
+	 * container would not unpack cleanly (Java's codecs then report it). */
+	@Nullable
+	private static List<SerializableChunkData.SectionData> sections(net.minecraft.world.level.chunk.NativeChunkSections.Decoded decoded,
+		PalettedContainerFactory palettedContainerFactory) {
+		int[] ints = decoded.ints();
+		int at = 0, words = 0, bytes = 0;
+		int count = ints[at++];
+		List<SerializableChunkData.SectionData> list = new ArrayList(count);
+		for (int k = 0; k < count; k++) {
+			int y = ints[at++], flags = ints[at++];
+			LevelChunkSection levelChunkSection = null;
+			if ((flags & 16) != 0) {
+				PalettedContainer<BlockState> states;
+				if ((flags & 1) != 0) {
+					int size = ints[at++], length = ints[at++];
+					List<BlockState> palette = new ArrayList<>(size);
+					for (int i = 0; i < size; i++) palette.add(decoded.state(ints[at++]));
+					Optional<java.util.stream.LongStream> data = length < 0 ? Optional.empty() : Optional.of(java.util.stream.LongStream.of(Arrays.copyOfRange(decoded.longs(), words, words + length)));
+					words += Math.max(length, 0);
+					com.mojang.serialization.DataResult<PalettedContainer<BlockState>> result = PalettedContainer.unpack(palettedContainerFactory.blockStatesStrategy(),
+						new PalettedContainerRO.PackedData<>(palette, data));
+					if (result.error().isPresent() || result.result().isEmpty()) return null;
+					states = result.result().get();
+				} else {
+					states = palettedContainerFactory.createForBlockStates();
+				}
+				PalettedContainerRO<Holder<Biome>> biomes;
+				if ((flags & 2) != 0) {
+					int size = ints[at++], length = ints[at++];
+					List<Holder<Biome>> palette = new ArrayList<>(size);
+					for (int i = 0; i < size; i++) palette.add(decoded.biomes().byId(ints[at++]));
+					Optional<java.util.stream.LongStream> data = length < 0 ? Optional.empty() : Optional.of(java.util.stream.LongStream.of(Arrays.copyOfRange(decoded.longs(), words, words + length)));
+					words += Math.max(length, 0);
+					com.mojang.serialization.DataResult<PalettedContainer<Holder<Biome>>> result = PalettedContainer.unpack(palettedContainerFactory.biomeStrategy(),
+						new PalettedContainerRO.PackedData<>(palette, data));
+					if (result.error().isPresent() || result.result().isEmpty()) return null;
+					biomes = result.result().get();
+				} else {
+					biomes = palettedContainerFactory.createForBiomes();
+				}
+				levelChunkSection = new LevelChunkSection(states, biomes);
+			}
+			DataLayer blockLight = null, skyLight = null;
+			if ((flags & 4) != 0) {
+				blockLight = new DataLayer(Arrays.copyOfRange(decoded.bytes(), bytes, bytes + 2048));
+				bytes += 2048;
+			}
+			if ((flags & 8) != 0) {
+				skyLight = new DataLayer(Arrays.copyOfRange(decoded.bytes(), bytes, bytes + 2048));
+				bytes += 2048;
+			}
+			list.add(new SerializableChunkData.SectionData(y, levelChunkSection, blockLight, skyLight));
+		}
+		return list;
+	}
+
 	@Nullable
 	public static SerializableChunkData parse(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, CompoundTag compoundTag) {
+		return parse(levelHeightAccessor, palettedContainerFactory, compoundTag, null);
+	}
+
+	/** With {@code decodedSections}, those are the sections and the tag's own list is not read. */
+	@Nullable
+	private static SerializableChunkData parse(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, CompoundTag compoundTag,
+		@Nullable List<SerializableChunkData.SectionData> decodedSections) {
 		if (compoundTag.getString("Status").isEmpty()) {
 			return null;
 		} else {
@@ -153,8 +245,8 @@ public record SerializableChunkData(
 			List<CompoundTag> list3 = compoundTag.getList("entities").stream().flatMap(ListTag::compoundStream).toList();
 			List<CompoundTag> list4 = compoundTag.getList("block_entities").stream().flatMap(ListTag::compoundStream).toList();
 			CompoundTag compoundTag2 = compoundTag.getCompoundOrEmpty("structures");
-			ListTag listTag3 = compoundTag.getListOrEmpty("sections");
-			List<SerializableChunkData.SectionData> list5 = new ArrayList(listTag3.size());
+			ListTag listTag3 = decodedSections != null ? new ListTag() : compoundTag.getListOrEmpty("sections");
+			List<SerializableChunkData.SectionData> list5 = decodedSections != null ? decodedSections : new ArrayList(listTag3.size());
 			Codec<PalettedContainerRO<Holder<Biome>>> codec = palettedContainerFactory.biomeContainerCodec();
 			Codec<PalettedContainer<BlockState>> codec2 = palettedContainerFactory.blockStatesContainerCodec();
 

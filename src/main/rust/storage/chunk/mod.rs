@@ -5,6 +5,7 @@
 //! supplies raw container storage and registry vocabulary; see
 //! `NativeChunkSections`.
 pub(crate) mod ffi;
+pub(crate) mod load;
 #[cfg(test)]
 mod tests;
 
@@ -136,6 +137,8 @@ pub(crate) struct Vocabulary {
     pub fragments: Vec<u8>,
     pub offsets: Vec<u32>,
     pub bits: Vec<u8>,
+    /// Labels by fragment, for loading; built on first use.
+    pub lookup: std::sync::OnceLock<load::Lookup>,
 }
 
 /// A section as `SectionData` holds it.

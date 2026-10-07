@@ -36,6 +36,22 @@ public final class NativeChunkSections {
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+    private static final MethodHandle NAMES = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_biome_names_create",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle NAMES_RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_biome_names_release",
+        FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+    private static final MethodHandle DECODE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_decode",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    private static final MethodHandle TAKE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_take",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+        java.lang.foreign.Linker.Option.critical(true));
+    private static final java.lang.ref.Cleaner CLEANER = java.lang.ref.Cleaner.create();
+    // Each biome registry's names for loading; weak keys compare ID maps by identity.
+    private static final java.util.concurrent.ConcurrentMap<IdMap<Holder<Biome>>, BiomeNames> BIOME_NAMES =
+        new com.google.common.collect.MapMaker().weakKeys().makeMap();
+    // Chunks whose sections Rust decoded on load, so tests can prove the route.
+    public static final AtomicLong LOADED = new AtomicLong();
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
     // Tests compare both routes in one JVM; production reads the property once.
     private static volatile boolean enabled = !Boolean.getBoolean("mattmc.storage.javaChunkSections");
@@ -57,6 +73,8 @@ public final class NativeChunkSections {
      * strategy's storage bits per palette size. Built on first use. */
     private static final class Vocabulary {
         static final int[] LABELS;
+        // The state of each label (its first registry ID's state).
+        static final BlockState[] BY_LABEL;
         static final long HANDLE;
         @Nullable
         static final Strategy<BlockState> STRATEGY;
@@ -97,6 +115,11 @@ public final class NativeChunkSections {
                 handle = 0;
             }
             LABELS = labels;
+            int distinct = 0;
+            for (int label : labels) distinct = Math.max(distinct, label + 1);
+            BlockState[] byLabel = new BlockState[distinct];
+            for (int id = labels.length - 1; id >= 0; id--) byLabel[labels[id]] = Block.BLOCK_STATE_REGISTRY.byId(id);
+            BY_LABEL = byLabel;
             HANDLE = handle;
             STRATEGY = strategy;
         }
@@ -350,6 +373,93 @@ public final class NativeChunkSections {
             throw error;
         } catch (Throwable error) {
             throw new IllegalStateException("Native chunk section encoding failed", error);
+        }
+    }
+
+    /** A biome registry's names, as its by-name codec reads them, by ID. */
+    private static final class BiomeNames {
+        final long handle;
+
+        BiomeNames(long handle) {
+            this.handle = handle;
+            CLEANER.register(this, () -> {
+                try {
+                    NAMES_RELEASE.invokeExact(handle);
+                } catch (Throwable error) {
+                    throw new IllegalStateException("Cannot release native biome names", error);
+                }
+            });
+        }
+    }
+
+    private static long biomeNames(IdMap<Holder<Biome>> ids) {
+        BiomeNames names = BIOME_NAMES.computeIfAbsent(ids, map -> {
+            var units = new StringBuilder();
+            int[] lengths = new int[map.size()];
+            for (int id = 0; id < lengths.length; id++) {
+                // Only registered references have a name; others never match.
+                String name = map.byId(id) instanceof Holder.Reference<Biome> reference ? reference.key().location().toString() : "\uFFFF";
+                units.append(name);
+                lengths[id] = name.length();
+            }
+            char[] chars = units.toString().toCharArray();
+            try (Arena arena = Arena.ofConfined()) {
+                return new BiomeNames((long)NAMES.invokeExact(arena.allocateFrom(ValueLayout.JAVA_CHAR, chars), chars.length,
+                    arena.allocateFrom(ValueLayout.JAVA_INT, lengths), lengths.length));
+            } catch (RuntimeException | Error error) {
+                throw error;
+            } catch (Throwable error) {
+                throw new IllegalStateException("Cannot create native biome names", error);
+            }
+        });
+        return names.handle;
+    }
+
+    /** A saved chunk's sections decoded by Rust, and its tape without them.
+     * {@code ints}: section count, then per section y, flags (1 block states,
+     * 2 biomes, 4 block light, 8 sky light, 16 within the height) and for each
+     * container its palette size, word count (-1 without data) and entries. */
+    public record Decoded(byte[] root, int[] ints, long[] longs, byte[] bytes, IdMap<Holder<Biome>> biomes) {
+        public BlockState state(int label) {
+            return Vocabulary.BY_LABEL[label];
+        }
+    }
+
+    /** Decodes a saved chunk's tape for a level with sections
+     * {@code minSection..maxSection}; null when Rust declines (Java then
+     * parses the whole tag). */
+    @Nullable
+    public static Decoded decode(byte[] tape, PalettedContainerFactory factory, int minSection, int maxSection) {
+        if (!enabled || Vocabulary.HANDLE == 0 || factory.blockStatesStrategy().entryCount() != 4096 || factory.biomeStrategy().entryCount() != 64) {
+            return null;
+        }
+        Scratch scratch = SCRATCH.get();
+        if (scratch.blockStrategy != factory.blockStatesStrategy()) {
+            if (!sameBlockBits(factory.blockStatesStrategy())) return null;
+            scratch.blockStrategy = factory.blockStatesStrategy();
+        }
+        IdMap<Holder<Biome>> ids = factory.biomeStrategy().globalMap();
+        long names = biomeNames(ids);
+        if (names == 0) return null;
+        try (Arena arena = Arena.ofConfined()) {
+            var input = arena.allocate(Math.max(1, tape.length), 8);
+            MemorySegment.copy(MemorySegment.ofArray(tape), 0, input, 0, tape.length);
+            var sizes = arena.allocate(ValueLayout.JAVA_LONG, 4);
+            int status = (int)DECODE.invokeExact(Vocabulary.HANDLE, names, input, tape.length, minSection, maxSection, sizes);
+            if (status == -2) return null;
+            if (status != 0) throw new IllegalStateException("Native chunk section decoding rejected its input: " + status);
+            int[] ints = new int[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 0)];
+            long[] longs = new long[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 1)];
+            byte[] bytes = new byte[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 2)];
+            byte[] root = new byte[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 3)];
+            status = (int)TAKE.invokeExact(MemorySegment.ofArray(ints), MemorySegment.ofArray(longs), MemorySegment.ofArray(bytes),
+                MemorySegment.ofArray(root));
+            if (status != 0) throw new IllegalStateException("Native chunk section decoding lost its result");
+            return new Decoded(root, ints, longs, bytes, ids);
+        } catch (RuntimeException | Error error) {
+            throw error;
+        } catch (Throwable error) {
+            throw new IllegalStateException("Native chunk section decoding failed", error);
         }
     }
 }

@@ -129,12 +129,13 @@ class NativeChunkSectionsTest {
         };
     }
 
-    @Test void syntheticPalettesLightAndEmptySectionsEncodeIdentically() throws Exception {
+    @Test void syntheticPalettesLightAndEmptySectionsEncodeIdentically(@TempDir Path dir) throws Exception {
         var states = new ArrayList<BlockState>();
         for (int id = 0; id < Block.BLOCK_STATE_REGISTRY.size(); id++) states.add(Block.BLOCK_STATE_REGISTRY.byId(id));
         List<Holder<Biome>> biomes = new ArrayList<>(registries.lookupOrThrow(Registries.BIOME).listElements().toList());
         var random = new Random(77);
         int chunks = 0;
+        var synthetic = new ArrayList<CompoundTag>();
         for (int round = 0; round < 64; round++) {
             var sections = new ArrayList<SerializableChunkData.SectionData>();
             for (int y = -5; y < 21; y++) {
@@ -154,9 +155,12 @@ class NativeChunkSectionsTest {
                 List.of(), new CompoundTag());
             byte[][] tapes = tapes(data);
             assertArrayEquals(tapes[0], tapes[1], "round " + round);
+            synthetic.add(data.write());
             chunks++;
         }
-        System.out.println("CHUNK_SECTIONS_PARITY synthetic_chunks=" + chunks);
+        // The same chunks loaded back on both routes.
+        int rust = loads(dir, synthetic, true);
+        System.out.println("CHUNK_SECTIONS_PARITY synthetic_chunks=" + chunks + " loaded_by_rust=" + rust);
     }
 
     private static SerializableChunkData chunk(List<SerializableChunkData.SectionData> sections) {
@@ -185,6 +189,118 @@ class NativeChunkSectionsTest {
         assertArrayEquals(tapes[0], tapes[1]);
     }
 
+    /** Everything parse produced: the tape it re-encodes to, every section's
+     * storage, light and Y. */
+    static String fingerprint(SerializableChunkData data) throws Exception {
+        if (data == null) return "null";
+        var out = new StringBuilder(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+            .digest(NativeNbtRegionAccess.writeTape(data.write()))));
+        for (var section : data.sectionData()) {
+            out.append('\n').append(section.y()).append(' ').append(net.minecraft.world.level.chunk.SectionFingerprint.of(section.chunkSection()));
+            for (var layer : new DataLayer[]{section.blockLight(), section.skyLight()}) {
+                out.append(layer == null ? " -" : " " + java.util.Arrays.hashCode(layer.getData()));
+            }
+        }
+        return out.toString();
+    }
+
+    /** Loads each tag through a region file on both routes and compares what parse built. */
+    static int loads(Path dir, List<CompoundTag> tags, boolean expectRust) throws Exception {
+        var storage = new RegionFileStorage(new RegionStorageInfo("load", net.minecraft.world.level.Level.OVERWORLD, "chunk"), dir, false);
+        int rust = 0;
+        try {
+            for (CompoundTag tag : tags) {
+                var pos = new ChunkPos(tag.getIntOr("xPos", 0), tag.getIntOr("zPos", 0));
+                storage.write(pos, tag);
+                String java, native_;
+                Exception javaError = null, nativeError = null;
+                try {
+                    java = fingerprint(SerializableChunkData.parse(LevelHeightAccessor.create(-64, 384), factory, storage.read(pos)));
+                } catch (Exception e) {
+                    java = null;
+                    javaError = e;
+                }
+                long before = NativeChunkSections.LOADED.get();
+                try {
+                    var loaded = new IOWorker.Loaded(storage.readTape(pos), null);
+                    native_ = fingerprint(SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), factory, loaded, t -> t));
+                } catch (Exception e) {
+                    native_ = null;
+                    nativeError = e;
+                }
+                if (javaError != null || nativeError != null) {
+                    assertNotNull(javaError, "only Rust failed: " + nativeError);
+                    assertNotNull(nativeError, "only Java failed: " + javaError);
+                    Throwable cause = nativeError instanceof java.io.UncheckedIOException u ? u.getCause() : nativeError;
+                    assertEquals(javaError.getClass(), cause.getClass());
+                } else {
+                    assertEquals(java, native_, "chunk " + pos);
+                }
+                if (NativeChunkSections.LOADED.get() > before) rust++;
+            }
+        } finally {
+            storage.close();
+        }
+        if (expectRust) assertEquals(tags.size(), rust, "every chunk must load through Rust");
+        return rust;
+    }
+
+    @Test void savedChunksLoadIdentically(@TempDir Path dir) throws Exception {
+        int rust = loads(dir, corpus(), true);
+        System.out.println("CHUNK_SECTIONS_LOAD_PARITY saved_chunks=" + rust);
+    }
+
+    /** Edited saved chunks: what Rust must decline (Java decodes) and what it must still read. */
+    @Test void nonCanonicalAndOddSectionsLoadIdentically(@TempDir Path dir) throws Exception {
+        var tags = corpus();
+        var edited = new ArrayList<CompoundTag>();
+        int i = 0;
+        for (CompoundTag original : tags.subList(0, 24)) {
+            CompoundTag tag = original.copy();
+            var sections = tag.getListOrEmpty("sections");
+            var section = sections.getCompound(sections.size() / 2).orElseThrow();
+            switch (i++ % 8) {
+                case 0 -> section.getCompound("block_states").orElseThrow().getListOrEmpty("palette").getCompound(0).orElseThrow()
+                    .putString("Name", "stone"); // no namespace: Java resolves it, Rust declines
+                case 1 -> section.getCompound("biomes").orElseThrow().getListOrEmpty("palette").set(0, net.minecraft.nbt.StringTag.valueOf("plains"));
+                case 2 -> section.putByteArray("BlockLight", new byte[1000]); // DataLayer rejects: both fail
+                case 3 -> section.putString("unknown", "ignored"); // both ignore it
+                case 4 -> section.putByte("Y", (byte)100); // outside the height: containers ignored
+                case 5 -> section.getCompound("block_states").orElseThrow().putString("extra", "ignored");
+                case 6 -> section.remove("biomes"); // default biome container
+                default -> section.putInt("Y", section.getByteOr("Y", (byte)0)); // non-byte Y: Rust declines
+            }
+            edited.add(tag);
+        }
+        int rust = loads(dir, edited, false);
+        // Unknown keys, out-of-height sections, missing biomes and extra container keys stay on Rust (cases 3-6).
+        assertTrue(rust >= 12, "Rust loads " + rust);
+        System.out.println("CHUNK_SECTIONS_LOAD_PARITY edited_chunks=" + edited.size() + " rust=" + rust);
+    }
+
+    @Test void olderDataVersionsTakeTheUpgradePath(@TempDir Path dir) throws Exception {
+        var storage = new RegionFileStorage(new RegionStorageInfo("old", net.minecraft.world.level.Level.OVERWORLD, "chunk"), dir, false);
+        try {
+            CompoundTag tag = corpus().getFirst().copy();
+            int current = tag.getIntOr("DataVersion", 0);
+            tag.putInt("DataVersion", current - 1);
+            var pos = new ChunkPos(tag.getIntOr("xPos", 0), tag.getIntOr("zPos", 0));
+            storage.write(pos, tag);
+            int[] upgrades = {0};
+            long before = NativeChunkSections.LOADED.get();
+            var parsed = SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), factory, new IOWorker.Loaded(storage.readTape(pos), null),
+                t -> {
+                    upgrades[0]++;
+                    return t;
+                });
+            assertEquals(1, upgrades[0], "an older chunk must be upgraded");
+            assertEquals(before, NativeChunkSections.LOADED.get(), "an older chunk must not use the Rust sections");
+            assertEquals(fingerprint(SerializableChunkData.parse(LevelHeightAccessor.create(-64, 384), factory, tag)), fingerprint(parsed));
+        } finally {
+            storage.close();
+        }
+    }
+
     @Test void pendingReadsAndDiskRoundTripMatchTheTag(@TempDir Path dir) throws Exception {
         var tags = corpus();
         var info = new RegionStorageInfo("test", net.minecraft.world.level.Level.OVERWORLD, "chunk");
@@ -197,6 +313,13 @@ class NativeChunkSectionsTest {
                 worker.scanChunk(data.chunkPos(), visitor).join();
                 assertEquals(data.write(), visitor.getResult());
                 assertEquals(data.write(), worker.loadAsync(data.chunkPos()).join().orElseThrow());
+            }
+            // A pending encoded chunk loads from its tape like a region read.
+            for (CompoundTag tag : tags.subList(0, 8)) {
+                var data = parse(tag);
+                var loaded = worker.loadForParse(data.chunkPos()).join().orElseThrow();
+                assertNotNull(loaded.tape());
+                assertEquals(fingerprint(data), fingerprint(SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), factory, loaded, t -> t)));
             }
             worker.synchronize(true).join();
             for (CompoundTag tag : tags.subList(0, 8)) {

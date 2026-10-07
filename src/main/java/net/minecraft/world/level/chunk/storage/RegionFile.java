@@ -97,7 +97,14 @@ public class RegionFile implements AutoCloseable {
 	}
 
 	@Nullable
-	public synchronized CompoundTag readChunk(ChunkPos chunkPos) throws IOException {
+	public CompoundTag readChunk(ChunkPos chunkPos) throws IOException {
+		byte[] tape = this.readChunkTape(chunkPos);
+		return tape == null ? null : NativeNbtRegionAccess.readTape(tape);
+	}
+
+	/** The chunk's NBT as tape, or null when absent. */
+	@Nullable
+	public synchronized byte[] readChunkTape(ChunkPos chunkPos) throws IOException {
 		NativeRegionFileBridge.TapeResult tape;
 		long started = StoragePerfDiagnostics.start();
 		try {
@@ -145,7 +152,7 @@ public class RegionFile implements AutoCloseable {
 			);
 		}
 		JvmProfiler.INSTANCE.onRegionFileRead(this.info, chunkPos, regionFileVersion, Math.toIntExact(result.compressedLength()));
-		return NativeNbtRegionAccess.readTape(tape.bytes());
+		return tape.bytes();
 	}
 
 	public synchronized void writeBenchmarkPayload(ChunkPos chunkPos, byte[] encodedPayload) throws IOException {

@@ -74,6 +74,15 @@ public abstract class BiomeSource implements BiomeResolver {
 		return this.findBiomeHorizontal(i, j, k, l, 1, predicate, randomSource, false, sampler);
 	}
 
+	/** {@link #findBiomeHorizontal(int, int, int, int, Predicate, RandomSource, Climate.Sampler)}
+	 * for membership in a holder set, a pure test sources may evaluate once per biome. */
+	@Nullable
+	public Pair<BlockPos, Holder<Biome>> findBiomeHorizontal(
+		int i, int j, int k, int l, net.minecraft.core.HolderSet<Biome> biomes, RandomSource randomSource, Climate.Sampler sampler
+	) {
+		return this.findBiomeHorizontal(i, j, k, l, biomes::contains, randomSource, sampler);
+	}
+
 	@Nullable
 	public Pair<BlockPos, Holder<Biome>> findClosestBiome3d(
 		BlockPos blockPos, int i, int j, int k, Predicate<Holder<Biome>> predicate, Climate.Sampler sampler, LevelReader levelReader
@@ -82,26 +91,32 @@ public abstract class BiomeSource implements BiomeResolver {
 		if (set.isEmpty()) {
 			return null;
 		} else {
-			int l = Math.floorDiv(i, j);
 			int[] is = Mth.outFromOrigin(blockPos.getY(), levelReader.getMinY() + 1, levelReader.getMaxY() + 1, k).toArray();
+			return this.findClosestBiome3d(blockPos, i, j, set, is, sampler);
+		}
+	}
 
-			for (BlockPos.MutableBlockPos mutableBlockPos : BlockPos.spiralAround(BlockPos.ZERO, l, Direction.EAST, Direction.SOUTH)) {
-				int m = blockPos.getX() + mutableBlockPos.getX() * j;
-				int n = blockPos.getZ() + mutableBlockPos.getZ() * j;
-				int o = QuartPos.fromBlock(m);
-				int p = QuartPos.fromBlock(n);
+	/** The spiral search of {@link #findClosestBiome3d} over the accepted biomes and the Ys to try per column. */
+	@Nullable
+	protected Pair<BlockPos, Holder<Biome>> findClosestBiome3d(BlockPos blockPos, int i, int j, Set<Holder<Biome>> set, int[] is, Climate.Sampler sampler) {
+		int l = Math.floorDiv(i, j);
 
-				for (int q : is) {
-					int r = QuartPos.fromBlock(q);
-					Holder<Biome> holder = this.getNoiseBiome(o, r, p, sampler);
-					if (set.contains(holder)) {
-						return Pair.of(new BlockPos(m, q, n), holder);
-					}
+		for (BlockPos.MutableBlockPos mutableBlockPos : BlockPos.spiralAround(BlockPos.ZERO, l, Direction.EAST, Direction.SOUTH)) {
+			int m = blockPos.getX() + mutableBlockPos.getX() * j;
+			int n = blockPos.getZ() + mutableBlockPos.getZ() * j;
+			int o = QuartPos.fromBlock(m);
+			int p = QuartPos.fromBlock(n);
+
+			for (int q : is) {
+				int r = QuartPos.fromBlock(q);
+				Holder<Biome> holder = this.getNoiseBiome(o, r, p, sampler);
+				if (set.contains(holder)) {
+					return Pair.of(new BlockPos(m, q, n), holder);
 				}
 			}
-
-			return null;
 		}
+
+		return null;
 	}
 
 	@Nullable

@@ -123,7 +123,7 @@ public class ChunkGeneratorStructureState {
 						() -> {
 							Pair<BlockPos, Holder<Biome>> pair = this.biomeSource
 								.findBiomeHorizontal(
-									SectionPos.sectionToBlockCoord(o, 8), 0, SectionPos.sectionToBlockCoord(p, 8), 112, holderSet::contains, randomSource2, this.randomState.sampler()
+									SectionPos.sectionToBlockCoord(o, 8), 0, SectionPos.sectionToBlockCoord(p, 8), 112, holderSet, randomSource2, this.randomState.sampler()
 								);
 							if (pair != null) {
 								BlockPos blockPos = pair.getFirst();

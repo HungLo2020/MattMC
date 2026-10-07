@@ -62,6 +62,21 @@ public class MultiNoiseBiomeSource extends BiomeSource {
 	}
 
 	@Override
+	public Pair<BlockPos, Holder<Biome>> findBiomeHorizontal(
+		int i, int j, int k, int l, net.minecraft.core.HolderSet<Biome> biomes, net.minecraft.util.RandomSource randomSource, Climate.Sampler sampler
+	) {
+		var search = net.minecraft.world.level.levelgen.NativeBiomeSearch.horizontal(this, i, j, k, l, biomes::contains, randomSource, sampler);
+		return search.handled() ? search.result() : super.findBiomeHorizontal(i, j, k, l, biomes, randomSource, sampler);
+	}
+
+	@Override
+	protected Pair<BlockPos, Holder<Biome>> findClosestBiome3d(BlockPos blockPos, int i, int j, java.util.Set<Holder<Biome>> set, int[] is,
+		Climate.Sampler sampler) {
+		var search = net.minecraft.world.level.levelgen.NativeBiomeSearch.closest(this, blockPos, i, j, set, is, sampler);
+		return search.handled() ? search.result() : super.findClosestBiome3d(blockPos, i, j, set, is, sampler);
+	}
+
+	@Override
 	public Holder<Biome> getNoiseBiome(int i, int j, int k, Climate.Sampler sampler) {
 		return this.getNoiseBiome(sampler.sample(i, j, k));
 	}

@@ -53,6 +53,12 @@ public final class RegionFileStorage implements AutoCloseable {
 		return regionFile.readChunk(chunkPos);
 	}
 
+	/** {@link #read} as NBT tape, or null when absent. */
+	@Nullable
+	public byte[] readTape(ChunkPos chunkPos) throws IOException {
+		return this.getRegionFile(chunkPos).readChunkTape(chunkPos);
+	}
+
 	public void scanChunk(ChunkPos chunkPos, StreamTagVisitor streamTagVisitor) throws IOException {
 		RegionFile regionFile = this.getRegionFile(chunkPos);
 		DataInputStream dataInputStream = regionFile.getChunkDataInputStream(chunkPos);

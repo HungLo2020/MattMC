@@ -559,8 +559,9 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	private CompletableFuture<ChunkAccess> scheduleChunkLoad(ChunkPos chunkPos) {
-		CompletableFuture<Optional<SerializableChunkData>> completableFuture = this.readChunk(chunkPos).thenApplyAsync(optional -> optional.map(compoundTag -> {
-			SerializableChunkData serializableChunkData = SerializableChunkData.parse(this.level, this.level.palettedContainerFactory(), compoundTag);
+		CompletableFuture<Optional<SerializableChunkData>> completableFuture = this.readForParse(chunkPos).thenApplyAsync(optional -> optional.map(loaded -> {
+			SerializableChunkData serializableChunkData = SerializableChunkData.parseLoaded(this.level, this.level.palettedContainerFactory(), loaded,
+				this::upgradeChunkTag);
 			if (serializableChunkData == null) {
 				LOGGER.error("Chunk file at {} is missing level data, skipping", chunkPos);
 			}

@@ -1,6 +1,6 @@
 # Rust chunk section serialization
 
-Saving a chunk now builds its `sections` list in Rust. In
+Saving and loading a chunk now handle its `sections` list in Rust. In
 [`storage/chunk/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/storage/chunk),
 each section is written straight as NBT tape:
 
@@ -34,6 +34,38 @@ packing and tape records. Java supplies vocabulary built once:
 - every block state's `BlockState.CODEC` compound as tape
 - the storage bits of each palette size, taken from the strategies themselves
 - biome names as `holderByNameCodec` writes them, sent with each chunk
+
+## How a load flows
+
+1. `ChunkMap.scheduleChunkLoad` reads the chunk as tape
+   (`IOWorker.loadForParse`): the region file's tape, or a pending encoded
+   write's tape. A pending tag is copied as before.
+2. On the background executor, `SerializableChunkData.parseLoaded` passes the
+   tape to Rust ([`load.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/storage/chunk/load.rs)).
+   Rust finds the root `sections` list and decodes it:
+   - Palette states are identified by matching each entry's tape byte for byte
+     against the save vocabulary's encoded compounds.
+   - Biome names are looked up in the registry's names.
+   - It also returns storage words, light layers and `Y`, plus the root tape
+     without `sections`.
+3. Java reads that smaller root as a tag. If its `DataVersion` is current
+   (`upgradeChunkTag` would return it unchanged), Java builds each section the
+   way the codecs do: `PalettedContainer.unpack` with the decoded palette and
+   words, `new DataLayer(bytes)`, and default containers for missing keys.
+   `parse` reads everything else from the root.
+4. Java falls back to its original route in three cases: an older data
+   version, a Rust decline, or an `unpack` that does not succeed cleanly. It
+   upgrades the full tag and parses it, so logging, partial results and
+   exceptions are the original ones.
+
+Rust declines, so Java decodes the chunk, for:
+- a palette entry that is not the canonical encoding of a registered state
+  (for example a name without a namespace)
+- a biome name not exactly as the registry writes it
+- a `Y`, light layer, palette or `data` of an unexpected type or length
+
+Unknown keys, out-of-height sections (their containers are never read) and
+missing containers follow `parse` exactly and stay on Rust.
 
 ## Constraints when changing this code
 
@@ -90,8 +122,21 @@ python3 DevUtils/tests/storage/VerifyRustChunkSections.py --forks 3
   and biomes; sections without containers; absent, lazy and explicit light.
 - an all-empty section list and a palette that names one state twice
 
-It also stores eight encoded chunks through `IOWorker`, queues `scanChunk` and
-`loadAsync`, then synchronizes and reads back through the same worker against
+Loading is compared with a fingerprint of everything `parse` built:
+- the tape it re-encodes to
+- every section's palette class and entries (by identity), storage class,
+  bits and raw words, block counters, light layers and `Y`
+
+The checks:
+- The 40 saved and 64 synthetic chunks are written to a region file and
+  loaded on both routes. Every chunk must use Rust.
+- 24 edited chunks cover the decline and keep cases above. When the original
+  throws (a short light layer), both routes throw the same exception.
+- An older `DataVersion` must go through the upgrade function.
+
+It also stores eight encoded chunks through `IOWorker`, queues `scanChunk`,
+`loadAsync` and `loadForParse`, then synchronizes and reads back through the
+same worker against
 `write()` (tag equality, not region-file bytes; region headers carry write
 timestamps). The test does not force or observe the pending-write branch, reopen
 storage, or exercise same-chunk coalescing and injected failures.
@@ -105,10 +150,12 @@ two cases:
 
 - `encode`: chunk data to tape
 - `save`: `encode` plus direct region file writes with `sync=false`
+- `load`: reading every chunk back from its region file and `parseLoaded`,
+  including the unchanged Rust region read and decompression
 
 Parsing, live snapshots, `IOWorker` scheduling and final close/flush are outside
-the measured operations. The `save` result is not durable end-to-end save/load
-throughput.
+the measured operations. The `save` and `load` results are not durable
+end-to-end save/load throughput.
 
 Three independent JVM pairs alternate the route order on the same CPUs. Each
 case must save at least 5% in every pair and at the upper 95% bootstrap
@@ -120,36 +167,45 @@ success alone is not performance acceptance.
 ## Status
 
 The implementation author recorded release acceptance on 2026-10-06: Ryzen 5
-5600G, Linux x86_64, OpenJDK 25, with `passes: true` for both cases.
+5600G, Linux x86_64, OpenJDK 25, with `passes: true` for all three cases.
 
-Parity: four Java tests and three Rust tests passed with byte-identical tapes.
-That covers 40 saved chunks (960 sections, 1.8 MB of tape) and 64 synthetic
-chunks.
+Parity: seven Java tests and three Rust tests passed.
+- Saving: byte-identical tapes for 40 saved chunks (960 sections, 1.8 MB of
+  tape) and 64 synthetic chunks.
+- Loading: identical fingerprints for all 40 saved and 64 synthetic chunks,
+  every one through Rust. Of the 24 edited chunks, the 12 expected cases
+  stayed on Rust and the rest fell back with identical results or exceptions.
 
 Mutation checks:
-- Eleven semantic mutations were all caught. They covered:
-  - hash tie order, hash spreading and key insertion order
-  - identity labels, palette element type and storage-bits lookup
-  - empty-list type, signed `Y` and biome names
-  - pending scans of lazily built tags
-- One further mutation was a proven equivalent and was replaced. Moving
-  `BlockLight` earlier cannot change order, because it shares its bucket only
-  with the later `Y`.
+- Saving: eleven semantic mutations were caught. They covered hash tie
+  order, hash spreading, key insertion order, identity labels, palette
+  element type, storage-bits lookup, empty-list type, signed `Y`, biome names
+  and pending scans.
+- Loading: seven were caught: signed `Y`, the height check, the root's child
+  count, light order, palette labels, the data-version gate and biome IDs.
+- Proven equivalents:
+  - Saving: moving `BlockLight` earlier in insertion order. It shares its
+    bucket only with the later `Y`, so order cannot change.
+  - Loading: passing absent `data` as an empty array. `unpack` ignores storage
+    for a single-entry palette, and for larger palettes both forms fail
+    `unpack`, which sends the chunk to Java.
 
 Median time per round of 40 chunks over three JVM pairs. The last column is
 the conservative saving at the upper 95% bound of the time ratio:
 
 | Case | Java | Rust including boundary | Time saved | Conservative saving |
 |---|---:|---:|---:|---:|
-| `encode` | 32.7 ms | 8.7 ms | 73.3% | 69.9% |
-| `save` | 57.5 ms | 37.5 ms | 34.7% | 33.7% |
+| `encode` | 32.8 ms | 9.2 ms | 71.9% | 70.6% |
+| `save` | 61.0 ms | 38.4 ms | 37.1% | 33.2% |
+| `load` | 18.4 ms | 14.3 ms | 22.7% | 20.5% |
 
-Every pair passed. The smallest individual-pair savings were 70.1% (`encode`)
-and 34.0% (`save`). The unchanged Rust NBT encoding, compression and file
-write make up most of `save`'s remaining time.
+Every pair passed. The smallest individual-pair savings were 70.9%
+(`encode`), 33.6% (`save`) and 21.3% (`load`). The unchanged Rust NBT
+encoding, compression and file I/O make up most of `save`'s and `load`'s
+remaining time. `load`'s pairs varied widely, from 21% to 54% saved.
 
-A few measured rounds overlapped JIT compilation (1 and 4 of 180 samples per
-case). These are warmed subsystem timings on this machine and corpus, not
+A few measured rounds overlapped JIT compilation (2, 4 and 4 of 180 samples
+per case). These are warmed subsystem timings on this machine and corpus, not
 whole-server claims. The benchmark's route guard requires some native chunks
 in native mode and zero in Java mode; the separate parity helper requires one
 native encoding per tested fixture. Those checks have different strength.
@@ -172,4 +228,4 @@ not create that malformed-input trigger. No runtime reproduction or world damage
 was observed in this review. Acceptance needs deterministic rejection-then-valid
 encoding and exceptional-completion regressions, alongside pending/coalescing,
 reopen and concurrent-save coverage; the successful fixtures above do not close
-those requirements.
+those requirements. The load route added afterwards was not part of that review.
