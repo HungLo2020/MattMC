@@ -27,6 +27,7 @@ import net.sodium.client.util.NativeBuffer;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.core.SectionPos;
 import org.slf4j.Logger;
 import net.logging.LogUtils;
 
@@ -924,7 +925,7 @@ public final class RustGalTerrainRenderer {
 		return true;
 	}
 
-	private static void recordAnimatedSpriteUse(RenderSection section) {
+	static void recordAnimatedSpriteUse(RenderSection section) {
 		var animatedSprites = section.getAnimatedSprites();
 		if (animatedSprites != null) {
 			for (var sprite : animatedSprites) {
@@ -4060,6 +4061,7 @@ public final class RustGalTerrainRenderer {
 			SECTION_ASSETS.putAll(replacement);
 			SECTION_ASSET_ROWS.clear();
 			SECTION_SHADOW_IDENTITIES.clear();
+			queueGraphMeshReset();
 			for (LayerKey key : replacement.keySet()) {
 				mirrorSectionAssetRow(key);
 			}
@@ -4836,6 +4838,7 @@ public final class RustGalTerrainRenderer {
 		if (slot < 0) {
 			return;
 		}
+		queueGraphMeshRow(layerKey.sectionPos());
 		SECTION_ASSET_ROWS.compute(rowKey(layerKey.sectionPos()), (rowKey, row) -> {
 			TerrainSectionAsset[] next = row == null ? new TerrainSectionAsset[3] : row.clone();
 			next[slot] = SECTION_ASSETS.get(layerKey);
@@ -4854,6 +4857,124 @@ public final class RustGalTerrainRenderer {
 			SECTION_SHADOW_IDENTITIES.put(rowKey, identities);
 			return next;
 		});
+	}
+
+	// Section rows changed since the section graph last drained them. The
+	// graph re-reads each current row, so a position needs listing only once.
+	private static final Object GRAPH_MESH_ROWS_LOCK = new Object();
+	private static final it.unimi.dsi.fastutil.longs.LongArrayList GRAPH_MESH_ROW_POSITIONS =
+		new it.unimi.dsi.fastutil.longs.LongArrayList();
+	private static boolean graphMeshRowsReset = true;
+
+	private static void queueGraphMeshRow(long sectionPos) {
+		synchronized (GRAPH_MESH_ROWS_LOCK) {
+			if (!graphMeshRowsReset) {
+				GRAPH_MESH_ROW_POSITIONS.add(sectionPos);
+			}
+		}
+	}
+
+	private static void queueGraphMeshReset() {
+		synchronized (GRAPH_MESH_ROWS_LOCK) {
+			GRAPH_MESH_ROW_POSITIONS.clear();
+			graphMeshRowsReset = true;
+		}
+	}
+
+	/**
+	 * Mirrors changed section asset rows into {@code graph}; after a reset, or
+	 * with {@code republish} for a new graph, every current row.
+	 */
+	static void drainGraphMeshRows(RustSectionGraph graph, boolean republish) {
+		long[] positions;
+		boolean reset;
+		synchronized (GRAPH_MESH_ROWS_LOCK) {
+			reset = graphMeshRowsReset || republish;
+			graphMeshRowsReset = false;
+			positions = reset ? null : GRAPH_MESH_ROW_POSITIONS.toLongArray();
+			GRAPH_MESH_ROW_POSITIONS.clear();
+		}
+		if (reset) {
+			graph.clearMeshes();
+			LongOpenHashSet all = new LongOpenHashSet();
+			for (LayerKey key : SECTION_ASSETS.keySet()) {
+				if (rowSlot(key.layer()) >= 0) {
+					all.add(key.sectionPos());
+				}
+			}
+			positions = all.toLongArray();
+		}
+		for (long sectionPos : positions) {
+			TerrainSectionAsset[] row = sectionAssetRow(sectionPos);
+			TerrainSectionAsset solid = row == null ? null : row[0];
+			TerrainSectionAsset cutout = row == null ? null : row[1];
+			TerrainSectionAsset translucent = row == null ? null : row[2];
+			graph.setMeshes(SectionPos.x(sectionPos), SectionPos.y(sectionPos), SectionPos.z(sectionPos),
+				translucent != null && terrainCameraSortRequested(ChunkSectionLayer.TRANSLUCENT,
+					translucent.translucentSortType()),
+				solid == null ? 0L : solid.meshKey(), solid == null ? 0L : solid.meshGeneration(),
+				cutout == null ? 0L : cutout.meshKey(), cutout == null ? 0L : cutout.meshGeneration(),
+				translucent == null ? 0L : translucent.meshKey(),
+				translucent == null ? 0L : translucent.meshGeneration());
+		}
+	}
+
+	/**
+	 * Whether this frame's static terrain comes from the Rust section graph's
+	 * selection. Diagnostic, fault, reload and per-record frames, and frames
+	 * whose readiness needs per-layer identity receipts, keep the Java path.
+	 */
+	static boolean wholeFrameTerrainSelectionEligible() {
+		String fault = activeFault();
+		return !resourceReloadStaging && fault.isEmpty() && !detailedTerrainDiagnosticsEnabled(fault)
+			&& !Boolean.getBoolean("mattmc.dev.perRecordStaticTerrain")
+			&& !net.minecraft.client.dev.GraphicsFrameBenchmark.needsSubmittedWorkIdentity()
+			&& !net.minecraft.client.dev.DeterministicCameraCapture.needsSubmittedWorkIdentity()
+			&& !net.sodium.client.render.StaticTerrainParityDiagnostics.isEnabled();
+	}
+
+	/** Depth policies of the solid, cutout and translucent rows. */
+	static int[] selectionDepthPolicies() {
+		return new int[] {
+			terrainDepthPolicy(ChunkSectionLayer.SOLID),
+			terrainDepthPolicy(ChunkSectionLayer.CUTOUT_MIPPED),
+			terrainDepthPolicy(ChunkSectionLayer.TRANSLUCENT)
+		};
+	}
+
+	static final int[] SELECTION_LAYER_ORDINALS = {
+		ChunkSectionLayer.SOLID.ordinal(), ChunkSectionLayer.CUTOUT_MIPPED.ordinal(), ChunkSectionLayer.TRANSLUCENT.ordinal()
+	};
+
+	static final int MAX_SELECTION_SHADOW_CANDIDATES = MAX_SHADOW_CANDIDATE_SECTIONS;
+
+	/**
+	 * Enqueues a Rust terrain selection as the frame's static terrain: the
+	 * same compact sections and casters the Java producer built, plus its
+	 * producer receipts.
+	 */
+	static void enqueueWholeFrameTerrainSelection(RustSectionGraph.TerrainSelection selection, Camera camera) {
+		double cameraX = camera.getPosition().x();
+		double cameraY = camera.getPosition().y();
+		double cameraZ = camera.getPosition().z();
+		RustGalWorldPrimitiveRenderer.seedStaticTerrainFrameCamera(cameraX, cameraY, cameraZ);
+		if (terrainCountersEnabled("") && selection.layerSubmissions() > 0) {
+			visibleLayerProbes.addAndGet(selection.layerProbes());
+			visibleLayerSubmissions.addAndGet(selection.layerSubmissions());
+			long enqueued = rustEnqueueFrames.addAndGet(selection.layerSubmissions());
+			long frameId = currentGameplayFrameId();
+			lastVisibleSubmissionFrameId.set(frameId > 0L ? frameId : enqueued);
+			currentFrameVisibleLayerSubmissions.set(selection.layerSubmissions());
+			currentFrameVisibleFingerprint.set(selection.fingerprint());
+		}
+		RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSelection(selection.sections(), selection.sectionCount(),
+			selection.casters(), selection.casterCount(), cameraX, cameraY, cameraZ);
+		if (selection.layerProbes() > 0) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.setup", 1L);
+			for (int layerPass = 0; layerPass < 3; layerPass++) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
+			}
+		}
 	}
 
 	/** Solid, cutout, and translucent assets of one section (slots per {@link #rowSlot}); null if none. */

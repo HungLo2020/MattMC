@@ -1637,6 +1637,9 @@ public final class RustGalFrameCoordinator {
 				"Rust Vulkan whole-frame target audit requires a consumed semantic primitive frame"
 			);
 		}
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
 		VulkanicGalBridge.WorldBackgroundRecord background = primitiveFrame == null
 			? VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback()
 			: primitiveFrame.background();

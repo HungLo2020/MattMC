@@ -6024,27 +6024,36 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	/**
-	 * Off-camera static-terrain shadow casters as compact copied arrays: mesh
-	 * identity, aligned section origin (x, y, z per caster) and layer depth
-	 * policy. Rust expands resident casters into shadow-only instances with the
-	 * frame's terrain camera; no per-caster Java record is built.
+	 * Off-camera static-terrain shadow casters, packed in the native
+	 * {@code FfiStaticTerrainShadowCaster} layout ({@link #packStaticTerrainShadowCaster}):
+	 * mesh identity, aligned section origin and layer depth policy. Rust
+	 * expands resident casters into shadow-only instances with the frame's
+	 * terrain camera; no per-caster Java record is built.
 	 */
-	public record StaticTerrainShadowCasters(
-		long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] depthPolicies, int count
-	) {
+	public record StaticTerrainShadowCasters(MemorySegment packed, int count) {
 		public static final StaticTerrainShadowCasters EMPTY =
-			new StaticTerrainShadowCasters(new long[0], new long[0], new int[0], new int[0], 0);
+			new StaticTerrainShadowCasters(MemorySegment.ofArray(new byte[0]), 0);
 
 		public StaticTerrainShadowCasters {
-			Objects.requireNonNull(meshKeys, "meshKeys");
-			Objects.requireNonNull(meshGenerations, "meshGenerations");
-			Objects.requireNonNull(sectionOrigins, "sectionOrigins");
-			Objects.requireNonNull(depthPolicies, "depthPolicies");
-			if (count < 0 || count > meshKeys.length || count > meshGenerations.length
-				|| count > depthPolicies.length || (long) count * 3L > sectionOrigins.length) {
+			Objects.requireNonNull(packed, "packed");
+			if (count < 0 || packed.byteSize() < count * Struct.STATIC_TERRAIN_SHADOW_CASTER.byteSize()) {
 				throw new IllegalArgumentException("static terrain shadow casters are not bounded");
 			}
 		}
+	}
+
+	/** Writes caster {@code index} of a packed caster array. */
+	public static void packStaticTerrainShadowCaster(MemorySegment packed, int index, long meshKey,
+			long meshGeneration, int originX, int originY, int originZ, int depthPolicy) {
+		var layout = Struct.STATIC_TERRAIN_SHADOW_CASTER;
+		long base = index * layout.byteSize();
+		long originOffset = base + layout.offset(2);
+		packed.set(ValueLayout.JAVA_LONG_UNALIGNED, base + layout.offset(0), meshKey);
+		packed.set(ValueLayout.JAVA_LONG_UNALIGNED, base + layout.offset(1), meshGeneration);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, originOffset, originX);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, originOffset + Integer.BYTES, originY);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, originOffset + 2L * Integer.BYTES, originZ);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, base + layout.offset(3), depthPolicy);
 	}
 
 	private static void writeStaticTerrainShadowCasters(
@@ -6054,25 +6063,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (count != 0 && camera == null) {
 			throw new IllegalStateException("static terrain shadow casters require the frame terrain camera");
 		}
-		var layout = Struct.STATIC_TERRAIN_SHADOW_CASTER;
-		MemorySegment records = layout.array(arena, count);
-		long keyOffset = layout.offset(0);
-		long generationOffset = layout.offset(1);
-		long originOffset = layout.offset(2);
-		long depthOffset = layout.offset(3);
-		long stride = layout.byteSize();
-		long[] keys = casters.meshKeys();
-		long[] generations = casters.meshGenerations();
-		int[] origins = casters.sectionOrigins();
-		int[] depths = casters.depthPolicies();
-		for (int i = 0; i < count; i++) {
-			long base = i * stride;
-			records.set(ValueLayout.JAVA_LONG, base + keyOffset, keys[i]);
-			records.set(ValueLayout.JAVA_LONG, base + generationOffset, generations[i]);
-			records.set(ValueLayout.JAVA_INT, base + originOffset, origins[i * 3]);
-			records.set(ValueLayout.JAVA_INT, base + originOffset + Integer.BYTES, origins[i * 3 + 1]);
-			records.set(ValueLayout.JAVA_INT, base + originOffset + 2L * Integer.BYTES, origins[i * 3 + 2]);
-			records.set(ValueLayout.JAVA_INT, base + depthOffset, depths[i]);
+		MemorySegment records = Struct.STATIC_TERRAIN_SHADOW_CASTER.array(arena, count);
+		if (count != 0) {
+			MemorySegment.copy(casters.packed(), 0, records, 0, records.byteSize());
 		}
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 47, records, count);
 		long cameraOffset = Struct.WHOLE_FRAME_SUBMIT.offset(48);
@@ -6083,29 +6076,38 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 	/**
 	 * Camera-visible static-terrain section layers in draw order (translucent
-	 * back to front) as compact copied arrays: mesh identity, aligned section
-	 * origin, layer depth policy and camera-sort flag. Rust places each with
-	 * the frame's terrain camera and draws the generation it acknowledged for
-	 * the key; no per-section Java instance record is built.
+	 * back to front), packed in the native {@code FfiStaticTerrainSection}
+	 * layout ({@link #packStaticTerrainSection}): mesh identity, aligned
+	 * section origin, layer depth policy and camera-sort flag. Rust places each
+	 * with the frame's terrain camera and draws the generation it acknowledged
+	 * for the key; no per-section Java instance record is built.
 	 */
-	public record StaticTerrainSections(
-		long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] depthPolicies, int[] flags, int count
-	) {
+	public record StaticTerrainSections(MemorySegment packed, int count) {
 		public static final StaticTerrainSections EMPTY =
-			new StaticTerrainSections(new long[0], new long[0], new int[0], new int[0], new int[0], 0);
+			new StaticTerrainSections(MemorySegment.ofArray(new byte[0]), 0);
 
 		public StaticTerrainSections {
-			Objects.requireNonNull(meshKeys, "meshKeys");
-			Objects.requireNonNull(meshGenerations, "meshGenerations");
-			Objects.requireNonNull(sectionOrigins, "sectionOrigins");
-			Objects.requireNonNull(depthPolicies, "depthPolicies");
-			Objects.requireNonNull(flags, "flags");
-			if (count < 0 || count > meshKeys.length || count > meshGenerations.length
-				|| count > depthPolicies.length || count > flags.length
-				|| (long) count * 3L > sectionOrigins.length) {
+			Objects.requireNonNull(packed, "packed");
+			if (count < 0 || packed.byteSize() < count * Struct.STATIC_TERRAIN_SECTION.byteSize()) {
 				throw new IllegalArgumentException("static terrain sections are not bounded");
 			}
 		}
+	}
+
+	/** Writes section layer {@code index} of a packed section array. */
+	public static void packStaticTerrainSection(MemorySegment packed, int index, long meshKey, long meshGeneration,
+			int originX, int originY, int originZ, int depthPolicy, int flags) {
+		var layout = Struct.STATIC_TERRAIN_SECTION;
+		long base = index * layout.byteSize();
+		long originOffset = base + layout.offset(2);
+		packed.set(ValueLayout.JAVA_LONG_UNALIGNED, base + layout.offset(0), meshKey);
+		packed.set(ValueLayout.JAVA_LONG_UNALIGNED, base + layout.offset(1), meshGeneration);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, originOffset, originX);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, originOffset + Integer.BYTES, originY);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, originOffset + 2L * Integer.BYTES, originZ);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, base + layout.offset(3), depthPolicy);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, base + layout.offset(4), flags);
+		packed.set(ValueLayout.JAVA_INT_UNALIGNED, base + layout.offset(5), 0);
 	}
 
 	private static void writeStaticTerrainSections(
@@ -6115,28 +6117,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (count != 0 && camera == null) {
 			throw new IllegalStateException("static terrain sections require the frame terrain camera");
 		}
-		var layout = Struct.STATIC_TERRAIN_SECTION;
-		MemorySegment records = layout.array(arena, count);
-		long keyOffset = layout.offset(0);
-		long generationOffset = layout.offset(1);
-		long originOffset = layout.offset(2);
-		long depthOffset = layout.offset(3);
-		long flagsOffset = layout.offset(4);
-		long stride = layout.byteSize();
-		long[] keys = sections.meshKeys();
-		long[] generations = sections.meshGenerations();
-		int[] origins = sections.sectionOrigins();
-		int[] depths = sections.depthPolicies();
-		int[] flags = sections.flags();
-		for (int i = 0; i < count; i++) {
-			long base = i * stride;
-			records.set(ValueLayout.JAVA_LONG, base + keyOffset, keys[i]);
-			records.set(ValueLayout.JAVA_LONG, base + generationOffset, generations[i]);
-			records.set(ValueLayout.JAVA_INT, base + originOffset, origins[i * 3]);
-			records.set(ValueLayout.JAVA_INT, base + originOffset + Integer.BYTES, origins[i * 3 + 1]);
-			records.set(ValueLayout.JAVA_INT, base + originOffset + 2L * Integer.BYTES, origins[i * 3 + 2]);
-			records.set(ValueLayout.JAVA_INT, base + depthOffset, depths[i]);
-			records.set(ValueLayout.JAVA_INT, base + flagsOffset, flags[i]);
+		MemorySegment records = Struct.STATIC_TERRAIN_SECTION.array(arena, count);
+		if (count != 0) {
+			MemorySegment.copy(sections.packed(), 0, records, 0, records.byteSize());
 		}
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 49, records, count);
 	}

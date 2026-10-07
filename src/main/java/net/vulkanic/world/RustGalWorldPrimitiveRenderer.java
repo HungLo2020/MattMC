@@ -1,5 +1,7 @@
 package net.vulkanic.world;
 
+import java.lang.foreign.MemorySegment;
+
 import net.minecraft.Util;
 import java.lang.ref.WeakReference;
 import net.blaze3d.vertex.PoseStack;
@@ -500,69 +502,95 @@ public final class RustGalWorldPrimitiveRenderer {
 	// 4096 sections x 3 layers) are retained together. A smaller cap evicted
 	// live instances every frame and forced their records to be rebuilt.
 	private static final int MAX_ACTIVE_STATIC_TERRAIN_INSTANCES = 2 * 4096 * 3;
-	private static final StaticTerrainBlock PENDING_SHADOW_CASTERS = new StaticTerrainBlock();
+	private static final StaticTerrainBlock PENDING_SHADOW_CASTERS = new StaticTerrainBlock(false);
 	/** Camera-visible static terrain of the compact path, in draw order. */
-	private static final StaticTerrainBlock PENDING_TERRAIN_SECTIONS = new StaticTerrainBlock();
+	private static final StaticTerrainBlock PENDING_TERRAIN_SECTIONS = new StaticTerrainBlock(true);
 
 	/** Reusable producer-side caster arrays; copied exactly once per consumed frame. */
 	/** Compact static-terrain section layers: identity, origin, policy and flags per entry. */
+	/**
+	 * One frame's static-terrain sections or shadow casters, packed in the
+	 * native record layout as they arrive (from Java arrays or a Rust terrain
+	 * selection), so the request encoder copies them in one block.
+	 */
 	private static final class StaticTerrainBlock {
-		private long[] keys = new long[0];
-		private long[] generations = new long[0];
-		private int[] origins = new int[0];
-		private int[] depthPolicies = new int[0];
-		private int[] flags = new int[0];
+		private final boolean sections;
+		private byte[] bytes = new byte[0];
+		private MemorySegment packed = MemorySegment.ofArray(bytes);
 		private int count;
 
-		void append(long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] policies,
-				int[] entryFlags, int added) {
+		StaticTerrainBlock(boolean sections) {
+			this.sections = sections;
+		}
+
+		/** Resolved on first use: the native layouts load with the bridge. */
+		private VulkanicGalBridge.Struct layout() {
+			return sections ? VulkanicGalBridge.Struct.STATIC_TERRAIN_SECTION
+				: VulkanicGalBridge.Struct.STATIC_TERRAIN_SHADOW_CASTER;
+		}
+
+		private MemorySegment reserve(int added) {
 			if (added > MAX_RUST_WORLD_MESH_INSTANCES - count) {
 				throw new IllegalStateException("static terrain section capacity exceeded");
 			}
-			int required = count + added;
-			if (required > keys.length) {
-				int capacity = Math.min(MAX_RUST_WORLD_MESH_INSTANCES, Math.max(required, keys.length * 2));
-				keys = java.util.Arrays.copyOf(keys, capacity);
-				generations = java.util.Arrays.copyOf(generations, capacity);
-				origins = java.util.Arrays.copyOf(origins, capacity * 3);
-				depthPolicies = java.util.Arrays.copyOf(depthPolicies, capacity);
-				flags = java.util.Arrays.copyOf(flags, capacity);
+			long required = (long) (count + added) * layout().byteSize();
+			if (required > bytes.length) {
+				long capacity = Math.max(required, bytes.length * 2L);
+				bytes = java.util.Arrays.copyOf(bytes, Math.toIntExact(capacity));
+				packed = MemorySegment.ofArray(bytes);
 			}
-			System.arraycopy(meshKeys, 0, keys, count, added);
-			System.arraycopy(meshGenerations, 0, generations, count, added);
-			System.arraycopy(sectionOrigins, 0, origins, count * 3, added * 3);
-			System.arraycopy(policies, 0, depthPolicies, count, added);
-			if (entryFlags == null) {
-				java.util.Arrays.fill(flags, count, required, 0);
-			} else {
-				System.arraycopy(entryFlags, 0, flags, count, added);
+			return packed;
+		}
+
+		void append(long[] meshKeys, long[] meshGenerations, int[] sectionOrigins, int[] policies,
+				int[] entryFlags, int added) {
+			MemorySegment target = reserve(added);
+			for (int index = 0; index < added; index++) {
+				int slot = count + index;
+				if (sections) {
+					VulkanicGalBridge.packStaticTerrainSection(target, slot, meshKeys[index], meshGenerations[index],
+						sectionOrigins[index * 3], sectionOrigins[index * 3 + 1], sectionOrigins[index * 3 + 2],
+						policies[index], entryFlags == null ? 0 : entryFlags[index]);
+				} else {
+					VulkanicGalBridge.packStaticTerrainShadowCaster(target, slot, meshKeys[index],
+						meshGenerations[index], sectionOrigins[index * 3], sectionOrigins[index * 3 + 1],
+						sectionOrigins[index * 3 + 2], policies[index]);
+				}
 			}
-			count = required;
+			count += added;
+		}
+
+		/** Appends records already in this block's native layout. */
+		void appendPacked(MemorySegment records, int added) {
+			MemorySegment target = reserve(added);
+			long stride = layout().byteSize();
+			MemorySegment.copy(records, 0, target, count * stride, added * stride);
+			count += added;
 		}
 
 		int count() {
 			return count;
 		}
 
+		private MemorySegment frameCopy() {
+			return MemorySegment.ofArray(java.util.Arrays.copyOf(bytes, count * layout().byteSize()));
+		}
+
 		VulkanicGalBridge.StaticTerrainShadowCasters casters() {
 			if (count == 0) return VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY;
-			return new VulkanicGalBridge.StaticTerrainShadowCasters(
-				java.util.Arrays.copyOf(keys, count), java.util.Arrays.copyOf(generations, count),
-				java.util.Arrays.copyOf(origins, count * 3), java.util.Arrays.copyOf(depthPolicies, count), count);
+			return new VulkanicGalBridge.StaticTerrainShadowCasters(frameCopy(), count);
 		}
 
 		VulkanicGalBridge.StaticTerrainSections sections() {
 			if (count == 0) return VulkanicGalBridge.StaticTerrainSections.EMPTY;
-			return new VulkanicGalBridge.StaticTerrainSections(
-				java.util.Arrays.copyOf(keys, count), java.util.Arrays.copyOf(generations, count),
-				java.util.Arrays.copyOf(origins, count * 3), java.util.Arrays.copyOf(depthPolicies, count),
-				java.util.Arrays.copyOf(flags, count), count);
+			return new VulkanicGalBridge.StaticTerrainSections(frameCopy(), count);
 		}
 
 		void clear() {
 			count = 0;
 		}
 	}
+
 	private static VulkanicGalBridge.TerrainFrameCamera pendingStaticTerrainCamera;
 	// First-person items have an explicit camera-space projection/depth domain.
 	// They never join ordinary entity meshes, even though both reuse the same
@@ -11013,6 +11041,27 @@ public final class RustGalWorldPrimitiveRenderer {
 			// the per-record path must not replay alongside it.
 			ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
 			PENDING_TERRAIN_SECTIONS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, flags, count);
+		}
+	}
+
+	/**
+	 * Appends a Rust terrain selection: the frame's camera-visible section
+	 * layers and off-camera shadow casters, already packed in the native
+	 * record layouts and placed with the seeded frame camera.
+	 */
+	public static void enqueueStaticTerrainSelection(MemorySegment sections, int sectionCount,
+			MemorySegment casters, int casterCount, double cameraX, double cameraY, double cameraZ) {
+		synchronized (LOCK) {
+			VulkanicGalBridge.TerrainFrameCamera frameCamera = pendingStaticTerrainCamera;
+			if (frameCamera == null
+				|| Double.compare(frameCamera.x(), cameraX) != 0
+				|| Double.compare(frameCamera.y(), cameraY) != 0
+				|| Double.compare(frameCamera.z(), cameraZ) != 0) {
+				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
+			}
+			ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
+			PENDING_TERRAIN_SECTIONS.appendPacked(sections, sectionCount);
+			PENDING_SHADOW_CASTERS.appendPacked(casters, casterCount);
 		}
 	}
 

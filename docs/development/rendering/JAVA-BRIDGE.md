@@ -212,6 +212,8 @@ handing over frame N+1. The worker runs a FIFO of jobs
   context-registry entry points still join all queued work first, so rare
   context operations cannot overlap the worker. Standalone query handles
   remain independent.
+  A rejected queued call joins and stores its message, so Java's
+  `failed with status` errors carry the Rust reason (`lastError`).
 
 `RustGalFrameCoordinator` keeps at most one frame queued ahead of the one it
 prepares. This is Java-side backpressure; the native FIFO channel itself is

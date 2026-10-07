@@ -165,7 +165,17 @@ pub(crate) fn with_queue<T>(
             let pipeline = FramePipeline::new(context)?;
             registry.pipelines.insert(context_id, pipeline);
         }
-        f(registry.pipelines.get(&context_id).expect("pipeline inserted above"))
+        let result = f(registry.pipelines.get(&context_id).expect("pipeline inserted above"));
+        if let Err(error) = &result {
+            // A rejected queue entry leaves the worker's queue as it was; join
+            // it so the message lands where `last_error` reports it.
+            registry.join_pipelined_frames();
+            registry.last_error = error.to_string();
+            if let Some(context) = registry.contexts.get_mut(&context_id) {
+                context.last_error = error.to_string();
+            }
+        }
+        result
     })
 }
 

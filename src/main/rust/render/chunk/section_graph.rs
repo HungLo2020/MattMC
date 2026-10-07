@@ -219,7 +219,12 @@ pub struct VisitedSection {
 pub struct SectionGraph {
     min_section_y: i32,
     max_section_y: i32,
-    slots: HashMap<[i32; 3], u32>,
+    pub(super) slots: HashMap<[i32; 3], u32>,
+    /// Published layer meshes per section (see `terrain_selection`).
+    pub(super) meshes: super::terrain_selection::SectionMeshTable,
+    /// The latest camera selection's visits and the terrain built from them.
+    pub(super) last_visits: Vec<VisitedSection>,
+    pub(super) terrain: super::terrain_selection::TerrainSelection,
     nodes: Vec<SectionNode>,
     free: Vec<u32>,
     /// Shared per traversal; never 0 after the first traversal.
@@ -237,6 +242,9 @@ impl SectionGraph {
             min_section_y,
             max_section_y,
             slots: HashMap::new(),
+            meshes: HashMap::new(),
+            last_visits: Vec::new(),
+            terrain: Default::default(),
             nodes: Vec::new(),
             free: Vec::new(),
             frame: 0,
@@ -252,6 +260,11 @@ impl SectionGraph {
 
     pub fn slot(&self, position: [i32; 3]) -> Option<u32> {
         self.slots.get(&position).copied()
+    }
+
+    /// Build flags of a live slot, or `None` before its first build.
+    pub(super) fn section_flags(&self, slot: u32) -> Option<u8> {
+        self.nodes[slot as usize].info.map(|info| info.flags)
     }
 
     /// Adds every section of a newly ready column (`onChunkAdded`): all air

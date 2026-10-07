@@ -157,6 +157,14 @@ and visibility data into the graph through a standalone handle
 which is outside any bridge context so selecting never joins a pipelined frame.
 
 - Visible sections are visited sections that are built with geometry.
+- Ordinary frames take their static terrain from the graph
+  ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
+  Java mirrors each section's published layer meshes into the graph, and Rust
+  emits the compact camera layers (key order, translucent back to front),
+  shader shadow casters and animated-sprite sections in the frame records'
+  native layout. Java copies them into the request without a per-section
+  pass. Diagnostic, fault, reload and readiness-receipt frames keep the Java
+  producer; the two produce identical records.
 - Builds are requested in visit order; block-edit rebuilds go first. In-flight
   builds are capped at twice the worker count.
 - All-air sections of a ready column are built as empty at once, as in Frozen,

@@ -86,8 +86,9 @@ public final class RustGalWholeFrameTerrainSource {
 	private final float[] cullingMatrix = new float[16];
 	private final ArrayList<RenderSection> visibleSections = new ArrayList<>();
 	private final LongOpenHashSet visibleKeys = new LongOpenHashSet();
+	/** Whether the graph holds every published section mesh row. */
+	private boolean graphMeshesPublished;
 	/** Every section the current camera search visited, as Sodium's last-visible frame. */
-	private final LongArrayList visitedKeys = new LongArrayList();
 	private final LongOpenHashSet visitedKeySet = new LongOpenHashSet();
 	private boolean visitedKeySetCurrent;
 	/** The source whose search belongs to the frame now extracting entities. */
@@ -114,6 +115,7 @@ public final class RustGalWholeFrameTerrainSource {
 			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, this.workerSeparateAo,
 				semanticMeshWorkerCount());
 			this.graph = new RustSectionGraph(level.getMinSectionY(), level.getMaxSectionY());
+			this.graphMeshesPublished = false;
 		}
 	}
 
@@ -155,7 +157,10 @@ public final class RustGalWholeFrameTerrainSource {
 		boolean spectatorInSolidBlock = minecraft.player != null && minecraft.player.isSpectator()
 			&& this.level.getBlockState(camera.getBlockPosition()).isSolidRender();
 		boolean useOcclusionCulling = terrainOcclusionCullingEnabled(minecraft.smartCull, spectatorInSolidBlock);
-		this.selectVisible(frustum, terrainSelectionDistance, useOcclusionCulling);
+		// Ordinary frames take their terrain from the graph's Rust selection;
+		// diagnostic and receipt frames keep the Java visible list.
+		boolean rustSelection = RustGalTerrainRenderer.wholeFrameTerrainSelectionEligible();
+		this.selectVisible(frustum, terrainSelectionDistance, useOcclusionCulling, !rustSelection);
 		this.scheduleBuilds(camera);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
 			"world.static-terrain.completed-builds-consumed", this.completedBuildsConsumedThisFrame);
@@ -164,6 +169,11 @@ public final class RustGalWholeFrameTerrainSource {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.source-select");
 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.semantic-submit");
+		if (rustSelection) {
+			this.enqueueRustTerrainSelection(camera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.semantic-submit");
+			return;
+		}
 		if (wholeFrameTerrainQueueDrained && (StaticTerrainParityDiagnostics.isEnabled()
 				|| net.minecraft.client.dev.DeterministicCameraCapture.isActiveForDiagnostics())) {
 			StaticTerrainParityDiagnostics.recordWholeFrameVisibleSections(
@@ -259,20 +269,28 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	/** Frozen's camera-pass selection and the visible list it implies. */
-	private void selectVisible(Frustum frustum, float searchDistance, boolean useOcclusionCulling) {
+	private void selectVisible(Frustum frustum, float searchDistance, boolean useOcclusionCulling,
+			boolean javaVisibleList) {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-list");
+		RustGalTerrainRenderer.drainGraphMeshRows(this.graph, !this.graphMeshesPublished);
+		this.graphMeshesPublished = true;
 		frustum.copyCullingMatrix(this.cullingMatrix);
 		this.graph.select(frustum.cameraX(), frustum.cameraY(), frustum.cameraZ(), this.cullingMatrix,
 			searchDistance, useOcclusionCulling);
 		this.visibleSections.clear();
 		this.visibleKeys.clear();
 		this.buildRequests.clear();
-		this.visitedKeys.clear();
 		this.visitedKeySetCurrent = false;
+		entityCullingSource = this;
+		if (!javaVisibleList && this.needsBuild.isEmpty()) {
+			// Rust selects the frame's terrain; with nothing to build, Java
+			// needs no per-section pass over the visits.
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
+			return;
+		}
 		int urgent = 0;
 		for (int index = 0, count = this.graph.visitCount(); index < count; index++) {
 			long key = SectionPos.asLong(this.graph.visitX(index), this.graph.visitY(index), this.graph.visitZ(index));
-			this.visitedKeys.add(key);
 			if (this.needsBuild.contains(key) && !this.inFlight.contains(key)) {
 				// Block edits are important rebuilds; everything else keeps visit order.
 				if (this.urgentRebuilds.contains(key)) {
@@ -281,7 +299,7 @@ public final class RustGalWholeFrameTerrainSource {
 					this.buildRequests.add(key);
 				}
 			}
-			if (this.graph.visitBuilt(index) && this.graph.visitFlags(index) != 0) {
+			if (javaVisibleList && this.graph.visitBuilt(index) && this.graph.visitFlags(index) != 0) {
 				RenderSection section = this.sections.get(key);
 				if (section != null && this.visibleKeys.add(key)) {
 					this.visibleSections.add(section);
@@ -290,8 +308,30 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		// Canonical order: an identical visible set must reach Rust identically.
 		this.sectionKeyOrder.sort(this.visibleSections, RenderSection::getPositionAsLong);
-		entityCullingSource = this;
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
+	}
+
+	/**
+	 * The frame's static terrain from the graph's Rust selection: the camera
+	 * layers and shadow casters Java's compact producer built, and the
+	 * animated sprites of the sections it drew.
+	 */
+	private void enqueueRustTerrainSelection(Camera camera) {
+		boolean shadowCandidates = net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive();
+		RustSectionGraph.TerrainSelection selection = this.graph.selectTerrain(
+			camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
+			RustGalTerrainRenderer.selectionDepthPolicies(), RustGalTerrainRenderer.SELECTION_LAYER_ORDINALS,
+			shadowCandidates, RustGalTerrainRenderer.MAX_SELECTION_SHADOW_CANDIDATES,
+			net.vulkanic.bridge.VulkanicGalBridge.Struct.STATIC_TERRAIN_SECTION.byteSize(),
+			net.vulkanic.bridge.VulkanicGalBridge.Struct.STATIC_TERRAIN_SHADOW_CASTER.byteSize());
+		for (int index = 0; index < selection.animatedCount(); index++) {
+			RenderSection section = this.sections.get(SectionPos.asLong(
+				selection.animatedX(index), selection.animatedY(index), selection.animatedZ(index)));
+			if (section != null) {
+				RustGalTerrainRenderer.recordAnimatedSpriteUse(section);
+			}
+		}
+		RustGalTerrainRenderer.enqueueWholeFrameTerrainSelection(selection, camera);
 	}
 
 	/**
@@ -330,7 +370,10 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		if (!this.visitedKeySetCurrent) {
 			this.visitedKeySet.clear();
-			this.visitedKeySet.addAll(this.visitedKeys);
+			for (int index = 0, count = this.graph.visitCount(); index < count; index++) {
+				this.visitedKeySet.add(SectionPos.asLong(
+					this.graph.visitX(index), this.graph.visitY(index), this.graph.visitZ(index)));
+			}
 			this.visitedKeySetCurrent = true;
 		}
 		int minX = SectionPos.posToSectionCoord(x1 - 0.5D);

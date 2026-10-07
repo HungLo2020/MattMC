@@ -5,6 +5,8 @@
 //! bridge context: querying visibility must never join a pipelined frame.
 
 use super::section_graph::{Frustum, SectionGraph, SectionInfo, Viewport};
+use super::terrain_selection::{SectionMeshes, SelectedLayer, TerrainSelectionParams};
+use crate::render::bridge::abi::{FfiStaticTerrainSection, FfiStaticTerrainShadowCaster};
 
 const OK: i32 = 0;
 const ERR_NULL_POINTER: i32 = -1;
@@ -135,7 +137,10 @@ pub unsafe extern "C" fn mattmc_sodium_section_graph_select(
     let viewport = Viewport::new(Frustum::from_matrix(matrix), camera);
     let out = if capacity == 0 { &mut [][..] } else { std::slice::from_raw_parts_mut(out, capacity as usize) };
     let mut count = 0usize;
+    let mut visits = std::mem::take(&mut graph.last_visits);
+    visits.clear();
     graph.select_camera_sections(&viewport, search_distance, use_occlusion_culling != 0, |section| {
+        visits.push(section);
         if let Some(slot) = out.get_mut(count) {
             *slot = FfiSectionGraphVisit {
                 x: section.position[0],
@@ -147,10 +152,142 @@ pub unsafe extern "C" fn mattmc_sodium_section_graph_select(
         }
         count += 1;
     });
+    graph.last_visits = visits;
     *out_count = count as u32;
     if count > out.len() {
         ERR_CAPACITY
     } else {
         OK
     }
+}
+
+/// One section's published layer meshes (solid, cutout, translucent); zero
+/// keys are absent layers and all-zero keys clear the section.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct FfiSectionMeshes {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    /// Bit 0: the translucent layer is camera-sorted.
+    pub flags: u32,
+    pub keys: [u64; 3],
+    pub generations: [u64; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct FfiTerrainSelectionParams {
+    pub camera: [f64; 3],
+    pub depth_policies: [u32; 3],
+    pub layer_ordinals: [u32; 3],
+    pub shadow_candidates: u32,
+    pub max_shadow_candidates: u32,
+}
+
+/// Views of the graph-owned selection; valid until the graph's next
+/// selection, mesh update or destruction.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct FfiTerrainSelectionView {
+    pub sections: *const FfiStaticTerrainSection,
+    pub section_layers: *const SelectedLayer,
+    pub section_count: u64,
+    pub casters: *const FfiStaticTerrainShadowCaster,
+    pub caster_count: u64,
+    /// `[x, y, z]` section positions.
+    pub animated: *const i32,
+    pub animated_count: u64,
+    pub layer_probes: u64,
+    pub layer_submissions: u64,
+    pub fingerprint: u64,
+}
+
+/// Applies published mesh rows; `clear` first drops every row.
+///
+/// # Safety
+/// `records` addresses `count` records (null only for 0).
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_graph_set_meshes(
+    graph: *mut SectionGraph,
+    clear: u32,
+    records: *const FfiSectionMeshes,
+    count: u32,
+) -> i32 {
+    let Some(graph) = graph.as_mut() else {
+        return ERR_NULL_POINTER;
+    };
+    if count != 0 && records.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if clear != 0 {
+        graph.clear_meshes();
+    }
+    let records = if count == 0 { &[][..] } else { std::slice::from_raw_parts(records, count as usize) };
+    for record in records {
+        if record.flags & !1 != 0 {
+            return ERR_INVALID_ARGUMENT;
+        }
+        graph.set_meshes(
+            [record.x, record.y, record.z],
+            Some(SectionMeshes {
+                keys: record.keys,
+                generations: record.generations,
+                translucent_camera_sorted: record.flags & 1 != 0,
+            }),
+        );
+    }
+    OK
+}
+
+/// Builds the frame's static-terrain selection from the latest camera
+/// selection (`terrain_selection`) and returns views of it.
+///
+/// # Safety
+/// `params` and `out` address one record each.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_graph_select_terrain(
+    graph: *mut SectionGraph,
+    params: *const FfiTerrainSelectionParams,
+    out: *mut FfiTerrainSelectionView,
+) -> i32 {
+    let Some(graph) = graph.as_mut() else {
+        return ERR_NULL_POINTER;
+    };
+    if params.is_null() || out.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    let params = std::ptr::read_unaligned(params);
+    if params.camera.iter().any(|value| !value.is_finite()) {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let params = TerrainSelectionParams {
+        camera: params.camera,
+        depth_policies: params.depth_policies,
+        layer_ordinals: params.layer_ordinals,
+        shadow_candidates: params.shadow_candidates != 0,
+        max_shadow_candidates: params.max_shadow_candidates as usize,
+    };
+    let visits = std::mem::take(&mut graph.last_visits);
+    let mut terrain = std::mem::take(&mut graph.terrain);
+    graph.select_terrain(&visits, &params, &mut terrain);
+    graph.last_visits = visits;
+    graph.terrain = terrain;
+    let terrain = &graph.terrain;
+    std::ptr::write_unaligned(
+        out,
+        FfiTerrainSelectionView {
+            sections: terrain.sections.as_ptr(),
+            section_layers: terrain.section_layers.as_ptr(),
+            section_count: terrain.sections.len() as u64,
+            casters: terrain.casters.as_ptr(),
+            caster_count: terrain.casters.len() as u64,
+            animated: terrain.animated.as_ptr().cast(),
+            animated_count: terrain.animated.len() as u64,
+            layer_probes: terrain.receipts.layer_probes,
+            layer_submissions: terrain.receipts.layer_submissions,
+            fingerprint: terrain.receipts.fingerprint,
+        },
+    );
+    OK
 }
