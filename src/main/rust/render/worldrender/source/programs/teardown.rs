@@ -213,7 +213,7 @@ impl WorldPrimitiveFrontend {
             .collect();
         self.destroy_lowered_entity_source_pack_resources_for_keys(gal, entity);
         self.lod_exact_atlas_source_pass_resources.destroy(gal);
-        self.lod_source_pass_resources.release_pack_resources(gal);
+        self.lod_source_pass_resources.release_pack_resources(gal, binds);
     }
 
     pub(crate) fn destroy_lowered_source_terrain_pack_resources(&mut self, gal: &mut VulkanicGal) {

@@ -738,12 +738,25 @@ impl WorldLodSourcePassResources {
         )
     }
 
-    /// Releases only the set-one pack bindings (lightmap, voxel volumes,
-    /// named targets, ...). Draw sets, pipelines, and per-frame rings bind
-    /// none of those, so a lightmap or volume change keeps them.
-    pub(crate) fn release_pack_resources(&mut self, gal: &mut VulkanicGal) {
-        for (_, set) in std::mem::take(&mut self.pack_resources) {
-            let _ = gal.destroy(set);
+    /// Releases the set-one pack bindings that bind a role `binds` selects
+    /// (lightmap, voxel volumes, named targets, ...). Draw sets, pipelines and
+    /// per-frame rings bind none of those, and pack sets that bind none of the
+    /// released roles stay valid (a lightmap change must not rebuild them).
+    pub(crate) fn release_pack_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        binds: impl Fn(&[(TerrainSourceResourceRole, u64)]) -> bool,
+    ) {
+        let released: Vec<_> = self
+            .pack_resources
+            .keys()
+            .filter(|key| binds(&key.resource_generations))
+            .cloned()
+            .collect();
+        for key in released {
+            if let Some(set) = self.pack_resources.remove(&key) {
+                let _ = gal.destroy(set);
+            }
         }
     }
 
