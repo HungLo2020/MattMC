@@ -122,7 +122,9 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// frame's terrain camera; Rust expands them into shadow-only instances.
 /// v70 appends compact camera-visible static-terrain sections; Java no
 /// longer sends a per-section terrain instance record.
-pub const FFI_ABI_VERSION: u32 = 70;
+/// v71 appends model-rig part poses: Java sends one instance per entity model
+/// and Rust expands the registered part hierarchy.
+pub const FFI_ABI_VERSION: u32 = 71;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

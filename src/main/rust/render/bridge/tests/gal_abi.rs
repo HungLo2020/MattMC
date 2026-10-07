@@ -20,7 +20,7 @@ fn gal() -> VulkanicGal {
 #[test]
 fn exported_struct_layouts_fit_mirrored_capacity_and_include_shadow_distance() {
     assert_eq!(size_of::<FfiStructLayout>(), 312);
-    for id in 1..=113 {
+    for id in 1..=115 {
         let layout = crate::render::bridge::layout::layout_for_struct(id).unwrap();
         assert_eq!(layout.header.byte_size as usize, size_of::<FfiStructLayout>());
         assert!(layout.field_count as usize <= FFI_MAX_STRUCT_LAYOUT_FIELDS);
@@ -356,7 +356,7 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V40_VERSION, 40);
     assert_eq!(FFI_ABI_V41_VERSION, 41);
     assert_eq!(FFI_ABI_V42_VERSION, 42);
-    assert_eq!(FFI_ABI_VERSION, 70);
+    assert_eq!(FFI_ABI_VERSION, 71);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);

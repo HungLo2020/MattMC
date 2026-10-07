@@ -505,6 +505,31 @@ pub struct FfiStaticTerrainShadowCaster {
 /// ABI v70: one camera-visible static-terrain section layer. Rust places it
 /// with the frame's terrain camera and draws the generation it has
 /// acknowledged for `mesh_key`; Java builds no per-section instance record.
+/// One node of a registered model rig (a `ModelPart`, in `visitRenderable`
+/// pre-order). `parent` is an earlier node index or -1 for the root.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiModelRigNode {
+    pub parent: i32,
+    /// Bit 0: the node has cubes and `mesh_key`/`mesh_generation` name its
+    /// local-space mesh asset.
+    pub flags: u32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+}
+
+/// One rig node's raw `ModelPart` pose fields after `setupAnim`: offset in
+/// model pixels, ZYX rotation angles, scale, and visibility flags.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiModelRigPose {
+    pub offset: [f32; 3],
+    pub rotation: [f32; 3],
+    pub scale: [f32; 3],
+    /// Bit 0 `visible`, bit 1 `skipDraw`.
+    pub flags: u32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiStaticTerrainSection {

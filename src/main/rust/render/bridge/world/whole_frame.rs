@@ -1085,75 +1085,90 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     )
     .unwrap_or(FFI_MAX_BATCH_ITEMS)
     .min(FFI_MAX_BATCH_ITEMS);
+    let raw_rig_poses = read_slice(request.world_model_rig_poses, true, "model rig poses")?;
     let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len() + appended_capacity);
-    for instance in raw_mesh_instances {
+    let mut rig_parts = Vec::new();
+    for raw_instance in raw_mesh_instances {
         validate_item_size::<FfiWorldMeshInstanceRecord>(
-            instance.byte_size,
+            raw_instance.byte_size,
             "world primitive mesh instance",
         )?;
-        validate_mesh_instance_semantic_identity(instance, "world primitive mesh instance")?;
-        if !is_world_mesh_stratum(instance.stratum) {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh stratum {}", instance.stratum),
-            ));
-        }
-        if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
-            && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
-            && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
-            && !(instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
-                && instance.stratum == WORLD_STRATUM_ENTITY_MESH)
-        {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh depth policy {}", instance.depth_policy),
-            ));
-        }
-        if instance.cull_policy != WORLD_CULL_NONE
-            && instance.cull_policy != WORLD_CULL_BACK
-            && instance.cull_policy != WORLD_CULL_FRONT
-        {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh cull policy {}", instance.cull_policy),
-            ));
-        }
-        if instance.winding != WORLD_WINDING_CCW && instance.winding != WORLD_WINDING_CW {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh winding {}", instance.winding),
-            ));
-        }
-        let viewport_width =
-            decode_world_viewport_axis(instance.viewport_width, "world mesh viewport width")?;
-        let viewport_height =
-            decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
-        let transform = decode_mesh_instance_transform(instance)?;
-        mesh_instances.push(WorldMeshInstanceRequest {
-            entity_culling: decode_entity_culling(instance, false)?,
+        // A model-rig instance stands for its drawn parts, in place.
+        let expanded = if raw_instance.flags & super::model_rigs::WORLD_MESH_INSTANCE_FLAG_MODEL_RIG != 0 {
+            rig_parts.clear();
+            super::model_rigs::expand_model_rig(raw_instance, raw_rig_poses, &mut rig_parts)?;
+            if mesh_instances.len() + rig_parts.len() > FFI_MAX_BATCH_ITEMS {
+                return Err(GalError::invalid_argument("expanded model rig instances exceed the frame bound"));
+            }
+            &rig_parts[..]
+        } else {
+            std::slice::from_ref(raw_instance)
+        };
+        for instance in expanded {
+            validate_mesh_instance_semantic_identity(instance, "world primitive mesh instance")?;
+            if !is_world_mesh_stratum(instance.stratum) {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh stratum {}", instance.stratum),
+                ));
+            }
+            if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
+                && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+                && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+                && !(instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+                    && instance.stratum == WORLD_STRATUM_ENTITY_MESH)
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh depth policy {}", instance.depth_policy),
+                ));
+            }
+            if instance.cull_policy != WORLD_CULL_NONE
+                && instance.cull_policy != WORLD_CULL_BACK
+                && instance.cull_policy != WORLD_CULL_FRONT
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh cull policy {}", instance.cull_policy),
+                ));
+            }
+            if instance.winding != WORLD_WINDING_CCW && instance.winding != WORLD_WINDING_CW {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh winding {}", instance.winding),
+                ));
+            }
+            let viewport_width =
+                decode_world_viewport_axis(instance.viewport_width, "world mesh viewport width")?;
+            let viewport_height =
+                decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
+            let transform = decode_mesh_instance_transform(instance)?;
+            mesh_instances.push(WorldMeshInstanceRequest {
+                entity_culling: decode_entity_culling(instance, false)?,
 
-            model_submission_order: decode_model_submission_order(instance)?,
-            item_foil: decode_world_item_foil(instance)?,
-            decal_foil: decode_world_decal_foil(instance, false)?,
-            stratum: instance.stratum,
-            mesh_key: instance.mesh_key,
-            mesh_generation: instance.mesh_generation,
-            mesh_section_index: instance.mesh_section_index,
-            terrain_visible_facing_mask: terrain_visible_facing_mask(instance),
-            depth_policy: instance.depth_policy,
-            cull_policy: instance.cull_policy,
-            winding: instance.winding,
-            color_argb: instance.color_argb,
-            entity_id: instance.entity_id,
-            entity_color_argb: instance.entity_color_argb,
-            packed_light: instance.packed_light,
-            transform,
-            outline_color_argb: instance.outline_color_argb,
-            flags: instance.flags,
-            block_entity_id: instance.block_entity_id,
-            viewport_width,
-            viewport_height,
-        });
+                model_submission_order: decode_model_submission_order(instance)?,
+                item_foil: decode_world_item_foil(instance)?,
+                decal_foil: decode_world_decal_foil(instance, false)?,
+                stratum: instance.stratum,
+                mesh_key: instance.mesh_key,
+                mesh_generation: instance.mesh_generation,
+                mesh_section_index: instance.mesh_section_index,
+                terrain_visible_facing_mask: terrain_visible_facing_mask(instance),
+                depth_policy: instance.depth_policy,
+                cull_policy: instance.cull_policy,
+                winding: instance.winding,
+                color_argb: instance.color_argb,
+                entity_id: instance.entity_id,
+                entity_color_argb: instance.entity_color_argb,
+                packed_light: instance.packed_light,
+                transform,
+                outline_color_argb: instance.outline_color_argb,
+                flags: instance.flags,
+                block_entity_id: instance.block_entity_id,
+                viewport_width,
+                viewport_height,
+            });
+        }
     }
     if !raw_orbs.is_empty() {
         mesh_instances = merge_experience_orb_instances(

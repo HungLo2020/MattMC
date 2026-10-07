@@ -85,6 +85,22 @@ Keys with no acknowledged generation are skipped until upload. Diagnostic,
 fault-injection and resource-reload frames still send per-section instance records;
 `-Dmattmc.dev.perRecordStaticTerrain=true` forces that path for A/B checks.
 
+ABI 71 appends `world_model_rig_poses` (struct 115, 40-byte records: raw
+`ModelPart` offset, rotation and scale, plus visible/skipDraw flags) as field 50.
+A cached entity model registers its part tree once as a rig
+(`mattmc_vulkanic_world_model_rig_register`, struct 114 nodes: parent index and
+part mesh key/generation) and sends one mesh instance per model each frame,
+flagged `0x4000_0000`, with `mesh_key` = rig id and `mesh_generation - 1` = its
+first pose. Rust composes the hierarchy like `ModelPart.visitRenderable` and
+expands one ordinary instance per drawn part before validation
+([`model_rigs.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/model_rigs.rs)).
+Java retires a rig when its topology is evicted or a part generation changes,
+and releases it three frames later, so a pipelined frame never names a released
+rig. First-person frames, uncacheable dynamic textures and per-part mesh
+diagnostics keep Java-posed part instances; `-Dmattmc.dev.modelRigs=false`
+forces that path for A/B checks. `ModelRigTransformParityTest` compares Rust's
+part transforms with Java's on vanilla models under random poses.
+
 Typed orb placements name a boundary in the collected mesh stream. When the
 shadow-only CPU capture removes foil or outline meshes, map those boundaries
 through its kept-mesh prefix before the later source-admission mapping.

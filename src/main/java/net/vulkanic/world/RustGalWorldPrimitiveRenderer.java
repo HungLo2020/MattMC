@@ -663,7 +663,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		new LinkedHashMap<>(64, 0.75F, true) {
 			@Override
 			protected boolean removeEldestEntry(Map.Entry<ModelTopologyCacheKey, CachedModelTopology> eldest) {
-				return size() > MAX_STABLE_MODEL_TOPOLOGIES;
+				if (size() <= MAX_STABLE_MODEL_TOPOLOGIES) return false;
+				retireModelRig(eldest.getValue());
+				return true;
 			}
 		};
 	private static final DynamicWorldMeshLifetime DYNAMIC_WORLD_MESH_LIFETIME = new DynamicWorldMeshLifetime();
@@ -1552,6 +1554,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PARTICLE_ATLAS_SNAPSHOT_PUBLICATIONS.clear();
 					ENCODED_ATLAS_SNAPSHOTS.clear();
 					synchronized (STABLE_MODEL_TOPOLOGIES) {
+						STABLE_MODEL_TOPOLOGIES.values().forEach(RustGalWorldPrimitiveRenderer::retireModelRig);
 						STABLE_MODEL_TOPOLOGIES.clear();
 					}
 					staticShieldAtlasPublication = null;
@@ -1567,6 +1570,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				ATLAS_ANIMATION_PUBLICATIONS.clear();
 				registerWorldSkyTextureAssetsLocked(resourceManager);
 				PENDING_MESH_INSTANCES.clear();
+				pendingModelRigPoseCount = 0;
 				PENDING_SHADOW_CASTERS.clear();
 				PENDING_TERRAIN_SECTIONS.clear();
 				ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
@@ -1751,7 +1755,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				frame.firstPersonMeshInstances().size()), frame.orbInstances().size());
 			var protectedGenerations = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap(references);
 			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
-				StaticTerrainVisibilitySet.protectGeneration(protectedGenerations, instance.meshKey(), instance.meshGeneration());
+				forEachInstanceMeshLocked(instance, (meshKey, meshGeneration) -> {
+					StaticTerrainVisibilitySet.protectGeneration(protectedGenerations, meshKey, meshGeneration);
+					return 0L;
+				});
 			}
 			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.firstPersonMeshInstances()) {
 				StaticTerrainVisibilitySet.protectGeneration(protectedGenerations, instance.meshKey(), instance.meshGeneration());
@@ -2245,6 +2252,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingUnsupportedWorldTextSubmits = 0;
 			worldTextDiagnostic = WorldTextDiagnostic.empty(semanticFrameSequence);
 			PENDING_MESH_INSTANCES.clear();
+			pendingModelRigPoseCount = 0;
 			PENDING_SHADOW_CASTERS.clear();
 			PENDING_TERRAIN_SECTIONS.clear();
 			PENDING_MESH_PRODUCERS.clear();
@@ -3247,6 +3255,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_DH_GENERIC_BOXES.clear();
 				PENDING_TEXT_QUADS.clear();
 				PENDING_MESH_INSTANCES.clear();
+				pendingModelRigPoseCount = 0;
 				PENDING_SHADOW_CASTERS.clear();
 				PENDING_TERRAIN_SECTIONS.clear();
 			PENDING_MESH_PRODUCERS.clear();
@@ -3279,6 +3288,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingDistantHorizonsPrivateClouds = false;
 			pendingUnsupportedWorldTextSubmits = 0;
 			PENDING_MESH_INSTANCES.clear();
+			pendingModelRigPoseCount = 0;
 			PENDING_SHADOW_CASTERS.clear();
 			PENDING_TERRAIN_SECTIONS.clear();
 			PENDING_MESH_PRODUCERS.clear();
@@ -4099,6 +4109,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			// (copying every key was a per-producer cost once meshes changed).
 			return new ModelMeshBatchCheckpoint(
 				PENDING_MESH_INSTANCES.size(),
+				pendingModelRigPoseCount,
 				PENDING_FIRST_PERSON_MESH_INSTANCES.size(),
 				pendingFirstPersonMainHandInstanceCount,
 				PENDING_MESH_PRODUCERS.size(),
@@ -4186,6 +4197,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				throw new IllegalArgumentException("Rust model mesh batch checkpoint is outside the pending frame");
 			}
 			PENDING_MESH_INSTANCES.subList(checkpoint.meshInstances, PENDING_MESH_INSTANCES.size()).clear();
+			pendingModelRigPoseCount = Math.min(pendingModelRigPoseCount, checkpoint.modelRigPoses);
 			PENDING_FIRST_PERSON_MESH_INSTANCES.subList(
 				checkpoint.firstPersonMeshInstances, PENDING_FIRST_PERSON_MESH_INSTANCES.size()).clear();
 			pendingFirstPersonMainHandInstanceCount = checkpoint.firstPersonMainHandInstances;
@@ -4216,6 +4228,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	public static final class ModelMeshBatchCheckpoint {
 		private final int meshInstances;
+		private final int modelRigPoses;
 		private final int firstPersonMeshInstances;
 		private final int firstPersonMainHandInstances;
 		private final int producers;
@@ -4233,6 +4246,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 		private ModelMeshBatchCheckpoint(
 			int meshInstances,
+			int modelRigPoses,
 			int firstPersonMeshInstances,
 			int firstPersonMainHandInstances,
 			int producers,
@@ -4249,6 +4263,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			long lastPayloadCount
 		) {
 			this.meshInstances = meshInstances;
+			this.modelRigPoses = modelRigPoses;
 			this.firstPersonMeshInstances = firstPersonMeshInstances;
 			this.firstPersonMainHandInstances = firstPersonMainHandInstances;
 			this.producers = producers;
@@ -9883,21 +9898,28 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		GraphicsFrameBenchmark.beginDetailedPhase("world.model.java-extraction");
 		List<ModelPoseMeshExtraction> extractions;
+		CachedModelTopology rigTopology;
 		try {
 			model.setupAnim(state);
 			net.minecraft.client.dev.GraphicsAuditCowOutlineFixture.observeModel(model, state, entityPose.pose());
-			extractions = extractModelPartPoseMeshes(
+			ModelExtraction modelExtraction = extractModel(
 					model.root(),
 					textureIdentity,
 					sprite,
 					entityIdentity,
-					packedLight,
 					semantics.materialId(),
 					semantics.materialMode(),
-					semantics.cullPolicy()
+					semantics.cullPolicy(),
+					MODEL_RIGS_ENABLED && !pendingFirstPersonFrame
 				);
+			rigTopology = modelExtraction.topology();
+			extractions = modelExtraction.parts();
 		} finally {
 			GraphicsFrameBenchmark.endDetailedPhase("world.model.java-extraction");
+		}
+		if (rigTopology != null) {
+			return enqueueModelRigInstance(model, rigTopology, entityPose, textureIdentity, packedLight, tintedColor,
+				semantics, overlayColorArgb, outlineColor, flags);
 		}
 		if (extractions.isEmpty()) {
 			throw new IllegalStateException("Rust model mesh route selected but copied ModelPart extraction produced no mesh");
@@ -11306,29 +11328,36 @@ public final class RustGalWorldPrimitiveRenderer {
 		// otherwise a full static-terrain upload window can discard an airborne
 		// moving instance when this frame is frozen. The asset contract remains
 		// shared; this is only admission ordering for the current semantic frame.
+		long[] frameBytes = {0L};
+		boolean[] full = {false};
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
+			if (full[0]) {
+				break;
+			}
 			if (instance.stratum() == STRATUM_WORLD_TERRAIN) {
 				continue;
 			}
-			if (!DIRTY_WORLD_MESH_ASSETS.contains(instance.meshKey())) {
-				continue;
-			}
-			VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(instance.meshKey());
-			if (mesh == null || mesh.meshGeneration() != instance.meshGeneration()) {
-				continue;
-			}
-			if (!StaticTerrainVisibilitySet.mayPublishGeneration(protectedGenerations, mesh.meshKey(), mesh.meshGeneration())) {
-				continue;
-			}
-			if (containsWorldMeshAsset(meshes, mesh.meshKey())) {
-				continue;
-			}
-			long meshBytes = worldMeshAssetPayloadBytes(mesh);
-			if (!appendWorldMeshAssetWithinBudget(meshes, mesh, bytes, limit, byteBudget)) {
-				break;
-			}
-			bytes += meshBytes;
+			// A rig instance stands for each of its part meshes.
+			forEachInstanceMeshLocked(instance, (meshKey, meshGeneration) -> {
+				if (full[0] || !DIRTY_WORLD_MESH_ASSETS.contains(meshKey)) {
+					return 0L;
+				}
+				VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(meshKey);
+				if (mesh == null || mesh.meshGeneration() != meshGeneration
+					|| !StaticTerrainVisibilitySet.mayPublishGeneration(protectedGenerations, mesh.meshKey(), mesh.meshGeneration())
+					|| containsWorldMeshAsset(meshes, mesh.meshKey())) {
+					return 0L;
+				}
+				long meshBytes = worldMeshAssetPayloadBytes(mesh);
+				if (!appendWorldMeshAssetWithinBudget(meshes, mesh, frameBytes[0], limit, byteBudget)) {
+					full[0] = true;
+					return 0L;
+				}
+				frameBytes[0] += meshBytes;
+				return 0L;
+			});
 		}
+		bytes = frameBytes[0];
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
 			if (instance.stratum() != STRATUM_WORLD_TERRAIN) {
 				continue;
@@ -12161,6 +12190,22 @@ public final class RustGalWorldPrimitiveRenderer {
 		ModelPart modelRoot, ResourceLocation textureIdentity, @Nullable TextureAtlasSprite sprite,
 		String entityIdentity, int packedLight, int materialId, int materialMode, int cullPolicy
 	) {
+		return extractModel(modelRoot, textureIdentity, sprite, entityIdentity, materialId, materialMode,
+			cullPolicy, false).parts();
+	}
+
+	/**
+	 * Either the model's per-part meshes posed by Java ({@code parts}) or, when
+	 * {@code rig} is requested and the topology is cacheable, the cached
+	 * topology whose Rust rig poses the parts ({@code topology}).
+	 */
+	private record ModelExtraction(@Nullable List<ModelPoseMeshExtraction> parts, @Nullable CachedModelTopology topology) {
+	}
+
+	private static ModelExtraction extractModel(
+		ModelPart modelRoot, ResourceLocation textureIdentity, @Nullable TextureAtlasSprite sprite,
+		String entityIdentity, int materialId, int materialMode, int cullPolicy, boolean rig
+	) {
 		if (modelRoot == null || textureIdentity == null || entityIdentity == null) {
 			throw new IllegalArgumentException("stable model extraction requires complete semantic identity");
 		}
@@ -12185,42 +12230,42 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		boolean dynamicTexture = !ownedAtlas
 			&& Minecraft.getInstance().getTextureManager().getTexture(textureIdentity) instanceof DynamicTexture;
-		ModelTopologyCacheKey cacheKey = new ModelTopologyCacheKey(
-			modelRoot, textureIdentity, sprite, entityIdentity, materialId, materialMode, cullPolicy,
-			ownedBlockAtlas, ownedShieldAtlas
-		);
+		int textureId = ownedBlockAtlas ? MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : stableTextureId(textureIdentity);
 		if (!dynamicTexture) {
+			ModelTopologyCacheKey cacheKey = new ModelTopologyCacheKey(
+				modelRoot, textureIdentity, sprite, entityIdentity, materialId, materialMode, cullPolicy,
+				ownedBlockAtlas, ownedShieldAtlas
+			);
 			CachedModelTopology cached;
 			synchronized (STABLE_MODEL_TOPOLOGIES) {
 				cached = STABLE_MODEL_TOPOLOGIES.get(cacheKey);
 			}
-			if (cached != null) {
-				List<ModelPoseMeshExtraction> rebound = cached.bindCurrentPoses(modelRoot);
-				if (rebound != null) {
-					GraphicsFrameBenchmark.recordCounterSample("world.model-topology-cache.hit", 1L);
-					if (ownedAtlas && sprite != null) {
-						recordAtlasSpriteUse(sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+			if (cached == null) {
+				GraphicsFrameBenchmark.recordCounterSample("world.model-topology-cache.miss", 1L);
+				cached = buildModelTopology(modelRoot, textureIdentity, sprite, entityIdentity, materialId,
+					textureId, materialMode, cullPolicy, modelTextureAssets(textureIdentity, sprite, ownedAtlas, false, textureId));
+				if (cached != null) {
+					synchronized (STABLE_MODEL_TOPOLOGIES) {
+						CachedModelTopology replaced = STABLE_MODEL_TOPOLOGIES.put(cacheKey, cached);
+						if (replaced != null) {
+							retireModelRig(replaced);
+						}
 					}
-					return rebound;
 				}
-				synchronized (STABLE_MODEL_TOPOLOGIES) {
-					STABLE_MODEL_TOPOLOGIES.remove(cacheKey);
-				}
+			} else {
+				GraphicsFrameBenchmark.recordCounterSample("world.model-topology-cache.hit", 1L);
 			}
-			GraphicsFrameBenchmark.recordCounterSample("world.model-topology-cache.miss", 1L);
+			if (cached != null) {
+				if (ownedAtlas && sprite != null) {
+					recordAtlasSpriteUse(sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				}
+				return rig ? new ModelExtraction(null, cached) : new ModelExtraction(cached.bindCurrentPoses(modelRoot), null);
+			}
 		} else {
 			GraphicsFrameBenchmark.recordCounterSample("world.model-topology-cache.bypass", 1L);
 		}
-		byte[] texturePayload = ownedAtlas ? null : readModelTexturePayload(textureIdentity, sprite);
-		if (!ownedAtlas && texturePayload == null) {
-			throw new IllegalStateException("unsupported model texture asset " + textureIdentity);
-		}
-		int textureId = ownedBlockAtlas ? MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : stableTextureId(textureIdentity);
-		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textureAssets = ownedAtlas
-			? List.of()
-			: List.of(dynamicTexture
-				? localModelTextureAsset(textureId, texturePayload)
-				: reuseRegisteredStaticModelTexture(localModelTextureAsset(textureId, texturePayload)));
+		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textureAssets =
+			modelTextureAssets(textureIdentity, sprite, ownedAtlas, dynamicTexture, textureId);
 		Map<String, ModelPartMeshBuilder> builders = new LinkedHashMap<>();
 		PoseStack modelPose = new PoseStack();
 		modelRoot.visitRenderable(modelPose, (partPose, partPath, cubeIndex, cube) -> {
@@ -12230,109 +12275,386 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (!builder.localPose.isFinite()) {
 				throw new IllegalStateException("stable model extraction contains a non-finite part transform at " + partPath);
 			}
-			for (ModelPart.Polygon polygon : cube.polygons) {
-				ensureWorldMeshExtractionCapacity(builder.vertices, builder.indices, builder.sections);
-				if (polygon == null || polygon.vertices().length != 4) {
-					throw new IllegalStateException("ModelPart contains unsupported non-quad polygon at " + partPath + "/" + cubeIndex);
-				}
-				Vector3f localNormal = new Vector3f(polygon.normal());
-				ensureFiniteModelVector(localNormal, "stable model polygon normal", partPath, cubeIndex);
-				int normalPacked = packWorldMeshNormal(localNormal.x, localNormal.y, localNormal.z);
-				int base = builder.vertices.size();
-				int firstIndex = builder.indices.size();
-				for (int vertexIndex = 0; vertexIndex < polygon.vertices().length; vertexIndex++) {
-					ModelPart.Vertex vertex = polygon.vertices()[vertexIndex];
-					float textureU = sprite == null ? vertex.u() : sprite.getU(vertex.u());
-					float textureV = sprite == null ? vertex.v() : sprite.getV(vertex.v());
-					Vector3f position = new Vector3f(vertex.worldX(), vertex.worldY(), vertex.worldZ());
-					ensureFiniteModelVector(position, "stable model vertex position", partPath, cubeIndex);
-					if (materialId == MATERIAL_ID_BOAT_WATER_MASK) {
-						textureU = 0.0F;
-						textureV = 0.0F;
-					} else if (!Float.isFinite(vertex.u()) || !Float.isFinite(vertex.v())
-						|| !Float.isFinite(textureU) || !Float.isFinite(textureV)) {
-						throw new IllegalStateException("ModelPart contains non-finite vertex UV at " + partPath + "/" + cubeIndex);
-					}
-					builder.vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
-						position.x, position.y, position.z,
-						textureU, textureV, textureU, textureV,
-						0, 1, 0, 0xffffffff, normalPacked, 0, 0
-					));
-				}
-				// The cached asset stores model-local vertices and applies the
-				// current part pose through the per-instance transform. Winding is
-				// therefore a topology property and must be derived from the same
-				// local-space normal used by the copied vertex ABI. Comparing a
-				// pose-transformed normal with local vertices made the content hash
-				// change as animated parts moved, defeating the immutable mesh cache.
-				int winding = worldMeshWinding(
-					builder.vertices.get(base),
-					builder.vertices.get(base + 1),
-					builder.vertices.get(base + 2),
-					localNormal
-				);
-				builder.indices.add(base);
-				builder.indices.add(base + 1);
-				builder.indices.add(base + 2);
-				builder.indices.add(base + 2);
-				builder.indices.add(base + 3);
-				builder.indices.add(base);
-				builder.sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
-					materialId, textureId, materialMode, cullPolicy, winding, firstIndex, 6
-				));
-			}
+			appendModelCube(builder, cube, partPath, cubeIndex, sprite, materialId, textureId, materialMode, cullPolicy);
 		});
 		List<ModelPoseMeshExtraction> result = new ArrayList<>(builders.size());
-		List<CachedModelPartMesh> cachedParts = dynamicTexture ? null : new ArrayList<>(builders.size());
 		for (Map.Entry<String, ModelPartMeshBuilder> entry : builders.entrySet()) {
-			ModelPartMeshBuilder builder = entry.getValue();
-			if (builder.vertices.isEmpty() || builder.sections.isEmpty()) continue;
-			int indexType = builder.vertices.size() <= 0xffff ? VulkanicGalBridge.INDEX_U16 : VulkanicGalBridge.INDEX_U32;
-			int indexStride = indexType == VulkanicGalBridge.INDEX_U16 ? 2 : 4;
-			byte[] indexBytes = new byte[builder.indices.size() * indexStride];
-			for (int index = 0; index < builder.indices.size(); index++) {
-				int value = builder.indices.get(index);
-				for (int byteIndex = 0; byteIndex < indexStride; byteIndex++) {
-					indexBytes[index * indexStride + byteIndex] = (byte)(value >>> (byteIndex * 8));
-				}
-			}
-			List<VulkanicGalBridge.WorldMeshSectionRecord> byteSections = new ArrayList<>(builder.sections.size());
-			for (VulkanicGalBridge.WorldMeshSectionRecord section : builder.sections) {
-				byteSections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
-					section.materialId(), section.textureId(), section.materialMode(), section.cullPolicy(), section.winding(),
-					Math.multiplyExact(section.indexOffset(), indexStride), section.indexCount()
-				));
-			}
-			// ModelPart names are Java model data, not Minecraft resource
-			// locations.  They may contain uppercase letters, spaces, or other
-			// characters that the Rust source identity contract deliberately
-			// rejects.  Encode the exact UTF-8 name as lowercase hex so the
-			// per-part identity remains canonical and collision-free without
-			// weakening the shared FFI boundary.
-			String partIdentity = canonicalModelPartIdentity(entityIdentity, entry.getKey());
-			long meshKey = meshContentHash(builder.vertices, indexBytes, byteSections, partIdentity);
-			long meshGeneration = Math.max(1L, worldMeshAssetGeneration + 1L);
-			BlockMeshExtraction extraction = new BlockMeshExtraction(
-				meshKey,
-				meshGeneration,
-				new VulkanicGalBridge.WorldMeshAssetRecord(
-					meshKey, meshGeneration, MESH_VERTEX_LAYOUT_V2, indexType,
-					builder.vertices, indexBytes, byteSections, partIdentity
-				),
-				textureAssets
-			);
-			result.add(new ModelPoseMeshExtraction(extraction, builder.localPose));
-			if (cachedParts != null) cachedParts.add(new CachedModelPartMesh(entry.getKey(), extraction));
-		}
-		if (cachedParts != null && !cachedParts.isEmpty()) {
-			synchronized (STABLE_MODEL_TOPOLOGIES) {
-				STABLE_MODEL_TOPOLOGIES.put(cacheKey, new CachedModelTopology(cachedParts));
+			BlockMeshExtraction extraction = finishModelPartMesh(entry.getValue(), entry.getKey(), entityIdentity, textureAssets);
+			if (extraction != null) {
+				result.add(new ModelPoseMeshExtraction(extraction, entry.getValue().localPose));
 			}
 		}
 		if (ownedAtlas && sprite != null) {
 			recordAtlasSpriteUse(sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
 		}
-		return result;
+		return new ModelExtraction(result, null);
+	}
+
+	private static List<VulkanicGalBridge.WorldMeshTextureAssetRecord> modelTextureAssets(
+		ResourceLocation textureIdentity, @Nullable TextureAtlasSprite sprite, boolean ownedAtlas, boolean dynamicTexture,
+		int textureId
+	) {
+		if (ownedAtlas) {
+			return List.of();
+		}
+		byte[] texturePayload = readModelTexturePayload(textureIdentity, sprite);
+		if (texturePayload == null) {
+			throw new IllegalStateException("unsupported model texture asset " + textureIdentity);
+		}
+		return List.of(dynamicTexture
+			? localModelTextureAsset(textureId, texturePayload)
+			: reuseRegisteredStaticModelTexture(localModelTextureAsset(textureId, texturePayload)));
+	}
+
+	/**
+	 * The model's whole part structure (visible or not) with one local-space
+	 * mesh per part that has cubes: the parts Java poses itself and the nodes
+	 * of the Rust rig. Null when no part has geometry.
+	 */
+	private static @Nullable CachedModelTopology buildModelTopology(
+		ModelPart modelRoot, ResourceLocation textureIdentity, @Nullable TextureAtlasSprite sprite, String entityIdentity,
+		int materialId, int textureId, int materialMode, int cullPolicy,
+		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textureAssets
+	) {
+		List<ModelPart> nodes = new ArrayList<>();
+		it.unimi.dsi.fastutil.ints.IntArrayList parents = new it.unimi.dsi.fastutil.ints.IntArrayList();
+		List<BlockMeshExtraction> meshes = new ArrayList<>();
+		Map<String, BlockMeshExtraction> meshesByPath = new LinkedHashMap<>();
+		modelRoot.visitStructure((index, parent, path, part, cubes) -> {
+			nodes.add(part);
+			parents.add(parent);
+			BlockMeshExtraction mesh = null;
+			if (!cubes.isEmpty()) {
+				ModelPartMeshBuilder builder = new ModelPartMeshBuilder(new Matrix4f());
+				for (int cubeIndex = 0; cubeIndex < cubes.size(); cubeIndex++) {
+					appendModelCube(builder, cubes.get(cubeIndex), path, cubeIndex, sprite, materialId, textureId,
+						materialMode, cullPolicy);
+				}
+				mesh = finishModelPartMesh(builder, path, entityIdentity, textureAssets);
+				if (mesh != null) {
+					meshesByPath.put(path, mesh);
+				}
+			}
+			meshes.add(mesh);
+		});
+		if (meshesByPath.isEmpty()) {
+			return null;
+		}
+		return new CachedModelTopology(nodes.toArray(ModelPart[]::new), parents.toIntArray(),
+			meshes.toArray(BlockMeshExtraction[]::new), meshesByPath);
+	}
+
+	/** Appends one cube's quads in part-local space (no pose applied). */
+	private static void appendModelCube(
+		ModelPartMeshBuilder builder, ModelPart.Cube cube, String partPath, int cubeIndex,
+		@Nullable TextureAtlasSprite sprite, int materialId, int textureId, int materialMode, int cullPolicy
+	) {
+		for (ModelPart.Polygon polygon : cube.polygons) {
+			ensureWorldMeshExtractionCapacity(builder.vertices, builder.indices, builder.sections);
+			if (polygon == null || polygon.vertices().length != 4) {
+				throw new IllegalStateException("ModelPart contains unsupported non-quad polygon at " + partPath + "/" + cubeIndex);
+			}
+			Vector3f localNormal = new Vector3f(polygon.normal());
+			ensureFiniteModelVector(localNormal, "stable model polygon normal", partPath, cubeIndex);
+			int normalPacked = packWorldMeshNormal(localNormal.x, localNormal.y, localNormal.z);
+			int base = builder.vertices.size();
+			int firstIndex = builder.indices.size();
+			for (int vertexIndex = 0; vertexIndex < polygon.vertices().length; vertexIndex++) {
+				ModelPart.Vertex vertex = polygon.vertices()[vertexIndex];
+				float textureU = sprite == null ? vertex.u() : sprite.getU(vertex.u());
+				float textureV = sprite == null ? vertex.v() : sprite.getV(vertex.v());
+				Vector3f position = new Vector3f(vertex.worldX(), vertex.worldY(), vertex.worldZ());
+				ensureFiniteModelVector(position, "stable model vertex position", partPath, cubeIndex);
+				if (materialId == MATERIAL_ID_BOAT_WATER_MASK) {
+					textureU = 0.0F;
+					textureV = 0.0F;
+				} else if (!Float.isFinite(vertex.u()) || !Float.isFinite(vertex.v())
+					|| !Float.isFinite(textureU) || !Float.isFinite(textureV)) {
+					throw new IllegalStateException("ModelPart contains non-finite vertex UV at " + partPath + "/" + cubeIndex);
+				}
+				builder.vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
+					position.x, position.y, position.z,
+					textureU, textureV, textureU, textureV,
+					0, 1, 0, 0xffffffff, normalPacked, 0, 0
+				));
+			}
+			// The cached asset stores model-local vertices and applies the
+			// current part pose through the per-instance transform. Winding is
+			// therefore a topology property and must be derived from the same
+			// local-space normal used by the copied vertex ABI. Comparing a
+			// pose-transformed normal with local vertices made the content hash
+			// change as animated parts moved, defeating the immutable mesh cache.
+			int winding = worldMeshWinding(
+				builder.vertices.get(base),
+				builder.vertices.get(base + 1),
+				builder.vertices.get(base + 2),
+				localNormal
+			);
+			builder.indices.add(base);
+			builder.indices.add(base + 1);
+			builder.indices.add(base + 2);
+			builder.indices.add(base + 2);
+			builder.indices.add(base + 3);
+			builder.indices.add(base);
+			builder.sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
+				materialId, textureId, materialMode, cullPolicy, winding, firstIndex, 6
+			));
+		}
+	}
+
+	/** The immutable asset of one part's built mesh, or null when it has no quads. */
+	private static @Nullable BlockMeshExtraction finishModelPartMesh(
+		ModelPartMeshBuilder builder, String partPath, String entityIdentity,
+		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textureAssets
+	) {
+		if (builder.vertices.isEmpty() || builder.sections.isEmpty()) return null;
+		int indexType = builder.vertices.size() <= 0xffff ? VulkanicGalBridge.INDEX_U16 : VulkanicGalBridge.INDEX_U32;
+		int indexStride = indexType == VulkanicGalBridge.INDEX_U16 ? 2 : 4;
+		byte[] indexBytes = new byte[builder.indices.size() * indexStride];
+		for (int index = 0; index < builder.indices.size(); index++) {
+			int value = builder.indices.get(index);
+			for (int byteIndex = 0; byteIndex < indexStride; byteIndex++) {
+				indexBytes[index * indexStride + byteIndex] = (byte)(value >>> (byteIndex * 8));
+			}
+		}
+		List<VulkanicGalBridge.WorldMeshSectionRecord> byteSections = new ArrayList<>(builder.sections.size());
+		for (VulkanicGalBridge.WorldMeshSectionRecord section : builder.sections) {
+			byteSections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
+				section.materialId(), section.textureId(), section.materialMode(), section.cullPolicy(), section.winding(),
+				Math.multiplyExact(section.indexOffset(), indexStride), section.indexCount()
+			));
+		}
+		// ModelPart names are Java model data, not Minecraft resource
+		// locations.  They may contain uppercase letters, spaces, or other
+		// characters that the Rust source identity contract deliberately
+		// rejects.  Encode the exact UTF-8 name as lowercase hex so the
+		// per-part identity remains canonical and collision-free without
+		// weakening the shared FFI boundary.
+		String partIdentity = canonicalModelPartIdentity(entityIdentity, partPath);
+		long meshKey = meshContentHash(builder.vertices, indexBytes, byteSections, partIdentity);
+		long meshGeneration = Math.max(1L, worldMeshAssetGeneration + 1L);
+		return new BlockMeshExtraction(
+			meshKey,
+			meshGeneration,
+			new VulkanicGalBridge.WorldMeshAssetRecord(
+				meshKey, meshGeneration, MESH_VERTEX_LAYOUT_V2, indexType,
+				builder.vertices, indexBytes, byteSections, partIdentity
+			),
+			textureAssets
+		);
+	}
+
+	/** Queues one model-rig instance: Rust expands the drawn parts from the copied poses. */
+	private static boolean enqueueModelRigInstance(
+		Model<?> model, CachedModelTopology topology, PoseStack.Pose entityPose, ResourceLocation textureIdentity,
+		int packedLight, int tintedColor, ModelMeshRenderSemantics semantics, int overlayColorArgb, int outlineColor,
+		int flags
+	) {
+		GraphicsFrameBenchmark.beginDetailedPhase("world.model.rust-enqueue");
+		try {
+			synchronized (LOCK) {
+				ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL model mesh requires a seeded bounded world primitive frame");
+				ensureWorldQueueCapacityLocked(
+					PENDING_MESH_INSTANCES.size(), topology.meshesByPath.size(), MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
+				);
+				long rigId = prepareModelRigLocked(topology);
+				int firstPose = appendModelRigPosesLocked(topology.nodes);
+				PENDING_MESH_INSTANCES.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
+					STRATUM_WORLD_ENTITY_MESH,
+					rigId,
+					firstPose + 1L,
+					MESH_SECTION_ALL,
+					semantics.depthPolicy(),
+					semantics.cullPolicy(),
+					WORLD_WINDING_CCW,
+					resolvedModelInstanceColor(tintedColor),
+					entityPose.pose().get(new float[16]),
+					pendingViewportWidth,
+					pendingViewportHeight,
+					0,
+					overlayColorArgb,
+					outlineColor,
+					flags | semantics.viewLayerFlags() | VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG
+				).withPackedLight(packedLight));
+				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
+				PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity(
+					model.getClass().getName(), textureIdentity
+				));
+				recordWorldMeshSubmittedWorkIdentity(
+					"model",
+					"rust-vulkan-whole-frame:" + textureIdentity
+				);
+			}
+		} finally {
+			GraphicsFrameBenchmark.endDetailedPhase("world.model.rust-enqueue");
+		}
+		return true;
+	}
+
+	/**
+	 * Model rigs: Rust composes a cached model's part hierarchy from the raw
+	 * per-frame {@code ModelPart} pose fields and expands one instance per
+	 * drawn part (see {@code bridge/world/model_rigs.rs}). Java sends one
+	 * instance per model. Off for first-person frames, uncacheable dynamic
+	 * textures and per-part mesh diagnostics, which keep Java's part poses.
+	 */
+	private static final boolean MODEL_RIGS_ENABLED = !"false".equals(System.getProperty("mattmc.dev.modelRigs"))
+		&& !Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+		&& !Boolean.getBoolean("mattmc.dev.graphicsAuditVerboseMeshes");
+	/** Frames a released rig stays registered: covers a pipelined frame still decoding. */
+	private static final long MODEL_RIG_RELEASE_DELAY_FRAMES = 3L;
+	/** Registered rigs by id; guarded by LOCK. */
+	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<CachedModelTopology> MODEL_RIGS =
+		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+	/** Rig ids awaiting release with the frame sequence that retired them. */
+	private static final java.util.ArrayDeque<long[]> RETIRED_MODEL_RIGS = new java.util.ArrayDeque<>();
+	private static long nextModelRigId;
+	private static final int MODEL_RIG_POSE_RING = 3;
+	private static final float[][] MODEL_RIG_POSE_VALUES = new float[MODEL_RIG_POSE_RING][];
+	private static final int[][] MODEL_RIG_POSE_FLAGS = new int[MODEL_RIG_POSE_RING][];
+	private static int modelRigPoseRing;
+	private static int pendingModelRigPoseCount;
+
+	/** Queues a topology's rig for release once no queued frame can name it. */
+	private static void retireModelRig(CachedModelTopology topology) {
+		synchronized (RETIRED_MODEL_RIGS) {
+			if (topology.rigId != 0L) {
+				RETIRED_MODEL_RIGS.add(new long[] {topology.rigId, semanticFrameSequence});
+			}
+		}
+	}
+
+	/** Releases retired rigs old enough that no submitted frame still decodes them. */
+	private static void releaseRetiredModelRigsLocked() {
+		synchronized (RETIRED_MODEL_RIGS) {
+			while (!RETIRED_MODEL_RIGS.isEmpty()
+				&& RETIRED_MODEL_RIGS.peekFirst()[1] + MODEL_RIG_RELEASE_DELAY_FRAMES <= semanticFrameSequence) {
+				long rigId = RETIRED_MODEL_RIGS.pollFirst()[0];
+				MODEL_RIGS.remove(rigId);
+				VulkanicGalBridge.releaseModelRig(rigId);
+			}
+		}
+	}
+
+	/**
+	 * Keeps the rig's part assets admitted and live for this frame and
+	 * returns its registered id, registering a new rig when a part's
+	 * admitted generation differs from the registered one.
+	 */
+	private static long prepareModelRigLocked(CachedModelTopology topology) {
+		BlockMeshExtraction[] meshes = topology.meshes;
+		long[] generations = topology.rigGenerations;
+		boolean changed = generations == null;
+		if (changed) {
+			generations = new long[meshes.length];
+		}
+		for (int node = 0; node < meshes.length; node++) {
+			BlockMeshExtraction mesh = meshes[node];
+			if (mesh == null) continue;
+			ensureMeshAssetLocked(mesh);
+			VulkanicGalBridge.WorldMeshAssetRecord admitted = WORLD_MESH_ASSETS.get(mesh.meshKey());
+			long generation = admitted == null ? mesh.meshGeneration() : admitted.meshGeneration();
+			if (generations[node] != generation) {
+				if (!changed) {
+					generations = generations.clone();
+					changed = true;
+				}
+				generations[node] = generation;
+			}
+		}
+		if (changed) {
+			long[] keys = new long[meshes.length];
+			for (int node = 0; node < meshes.length; node++) {
+				keys[node] = meshes[node] == null ? 0L : meshes[node].meshKey();
+			}
+			long rigId = ++nextModelRigId;
+			VulkanicGalBridge.registerModelRig(rigId, topology.parents, keys, generations);
+			// Queued frames may still name the previous id: it is released later.
+			retireModelRig(topology);
+			topology.rigId = rigId;
+			topology.rigGenerations = generations;
+			MODEL_RIGS.put(rigId, topology);
+		}
+		return topology.rigId;
+	}
+
+	/** Copies the nodes' current pose fields; returns the first pose index. */
+	private static int appendModelRigPosesLocked(ModelPart[] nodes) {
+		int first = pendingModelRigPoseCount;
+		int end = Math.addExact(first, nodes.length);
+		float[] values = MODEL_RIG_POSE_VALUES[modelRigPoseRing];
+		int[] flags = MODEL_RIG_POSE_FLAGS[modelRigPoseRing];
+		if (flags == null || flags.length < end) {
+			int capacity = Math.max(end, flags == null ? 1024 : flags.length * 2);
+			values = values == null ? new float[capacity * VulkanicGalBridge.MODEL_RIG_POSE_FLOATS]
+				: Arrays.copyOf(values, capacity * VulkanicGalBridge.MODEL_RIG_POSE_FLOATS);
+			flags = flags == null ? new int[capacity] : Arrays.copyOf(flags, capacity);
+			MODEL_RIG_POSE_VALUES[modelRigPoseRing] = values;
+			MODEL_RIG_POSE_FLAGS[modelRigPoseRing] = flags;
+		}
+		for (int node = 0; node < nodes.length; node++) {
+			ModelPart part = nodes[node];
+			int base = (first + node) * VulkanicGalBridge.MODEL_RIG_POSE_FLOATS;
+			values[base] = part.x;
+			values[base + 1] = part.y;
+			values[base + 2] = part.z;
+			values[base + 3] = part.xRot;
+			values[base + 4] = part.yRot;
+			values[base + 5] = part.zRot;
+			values[base + 6] = part.xScale;
+			values[base + 7] = part.yScale;
+			values[base + 8] = part.zScale;
+			flags[first + node] = (part.visible ? VulkanicGalBridge.MODEL_RIG_POSE_VISIBLE : 0)
+				| (part.skipDraw ? VulkanicGalBridge.MODEL_RIG_POSE_SKIP_DRAW : 0);
+		}
+		pendingModelRigPoseCount = end;
+		return first;
+	}
+
+	/** Hands the frame its poses and moves the producer to the next ring buffer. */
+	private static VulkanicGalBridge.ModelRigPoses takeModelRigPosesLocked() {
+		int count = pendingModelRigPoseCount;
+		pendingModelRigPoseCount = 0;
+		if (count == 0) {
+			return VulkanicGalBridge.ModelRigPoses.EMPTY;
+		}
+		var poses = new VulkanicGalBridge.ModelRigPoses(MODEL_RIG_POSE_VALUES[modelRigPoseRing],
+			MODEL_RIG_POSE_FLAGS[modelRigPoseRing], count);
+		modelRigPoseRing = (modelRigPoseRing + 1) % MODEL_RIG_POSE_RING;
+		return poses;
+	}
+
+	/** Whether every part mesh of a rig instance has crossed with the rig's current generations. */
+	private static boolean isModelRigUploadedLocked(long rigId) {
+		CachedModelTopology topology = MODEL_RIGS.get(rigId);
+		return topology != null && isModelRigMeshesUploadedLocked(topology);
+	}
+
+	private static boolean isModelRigMeshesUploadedLocked(CachedModelTopology topology) {
+		for (int node = 0; node < topology.meshes.length; node++) {
+			BlockMeshExtraction mesh = topology.meshes[node];
+			if (mesh != null && !isWorldMeshGenerationAndTexturesUploadedLocked(mesh.meshKey(), topology.rigGenerations[node])) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Each mesh identity an instance draws: its own, or every part of its rig. */
+	private static void forEachInstanceMeshLocked(VulkanicGalBridge.WorldMeshInstanceRecord instance,
+			java.util.function.LongBinaryOperator consumer) {
+		if ((instance.flags() & VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) == 0) {
+			consumer.applyAsLong(instance.meshKey(), instance.meshGeneration());
+			return;
+		}
+		CachedModelTopology topology = MODEL_RIGS.get(instance.meshKey());
+		if (topology == null) return;
+		for (int node = 0; node < topology.meshes.length; node++) {
+			BlockMeshExtraction mesh = topology.meshes[node];
+			if (mesh != null) {
+				consumer.applyAsLong(mesh.meshKey(), topology.rigGenerations[node]);
+			}
+		}
 	}
 
 	/**
@@ -13347,36 +13669,43 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private record CachedModelPartMesh(String partPath, BlockMeshExtraction extraction) {
-		private CachedModelPartMesh {
-			Objects.requireNonNull(partPath, "partPath");
-			Objects.requireNonNull(extraction, "extraction");
-		}
-	}
+	/**
+	 * A cached model's part structure: its nodes in {@code visitRenderable}
+	 * pre-order with parent indices and each node's local-space mesh (null
+	 * without cubes). Java poses visible parts itself for first-person and
+	 * diagnostic frames; otherwise the Rust rig registered from it does.
+	 */
+	private static final class CachedModelTopology {
+		private final ModelPart[] nodes;
+		private final int[] parents;
+		private final BlockMeshExtraction[] meshes;
+		private final Map<String, BlockMeshExtraction> meshesByPath;
+		/** Registered Rust rig and the mesh generations it names; guarded by LOCK. */
+		private long rigId;
+		private long[] rigGenerations;
 
-	private record CachedModelTopology(List<CachedModelPartMesh> parts) {
-		private CachedModelTopology {
-			parts = List.copyOf(parts);
+		private CachedModelTopology(ModelPart[] nodes, int[] parents, BlockMeshExtraction[] meshes,
+				Map<String, BlockMeshExtraction> meshesByPath) {
+			this.nodes = nodes;
+			this.parents = parents;
+			this.meshes = meshes;
+			this.meshesByPath = Map.copyOf(meshesByPath);
 		}
 
 		private List<ModelPoseMeshExtraction> bindCurrentPoses(ModelPart root) {
-			List<ModelPoseMeshExtraction> result = new ArrayList<>(parts.size());
+			List<ModelPoseMeshExtraction> result = new ArrayList<>(this.meshesByPath.size());
 			String[] activePath = {null};
-			int[] nextPart = {0};
-			boolean[] mismatch = {false};
 			root.visitRenderable(new PoseStack(), (partPose, partPath, cubeIndex, cube) -> {
-				if (mismatch[0] || partPath.equals(activePath[0])) return;
+				if (partPath.equals(activePath[0])) return;
 				activePath[0] = partPath;
-				if (nextPart[0] >= parts.size() || !parts.get(nextPart[0]).partPath().equals(partPath)) {
-					mismatch[0] = true;
-					return;
-				}
+				BlockMeshExtraction mesh = this.meshesByPath.get(partPath);
+				if (mesh == null) return;
 				if (!partPose.pose().isFinite()) {
 					throw new IllegalStateException("stable model cache contains a non-finite part transform at " + partPath);
 				}
-				result.add(new ModelPoseMeshExtraction(parts.get(nextPart[0]++).extraction(), partPose.pose()));
+				result.add(new ModelPoseMeshExtraction(mesh, partPose.pose()));
 			});
-			return mismatch[0] || nextPart[0] != parts.size() ? null : result;
+			return result;
 		}
 	}
 
@@ -17961,6 +18290,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	public static PrimitiveFrame consumeFrame() {
 		synchronized (LOCK) {
+			releaseRetiredModelRigsLocked();
 			List<VulkanicGalBridge.WorldMeshInstanceRecord> admittedMeshInstances = new ArrayList<>(
 				ACTIVE_STATIC_TERRAIN_INSTANCES.size() + PENDING_MESH_INSTANCES.size());
 			List<String> meshProducerLabels = new ArrayList<>(
@@ -18099,7 +18429,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				admittedDistantHorizonsGenericBoxes,
 				pendingStaticTerrainCamera,
 				shadowCasters,
-				terrainSections
+				terrainSections,
+				takeModelRigPosesLocked()
 			);
 			worldTextDiagnostic = worldTextDiagnostic.withConsumed(semanticFrameSequence, frame.textQuads().size());
 			ORB_SEMANTICS.clearFrame();
@@ -18112,6 +18443,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					pendingEntityFlameQuadCount = 0;
 					PENDING_TEXT_QUADS.clear();
 					PENDING_MESH_INSTANCES.clear();
+					pendingModelRigPoseCount = 0;
 					PENDING_SHADOW_CASTERS.clear();
 					PENDING_TERRAIN_SECTIONS.clear();
 					PENDING_MESH_PRODUCERS.clear();
@@ -18345,7 +18677,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			frame.distantHorizonsGenericBoxes(),
 			frame.terrainFrameCamera(),
 			frame.staticTerrainShadowCasters(),
-			frame.staticTerrainSections()
+			frame.staticTerrainSections(),
+			frame.modelRigPoses()
 		);
 	}
 
@@ -18388,9 +18721,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes,
 		VulkanicGalBridge.TerrainFrameCamera terrainFrameCamera,
 		VulkanicGalBridge.StaticTerrainShadowCasters staticTerrainShadowCasters,
-		VulkanicGalBridge.StaticTerrainSections staticTerrainSections
+		VulkanicGalBridge.StaticTerrainSections staticTerrainSections,
+		VulkanicGalBridge.ModelRigPoses modelRigPoses
 	) {
 		public PrimitiveFrame {
+			if (modelRigPoses == null) {
+				modelRigPoses = VulkanicGalBridge.ModelRigPoses.EMPTY;
+			}
 			if (staticTerrainShadowCasters == null) {
 				staticTerrainShadowCasters = VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY;
 			}
@@ -18437,7 +18774,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				shaderEnvironmentFrame, featureCoverage, lodInstances, lodRenderFrame, entityFlameQuadCount,
 				firstPersonFrame, firstPersonMeshInstances, particleQuads, orbInstances,
 				distantHorizonsGenericBoxes, null, VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY,
-				VulkanicGalBridge.StaticTerrainSections.EMPTY);
+				VulkanicGalBridge.StaticTerrainSections.EMPTY, VulkanicGalBridge.ModelRigPoses.EMPTY);
 		}
 	public PrimitiveFrame(
 		int viewportWidth,
@@ -18555,6 +18892,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static boolean isWorldMeshInstanceUploadedLocked(VulkanicGalBridge.WorldMeshInstanceRecord instance) {
+		if ((instance.flags() & VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) != 0) {
+			return isModelRigUploadedLocked(instance.meshKey());
+		}
 		return isWorldMeshGenerationAndTexturesUploadedLocked(instance.meshKey(), instance.meshGeneration());
 	}
 
@@ -18866,9 +19206,16 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (PENDING_MATERIAL_QUADS.stream().anyMatch(quad -> quad.materialMode() == MATERIAL_MODE_TRANSLUCENT)) {
 				return true;
 			}
+			boolean[] blended = {false};
 			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
-				VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(instance.meshKey());
-				if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
+				forEachInstanceMeshLocked(instance, (meshKey, meshGeneration) -> {
+					VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
+					if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
+						blended[0] = true;
+					}
+					return 0L;
+				});
+				if (blended[0]) {
 					return true;
 				}
 			}

@@ -147,6 +147,12 @@ second copy of the instance records. Source resource sets (`TerrainSourceOwnedRe
 are immutable and `Arc`-shared: per-draw material preparation clones and compares
 them, so keep them cheap to clone and do not add mutable state.
 
+Entity models are model rigs: Java registers each cached model's part tree once
+and per frame copies only the raw part pose fields after `setupAnim`; Rust
+composes the hierarchy and expands the part instances (see
+[JAVA-BRIDGE](JAVA-BRIDGE.md), ABI 71). Animation (`setupAnim`) still runs in
+Java; it is the next piece to port per entity type.
+
 The shared mesh instance stream is bound into every mesh resource set, so
 growing it rebuilds them all. It grows to at least twice its previous capacity;
 growing to the exact requirement while terrain streamed caused ~30 ms frames.

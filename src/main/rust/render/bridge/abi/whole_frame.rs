@@ -86,6 +86,9 @@ pub struct FfiWholeFrameSubmitRequest {
     /// ABI v70: camera-visible static-terrain section layers, in draw order
     /// (translucent back to front), placed with `static_terrain_camera`.
     pub world_static_terrain_sections: FfiSlice<FfiStaticTerrainSection>,
+    /// ABI v71: raw part poses of the frame's model-rig instances; Rust
+    /// composes each rig's hierarchy and expands its part instances.
+    pub world_model_rig_poses: FfiSlice<FfiModelRigPose>,
 }
 
 #[repr(C)]

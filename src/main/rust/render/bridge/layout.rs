@@ -780,7 +780,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_distant_horizons_generic_boxes,
                 world_static_terrain_shadow_casters,
                 static_terrain_camera,
-                world_static_terrain_sections
+                world_static_terrain_sections,
+                world_model_rig_poses
             ]
         ),
         89 => layout!(
@@ -1634,6 +1635,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             FfiStaticTerrainSection,
             [mesh_key, mesh_generation, origin, depth_policy, flags, reserved]
         ),
+        114 => layout!(114, FfiModelRigNode, [parent, flags, mesh_key, mesh_generation]),
+        115 => layout!(115, FfiModelRigPose, [offset, rotation, scale, flags]),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,

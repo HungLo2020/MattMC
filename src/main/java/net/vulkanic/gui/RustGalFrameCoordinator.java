@@ -1056,7 +1056,8 @@ public final class RustGalFrameCoordinator {
 							primitiveFrame.distantHorizonsGenericBoxes(),
 							primitiveFrame.terrainFrameCamera(),
 							primitiveFrame.staticTerrainShadowCasters(),
-							primitiveFrame.staticTerrainSections()
+							primitiveFrame.staticTerrainSections(),
+							primitiveFrame.modelRigPoses()
 						);
 						break;
 					} catch (IllegalStateException failure) {

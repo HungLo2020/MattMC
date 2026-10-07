@@ -120,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 70;
+	public static final int ABI_VERSION = 71;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -1721,7 +1721,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
 		TerrainFrameCamera terrainFrameCamera,
 		StaticTerrainShadowCasters staticTerrainShadowCasters,
-		StaticTerrainSections staticTerrainSections
+		StaticTerrainSections staticTerrainSections,
+		ModelRigPoses modelRigPoses
 	) {
 		return submitWorldFrame(generation, frameId, correlationId, frameTarget, guiWidth, guiHeight,
 			viewportWidth, viewportHeight, viewMatrix, projectionMatrix, worldBackground, worldSegments,
@@ -1731,7 +1732,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId, true,
 			guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
 			worldDistantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters,
-			staticTerrainSections);
+			staticTerrainSections, modelRigPoses);
 	}
 
 	private WholeFrameSubmitResult submitWorldFrame(
@@ -1857,7 +1858,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads,
 			firstPersonFrame, firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId,
 			wholeFrame, guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
-			worldDistantHorizonsGenericBoxes, null, StaticTerrainShadowCasters.EMPTY, StaticTerrainSections.EMPTY
+			worldDistantHorizonsGenericBoxes, null, StaticTerrainShadowCasters.EMPTY, StaticTerrainSections.EMPTY,
+			ModelRigPoses.EMPTY
 		);
 	}
 
@@ -1901,7 +1903,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
 		TerrainFrameCamera terrainFrameCamera,
 		StaticTerrainShadowCasters staticTerrainShadowCasters,
-		StaticTerrainSections staticTerrainSections
+		StaticTerrainSections staticTerrainSections,
+		ModelRigPoses modelRigPoses
 	) {
 		if (pipelinedRequestArena != null) {
 			// The worker still decodes the previous request, which shares the
@@ -2336,6 +2339,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldDistantHorizonsGenericBoxes.size());
 		writeStaticTerrainShadowCasters(arena, request, staticTerrainShadowCasters, terrainFrameCamera);
 		writeStaticTerrainSections(arena, request, staticTerrainSections, terrainFrameCamera);
+		writeModelRigPoses(arena, request, modelRigPoses == null ? ModelRigPoses.EMPTY : modelRigPoses);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-particles-and-orbs");
 		MemorySegment firstPerson = request.asSlice(
 			Struct.WHOLE_FRAME_SUBMIT.offset(29),
@@ -6261,6 +6265,85 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 49, records, count);
 	}
 
+	/**
+	 * Raw {@code ModelPart} pose fields of the frame's model-rig instances,
+	 * nine floats per node (offset x/y/z in model pixels, x/y/z rotation,
+	 * x/y/z scale) and one flags word ({@link #MODEL_RIG_POSE_VISIBLE},
+	 * {@link #MODEL_RIG_POSE_SKIP_DRAW}). Rust composes each registered rig's
+	 * hierarchy from them; Java builds no per-part transform or instance.
+	 */
+	public record ModelRigPoses(float[] values, int[] flags, int count) {
+		public static final ModelRigPoses EMPTY = new ModelRigPoses(new float[0], new int[0], 0);
+
+		public ModelRigPoses {
+			Objects.requireNonNull(values, "values");
+			Objects.requireNonNull(flags, "flags");
+			if (count < 0 || count > flags.length || (long) count * MODEL_RIG_POSE_FLOATS > values.length) {
+				throw new IllegalArgumentException("model rig poses are not bounded");
+			}
+		}
+	}
+
+	public static final int MODEL_RIG_POSE_FLOATS = 9;
+	public static final int MODEL_RIG_POSE_VISIBLE = 1;
+	public static final int MODEL_RIG_POSE_SKIP_DRAW = 2;
+	/** Instance flag: {@code meshKey} is a rig id and {@code meshGeneration - 1} its first pose. */
+	public static final int WORLD_MESH_INSTANCE_FLAG_MODEL_RIG = 0x4000_0000;
+
+	private static void writeModelRigPoses(Arena arena, MemorySegment request, ModelRigPoses poses) {
+		int count = poses.count();
+		var layout = Struct.MODEL_RIG_POSE;
+		MemorySegment records = layout.array(arena, count);
+		long stride = layout.byteSize();
+		long offsetOffset = layout.offset(0);
+		long rotationOffset = layout.offset(1);
+		long scaleOffset = layout.offset(2);
+		long flagsOffset = layout.offset(3);
+		float[] values = poses.values();
+		int[] flags = poses.flags();
+		for (int node = 0; node < count; node++) {
+			long base = node * stride;
+			int value = node * MODEL_RIG_POSE_FLOATS;
+			MemorySegment.copy(values, value, records, ValueLayout.JAVA_FLOAT, base + offsetOffset, 3);
+			MemorySegment.copy(values, value + 3, records, ValueLayout.JAVA_FLOAT, base + rotationOffset, 3);
+			MemorySegment.copy(values, value + 6, records, ValueLayout.JAVA_FLOAT, base + scaleOffset, 3);
+			records.set(ValueLayout.JAVA_INT, base + flagsOffset, flags[node]);
+		}
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 50, records, count);
+	}
+
+	/**
+	 * Registers a model rig with Rust: nodes in {@code visitRenderable}
+	 * pre-order, each with its parent index (-1 for the root) and, when it has
+	 * cubes, its local-space mesh asset identity (zero key otherwise).
+	 */
+	public static void registerModelRig(long rigId, int[] parents, long[] meshKeys, long[] meshGenerations) {
+		int count = parents.length;
+		if (count == 0 || meshKeys.length != count || meshGenerations.length != count) {
+			throw new IllegalArgumentException("model rig arrays are not parallel");
+		}
+		var layout = Struct.MODEL_RIG_NODE;
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment nodes = layout.array(arena, count);
+			long stride = layout.byteSize();
+			for (int node = 0; node < count; node++) {
+				long base = node * stride;
+				nodes.set(ValueLayout.JAVA_INT, base + layout.offset(0), parents[node]);
+				nodes.set(ValueLayout.JAVA_INT, base + layout.offset(1), meshKeys[node] == 0L ? 0 : 1);
+				nodes.set(ValueLayout.JAVA_LONG, base + layout.offset(2), meshKeys[node]);
+				nodes.set(ValueLayout.JAVA_LONG, base + layout.offset(3), meshGenerations[node]);
+			}
+			int status = Native.modelRigRegister(rigId, nodes, count);
+			if (status != 0) {
+				throw new IllegalStateException("Rust model rig " + rigId + " registration rejected with status " + status);
+			}
+		}
+	}
+
+	public static void releaseModelRig(long rigId) {
+		Native.modelRigRelease(rigId);
+	}
+
 	/** Immutable semantic section origin; frame camera and Rust matrix lowering remain separate. */
 	public record TerrainSectionPlacement(int x, int y, int z) {
 		public TerrainSectionPlacement {
@@ -6525,7 +6608,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 			return new WorldMeshInstanceRecord(WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM, meshKey, meshGeneration,
 				meshSectionIndex, depthPolicy == 3 ? 1 : depthPolicy, cullPolicy, winding, colorArgb, transform,
-				viewportWidth, viewportHeight, entityId, entityColorArgb, 0, 0, -1, (TerrainSectionPlacement) null,
+				viewportWidth, viewportHeight, entityId, entityColorArgb, 0, flags & WORLD_MESH_INSTANCE_FLAG_MODEL_RIG, -1,
+				(TerrainSectionPlacement) null,
 				(StandardItemFoilRecord) null, (WorldDecalFoilRecord) null, (Integer) null, packedLight, entityCulling);
 		}
 
@@ -6666,15 +6750,23 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (meshKey == 0L || meshGeneration == 0L) {
 				throw new IllegalArgumentException("world mesh instance key and generation must be non-zero");
 			}
+			// A model-rig instance names a Rust rig whose expanded parts carry
+			// the remaining flags; it is otherwise a plain entity mesh.
+			boolean modelRig = (flags & WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) != 0;
+			if (modelRig && ((stratum != WORLD_MESH_ENTITY_STRATUM && stratum != WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM)
+				|| itemFoil != null || decalFoil != null || terrainPlacement != null)) {
+				throw new IllegalArgumentException("model rig instances must be plain entity meshes");
+			}
+			int semanticFlags = flags & ~WORLD_MESH_INSTANCE_FLAG_MODEL_RIG;
 			// Bit 4 is shadow-only for terrain and perspective layering for
 			// entities; these strata have disjoint semantic contracts.
-			int viewLayerFlags = stratum == 60 ? flags & WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC
-				: flags & (WORLD_MESH_VIEW_LAYER_PERSPECTIVE | WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC);
-			if (viewLayerFlags != 0 && (viewLayerFlags == 12 || (flags & ~12) != 0
+			int viewLayerFlags = stratum == 60 ? semanticFlags & WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC
+				: semanticFlags & (WORLD_MESH_VIEW_LAYER_PERSPECTIVE | WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC);
+			if (viewLayerFlags != 0 && (viewLayerFlags == 12 || (semanticFlags & ~12) != 0
 				|| stratum != WORLD_MESH_ENTITY_STRATUM || itemFoil != null || terrainPlacement != null || blockEntityId != -1)) {
 				throw new IllegalArgumentException("view layering requires one projection and an ordinary entity mesh");
 			}
-			if (flags < 0 || (flags & ~15) != 0) {
+			if (semanticFlags < 0 || (semanticFlags & ~15) != 0) {
 				throw new IllegalArgumentException("world mesh instance contains unknown semantic flags");
 			}
 			if (stratum == 60 && (flags & 4) != 0 && (flags & 2) != 0) {
@@ -7640,6 +7732,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		private static final MethodHandle MODEL_RIG_REGISTER = downcall("mattmc_vulkanic_world_model_rig_register",
+			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+		private static final MethodHandle MODEL_RIG_RELEASE = downcall("mattmc_vulkanic_world_model_rig_release",
+			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+
+		static int modelRigRegister(long rigId, MemorySegment nodes, int count) {
+			try {
+				return (int) MODEL_RIG_REGISTER.invokeExact(rigId, nodes, count);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to register a Rust model rig", throwable);
+			}
+		}
+
+		static int modelRigRelease(long rigId) {
+			try {
+				return (int) MODEL_RIG_RELEASE.invokeExact(rigId);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to release a Rust model rig", throwable);
+			}
+		}
+
 		static int wholeFrameSubmitQueued(long contextId, MemorySegment request, long correlationId, int width, int height) {
 			try {
 				return (int) WHOLE_FRAME_SUBMIT_QUEUED.invokeExact(contextId, request, correlationId, width, height);
@@ -7759,6 +7872,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WORLD_DH_GENERIC_BOX(111),
 			STATIC_TERRAIN_SHADOW_CASTER(112),
 			STATIC_TERRAIN_SECTION(113),
+			MODEL_RIG_NODE(114),
+			MODEL_RIG_POSE(115),
 			WORLD_CRACK_QUAD_REQUEST(51),
 			WORLD_BORDER_QUAD_REQUEST(52),
 			WHOLE_FRAME_SUBMIT(53),

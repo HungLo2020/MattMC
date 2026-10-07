@@ -285,6 +285,12 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
                 .count
                 .saturating_mul(size_of::<FfiStaticTerrainSection>() as u64),
         )
+        .saturating_add(
+            request
+                .world_model_rig_poses
+                .count
+                .saturating_mul(size_of::<FfiModelRigPose>() as u64),
+        )
         .saturating_add(request.post_effect_id.len)
 }
 
