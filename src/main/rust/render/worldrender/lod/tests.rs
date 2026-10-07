@@ -2683,7 +2683,7 @@ fn source_opaque_and_depth_transaction_executes_after_pack_semantic_bootstrap() 
     );
     assert!(ops.iter().any(|op| matches!(op, CommandOp::CopyTexture(_))));
     let mut batched_ops = Vec::new();
-    WorldLodSourcePassResources::append_opaque_batch(
+    WorldLodSourcePassResources::append_ordered_batch(
         &opaque_target,
         &[(source_draw, pack_set), (source_draw, pack_set)],
         crate::render::vulkanic::commands::ClearColor {

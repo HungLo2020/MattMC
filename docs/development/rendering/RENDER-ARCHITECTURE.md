@@ -296,6 +296,14 @@ Preserve this rule in the CPU builder and its semantic packets: moving opaque
 foliage into the late `dh_water` writer changes pack lighting and fog, even when
 the copied geometry and material category are otherwise correct.
 
+With a shader pack, the DH opaque range (reduced-color, exact-atlas and generic
+draws) and the late `dh_water` range are each recorded as one ordered pass
+(`append_ordered_batch` in
+[`lod/source.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/lod/source.rs)).
+Nothing samples the DH target mid-range, so per-draw passes only added GPU
+stalls: on the coastal benchmark ~200 single-draw translucent passes cost
+~0.6 ms of GPU per frame (shaders+DH 193→215 FPS).
+
 Built-in DH materials sample the copied skylight coordinate at its original
 lightmap texel center, including dark rows for covered or submerged geometry.
 Frozen OpenGL is the semantic baseline. Its Java Vulkan-only brightness fold

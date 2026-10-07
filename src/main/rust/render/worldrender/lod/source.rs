@@ -537,15 +537,16 @@ impl WorldLodSourcePassResources {
         Ok(())
     }
 
-    /// Appends a compatible opaque DH range in one render pass.
+    /// Appends an ordered DH draw range in one render pass.
     ///
-    /// Opaque reduced-color and exact-atlas draws write the same named source
-    /// attachments with the same depth domain.  Keeping that attachment open
-    /// across the range preserves draw order and per-draw pipeline/resource
-    /// bindings while avoiding a pass/barrier round trip for every segment.
-    /// The caller still performs the one opaque-depth snapshot after this
-    /// range, before any translucent source work can read it.
-    pub(crate) fn append_opaque_batch(
+    /// The opaque range (reduced-color, exact-atlas and generic draws) and the
+    /// late translucent range each write the same named source attachments
+    /// with one depth domain and nothing reads them mid-range. Keeping the
+    /// attachments open across a range preserves draw (and blend) order and
+    /// per-draw pipeline/resource bindings while avoiding a pass/barrier round
+    /// trip for every segment. The caller still performs the one opaque-depth
+    /// snapshot after the opaque range, before translucent work reads it.
+    pub(crate) fn append_ordered_batch(
         target: &WorldLodPreparedSourceTarget,
         draws: &[(WorldLodPreparedSourceDraw, Handle)],
         fog_color: crate::render::vulkanic::commands::ClearColor,
@@ -562,7 +563,7 @@ impl WorldLodSourcePassResources {
             || depth_before == TextureUsageState::DepthStencilAttachment
         {
             return Err(GalError::invalid_argument(
-                "Distant Horizons source opaque batch cannot begin while a target attachment is already in a pass",
+                "Distant Horizons source batch cannot begin while a target attachment is already in a pass",
             ));
         }
         if color_before == TextureUsageState::Undefined && !clear_primary_color {
@@ -585,17 +586,17 @@ impl WorldLodSourcePassResources {
                 != Some(crate::render::vulkanic::handles::HandleKind::ResourceSet)
             {
                 return Err(GalError::invalid_argument(
-                    "Distant Horizons source opaque batch requires GAL pack resource-set handles",
+                    "Distant Horizons source batch requires GAL pack resource-set handles",
                 ));
             }
             if draw.source_data_dynamic_offset_count > 2 {
                 return Err(GalError::invalid_argument(
-                    "Distant Horizons source opaque batch has an invalid set-zero dynamic-offset count",
+                    "Distant Horizons source batch has an invalid set-zero dynamic-offset count",
                 ));
             }
             if draw.index_count == 0 || draw.index_count % 3 != 0 {
                 return Err(GalError::invalid_argument(
-                    "Distant Horizons source opaque batch requires triangle-aligned indices",
+                    "Distant Horizons source batch requires triangle-aligned indices",
                 ));
             }
         }

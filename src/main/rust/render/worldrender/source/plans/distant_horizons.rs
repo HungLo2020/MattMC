@@ -139,7 +139,7 @@ impl PreparedNamedSourceDistantHorizonsFramePlan {
             // DH clears its own depth buffer every frame. Loading the previous
             // frame's depth made this frame's identical LOD geometry fail its
             // depth test almost everywhere (only silhouette edges survived).
-            lod::WorldLodSourcePassResources::append_opaque_batch(
+            lod::WorldLodSourcePassResources::append_ordered_batch(
                 &self.target,
                 &opaque_draws,
                 fog_color,
@@ -177,27 +177,31 @@ impl PreparedNamedSourceDistantHorizonsFramePlan {
                 "prepared Distant Horizons translucent draws have no prepared source resource set",
             )
         })?;
-        for draw in std::mem::take(&mut self.translucent_draws) {
-            // Without opaque DH work this frame, the first translucent draw
-            // starts from a cleared DH depth rather than last frame's.
-            let depth_before = if self.depth_cleared {
-                TextureUsageState::ShaderRead
-            } else {
-                TextureUsageState::Undefined
-            };
-            self.depth_cleared = true;
-            lod::WorldLodSourcePassResources::append_draw(
-                &self.target,
-                draw,
-                translucent_pack_resources,
-                fog_color,
-                false,
-                TextureUsageState::ShaderRead,
-                depth_before,
-                Some(TextureUsageState::ShaderRead),
-                operations,
-            )?;
-        }
+        // Without opaque DH work this frame, the translucent range starts from
+        // a cleared DH depth rather than last frame's.
+        let depth_before = if self.depth_cleared {
+            TextureUsageState::ShaderRead
+        } else {
+            TextureUsageState::Undefined
+        };
+        self.depth_cleared = true;
+        // One pass for the ordered range: nothing samples the DH target
+        // between translucent draws, so per-draw pass/barrier round trips
+        // (hundreds per frame on an ocean) only stalled the GPU.
+        let translucent_draws: Vec<_> = std::mem::take(&mut self.translucent_draws)
+            .into_iter()
+            .map(|draw| (draw, translucent_pack_resources))
+            .collect();
+        lod::WorldLodSourcePassResources::append_ordered_batch(
+            &self.target,
+            &translucent_draws,
+            fog_color,
+            false,
+            TextureUsageState::ShaderRead,
+            depth_before,
+            Some(TextureUsageState::ShaderRead),
+            operations,
+        )?;
         color_transaction.record_external_outputs(&[
             TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         ])?;
