@@ -186,29 +186,13 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertTrue(!setup.contains("RustGalWorldPrimitiveRenderer.CULL_NONE"),
 				"the semantic terrain route must not accumulate both sides of copied glass or fluid faces");
 
-		int assetBuild = source.indexOf("new VulkanicGalBridge.WorldMeshSectionRecord(");
-		assertTrue(assetBuild >= 0);
-		String firstAssetSection = source.substring(assetBuild, source.indexOf(");", assetBuild) + 2);
-		assertTrue(firstAssetSection.contains("RustGalWorldPrimitiveRenderer.CULL_BACK"));
+		// Draw ranges are assembled in Rust (worldrender/terrain/assembly.rs).
+		String assembly = Files.readString(Path.of("src/main/rust/render/worldrender/terrain/assembly.rs"));
+		assertEquals(2, assembly.split("cull_policy: WORLD_CULL_BACK", -1).length - 1,
+				"opaque/cutout and translucent ranges keep back-face culling");
+		assertTrue(!assembly.contains("WORLD_CULL_NONE"));
 	}
 
-	@Test
-	public void staticTerrainDecoderEmitsOneCompleteIndexRangePerVertexSegment() throws Exception {
-		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
-		));
-		int decoder = source.indexOf("private static TerrainSectionAsset decodeMesh(");
-		int finish = source.indexOf("if (cursor != vertexCount)", decoder);
-		assertTrue(decoder >= 0 && finish > decoder);
-		String body = source.substring(decoder, finish);
-		int quadLoop = body.indexOf("for (int quadBase = cursor");
-		int sectionRecord = body.indexOf("sections.add(new VulkanicGalBridge.WorldMeshSectionRecord", quadLoop);
-		int cursorAdvance = body.indexOf("cursor += segmentVertexCount", quadLoop);
-		assertTrue(quadLoop >= 0 && sectionRecord > quadLoop && cursorAdvance > sectionRecord,
-			"all quads in a segment must be indexed before its one material range and cursor advance");
-		assertEquals(cursorAdvance, body.lastIndexOf("cursor += segmentVertexCount"),
-			"the segment cursor must advance once, not once per quad");
-	}
 
 	@Test
 	public void uploadedTerrainCanEnqueueAfterCpuPayloadRelease() throws Exception {
@@ -307,45 +291,6 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	public void translucentPrimitiveMetadataBuildsOrderedMixedMaterialRanges() {
-		byte[] sorted = sortedQuads(0, 1, 2);
-		int[] metadata = primitiveMetadata(
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER
-		);
-		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
-
-		RustGalTerrainRenderer.OrderedTranslucentMesh mesh =
-			RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, metadata, testVertices(3), 12);
-		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = mesh.sections();
-
-		assertEquals(sorted.length, mesh.indexBytes().length);
-		assertEquals(3, mesh.sourcePrimitiveCount());
-		assertEquals(1, mesh.nonFluidPrimitiveCount());
-		assertEquals(2, mesh.waterPrimitiveCount());
-		assertEquals(0, mesh.unsupportedPrimitiveCount());
-		assertEquals(3, mesh.retainedPrimitiveCount());
-		assertEquals(0, mesh.omittedPrimitiveCount());
-		assertEquals(18, mesh.sourceIndexCount());
-		assertEquals(18, mesh.retainedIndexCount());
-		assertEquals(3, sections.size(), "water/glass/water sorted order must not be grouped by material");
-		assertEquals(2, mesh.materialSwitchCount());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT, sections.get(0).materialId());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL, sections.get(0).textureId());
-		assertEquals(0, sections.get(0).indexOffset());
-		assertEquals(6, sections.get(0).indexCount());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED, sections.get(1).materialId());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, sections.get(1).textureId());
-		assertEquals(24, sections.get(1).indexOffset());
-		assertEquals(6, sections.get(1).indexCount());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT, sections.get(2).materialId());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW, sections.get(2).textureId());
-		assertEquals(48, sections.get(2).indexOffset());
-		assertEquals(6, sections.get(2).indexCount());
-	}
-
-	@Test
 	public void normalVulkanWaterBindingDoesNotDependOnPrivateAnimationAdmission() throws Exception {
 		String property = "mattmc.dev.rustGalAtlasAnimation";
 		String previous = System.getProperty(property);
@@ -368,174 +313,6 @@ public class RustGalTerrainRendererLightingContractTest {
 		} finally {
 			if (previous == null) System.clearProperty(property); else System.setProperty(property, previous);
 		}
-	}
-
-	@Test
-	public void atlasWaterPreservesSortedGeometryAndMaterialWithoutSheetUvRemapping() {
-		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(3);
-		List<VulkanicGalBridge.WorldMeshVertexRecord> originals = List.copyOf(vertices);
-		byte[] sorted = sortedQuads(2, 1, 0);
-		var mesh = RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, primitiveMetadata(
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER), vertices, 12,
-			RustGalTerrainRenderer.waterTextureBinding(WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME));
-		assertArrayEquals(sorted, mesh.indexBytes());
-		assertEquals(3, mesh.sections().size());
-		assertEquals(1, mesh.waterStillPrimitiveCount());
-		assertEquals(1, mesh.waterFlowPrimitiveCount());
-		assertEquals(0, mesh.omittedPrimitiveCount());
-		for (int index = 0; index < vertices.size(); index++) {
-			var before = originals.get(index);
-			var after = vertices.get(index);
-			int type = index < 4 ? 1 : index >= 8 ? 2 : before.shaderMaterialType();
-			assertEquals(new VulkanicGalBridge.WorldMeshVertexRecord(
-				before.x(), before.y(), before.z(), before.u(), before.v(), before.atlasU(), before.atlasV(),
-				before.shaderBlockId(), type, before.terrainMaterialBits(), before.colorArgb(),
-				before.normalPacked(), before.light(), before.midBlockPacked()), after);
-		}
-		for (int index = 0; index < 3; index++) {
-			var section = mesh.sections().get(index);
-			assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, section.textureId());
-			assertEquals(index == 1 ? RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED
-				: RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT, section.materialId());
-			assertEquals(index * 24, section.indexOffset());
-			assertEquals(6, section.indexCount());
-			assertEquals(RustGalWorldPrimitiveRenderer.CULL_BACK, section.cullPolicy());
-			assertEquals(RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW, section.winding());
-			assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT, section.materialMode());
-		}
-	}
-
-	@Test
-	public void adjacentAtlasWaterSpritesShareOneRangeWithoutLosingSpriteIdentity() {
-		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(3);
-		// The middle quad occupies the overlay sprite; the others are still/flow.
-		vertices.set(4, vertex(0.55F, 0.05F));
-		vertices.set(5, vertex(0.60F, 0.05F));
-		vertices.set(6, vertex(0.60F, 0.10F));
-		vertices.set(7, vertex(0.55F, 0.10F));
-		byte[] sorted = sortedQuads(2, 0, 1);
-		var mesh = RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, primitiveMetadata(
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER), vertices, 12,
-			RustGalTerrainRenderer.WaterTextureBinding.BLOCK_ATLAS);
-		assertArrayEquals(sorted, mesh.indexBytes());
-		assertEquals(1, mesh.sections().size());
-		assertEquals(18, mesh.sections().getFirst().indexCount());
-		assertEquals(1, mesh.waterStillPrimitiveCount());
-		assertEquals(1, mesh.waterFlowPrimitiveCount());
-		assertEquals(1, mesh.waterOverlayPrimitiveCount());
-		assertEquals(3, vertices.get(4).shaderMaterialType());
-		assertEquals(0.55F, vertices.get(4).u());
-		assertEquals(0, mesh.waterTextureSwitchCount());
-	}
-
-	@Test
-	public void translucentPrimitiveMetadataRetainsGenericFluidWithAtlasSemanticsWithoutReordering() {
-		byte[] sorted = sortedQuads(0, 1, 2);
-		int[] metadata = primitiveMetadata(
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER
-		);
-		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
-
-		RustGalTerrainRenderer.OrderedTranslucentMesh mesh =
-			RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, metadata, testVertices(3), 12);
-		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = mesh.sections();
-
-		assertEquals(72, mesh.indexBytes().length, "a generic fluid must remain in the sorted payload");
-		assertEquals(3, mesh.sourcePrimitiveCount());
-		assertEquals(2, mesh.nonFluidPrimitiveCount());
-		assertEquals(1, mesh.waterPrimitiveCount());
-		assertEquals(0, mesh.unsupportedPrimitiveCount());
-		assertEquals(3, mesh.retainedPrimitiveCount());
-		assertEquals(0, mesh.omittedPrimitiveCount());
-		assertEquals(18, mesh.sourceIndexCount());
-		assertEquals(18, mesh.retainedIndexCount());
-		assertEquals(0, mesh.omittedIndexCount());
-		assertEquals(2, sections.size(), "adjacent generic-fluid and ordinary translucent atlas ranges should coalesce");
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED, sections.get(0).materialId());
-		assertEquals(0, sections.get(0).indexOffset());
-		assertEquals(12, sections.get(0).indexCount());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT, sections.get(1).materialId());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW, sections.get(1).textureId());
-		assertEquals(48, sections.get(1).indexOffset());
-	}
-
-	@Test
-	public void translucentPrimitiveMetadataRejectsMalformedSortReferences() {
-		int[] metadata = primitiveMetadata(
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER
-		);
-		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(2);
-
-		assertThrows(IllegalArgumentException.class,
-			() -> RustGalTerrainRenderer.buildOrderedTranslucentMesh(sortedQuads(0, 0), metadata, new ArrayList<>(vertices), 8));
-		assertThrows(IllegalArgumentException.class,
-			() -> RustGalTerrainRenderer.buildOrderedTranslucentMesh(sortedQuads(0), metadata, new ArrayList<>(vertices), 8));
-
-		byte[] interleaved = sortedQuads(0);
-		interleaved[4] = 7;
-		assertThrows(IllegalArgumentException.class,
-			() -> RustGalTerrainRenderer.buildOrderedTranslucentMesh(interleaved, metadata, new ArrayList<>(vertices), 8));
-	}
-
-	@Test
-	public void facingLocalStaticSortIndicesNormalizeIntoTheCopiedGlobalVertexStream() {
-		byte[] facingLocal = sortedQuads(0, 0);
-
-		byte[] normalized = RustGalTerrainRenderer.normalizeTranslucentSortedIndexBytes(
-			facingLocal,
-			8,
-			new int[] { 1, 1 }
-		);
-
-		assertArrayEquals(sortedQuads(0, 1), normalized);
-		assertArrayEquals(
-			sortedQuads(1, 0),
-			RustGalTerrainRenderer.normalizeTranslucentSortedIndexBytes(sortedQuads(1, 0), 8, new int[] { 1, 1 }),
-			"already-global dynamic or topological sorter payloads must pass through unchanged"
-		);
-		assertThrows(IllegalArgumentException.class,
-			() -> RustGalTerrainRenderer.normalizeTranslucentSortedIndexBytes(sortedQuads(0, 0), 8, new int[] { 2 }));
-	}
-
-	@Test
-	public void translucentPrimitiveMetadataRepresentsAllUnsupportedPayloadAsAnEmptyFilteredRange() {
-		int[] metadata = primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID);
-
-		RustGalTerrainRenderer.OrderedTranslucentMesh mesh =
-			RustGalTerrainRenderer.buildOrderedTranslucentMesh(sortedQuads(0), metadata, testVertices(1), 4);
-
-		assertEquals(1, mesh.sourcePrimitiveCount());
-		assertEquals(1, mesh.unsupportedPrimitiveCount());
-		assertEquals(0, mesh.retainedPrimitiveCount());
-		assertEquals(1, mesh.omittedPrimitiveCount());
-		assertEquals(0, mesh.retainedIndexCount());
-		assertEquals(6, mesh.omittedIndexCount());
-		assertTrue(mesh.sections().isEmpty());
-	}
-
-	@Test
-	public void translucentPrimitiveMetadataTreatsUnknownFlatQuadAsNonFluidTranslucent() {
-		RustGalTerrainRenderer.OrderedTranslucentMesh mesh =
-			RustGalTerrainRenderer.buildOrderedTranslucentMesh(
-				sortedQuads(0),
-				primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN),
-				testVertices(1), 4);
-
-		assertEquals(1, mesh.nonFluidPrimitiveCount());
-		assertEquals(1, mesh.retainedPrimitiveCount());
-		assertEquals(0, mesh.omittedPrimitiveCount());
-		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED,
-			mesh.sections().get(0).materialId());
 	}
 
 	@Test
@@ -614,20 +391,6 @@ public class RustGalTerrainRendererLightingContractTest {
 		return metadata;
 	}
 
-	private static byte[] sortedQuads(int... primitiveIds) {
-		byte[] bytes = new byte[primitiveIds.length * 24];
-		int cursor = 0;
-		for (int primitiveId : primitiveIds) {
-			int base = primitiveId * 4;
-			for (int value : new int[] { base, base + 1, base + 2, base + 2, base + 3, base }) {
-				bytes[cursor++] = (byte)(value & 0xff);
-				bytes[cursor++] = (byte)((value >>> 8) & 0xff);
-				bytes[cursor++] = (byte)((value >>> 16) & 0xff);
-				bytes[cursor++] = (byte)((value >>> 24) & 0xff);
-			}
-		}
-		return bytes;
-	}
 
 	private static List<VulkanicGalBridge.WorldMeshVertexRecord> testVertices(int primitiveCount) {
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>(primitiveCount * 4);

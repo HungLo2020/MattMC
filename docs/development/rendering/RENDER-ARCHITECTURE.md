@@ -196,16 +196,26 @@ Java keeps only what Rust cannot hold: the meshing workers, and the
   implementation author reports byte-identical records over 1,800 frames per
   mode; this review did not rerun that comparison.
   [Selection eligibility and handoff](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L4921-L4979)
-- A finished build's layer meshes are decoded in Rust
-  ([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs);
-  its C export, which writes the vertex ABI, is
-  [`bridge/world/terrain_intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/terrain_intake.rs)):
-  compact positions, colour/AO, light, copied-atlas UVs, segment normals, the
-  canonical block identity and mid-block words, plus the static-terrain audit's
-  fault injections. It matched Java's former decoder bit for bit on 1,500+ real
-  section layers in vanilla and shader modes; `cargo test --lib terrain::intake`
-  pins the contract. Java publishes the result (keys, generations, translucent
-  order, residency).
+- A finished build's layers are decoded and assembled in Rust by one call
+  ([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs),
+  [`terrain/assembly.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/assembly.rs);
+  C export in
+  [`bridge/world/terrain_intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/terrain_intake.rs)).
+  - **Decode:** compact positions, colour/AO, light, copied-atlas UVs, segment
+    normals, the canonical block identity and mid-block words, plus the
+    static-terrain audit's fault injections.
+  - **Assembly:** one u16 index range per vertex segment (opaque/cutout). For
+    translucent layers, the build sorter's order is made global if
+    facing-local, unsupported fluids are omitted, water is classified and its
+    material type set, and ranges are split by material/texture.
+  - **Identity:** the atlas-scoped `mesh_key` and the content hash
+    `mesh_generation` (an identical rebuild keeps it).
+  - **Verification:** both steps matched Java's former code bit for bit
+    (decode on 1,500+ layers in vanilla and shaders; assembly on 1,500+ layers
+    with shaders, 0 mismatches). `cargo test --lib terrain::` pins the
+    contracts, including the former Java translucent cases.
+  - Java receives the vertices, index bytes, ranges and a receipt, and still
+    publishes the asset (residency, upload acknowledgement, reload staging).
 - Rust lists the build requests in visit order, block-edit rebuilds first and
   sections already in flight skipped. Java dispatches them while in-flight
   builds stay below twice the worker count, and asks Rust whether each

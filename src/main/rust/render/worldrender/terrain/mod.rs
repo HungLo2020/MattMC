@@ -4,6 +4,7 @@
 //! section lifecycle and compatibility concepts so future terrain work has a focused home instead
 //! of expanding the primitive frontend.
 
+pub mod assembly;
 pub mod intake;
 pub mod diagnostics;
 pub mod materials;

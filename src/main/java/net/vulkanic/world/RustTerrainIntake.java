@@ -12,10 +12,11 @@ import net.minecraft.util.NativeLibraryLoader;
 import net.vulkanic.bridge.VulkanicGalBridge;
 
 /**
- * Rust decoding of a section layer's compact Sodium vertices into the world
- * mesh vertex ABI ({@code worldrender/terrain/intake.rs}): segment normals,
- * colour/AO/light, copied-atlas UVs, canonical block identity and mid-block
- * words, with the static-terrain audit's fault injections. Render thread only.
+ * Rust decoding and assembly of a section layer's compact Sodium vertices
+ * ({@code worldrender/terrain/intake.rs}, {@code assembly.rs}): world-mesh
+ * vertices, index bytes, draw ranges, translucent order, mesh key and
+ * generation, with the static-terrain audit's fault injections. Render
+ * thread only.
  */
 final class RustTerrainIntake {
 	static final int FAULT_INVERTED_AO = 1;
@@ -24,13 +25,158 @@ final class RustTerrainIntake {
 	static final int FAULT_INVERTED_NORMAL = 8;
 	static final int FAULT_WRONG_TOP_FACE_SHADE = 16;
 
-	private static final MethodHandle DECODE = NativeLibraryLoader.downcallHandle("mattmc_rust",
-		"mattmc_terrain_decode_compact_vertices",
-		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
-			ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
-			ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 	private static final long PARAMS_BYTES = 32;
 	private static final long STATS_BYTES = 56;
+	private static final MethodHandle ASSEMBLE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_terrain_assemble_layer",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
+			ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
+			ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+	private static final long ASSEMBLY_PARAMS_BYTES = 96;
+	private static final long RECEIPT_BYTES = 136;
+	private static final long OUTPUT_BYTES = 80;
+	private static final int SECTION_RECORD_BYTES = 36;
+	private static final int SAMPLE_INTS = 6;
+	private static final int SAMPLE_LIMIT = 64;
+	private static final int ERROR_BYTES = 512;
+
+	/** One built-in water sprite's atlas rectangle. */
+	record WaterSprite(int textureId, float u0, float u1, float v0, float v1) {
+	}
+
+	/**
+	 * One assembled section layer (`worldrender/terrain/assembly.rs`): its
+	 * vertices, index bytes and draw ranges, identities and receipts.
+	 * `samples` holds six ints per translucent primitive sample.
+	 */
+	record AssembledLayer(DecodedVertices decoded, byte[] indexBytes,
+			List<VulkanicGalBridge.WorldMeshSectionRecord> sections, long meshKey, long meshGeneration, int indexType,
+			int assembledIndexCount, int maxIndex, int positiveYSections, int negativeYSections, int horizontalSections,
+			boolean translucent, int sourcePrimitives, int nonFluidPrimitives, int waterPrimitives,
+			int unsupportedPrimitives, int retainedPrimitives, int omittedPrimitives, int sourceIndices,
+			int retainedIndices, int omittedIndices, long sourceHash, long retainedHash, long omittedHash,
+			int materialSwitches, int waterStill, int waterFlow, int waterOverlay, int waterTextureSwitches,
+			int[] samples) {
+	}
+
+	/**
+	 * Decodes and assembles one section layer in Rust. `sortedIndices` is the
+	 * build sorter's u32 quad order (null or empty when there is none);
+	 * `water` holds the still, flow and overlay sprites (null before they are
+	 * known).
+	 */
+	static AssembledLayer assemble(ByteBuffer vertexData, int vertexStride, boolean separateAo, int atlasWidth,
+			int atlasHeight, int midBlockOffset, int faultBits, int[] segments, int[] metadata, int metadataStride,
+			int vertexCount, ByteBuffer sortedIndices, long sectionPos, int layerOrdinal, long atlasGeneration,
+			boolean waterBlockAtlas, WaterSprite[] water) {
+		MemorySegment buffer = MemorySegment.ofBuffer(vertexData);
+		VulkanicGalBridge.Struct layout = VulkanicGalBridge.Struct.WORLD_MESH_VERTEX;
+		MemorySegment vertices = Arena.ofAuto().allocate(Math.max(1L, vertexCount * layout.byteSize()), 8);
+		int primitiveCount = vertexCount / 4;
+		long indexCapacity = Math.max(4L, (long) primitiveCount * 6L * Integer.BYTES);
+		int sectionCapacity = Math.max(1, Math.max(segments.length / 2, primitiveCount));
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment params = arena.allocate(PARAMS_BYTES, 8);
+			params.set(ValueLayout.JAVA_INT, 0, vertexStride);
+			params.set(ValueLayout.JAVA_INT, 4, separateAo ? 1 : 0);
+			params.set(ValueLayout.JAVA_INT, 8, atlasWidth);
+			params.set(ValueLayout.JAVA_INT, 12, atlasHeight);
+			params.set(ValueLayout.JAVA_INT, 16, midBlockOffset);
+			params.set(ValueLayout.JAVA_INT, 20, faultBits);
+			params.set(ValueLayout.JAVA_INT, 24, metadataStride);
+			params.set(ValueLayout.JAVA_INT, 28, 0);
+			MemorySegment assembly = arena.allocate(ASSEMBLY_PARAMS_BYTES, 8);
+			assembly.set(ValueLayout.JAVA_LONG, 0, sectionPos);
+			assembly.set(ValueLayout.JAVA_LONG, 8, atlasGeneration);
+			assembly.set(ValueLayout.JAVA_INT, 16, layerOrdinal);
+			assembly.set(ValueLayout.JAVA_INT, 20, waterBlockAtlas ? 1 : 0);
+			assembly.set(ValueLayout.JAVA_INT, 24, water != null ? 1 : 0);
+			if (water != null) {
+				for (int index = 0; index < 3; index++) {
+					long base = 32 + index * 20L;
+					assembly.set(ValueLayout.JAVA_INT, base, water[index].textureId());
+					assembly.set(ValueLayout.JAVA_FLOAT, base + 4, water[index].u0());
+					assembly.set(ValueLayout.JAVA_FLOAT, base + 8, water[index].u1());
+					assembly.set(ValueLayout.JAVA_FLOAT, base + 12, water[index].v0());
+					assembly.set(ValueLayout.JAVA_FLOAT, base + 16, water[index].v1());
+				}
+			}
+			MemorySegment indices = arena.allocate(indexCapacity, 8);
+			MemorySegment sections = arena.allocate((long) sectionCapacity * SECTION_RECORD_BYTES, 8);
+			MemorySegment samples = arena.allocate((long) SAMPLE_LIMIT * SAMPLE_INTS * Integer.BYTES, 8);
+			MemorySegment error = arena.allocate(ERROR_BYTES);
+			MemorySegment stats = arena.allocate(STATS_BYTES, 8);
+			MemorySegment receipt = arena.allocate(RECEIPT_BYTES, 8);
+			MemorySegment output = arena.allocate(OUTPUT_BYTES, 8);
+			output.set(ValueLayout.ADDRESS, 0, vertices);
+			output.set(ValueLayout.JAVA_INT, 8, vertexCount);
+			output.set(ValueLayout.JAVA_INT, 12, sectionCapacity);
+			output.set(ValueLayout.ADDRESS, 16, indices);
+			output.set(ValueLayout.JAVA_LONG, 24, indexCapacity);
+			output.set(ValueLayout.ADDRESS, 32, sections);
+			output.set(ValueLayout.ADDRESS, 40, samples);
+			output.set(ValueLayout.JAVA_INT, 48, SAMPLE_LIMIT * SAMPLE_INTS);
+			output.set(ValueLayout.JAVA_INT, 52, ERROR_BYTES);
+			output.set(ValueLayout.ADDRESS, 56, error);
+			output.set(ValueLayout.ADDRESS, 64, stats);
+			output.set(ValueLayout.ADDRESS, 72, receipt);
+			MemorySegment sorted = sortedIndices == null || !sortedIndices.hasRemaining()
+				? MemorySegment.NULL : MemorySegment.ofBuffer(sortedIndices);
+			long sortedLength = sorted.equals(MemorySegment.NULL) ? 0L : sortedIndices.remaining();
+			int decoded;
+			try {
+				decoded = (int) ASSEMBLE.invokeExact(buffer, (long) vertexData.remaining(), params,
+					arena.allocateFrom(ValueLayout.JAVA_INT, segments), segments.length,
+					arena.allocateFrom(ValueLayout.JAVA_INT, metadata), metadata.length, sorted, sortedLength,
+					assembly, output);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Rust terrain layer assembly failed", throwable);
+			}
+			if (decoded == -3) {
+				throw new IllegalArgumentException(error.getString(0));
+			}
+			if (decoded != vertexCount) {
+				throw new IllegalArgumentException("Rust terrain layer assembly rejected the section mesh (" + decoded
+					+ " of " + vertexCount + " vertices)");
+			}
+			DecodedVertices decodedVertices = new DecodedVertices(vertices, vertexCount,
+				stats.get(ValueLayout.JAVA_FLOAT, 0), stats.get(ValueLayout.JAVA_FLOAT, 4),
+				stats.get(ValueLayout.JAVA_FLOAT, 8), stats.get(ValueLayout.JAVA_FLOAT, 12),
+				stats.get(ValueLayout.JAVA_FLOAT, 16), stats.get(ValueLayout.JAVA_FLOAT, 20),
+				stats.get(ValueLayout.JAVA_FLOAT, 24), stats.get(ValueLayout.JAVA_FLOAT, 28),
+				stats.get(ValueLayout.JAVA_FLOAT, 32), stats.get(ValueLayout.JAVA_FLOAT, 36),
+				stats.get(ValueLayout.JAVA_FLOAT, 40), stats.get(ValueLayout.JAVA_FLOAT, 44),
+				stats.get(ValueLayout.JAVA_INT, 48), stats.get(ValueLayout.JAVA_INT, 52) != 0);
+			int indexBytes = receipt.get(ValueLayout.JAVA_INT, 44);
+			int sectionCount = receipt.get(ValueLayout.JAVA_INT, 52);
+			List<VulkanicGalBridge.WorldMeshSectionRecord> sectionRecords = new ArrayList<>(sectionCount);
+			for (int index = 0; index < sectionCount; index++) {
+				long base = (long) index * SECTION_RECORD_BYTES;
+				sectionRecords.add(new VulkanicGalBridge.WorldMeshSectionRecord(
+					sections.get(ValueLayout.JAVA_INT, base + 4), sections.get(ValueLayout.JAVA_INT, base + 8),
+					sections.get(ValueLayout.JAVA_INT, base + 12), sections.get(ValueLayout.JAVA_INT, base + 16),
+					sections.get(ValueLayout.JAVA_INT, base + 20), sections.get(ValueLayout.JAVA_INT, base + 24),
+					sections.get(ValueLayout.JAVA_INT, base + 28), sections.get(ValueLayout.JAVA_INT, base + 32)));
+			}
+			int sampleCount = receipt.get(ValueLayout.JAVA_INT, 132);
+			int u32 = 40;
+			return new AssembledLayer(decodedVertices, indices.asSlice(0, indexBytes).toArray(ValueLayout.JAVA_BYTE),
+				List.copyOf(sectionRecords), receipt.get(ValueLayout.JAVA_LONG, 0), receipt.get(ValueLayout.JAVA_LONG, 8),
+				receipt.get(ValueLayout.JAVA_INT, u32), receipt.get(ValueLayout.JAVA_INT, u32 + 8),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 16), receipt.get(ValueLayout.JAVA_INT, u32 + 20),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 24), receipt.get(ValueLayout.JAVA_INT, u32 + 28),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 32) != 0, receipt.get(ValueLayout.JAVA_INT, u32 + 36),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 40), receipt.get(ValueLayout.JAVA_INT, u32 + 44),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 48), receipt.get(ValueLayout.JAVA_INT, u32 + 52),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 56), receipt.get(ValueLayout.JAVA_INT, u32 + 60),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 64), receipt.get(ValueLayout.JAVA_INT, u32 + 68),
+				receipt.get(ValueLayout.JAVA_LONG, 16), receipt.get(ValueLayout.JAVA_LONG, 24),
+				receipt.get(ValueLayout.JAVA_LONG, 32), receipt.get(ValueLayout.JAVA_INT, u32 + 72),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 76), receipt.get(ValueLayout.JAVA_INT, u32 + 80),
+				receipt.get(ValueLayout.JAVA_INT, u32 + 84), receipt.get(ValueLayout.JAVA_INT, u32 + 88),
+				samples.asSlice(0, (long) sampleCount * SAMPLE_INTS * Integer.BYTES).toArray(ValueLayout.JAVA_INT));
+		}
+	}
 
 	/** Decoded vertices in the {@code FfiWorldMeshVertex} layout, and their receipts. */
 	record DecodedVertices(MemorySegment vertices, int count, float minX, float minY, float minZ, float maxX,
@@ -43,74 +189,10 @@ final class RustTerrainIntake {
 			return new VulkanicGalBridge.EncodedWorldMeshVertices(this.vertices, this.count);
 		}
 
-		/** The vertices as Java records (for consumers not yet reading the ABI bytes). */
-		List<VulkanicGalBridge.WorldMeshVertexRecord> records() {
-			List<VulkanicGalBridge.WorldMeshVertexRecord> records = new ArrayList<>(this.count);
-			long stride = LAYOUT.byteSize();
-			for (int index = 0; index < this.count; index++) {
-				long base = index * stride;
-				records.add(new VulkanicGalBridge.WorldMeshVertexRecord(
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(4)),
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(5)),
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(6)),
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(7)),
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(8)),
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(9)),
-					this.vertices.get(ValueLayout.JAVA_FLOAT, base + LAYOUT.offset(10)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(11)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(12)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(13)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(1)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(2)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(3)),
-					this.vertices.get(ValueLayout.JAVA_INT, base + LAYOUT.offset(14))));
-			}
-			return records;
-		}
+
 	}
 
 	private RustTerrainIntake() {
 	}
 
-	static DecodedVertices decode(ByteBuffer vertexData, int vertexStride, boolean separateAo, int atlasWidth,
-			int atlasHeight, int midBlockOffset, int faultBits, int[] segments, int[] metadata, int metadataStride,
-			int vertexCount) {
-		MemorySegment buffer = MemorySegment.ofBuffer(vertexData);
-		VulkanicGalBridge.Struct layout = VulkanicGalBridge.Struct.WORLD_MESH_VERTEX;
-		// The decoded vertices live as long as the asset that references them.
-		MemorySegment vertices = Arena.ofAuto().allocate(Math.max(1L, vertexCount * layout.byteSize()), 8);
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment params = arena.allocate(PARAMS_BYTES, 8);
-			params.set(ValueLayout.JAVA_INT, 0, vertexStride);
-			params.set(ValueLayout.JAVA_INT, 4, separateAo ? 1 : 0);
-			params.set(ValueLayout.JAVA_INT, 8, atlasWidth);
-			params.set(ValueLayout.JAVA_INT, 12, atlasHeight);
-			params.set(ValueLayout.JAVA_INT, 16, midBlockOffset);
-			params.set(ValueLayout.JAVA_INT, 20, faultBits);
-			params.set(ValueLayout.JAVA_INT, 24, metadataStride);
-			params.set(ValueLayout.JAVA_INT, 28, 0);
-			MemorySegment segmentInts = arena.allocateFrom(ValueLayout.JAVA_INT, segments);
-			MemorySegment metadataInts = arena.allocateFrom(ValueLayout.JAVA_INT, metadata);
-			MemorySegment stats = arena.allocate(STATS_BYTES, 8);
-			int decoded;
-			try {
-				decoded = (int) DECODE.invokeExact(buffer, (long) vertexData.remaining(), params, segmentInts,
-					segments.length, metadataInts, metadata.length, vertices, vertexCount, stats);
-			} catch (Throwable throwable) {
-				throw new IllegalStateException("Rust terrain vertex decode failed", throwable);
-			}
-			if (decoded != vertexCount) {
-				throw new IllegalArgumentException("Rust terrain vertex decode rejected the section mesh (" + decoded
-					+ " of " + vertexCount + " vertices)");
-			}
-			return new DecodedVertices(vertices, vertexCount,
-				stats.get(ValueLayout.JAVA_FLOAT, 0), stats.get(ValueLayout.JAVA_FLOAT, 4),
-				stats.get(ValueLayout.JAVA_FLOAT, 8), stats.get(ValueLayout.JAVA_FLOAT, 12),
-				stats.get(ValueLayout.JAVA_FLOAT, 16), stats.get(ValueLayout.JAVA_FLOAT, 20),
-				stats.get(ValueLayout.JAVA_FLOAT, 24), stats.get(ValueLayout.JAVA_FLOAT, 28),
-				stats.get(ValueLayout.JAVA_FLOAT, 32), stats.get(ValueLayout.JAVA_FLOAT, 36),
-				stats.get(ValueLayout.JAVA_FLOAT, 40), stats.get(ValueLayout.JAVA_FLOAT, 44),
-				stats.get(ValueLayout.JAVA_INT, 48), stats.get(ValueLayout.JAVA_INT, 52) != 0);
-		}
-	}
 }
