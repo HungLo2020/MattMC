@@ -734,44 +734,47 @@ pub(in crate::render::worldrender) fn distant_horizons_generic_box_batches(
     color_format: ColorFormat,
     raster_y_direction: RasterYDirection,
 ) -> Vec<DistantHorizonsGenericBoxBatch> {
+    let box_key = |ssao: bool, translucent: bool| MaterialResourceKey {
+        raster_y_direction,
+        compact_dh_box: true,
+        stratum: if ssao {
+            WORLD_STRATUM_DH_GENERIC_SSAO
+        } else {
+            WORLD_STRATUM_DH_GENERIC
+        },
+        material_id: if translucent {
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED
+        } else {
+            WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+        },
+        texture_id: WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
+        source_program: WORLD_MATERIAL_SOURCE_TEXTURED,
+        material_mode: if translucent {
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        } else {
+            WORLD_MATERIAL_MODE_OPAQUE
+        },
+        depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+        cull_policy: WORLD_CULL_BACK,
+        winding: WORLD_WINDING_CCW,
+        color_format,
+    };
+    // A box's key depends only on (ssao, translucent): track the open batch
+    // of each of the four keys instead of hashing a full key per box.
     let mut batches = Vec::<DistantHorizonsGenericBoxBatch>::new();
-    let mut key_to_batch = HashMap::<MaterialResourceKey, usize>::new();
+    let mut open: [Option<usize>; 4] = [None; 4];
     for (index, item) in frame.dh_generic_boxes.iter().enumerate() {
         let translucent = item.color_argb >> 24 != 0xff;
-        let key = MaterialResourceKey {
-            raster_y_direction,
-            compact_dh_box: true,
-            stratum: if item.ssao_enabled {
-                WORLD_STRATUM_DH_GENERIC_SSAO
-            } else {
-                WORLD_STRATUM_DH_GENERIC
-            },
-            material_id: if translucent {
-                WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED
-            } else {
-                WORLD_MATERIAL_ID_OPAQUE_TEXTURED
-            },
-            texture_id: WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
-            source_program: WORLD_MATERIAL_SOURCE_TEXTURED,
-            material_mode: if translucent {
-                WORLD_MATERIAL_MODE_TRANSLUCENT
-            } else {
-                WORLD_MATERIAL_MODE_OPAQUE
-            },
-            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
-            cull_policy: WORLD_CULL_BACK,
-            winding: WORLD_WINDING_CCW,
-            color_format,
-        };
-        let reusable = key_to_batch.get(&key).copied().filter(|batch_index| {
+        let class = usize::from(item.ssao_enabled) * 2 + usize::from(translucent);
+        let reusable = open[class].filter(|batch_index| {
             batches[*batch_index].indices.len() < WORLD_MAX_MATERIAL_QUADS_PER_BATCH
         });
         if let Some(batch_index) = reusable {
             batches[batch_index].indices.push(index);
         } else {
-            key_to_batch.insert(key, batches.len());
+            open[class] = Some(batches.len());
             batches.push(DistantHorizonsGenericBoxBatch {
-                key,
+                key: box_key(item.ssao_enabled, translucent),
                 indices: vec![index],
             });
         }
@@ -2098,16 +2101,14 @@ pub(in crate::render::worldrender) fn packed_dh_generic_box_uniforms_for_batch(
     ] {
         push_f32(&mut out, value);
     }
+    // 64 bytes per box: min.xyz,0, max.xyz,0, six shaded face colors, light, 0.
     for index in &batch.indices {
         let item = &frame.dh_generic_boxes[*index];
-        for value in item
-            .min
-            .into_iter()
-            .chain([0.0])
-            .chain(item.max)
-            .chain([0.0])
-        {
-            push_f32(&mut out, value);
+        let mut block = [0u8; 64];
+        let mut words = block.chunks_exact_mut(4);
+        let mut put = |bits: u32| words.next().expect("64-byte box block").copy_from_slice(&bits.to_le_bytes());
+        for value in [item.min[0], item.min[1], item.min[2], 0.0, item.max[0], item.max[1], item.max[2], 0.0] {
+            put(f32::to_bits(value));
         }
         for shading in [
             item.shading[0],
@@ -2120,14 +2121,14 @@ pub(in crate::render::worldrender) fn packed_dh_generic_box_uniforms_for_batch(
             let shade = |component: u32| -> u32 {
                 ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
             };
-            let color = (item.color_argb & 0xff00_0000)
+            put((item.color_argb & 0xff00_0000)
                 | (shade((item.color_argb >> 16) & 0xff) << 16)
                 | (shade((item.color_argb >> 8) & 0xff) << 8)
-                | shade(item.color_argb & 0xff);
-            push_u32(&mut out, color);
+                | shade(item.color_argb & 0xff));
         }
-        push_u32(&mut out, item.packed_light);
-        push_u32(&mut out, 0);
+        put(item.packed_light);
+        put(0);
+        out.extend_from_slice(&block);
     }
     out
 }
