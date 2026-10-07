@@ -319,7 +319,7 @@ impl VulkanicGal {
         &mut self,
         handle: Handle,
         id: SubmissionId,
-        marked: &mut HashSet<Handle>,
+        marked: &mut HashSet<Handle, AccessHashBuilder>,
     ) -> GalResult<()> {
         if !marked.insert(handle) {
             // Already marked with its whole dependency closure for `id`.
