@@ -12626,6 +12626,12 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * admitted generation differs from the registered one.
 	 */
 	private static long prepareModelRigLocked(CachedModelTopology topology) {
+		// Every entity of a model type shares its topology: admit and observe
+		// the part assets once per frame, not once per entity.
+		if (topology.rigPreparedFrame == semanticFrameSequence && topology.rigId != 0L) {
+			return topology.rigId;
+		}
+		topology.rigPreparedFrame = semanticFrameSequence;
 		BlockMeshExtraction[] meshes = topology.meshes;
 		long[] generations = topology.rigGenerations;
 		boolean changed = generations == null;
@@ -13784,6 +13790,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		private long[] rigGenerations;
 		/** `worldMeshUploadWithdrawals` when every part was proven uploaded, or -1. */
 		private long rigUploadProof = -1L;
+		/** Semantic frame whose part assets were last admitted (one pass per frame). */
+		private long rigPreparedFrame = -1L;
 
 		private CachedModelTopology(ModelPart[] nodes, int[] parents, BlockMeshExtraction[] meshes,
 				Map<String, BlockMeshExtraction> meshesByPath) {
