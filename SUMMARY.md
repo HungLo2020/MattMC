@@ -5,6 +5,6 @@
 | Shaders (Complementary), 1,800 frames: FPS / median | 291–305 FPS / 3.06–3.10 ms | 307–309 FPS / 2.99 ms |
 | Shaders GPU frame time (GPU at 100%) | 2.93–3.0 ms | ~3.0 ms |
 | Vanilla, 1,800 frames after 240 warm-up: FPS / median | 492–517 FPS / 1.56–1.66 ms | 937 FPS / 0.84 ms |
-| Vanilla, steady state (6,000 warm-up): FPS / median | 960 FPS / 0.90 ms (was 809 / 1.06) | 1395 FPS / 0.66 ms |
+| Vanilla, steady state (6,000 warm-up): FPS / median | 1003 FPS / 0.84 ms (was 809 / 1.06) | 1395 FPS / 0.66 ms |
 
 Shaders: GPU-bound, ~2% behind. Vanilla: native worker bounds at steady state (world record + GUI + GAL encode), Java JIT warm-up dominates short runs.

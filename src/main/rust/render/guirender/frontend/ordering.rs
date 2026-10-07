@@ -198,22 +198,18 @@ pub(super) fn coalesce_ordered_affine_requests(ordered: Vec<GuiFrameRequest>) ->
 pub(super) fn group_gui_mesh_items(mut batches: Vec<GuiMeshBatchRequest>) -> GalResult<Vec<GuiMeshItem>> {
     crate::render::guirender::mesh::validate_batches(&batches)?;
     batches.sort_by_key(|batch| (batch.stratum, batch.sequence, batch.layer_index));
-    let mut items = Vec::new();
-    let mut cursor = 0;
-    while cursor < batches.len() {
-        let first = &batches[cursor];
-        let key = (first.stratum, first.sequence);
-        let end = batches[cursor..]
-            .iter()
-            .position(|batch| (batch.stratum, batch.sequence) != key)
-            .map(|offset| cursor + offset)
-            .unwrap_or(batches.len());
-        items.push(GuiMeshItem {
-            stratum: key.0,
-            sequence: key.1,
-            layers: batches[cursor..end].to_vec(),
-        });
-        cursor = end;
+    // Move each batch into its item; the requests (and their vertices) are owned.
+    let mut items: Vec<GuiMeshItem> = Vec::new();
+    for batch in batches {
+        let key = (batch.stratum, batch.sequence);
+        match items.last_mut() {
+            Some(item) if (item.stratum, item.sequence) == key => item.layers.push(batch),
+            _ => items.push(GuiMeshItem {
+                stratum: key.0,
+                sequence: key.1,
+                layers: vec![batch],
+            }),
+        }
     }
     Ok(items)
 }

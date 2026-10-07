@@ -1242,10 +1242,9 @@ impl WorldPrimitiveFrontend {
             let _ = gal.destroy(handle);
         }
         let submission = gal.latest_submission_id();
+        // A page binding names the whole vertex page, so released ranges leave
+        // it valid; only a page that empties (and is trimmed) retires its sets.
         let deferred_ranges = std::mem::take(&mut self.deferred_mesh_geometry_range_releases);
-        if !deferred_ranges.is_empty() {
-            self.destroy_mesh_page_resource_sets(gal);
-        }
         for resources in deferred_ranges {
             gal.unwatch_buffer_upload_for_capture(
                 resources.vertex_buffer,
@@ -1260,7 +1259,11 @@ impl WorldPrimitiveFrontend {
             self.mesh_geometry_arena
                 .defer_release(submission, resources);
         }
-        self.mesh_geometry_arena.reclaim_completed(gal);
+        let emptied_pages = self.mesh_geometry_arena.release_completed(gal);
+        if !emptied_pages.is_empty() {
+            self.destroy_mesh_page_resource_sets_for_vertex_pages(gal, &emptied_pages);
+        }
+        self.mesh_geometry_arena.trim_empty_pages(gal);
     }
 
     pub(in crate::render::worldrender) fn world_mesh_texture_mip_bytes(&self, texture_id: u32) -> GalResult<(Vec<Vec<u8>>, u32, u32)> {

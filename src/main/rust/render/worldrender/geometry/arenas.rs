@@ -299,7 +299,12 @@ impl MeshGeometryArena {
             .map(|page| page.capacity)
     }
 
-    pub(in crate::render::worldrender) fn reclaim_completed(&mut self, gal: &mut VulkanicGal) {
+    /// Releases ranges whose protecting submission completed and returns the
+    /// vertex page buffers left empty, which the next `trim_empty_pages`
+    /// destroys (a completed generation can leave a whole 16 MiB page empty;
+    /// keeping it would accumulate native upload memory forever). Bindings of
+    /// those pages must be retired before that.
+    pub(in crate::render::worldrender) fn release_completed(&mut self, gal: &mut VulkanicGal) -> Vec<Handle> {
         let completed = gal.poll_completed();
         let mut retained = Vec::new();
         for (submission, resources) in std::mem::take(&mut self.pending_releases) {
@@ -319,11 +324,11 @@ impl MeshGeometryArena {
             }
         }
         self.pending_releases = retained;
-        // A completed generation can leave an entire 16 MiB arena page empty.
-        // Return such pages to the GAL immediately; keeping an empty page
-        // resident defeats the completion-gated retirement contract and makes
-        // streamed terrain growth accumulate native upload memory forever.
-        self.trim_empty_pages(gal);
+        self.vertex_pages
+            .iter()
+            .filter(|page| page.free_ranges.len() == 1 && page.free_ranges[0] == (0, page.capacity))
+            .map(|page| page.buffer)
+            .collect()
     }
 
     pub(in crate::render::worldrender) fn defer_release(&mut self, submission: SubmissionId, resources: MeshGeometryResources) {
@@ -757,6 +762,33 @@ impl WorldPrimitiveFrontend {
         for (_, resources) in std::mem::take(&mut self.source_mesh_resources) {
             self.deferred_mesh_resource_destroys
                 .push(resources.resource_set);
+        }
+    }
+
+    /// Retires only the page bindings of vertex pages about to be destroyed.
+    pub(in crate::render::worldrender) fn destroy_mesh_page_resource_sets_for_vertex_pages(
+        &mut self,
+        gal: &mut VulkanicGal,
+        vertex_pages: &[Handle],
+    ) {
+        let mut destroyed = Vec::new();
+        self.mesh_page_resource_sets.retain(|key, set| {
+            let retire = vertex_pages.contains(&key.vertex_buffer);
+            if retire {
+                destroyed.push(*set);
+            }
+            !retire
+        });
+        if destroyed.is_empty() {
+            return;
+        }
+        for resources in self.mesh_resources.values_mut() {
+            if resources.page_resource_set.is_some_and(|set| destroyed.contains(&set)) {
+                resources.page_resource_set = None;
+            }
+        }
+        for set in destroyed {
+            let _ = gal.destroy(set);
         }
     }
 

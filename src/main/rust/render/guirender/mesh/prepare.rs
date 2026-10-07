@@ -55,12 +55,13 @@ const MEMO_MIN_VERTICES: usize = 64;
 const MEMO_MAX_ENTRIES: usize = 256;
 
 impl PreparedGeometryMemo {
+    /// `batches` must already be validated (the frontend validates every
+    /// frame's mesh batches when grouping them into items).
     pub(crate) fn prepare_draws_with_reuse(
         &mut self,
         batches: &[GuiMeshBatchRequest],
         reusable_items: &BTreeSet<(u32, u64)>,
     ) -> GalResult<Vec<GuiMeshPreparedDraw>> {
-        validate_batches(batches)?;
         self.frame = self.frame.wrapping_add(1);
         let draws = batches
             .iter()
