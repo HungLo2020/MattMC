@@ -96,9 +96,10 @@ impl PreparedGeometryMemo {
             draw.vertices = entry.vertices.clone();
             draw.indices = entry.indices.clone();
             draw.front_face = entry.front_face;
+            draw.geometry_identity = Some(key);
             return Ok(draw);
         }
-        let draw = prepare_draw(batch)?;
+        let mut draw = prepare_draw(batch)?;
         if self.entries.len() < MEMO_MAX_ENTRIES {
             self.entries.insert(key, MemoizedGeometry {
                 last_frame: self.frame,
@@ -106,6 +107,7 @@ impl PreparedGeometryMemo {
                 indices: draw.indices.clone(),
                 front_face: draw.front_face,
             });
+            draw.geometry_identity = Some(key);
         }
         Ok(draw)
     }
@@ -211,6 +213,7 @@ pub(super) fn prepare_reused_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiM
         vertices: Vec::new(),
         indices: Vec::new(),
         uv_transform: GUI_MESH_IDENTITY_UV_TRANSFORM,
+        geometry_identity: None,
     })
 }
 
@@ -327,6 +330,7 @@ pub(super) fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPrep
     };
     Ok(GuiMeshPreparedDraw {
         uv_transform,
+        geometry_identity: None,
         item_cache: batch.item_cache,
         stratum: batch.stratum,
         layer_index: batch.layer_index,

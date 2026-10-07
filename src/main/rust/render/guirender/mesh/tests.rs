@@ -3066,21 +3066,27 @@ fn prepared_geometry_memo_reuses_unchanged_meshes_and_refreshes_placement() {
     let mut memo = PreparedGeometryMemo::default();
     let reusable = BTreeSet::new();
     let mut request = large_explicit_mesh();
+    let plain = |draw: GuiMeshPreparedDraw| GuiMeshPreparedDraw { geometry_identity: None, ..draw };
     let first = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
-    assert_eq!(first, prepare_draws(&[request.clone()]).unwrap().remove(0));
+    let identity = first.geometry_identity.expect("memoized draws carry their identity");
+    assert_eq!(plain(first), prepare_draws(&[request.clone()]).unwrap().remove(0));
     // Placement and ordering fields are not memoized.
     request.sequence = 9;
     request.gui_pose[4] = 40.0;
     let moved = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
+    assert_eq!(moved.geometry_identity, Some(identity), "placement does not change geometry identity");
+    let moved = plain(moved);
     assert_eq!(moved, prepare_draws(&[request.clone()]).unwrap().remove(0));
     assert_eq!(moved.sequence, 9);
     // Any geometry input change prepares afresh.
     request.vertices[3].position[0] = 0.5;
     let edited = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
+    assert_ne!(edited.geometry_identity, Some(identity));
+    let edited = plain(edited);
     assert_eq!(edited, prepare_draws(&[request.clone()]).unwrap().remove(0));
     assert_ne!(edited.vertices, moved.vertices);
     request.model_transform[12] = 2.0;
     let transformed = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
-    assert_eq!(transformed, prepare_draws(&[request]).unwrap().remove(0));
+    assert_eq!(plain(transformed), prepare_draws(&[request]).unwrap().remove(0));
 }
 

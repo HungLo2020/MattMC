@@ -81,6 +81,8 @@ impl GuiFrontend {
             let reference = self
                 .atlas_references
                 .resolve(draw.asset_id, |id| owner.accepted_gui_atlas_incarnation(id))?;
+            // Remapped UVs depend on the atlas incarnation, not the memo key.
+            draw.geometry_identity = None;
             for vertex in &mut draw.vertices {
                 vertex.local_uv = reference.atlas_uv(vertex.local_uv)?;
             }
@@ -182,7 +184,10 @@ impl GuiFrontend {
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
                 // Content-keyed: unchanged geometry stays resident across frames.
-                let geometry_key = (raster_key, gui_mesh_geometry_fingerprint(first), 0);
+                let fingerprint = first
+                    .geometry_identity
+                    .unwrap_or_else(|| gui_mesh_geometry_fingerprint(first));
+                let geometry_key = (raster_key, fingerprint, 0);
                 let vertex_bytes = (first.vertices.len()
                     * crate::render::guirender::mesh::GUI_MESH_GPU_VERTEX_BYTES)
                     as u64;
@@ -331,7 +336,10 @@ impl GuiFrontend {
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
                 // Content-keyed: unchanged geometry stays resident across frames.
-                let geometry_key = (raster_key, gui_mesh_geometry_fingerprint(draw), 0);
+                let fingerprint = draw
+                    .geometry_identity
+                    .unwrap_or_else(|| gui_mesh_geometry_fingerprint(draw));
+                let geometry_key = (raster_key, fingerprint, 0);
                 let vertex_bytes = (draw.vertices.len()
                     * crate::render::guirender::mesh::GUI_MESH_GPU_VERTEX_BYTES)
                     as u64;

@@ -334,6 +334,10 @@ pub struct GuiMeshPreparedDraw {
     /// (`[column0, column1, translation]`). Standard item foil animates only
     /// this per-draw uniform, so its geometry stays resident across frames.
     pub uv_transform: [[f32; 2]; 3],
+    /// Content identity of `vertices`/`indices` when they came from the
+    /// prepared-geometry memo (its key); `None` when the full geometry
+    /// fingerprint must be computed, e.g. after atlas UV remapping.
+    pub geometry_identity: Option<u64>,
 }
 
 /// Identity `GuiMeshPreparedDraw::uv_transform`.
