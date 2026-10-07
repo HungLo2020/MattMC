@@ -7076,6 +7076,7 @@ public final class DeterministicCameraCapture {
 		net.minecraft.client.particle.GraphicsAuditAtlasParticleFixture.install(Minecraft.getInstance());
 		net.minecraft.client.particle.GraphicsAuditShriekParticleFixture.install(Minecraft.getInstance());
 		net.minecraft.client.particle.GraphicsAuditVibrationParticleFixture.install(Minecraft.getInstance());
+		net.minecraft.client.particle.GraphicsAuditLeafParticleFixture.install(Minecraft.getInstance());
 	}
 
 	private static ForcedBlockOutlineTarget findForcedBlockOutlineTarget(ClientLevel level, LocalPlayer player) {

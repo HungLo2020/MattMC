@@ -2,6 +2,30 @@
 
 use super::*;
 
+/// `MATTMC_TRACE_PARTICLE_QUADS=N` logs the first N decoded particle quads of
+/// each frame (texture, surface, UV bounds, ARGB colour, packed light,
+/// centre) to stderr, so a colour can be followed from Java to the GPU.
+fn trace_particle_quads(particles: &[FfiWorldParticleQuadRequest]) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LIMIT: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    static FRAME: AtomicU64 = AtomicU64::new(0);
+    let limit = *LIMIT.get_or_init(|| {
+        crate::core::environment::var_os("MATTMC_TRACE_PARTICLE_QUADS")
+            .and_then(|value| value.to_str().and_then(|value| value.parse().ok()))
+            .unwrap_or(0)
+    });
+    if limit == 0 {
+        return;
+    }
+    let frame = FRAME.fetch_add(1, Ordering::Relaxed);
+    for (index, p) in particles.iter().take(limit).enumerate() {
+        eprintln!(
+            "[mattmc particle-trace] frame={frame} index={index} texture={} surface={} uv={:?} argb={:08x} light={:08x} center={:?} size={}",
+            p.texture_id, p.surface_kind, p.uv_bounds, p.color_argb, p.packed_light, p.center, p.size
+        );
+    }
+}
+
 pub(crate) fn merge_particle_semantics(
     materials: Vec<WorldMaterialQuadRequest>,
     particles: &[FfiWorldParticleQuadRequest],
@@ -18,6 +42,7 @@ pub(crate) fn merge_particle_semantics(
     let mut source = materials.into_iter();
     let mut output = Vec::with_capacity(count);
     let mut cursor = 0;
+    trace_particle_quads(particles);
     for p in particles {
         validate_item_size::<FfiWorldParticleQuadRequest>(p.byte_size, "particle semantics")?;
         let index = p.material_index as usize;

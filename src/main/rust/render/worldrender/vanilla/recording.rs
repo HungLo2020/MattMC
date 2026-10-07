@@ -1052,9 +1052,15 @@ impl WorldPrimitiveFrontend {
         let mut forward_material_draws = Vec::new();
         let mut receiver_shadow_ops = Vec::new();
         let mut deferred_entity_layer_ops = Vec::new();
+        // Frozen draws particles in their own frame pass after the whole main
+        // pass: after translucent terrain and both DH vanilla-fade boundaries.
+        // Drawn earlier, a DH fade reads the terrain behind each particle and
+        // replaces the particle's pixels with LOD/sky colour.
+        let mut late_particle_ops = Vec::new();
         if !material_batches.is_empty() {
             let mut material_slot_indices = BTreeMap::new();
             let mut material_draws = Vec::with_capacity(material_batches.len());
+            let mut particle_draws = Vec::with_capacity(material_batches.len());
             for batch in material_batches {
                 let slot_index = material_slot_indices.entry(batch.key).or_insert(0usize);
                 let resources = self.material_resources.get(&batch.key).ok_or_else(|| {
@@ -1090,6 +1096,7 @@ impl WorldPrimitiveFrontend {
                     resources.index_buffer,
                     batch.count() as u32,
                 ));
+                particle_draws.push(batch.key.source_program == WORLD_MATERIAL_SOURCE_PARTICLES);
             }
             if use_g_buffer_mesh_path {
                 forward_material_draws = material_draws
@@ -1133,19 +1140,24 @@ impl WorldPrimitiveFrontend {
                     }),
                 });
                 for (
-                    material_id,
-                    pipeline,
-                    pipeline_layout,
-                    resource_set,
-                    requires_lightmap,
-                    index_buffer,
-                    instance_count,
-                ) in material_draws
+                    (
+                        material_id,
+                        pipeline,
+                        pipeline_layout,
+                        resource_set,
+                        requires_lightmap,
+                        index_buffer,
+                        instance_count,
+                    ),
+                    particle,
+                ) in material_draws.into_iter().zip(particle_draws)
                 {
                     // Receiver shadows consume the completed world depth.
                     // The direct terrain pass below clears that attachment;
                     // emitting shadows here would erase them under terrain.
-                    let ops = if material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW {
+                    let ops = if particle {
+                        &mut late_particle_ops
+                    } else if material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW {
                         &mut receiver_shadow_ops
                     } else if material_id == WORLD_MATERIAL_ID_ENERGY_SWIRL {
                         // EnergySwirl is authored after its entity's base model.
@@ -2535,6 +2547,21 @@ impl WorldPrimitiveFrontend {
                 }),
             });
             ops.extend(receiver_shadow_ops);
+            ops.push(CommandOp::EndPass);
+        }
+        if !late_particle_ops.is_empty() {
+            ops.push(CommandOp::BeginPass {
+                pass,
+                target: frame_target,
+                colors: vec![loaded_frame_color_attachment(color_attachment)],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            ops.extend(late_particle_ops);
             ops.push(CommandOp::EndPass);
         }
         if let Some(outline_plan) = entity_outline_plan.as_ref() {

@@ -348,6 +348,15 @@ not preserve the scene or its depth. Keep this source policy in
 [`contracts/material.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/contracts/material.rs)
 and the prepared shader, outside the game-neutral GAL.
 
+On the direct (no shader pack) route, particle material quads draw in a late
+pass after translucent terrain, the DH vanilla-fade composites and receiver
+shadows, as Frozen's separate particles frame pass does
+([`vanilla/recording.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/vanilla/recording.rs)).
+A fade composite reconstructs distance from the vanilla depth/colour snapshot;
+a particle drawn before it is faded as if it were the terrain behind it.
+`direct_dh_fade_composites_run_before_particle_draws` pins the order. Clouds
+and weather still draw with the early material pass.
+
 Named-source terrain packs one immutable CPU uniform block per used material
 pass and one for shadows in each frame. The block borrows its exact Rust source
 program, keeping the ABI immutable, and rejects use with another program or

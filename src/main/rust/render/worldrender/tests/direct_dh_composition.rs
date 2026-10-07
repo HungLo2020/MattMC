@@ -202,3 +202,46 @@ fn direct_dh_composition_failed_submission_does_not_confirm_snapshot_state() {
         )
         .unwrap();
 }
+
+/// Frozen draws particles in their own pass after the main pass, so DH's
+/// vanilla-fade boundaries never see them. A particle drawn before a fade
+/// boundary is faded by the depth/colour behind it: falling leaves showed
+/// sky and LOD colour that changed every frame (DH on, shaders off).
+#[test]
+fn direct_dh_fade_composites_run_before_particle_draws() {
+    for fade in [
+        WORLD_LOD_FLAG_VANILLA_FADE_SINGLE_PASS,
+        WORLD_LOD_FLAG_VANILLA_FADE_DOUBLE_PASS,
+    ] {
+        let mut gal = gal();
+        let mut frontend = prepare_frontend(&mut gal);
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frame = direct_frame(fade, 128);
+        frame.mesh_instances.push(mesh_instance(82, 1));
+        let mut particle = material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE);
+        particle.source_program = WORLD_MATERIAL_SOURCE_PARTICLES;
+        frame.material_quads.push(particle);
+        frontend
+            .ensure_rust_lod_lightmap_for_frame(&mut gal, 1, &frame)
+            .unwrap();
+        let (ops, _) = frontend.append_frame_ops(&mut gal, 1, target, frame).unwrap();
+        let snapshot = frontend
+            .lod_direct_composition_resources
+            .as_ref()
+            .unwrap()
+            .vanilla_color_texture;
+        let last_fade_snapshot = ops
+            .iter()
+            .rposition(|op| matches!(op, CommandOp::Barrier(barrier)
+                if barrier.resource == snapshot && barrier.after == TextureUsageState::TransferDst))
+            .unwrap_or_else(|| panic!("fade={fade}: no DH vanilla snapshot recorded"));
+        let particle_draw = ops
+            .iter()
+            .rposition(|op| matches!(op, CommandOp::DrawIndexed { indices: 6, .. }))
+            .unwrap_or_else(|| panic!("fade={fade}: particle material was not drawn"));
+        assert!(
+            particle_draw > last_fade_snapshot,
+            "fade={fade}: particles must draw after the last DH fade boundary"
+        );
+    }
+}

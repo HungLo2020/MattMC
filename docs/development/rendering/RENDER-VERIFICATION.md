@@ -458,6 +458,19 @@ the full particle region including transparent holes, and the visible effect
 against the hidden control. An opaque `particle-atlas-static-a` comparison
 cannot establish transparency: all its source texels have alpha 255.
 
+For falling-leaf particles, `-Dmattmc.dev.graphicsAuditLeafParticles=true`
+holds six leaves (tinted `leaf_*` with known tints, cherry, pale oak) in front
+of the camera through the ordinary `FallingLeavesParticle` extraction
+([`GraphicsAuditLeafParticleFixture`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/particle/GraphicsAuditLeafParticleFixture.java)).
+Add `.distance=<blocks>` (1–64) and `.spin=true` to exercise coarse mips and
+rotation. Deterministic captures force GPU retirement and do not enable DH by
+default, so observe live gameplay with the window-video observer instead, with
+and without DH (`--world-distant-horizons-real-world
+--world-distant-horizons-opaque`, shaders off): every leaf must keep its tint
+from frame to frame. `MATTMC_TRACE_PARTICLE_QUADS=N` logs the first N decoded
+particle quads per frame (texture, surface, UVs, ARGB, light, centre) to stderr;
+stable values there with changing pixels point at a GPU pass, not the producer.
+
 ## 3. Real-config session
 
 Set diagnostic environment options before launching. Production renderer
