@@ -149,6 +149,16 @@ fn geometry_request_key(batch: &GuiMeshBatchRequest, model_transform: [f32; 16])
         }
         bytes.extend_from_slice(&(batch.vertices.len() as u64).to_le_bytes());
         bytes.extend_from_slice(&(batch.indices.len() as u64).to_le_bytes());
+        if let Some(persistent) = batch.persistent_geometry {
+            // The caller keeps this geometry immutable at these addresses for
+            // the store generation; its identity stands for its contents.
+            bytes.push(1);
+            bytes.extend_from_slice(&persistent.vertices.to_le_bytes());
+            bytes.extend_from_slice(&persistent.indices.to_le_bytes());
+            bytes.extend_from_slice(&persistent.generation.to_le_bytes());
+            return xxhash_rust::xxh3::xxh3_64(&bytes);
+        }
+        bytes.push(0);
         for source in &batch.vertices {
             for word in [
                 source.position[0].to_bits(),

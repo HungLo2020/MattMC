@@ -58,7 +58,9 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
     let mut owned = Vec::with_capacity(batches.len());
     for batch in batches {
         validate_item_size::<FfiGuiMeshBatchRequest>(batch.byte_size, "GUI mesh batch")?;
-        if batch.reserved0 != 0 || batch.gui_width != gui_width || batch.gui_height != gui_height {
+        // reserved0 bit 0: persistent caller geometry; upper bits: its store generation.
+        let persistent_flag = batch.reserved0 & 1 != 0;
+        if (batch.reserved0 != 0 && !persistent_flag) || batch.gui_width != gui_width || batch.gui_height != gui_height {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
                 "GUI mesh batch reserved fields and frame GUI extent must match",
@@ -117,6 +119,11 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             })
             .collect();
         let request = GuiMeshBatchRequest {
+            persistent_geometry: persistent_flag.then(|| crate::render::guirender::mesh::GuiPersistentGeometry {
+                vertices: batch.vertices.ptr as u64,
+                indices: batch.indices.ptr as u64,
+                generation: batch.reserved0 >> 1,
+            }),
             item_cache: crate::render::guirender::mesh::GuiItemCache::decode(
                 batch.item_cache_identity,
                 batch.item_cache_mode,

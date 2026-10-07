@@ -261,6 +261,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	private final IdentityHashMap<List<GuiMeshVertexRecord>, IdentityHashMap<List<Integer>, PackedGuiMeshTopology>>
 		persistentGuiMeshTopologies = new IdentityHashMap<>();
 	private int persistentGuiMeshTopologyCount;
+	/** Advances whenever the persistent GUI geometry store is cleared (addresses may be reused). */
+	private int persistentGuiMeshTopologyGeneration;
 
 	/**
 	 * Reusable copied LOD instance staging. The native call copies this slice
@@ -806,7 +808,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 5, batch.assetId());
 			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 6, batch.sequence());
 			Struct.GUI_MESH_BATCH_REQUEST.setFloat(item, 7, batch.alphaCutoff());
-			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 8, 0);
+			// Bit 0: persistent (immutable for this store generation) geometry.
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 8, persistent == null ? 0
+				: 1 | ((persistentGuiMeshTopologyGeneration & 0x3fff_ffff) << 1));
 			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(9) + component * 4L, batch.modelTransform[component]);
 			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(10) + component * 4L, batch.guiPose[component]);
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 11, batch.left());
@@ -4787,6 +4791,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 		queuedFrameCount = 0;
 		persistentGuiMeshTopologies.clear();
+		persistentGuiMeshTopologyGeneration++;
 		arena.close();
 	}
 

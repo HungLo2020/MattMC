@@ -183,6 +183,12 @@ also share persistent instance arrays. This was the default at the earlier
 · [Java repacking guard](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L1892-L1900)
 · [`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)
 
+- GUI mesh batches whose vertex and index lists come from a long-lived cache
+  (item topology caches, cached TACZ captures) are encoded once into the
+  context's persistent arena. `reserved0` bit 0 marks such a batch and the
+  upper bits carry the store generation (advanced whenever the store is
+  cleared); Rust then identifies the unchanged mesh by address instead of
+  rehashing its vertices. Never rewrite persistent GUI geometry in place.
 - Non-queued context-registry entry points join pending work first (`with_registry*`),
   preventing concurrent access to a context. Keep context access behind these
   wrappers. Selection through the [standalone query handles](#standalone-query-handles)

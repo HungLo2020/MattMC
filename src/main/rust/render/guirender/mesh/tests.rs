@@ -5,6 +5,7 @@ use crate::render::vulkanic::commands::{CommandList, CommandListDesc, Submission
 fn batch() -> GuiMeshBatchRequest {
     GuiMeshBatchRequest {
         item_cache: None,
+        persistent_geometry: None,
         block_item_raster: None,
         item_raster_scale: 0,
         item_lighting: None,

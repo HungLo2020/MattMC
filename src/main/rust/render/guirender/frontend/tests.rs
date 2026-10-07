@@ -2934,6 +2934,7 @@ fn model_overlay_passes_finish_before_foil_without_changing_authored_layers() {
 fn mesh_batch(layer_index: u32) -> GuiMeshBatchRequest {
     GuiMeshBatchRequest {
         item_cache: None,
+        persistent_geometry: None,
         block_item_raster: None,
         item_raster_scale: 0,
         item_lighting: None,

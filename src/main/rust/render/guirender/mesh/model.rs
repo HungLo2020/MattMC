@@ -180,6 +180,10 @@ impl GuiItemCache {
 #[derive(Clone, Debug, PartialEq)]
 pub struct GuiMeshBatchRequest {
     pub item_cache: Option<GuiItemCache>,
+    /// Identity of vertex/index data the caller keeps immutable in persistent
+    /// memory for its context's lifetime; unchanged meshes are then
+    /// recognised without rehashing every vertex.
+    pub persistent_geometry: Option<GuiPersistentGeometry>,
     /// Private native contract: copied model-space bounds, original normals,
     /// and GUI scale. No caller-selected offscreen extent/guard/raster matrix.
     pub block_item_raster: Option<GuiBlockItemRaster>,
@@ -223,6 +227,15 @@ pub struct GuiMeshBatchRequest {
     pub clip_height: i32,
     pub vertices: Vec<GuiMeshVertex>,
     pub indices: Vec<u32>,
+}
+
+/// Address identity of persistent caller geometry plus the caller's store
+/// generation (a cleared store may reuse addresses).
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct GuiPersistentGeometry {
+    pub vertices: u64,
+    pub indices: u64,
+    pub generation: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

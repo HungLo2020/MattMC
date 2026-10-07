@@ -1381,6 +1381,29 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
 }
 
 #[test]
+fn gui_mesh_persistent_geometry_flag_carries_source_identity() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32, 1, 2];
+    let mut request = gui_mesh_batch_request(&vertices, &indices);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        crate::render::bridge::gui::decode_gui_mesh_batches(
+            FfiSlice { ptr: request, count: 1 },
+            320,
+            180,
+        )
+    };
+    assert!(decode(&request).unwrap()[0].persistent_geometry.is_none());
+    request.reserved0 = 1 | (7 << 1);
+    let persistent = decode(&request).unwrap()[0].persistent_geometry.unwrap();
+    assert_eq!(persistent.vertices, vertices.as_ptr() as u64);
+    assert_eq!(persistent.indices, indices.as_ptr() as u64);
+    assert_eq!(persistent.generation, 7);
+    // A generation without the persistent flag is a malformed reserved field.
+    request.reserved0 = 7 << 1;
+    assert!(decode(&request).is_err());
+}
+
+#[test]
 fn gui_mesh_decal_transport_copies_poses_and_rejects_noncanonical_or_incomplete_state() {
     let mut vertices = gui_mesh_vertices();
     for vertex in &mut vertices {
