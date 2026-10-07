@@ -101,7 +101,10 @@ Static chunk sections whose meshes are resident are drawn by
 Since ABI 70, visible section layers and casters cross the Java bridge as compact
 entries (see [Java Bridge](JAVA-BRIDGE.md)). Ordinary frames now form them in
 [`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/rust/render/chunk/terrain_selection.rs);
-Java copies the native records into its frame/request storage. Java still owns
+Java copies the native records into its frame/request storage. At the
+[`20e157ca` checkpoint](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection.rs),
+solid/cutout layers preserve graph visit order while translucent layers remain
+back to front; this supersedes the earlier key-order equality report. Java still owns
 readiness/build scheduling, mesh publication, animated-sprite marking and the
 ineligible-frame producer. Native record selection and retained GPU scene drawing
 are separate steps. When the shader route is armed, admission
@@ -135,7 +138,10 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
    sections in `chunk/terrain_selection.rs`. Java skips its visible-list and
    per-section record construction on that route. It still consumes visits
    when scheduling needed builds or lazily checking entity visibility, mirrors
-   published mesh rows and marks selected animated sprites. Diagnostic/fault/
+   published mesh rows and marks selected animated sprites. Shader-disabled
+   frames also extract block entities from visited built sections plus global
+   entries when a current search exists; Java still performs their semantic
+   extraction, so this is not the retained-entity phase. Diagnostic/fault/
    reload/readiness-receipt frames keep the Java producer. Render-list region
    order, Iris's non-culling frustum and complete scene-owned visibility remain;
    this does not complete every phase or remove Java.

@@ -90,12 +90,19 @@ launch. GAL checks are separate from Vulkan's validation layers; enable the
 appropriate checks for the run.
 
 Vulkan command labels (`gal.batch.*`, `gal.command-list.*`, `gal.pass.*`) are
-emitted only when validation is on, a RenderDoc capture is requested
-(`MATTMC_RENDERDOC_CAPTURE` or RenderDoc's `ENABLE_VULKAN_RENDERDOC_CAPTURE`) or
-`MATTMC_VULKAN_DEBUG_LABELS=1` is set; set the last one before attaching another
-tool. Object names are always set
+emitted only with Vulkan debug-utils available and at least one enabling
+condition: validation, a requested RenderDoc capture (`MATTMC_RENDERDOC_CAPTURE`
+or RenderDoc's `ENABLE_VULKAN_RENDERDOC_CAPTURE`), or
+`MATTMC_VULKAN_DEBUG_LABELS=1`. Set the last switch before attaching another
+tool. Object naming remains independent of the command-label switch and uses
+debug-utils when available
 ([`command_labels_requested`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/backends/vulkan/device.rs)). Run new rendering work under a validation
 capture before trusting it.
+
+[Submission trace messages](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/vulkanic/gal/submission.rs#L5-L12)
+are now formatted only when `MATTMC_TRACE_WHOLE_FRAME` is present. This switch is
+read once; even a value of `0` is present, so unset it for an untraced timing
+run. It is separate from the command-label switches and validation mode.
 
 For CPU changes to hazard tracking, set `MATTMC_GAL_VALIDATION=1` and compare
 the gameplay benchmark's `gal-hazard-analysis` time alongside its

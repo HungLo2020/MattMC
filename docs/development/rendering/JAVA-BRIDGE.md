@@ -186,14 +186,29 @@ also share persistent instance arrays. This was the default at the earlier
 - GUI mesh batches whose vertex and index lists come from a long-lived cache
   (item topology caches, cached TACZ captures) are encoded once into the
   context's persistent arena. `reserved0` bit 0 marks such a batch and the
-  upper bits carry the store generation (advanced whenever the store is
-  cleared); Rust then identifies the unchanged mesh by address instead of
-  rehashing its vertices. Never rewrite persistent GUI geometry in place.
+  upper bits carry the store generation. Rust keys decoded geometry by both
+  addresses, both counts and that generation instead of re-decoding it.
+  Never rewrite persistent GUI geometry in place. The Java store admits at most
+  4,096 topologies; the separate thread-local Rust decode cache clears at 1,024
+  entries before inserting another. Cache hits still return owned geometry
+  copies, check each batch's metadata and skip per-vertex validation only after
+  a successful check under the same block-raster-presence state.
+  [Decoder](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/gui/mesh.rs#L11-L30)
+  · [Validation](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/gui/mesh.rs#L254-L270)
+  The generation belongs to each Java bridge instance and advances on its close;
+  the native thread-local key contains no new-context identity. Same-thread
+  context recreation with address reuse is an unverified lifecycle case, not
+  a demonstrated defect or a guarantee supplied by the generation field.
 - Generic DH boxes (up to 10,000 per frame, mostly clouds) travel as
   `PackedDhGenericBoxes` primitive arrays rather than a record per box. The
   pending buffer rotates through a ring of three; a consumed frame takes the
-  buffer itself (frames complete before their buffer is reused), and the
-  encoder writes the arrays straight into the native layout.
+  buffer itself, and the encoder writes its arrays into native layout. Reuse
+  relies on the coordinator draining queued work down to one prior frame and
+  queued submission copying on the caller before return; preserve both when
+  changing queue depth. The new packed-box tests assert ABI equality and value
+  validation, not ring-wraparound or queue-lifetime behavior.
+  [Pending ring](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L467-L483)
+  · [Queue drain](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java#L745-L761)
 - Non-queued context-registry entry points join pending work first (`with_registry*`),
   preventing concurrent access to a context. Keep context access behind these
   wrappers. Selection through the [standalone query handles](#standalone-query-handles)

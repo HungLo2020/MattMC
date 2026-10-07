@@ -87,19 +87,26 @@ instance. On the Java side, resource texture bytes requested during frame
 extraction go through `TexturePayloadCache`, which resource reload clears.
 
 Java also memoizes the raw biome sky and fog samples before their later
-brightness/weather adjustments. Each `ClientLevel` stores separate last samples,
-keyed by exact quart-position coordinates, partial-tick bits and game time;
+brightness/weather adjustments. Each `ClientLevel` stores four sky samples in
+a ring and one fog sample, keyed by exact quart-position coordinates,
+partial-tick bits and game time;
 a miss still uses the hooks and Gaussian fallback. These are key-based memos,
 with no explicit frame-id reset. Keep hook/biome changes in mind when changing
 their lifetime; this does not transfer semantic color ownership to Rust.
 See [`ClientLevel`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L952-L1004)
 and [`AirBasedFogEnvironment`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/renderer/fog/environment/AirBasedFogEnvironment.java#L20-L41).
 
+The [four-entry sky memo](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L952-L1013)
+retains alternate callers' exact keys; it does not round positions or cache
+later weather/brightness adjustments.
+
 Ordinary frames select camera-visible terrain layers in the Rust section graph.
-Solid and cutout layers keep the graph's near-to-far visit order, which is
-stable for a still camera and lets the GPU reject hidden fragments early (with
-shaders this measured 2.93 ms GPU against 3.18 ms in key order); translucent
-layers are sorted back to front. The retained Java producer emits ascending
+Solid and cutout layers preserve the graph's BFS visit order rather than
+sorting by section key or Euclidean distance. The [selection regression](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection/tests.rs#L45-L74)
+intentionally supplies a far section first and preserves that order. Translucent
+layers are sorted back to front, with equal-distance ties retaining visit order.
+The author's local shader comparison reports GPU 3.18→2.93 ms; it is not an
+independent performance result. The retained Java producer emits ascending
 section-key order (`SectionKeyOrder`) for ineligible diagnostic, fault, reload
 and readiness-receipt frames, because hash-map iteration order shifted as
 sections streamed and identical sets missed Rust's batch-plan cache.
@@ -165,7 +172,7 @@ which is outside any bridge context so selecting never joins a pipelined frame.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
   Java mirrors each section's published layer meshes into the graph, and Rust
-  emits the compact camera layers (near-to-far visit order, translucent back
+  emits the compact camera layers (graph visit order, translucent back
   to front),
   shader shadow casters and animated-sprite sections in the frame records'
   native layout. Java copies these records without rebuilding each section's
@@ -189,12 +196,15 @@ which is outside any bridge context so selecting never joins a pipelined frame.
   outside level height and checks without an active frame search bypass this
   additional rejection. The hook declares that it does not affect the shadow
   pass; Java still extracts retained entities and their geometry.
-- Without a shader pack, block entities are extracted as Frozen's Sodium does
+- With shader execution inactive and a current section search, block entities
+  are extracted as Frozen's Sodium does
   (`RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity`): the culled
   block entities of each visited built section, then the global ones of every
   built section. Moving pistons arrive the same way. Shader frames still scan
   every loaded chunk in range, because the shadow pass takes its block
-  entities from that list (vanilla A/B 455→516 FPS once the scan was gone).
+  entities from that list; unavailable-search cases also keep the fallback.
+  The author reports vanilla A/B 455→516 FPS; no dedicated block-entity-selection
+  regression was added in this interval. See [the route gate](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/minecraft/client/renderer/LevelRenderer.java#L2051-L2064).
 
 Keep the graph's behaviour identical to Frozen: its unit tests in
 `section_graph/tests.rs` pin each rule, so run
@@ -300,9 +310,18 @@ With a shader pack, the DH opaque range (reduced-color, exact-atlas and generic
 draws) and the late `dh_water` range are each recorded as one ordered pass
 (`append_ordered_batch` in
 [`lod/source.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/lod/source.rs)).
-Nothing samples the DH target mid-range, so per-draw passes only added GPU
-stalls: on the coastal benchmark ~200 single-draw translucent passes cost
-~0.6 ms of GPU per frame (shaders+DH 193→215 FPS).
+The ranges retain draw order and their snapshot boundary; the author reports
+shaders+DH 193→215 FPS after replacing about 200 single-draw translucent passes.
+The changed LOD regression exercises the existing opaque identical-draw case,
+not a new late-translucent-order assertion.
+
+Generic boxes group by four `(SSAO, translucency)` key classes and pack fixed
+uniform blocks; Java uses the [packed-buffer transport](JAVA-BRIDGE.md).
+[Ordinary DH source pack sets](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/lod/source.rs#L741-L761)
+retire only when their recorded resource generations bind a released role.
+Their draw sets, pipelines and frame rings stay intact. The [shared teardown](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/source/programs/teardown.rs#L186-L217)
+still destroys exact-atlas source resources wholesale, so this is not universal
+role-filtered DH retirement.
 
 Built-in DH materials sample the copied skylight coordinate at its original
 lightmap texel center, including dark rows for covered or submerged geometry.
@@ -325,10 +344,25 @@ identities, so they never share pixels.
 
 GUI mesh geometry is content-keyed (raster key plus geometry fingerprint) and
 stays resident across frames: a draw re-uses a range once an accepted
-submission (or the same frame) wrote it, and a range is released after two idle
-frames once completed. A range never proven written that pending commands still
+submission (or the same transaction) wrote it, and a completed range becomes
+eligible for release after two idle mesh transactions. A range never proven written that pending commands still
 reference is retired rather than rewritten
 ([`mesh_items/geometry.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/frontend/mesh_items/geometry.rs)).
+
+The [transaction counter](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/guirender/frontend/recording/target.rs#L206-L235)
+does not advance on the no-mesh/no-tile/no-atlas fast path; two displayed frames
+alone therefore do not guarantee reclamation. Fixed-capacity pressure can
+reclaim completed ranges earlier, while pending commands still protect them.
+Explicit non-foil meshes of at least 64 vertices also use a separate
+[prepared-geometry memo](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/guirender/mesh/prepare.rs#L34-L110):
+at most 256 entries, with age measured in preparation calls; above 128 entries,
+it prunes entries unused for more than 64 calls. Placement and ordering are
+refreshed from each request. These bounds do not prove whole-renderer memory
+stability.
+
+World geometry range release retains bindings to a still-live vertex page.
+[Only emptied pages' bindings retire](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/assets/stores.rs#L1243-L1266)
+before page trimming; this reduces descriptor churn without changing ownership.
 
 Prebuilt GUI commands must keep the `GuiSubmitStats` produced while recording
 through route selection: source preparation can arm the selected-source route
@@ -359,6 +393,13 @@ accepted submission; resource replacement and reset discard it. See
 [direct recording](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/vanilla/recording.rs).
 
 ## Shader controls at startup
+
+Java's [configured-pack disk-state memo](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/shaderpack/RustShaderPackSourceCollector.java#L168-L198)
+reuses a result within the same nonzero frame epoch, or across epochs while its
+age is below 250 ms. Same-epoch reuse can exceed that interval, and there is no
+end-frame epoch reset. Epoch zero always rechecks; in-process settings writes
+invalidate the memo, and the vanilla post-effect lookup is uncached. Treat
+250 ms as a polling throttle, not a maximum external-edit detection latency.
 
 Shader selection, pack options and key bindings remain Java-owned configuration.
 `Minecraft` initializes that configuration before constructing `Options`, which

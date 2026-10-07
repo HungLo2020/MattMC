@@ -38,6 +38,41 @@ The architecture boundary tests run with the Rust tests; see
 "Mockito cannot mock this class" are a known JDK 25 limitation, not
 regressions; compare their count with the base commit.
 
+### October 7 residency and selection checks
+
+For the `20e157ca` changes, target the following regressions before fresh
+runtime comparisons (these definitions were inspected, not executed, by this
+source review):
+
+```sh
+(cd src/main/rust && cargo test --release gui_mesh_persistent)
+(cd src/main/rust && cargo test --release accepted_mesh_geometry_stays_resident_across_frames_until_idle)
+(cd src/main/rust && cargo test --release prepared_geometry_memo_reuses_unchanged_meshes_and_refreshes_placement)
+(cd src/main/rust && cargo test --release semantic_item_foil_animation_is_a_uniform_and_strength_invalidates_geometry)
+(cd src/main/rust && cargo test --release camera_layers_follow_visit_order_then_translucent_back_to_front)
+./gradlew test --tests net.vulkanic.bridge.PackedDhGenericBoxesTest --tests net.vulkanic.gui.GuiItemMeshSemanticCollectorTest --tests net.minecraft.client.dev.GraphicsFrameBenchmarkReadinessTest
+```
+
+The [persistent-decode fixture](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/tests/mod.rs#L1383-L1430)
+checks repeated geometry equality, repeated invalid-geometry rejection and
+address/generation transport. Despite its name, it does not change the
+block-raster state of an already valid cached batch. The GUI residency test uses
+mock GAL to verify accepted-write reuse and idle reclamation; foil tests keep
+geometry stable while its draw transform changes. The [terrain fixture](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection/tests.rs#L45-L74)
+preserves deliberately far-first input visits, not strict distance order.
+[Packed-box tests](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/test/java/net/vulkanic/bridge/PackedDhGenericBoxesTest.java)
+compare encoded bytes and reject invalid values; they do not exercise the
+three-buffer ring wrapping with queued work.
+
+No dedicated tests were added here for block-entity selection, emptied-page
+binding retirement or role-filtered DH teardown. The modified LOD test still
+uses the existing opaque identical-draw case, not a new late-water-order test.
+Exercise same-thread bridge recreation/address reuse, queue overlap, idle GUI
+paths, resource reload and both shader/DH transitions in fresh runtime checks.
+Use moving pistons and global/offscreen block entities for the selection change,
+and observe foil animation as well as still GUI pixels. These open verification
+cases are not assertions that failures have been reproduced.
+
 For GUI target declarations, [commit `78e8e04`](https://github.com/HungLo2020/MattMC/commit/78e8e0423084f010bb47e36132550619b37644c2)
 adds two GUI unit tests and extends one existing world-frame test:
 
@@ -381,7 +416,31 @@ or a performance gain.
 [`DevUtils/Audit/Capture.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/Audit/Capture.py)
 captures the same world pose in Current and in Frozen. Frozen's checkout is
 found through `java_perf_repo` in `DevUtils/Common/platform/directory/directories.json`
-(or `--frozen-repo`). A shader-pack pair at a fixed pose:
+(or `--frozen-repo`). To prepare a separate full clone, run:
+
+```sh
+python3 DevUtils/ProvisionFrozenBaseline.py --dest /path/to/Frozen
+```
+
+The [provisioner](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/DevUtils/ProvisionFrozenBaseline.py#L123-L154)
+clones the latest `JavaPerfTesting` or fast-forwards a matching clean checkout.
+It refuses worktrees, another branch/origin, ahead commits or dirty state
+without discarding them. Default preparation runs `copyJdkToRun jar
+shaderPackZip testClasses` while skipping tests; `--no-build` skips it.
+`--copy-run-inputs` copies absent `run/options.txt`,
+`run/shaderpacks/ComplementaryHungLoIfied.zip` and selected `--world` directories;
+existing destinations win. Pass `--frozen-repo` to comparison tools
+when `--dest` differs from their configured location, and record/pin the exact
+reference commit because the latest branch moves.
+
+[`--check`](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/DevUtils/ProvisionFrozenBaseline.py#L217-L274)
+fetches remote-tracking refs but does not merge, build or copy inputs; this
+fetch still happens with `--check --dry-run`. Plain `--dry-run` suppresses
+state-changing steps while platform/Git inspection still runs; it checks cached
+upstream refs, not fresh remote state. This review
+did not execute the provisioner.
+
+A shader-pack pair at a fixed pose:
 
 ```sh
 MATTMC_CAPTURE_SHADER_PACK_SOURCE=$PWD/run/shaderpacks/ComplementaryHungLoIfied.zip \
@@ -638,6 +697,10 @@ Per-item producer phases (GUI sprite `*.java-producer`, `world.model.java-extrac
 and `world.model.rust-enqueue`) run many times per frame, so they are recorded
 only with `--jvm-arg=-Dmattmc.dev.benchmark.detailedPhases=true`. Leave the flag
 off for timing comparisons; enable it to attribute Java producer time.
+Whole-frame/aggregate phases remain; absent per-item entries do not mean zero
+producer cost. Preserve this setting with warm-up length and measured-frame
+count, and compare equivalent modes. The [October 7 summary](GOAL-5-STATUS.md#october-7-mode-summary)
+keeps short and long vanilla windows distinct.
 
 Release gameplay skips the GAL's per-frame op, handle and hazard checks unless
 `MATTMC_GAL_VALIDATION=1` is set before launch. The capture harness sets it for

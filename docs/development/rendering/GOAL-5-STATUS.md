@@ -2,9 +2,9 @@
 
 **Goal 5 remains incomplete.** The current review covers retained-scene,
 queued-frame, compact-terrain, visibility and rendering-cost work through
-[`313e7a8a`](https://github.com/HungLo2020/MattMC/commit/313e7a8a82a34dc915c4924a78da77c720af2f7e),
-including native compact terrain selection, camera entity culling and direct-route
-particle ordering. It adds native ownership and author-recorded workload improvements;
+[`20e157ca`](https://github.com/HungLo2020/MattMC/commit/20e157cab7962140b30b83f40374cdeb1e6a8b19),
+including persistent GUI geometry, graph-visit terrain order, vanilla block-entity
+selection and DH transport/batching. It adds native ownership and author-recorded workload improvements;
 it does not establish broad visual/temporal parity, full scene migration,
 long-run resource bounds or resolution of the earlier independent native crash.
 
@@ -29,6 +29,25 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 ## What changed
 
 ### October 7 source review
+
+#### GUI residency and mode-cost follow-up
+
+The `20e157ca` source checkpoint extends the earlier review below:
+
+- **GUI reuse:** flat and standard-foil items keep topology/raster identities; foil pixels remain animated through a per-draw UV transform. Cached TACZ captures can use persistent bridge storage. Native decode, prepared-geometry and accepted GPU-range reuse avoid repeated work, with separate bounds and lifetimes. Geometry idle age counts mesh transactions, not every displayed frame. Same-thread context recreation/address reuse remains a verification gap, not a demonstrated failure. [Bridge](JAVA-BRIDGE.md) · [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **Terrain and block entities:** solid/cutout compact selection preserves graph visit order; translucent selection stays back to front. This is not a strict Euclidean near-to-far sort. Shader-disabled block-entity extraction consumes visited built sections plus global block entities when a current search exists; shader frames and unavailable-search cases keep the range-scan path. Java still owns the semantic extraction. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **DH and resources:** generic boxes use bounded primitive buffers and a three-slot pending ring; source opaque and late-water ranges each use an ordered pass. Ordinary DH pack-set release filters changed resource roles; exact-atlas teardown remains broader. Empty world geometry pages retire only their dependent bindings. These changes do not establish long-run bounds or cross-route temporal parity. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **Java and diagnostics:** four exact-key sky samples, throttled disk-state checks, single-pass chunk vertex construction, bulk native-profile reads and optional per-item phases reduce collection/instrumentation work. Disk-state reuse is unconditional within a nonzero frame epoch and may outlast 250 ms; the interval applies between epochs. [Profiling](SHADER-TERRAIN-PROFILING.md) · [Verification](RENDER-VERIFICATION.md)
+
+This review inspected pinned source and test definitions only. It did not rerun
+Java/native tests, live captures or benchmarks, and did not inspect the author's
+unbundled artifacts. The [verification guidance](RENDER-VERIFICATION.md#october-7-residency-and-selection-checks)
+distinguishes new assertions from remaining lifecycle and visual checks.
+
+#### Earlier native-selection checkpoint
+
+The following review retains its [`313e7a8a`](https://github.com/HungLo2020/MattMC/commit/313e7a8a82a34dc915c4924a78da77c720af2f7e) scope; later ordering and residency
+changes above are not covered by its byte-identical-record report.
 
 - **Ordinary terrain selection:** Rust now forms compact camera layers, optional off-camera shadow candidates and animated-section positions from graph visits and mirrored published mesh rows. Java copies native-layout records without its ordinary visible-list/per-section record construction. It still owns readiness/build scheduling, mesh publication, animated-sprite marking and semantic producers; diagnostics, faults, reloads, explicit per-record mode and identity-receipt frames retain the Java producer. This advances the visibility phase without completing all retained-scene phases. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries) · [Bridge lifetime](JAVA-BRIDGE.md#standalone-query-handles)
 - **Camera entity culling:** the Sodium option gates an additional visited-section rejection before the ordinary frustum check. Glowing/name-visible entities and other documented bypass cases bypass the added rejection; the hook does not affect shadow-pass admission. This avoids some Java extraction work without moving entity semantics or adding Citadel model transport. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
@@ -76,7 +95,7 @@ Admission remains bounded. The source supports [at most eight color targets](htt
 
 ## What the recorded evidence establishes
 
-The following paragraphs retain the earlier October 3–4 evidence. Later retained-scene reports and the October 6 speed summary are separated below; none is a universal runtime certificate.
+The following paragraphs retain the earlier October 3–4 evidence. Later retained-scene reports and the October 6–7 speed summaries are separated below; none is a universal runtime certificate.
 
 The [earlier progress log](https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/PROGRESS.md) and [follow-up progress log](https://github.com/HungLo2020/MattMC/blob/37817e128b99b07456c0ee22a5d34eaf05c72150/PROGRESS.md) contain the implementation author's test and capture results. Those Java, Rust, native and gameplay runs were not rerun by this documentation review; their ignored capture artifacts are not bundled with the wiki. The earlier independent review passed 60 Python rendering-tool tests; the follow-up tracker review passed 79 isolated Python rendering-tool tests at `37817e1`. These verify tooling scope only.
 
@@ -93,6 +112,31 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 7 mode summary
+
+The [source-pinned summary](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/SUMMARY.md) reports moving-camera runs with
+matching settings. FPS and median frame time are distinct aggregate measures:
+
+| Reported workload | Rust/Vulkan FPS / median frame | Frozen Java/OpenGL FPS / median frame |
+| --- | --- | --- |
+| Shaders, 1,800 frames | 314 / 2.98 ms | 307–309 / 2.99 ms |
+| Shaders + DH, 1,800 frames | 223 / 4.21 ms | 228 / 4.19 ms |
+| Vanilla + DH, 1,800 frames | 417 / 2.01 ms | 415 / 2.08 ms |
+| Vanilla, 1,800 frames after 240 warm-up | 595 / 1.37 ms | 937 / 0.84 ms |
+| Vanilla, 1,800 frames after 6,000 warm-up (earlier that day) | 912 / 0.94 ms | 1395 / 0.66 ms |
+| Vanilla, 30,000 frames after 6,000 warm-up (earlier that day) | 1334 / 0.64 ms | 1462 / 0.52 ms |
+
+These are implementation-author reports, not independent reruns or broad
+performance acceptance. The [progress log](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/PROGRESS.md#L13)
+records latest short-run ranges of shaders 305–314 and shaders+DH 215–223 FPS,
+with shaders+DH p99 about 14 ms against Frozen 9.3 ms. Its earlier unequal-warm-up
+vanilla parity claim is explicitly withdrawn; the equal-warm-up rows above
+still show a gap. Do not combine these windows, component timings or successive
+local optimizations into additive gains. Recorded scoped image passes keep
+their original workloads and tolerances; failed underground comparisons,
+terrain readiness/flicker, long-run resource bounds and the independent native
+crash remain open.
 
 #### Updated October 6 summary reviewed October 7
 
@@ -192,6 +236,14 @@ Entity culling does not add Citadel model geometry transport. The conditional em
 For source-input investigations use [RenderDoc observations](RENDERDOC-INPUTS.md). For acceptance use equivalent Frozen **Java OpenGL** workloads and the unchanged [verification rules](RENDER-VERIFICATION.md); source and numerical tests remain supplemental.
 
 ## Tracked follow-up
+
+The later October 7 [GUI residency review](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6043636919),
+[terrain/block-entity review](https://github.com/HungLo2020/MattMC/issues/520#issuecomment-6043638924),
+[DH transport/batching review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6043640406)
+and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6043642312)
+cover the `20e157ca` checkpoint without closing those issues. They preserve
+lifecycle/test-coverage gaps and author-only runtime provenance; no new
+native/Java run or benchmark is established by these source reviews.
 
 The October 7 [terrain-selection review](https://github.com/HungLo2020/MattMC/issues/520#issuecomment-6029873623),
 [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6029874156)

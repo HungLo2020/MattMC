@@ -6,8 +6,28 @@ correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
 The [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary)
-separates current reported timings from the historical profiles below; none of
+and [October 7 mode summary](GOAL-5-STATUS.md#october-7-mode-summary)
+separate their dated reported timings from the historical profiles below; none of
 these rows is a substitute for rerunning the same workload on a new revision.
+
+## October 7 comparison controls
+
+Keep short vanilla (240 warm-up + 1,800 measured frames), settled vanilla
+(6,000 + 1,800) and long vanilla (6,000 + 30,000) separate. The
+[author's progress log](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/PROGRESS.md#L13) withdraws the earlier
+unequal-warm-up parity comparison; even its equal-warm-up long run remains
+1334 versus Frozen 1462 FPS. Near-matching shader or vanilla+DH means do not
+establish all-mode parity or matching tails: the reported shaders+DH p99 is
+about 14 ms against 9.3 ms. This documentation review did not rerun these runs.
+
+Use ordinary release timing with per-item phases off, then a separate attribution
+run with `-Dmattmc.dev.benchmark.detailedPhases=true`. Per-frame aggregate phases
+remain available; missing detailed producer entries are not zero-cost evidence.
+The bridge bulk-copies the 131 native-profile words instead of reading each
+field separately, and phase lookup/sprite labels avoid repeated bookkeeping.
+These implementation changes do not make results from different instrumentation
+settings interchangeable. Preserve validation, tracing, debug-label and profiler
+settings with every result; see [verification](RENDER-VERIFICATION.md).
 
 ## Reproduce the workload
 
