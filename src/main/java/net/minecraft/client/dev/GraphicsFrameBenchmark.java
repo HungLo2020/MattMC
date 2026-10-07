@@ -181,6 +181,8 @@ public final class GraphicsFrameBenchmark {
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
 	/** Nested and exclusive stats by phase-name instance (names are literals); cleared with the maps. */
 	private static final java.util.IdentityHashMap<String, PhaseStats[]> PHASE_STATS_BY_NAME = new java.util.IdentityHashMap<>();
+	private static final Map<String, PhaseStats[]> PHASE_STATS_BY_VALUE = new java.util.HashMap<>();
+	private static final java.util.IdentityHashMap<String, PhaseStats> COUNTER_STATS_BY_NAME = new java.util.IdentityHashMap<>();
 	private static final Map<String, PhaseStats> COUNTER_SAMPLES = new LinkedHashMap<>();
 	private static final List<FrameTimelineEvent> FRAME_TIMELINE_EVENTS = new ArrayList<>();
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
@@ -510,6 +512,8 @@ public final class GraphicsFrameBenchmark {
 		EXCLUSIVE_PHASES.clear();
 		NESTED_PHASES.clear();
 		PHASE_STATS_BY_NAME.clear();
+		PHASE_STATS_BY_VALUE.clear();
+		COUNTER_STATS_BY_NAME.clear();
 		COUNTER_SAMPLES.clear();
 		lastDhSemanticColumnsBuilt = -1L;
 		lastDhSemanticColumnsReused = -1L;
@@ -748,13 +752,20 @@ public final class GraphicsFrameBenchmark {
 
 	private static PhaseStats[] phaseStats(String name) {
 		PhaseStats[] stats = PHASE_STATS_BY_NAME.get(name);
+		if (stats != null) {
+			return stats;
+		}
+		stats = PHASE_STATS_BY_VALUE.get(name);
 		if (stats == null) {
 			stats = new PhaseStats[] {
 				NESTED_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()),
 				EXCLUSIVE_PHASES.computeIfAbsent(name, ignored -> new PhaseStats())
 			};
-			// Dynamic names are new instances each time; bound the identity cache.
-			if (PHASE_STATS_BY_NAME.size() < 4096) PHASE_STATS_BY_NAME.put(name, stats);
+			PHASE_STATS_BY_VALUE.put(name, stats);
+			// Only a name's first instance enters the identity cache: a name
+			// built at runtime is a new instance per call and would fill it
+			// with dead keys (and slow every probe) without ever hitting.
+			PHASE_STATS_BY_NAME.put(name, stats);
 		}
 		return stats;
 	}
@@ -772,7 +783,16 @@ public final class GraphicsFrameBenchmark {
 		if (!ENABLED || !frameActive || !measurementFrame || name == null || value < 0L) {
 			return;
 		}
-		COUNTER_SAMPLES.computeIfAbsent(name, ignored -> new PhaseStats()).add(value);
+		PhaseStats stats = COUNTER_STATS_BY_NAME.get(name);
+		if (stats == null) {
+			stats = COUNTER_SAMPLES.get(name);
+			if (stats == null) {
+				stats = new PhaseStats();
+				COUNTER_SAMPLES.put(name, stats);
+				COUNTER_STATS_BY_NAME.put(name, stats);
+			}
+		}
+		stats.add(value);
 	}
 
 	public static void recordRustWholeFrameTimeline(

@@ -60,8 +60,8 @@ fn batch() -> GuiMeshBatchRequest {
                 source_face: 0,
                 source_foil_type: 0,
             },
-        ],
-        indices: vec![0, 1, 2],
+        ].into(),
+        indices: vec![0, 1, 2].into(),
     }
 }
 
@@ -1404,7 +1404,7 @@ fn captured_leaf_depth_pixels_at_clock(
                 }
             })
             .collect();
-        request.indices = vec![0, 1, 2, 2, 3, 0];
+        *request.indices = vec![0, 1, 2, 2, 3, 0];
         requests.push(request);
     }
     for (layer, mut draw) in prepare_draws(&requests).unwrap().into_iter().enumerate() {
@@ -2374,11 +2374,11 @@ fn flat_mesh_accepts_copied_back_and_edge_faces_without_discarding_geometry() {
                 ..template
             })
             .collect();
-        request.indices = vec![0, 1, 2, 2, 3, 0];
+        *request.indices = vec![0, 1, 2, 2, 3, 0];
         let output = prepare_draws(&[request.clone()]).unwrap();
         assert_eq!(output.len(), 1);
         assert_eq!(output[0].vertices.len(), 4);
-        assert_eq!(output[0].indices, request.indices);
+        assert_eq!(output[0].indices, *request.indices);
         assert_eq!(
             output[0].front_face,
             crate::render::vulkanic::resources::FrontFace::CounterClockwise
@@ -2392,7 +2392,7 @@ fn flat_mesh_accepts_copied_back_and_edge_faces_without_discarding_geometry() {
     let output = prepare_draws(&[combined.clone()]).unwrap();
     assert_eq!(output.len(), 1);
     assert_eq!(output[0].vertices.len(), 20);
-    assert_eq!(output[0].indices, combined.indices);
+    assert_eq!(output[0].indices, *combined.indices);
     // Independent reversed source winding is reconciled in Rust, while
     // the copied resource/vertex order remains unchanged.
     combined.indices.swap(7, 8);
@@ -2987,7 +2987,7 @@ fn non_reflected_gui_item_pose_reverses_the_complete_clip_space_front_face() {
 #[test]
 fn source_quad_winding_selects_the_per_face_front_face_without_disabling_culling() {
     let mut reverse_wound = batch();
-    reverse_wound.vertices = vec![
+    *reverse_wound.vertices = vec![
         GuiMeshVertex {
             position: [0.0, 0.0, 0.0],
             atlas_uv: [0.0, 0.0],

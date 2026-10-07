@@ -175,6 +175,65 @@ impl GuiItemCache {
     }
 }
 
+/// Copy-on-write vector: clones share one allocation, so persistent GUI
+/// geometry decoded once is reused every frame without copying; mutation
+/// copies only while shared.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SharedVec<T>(std::sync::Arc<Vec<T>>);
+
+impl<T> std::ops::Deref for SharedVec<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Vec<T> {
+        &self.0
+    }
+}
+
+impl<T: Clone> std::ops::DerefMut for SharedVec<T> {
+    fn deref_mut(&mut self) -> &mut Vec<T> {
+        std::sync::Arc::make_mut(&mut self.0)
+    }
+}
+
+impl<T> From<Vec<T>> for SharedVec<T> {
+    fn from(values: Vec<T>) -> Self {
+        Self(std::sync::Arc::new(values))
+    }
+}
+
+impl<T> FromIterator<T> for SharedVec<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self::from(iter.into_iter().collect::<Vec<_>>())
+    }
+}
+
+impl<'a, T> IntoIterator for &'a SharedVec<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a, T: Clone> IntoIterator for &'a mut SharedVec<T> {
+    type Item = &'a mut T;
+    type IntoIter = std::slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::sync::Arc::make_mut(&mut self.0).iter_mut()
+    }
+}
+
+impl<T: Clone> IntoIterator for SharedVec<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::sync::Arc::try_unwrap(self.0).unwrap_or_else(|shared| (*shared).clone()).into_iter()
+    }
+}
+
 /// A material-homogeneous indexed mesh for one GUI item layer. `asset_id`
 /// refers to a Rust-owned raw image asset, never a Minecraft atlas object.
 #[derive(Clone, Debug, PartialEq)]
@@ -225,8 +284,8 @@ pub struct GuiMeshBatchRequest {
     pub clip_top: i32,
     pub clip_width: i32,
     pub clip_height: i32,
-    pub vertices: Vec<GuiMeshVertex>,
-    pub indices: Vec<u32>,
+    pub vertices: SharedVec<GuiMeshVertex>,
+    pub indices: SharedVec<u32>,
 }
 
 /// Address identity of persistent caller geometry plus the caller's store

@@ -1710,7 +1710,7 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     .expect("valid copied GUI mesh batch");
     assert_eq!(1, decoded.len());
     assert_eq!([0.0, 0.0], decoded[0].vertices[0].local_uv);
-    assert_eq!(vec![0, 1, 2], decoded[0].indices);
+    assert_eq!(vec![0, 1, 2], *decoded[0].indices);
 
     let mut panorama = gui_mesh_batch_request(&vertices, &indices);
     panorama.material_mode = crate::render::bridge::gui::GUI_MESH_MATERIAL_PANORAMA;

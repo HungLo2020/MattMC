@@ -1,6 +1,7 @@
 //! GUI mesh batch decoding and item-layer compaction.
 
 use super::*;
+use crate::render::guirender::mesh::SharedVec;
 
 /// Stable `GuiMeshBatchRecord.materialMode` ABI value for title panoramas.
 pub(crate) const GUI_MESH_MATERIAL_PANORAMA: u32 = 5;
@@ -14,8 +15,8 @@ pub(crate) const GUI_MESH_MATERIAL_PANORAMA: u32 = 5;
 /// always runs on the caller's render thread.
 #[derive(Clone)]
 struct DecodedPersistentGeometry {
-    vertices: Vec<GuiMeshVertex>,
-    indices: Vec<u32>,
+    vertices: SharedVec<GuiMeshVertex>,
+    indices: SharedVec<u32>,
     /// Block-raster presence under which the geometry checks last passed.
     validated_with_block_raster: Option<bool>,
 }
@@ -141,7 +142,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
         let (vertices, indices, validated_state) = match cached {
             Some(decoded) => (decoded.vertices, decoded.indices, decoded.validated_with_block_raster),
             None => {
-                let decoded_vertices: Vec<GuiMeshVertex> = vertices
+                let decoded_vertices: SharedVec<GuiMeshVertex> = vertices
                     .iter()
                     .map(|vertex| GuiMeshVertex {
                         position: vertex.position,
@@ -153,7 +154,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
                         source_foil_type: vertex.source_foil_type,
                     })
                     .collect();
-                let decoded_indices = indices.to_vec();
+                let decoded_indices = SharedVec::from(indices.to_vec());
                 if let Some(key) = persistent_key {
                     DECODED_PERSISTENT_GEOMETRY.with(|cache| {
                         let mut cache = cache.borrow_mut();

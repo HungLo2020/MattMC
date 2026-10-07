@@ -2990,8 +2990,8 @@ fn mesh_batch(layer_index: u32) -> GuiMeshBatchRequest {
                 source_face: 0,
                 source_foil_type: 0,
             },
-        ],
-        indices: vec![0, 1, 2],
+        ].into(),
+        indices: vec![0, 1, 2].into(),
     }
 }
 
@@ -3136,7 +3136,7 @@ fn rotating_panorama_meshes_stay_within_the_bounded_rust_stream() {
         panorama.model_transform = [
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
-        panorama.vertices = vec![
+        *panorama.vertices = vec![
             GuiMeshVertex {
                 position: [0.0, 1.0, frame as f32 / 10.0],
                 atlas_uv: [0.0, 0.0],
@@ -3165,7 +3165,7 @@ fn rotating_panorama_meshes_stay_within_the_bounded_rust_stream() {
                 source_foil_type: 0,
             },
         ];
-        panorama.indices = vec![0, 1, 2];
+        *panorama.indices = vec![0, 1, 2];
         let stats = frontend
             .submit_frame_with_affine_quads_and_mesh_batches(
                 &mut gal,

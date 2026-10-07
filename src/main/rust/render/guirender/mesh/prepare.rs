@@ -319,7 +319,7 @@ pub(super) fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPrep
         reconcile_model_mesh_topology(model_transform, &vertices, &batch.indices)?
     } else {
         (
-            batch.indices.clone(),
+            batch.indices.to_vec(),
             transformed_front_face(model_transform, &vertices, &batch.indices)?,
         )
     };
