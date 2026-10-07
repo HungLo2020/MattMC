@@ -6739,7 +6739,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				|| !Arrays.equals(transform, decalFoil.modelPose()))) {
 				throw new IllegalArgumentException("world decal requires item foil and matching draw pose");
 			}
-			if (itemFoil != null && (stratum != WORLD_MESH_ENTITY_STRATUM || terrainPlacement != null || flags != 0 || blockEntityId != -1)) {
+			if (itemFoil != null && (stratum != WORLD_MESH_ENTITY_STRATUM || terrainPlacement != null
+				|| (flags & ~WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) != 0 || blockEntityId != -1)) {
 				throw new IllegalArgumentException("standard foil requires an ordinary entity mesh instance");
 			}
 			Objects.requireNonNull(transform, "transform");
@@ -6754,7 +6755,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			// the remaining flags; it is otherwise a plain entity mesh.
 			boolean modelRig = (flags & WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) != 0;
 			if (modelRig && ((stratum != WORLD_MESH_ENTITY_STRATUM && stratum != WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM)
-				|| itemFoil != null || decalFoil != null || terrainPlacement != null)) {
+				|| decalFoil != null || terrainPlacement != null)) {
 				throw new IllegalArgumentException("model rig instances must be plain entity meshes");
 			}
 			int semanticFlags = flags & ~WORLD_MESH_INSTANCE_FLAG_MODEL_RIG;

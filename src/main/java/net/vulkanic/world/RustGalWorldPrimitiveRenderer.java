@@ -9752,6 +9752,24 @@ public final class RustGalWorldPrimitiveRenderer {
 		ResourceLocation identity = ResourceLocation.withDefaultNamespace(armor
 			? "model-part/armor-texture-glint" : "model-part/direct-texture-glint");
 		model.setupAnim(state);
+		if (MODEL_RIGS_ENABLED && !pendingFirstPersonFrame) {
+			// A glint pass over the rig: no per-frame posed mesh asset.
+			CachedModelTopology topology = extractModel(model.root(), foilTexture, null, identity.toString(),
+				MATERIAL_ID_GLINT_TEXTURED, MATERIAL_MODE_GLINT, CULL_NONE, true, foilTexture).topology();
+			if (armor) net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beforeFirstSemanticClock(
+				Minecraft.getInstance().options.glintSpeed().get());
+			var foil = copiedEntityFoilSemantics();
+			if (armor) {
+				var kind = net.vulkanic.VulkanicAPI.getProjectionType() == net.blaze3d.ProjectionType.ORTHOGRAPHIC
+					? VulkanicGalBridge.StandardFoilKind.ARMOR_ORTHOGRAPHIC : VulkanicGalBridge.StandardFoilKind.ARMOR;
+				foil = new VulkanicGalBridge.StandardItemFoilRecord(foil.clockMillis(), foil.speed(), foil.strength(), kind);
+			}
+			long rigId = enqueueModelRig(model, topology, entityPose, textureIdentity, packedLight,
+				DEPTH_POLICY_TEST_NO_WRITE, CULL_NONE, 0xffffffff, 0, 0, 0, foil, "model-glint");
+			if (armor) net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.observeSemanticClock(
+				rigId, foil.clockMillis(), foil.speed(), foil.strength());
+			return true;
+		}
 		BlockMeshExtraction extraction = extractModelPartMesh(
 			model.root(), textureIdentity, null, identity.toString(), packedLight,
 			MATERIAL_ID_GLINT_TEXTURED, MATERIAL_MODE_GLINT, CULL_NONE, foilTexture
@@ -9910,7 +9928,8 @@ public final class RustGalWorldPrimitiveRenderer {
 					semantics.materialId(),
 					semantics.materialMode(),
 					semantics.cullPolicy(),
-					MODEL_RIGS_ENABLED && !pendingFirstPersonFrame
+					MODEL_RIGS_ENABLED && !pendingFirstPersonFrame,
+					null
 				);
 			rigTopology = modelExtraction.topology();
 			extractions = modelExtraction.parts();
@@ -12191,7 +12210,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		String entityIdentity, int packedLight, int materialId, int materialMode, int cullPolicy
 	) {
 		return extractModel(modelRoot, textureIdentity, sprite, entityIdentity, materialId, materialMode,
-			cullPolicy, false).parts();
+			cullPolicy, false, null).parts();
 	}
 
 	/**
@@ -12202,12 +12221,51 @@ public final class RustGalWorldPrimitiveRenderer {
 	private record ModelExtraction(@Nullable List<ModelPoseMeshExtraction> parts, @Nullable CachedModelTopology topology) {
 	}
 
+	/**
+	 * With {@code glintTexture}, the cached topology is a glint pass over the
+	 * model: every section samples that foil texture (the base texture plays
+	 * no part), as the baked {@code extractModelPartMesh} glint does.
+	 */
 	private static ModelExtraction extractModel(
 		ModelPart modelRoot, ResourceLocation textureIdentity, @Nullable TextureAtlasSprite sprite,
-		String entityIdentity, int materialId, int materialMode, int cullPolicy, boolean rig
+		String entityIdentity, int materialId, int materialMode, int cullPolicy, boolean rig,
+		@Nullable ResourceLocation glintTexture
 	) {
 		if (modelRoot == null || textureIdentity == null || entityIdentity == null) {
 			throw new IllegalArgumentException("stable model extraction requires complete semantic identity");
+		}
+		if (glintTexture != null) {
+			ModelTopologyCacheKey cacheKey = new ModelTopologyCacheKey(
+				modelRoot, glintTexture, null, entityIdentity, materialId, materialMode, cullPolicy, false, false);
+			CachedModelTopology cached;
+			synchronized (STABLE_MODEL_TOPOLOGIES) {
+				cached = STABLE_MODEL_TOPOLOGIES.get(cacheKey);
+			}
+			if (cached == null) {
+				VulkanicGalBridge.WorldMeshTextureAssetRecord foilTexture;
+				try {
+					foilTexture = cachedStandardItemFoilTexture(glintTexture);
+				} catch (IOException error) {
+					throw new IllegalStateException("cannot copy semantic model foil resource", error);
+				}
+				if (foilTexture == null) {
+					throw new IllegalStateException("unsupported model texture asset " + glintTexture);
+				}
+				cached = buildModelTopology(modelRoot, glintTexture, null, entityIdentity, materialId,
+					stableTextureId(glintTexture), materialMode, cullPolicy, List.of(foilTexture));
+				if (cached != null) {
+					synchronized (STABLE_MODEL_TOPOLOGIES) {
+						CachedModelTopology replaced = STABLE_MODEL_TOPOLOGIES.put(cacheKey, cached);
+						if (replaced != null) {
+							retireModelRig(replaced);
+						}
+					}
+				}
+			}
+			if (cached == null) {
+				throw new IllegalStateException("Rust model glint extraction produced no mesh");
+			}
+			return rig ? new ModelExtraction(null, cached) : new ModelExtraction(cached.bindCurrentPoses(modelRoot), null);
 		}
 		boolean ownedBlockAtlas = (sprite != null)
 			&& itemSpriteUsesOwnedBlockAtlas(sprite);
@@ -12450,45 +12508,61 @@ public final class RustGalWorldPrimitiveRenderer {
 		int packedLight, int tintedColor, ModelMeshRenderSemantics semantics, int overlayColorArgb, int outlineColor,
 		int flags
 	) {
+		enqueueModelRig(model, topology, entityPose, textureIdentity, packedLight, semantics.depthPolicy(),
+			semantics.cullPolicy(), resolvedModelInstanceColor(tintedColor), overlayColorArgb, outlineColor,
+			flags | semantics.viewLayerFlags(), null, "model");
+		return true;
+	}
+
+	/** Queues a model-rig instance (optionally a foil pass) and returns its rig id. */
+	private static long enqueueModelRig(
+		Model<?> model, CachedModelTopology topology, PoseStack.Pose entityPose, ResourceLocation textureIdentity,
+		int packedLight, int depthPolicy, int cullPolicy, int colorArgb, int entityColorArgb, int outlineColor,
+		int flags, @Nullable VulkanicGalBridge.StandardItemFoilRecord foil, String producer
+	) {
 		GraphicsFrameBenchmark.beginDetailedPhase("world.model.rust-enqueue");
 		try {
 			synchronized (LOCK) {
-				ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL model mesh requires a seeded bounded world primitive frame");
-				ensureWorldQueueCapacityLocked(
-					PENDING_MESH_INSTANCES.size(), topology.meshesByPath.size(), MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
-				);
-				long rigId = prepareModelRigLocked(topology);
-				int firstPose = appendModelRigPosesLocked(topology.nodes);
-				PENDING_MESH_INSTANCES.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
-					STRATUM_WORLD_ENTITY_MESH,
-					rigId,
-					firstPose + 1L,
-					MESH_SECTION_ALL,
-					semantics.depthPolicy(),
-					semantics.cullPolicy(),
-					WORLD_WINDING_CCW,
-					resolvedModelInstanceColor(tintedColor),
-					entityPose.pose().get(new float[16]),
-					pendingViewportWidth,
-					pendingViewportHeight,
-					0,
-					overlayColorArgb,
-					outlineColor,
-					flags | semantics.viewLayerFlags() | VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG
-				).withPackedLight(packedLight));
-				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
-				PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity(
-					model.getClass().getName(), textureIdentity
-				));
-				recordWorldMeshSubmittedWorkIdentity(
-					"model",
-					"rust-vulkan-whole-frame:" + textureIdentity
-				);
+				// A failure before the instance is added leaves only admitted
+				// assets and unreferenced poses, so no batch checkpoint is needed.
+				{
+					ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL model mesh requires a seeded bounded world primitive frame");
+					ensureWorldQueueCapacityLocked(
+						PENDING_MESH_INSTANCES.size(), topology.meshesByPath.size(), MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
+					);
+					long rigId = prepareModelRigLocked(topology);
+					int firstPose = appendModelRigPosesLocked(topology.nodes);
+					VulkanicGalBridge.WorldMeshInstanceRecord instance = new VulkanicGalBridge.WorldMeshInstanceRecord(
+						STRATUM_WORLD_ENTITY_MESH,
+						rigId,
+						firstPose + 1L,
+						MESH_SECTION_ALL,
+						depthPolicy,
+						cullPolicy,
+						WORLD_WINDING_CCW,
+						colorArgb,
+						entityPose.pose().get(new float[16]),
+						pendingViewportWidth,
+						pendingViewportHeight,
+						0,
+						entityColorArgb,
+						outlineColor,
+						flags | VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG
+					).withPackedLight(packedLight);
+					PENDING_MESH_INSTANCES.add(foil == null ? instance : instance.withItemFoil(foil));
+					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
+					if (foil == null) {
+						PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity(
+							model.getClass().getName(), textureIdentity
+						));
+					}
+					recordWorldMeshSubmittedWorkIdentity(producer, "rust-vulkan-whole-frame:" + textureIdentity);
+					return rigId;
+				}
 			}
 		} finally {
 			GraphicsFrameBenchmark.endDetailedPhase("world.model.rust-enqueue");
 		}
-		return true;
 	}
 
 	/**
