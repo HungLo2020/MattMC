@@ -3580,12 +3580,10 @@ public final class RustGalTerrainRenderer {
 		currentFrameVisibleFingerprint.set(fingerprint);
 	}
 
+	/** One word of the visible-layer fingerprint; Rust's selection mixes identically. */
 	private static long terrainFingerprintLong(long hash, long value) {
-		for (int shift = 0; shift < 64; shift += 8) {
-			hash ^= (value >>> shift) & 0xffL;
-			hash *= 0x100000001b3L;
-		}
-		return hash;
+		long mixed = (hash ^ value) * 0x100000001b3L;
+		return mixed ^ (mixed >>> 32);
 	}
 
 	private static boolean finiteBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {

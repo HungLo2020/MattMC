@@ -62,7 +62,7 @@ pub struct TerrainSelectionParams {
 
 /// Benchmark receipts of the camera stream, matching Java's producer
 /// counters: probes per visible layer lookup, accepted layers and their
-/// FNV-1a fingerprint over (section key, mesh key, generation, layer).
+/// word-mixed fingerprint over (section key, mesh key, generation, layer).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TerrainSelectionReceipts {
     pub layer_probes: u64,
@@ -104,12 +104,10 @@ fn centre_distance(position: [i32; 3], camera: [f64; 3]) -> f64 {
     dx * dx + dy * dy + dz * dz
 }
 
-fn fingerprint(mut hash: u64, value: u64) -> u64 {
-    for shift in (0..64).step_by(8) {
-        hash ^= (value >> shift) & 0xff;
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    hash
+/// One word of the fingerprint (Java's `terrainFingerprintLong` mixes identically).
+fn fingerprint(hash: u64, value: u64) -> u64 {
+    let mixed = (hash ^ value).wrapping_mul(0x0000_0100_0000_01b3);
+    mixed ^ (mixed >> 32)
 }
 
 impl TerrainSelection {
