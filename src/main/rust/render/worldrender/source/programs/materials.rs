@@ -246,7 +246,7 @@ impl WorldPrimitiveFrontend {
         let pack_resources = match gal.create_resource_layout(layouts.pack_resources) {
             Ok(layout) => layout,
             Err(error) => {
-                let _ = gal.destroy(source_data);
+                let _ = gal.retire(source_data);
                 return Err(error);
             }
         };
@@ -837,7 +837,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.lowered_entity_source_pipeline_resources
@@ -1019,7 +1019,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.lowered_textured_material_source_pipeline_resources
@@ -1539,7 +1539,7 @@ impl WorldPrimitiveFrontend {
             })();
             if result.is_err() {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             self.lowered_source_terrain_frame_data_resources
@@ -2044,7 +2044,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.source_material_texture_resources

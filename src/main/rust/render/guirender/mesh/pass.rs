@@ -132,7 +132,7 @@ impl GuiMeshPassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -517,9 +517,9 @@ impl GuiMeshPassResources {
     }
 
     pub fn destroy_asset_resources(self, gal: &mut VulkanicGal) {
-        for handle in [self.resource_set, self.uniform_buffer] { let _ = gal.destroy(handle); }
+        for handle in [self.resource_set, self.uniform_buffer] { let _ = gal.retire(handle); }
         if self.owns_geometry {
-            for handle in [self.index_buffer, self.vertex_buffer] { let _ = gal.destroy(handle); }
+            for handle in [self.index_buffer, self.vertex_buffer] { let _ = gal.retire(handle); }
         }
     }
 

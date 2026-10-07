@@ -79,7 +79,7 @@ impl ShaderPackColorClearPasses {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         for clear in self.passes.iter().rev() {
             for handle in [clear.pass, clear.target] {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

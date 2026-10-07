@@ -329,7 +329,7 @@ impl GuiFrontend {
                 Ok((ops, stats))
             }
             Err(error) => {
-                let _ = gal.destroy(pass);
+                let _ = gal.retire(pass);
                 Err(error)
             }
         }

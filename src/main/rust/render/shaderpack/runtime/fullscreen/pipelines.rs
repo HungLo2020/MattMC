@@ -47,7 +47,7 @@ impl FullscreenPipelineObjects {
             self.source_data_layout,
             self.pack_resources_layout,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -213,7 +213,7 @@ impl CachedFullscreenStage {
             .into_iter()
             .chain(self.scalar_uniform_buffer)
         {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         self.color_resources.destroy(gal);
         if let Ok(objects) = std::sync::Arc::try_unwrap(self.objects) {
@@ -299,7 +299,7 @@ impl FullscreenPipelineCache {
         }
     }
 
-    pub(super) fn release_all(&self, gal: &mut VulkanicGal) {
+    pub(crate) fn release_all(&self, gal: &mut VulkanicGal) {
         self.release_stages(gal);
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
         for cached in entries.into_values().flatten() {
@@ -322,8 +322,8 @@ impl CompiledFullscreenSourcePass {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(shared) = self.shared {
             if self.owns_target {
-                let _ = gal.destroy(self.pass);
-                let _ = gal.destroy(self.target);
+                let _ = gal.retire(self.pass);
+                let _ = gal.retire(self.target);
             }
             if let Ok(objects) = std::sync::Arc::try_unwrap(shared) {
                 objects.destroy(gal);
@@ -340,7 +340,7 @@ impl CompiledFullscreenSourcePass {
             self.source_data_layout,
             self.pack_resources_layout,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }

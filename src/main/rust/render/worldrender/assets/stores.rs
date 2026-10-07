@@ -1235,11 +1235,11 @@ impl WorldPrimitiveFrontend {
     pub(in crate::render::worldrender) fn flush_deferred_mesh_resource_destroys(&mut self, gal: &mut VulkanicGal) {
         let deferred = std::mem::take(&mut self.deferred_mesh_resource_destroys);
         for handle in deferred {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         let deferred_streams = std::mem::take(&mut self.deferred_mesh_stream_buffer_destroys);
         for handle in deferred_streams {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         let submission = gal.latest_submission_id();
         // A page binding names the whole vertex page, so released ranges leave
@@ -1493,7 +1493,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.mesh_texture_resources.insert(texture_id, result?);
@@ -1747,7 +1747,7 @@ impl WorldPrimitiveFrontend {
         for key in stale_keys {
             if let Some(resources) = self.material_resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -1762,7 +1762,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.mesh_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let geometry = std::mem::take(&mut self.mesh_geometry_resources);
@@ -1787,7 +1787,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.mesh_texture_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -1842,7 +1842,7 @@ impl WorldPrimitiveFrontend {
             if let Some(resources) = self.source_mesh_resources.remove(&source_key) {
                 source_geometry_keys.insert(resources.geometry_key);
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }

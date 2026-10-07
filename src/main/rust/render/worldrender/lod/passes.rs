@@ -57,10 +57,10 @@ pub(super) struct WorldLodPipelineResources {
 impl WorldLodPipelineResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(handle) = self.offscreen_pipeline {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         if let Some(handle) = self.offscreen_replay_pipeline {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         for handle in [
             self.pipeline,
@@ -70,7 +70,7 @@ impl WorldLodPipelineResources {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -119,9 +119,9 @@ pub(super) struct WorldLodLightmapResources {
 
 impl WorldLodDrawResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.resource_set);
+        let _ = gal.retire(self.resource_set);
         if let Some(uniform_buffer) = self.uniform_buffer {
-            let _ = gal.destroy(uniform_buffer);
+            let _ = gal.retire(uniform_buffer);
         }
     }
 }
@@ -277,7 +277,7 @@ impl WorldLodPassResources {
                 Ok(set) => set,
                 Err(error) => {
                     if let Some(own_uniform_buffer) = own_uniform_buffer {
-                        let _ = gal.destroy(own_uniform_buffer);
+                        let _ = gal.retire(own_uniform_buffer);
                     }
                     return Err(error);
                 }
@@ -417,7 +417,7 @@ impl WorldLodPassResources {
             .collect::<Vec<_>>();
         for key in stale {
             if let Some(resources) = self.lightmaps.remove(&key) {
-                let _ = gal.destroy(resources.resource_set);
+                let _ = gal.retire(resources.resource_set);
             }
         }
     }
@@ -427,7 +427,7 @@ impl WorldLodPassResources {
     /// lifetime; this cache owns only consumers of its view.
     pub(crate) fn clear_lightmap_bindings(&mut self, gal: &mut VulkanicGal) {
         for (_, resources) in std::mem::take(&mut self.lightmaps) {
-            let _ = gal.destroy(resources.resource_set);
+            let _ = gal.retire(resources.resource_set);
         }
     }
 
@@ -667,7 +667,7 @@ impl WorldLodPassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.pipeline = Some(result?);

@@ -764,7 +764,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -818,7 +818,7 @@ impl WorldPrimitiveFrontend {
                     Err(error) => {
                         self.pending_terrain_fabulous_handoff = false;
                         if terrain_presentation_pass != Handle::NULL {
-                            let _ = gal.destroy(terrain_presentation_pass);
+                            let _ = gal.retire(terrain_presentation_pass);
                         }
                         gal.rollback_frame_target_depth_write(frame_target);
                         return Err(error);
@@ -847,7 +847,7 @@ impl WorldPrimitiveFrontend {
                     None => {
                         self.pending_terrain_fabulous_handoff = false;
                         if terrain_presentation_pass != Handle::NULL {
-                            let _ = gal.destroy(terrain_presentation_pass);
+                            let _ = gal.retire(terrain_presentation_pass);
                         }
                         gal.rollback_frame_target_depth_write(frame_target);
                         return Err(GalError::backend(
@@ -860,7 +860,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -871,7 +871,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -882,7 +882,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -908,7 +908,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -990,7 +990,7 @@ impl WorldPrimitiveFrontend {
             if let Err(error) = capture_result {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.discard_pending_lowered_source_terrain_submission(gal);
@@ -1012,7 +1012,7 @@ impl WorldPrimitiveFrontend {
             if let Err(error) = capture.append_normal_world_output(gal, &mut ops, frame_target) {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.discard_pending_lowered_source_terrain_submission(gal);
@@ -1055,7 +1055,7 @@ impl WorldPrimitiveFrontend {
                 ) {
                     self.world_text.cancel_submission();
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     self.discard_pending_lowered_source_terrain_submission(gal);
@@ -1077,7 +1077,7 @@ impl WorldPrimitiveFrontend {
             {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.discard_pending_lowered_source_terrain_submission(gal);
@@ -1130,7 +1130,7 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.pending_entity_outline_targets_written = false;
@@ -1168,7 +1168,7 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.pending_entity_outline_targets_written = false;

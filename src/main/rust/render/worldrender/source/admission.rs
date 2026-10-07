@@ -156,6 +156,9 @@ impl WorldPrimitiveFrontend {
         if has_matching_runtime {
             return Ok(());
         }
+        if self.shader_runtime.as_ref().is_some_and(|runtime| runtime.generation() != generation) {
+            self.release_cached_source_consumers(gal);
+        }
         if let Some(previous) = self.shader_runtime.take() {
             self.release_source_color_consumers(gal);
             // The LOD pass caches resource sets that reference the runtime's

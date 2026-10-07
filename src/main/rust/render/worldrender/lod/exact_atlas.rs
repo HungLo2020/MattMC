@@ -49,10 +49,10 @@ pub(super) struct WorldLodExactAtlasPipelineResources {
 impl WorldLodExactAtlasPipelineResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(handle) = self.offscreen_pipeline {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         if let Some(handle) = self.offscreen_replay_pipeline {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         for handle in [
             self.pipeline,
@@ -62,7 +62,7 @@ impl WorldLodExactAtlasPipelineResources {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -307,7 +307,7 @@ impl WorldLodExactAtlasPassResources {
             }) {
                 Ok(set) => set,
                 Err(error) => {
-                    let _ = gal.destroy(uniform_buffer);
+                    let _ = gal.retire(uniform_buffer);
                     return Err(error);
                 }
             };
@@ -420,14 +420,14 @@ impl WorldLodExactAtlasPassResources {
             .collect::<Vec<_>>();
         for key in stale {
             if let Some(set) = self.material_sets.remove(&key) {
-                let _ = gal.destroy(set);
+                let _ = gal.retire(set);
             }
         }
     }
 
     pub(crate) fn clear_bindings(&mut self, gal: &mut VulkanicGal) {
         for (_, set) in std::mem::take(&mut self.material_sets) {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
     }
 
@@ -591,7 +591,7 @@ impl WorldLodExactAtlasPassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.pipeline = Some(result?);
@@ -731,7 +731,7 @@ impl WorldLodExactAtlasSourcePipelineResources {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -744,11 +744,11 @@ pub(super) struct WorldLodExactAtlasSourceDrawResources {
 
 impl WorldLodExactAtlasSourceDrawResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.source_data_set);
+        let _ = gal.retire(self.source_data_set);
         if let Some(buffer) = self.scalar_uniform_buffer {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
-        let _ = gal.destroy(self.column_frame_buffer);
+        let _ = gal.retire(self.column_frame_buffer);
     }
 }
 
@@ -875,9 +875,9 @@ impl WorldLodExactAtlasSourcePassResources {
                 Ok(set) => set,
                 Err(error) => {
                     if let Some(buffer) = scalar_uniform_buffer {
-                        let _ = gal.destroy(buffer);
+                        let _ = gal.retire(buffer);
                     }
-                    let _ = gal.destroy(column_frame_buffer);
+                    let _ = gal.retire(column_frame_buffer);
                     return Err(error);
                 }
             };
@@ -980,14 +980,14 @@ impl WorldLodExactAtlasSourcePassResources {
             .collect::<Vec<_>>();
         for key in stale {
             if let Some(set) = self.material_sets.remove(&key) {
-                let _ = gal.destroy(set);
+                let _ = gal.retire(set);
             }
         }
     }
 
     pub(crate) fn clear_bindings(&mut self, gal: &mut VulkanicGal) {
         for (_, set) in std::mem::take(&mut self.material_sets) {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
     }
 
@@ -1069,7 +1069,7 @@ impl WorldLodExactAtlasSourcePassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.pipelines.insert(pipeline_key.clone(), result?);

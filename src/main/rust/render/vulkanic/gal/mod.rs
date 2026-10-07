@@ -110,6 +110,9 @@ pub struct VulkanicGal {
     render_passes: Arena<ResourceRecord<RenderPassDesc>>,
     dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
     reverse_dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
+    /// Resources retired while still bound (see `retire`); each is destroyed
+    /// when its last dependent goes.
+    retired_while_referenced: BTreeSet<Handle>,
     pending_destroys: BTreeMap<Handle, PendingDestroy>,
     /// Whole-frame frontends assemble command lists incrementally. Resources
     /// retired while that transaction is open must remain logically live until
@@ -155,6 +158,7 @@ impl VulkanicGal {
             render_passes: Arena::new(HandleKind::RenderPass),
             dependencies: BTreeMap::new(),
             reverse_dependencies: BTreeMap::new(),
+            retired_while_referenced: BTreeSet::new(),
             pending_destroys: BTreeMap::new(),
             command_recording_depth: 0,
             command_recording_destroys: Vec::new(),

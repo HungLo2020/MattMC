@@ -243,7 +243,7 @@ impl SourceTerrainGeometryPages {
 
     pub(in crate::render::worldrender) fn destroy_all(&mut self, gal: &mut VulkanicGal) {
         for page in self.vertex_pages.drain(..).chain(self.index_pages.drain(..)) {
-            let _ = gal.destroy(page.buffer);
+            let _ = gal.retire(page.buffer);
         }
         self.pending_releases.clear();
     }
@@ -427,7 +427,7 @@ impl MeshGeometryArena {
             }) {
                 Ok(staging) => Some(staging),
                 Err(error) => {
-                    let _ = gal.destroy(buffer);
+                    let _ = gal.retire(buffer);
                     return Err(error);
                 }
             }
@@ -510,9 +510,9 @@ impl MeshGeometryArena {
                     // submission completed. GAL still owns the final
                     // completion check and may defer destruction if another
                     // explicit dependency references the page.
-                    let _ = gal.destroy(page.buffer);
+                    let _ = gal.retire(page.buffer);
                     if let Some(staging) = page.staging_buffer {
-                        let _ = gal.destroy(staging);
+                        let _ = gal.retire(staging);
                     }
                 } else {
                     retained.push(page);
@@ -532,9 +532,9 @@ impl MeshGeometryArena {
             .drain(..)
             .chain(self.index_pages.drain(..))
         {
-            let _ = gal.destroy(page.buffer);
+            let _ = gal.retire(page.buffer);
             if let Some(staging) = page.staging_buffer {
-                let _ = gal.destroy(staging);
+                let _ = gal.retire(staging);
             }
         }
     }
@@ -788,7 +788,7 @@ impl WorldPrimitiveFrontend {
             }
         }
         for set in destroyed {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
     }
 
@@ -797,7 +797,7 @@ impl WorldPrimitiveFrontend {
             resources.page_resource_set = None;
         }
         for (_, set) in std::mem::take(&mut self.mesh_page_resource_sets) {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
     }
 
@@ -1176,7 +1176,7 @@ impl WorldPrimitiveFrontend {
                 ],
             })?;
             self.destroy_lowered_source_terrain_frame_data_resources_for_stream_buffer(gal, old);
-            let _ = gal.destroy(old);
+            let _ = gal.retire(old);
             let slot = &mut self.source_terrain_frame_stream_slots[slot_index];
             slot.buffer = buffer;
             slot.capacity = grown_capacity;
@@ -1291,7 +1291,7 @@ impl WorldPrimitiveFrontend {
             // The slot is only reused after its previous submission completed;
             // the GAL additionally defers destruction of in-flight buffers.
             if let Some(previous) = slot.indirect_buffer.replace(buffer) {
-                let _ = gal.destroy(previous);
+                let _ = gal.retire(previous);
             }
             slot.indirect_capacity = capacity;
         }
@@ -1566,13 +1566,13 @@ impl WorldPrimitiveFrontend {
         self.destroy_mesh_page_resource_sets(gal);
         let slots = std::mem::take(&mut self.mesh_instance_stream_slots);
         for slot in slots.into_iter().rev() {
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
         if let Some(slot) = self.mesh_indirect_stream.take() {
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
         if let Some(slot) = self.mesh_sorted_index_stream.take() {
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
     }
 
@@ -1587,7 +1587,7 @@ impl WorldPrimitiveFrontend {
                 gal,
                 slot.buffer,
             );
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
     }
 }

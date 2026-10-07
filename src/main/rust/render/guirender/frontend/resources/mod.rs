@@ -81,7 +81,7 @@ pub(in crate::render::guirender::frontend) struct GuiBatch {
 impl GuiFrontend {
     pub fn clear_frame_pass(&mut self, gal: &mut VulkanicGal) {
         if let Some(pass) = self.cached_pass.take() {
-            let _ = gal.destroy(pass.pass);
+            let _ = gal.retire(pass.pass);
         }
     }
 
@@ -91,7 +91,7 @@ impl GuiFrontend {
         };
         if targets.contains(&pass.frame_target) {
             self.cached_pass = None;
-            let _ = gal.destroy(pass.pass);
+            let _ = gal.retire(pass.pass);
         }
     }
 
@@ -384,7 +384,7 @@ impl GuiFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result

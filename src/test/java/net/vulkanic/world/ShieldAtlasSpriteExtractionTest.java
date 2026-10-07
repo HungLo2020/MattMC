@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ShieldAtlasSpriteExtractionTest {
-    @Test void animatedAdmissionRequiresVulkanOwnershipAndCurrentBoundResource() {
+    @Test void animatedAdmissionRequiresTheCurrentBoundResource() {
         String atlasKey = "mattmc.dev.rustGalShieldAtlas", clockKey = "mattmc.dev.rustGalShieldAtlasAnimation";
         String beforeAtlas = System.getProperty(atlasKey), beforeClock = System.getProperty(clockKey);
         var name = ResourceLocation.withDefaultNamespace("entity/shield_base_nopattern");
@@ -40,9 +40,10 @@ class ShieldAtlasSpriteExtractionTest {
             assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             when(sprite.semanticAnimationResource()).thenReturn(resource);
             assertTrue(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
-            // Legacy flags cannot create ownership when the Vulkan frame is absent.
+            // The Rust route is the only route: the legacy properties neither
+            // grant nor revoke ownership.
             System.setProperty(clockKey, "true"); System.setProperty(atlasKey, "true");
-            assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
+            assertTrue(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             when(atlas.getSprite(name)).thenReturn(mock(TextureAtlasSprite.class));
             assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             when(atlas.getSprite(name)).thenReturn(sprite);

@@ -42,6 +42,17 @@ cargo doc --no-deps --open    # then open mattmc_rust::render::vulkanic
    or `retire_through`). Inside a command-recording scope
    (`begin_command_recording`/`finish_command_recording`), destroys queue
    until the outermost scope closes.
+6. **Owners retire; they don't force.** A resource whose consumers live in
+   other caches (sampled targets, depth/shadow samplers, material textures)
+   is released with `retire`: destroyed now when nothing binds it, otherwise
+   destroyed when its last dependent is destroyed (a view's release then
+   releases its texture). Teardown code that ignores the result
+   (`let _ = gal.retire(..)`) uses `retire`; `destroy` keeps the strict
+   `DependencyViolation` for code that must know. Teardown also drops cached
+   consumer sets first (`release_cached_source_consumers`). Every validation
+   failure is logged as `rust_gal_validation_failure` (rate-limited); the
+   [lifecycle gate](RENDER-VERIFICATION.md#lifecycle-gate) fails on a logged
+   dependency violation.
 
 Presentation follows its own cycle: `configure_frame_surface`, then per frame
 `acquire_frame`, `create_frame_target` for the acquired image, render, submit,

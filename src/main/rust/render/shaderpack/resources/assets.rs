@@ -148,7 +148,7 @@ impl TerrainSourceAssetResources {
 
         if let Err(error) = result {
             for handle in upload_buffers.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
             destroy_handles(
                 gal,
@@ -319,7 +319,7 @@ fn create_texture(
     }) {
         Ok(view) => view,
         Err(error) => {
-            let _ = gal.destroy(texture);
+            let _ = gal.retire(texture);
             return Err(error);
         }
     };
@@ -334,8 +334,8 @@ fn create_texture(
     }) {
         Ok(upload) => upload,
         Err(error) => {
-            let _ = gal.destroy(view);
-            let _ = gal.destroy(texture);
+            let _ = gal.retire(view);
+            let _ = gal.retire(texture);
             return Err(error);
         }
     };
@@ -449,16 +449,16 @@ fn destroy_handles(
     textures: Vec<Handle>,
 ) {
     for handle in combined.into_iter().rev() {
-        let _ = gal.destroy(handle);
+        let _ = gal.retire(handle);
     }
     for handle in samplers.into_iter().rev() {
-        let _ = gal.destroy(handle);
+        let _ = gal.retire(handle);
     }
     for handle in views.into_iter().rev() {
-        let _ = gal.destroy(handle);
+        let _ = gal.retire(handle);
     }
     for handle in textures.into_iter().rev() {
-        let _ = gal.destroy(handle);
+        let _ = gal.retire(handle);
     }
 }
 

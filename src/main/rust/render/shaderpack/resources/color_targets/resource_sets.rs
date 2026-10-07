@@ -29,10 +29,10 @@ impl ShaderPackSourceColorResources {
 
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         for handle in self.combined_samplers.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         for handle in self.samplers.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -398,7 +398,7 @@ pub(crate) fn prepare_source_color_resources(
     })();
     if result.is_err() {
         for handle in created.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
     result

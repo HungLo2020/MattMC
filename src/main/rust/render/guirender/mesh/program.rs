@@ -89,7 +89,7 @@ impl GuiMeshSharedProgram {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -103,7 +103,7 @@ impl GuiMeshSharedProgram {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }

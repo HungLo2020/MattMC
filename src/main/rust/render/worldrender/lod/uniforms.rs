@@ -386,6 +386,6 @@ impl WorldLodPackedUniforms {
     }
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.buffer);
+        let _ = gal.retire(self.buffer);
     }
 }

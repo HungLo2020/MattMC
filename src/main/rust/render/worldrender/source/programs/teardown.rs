@@ -7,7 +7,7 @@ impl WorldPrimitiveFrontend {
         let frame_resources = std::mem::take(&mut self.lowered_source_terrain_frame_data_resources);
         for (_, resources) in frame_resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let mut geometry_resources =
@@ -16,7 +16,7 @@ impl WorldPrimitiveFrontend {
         geometry_resources.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         for (_, resources) in geometry_resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.source_terrain_geometry_pages.destroy_all(gal);
@@ -43,7 +43,7 @@ impl WorldPrimitiveFrontend {
                     .remove(&frame_key)
                 {
                     for handle in resources.handles_in_destroy_order() {
-                        let _ = gal.destroy(handle);
+                        let _ = gal.retire(handle);
                     }
                 }
             }
@@ -74,7 +74,7 @@ impl WorldPrimitiveFrontend {
                     self.source_terrain_geometry_pages.release_after(release_after, index);
                 }
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -100,7 +100,7 @@ impl WorldPrimitiveFrontend {
                 .remove(&frame_key)
             {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -111,14 +111,14 @@ impl WorldPrimitiveFrontend {
             std::mem::take(&mut self.lowered_textured_material_source_frame_data_resources);
         for (_, resources) in frame_resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let pack_resources =
             std::mem::take(&mut self.lowered_textured_material_source_pack_resources);
         for (_, resources) in pack_resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.destroy_lowered_textured_material_source_local_texture_resources(gal);
@@ -126,13 +126,13 @@ impl WorldPrimitiveFrontend {
             std::mem::take(&mut self.lowered_textured_material_source_pipeline_resources);
         for (_, resources) in pipelines {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let layouts = std::mem::take(&mut self.lowered_textured_material_source_program_layouts);
         for (_, layouts) in layouts {
             for handle in layouts.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -154,7 +154,7 @@ impl WorldPrimitiveFrontend {
                 .remove(&key)
             {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -220,7 +220,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.lowered_source_terrain_pack_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -229,7 +229,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.lowered_textured_material_source_pack_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -245,7 +245,7 @@ impl WorldPrimitiveFrontend {
                 .remove(&key)
             {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -256,9 +256,23 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.lowered_entity_source_pack_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
+    }
+
+    /// Drops every cached set that binds shared source inputs (DH depth
+    /// targets, material and pack textures, color targets): fullscreen
+    /// plans and stages, entity/terrain/material pack sets and the final
+    /// output cache. Call before those inputs are destroyed.
+    pub(crate) fn release_cached_source_consumers(&mut self, gal: &mut VulkanicGal) {
+        if let Some(runtime) = self.shader_runtime.as_ref() {
+            runtime.release_fullscreen_consumers(gal);
+        }
+        self.destroy_lowered_entity_source_pack_resources(gal);
+        self.destroy_lowered_source_terrain_pack_resources(gal);
+        self.destroy_lowered_textured_material_source_resources(gal);
+        self.source_final_output_cache.destroy(gal);
     }
 
     pub(crate) fn destroy_lowered_entity_source_resources(&mut self, gal: &mut VulkanicGal) {
@@ -267,7 +281,7 @@ impl WorldPrimitiveFrontend {
         let pipelines = std::mem::take(&mut self.lowered_entity_source_pipeline_resources);
         for (_, resources) in pipelines {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -284,7 +298,7 @@ impl WorldPrimitiveFrontend {
         for key in keys {
             if let Some(resources) = self.lowered_entity_source_pack_resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -304,7 +318,7 @@ impl WorldPrimitiveFrontend {
         let bindings =
             std::mem::take(&mut self.lowered_textured_material_source_local_texture_resources);
         for (_, resources) in bindings {
-            let _ = gal.destroy(resources.combined_sampler);
+            let _ = gal.retire(resources.combined_sampler);
         }
         let textures = std::mem::take(&mut self.source_material_texture_resources);
         self.source_material_texture_upload_confirmed.clear();
@@ -313,7 +327,7 @@ impl WorldPrimitiveFrontend {
         self.source_material_texture_upload_operations.clear();
         for (_, resources) in textures {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -326,7 +340,7 @@ impl WorldPrimitiveFrontend {
         for key in keys {
             if let Some(resources) = self.lowered_source_terrain_pack_resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -336,7 +350,7 @@ impl WorldPrimitiveFrontend {
         let layouts = std::mem::take(&mut self.lowered_source_terrain_program_layouts);
         for (_, layouts) in layouts {
             for handle in layouts.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -345,7 +359,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.lowered_source_terrain_pipeline_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

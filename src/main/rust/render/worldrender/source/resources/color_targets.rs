@@ -12,8 +12,8 @@ impl WorldPrimitiveFrontend {
         self.source_final_output_cache.destroy(gal);
         let targets = std::mem::take(&mut self.source_terrain_color_pass_targets);
         for (_, resources) in targets {
-            let _ = gal.destroy(resources.targets.pass);
-            let _ = gal.destroy(resources.targets.target);
+            let _ = gal.retire(resources.targets.pass);
+            let _ = gal.retire(resources.targets.target);
         }
     }
 
@@ -165,7 +165,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -366,7 +366,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -492,7 +492,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -588,7 +588,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(view) => view,
                 Err(error) => {
-                    let _ = gal.destroy(texture);
+                    let _ = gal.retire(texture);
                     return Err(error);
                 }
             };
@@ -804,7 +804,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -934,7 +934,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };

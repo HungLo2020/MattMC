@@ -288,13 +288,13 @@ pub(crate) struct WorldLodGpuSegmentResources {
 impl WorldLodGpuSegmentResources {
     pub(super) fn retire_uploads(&mut self, gal: &mut VulkanicGal) {
         if let Some(buffer) = self.vertex_upload_buffer.take() {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
     }
 
     pub(super) fn destroy(mut self, gal: &mut VulkanicGal) {
         self.retire_uploads(gal);
-        let _ = gal.destroy(self.vertex_buffer);
+        let _ = gal.retire(self.vertex_buffer);
     }
 }
 
@@ -336,17 +336,17 @@ pub(crate) struct WorldLodGpuDraw {
 impl WorldLodGpuColumnResources {
     pub(super) fn destroy(mut self, gal: &mut VulkanicGal) {
         if let Some(buffer) = self.shared_vertex_upload_buffer.take() {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
         if let Some(buffer) = self.index_upload_buffer.take() {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
-        let _ = gal.destroy(self.index_buffer);
+        let _ = gal.retire(self.index_buffer);
         if let Some(buffer) = self.shared_vertex_buffer {
             for segment in &mut self.segments {
                 segment.retire_uploads(gal);
             }
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         } else {
             for segment in self.segments.into_iter().rev() {
                 segment.destroy(gal);

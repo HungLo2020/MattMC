@@ -1570,6 +1570,10 @@ test {
     
     // Set max heap for tests
     maxHeapSize = "2g"
+
+    // Mockito 5.8 bundles Byte Buddy 1.14, which predates Java 25 class
+    // files; without this flag inline mocks of game classes fail to load.
+    systemProperty 'net.bytebuddy.experimental', 'true'
     
     // Exclude performance tests from regular test runs
     // Performance tests are identified by naming convention: *PerformanceTest or *Benchmark

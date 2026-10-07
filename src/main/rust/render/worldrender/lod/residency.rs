@@ -273,10 +273,10 @@ impl WorldLodGpuResidency {
             // The successful combined submission recorded the staging copies.
             // GAL defers these destroys until that submission completes.
             if let Some(buffer) = resources.shared_vertex_upload_buffer.take() {
-                let _ = gal.destroy(buffer);
+                let _ = gal.retire(buffer);
             }
             if let Some(buffer) = resources.index_upload_buffer.take() {
-                let _ = gal.destroy(buffer);
+                let _ = gal.retire(buffer);
             }
             for segment in &mut resources.segments {
                 segment.retire_uploads(gal);
@@ -383,10 +383,10 @@ impl WorldLodTexturedGpuColumnResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         for (_, segment) in self.segments.into_iter().rev() {
             if let Some(index_buffer) = segment.unresolved_index_buffer {
-                let _ = gal.destroy(index_buffer);
+                let _ = gal.retire(index_buffer);
             }
-            let _ = gal.destroy(segment.index_buffer);
-            let _ = gal.destroy(segment.vertex_buffer);
+            let _ = gal.retire(segment.index_buffer);
+            let _ = gal.retire(segment.vertex_buffer);
         }
     }
 }
@@ -792,7 +792,7 @@ pub(super) fn create_column_resources(
                 }) {
                     Ok(buffer) => buffer,
                     Err(error) => {
-                        let _ = gal.destroy(vertex_upload_buffer);
+                        let _ = gal.retire(vertex_upload_buffer);
                         return Err(error);
                     }
                 };
@@ -831,7 +831,7 @@ pub(super) fn create_column_resources(
         }) {
             Ok(buffer) => buffer,
             Err(error) => {
-                let _ = gal.destroy(index_upload_buffer);
+                let _ = gal.retire(index_upload_buffer);
                 return Err(error);
             }
         };
@@ -846,10 +846,10 @@ pub(super) fn create_column_resources(
                 }
             }
             if let Some(buffer) = shared_vertex_buffer {
-                let _ = gal.destroy(buffer);
+                let _ = gal.retire(buffer);
             }
             if let Some(buffer) = shared_vertex_upload_buffer {
-                let _ = gal.destroy(buffer);
+                let _ = gal.retire(buffer);
             }
             return Err(error);
         }
@@ -1004,7 +1004,7 @@ pub(super) fn create_textured_column_resources(
             }) {
                 Ok(buffer) => buffer,
                 Err(error) => {
-                    let _ = gal.destroy(vertex_buffer);
+                    let _ = gal.retire(vertex_buffer);
                     return Err(error);
                 }
             };
@@ -1017,8 +1017,8 @@ pub(super) fn create_textured_column_resources(
                 }) {
                     Ok(buffer) => Some(buffer),
                     Err(error) => {
-                        let _ = gal.destroy(index_buffer);
-                        let _ = gal.destroy(vertex_buffer);
+                        let _ = gal.retire(index_buffer);
+                        let _ = gal.retire(vertex_buffer);
                         return Err(error);
                     }
                 },
@@ -1038,10 +1038,10 @@ pub(super) fn create_textured_column_resources(
     if let Err(error) = result {
         for (_, segment) in segments.into_iter().rev() {
             if let Some(index_buffer) = segment.unresolved_index_buffer {
-                let _ = gal.destroy(index_buffer);
+                let _ = gal.retire(index_buffer);
             }
-            let _ = gal.destroy(segment.index_buffer);
-            let _ = gal.destroy(segment.vertex_buffer);
+            let _ = gal.retire(segment.index_buffer);
+            let _ = gal.retire(segment.vertex_buffer);
         }
         return Err(error);
     }

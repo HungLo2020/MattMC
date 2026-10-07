@@ -34,9 +34,33 @@ Run from the repository root; the subshell preserves the Rust directory configur
 ```
 
 The architecture boundary tests run with the Rust tests; see
-[Render Architecture](RENDER-ARCHITECTURE.md). Java failures reading
-"Mockito cannot mock this class" are a known JDK 25 limitation, not
-regressions; compare their count with the base commit.
+[Render Architecture](RENDER-ARCHITECTURE.md). The Java test task sets
+`net.bytebuddy.experimental` so Mockito 5.8's bundled Byte Buddy can mock
+game classes on JDK 25; "Mockito cannot mock this class" now means a real
+setup problem, not the JDK.
+
+### Lifecycle gate
+
+World unload/reload (save and quit), resource reload, resize and view-distance
+changes cross the pipelined Java/Rust frame boundary: a queued frame can
+complete after the state it was built from is gone, and runtime-owned
+resources can still be bound by cached sets. Run the gate with every rendering
+batch, next to Frozen parity:
+
+```sh
+python3 DevUtils/tests/rendering/RunLifecycleGate.py --label <label>
+```
+
+It runs each transition scenario on the current client with Iris + DH
+(`--no-shaders`, `--no-dh`, `--scenario <name>` narrow it) and fails a
+scenario on a crashed audit row, any client exception, Rust panic or GAL
+`DependencyViolation`. The GAL logs every validation failure
+(`rust_gal_validation_failure`, rate-limited), including teardown errors that
+callers discard, so a still-bound resource fails the gate; other validation
+failures are reported, not failed. Results go to
+`artifacts/graphics-captures/lifecycle-gate/<label>/summary.json`. Run it with
+a relative script path: the capture harness stops processes whose command line
+names the repository.
 
 ### October 7 residency and selection checks
 

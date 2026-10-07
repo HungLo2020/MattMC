@@ -143,7 +143,7 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(init_layout);
+                let _ = gal.retire(init_layout);
                 return Err(error);
             }
         };
@@ -156,8 +156,8 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(init_pipeline_layout);
-                let _ = gal.destroy(init_layout);
+                let _ = gal.retire(init_pipeline_layout);
+                let _ = gal.retire(init_layout);
                 return Err(error);
             }
         };
@@ -168,9 +168,9 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(init_shader);
-                let _ = gal.destroy(init_pipeline_layout);
-                let _ = gal.destroy(init_layout);
+                let _ = gal.retire(init_shader);
+                let _ = gal.retire(init_pipeline_layout);
+                let _ = gal.retire(init_layout);
                 return Err(error);
             }
         };
@@ -200,10 +200,10 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(init_pipeline);
-                let _ = gal.destroy(init_shader);
-                let _ = gal.destroy(init_pipeline_layout);
-                let _ = gal.destroy(init_layout);
+                let _ = gal.retire(init_pipeline);
+                let _ = gal.retire(init_shader);
+                let _ = gal.retire(init_pipeline_layout);
+                let _ = gal.retire(init_layout);
                 return Err(error);
             }
         };
@@ -278,7 +278,7 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(propagate_layout);
+                let _ = gal.retire(propagate_layout);
                 destroy_init_compute(
                     gal,
                     even_init_set,
@@ -303,8 +303,8 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(propagate_pipeline_layout);
-                let _ = gal.destroy(propagate_layout);
+                let _ = gal.retire(propagate_pipeline_layout);
+                let _ = gal.retire(propagate_layout);
                 destroy_init_compute(
                     gal,
                     even_init_set,
@@ -324,9 +324,9 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(propagate_shader);
-                let _ = gal.destroy(propagate_pipeline_layout);
-                let _ = gal.destroy(propagate_layout);
+                let _ = gal.retire(propagate_shader);
+                let _ = gal.retire(propagate_pipeline_layout);
+                let _ = gal.retire(propagate_layout);
                 destroy_init_compute(
                     gal,
                     even_init_set,
@@ -387,7 +387,7 @@ impl TerrainFloodFillComputeResources {
                     propagate_pipeline_layout,
                     propagate_layout,
                 );
-                let _ = gal.destroy(temporal_mapping_buffer);
+                let _ = gal.retire(temporal_mapping_buffer);
                 destroy_init_compute(
                     gal,
                     even_init_set,
@@ -414,7 +414,7 @@ impl TerrainFloodFillComputeResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(even_to_odd_set);
+                let _ = gal.retire(even_to_odd_set);
                 destroy_propagate_compute(
                     gal,
                     propagate_pipeline,
@@ -422,7 +422,7 @@ impl TerrainFloodFillComputeResources {
                     propagate_pipeline_layout,
                     propagate_layout,
                 );
-                let _ = gal.destroy(temporal_mapping_buffer);
+                let _ = gal.retire(temporal_mapping_buffer);
                 destroy_init_compute(
                     gal,
                     even_init_set,
@@ -827,13 +827,13 @@ pub(super) fn destroy_init_compute(
     layout: Handle,
 ) {
     if let Some(odd_set) = odd_set {
-        let _ = gal.destroy(odd_set);
+        let _ = gal.retire(odd_set);
     }
-    let _ = gal.destroy(even_set);
-    let _ = gal.destroy(pipeline);
-    let _ = gal.destroy(shader);
-    let _ = gal.destroy(pipeline_layout);
-    let _ = gal.destroy(layout);
+    let _ = gal.retire(even_set);
+    let _ = gal.retire(pipeline);
+    let _ = gal.retire(shader);
+    let _ = gal.retire(pipeline_layout);
+    let _ = gal.retire(layout);
 }
 
 pub(super) fn destroy_propagate_compute(
@@ -843,10 +843,10 @@ pub(super) fn destroy_propagate_compute(
     pipeline_layout: Handle,
     layout: Handle,
 ) {
-    let _ = gal.destroy(pipeline);
-    let _ = gal.destroy(shader);
-    let _ = gal.destroy(pipeline_layout);
-    let _ = gal.destroy(layout);
+    let _ = gal.retire(pipeline);
+    let _ = gal.retire(shader);
+    let _ = gal.retire(pipeline_layout);
+    let _ = gal.retire(layout);
 }
 
 // These kernels encode source-derived initialization, six-neighbor propagation,
@@ -883,24 +883,24 @@ impl TerrainFloodFillGpuResources {
         let even_view = match create_volume_view(gal, descriptor, "even", even_texture) {
             Ok(view) => view,
             Err(error) => {
-                let _ = gal.destroy(even_texture);
+                let _ = gal.retire(even_texture);
                 return Err(error);
             }
         };
         let odd_texture = match create_texture(gal, "odd") {
             Ok(texture) => texture,
             Err(error) => {
-                let _ = gal.destroy(even_view);
-                let _ = gal.destroy(even_texture);
+                let _ = gal.retire(even_view);
+                let _ = gal.retire(even_texture);
                 return Err(error);
             }
         };
         let odd_view = match create_volume_view(gal, descriptor, "odd", odd_texture) {
             Ok(view) => view,
             Err(error) => {
-                let _ = gal.destroy(odd_texture);
-                let _ = gal.destroy(even_view);
-                let _ = gal.destroy(even_texture);
+                let _ = gal.retire(odd_texture);
+                let _ = gal.retire(even_view);
+                let _ = gal.retire(even_texture);
                 return Err(error);
             }
         };
@@ -920,10 +920,10 @@ impl TerrainFloodFillGpuResources {
         }) {
             Ok(sampler) => sampler,
             Err(error) => {
-                let _ = gal.destroy(odd_view);
-                let _ = gal.destroy(odd_texture);
-                let _ = gal.destroy(even_view);
-                let _ = gal.destroy(even_texture);
+                let _ = gal.retire(odd_view);
+                let _ = gal.retire(odd_texture);
+                let _ = gal.retire(even_view);
+                let _ = gal.retire(even_texture);
                 return Err(error);
             }
         };
@@ -939,11 +939,11 @@ impl TerrainFloodFillGpuResources {
         }) {
             Ok(buffer) => buffer,
             Err(error) => {
-                let _ = gal.destroy(sampler);
-                let _ = gal.destroy(odd_view);
-                let _ = gal.destroy(odd_texture);
-                let _ = gal.destroy(even_view);
-                let _ = gal.destroy(even_texture);
+                let _ = gal.retire(sampler);
+                let _ = gal.retire(odd_view);
+                let _ = gal.retire(odd_texture);
+                let _ = gal.retire(even_view);
+                let _ = gal.retire(even_texture);
                 return Err(error);
             }
         };
@@ -959,12 +959,12 @@ impl TerrainFloodFillGpuResources {
         }) {
             Ok(buffer) => buffer,
             Err(error) => {
-                let _ = gal.destroy(emission_buffer);
-                let _ = gal.destroy(sampler);
-                let _ = gal.destroy(odd_view);
-                let _ = gal.destroy(odd_texture);
-                let _ = gal.destroy(even_view);
-                let _ = gal.destroy(even_texture);
+                let _ = gal.retire(emission_buffer);
+                let _ = gal.retire(sampler);
+                let _ = gal.retire(odd_view);
+                let _ = gal.retire(odd_texture);
+                let _ = gal.retire(even_view);
+                let _ = gal.retire(even_texture);
                 return Err(error);
             }
         };

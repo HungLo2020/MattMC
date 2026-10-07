@@ -163,7 +163,7 @@ impl GuiFrontend {
         }
         if let Some(previous) = self.blur_resources.take() {
             for handle in previous.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
             self.blur_snapshot_initialized = false;
             self.creeper_intermediate_initialized = false;
@@ -808,7 +808,7 @@ impl GuiFrontend {
             }
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 Err(error)
             }

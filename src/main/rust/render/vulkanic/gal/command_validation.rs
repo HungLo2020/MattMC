@@ -5,6 +5,13 @@ use super::*;
 impl VulkanicGal {
     pub(super) fn validation_error<T>(&mut self, error: GalError) -> GalResult<T> {
         self.metrics.validation_failures += 1;
+        // Many callers discard teardown errors (`let _ = gal.destroy(..)`).
+        // Log them so a leaked or still-bound resource shows up in the
+        // client log (the lifecycle gate fails on dependency violations).
+        let count = self.metrics.validation_failures;
+        if count <= 32 || count.is_power_of_two() {
+            crate::core::console::stderr(format_args!("rust_gal_validation_failure count={count} {error}"));
+        }
         Err(error)
     }
 

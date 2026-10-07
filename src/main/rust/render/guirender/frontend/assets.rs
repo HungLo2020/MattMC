@@ -240,7 +240,7 @@ impl GuiFrontend {
                     texture_keys.insert(key);
                 }
                 for handle in resource.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }
@@ -256,7 +256,7 @@ impl GuiFrontend {
                     texture.texture,
                     texture.upload_buffer,
                 ] {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }

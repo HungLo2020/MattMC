@@ -1703,16 +1703,16 @@ impl GameplayAttachmentCapture {
     /// an unsubmitted command stream; never destroy an in-flight readback.
     pub(in crate::render::worldrender) fn discard(mut self, gal: &mut VulkanicGal) {
         for (_, readback) in std::mem::take(&mut self.readbacks) {
-            let _ = gal.destroy(readback);
+            let _ = gal.retire(readback);
         }
         for pass in std::mem::take(&mut self.transient_gui_passes) {
-            let _ = gal.destroy(pass);
+            let _ = gal.retire(pass);
         }
         if let Some(presented) = self.source_presented_capture.take() {
             presented.destroy(gal);
         }
         for texture in std::mem::take(&mut self.normal_presented_textures) {
-            let _ = gal.destroy(texture);
+            let _ = gal.retire(texture);
         }
     }
 }

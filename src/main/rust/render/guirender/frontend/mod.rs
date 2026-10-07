@@ -162,25 +162,25 @@ impl GuiFrontend {
             let _ = resources.target.destroy(gal);
         }
         if let Some(pass) = self.cached_pass.take() {
-            let _ = gal.destroy(pass.pass);
+            let _ = gal.retire(pass.pass);
         }
         let mesh_rasters = std::mem::take(&mut self.mesh_rasters);
         for resources in mesh_rasters.into_values() {
             resources.destroy_asset_resources(gal);
         }
         if let Some((vertices, indices)) = self.mesh_geometry_streams.take() {
-            let _ = gal.destroy(indices);
-            let _ = gal.destroy(vertices);
+            let _ = gal.retire(indices);
+            let _ = gal.retire(vertices);
         }
         let resources = std::mem::take(&mut self.resources);
         for resource in resources.values() {
             for handle in resource.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for pipeline in std::mem::take(&mut self.shared_pipelines).into_values() {
             for handle in pipeline.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         // Mesh raster resource sets also reference these images/samplers.
@@ -194,7 +194,7 @@ impl GuiFrontend {
                 texture.texture,
                 texture.upload_buffer,
             ] {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for program in std::mem::take(&mut self.mesh_shared_programs).into_values() {

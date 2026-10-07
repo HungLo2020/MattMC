@@ -1619,7 +1619,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.source_mesh_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

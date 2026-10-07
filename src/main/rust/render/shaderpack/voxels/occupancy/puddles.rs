@@ -258,7 +258,7 @@ impl TerrainPuddleGpuResources {
         }) {
             Ok(value) => value,
             Err(error) => {
-                let _ = gal.destroy(texture);
+                let _ = gal.retire(texture);
                 return Err(error);
             }
         };
@@ -274,8 +274,8 @@ impl TerrainPuddleGpuResources {
         }) {
             Ok(value) => value,
             Err(error) => {
-                let _ = gal.destroy(view);
-                let _ = gal.destroy(texture);
+                let _ = gal.retire(view);
+                let _ = gal.retire(texture);
                 return Err(error);
             }
         };
@@ -287,9 +287,9 @@ impl TerrainPuddleGpuResources {
             }) {
                 Ok(value) => value,
                 Err(error) => {
-                    let _ = gal.destroy(sampler);
-                    let _ = gal.destroy(view);
-                    let _ = gal.destroy(texture);
+                    let _ = gal.retire(sampler);
+                    let _ = gal.retire(view);
+                    let _ = gal.retire(texture);
                     return Err(error);
                 }
             };
@@ -301,10 +301,10 @@ impl TerrainPuddleGpuResources {
         }) {
             Ok(value) => value,
             Err(error) => {
-                let _ = gal.destroy(combined_sampler);
-                let _ = gal.destroy(sampler);
-                let _ = gal.destroy(view);
-                let _ = gal.destroy(texture);
+                let _ = gal.retire(combined_sampler);
+                let _ = gal.retire(sampler);
+                let _ = gal.retire(view);
+                let _ = gal.retire(texture);
                 return Err(error);
             }
         };

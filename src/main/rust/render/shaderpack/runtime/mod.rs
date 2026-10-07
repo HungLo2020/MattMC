@@ -313,6 +313,12 @@ impl ShaderPackRuntimeExecutor {
         self.fullscreen_pipeline_cache.destroy_parked(gal);
     }
 
+    /// Drops every cached fullscreen plan, stage and pipeline: they bind
+    /// targets and textures that teardown or runtime replacement destroys.
+    pub(crate) fn release_fullscreen_consumers(&self, gal: &mut VulkanicGal) {
+        self.fullscreen_pipeline_cache.release_all(gal);
+    }
+
     pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) -> GalResult<()> {
         self.fullscreen_pipeline_cache.destroy(gal);
         self.discard_vanilla_lightmap_submission(gal);

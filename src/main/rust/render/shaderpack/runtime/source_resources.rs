@@ -220,7 +220,8 @@ impl TerrainSourceShadowDepthResources {
         .into_iter()
         .flatten()
         {
-            gal.destroy(handle)?;
+            // Frontend pack sets of the old generation may still bind these.
+            gal.retire(handle)?;
         }
         Ok(())
     }
@@ -269,7 +270,7 @@ impl TerrainSourceShadowColorResources {
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
         for (_, combined_sampler) in self.combined_samplers.into_iter().rev() {
-            gal.destroy(combined_sampler)?;
+            gal.retire(combined_sampler)?;
         }
         Ok(())
     }
@@ -327,7 +328,8 @@ impl TerrainSourceMainDepthResources {
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
         for (_, handle) in self.combined_samplers.into_iter().rev() {
-            gal.destroy(handle)?;
+            // Frontend pack sets of the old generation may still bind these.
+            gal.retire(handle)?;
         }
         Ok(())
     }
@@ -879,7 +881,7 @@ impl ShaderPackRuntimeExecutor {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }
@@ -988,7 +990,7 @@ impl ShaderPackRuntimeExecutor {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }
@@ -1217,7 +1219,7 @@ impl ShaderPackRuntimeExecutor {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }

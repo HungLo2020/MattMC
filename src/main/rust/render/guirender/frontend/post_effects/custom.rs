@@ -11,23 +11,23 @@ impl GuiFrontend {
         self.clear_frame_pass(gal);
         if let Some(resources) = self.blur_resources.take() {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for resources in std::mem::take(&mut self.custom_post_effect_resources) {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for intermediate in std::mem::take(&mut self.custom_post_effect_intermediates).into_values()
         {
             for handle in intermediate.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         if let Some(resources) = self.custom_post_effect_depth_target.take() {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.blur_snapshot_initialized = false;
@@ -249,7 +249,7 @@ impl GuiFrontend {
             } else {
                 if let Some(previous) = self.custom_post_effect_depth_target.take() {
                     for handle in previous.handles_in_destroy_order() {
-                        let _ = gal.destroy(handle);
+                        let _ = gal.retire(handle);
                     }
                 }
                 let target = gal.create_render_target(RenderTargetDesc {
@@ -283,7 +283,7 @@ impl GuiFrontend {
         for target_name in stale_intermediate_names {
             if let Some(previous) = self.custom_post_effect_intermediates.remove(&target_name) {
                 for handle in previous.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }

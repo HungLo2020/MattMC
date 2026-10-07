@@ -61,6 +61,7 @@ impl WorldPrimitiveFrontend {
     }
 
     pub(super) fn destroy_resources(&mut self, gal: &mut VulkanicGal) {
+        self.release_cached_source_consumers(gal);
         // GAL defers physical destruction of accepted upload leases until
         // their submission completes, including teardown without an idle wait.
         let _ = self.atlas_animation_uploads.release(gal);
@@ -139,35 +140,35 @@ impl WorldPrimitiveFrontend {
         self.destroy_entity_outline_mask_gpu_resources(gal);
         if let Some(sets) = self.entity_outline_post_effect_sets.take() {
             for handle in sets.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         if let Some(pipelines) = self.entity_outline_post_effect_pipelines.take() {
             for handle in pipelines.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let resources = std::mem::take(&mut self.resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let sky_disc_resources = std::mem::take(&mut self.sky_disc_resources);
         for (_, resources) in sky_disc_resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let sky_disc_forward_resources = std::mem::take(&mut self.sky_disc_forward_resources);
         for (_, resources) in sky_disc_forward_resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         if let Some(resources) = self.entity_outline_targets.take() {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.destroy_crack_resources(gal);
@@ -180,7 +181,7 @@ impl WorldPrimitiveFrontend {
         self.destroy_mesh_texture_resources(gal);
         self.destroy_mesh_pipeline_resources(gal);
         if let Some(layout) = self.builtin_terrain_lightmap_layout.take() {
-            let _ = gal.destroy(layout);
+            let _ = gal.retire(layout);
         }
         let retired = self.destroy_g_buffer_resources(gal);
         self.pending_g_buffer_resources_retired = self
@@ -188,7 +189,7 @@ impl WorldPrimitiveFrontend {
             .saturating_add(retired);
         if let Some(depth) = self.depth_attachment.take() {
             for handle in depth.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
             self.pending_depth_attachment_retires =
                 self.pending_depth_attachment_retires.saturating_add(1);
@@ -196,13 +197,13 @@ impl WorldPrimitiveFrontend {
         if let Some(owner) = self.oriented_world_target.take() {
             self.clear_frame_passes_for_targets(gal, &[owner.target]);
             for handle in owner.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         if let Some(owner) = self.canonical_world_target.take() {
             self.clear_frame_passes_for_targets(gal, &[owner.target]);
             for handle in owner.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.flush_deferred_mesh_resource_destroys(gal);

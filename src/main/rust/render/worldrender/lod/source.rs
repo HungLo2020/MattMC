@@ -72,7 +72,7 @@ pub(super) struct WorldLodSourcePipelineResources {
 impl WorldLodSourcePipelineResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         if self.shares_base_layouts {
-            let _ = gal.destroy(self.pipeline);
+            let _ = gal.retire(self.pipeline);
             return;
         }
         for handle in [
@@ -83,7 +83,7 @@ impl WorldLodSourcePipelineResources {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -108,12 +108,12 @@ pub(super) struct WorldLodSourceDrawResources {
 
 impl WorldLodSourceDrawResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.source_data_set);
+        let _ = gal.retire(self.source_data_set);
         if let Some(buffer) = self.scalar_uniform_buffer {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
         if let Some(buffer) = self.column_frame_buffer {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
     }
 }
@@ -328,8 +328,8 @@ impl WorldLodSourcePassResources {
                 .collect::<Vec<_>>();
             for stale_key in stale {
                 if let Some(resources) = self.targets.remove(&stale_key) {
-                    let _ = gal.destroy(resources.pass);
-                    let _ = gal.destroy(resources.target);
+                    let _ = gal.retire(resources.pass);
+                    let _ = gal.retire(resources.target);
                 }
             }
             let target = gal.create_render_target(RenderTargetDesc {
@@ -358,7 +358,7 @@ impl WorldLodSourcePassResources {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -758,7 +758,7 @@ impl WorldLodSourcePassResources {
             .collect();
         for key in released {
             if let Some(set) = self.pack_resources.remove(&key) {
-                let _ = gal.destroy(set);
+                let _ = gal.retire(set);
             }
         }
     }
@@ -824,7 +824,7 @@ impl WorldLodSourcePassResources {
             }
         }
         if let Some(previous) = self.column_frame_rings.remove(scalar_key) {
-            let _ = gal.destroy(previous.buffer);
+            let _ = gal.retire(previous.buffer);
         }
         let alignment = gal.capabilities().limits.uniform_buffer_offset_alignment.max(1);
         let block = u64::from(program.execution_interface.column_frame_bytes);
@@ -1046,7 +1046,7 @@ impl WorldLodSourcePassResources {
             })();
             if result.is_err() {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             if alpha_blend {
@@ -1131,7 +1131,7 @@ impl WorldLodSourcePassResources {
             .collect::<Vec<_>>();
         for stale_key in stale {
             if let Some(set) = self.pack_resources.remove(&stale_key) {
-                let _ = gal.destroy(set);
+                let _ = gal.retire(set);
             }
         }
         let layout = self
@@ -1206,18 +1206,18 @@ impl WorldLodSourcePassResources {
         self.retire_generic_draws(gal);
         // Draw sets bound these; they are gone now.
         for (_, buffer) in std::mem::take(&mut self.scalar_buffers) {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
         for (_, ring) in std::mem::take(&mut self.column_frame_rings) {
-            let _ = gal.destroy(ring.buffer);
+            let _ = gal.retire(ring.buffer);
         }
         self.scalar_written_this_frame.clear();
         for (_, set) in std::mem::take(&mut self.pack_resources) {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
         for (_, resources) in std::mem::take(&mut self.targets) {
-            let _ = gal.destroy(resources.pass);
-            let _ = gal.destroy(resources.target);
+            let _ = gal.retire(resources.pass);
+            let _ = gal.retire(resources.target);
         }
         // Generic-blend variants borrow their base layouts: destroy them first.
         let (shared, owned): (Vec<_>, Vec<_>) = std::mem::take(&mut self.pipelines)
@@ -1368,7 +1368,7 @@ impl WorldLodSourcePassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.pipelines.insert(key.clone(), result?);
@@ -1592,7 +1592,7 @@ impl WorldLodSourceTargets {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -1611,7 +1611,7 @@ impl WorldLodSourceTargets {
             self.distant_depth_view,
             self.distant_depth_texture,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 

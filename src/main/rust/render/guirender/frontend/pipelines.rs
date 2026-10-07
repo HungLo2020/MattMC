@@ -203,7 +203,7 @@ impl GuiFrontend {
             }
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 Err(error)
             }

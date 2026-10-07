@@ -295,7 +295,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.material_resources.insert(key, result?);
@@ -457,7 +457,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.material_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

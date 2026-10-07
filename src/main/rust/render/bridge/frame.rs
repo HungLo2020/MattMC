@@ -462,7 +462,7 @@ fn capture_frame_target(gal: &mut VulkanicGal, target: Handle) -> GalResult<(u32
     }) {
         Ok(buffer) => buffer,
         Err(error) => {
-            let _ = gal.destroy(texture);
+            let _ = gal.retire(texture);
             return Err(error);
         }
     };
@@ -509,8 +509,8 @@ fn capture_frame_target(gal: &mut VulkanicGal, target: Handle) -> GalResult<(u32
             .ok_or_else(|| GalError::backend("frame capture readback did not complete"))
             .map(|read| read.bytes)
     });
-    let _ = gal.destroy(readback);
-    let _ = gal.destroy(texture);
+    let _ = gal.retire(readback);
+    let _ = gal.retire(texture);
     let mut bytes = result?;
     if bytes.len() as u64 != byte_count {
         return Err(GalError::backend("frame capture readback has an unexpected size"));

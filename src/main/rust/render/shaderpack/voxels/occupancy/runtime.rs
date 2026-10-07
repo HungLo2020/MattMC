@@ -652,7 +652,7 @@ impl TerrainOccupancyGpuResources {
         }) {
             Ok(view) => view,
             Err(error) => {
-                let _ = gal.destroy(texture);
+                let _ = gal.retire(texture);
                 return Err(error);
             }
         };
@@ -670,8 +670,8 @@ impl TerrainOccupancyGpuResources {
         }) {
             Ok(buffer) => buffer,
             Err(error) => {
-                let _ = gal.destroy(view);
-                let _ = gal.destroy(texture);
+                let _ = gal.retire(view);
+                let _ = gal.retire(texture);
                 return Err(error);
             }
         };

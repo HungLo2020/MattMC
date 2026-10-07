@@ -152,7 +152,7 @@ impl WorldPrimitiveFrontend {
                 .lowered_textured_material_source_local_texture_resources
                 .remove(&key)
             {
-                let _ = gal.destroy(resources.combined_sampler);
+                let _ = gal.retire(resources.combined_sampler);
             }
         }
         for texture_id in texture_ids {
@@ -164,7 +164,7 @@ impl WorldPrimitiveFrontend {
                 .remove(texture_id);
             if let Some(resources) = self.source_material_texture_resources.remove(texture_id) {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }

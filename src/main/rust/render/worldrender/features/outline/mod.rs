@@ -286,7 +286,7 @@ pub(crate) fn create_entity_outline_post_effect_resource_sets(
         Ok(resources) => Ok(resources),
         Err(error) => {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
             Err(error)
         }
@@ -689,7 +689,7 @@ void main() { out_color = texture(sampler2D(InTexture, InSampler), v_uv); }
         Ok(resources) => Ok(resources),
         Err(error) => {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
             Err(error)
         }
@@ -1041,7 +1041,7 @@ pub(crate) fn create_entity_outline_target_resources_with_depth(
     })();
     if result.is_err() {
         for handle in created.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
     result

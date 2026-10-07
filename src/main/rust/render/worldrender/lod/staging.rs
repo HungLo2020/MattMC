@@ -2312,7 +2312,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(handle) => handle,
                 Err(error) => {
-                    let _ = gal.destroy(vertex_buffer);
+                    let _ = gal.retire(vertex_buffer);
                     return Err(error);
                 }
             };
@@ -2409,8 +2409,8 @@ impl WorldPrimitiveFrontend {
     pub(in crate::render::worldrender) fn discard_distant_horizons_generic_source_buffers(&mut self, gal: &mut VulkanicGal) {
         self.lod_source_pass_resources.retire_generic_draws(gal);
         if let Some(previous) = self.dh_generic_source_buffers.take() {
-            let _ = gal.destroy(previous.vertex_buffer);
-            let _ = gal.destroy(previous.index_buffer);
+            let _ = gal.retire(previous.vertex_buffer);
+            let _ = gal.retire(previous.index_buffer);
         }
     }
 }

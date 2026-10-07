@@ -510,7 +510,7 @@ impl WorldPrimitiveFrontend {
         }
 
         for staging in std::mem::take(&mut self.retired_source_geometry_staging) {
-            let _ = gal.destroy(staging);
+            let _ = gal.retire(staging);
         }
         self.retire_unused_decal_glint_meshes(gal);
         let emptied_pages = self.source_terrain_geometry_pages.reclaim(gal);
@@ -527,12 +527,12 @@ impl WorldPrimitiveFrontend {
             for key in page_keys {
                 if let Some(resources) = self.lowered_source_terrain_frame_data_resources.remove(&key) {
                     for handle in resources.handles_in_destroy_order() {
-                        let _ = gal.destroy(handle);
+                        let _ = gal.retire(handle);
                     }
                 }
             }
             for page in emptied_pages {
-                let _ = gal.destroy(page);
+                let _ = gal.retire(page);
             }
         }
         let result = (|| -> GalResult<PreparedNamedSourceTerrainFramePlan> {

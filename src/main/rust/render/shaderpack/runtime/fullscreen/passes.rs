@@ -323,7 +323,7 @@ impl PreparedFullscreenSourcePass {
                 }) {
                     Ok(pass) => pass,
                     Err(error) => {
-                        let _ = gal.destroy(target);
+                        let _ = gal.retire(target);
                         return Err(error);
                     }
                 };
@@ -425,7 +425,7 @@ impl PreparedFullscreenSourcePass {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let mut compiled = result?;
@@ -573,7 +573,7 @@ impl PreparedFullscreenSourcePass {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -804,7 +804,7 @@ impl PreparedFullscreenSourcePass {
 impl BoundFullscreenSourcePass {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         if !self.owns_stage_resources {
-            let _ = gal.destroy(self.pack_resources_set);
+            let _ = gal.retire(self.pack_resources_set);
             return;
         }
         for handle in [
@@ -816,7 +816,7 @@ impl BoundFullscreenSourcePass {
         .into_iter()
         .flatten()
         {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }

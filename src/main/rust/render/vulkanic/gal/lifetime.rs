@@ -31,8 +31,33 @@ impl VulkanicGal {
         self.destroy_now(handle)
     }
 
+    /// Destroys `handle` now when nothing binds it; otherwise destroys it
+    /// as soon as its last dependent is destroyed. For owners whose
+    /// consumers live in other caches (sampled targets, material textures):
+    /// replacing a generation must not leak it while a cached set still
+    /// binds it. `destroy` keeps the strict check for everything else.
+    pub fn retire(&mut self, handle: Handle) -> GalResult<()> {
+        self.validate_any_resource(handle)?;
+        let referenced = self.dependencies.get(&handle).is_some_and(|dependents| {
+            dependents
+                .iter()
+                .any(|dependent| !self.command_recording_destroy_set.contains(dependent))
+        });
+        if referenced {
+            self.retired_while_referenced.insert(handle);
+            return Ok(());
+        }
+        self.destroy(handle)
+    }
+
+    /// Resources retired while referenced that are still waiting.
+    pub fn retired_while_referenced(&self) -> usize {
+        self.retired_while_referenced.len()
+    }
+
     pub(super) fn destroy_now(&mut self, handle: Handle) -> GalResult<()> {
         self.ensure_no_dependents(handle)?;
+        self.retired_while_referenced.remove(&handle);
         self.buffer_upload_capture.forget(handle);
         let owned_frame_depth = if handle.kind() == Some(HandleKind::FrameTarget) {
             self.frame_target_depth_populated.remove(&handle);
@@ -110,15 +135,25 @@ impl VulkanicGal {
     }
 
     pub(super) fn remove_reverse_edges(&mut self, dependent: Handle) {
+        let mut released = Vec::new();
         if let Some(resources) = self.reverse_dependencies.remove(&dependent) {
             for resource in resources {
                 if let Some(dependents) = self.dependencies.get_mut(&resource) {
                     dependents.remove(&dependent);
                     if dependents.is_empty() {
                         self.dependencies.remove(&resource);
+                        if self.retired_while_referenced.contains(&resource) {
+                            released.push(resource);
+                        }
                     }
                 }
             }
+        }
+        // A retired resource whose last dependent just went is destroyed now;
+        // its own release cascades (view, then texture).
+        for resource in released {
+            self.retired_while_referenced.remove(&resource);
+            let _ = self.destroy(resource);
         }
     }
 
