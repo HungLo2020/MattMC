@@ -588,9 +588,25 @@ public final class RustGalWorldPrimitiveRenderer {
 			return count;
 		}
 
+		/**
+		 * The frame's copy, in one of three reused arrays: a consumed frame's
+		 * entries stay intact until it completes (frames complete before
+		 * their slot comes round again).
+		 */
 		private MemorySegment frameCopy() {
-			return MemorySegment.ofArray(java.util.Arrays.copyOf(bytes, count * layout().byteSize()));
+			int length = Math.toIntExact(count * layout().byteSize());
+			frameSlot = (frameSlot + 1) % frameCopies.length;
+			byte[] target = frameCopies[frameSlot];
+			if (target.length < length) {
+				target = new byte[Math.max(length, target.length * 2)];
+				frameCopies[frameSlot] = target;
+			}
+			System.arraycopy(bytes, 0, target, 0, length);
+			return MemorySegment.ofArray(target).asSlice(0, length);
 		}
+
+		private final byte[][] frameCopies = {new byte[0], new byte[0], new byte[0]};
+		private int frameSlot;
 
 		VulkanicGalBridge.StaticTerrainShadowCasters casters() {
 			if (count == 0) return VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY;
@@ -12007,12 +12023,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (!ownedBlockAtlas && !ownedShieldSprite(sprite) && !glint && sprite != null && sprite.contents().isAnimated()) {
 			throw new IllegalStateException("animated-item-atlas-native-contract-unavailable");
 		}
-		byte[] texturePayload = ownedAtlas ? null : glint
-			? semanticFoilTexture.pngBytes()
+		// Glint draws use the copied foil texture record itself; only other
+		// local textures need their payload read here.
+		byte[] texturePayload = ownedAtlas || glint ? null
 			// Crack stages are full texture locations (textures/block/destroy_stage_N.png),
 			// not sprite names, so read the resource stack directly.
 			: crumbling ? readTexturePayloadForResource(textureIdentity) : readModelTexturePayload(textureIdentity, sprite);
-		if (!ownedAtlas && texturePayload == null) {
+		if (!ownedAtlas && (glint ? semanticFoilTexture == null : texturePayload == null)) {
 			throw new IllegalStateException("unsupported model texture asset " + effectiveTexture);
 		}
 		int textureId = ownedBlockAtlas ? MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : stableTextureId(effectiveTexture);

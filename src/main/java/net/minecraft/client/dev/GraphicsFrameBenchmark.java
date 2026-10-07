@@ -689,7 +689,9 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		long allocatedBytes = PHASE_ALLOCATION_SAMPLES ? currentThreadAllocatedBytes() : -1L;
-		PHASE_STACK.push(new OpenPhase(name, System.nanoTime(), allocatedBytes, beginTracyZone(name)));
+		OpenPhase pooled = PHASE_POOL.poll();
+		PHASE_STACK.push((pooled == null ? new OpenPhase() : pooled)
+			.reset(name, System.nanoTime(), allocatedBytes, beginTracyZone(name)));
 	}
 
 	/** Returns whether frame-local diagnostic timing is currently being sampled. */
@@ -704,21 +706,23 @@ public final class GraphicsFrameBenchmark {
 		long now = System.nanoTime();
 		OpenPhase phase = PHASE_STACK.pop();
 		phase.closeTracyZone();
-		long inclusive = Math.max(0L, now - phase.startNanos());
-		long exclusive = Math.max(0L, inclusive - phase.childNanos());
+		long inclusive = Math.max(0L, now - phase.startNanos);
+		long exclusive = Math.max(0L, inclusive - phase.childNanos);
 		long allocatedBytes = PHASE_ALLOCATION_SAMPLES ? currentThreadAllocatedBytes() : -1L;
-		long inclusiveAllocated = phase.startAllocatedBytes() >= 0L && allocatedBytes >= phase.startAllocatedBytes()
-			? allocatedBytes - phase.startAllocatedBytes()
+		long inclusiveAllocated = phase.startAllocatedBytes >= 0L && allocatedBytes >= phase.startAllocatedBytes
+			? allocatedBytes - phase.startAllocatedBytes
 			: -1L;
 		long exclusiveAllocated = inclusiveAllocated >= 0L
-			? Math.max(0L, inclusiveAllocated - phase.childAllocatedBytes())
+			? Math.max(0L, inclusiveAllocated - phase.childAllocatedBytes)
 			: -1L;
 		if (!PHASE_STACK.isEmpty()) {
-			OpenPhase parent = PHASE_STACK.pop();
-			PHASE_STACK.push(parent.withAdditionalChild(inclusive, Math.max(0L, inclusiveAllocated)));
+			PHASE_STACK.peek().addChild(inclusive, Math.max(0L, inclusiveAllocated));
 		}
+		String phaseName = phase.name;
+		phase.tracyZone = null;
+		PHASE_POOL.push(phase);
 		if (measurementFrame) {
-			String label = phase.name().equals(name) ? name : phase.name() + "/ended-as/" + name;
+			String label = phaseName.equals(name) ? name : phaseName + "/ended-as/" + name;
 			PhaseStats[] stats = phaseStats(label);
 			stats[0].add(inclusive);
 			stats[1].add(exclusive);
@@ -3051,37 +3055,36 @@ public final class GraphicsFrameBenchmark {
 		return "rust";
 	}
 
-	private record OpenPhase(
-		String name,
-		long startNanos,
-		long startAllocatedBytes,
-		long childNanos,
-		long childAllocatedBytes,
-		Zone tracyZone
-	) {
-		OpenPhase(String name, long startNanos) {
-			this(name, startNanos, -1L, 0L, 0L, null);
+	/** A phase on the open-phase stack; pooled, as phases open and close many times per frame. */
+	private static final class OpenPhase {
+		String name;
+		long startNanos;
+		long startAllocatedBytes;
+		long childNanos;
+		long childAllocatedBytes;
+		Zone tracyZone;
+
+		OpenPhase reset(String name, long startNanos, long startAllocatedBytes, Zone tracyZone) {
+			this.name = name;
+			this.startNanos = startNanos;
+			this.startAllocatedBytes = startAllocatedBytes;
+			this.childNanos = 0L;
+			this.childAllocatedBytes = 0L;
+			this.tracyZone = tracyZone;
+			return this;
 		}
 
-		OpenPhase(String name, long startNanos, long startAllocatedBytes, Zone tracyZone) {
-			this(name, startNanos, startAllocatedBytes, 0L, 0L, tracyZone);
-		}
-
-		OpenPhase withAdditionalChild(long nanos, long allocatedBytes) {
-			return new OpenPhase(
-				this.name,
-				this.startNanos,
-				this.startAllocatedBytes,
-				this.childNanos + Math.max(0L, nanos),
-				this.childAllocatedBytes + Math.max(0L, allocatedBytes),
-				this.tracyZone
-			);
+		void addChild(long nanos, long allocatedBytes) {
+			this.childNanos += Math.max(0L, nanos);
+			this.childAllocatedBytes += Math.max(0L, allocatedBytes);
 		}
 
 		void closeTracyZone() {
 			GraphicsFrameBenchmark.closeTracyZone(this.tracyZone);
 		}
 	}
+
+	private static final ArrayDeque<OpenPhase> PHASE_POOL = new ArrayDeque<>();
 
 	private record FrameTimelineEvent(
 		long frameIndex,
