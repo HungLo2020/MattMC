@@ -31,8 +31,12 @@ public final class GraphicsAuditGuiFoilSource {
         @Override public float[] atlasUvs() { return atlasUvs.clone(); }
     }
 
+    public static boolean enabled() {
+        return Boolean.getBoolean("mattmc.dev.guiItemRasterTrace");
+    }
+
     public static void record(BakedQuad quad) {
-        if (!Boolean.getBoolean("mattmc.dev.guiItemRasterTrace") || quad.direction() != Direction.SOUTH) return;
+        if (!enabled() || quad.direction() != Direction.SOUTH) return;
         float[] positions = new float[12], uv = new float[8];
         for (int i = 0; i < 4; i++) {
             positions[i*3] = quad.getX(i); positions[i*3+1] = quad.getY(i); positions[i*3+2] = quad.getZ(i);

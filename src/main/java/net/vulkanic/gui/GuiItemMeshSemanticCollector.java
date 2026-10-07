@@ -62,8 +62,9 @@ public final class GuiItemMeshSemanticCollector {
 		Object modelIdentity = item.itemStackRenderState().getModelIdentity();
 		TopologyKey cacheKey = !item.itemStackRenderState().isAnimated()
 			&& modelIdentity instanceof List<?> identityElements && !identityElements.isEmpty()
-			? new TopologyKey(modelIdentity, guiScale) : null;
+			? new TopologyKey(modelIdentity, guiScale, item.itemStackRenderState().hasFoil()) : null;
 		CachedTopology topology = cacheKey == null ? null : cachedTopology(cacheKey);
+		boolean stableTopology = topology != null;
 		if (topology != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
 				"gui.item-topology-cache.hit", 1L
@@ -92,11 +93,12 @@ public final class GuiItemMeshSemanticCollector {
 					sources.add(new GuiItemTextureSource.Raw(asset));
 			}
 			topology = new CachedTopology(layers, sources, atlasUses, blockRaster);
-			// Standard foil carries a frame clock. Keep the entire item frame-local
-			// until that animated material is represented separately from topology.
-			boolean reusable = cacheKey != null && layers.stream().noneMatch(layer -> layer.itemFoil() != null);
+			// Standard foil's frame clock is refreshed on every reuse below; the
+			// cached quads (and their resident geometry) stay shared.
+			boolean reusable = cacheKey != null;
 			if (reusable) {
 				cacheTopology(cacheKey, topology);
+				stableTopology = cachedTopology(cacheKey) == topology;
 				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-topology-cache.miss", 1L);
 			} else {
 				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-topology-cache.bypass", 1L);
@@ -111,8 +113,8 @@ public final class GuiItemMeshSemanticCollector {
 		return CollectionResult.accepted(new GuiItemMesh(
 			item.name(), item.x(), item.y(), left, top, right, bottom,
 			new float[] {item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()},
-			topology.layers(), topology.sources(), topology.atlasUses(), topology.blockRaster()
-		));
+			withCurrentFoil(topology.layers()), topology.sources(), topology.atlasUses(), topology.blockRaster()
+		), stableTopology);
 	}
 
 	private static synchronized CachedTopology cachedTopology(TopologyKey key) {
@@ -123,7 +125,26 @@ public final class GuiItemMeshSemanticCollector {
 		TOPOLOGY_CACHE.putIfAbsent(key, topology);
 	}
 
-	private record TopologyKey(Object modelIdentity, int guiScale) {
+	private record TopologyKey(Object modelIdentity, int guiScale, boolean foil) {
+	}
+
+	/** Standard foil animates with this frame's clock and options; quads stay shared. */
+	private static List<GuiItemMeshLayer> withCurrentFoil(List<GuiItemMeshLayer> layers) {
+		List<GuiItemMeshLayer> result = null;
+		for (int index = 0; index < layers.size(); index++) {
+			GuiItemMeshLayer layer = layers.get(index);
+			if (layer.itemFoil() == null) continue;
+			if (result == null) result = new ArrayList<>(layers);
+			result.set(index, new GuiItemMeshLayer(layer.materialMode(), layer.blockLight(), layer.modelTransform,
+				layer.quads(), currentFoil(), layer.sourceFoilType()));
+		}
+		return result == null ? layers : result;
+	}
+
+	private static net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord currentFoil() {
+		return new net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord(Util.getMillis(),
+			Minecraft.getInstance().options.glintSpeed().get(),
+			Minecraft.getInstance().options.glintStrength().get().floatValue());
 	}
 
 	private record CachedTopology(
@@ -167,9 +188,7 @@ public final class GuiItemMeshSemanticCollector {
 				glintQuads.add(glintQuad(quad, glint.assetId()));
 			}
 			output.add(new GuiItemMeshLayer(MaterialMode.GLINT, false, modelTransform, glintQuads,
-				new net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord(Util.getMillis(),
-					Minecraft.getInstance().options.glintSpeed().get(),
-					Minecraft.getInstance().options.glintStrength().get().floatValue()), sourceFoilType));
+				currentFoil(), sourceFoilType));
 		}
 		return null;
 	}
@@ -309,13 +328,14 @@ public final class GuiItemMeshSemanticCollector {
 		GLINT
 	}
 
-	public record CollectionResult(GuiItemMesh mesh, String rejection) {
-		private static CollectionResult accepted(GuiItemMesh mesh) {
-			return new CollectionResult(mesh, null);
+	/** {@code stableTopology}: the mesh's quad lists are owned by the topology cache. */
+	public record CollectionResult(GuiItemMesh mesh, String rejection, boolean stableTopology) {
+		private static CollectionResult accepted(GuiItemMesh mesh, boolean stableTopology) {
+			return new CollectionResult(mesh, null, stableTopology);
 		}
 
 		private static CollectionResult rejected(String rejection) {
-			return new CollectionResult(null, rejection);
+			return new CollectionResult(null, rejection, false);
 		}
 
 		public boolean accepted() {

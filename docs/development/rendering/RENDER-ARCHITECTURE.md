@@ -307,6 +307,14 @@ discards cached pixels needed by later items and causes repeated rasterization.
 Keep accepted static rasters across frames; identity, extent and asset-generation
 changes invalidate them. Pending command uses still prevent eviction.
 
+Flat and standard 3D GUI items both carry a raster identity (`GuiItemCacheRecord`)
+from their topology cache key. Static items reuse their raster. Standard-foil
+items are marked animated: they re-raster each frame, but their cached quads
+keep stable identity (encoded once into persistent native memory), and the
+foil clock is refreshed per frame (`withCurrentFoil`) and applied on the GPU as
+a per-draw UV transform. Foil and plain variants of one model use distinct
+identities, so they never share pixels.
+
 Prebuilt GUI commands must keep the `GuiSubmitStats` produced while recording
 through route selection: source preparation can arm the selected-source route
 for that same frame. At [commit `78e8e04`](https://github.com/HungLo2020/MattMC/commit/78e8e0423084f010bb47e36132550619b37644c2),

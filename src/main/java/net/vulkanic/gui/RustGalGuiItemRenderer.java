@@ -1048,19 +1048,21 @@ public final class RustGalGuiItemRenderer {
 			return List.of();
 		}
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = collected.mesh();
-		boolean cacheableRaster = !item.itemStackRenderState().isAnimated();
-		if (cacheableRaster) {
-			for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) {
-				if (layer.itemFoil() != null) {
-					cacheableRaster = false;
-					break;
-				}
+		// Foil items redraw their raster every frame (animated) but keep their
+		// identity, so cached topologies stay resident; foil and plain variants
+		// of one model never share a raster.
+		boolean foilItem = false;
+		for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) {
+			if (layer.itemFoil() != null) {
+				foilItem = true;
+				break;
 			}
 		}
-		long cacheIdentity = cacheableRaster
-			? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
+		Object modelIdentity = item.itemStackRenderState().getModelIdentity();
+		long cacheIdentity = item.itemStackRenderState().isAnimated() || modelIdentity == null ? 0
+			: GuiItemSemanticIdentities.identityOrZero(foilItem ? new FoilRasterIdentity(modelIdentity) : modelIdentity);
 		VulkanicGalBridge.GuiItemCacheRecord itemCache = cacheIdentity != 0
-			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, false) : null;
+			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, foilItem, collected.stableTopology()) : null;
 		var clip = item.scissorArea();
 		float[] guiPose = mesh.guiPoseOwned();
 		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
@@ -1179,18 +1181,27 @@ public final class RustGalGuiItemRenderer {
 				break;
 			}
 		}
+		boolean traceFoilSource = net.minecraft.client.dev.GraphicsAuditGuiFoilSource.enabled();
 		item.itemStackRenderState().forEachSemanticLayer(layer -> {
+			net.minecraft.client.renderer.texture.TextureAtlasSprite recorded = null;
 			for (BakedQuad face : layer.quads()) {
-				net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
+				if (traceFoilSource) net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
 				var sprite = ((BakedQuadView)(Object)face).getSprite();
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
-					sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				// Sprite use is a set: record each run of faces once.
+				if (sprite != recorded) {
+					recorded = sprite;
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				}
 			}
 		});
 		recordDiagnostic("flat-mesh-accepted-layers=" + snapshot.batches().size());
 		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.flat",
 			-1, -1.0F, GuiFillDirection.NONE, item.x(), item.y(), 16, 16, guiWidth, guiHeight));
 	}
+
+	/** Raster identity of a standard-foil item, distinct from its plain model's. */
+	private record FoilRasterIdentity(Object modelIdentity) {}
 
 	private static int guiMaterialMode(GuiItemMeshSemanticCollector.MaterialMode mode) {
 		return switch (mode) {

@@ -24,8 +24,12 @@ final class GuiFlatItemMeshCollector {
 		}
 	};
 	private record Faces(long asset, List<GuiMeshVertexRecord> vertices) {}
-	private record FlatTopologyKey(Object modelIdentity, int guiScale) {}
-	private record FlatLayer(int material, long asset, float[] transform, List<GuiMeshVertexRecord> vertices) {
+	private record FlatTopologyKey(Object modelIdentity, int guiScale, boolean foil) {}
+	/** Raster identity of a cached flat item; foil and plain variants never share pixels. */
+	private record FlatRasterIdentity(Object modelIdentity, boolean foil) {}
+	/** One cached layer; {@code foil} layers take each frame's foil clock, {@code specialFoil} its decal layout. */
+	private record FlatLayer(int material, long asset, float[] transform, List<GuiMeshVertexRecord> vertices,
+			List<Integer> indices, boolean foil, boolean specialFoil) {
 		private FlatLayer {
 			transform = transform.clone();
 			vertices = List.copyOf(vertices);
@@ -51,16 +55,16 @@ final class GuiFlatItemMeshCollector {
             || item.itemStackRenderState().usesBlockLight() || guiScale<=0) {
             throw new IllegalArgumentException("flat mesh requires GUI flat-lighting semantics");
         }
-        List<GuiMeshBatchRecord> batches=new ArrayList<>();
         List<GuiItemTextureSource> sources=new ArrayList<>();
         Object modelIdentity = item.itemStackRenderState().getModelIdentity();
-        FlatTopologyKey cacheKey = foil == null && !item.itemStackRenderState().isAnimated() && modelIdentity != null
-            ? new FlatTopologyKey(modelIdentity, guiScale) : null;
+        FlatTopologyKey cacheKey = !item.itemStackRenderState().isAnimated() && modelIdentity != null
+            ? new FlatTopologyKey(modelIdentity, guiScale, foil != null) : null;
         FlatTopology cached = cacheKey == null ? null : cachedTopology(cacheKey);
         if (cached != null) {
             net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-flat-topology-cache.hit", 1L);
-            return instantiate(item, guiWidth, guiHeight, guiScale, stratum, cached);
+            return instantiate(item, guiWidth, guiHeight, guiScale, stratum, cached, foil, itemCache(cacheKey));
         }
+        List<FlatLayer> layers = new ArrayList<>();
         int[] copiedVertexCount = {0};
         boolean[] animatedSource = {false};
         item.itemStackRenderState().forEachSemanticLayer(layer -> {
@@ -111,8 +115,8 @@ final class GuiFlatItemMeshCollector {
                 copied.getLast().vertices().addAll(vertices);
             }
             for (var faces : copied) {
-                batches.add(batch(item,guiWidth,guiHeight,guiScale,stratum,batches.size(),material,
-                    faces.asset(),layer.modelTransform(),faces.vertices(),null));
+                layers.add(new FlatLayer(material, faces.asset(), layer.modelTransform(), faces.vertices(),
+                    quadIndices(faces.vertices().size()), false, false));
             }
             if(layer.foilType()!=ItemStackRenderState.FoilType.NONE) {
                 var glint=RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
@@ -120,25 +124,23 @@ final class GuiFlatItemMeshCollector {
                 sources.add(new GuiItemTextureSource.Raw(glint));
                 List<GuiMeshVertexRecord> foilVertices = new ArrayList<>();
                 for (var faces : copied) foilVertices.addAll(faces.vertices());
-                var foilBatch=batch(item,guiWidth,guiHeight,guiScale,stratum,batches.size(),4,
-                    glint.assetId(),layer.modelTransform(),foilVertices,foil);
-                batches.add(specialFoil ? foilBatch.withDecalFoil(GuiDecalFoilRecord.forNativeItemLayout()) : foilBatch);
+                if (foil == null) throw new IllegalArgumentException("flat mesh foil layer without foil semantics");
+                layers.add(new FlatLayer(4, glint.assetId(), layer.modelTransform(), foilVertices,
+                    quadIndices(foilVertices.size()), true, specialFoil));
             }
-            if(batches.size()>64) throw new IllegalArgumentException("flat mesh layer bound exceeded");
+            if(layers.size()>64) throw new IllegalArgumentException("flat mesh layer bound exceeded");
         });
-        if(batches.isEmpty()) throw new IllegalArgumentException("flat mesh empty");
-        if (cacheKey != null && !animatedSource[0] && batches.stream().noneMatch(batch -> batch.itemFoil() != null)) {
-            List<FlatLayer> layers = new ArrayList<>(batches.size());
-            for (GuiMeshBatchRecord batch : batches) {
-                layers.add(new FlatLayer(batch.materialMode(), batch.assetId(), batch.modelTransform(), batch.vertices()));
-            }
-            FlatTopology topology = new FlatTopology(layers, sources);
+        if(layers.isEmpty()) throw new IllegalArgumentException("flat mesh empty");
+        FlatTopology topology = new FlatTopology(layers, sources);
+        if (cacheKey != null && !animatedSource[0]) {
             cacheTopology(cacheKey, topology);
             net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-flat-topology-cache.miss", 1L);
-        } else if (cacheKey == null) {
+            return instantiate(item, guiWidth, guiHeight, guiScale, stratum, topology, foil, itemCache(cacheKey));
+        }
+        if (cacheKey == null) {
             net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-flat-topology-cache.bypass", 1L);
         }
-        return new Snapshot(batches,sources);
+        return instantiate(item, guiWidth, guiHeight, guiScale, stratum, topology, foil, null);
     }
 
 	private static synchronized FlatTopology cachedTopology(FlatTopologyKey key) {
@@ -149,12 +151,33 @@ final class GuiFlatItemMeshCollector {
 		TOPOLOGY_CACHE.putIfAbsent(key, topology);
 	}
 
+	/**
+	 * A cached flat item reuses its Rust raster while static; with foil the
+	 * raster is redrawn each frame but the geometry stays resident.
+	 */
+	private static GuiItemCacheRecord itemCache(FlatTopologyKey key) {
+		long identity = GuiItemSemanticIdentities.identityOrZero(new FlatRasterIdentity(key.modelIdentity(), key.foil()));
+		return identity == 0 ? null : new GuiItemCacheRecord(identity, key.foil(), true);
+	}
+
+	private static List<Integer> quadIndices(int vertexCount) {
+		int[] indices = new int[vertexCount / 4 * 6];
+		for (int first = 0, cursor = 0; first < vertexCount; first += 4) {
+			indices[cursor++] = first; indices[cursor++] = first + 1; indices[cursor++] = first + 2;
+			indices[cursor++] = first + 2; indices[cursor++] = first + 3; indices[cursor++] = first;
+		}
+		return net.vulkanic.bridge.VulkanicGalBridge.packedGuiMeshIndices(indices, indices.length);
+	}
+
 	private static Snapshot instantiate(GuiItemRenderState item, int guiWidth, int guiHeight,
-		int guiScale, int stratum, FlatTopology topology) {
+		int guiScale, int stratum, FlatTopology topology, StandardItemFoilRecord foil, GuiItemCacheRecord itemCache) {
 		List<GuiMeshBatchRecord> batches = new ArrayList<>(topology.layers().size());
 		for (FlatLayer layer : topology.layers()) {
-			batches.add(batch(item, guiWidth, guiHeight, guiScale, stratum, batches.size(), layer.material(),
-				layer.asset(), layer.transform(), layer.vertices(), null));
+			if (layer.foil() && foil == null) throw new IllegalArgumentException("flat mesh foil layer without foil semantics");
+			var batch = batch(item, guiWidth, guiHeight, guiScale, stratum, batches.size(), layer.material(),
+				layer.asset(), layer.transform(), layer.vertices(), layer.indices(), layer.foil() ? foil : null, 1);
+			if (layer.specialFoil()) batch = batch.withDecalFoil(GuiDecalFoilRecord.forNativeItemLayout());
+			batches.add(itemCache == null ? batch : batch.withItemCache(itemCache));
 		}
 		return new Snapshot(batches, topology.sources());
 	}
@@ -168,15 +191,19 @@ final class GuiFlatItemMeshCollector {
     static GuiMeshBatchRecord batch(GuiItemRenderState item,int width,int height,int scale,int stratum,int layer,
                                            int material,long asset,float[] transform,List<GuiMeshVertexRecord> vertices,
                                            StandardItemFoilRecord foil,int lighting) {
+        if (vertices.isEmpty() || vertices.size()%4!=0 || vertices.size()>MAX_COPIED_VERTICES)
+            throw new IllegalArgumentException("flat mesh requires bounded complete quads");
+        return batch(item,width,height,scale,stratum,layer,material,asset,transform,vertices,
+            quadIndices(vertices.size()),foil,lighting);
+    }
+
+    private static GuiMeshBatchRecord batch(GuiItemRenderState item,int width,int height,int scale,int stratum,int layer,
+                                           int material,long asset,float[] transform,List<GuiMeshVertexRecord> vertices,
+                                           List<Integer> indices,StandardItemFoilRecord foil,int lighting) {
         var clip=item.scissorArea();
         var pose=item.pose();
         if (vertices.isEmpty() || vertices.size()%4!=0 || vertices.size()>MAX_COPIED_VERTICES)
             throw new IllegalArgumentException("flat mesh requires bounded complete quads");
-        List<Integer> indices = new ArrayList<>(vertices.size()/4*6);
-        for (int first=0;first<vertices.size();first+=4) {
-            indices.add(first); indices.add(first+1); indices.add(first+2);
-            indices.add(first+2); indices.add(first+3); indices.add(first);
-        }
         return new GuiMeshBatchRecord(stratum,layer,material,lighting,asset,0L,material == 1 || material == GUI_MESH_MATERIAL_MODEL_OVERLAY ? 0.0F : 0.1F,transform,
             new float[]{pose.m00(),pose.m01(),pose.m10(),pose.m11(),pose.m20(),pose.m21()},
             item.x(),item.y(),item.x()+16,item.y()+16,width,height,0,0,0,

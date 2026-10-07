@@ -856,7 +856,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		GuiMeshBatchRecord batch, List<GuiMeshVertexRecord> vertices, List<Integer> indices
 	) {
 		GuiItemCacheRecord cache = batch.itemCache;
-		if (cache == null || cache.animated() || batch.itemFoil != null) return null;
+		if (cache == null || (!cache.stableGeometry() && (cache.animated() || batch.itemFoil != null))) return null;
 		IdentityHashMap<List<Integer>, PackedGuiMeshTopology> byIndices = persistentGuiMeshTopologies.get(vertices);
 		if (byIndices != null) {
 			PackedGuiMeshTopology existing = byIndices.get(indices);
@@ -5478,8 +5478,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	/** Semantic model identity and authored animation flag, never a GPU/cache handle. */
-	public record GuiItemCacheRecord(long identity, boolean animated) {
+	/**
+	 * {@code stableGeometry} (Java only) marks vertex and index lists owned by a
+	 * topology cache: their identity is stable, so they encode once into
+	 * persistent native memory even when the raster is animated (foil).
+	 */
+	public record GuiItemCacheRecord(long identity, boolean animated, boolean stableGeometry) {
 		public GuiItemCacheRecord { if (identity <= 0) throw new IllegalArgumentException("Invalid GUI item identity"); }
+		public GuiItemCacheRecord(long identity, boolean animated) { this(identity, animated, false); }
 	}
 
 	public record GuiMeshBatchRecord(

@@ -247,17 +247,19 @@ class GuiItemMeshSemanticCollectorTest {
 		assertTrue(collector.contains("MAX_CACHED_TOPOLOGIES = 256"));
 		assertTrue(collector.contains("!item.itemStackRenderState().isAnimated()"),
 			"animated item geometry must remain frame-local");
-		assertTrue(collector.contains("layers.stream().noneMatch(layer -> layer.itemFoil() != null)"),
-			"clock-driven standard foil must remain frame-local until material animation is separated from topology");
-		assertTrue(collector.contains("new TopologyKey(modelIdentity, guiScale)"),
-			"cache identity must include vanilla model semantics and raster scale");
+		assertTrue(collector.contains("withCurrentFoil(topology.layers())"),
+			"cached standard foil must take this frame's foil clock, not the cached one");
+		assertTrue(collector.contains("new TopologyKey(modelIdentity, guiScale, item.itemStackRenderState().hasFoil())"),
+			"cache identity must include vanilla model semantics, raster scale and foil presence");
 		assertTrue(assets.contains("GuiItemMeshSemanticCollector.invalidateCache();"),
 			"resource reload must retire cached topology before new atlas identities are used");
 		String flatCollector = java.nio.file.Files.readString(java.nio.file.Path.of(
 			"src/main/java/net/vulkanic/gui/GuiFlatItemMeshCollector.java"));
 		assertTrue(flatCollector.contains("MAX_CACHED_TOPOLOGIES = 256"));
-		assertTrue(flatCollector.contains("foil == null"),
-			"foil submissions must bypass the non-foil topology cache");
+		assertTrue(flatCollector.contains("new FlatTopologyKey(modelIdentity, guiScale, foil != null)"),
+			"foil and plain flat items must not share a cached topology");
+		assertTrue(flatCollector.contains("layer.foil() ? foil : null"),
+			"cached flat foil layers must take this frame's foil clock");
 		assertTrue(flatCollector.contains("!item.itemStackRenderState().isAnimated()"),
 			"animated flat item geometry must remain frame-local");
 		assertTrue(flatCollector.contains("static synchronized void invalidateCache()"),
