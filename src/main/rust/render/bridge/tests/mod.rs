@@ -1381,6 +1381,32 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
 }
 
 #[test]
+fn gui_mesh_persistent_decode_reuses_geometry_but_revalidates_new_raster_state() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32, 1, 2];
+    let mut request = gui_mesh_batch_request(&vertices, &indices);
+    // A generation no other test uses keeps this thread's cache entry private.
+    request.reserved0 = 1 | (991 << 1);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        crate::render::bridge::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+    };
+    let first = decode(&request).unwrap().remove(0);
+    let cached = decode(&request).unwrap().remove(0);
+    assert_eq!(first.vertices, cached.vertices);
+    assert_eq!(first.indices, cached.indices);
+    // Geometry valid only with a native block raster must still be rejected
+    // when the cached content arrives without one.
+    let mut faced = gui_mesh_vertices();
+    for vertex in &mut faced {
+        vertex.source_face = 3;
+    }
+    let mut faced_request = gui_mesh_batch_request(&faced, &indices);
+    faced_request.reserved0 = 1 | (991 << 1);
+    assert!(decode(&faced_request).is_err());
+    assert!(decode(&faced_request).is_err(), "a cached entry must not skip failed checks");
+}
+
+#[test]
 fn gui_mesh_persistent_geometry_flag_carries_source_identity() {
     let vertices = gui_mesh_vertices();
     let indices = [0_u32, 1, 2];

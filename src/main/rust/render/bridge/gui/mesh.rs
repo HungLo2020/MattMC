@@ -8,6 +8,28 @@ pub(crate) const GUI_MESH_MATERIAL_PANORAMA: u32 = 5;
 /// Decodes the private coarse GUI mesh family. Callers may use this only once
 /// the owned GUI mesh pass is available; defining the transport does not arm a
 /// route or expose a backend capability.
+/// Decoded persistent caller geometry by (vertex address, count, index
+/// address, count, store generation). The caller never rewrites such memory
+/// for its generation, so an equal identity has equal contents. Decoding
+/// always runs on the caller's render thread.
+#[derive(Clone)]
+struct DecodedPersistentGeometry {
+    vertices: Vec<GuiMeshVertex>,
+    indices: Vec<u32>,
+    /// Block-raster presence under which the geometry checks last passed.
+    validated_with_block_raster: Option<bool>,
+}
+
+type PersistentGeometryKey = (u64, usize, u64, usize, u32);
+
+const MAX_DECODED_PERSISTENT_GEOMETRY: usize = 1024;
+
+thread_local! {
+    static DECODED_PERSISTENT_GEOMETRY: std::cell::RefCell<
+        std::collections::HashMap<PersistentGeometryKey, DecodedPersistentGeometry>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
 pub(crate) unsafe fn decode_gui_mesh_batches(
     raw: FfiSlice<FfiGuiMeshBatchRequest>,
     gui_width: i32,
@@ -56,6 +78,10 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
         }
     }
     let mut owned = Vec::with_capacity(batches.len());
+    // Per owned batch: its persistent identity, and whether its geometry
+    // checks can be skipped (decoded earlier and validated in the same state).
+    let mut persistent_keys: Vec<Option<PersistentGeometryKey>> = Vec::with_capacity(batches.len());
+    let mut validated_states: Vec<Option<bool>> = Vec::with_capacity(batches.len());
     for batch in batches {
         validate_item_size::<FfiGuiMeshBatchRequest>(batch.byte_size, "GUI mesh batch")?;
         // reserved0 bit 0: persistent caller geometry; upper bits: its store generation.
@@ -106,18 +132,46 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
                 "GUI mesh payload exceeds its bounded vertex or index capacity",
             ));
         }
-        let vertices = vertices
-            .iter()
-            .map(|vertex| GuiMeshVertex {
-                position: vertex.position,
-                atlas_uv: vertex.atlas_uv,
-                local_uv: vertex.local_uv,
-                color_argb: vertex.color_argb,
-                normal_packed: vertex.normal_packed,
-                source_face: vertex.source_face,
-                source_foil_type: vertex.source_foil_type,
-            })
-            .collect();
+        let persistent_key = persistent_flag.then(|| {
+            (batch.vertices.ptr as u64, vertices.len(), batch.indices.ptr as u64, indices.len(), batch.reserved0 >> 1)
+        });
+        let cached = persistent_key.and_then(|key| {
+            DECODED_PERSISTENT_GEOMETRY.with(|cache| cache.borrow().get(&key).cloned())
+        });
+        let (vertices, indices, validated_state) = match cached {
+            Some(decoded) => (decoded.vertices, decoded.indices, decoded.validated_with_block_raster),
+            None => {
+                let decoded_vertices: Vec<GuiMeshVertex> = vertices
+                    .iter()
+                    .map(|vertex| GuiMeshVertex {
+                        position: vertex.position,
+                        atlas_uv: vertex.atlas_uv,
+                        local_uv: vertex.local_uv,
+                        color_argb: vertex.color_argb,
+                        normal_packed: vertex.normal_packed,
+                        source_face: vertex.source_face,
+                        source_foil_type: vertex.source_foil_type,
+                    })
+                    .collect();
+                let decoded_indices = indices.to_vec();
+                if let Some(key) = persistent_key {
+                    DECODED_PERSISTENT_GEOMETRY.with(|cache| {
+                        let mut cache = cache.borrow_mut();
+                        if cache.len() >= MAX_DECODED_PERSISTENT_GEOMETRY {
+                            cache.clear();
+                        }
+                        cache.insert(key, DecodedPersistentGeometry {
+                            vertices: decoded_vertices.clone(),
+                            indices: decoded_indices.clone(),
+                            validated_with_block_raster: None,
+                        });
+                    });
+                }
+                (decoded_vertices, decoded_indices, None)
+            }
+        };
+        persistent_keys.push(persistent_key);
+        validated_states.push(validated_state);
         let request = GuiMeshBatchRequest {
             persistent_geometry: persistent_flag.then(|| crate::render::guirender::mesh::GuiPersistentGeometry {
                 vertices: batch.vertices.ptr as u64,
@@ -192,13 +246,25 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             clip_width: batch.clip_width,
             clip_height: batch.clip_height,
             vertices,
-            indices: indices.to_vec(),
+            indices,
         };
         owned.push(request);
     }
     compact_gui_mesh_item_layers(&mut owned);
-    // Validates every batch, then the item layer structure.
-    validate_gui_mesh_batches(&owned)?;
+    // Validates every batch, then the item layer structure. Persistent
+    // geometry already validated under the same block-raster state skips
+    // only its per-vertex checks.
+    crate::render::guirender::mesh::validate_batches_with_geometry(&owned, |index| {
+        validated_states[index] != Some(owned[index].block_item_raster.is_some())
+    })?;
+    DECODED_PERSISTENT_GEOMETRY.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        for (key, batch) in persistent_keys.iter().zip(&owned) {
+            if let Some(entry) = key.and_then(|key| cache.get_mut(&key)) {
+                entry.validated_with_block_raster = Some(batch.block_item_raster.is_some());
+            }
+        }
+    });
     Ok(owned)
 }
 

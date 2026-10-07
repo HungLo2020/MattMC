@@ -77,7 +77,6 @@ use crate::render::guirender::frontend::{
     GUI_MAX_VIEWPORT_AXIS,
 };
 use crate::render::guirender::mesh::{
-    validate_batches as validate_gui_mesh_batches,
     GuiMeshBatchRequest, GuiMeshLightingMode, GuiMeshMaterialMode, GuiMeshVertex,
     GUI_MESH_MAX_BATCHES, GUI_MESH_MAX_INDICES, GUI_MESH_MAX_VERTICES,
 };

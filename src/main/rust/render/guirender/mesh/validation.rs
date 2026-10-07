@@ -27,6 +27,15 @@ pub(crate) fn flat_item_mesh_decode_counts(
 }
 
 pub fn validate_batches(batches: &[GuiMeshBatchRequest]) -> GalResult<()> {
+    validate_batches_with_geometry(batches, |_| true)
+}
+
+/// `validate_batches`, running the geometry checks only for batches where
+/// `check_geometry(index)` (others reuse an earlier identical validation).
+pub(crate) fn validate_batches_with_geometry(
+    batches: &[GuiMeshBatchRequest],
+    check_geometry: impl Fn(usize) -> bool,
+) -> GalResult<()> {
     if batches.len() > GUI_MESH_MAX_BATCHES {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -38,8 +47,11 @@ pub fn validate_batches(batches: &[GuiMeshBatchRequest]) -> GalResult<()> {
         ));
     }
     let mut layer_groups = BTreeMap::<(u32, u64), BTreeSet<u32>>::new();
-    for batch in batches {
-        validate_batch(batch)?;
+    for (index, batch) in batches.iter().enumerate() {
+        validate_batch_header(batch)?;
+        if check_geometry(index) {
+            validate_batch_geometry(batch)?;
+        }
         if batch.sequence == 0 {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -180,6 +192,12 @@ pub(crate) fn resolved_item_bounds(batch: &GuiMeshBatchRequest) -> GalResult<[i3
 }
 
 pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
+    validate_batch_header(batch)?;
+    validate_batch_geometry(batch)
+}
+
+/// Every check except the per-vertex and per-index geometry checks.
+pub(crate) fn validate_batch_header(batch: &GuiMeshBatchRequest) -> GalResult<()> {
     if matches!(
         batch.material_mode,
         GuiMeshMaterialMode::EntityCutoutNoCull
@@ -383,6 +401,12 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
             ))
         }
     }
+    Ok(())
+}
+
+/// Per-vertex semantics and index range. Depends on the vertex and index
+/// data and on whether the batch carries a native block-item raster.
+pub(crate) fn validate_batch_geometry(batch: &GuiMeshBatchRequest) -> GalResult<()> {
     for vertex in &batch.vertices {
         if vertex.source_face > 6
             || vertex.source_foil_type > 1
