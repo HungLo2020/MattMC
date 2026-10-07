@@ -49,25 +49,75 @@ pub(in crate::render::guirender::frontend) fn direct_gui_mesh_raster_key(
     key
 }
 
-/// One private GUI-mesh stream allocation. It remains unavailable until the
-/// submission that references it has completed, then can be reused by later
-/// semantic mesh work without overwriting in-flight GPU reads.
+/// One private GUI-mesh stream allocation. Unchanged geometry stays resident
+/// across frames (draws re-track it read-only); a range is released only once
+/// its last submission has completed and it has gone unused for
+/// [`GUI_MESH_GEOMETRY_IDLE_TRANSACTIONS`] frames, so later mesh work never
+/// overwrites in-flight GPU reads.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::render::guirender::frontend) struct GuiMeshGeometryResidency {
     pub(in crate::render::guirender::frontend) stream: GuiMeshStreamRange,
     pub(in crate::render::guirender::frontend) vertex_bytes: u64,
     pub(in crate::render::guirender::frontend) index_bytes: u64,
     pub(in crate::render::guirender::frontend) usage: crate::render::vulkanic::commands::SubmissionUsage,
+    /// The GUI frame transaction that last drew this range.
+    pub(in crate::render::guirender::frontend) last_transaction: u64,
 }
 
+/// Frames a resident GUI geometry range may go unused before it is released.
+pub(in crate::render::guirender::frontend) const GUI_MESH_GEOMETRY_IDLE_TRANSACTIONS: u64 = 2;
+
 impl GuiFrontend {
+    /// Releases every completed range regardless of reuse (capacity pressure).
     pub(in crate::render::guirender::frontend) fn reclaim_completed_mesh_geometry(&mut self, completed: SubmissionId) {
+        self.reclaim_mesh_geometry(completed, u64::MAX);
+    }
+
+    /// Per-frame reclaim: completed ranges idle for the configured frames.
+    pub(in crate::render::guirender::frontend) fn reclaim_idle_mesh_geometry(&mut self, completed: SubmissionId) {
+        let idle_before = self
+            .mesh_geometry_transaction
+            .saturating_sub(GUI_MESH_GEOMETRY_IDLE_TRANSACTIONS);
+        self.reclaim_mesh_geometry(completed, idle_before);
+    }
+
+    /// An entry never proven written (no accepted submission, not this frame's)
+    /// that other prepared commands still reference must not be rewritten:
+    /// retire it so this draw allocates a fresh range; reclaim frees it once
+    /// nothing references it.
+    pub(in crate::render::guirender::frontend) fn retire_unwritten_pending_mesh_geometry(
+        &mut self,
+        key: &(GuiMeshRasterKey, u64, u64),
+    ) {
+        let Some(residency) = self.mesh_geometry_cache.get(key) else {
+            return;
+        };
+        let unwritten = residency.last_transaction != self.mesh_geometry_transaction
+            && residency.usage.last_submission() == SubmissionId::default();
+        if unwritten && residency.usage.has_pending_commands() {
+            let retired = self.mesh_geometry_cache.remove(key).expect("entry was present");
+            self.mesh_geometry_retired.push(retired);
+        }
+    }
+
+    fn reclaim_mesh_geometry(&mut self, completed: SubmissionId, idle_before: u64) {
+        let mut retired = std::mem::take(&mut self.mesh_geometry_retired);
+        retired.retain(|residency| {
+            let free = !residency.usage.has_pending_commands()
+                && residency.usage.last_submission() <= completed;
+            if free {
+                self.mesh_geometry_free_ranges.entry(()).or_default().push(residency.clone());
+            }
+            !free
+        });
+        self.mesh_geometry_retired = retired;
         let released: Vec<_> = self
             .mesh_geometry_cache
             .iter()
             .filter_map(|(key, residency)| {
                 (!residency.usage.has_pending_commands()
-                    && residency.usage.last_submission() <= completed)
+                    && residency.usage.last_submission() <= completed
+                    && residency.last_transaction <= idle_before)
                     .then(|| (*key, residency.clone()))
             })
             .collect();
@@ -114,6 +164,7 @@ impl GuiFrontend {
                     vertex_bytes: crate::render::guirender::mesh::GUI_MESH_MAX_VERTEX_BYTES,
                     index_bytes: crate::render::guirender::mesh::GUI_MESH_MAX_INDEX_BYTES,
                     usage: crate::render::vulkanic::commands::SubmissionUsage::default(),
+                    last_transaction: 0,
                 }]
             });
         let index = self.mesh_geometry_free_ranges[&()]
@@ -151,6 +202,7 @@ impl GuiFrontend {
             vertex_bytes,
             index_bytes,
             usage: crate::render::vulkanic::commands::SubmissionUsage::default(),
+            last_transaction: self.mesh_geometry_transaction,
         };
         let remaining_vertex_bytes = range.vertex_bytes - vertex_bytes;
         let remaining_index_bytes = range.index_bytes - index_bytes;
@@ -166,6 +218,7 @@ impl GuiFrontend {
                     vertex_bytes: remaining_vertex_bytes,
                     index_bytes: remaining_index_bytes,
                     usage: crate::render::vulkanic::commands::SubmissionUsage::default(),
+                    last_transaction: 0,
                 });
         }
         Ok(allocation)

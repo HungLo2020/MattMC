@@ -315,6 +315,13 @@ foil clock is refreshed per frame (`withCurrentFoil`) and applied on the GPU as
 a per-draw UV transform. Foil and plain variants of one model use distinct
 identities, so they never share pixels.
 
+GUI mesh geometry is content-keyed (raster key plus geometry fingerprint) and
+stays resident across frames: a draw re-uses a range once an accepted
+submission (or the same frame) wrote it, and a range is released after two idle
+frames once completed. A range never proven written that pending commands still
+reference is retired rather than rewritten
+([`mesh_items/geometry.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/frontend/mesh_items/geometry.rs)).
+
 Prebuilt GUI commands must keep the `GuiSubmitStats` produced while recording
 through route selection: source preparation can arm the selected-source route
 for that same frame. At [commit `78e8e04`](https://github.com/HungLo2020/MattMC/commit/78e8e0423084f010bb47e36132550619b37644c2),

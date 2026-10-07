@@ -4009,11 +4009,13 @@ fn pending_mesh_stream_survives_interleaved_upload_completion() {
         vertex_range(&second),
         "completed asset uploads must not release a pending draw's stream"
     );
+    let second_range = vertex_range(&second);
     drop((first, second));
     let retry = prepare(&mut frontend, &mut gal);
-    assert_eq!(
-        first_range,
-        vertex_range(&retry),
+    // Neither discarded preparation wrote its range, so the retry uploads
+    // again into one of the released reservations rather than a third range.
+    assert!(
+        [first_range, second_range].contains(&vertex_range(&retry)),
         "discarded preparations must release reservations without a fake submission"
     );
     let accepted = gal
@@ -4035,6 +4037,67 @@ fn pending_mesh_stream_survives_interleaved_upload_completion() {
     gal.retire_through(accepted.submission).unwrap();
     frontend.reclaim_completed_mesh_geometry(gal.poll_completed());
     assert!(frontend.mesh_geometry_cache.is_empty());
+    frontend.reset(&mut gal).unwrap();
+}
+
+#[test]
+fn accepted_mesh_geometry_stays_resident_across_frames_until_idle() {
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    frontend
+        .apply_raw_image_update(
+            &mut gal,
+            1,
+            vec![GuiRawImageAssetPayload {
+                sampling: None,
+                asset_id: 7,
+                format: GuiRawImageFormat::Rgba8,
+                width: 1,
+                height: 1,
+                pixels: vec![255; 4],
+            }],
+        )
+        .unwrap();
+    let prepare = |frontend: &mut GuiFrontend, gal: &mut VulkanicGal, batches: Vec<GuiMeshBatchRequest>| {
+        frontend
+            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                gal, 1, target, target, None, None, None, false, Vec::new(), Vec::new(), batches,
+            )
+            .unwrap()
+            .0
+    };
+    let uploads_vertices = |ops: &[CommandOp]| {
+        ops.iter().any(|op| matches!(op, CommandOp::HostWriteBuffer { data, .. } if data.len() == 3 * 48))
+    };
+    let submit = |gal: &mut VulkanicGal, operations: Vec<CommandOp>| {
+        let token = gal
+            .submit(SubmissionBatch {
+                label: "resident mesh frame".into(),
+                command_lists: vec![CommandList::from(CommandListDesc {
+                    label: "resident mesh commands".into(),
+                    operations,
+                })],
+            })
+            .unwrap();
+        gal.retire_through(token.submission).unwrap();
+    };
+    let first = prepare(&mut frontend, &mut gal, vec![mesh_batch(0)]);
+    assert!(uploads_vertices(&first));
+    submit(&mut gal, first);
+    // The next frame draws the same geometry from the accepted upload.
+    let second = prepare(&mut frontend, &mut gal, vec![mesh_batch(0)]);
+    assert!(!uploads_vertices(&second), "unchanged accepted GUI geometry must not re-upload");
+    submit(&mut gal, second);
+    // Unused for the idle window, the completed range is released; frames
+    // keep drawing other geometry meanwhile.
+    let mut other = mesh_batch(0);
+    other.vertices[0].position[0] += 0.25;
+    for _ in 0..=GUI_MESH_GEOMETRY_IDLE_TRANSACTIONS + 1 {
+        let frame = prepare(&mut frontend, &mut gal, vec![other.clone()]);
+        submit(&mut gal, frame);
+    }
+    assert_eq!(frontend.mesh_geometry_cache.len(), 1, "only the still-drawn geometry stays resident");
     frontend.reset(&mut gal).unwrap();
 }
 

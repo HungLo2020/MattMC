@@ -118,6 +118,8 @@ pub struct GuiFrontend {
     // alone is never evidence that their bytes reached the GPU.
     mesh_geometry_transaction: u64,
     mesh_geometry_cache: BTreeMap<(GuiMeshRasterKey, u64, u64), GuiMeshGeometryResidency>,
+    /// Ranges displaced while pending commands still referenced them.
+    mesh_geometry_retired: Vec<GuiMeshGeometryResidency>,
     mesh_geometry_free_ranges: BTreeMap<(), Vec<GuiMeshGeometryResidency>>,
     mesh_composite_uniform_cursor: u64,
     blur_resources: Option<GuiBlurResources>,
@@ -199,6 +201,7 @@ impl GuiFrontend {
             program.destroy(gal);
         }
         self.mesh_geometry_cache.clear();
+        self.mesh_geometry_retired.clear();
         self.mesh_geometry_free_ranges.clear();
         let mesh_composites = std::mem::take(&mut self.mesh_composites);
         let mut mesh_composites = mesh_composites.into_values().collect::<Vec<_>>();

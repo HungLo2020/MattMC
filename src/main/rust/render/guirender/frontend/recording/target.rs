@@ -232,7 +232,7 @@ impl GuiFrontend {
         // The backend reads mesh streams asynchronously. Reclaim only ranges
         // whose submission has completed, so animated semantic meshes cannot
         // exhaust permanent residency or overwrite in-flight vertices.
-        self.reclaim_completed_mesh_geometry(gal.poll_completed());
+        self.reclaim_idle_mesh_geometry(gal.poll_completed());
         // Eviction uses the complete ordered frame. Recording one mesh item
         // at a time must not evict the other items needed later in that frame.
         let mut needed_targets = Vec::new();
