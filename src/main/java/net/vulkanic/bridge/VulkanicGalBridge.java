@@ -3299,7 +3299,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				Struct.WORLD_MESH_ASSET_RECORD.setLong(item, 4, mesh.meshKey());
 				Struct.WORLD_MESH_ASSET_RECORD.setLong(item, 5, mesh.meshGeneration());
 				MemorySegment vertexArray = Struct.WORLD_MESH_VERTEX.array(updateArena, mesh.vertices().size());
-				for (int vertexIndex = 0; vertexIndex < mesh.vertices().size(); vertexIndex++) {
+				if (mesh.vertices() instanceof EncodedWorldMeshVertices encoded) {
+					MemorySegment.copy(encoded.bytes(), 0, vertexArray, 0,
+						(long) encoded.size() * Struct.WORLD_MESH_VERTEX.byteSize());
+				} else for (int vertexIndex = 0; vertexIndex < mesh.vertices().size(); vertexIndex++) {
 					WorldMeshVertexRecord vertex = mesh.vertices().get(vertexIndex);
 					MemorySegment vertexItem = Abi.item(vertexArray, Struct.WORLD_MESH_VERTEX, vertexIndex);
 					vertexItem.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_VERTEX.offset(0), Struct.WORLD_MESH_VERTEX.byteSize());
@@ -4382,6 +4385,94 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		return records;
 	}
 
+	/**
+	 * Vertices already in the native {@code FfiWorldMeshVertex} layout (Rust
+	 * decoded them; see {@code worldrender/terrain/intake.rs}). A fixed-size
+	 * list view over the bytes: uploads copy them in bulk, records are built
+	 * only for consumers that read single vertices, and {@link #set} writes
+	 * back into the bytes (intake rewrites water quads before publication).
+	 */
+	public static final class EncodedWorldMeshVertices extends java.util.AbstractList<WorldMeshVertexRecord>
+			implements java.util.RandomAccess {
+		private final MemorySegment bytes;
+		private final int count;
+
+		public EncodedWorldMeshVertices(MemorySegment bytes, int count) {
+			if (count < 0 || bytes.byteSize() < (long) count * Struct.WORLD_MESH_VERTEX.byteSize()) {
+				throw new IllegalArgumentException("encoded world mesh vertices are not bounded");
+			}
+			this.bytes = bytes;
+			this.count = count;
+		}
+
+		public MemorySegment bytes() {
+			return this.bytes;
+		}
+
+		@Override
+		public int size() {
+			return this.count;
+		}
+
+		private long fieldOffset(int index, int field) {
+			return index * Struct.WORLD_MESH_VERTEX.byteSize() + Struct.WORLD_MESH_VERTEX.offset(field);
+		}
+
+		public int intField(int index, int field) {
+			return this.bytes.get(ValueLayout.JAVA_INT, fieldOffset(index, field));
+		}
+
+		public float floatField(int index, int field) {
+			return this.bytes.get(ValueLayout.JAVA_FLOAT, fieldOffset(index, field));
+		}
+
+		@Override
+		public WorldMeshVertexRecord get(int index) {
+			Objects.checkIndex(index, this.count);
+			return new WorldMeshVertexRecord(floatField(index, 4), floatField(index, 5), floatField(index, 6),
+				floatField(index, 7), floatField(index, 8), floatField(index, 9), floatField(index, 10),
+				intField(index, 11), intField(index, 12), intField(index, 13), intField(index, 1),
+				intField(index, 2), intField(index, 3), intField(index, 14));
+		}
+
+		@Override
+		public WorldMeshVertexRecord set(int index, WorldMeshVertexRecord vertex) {
+			Objects.checkIndex(index, this.count);
+			Objects.requireNonNull(vertex, "vertex");
+			WorldMeshVertexRecord previous = get(index);
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 1), vertex.colorArgb());
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 2), vertex.normalPacked());
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 3), vertex.light());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 4), vertex.x());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 5), vertex.y());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 6), vertex.z());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 7), vertex.u());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 8), vertex.v());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 9), vertex.atlasU());
+			this.bytes.set(ValueLayout.JAVA_FLOAT, fieldOffset(index, 10), vertex.atlasV());
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 11), vertex.shaderBlockId());
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 12), vertex.shaderMaterialType());
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 13), vertex.terrainMaterialBits());
+			this.bytes.set(ValueLayout.JAVA_INT, fieldOffset(index, 14), vertex.midBlockPacked());
+			return previous;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (other instanceof EncodedWorldMeshVertices encoded) {
+				long length = (long) this.count * Struct.WORLD_MESH_VERTEX.byteSize();
+				return encoded.count == this.count
+					&& MemorySegment.mismatch(this.bytes, 0, length, encoded.bytes, 0, length) == -1;
+			}
+			return super.equals(other);
+		}
+
+		@Override
+		public int hashCode() {
+			return super.hashCode();
+		}
+	}
+
 	public record WorldMeshVertexRecord(
 		float x,
 		float y,
@@ -4431,7 +4522,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Objects.requireNonNull(indexBytes, "indexBytes");
 			Objects.requireNonNull(sections, "sections");
 			Objects.requireNonNull(entityIdentity, "entityIdentity");
-			vertices = List.copyOf(vertices);
+			// Natively encoded vertices are kept as they are: copying would
+			// materialize a record per vertex.
+			vertices = vertices instanceof EncodedWorldMeshVertices ? vertices : List.copyOf(vertices);
 			indexBytes = indexBytes.clone();
 			sections = List.copyOf(sections);
 		}

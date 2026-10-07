@@ -38,6 +38,11 @@ final class RustTerrainIntake {
 			int separateAoVertices, boolean aoContractValid) {
 		private static final VulkanicGalBridge.Struct LAYOUT = VulkanicGalBridge.Struct.WORLD_MESH_VERTEX;
 
+		/** The vertices as a list over the encoded bytes (writes go to the bytes). */
+		VulkanicGalBridge.EncodedWorldMeshVertices encoded() {
+			return new VulkanicGalBridge.EncodedWorldMeshVertices(this.vertices, this.count);
+		}
+
 		/** The vertices as Java records (for consumers not yet reading the ABI bytes). */
 		List<VulkanicGalBridge.WorldMeshVertexRecord> records() {
 			List<VulkanicGalBridge.WorldMeshVertexRecord> records = new ArrayList<>(this.count);

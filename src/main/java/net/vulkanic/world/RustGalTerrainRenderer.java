@@ -2227,7 +2227,7 @@ public final class RustGalTerrainRenderer {
 		RustTerrainIntake.DecodedVertices decoded = RustTerrainIntake.decode(buffer, vertexStride, separateAo,
 			copiedAtlasWidth, copiedAtlasHeight, midBlockOffset, faultBits, vertexSegments, primitiveMetadata,
 			metadataStride, vertexCount);
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = decoded.records();
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = decoded.encoded();
 		float minX = decoded.minX();
 		float minY = decoded.minY();
 		float minZ = decoded.minZ();
@@ -3730,7 +3730,18 @@ public final class RustGalTerrainRenderer {
 		hash = mix64(hash, sectionPos);
 		hash = mix64(hash, layer.ordinal());
 		hash = mix64(hash, vertices.size());
-		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
+		if (vertices instanceof VulkanicGalBridge.EncodedWorldMeshVertices encoded) {
+			// The same words as the record loop below, read without a record per vertex.
+			for (int index = 0; index < encoded.size(); index++) {
+				hash = mix64(hash, ((long)encoded.intField(index, 4) << 32) ^ (encoded.intField(index, 5) & 0xffffffffL));
+				hash = mix64(hash, ((long)encoded.intField(index, 6) << 32) ^ (encoded.intField(index, 7) & 0xffffffffL));
+				hash = mix64(hash, ((long)encoded.intField(index, 8) << 32) ^ (encoded.intField(index, 9) & 0xffffffffL));
+				hash = mix64(hash, ((long)encoded.intField(index, 10) << 32) ^ (encoded.intField(index, 11) & 0xffffffffL));
+				hash = mix64(hash, ((long)encoded.intField(index, 12) << 32) ^ (encoded.intField(index, 1) & 0xffffffffL));
+				hash = mix64(hash, ((long)encoded.intField(index, 2) << 32) ^ (encoded.intField(index, 3) & 0xffffffffL));
+				hash = mix64(hash, encoded.intField(index, 14));
+			}
+		} else for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
 			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.x()) << 32) ^ (Float.floatToIntBits(vertex.y()) & 0xffffffffL));
 			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.z()) << 32) ^ (Float.floatToIntBits(vertex.u()) & 0xffffffffL));
 			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.v()) << 32) ^ (Float.floatToIntBits(vertex.atlasU()) & 0xffffffffL));
