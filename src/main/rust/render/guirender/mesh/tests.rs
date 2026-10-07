@@ -3041,3 +3041,45 @@ fn assert_uv_close(actual: [f32; 2], expected: [f32; 2]) {
         );
     }
 }
+
+fn large_explicit_mesh() -> GuiMeshBatchRequest {
+    let mut request = batch();
+    let quad = request.vertices.clone();
+    let quad_indices = request.indices.clone();
+    request.vertices.clear();
+    request.indices.clear();
+    for copy in 0..32u32 {
+        let base = request.vertices.len() as u32;
+        for vertex in &quad {
+            let mut vertex = *vertex;
+            vertex.position[2] = copy as f32 * 0.01;
+            request.vertices.push(vertex);
+        }
+        request.indices.extend(quad_indices.iter().map(|index| base + index));
+    }
+    request
+}
+
+#[test]
+fn prepared_geometry_memo_reuses_unchanged_meshes_and_refreshes_placement() {
+    let mut memo = PreparedGeometryMemo::default();
+    let reusable = BTreeSet::new();
+    let mut request = large_explicit_mesh();
+    let first = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
+    assert_eq!(first, prepare_draws(&[request.clone()]).unwrap().remove(0));
+    // Placement and ordering fields are not memoized.
+    request.sequence = 9;
+    request.gui_pose[4] = 40.0;
+    let moved = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
+    assert_eq!(moved, prepare_draws(&[request.clone()]).unwrap().remove(0));
+    assert_eq!(moved.sequence, 9);
+    // Any geometry input change prepares afresh.
+    request.vertices[3].position[0] = 0.5;
+    let edited = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
+    assert_eq!(edited, prepare_draws(&[request.clone()]).unwrap().remove(0));
+    assert_ne!(edited.vertices, moved.vertices);
+    request.model_transform[12] = 2.0;
+    let transformed = memo.prepare_draws_with_reuse(&[request.clone()], &reusable).unwrap().remove(0);
+    assert_eq!(transformed, prepare_draws(&[request]).unwrap().remove(0));
+}
+

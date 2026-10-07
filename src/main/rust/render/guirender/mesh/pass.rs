@@ -191,7 +191,6 @@ impl GuiMeshPassResources {
                 "GUI mesh stream ranges must align to their vertex and index elements",
             ));
         }
-        let vertex_bytes = packed_vertices(draw);
         let vertex_base = u32::try_from(stream.vertex_offset / GUI_MESH_GPU_VERTEX_BYTES as u64)
             .map_err(|_| {
                 GalError::ffi(
@@ -199,10 +198,18 @@ impl GuiMeshPassResources {
                     "GUI mesh vertex stream offset exceeds u32 indices",
                 )
             })?;
-        let index_bytes = packed_indices_with_base(&draw.indices, vertex_base)?;
+        // Resident geometry was packed and range-checked when it was written;
+        // only its byte extents are needed to validate the stream range.
+        let (vertex_bytes, index_bytes) = if write_geometry {
+            (packed_vertices(draw), packed_indices_with_base(&draw.indices, vertex_base)?)
+        } else {
+            (Vec::new(), Vec::new())
+        };
+        let vertex_len = (draw.vertices.len() * GUI_MESH_GPU_VERTEX_BYTES) as u64;
+        let index_len = (draw.indices.len() * std::mem::size_of::<u32>()) as u64;
         let vertex_end = stream
             .vertex_offset
-            .checked_add(vertex_bytes.len() as u64)
+            .checked_add(vertex_len)
             .ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::InvalidArgument,
@@ -211,7 +218,7 @@ impl GuiMeshPassResources {
             })?;
         let index_end = stream
             .index_offset
-            .checked_add(index_bytes.len() as u64)
+            .checked_add(index_len)
             .ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::InvalidArgument,
@@ -365,7 +372,6 @@ impl GuiMeshPassResources {
                 "GUI mesh stream ranges must align to their vertex and index elements",
             ));
         }
-        let vertex_bytes = packed_vertices(draw);
         let vertex_base = u32::try_from(stream.vertex_offset / GUI_MESH_GPU_VERTEX_BYTES as u64)
             .map_err(|_| {
                 GalError::ffi(
@@ -373,10 +379,18 @@ impl GuiMeshPassResources {
                     "GUI mesh vertex stream offset exceeds u32 indices",
                 )
             })?;
-        let index_bytes = packed_indices_with_base(&draw.indices, vertex_base)?;
+        // Resident geometry was packed and range-checked when it was written;
+        // only its byte extents are needed to validate the stream range.
+        let (vertex_bytes, index_bytes) = if write_geometry {
+            (packed_vertices(draw), packed_indices_with_base(&draw.indices, vertex_base)?)
+        } else {
+            (Vec::new(), Vec::new())
+        };
+        let vertex_len = (draw.vertices.len() * GUI_MESH_GPU_VERTEX_BYTES) as u64;
+        let index_len = (draw.indices.len() * std::mem::size_of::<u32>()) as u64;
         let vertex_end = stream
             .vertex_offset
-            .checked_add(vertex_bytes.len() as u64)
+            .checked_add(vertex_len)
             .ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::InvalidArgument,
@@ -385,7 +399,7 @@ impl GuiMeshPassResources {
             })?;
         let index_end = stream
             .index_offset
-            .checked_add(index_bytes.len() as u64)
+            .checked_add(index_len)
             .ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::InvalidArgument,

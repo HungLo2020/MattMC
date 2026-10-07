@@ -3899,6 +3899,11 @@ public final class RustGalTerrainRenderer {
 		return hash == 0L ? 1L : hash;
 	}
 
+	/**
+	 * Content identity of one built layer: an identical rebuild keeps its
+	 * generation, so retained plans and caches stay valid. Word-wise mixing
+	 * (one multiply per field) keeps chunk-build intake cheap.
+	 */
 	private static long meshGeneration(
 		long sectionPos,
 		ChunkSectionLayer layer,
@@ -3906,41 +3911,44 @@ public final class RustGalTerrainRenderer {
 		byte[] indexBytes,
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections
 	) {
-		long hash = fnv64("static-terrain-generation-v1");
-		hash = fnv64Long(hash, sectionPos);
-		hash = fnv64Int(hash, layer.ordinal());
-		hash = fnv64Int(hash, vertices.size());
+		long hash = fnv64("static-terrain-generation-v2");
+		hash = mix64(hash, sectionPos);
+		hash = mix64(hash, layer.ordinal());
+		hash = mix64(hash, vertices.size());
 		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
-			hash = fnv64Float(hash, vertex.x());
-			hash = fnv64Float(hash, vertex.y());
-			hash = fnv64Float(hash, vertex.z());
-			hash = fnv64Float(hash, vertex.u());
-			hash = fnv64Float(hash, vertex.v());
-			hash = fnv64Float(hash, vertex.atlasU());
-			hash = fnv64Float(hash, vertex.atlasV());
-			hash = fnv64Int(hash, vertex.shaderBlockId());
-			hash = fnv64Int(hash, vertex.shaderMaterialType());
-				hash = fnv64Int(hash, vertex.colorArgb());
-				hash = fnv64Int(hash, vertex.normalPacked());
-				hash = fnv64Int(hash, vertex.light());
-				// The compact Rust-owned voxel source retains this terrain semantic
-				// alongside positions and material IDs. A rebuild that changes it
-				// must therefore advance the shared mesh generation as well.
-				hash = fnv64Int(hash, vertex.midBlockPacked());
-			}
-		hash = fnv64Int(hash, sections.size());
-		for (VulkanicGalBridge.WorldMeshSectionRecord section : sections) {
-			hash = fnv64Int(hash, section.materialId());
-			hash = fnv64Int(hash, section.textureId());
-			hash = fnv64Int(hash, section.materialMode());
-			hash = fnv64Int(hash, section.cullPolicy());
-			hash = fnv64Int(hash, section.winding());
-			hash = fnv64Int(hash, section.indexOffset());
-			hash = fnv64Int(hash, section.indexCount());
-			hash = fnv64Int(hash, section.sourceFacing());
+			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.x()) << 32) ^ (Float.floatToIntBits(vertex.y()) & 0xffffffffL));
+			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.z()) << 32) ^ (Float.floatToIntBits(vertex.u()) & 0xffffffffL));
+			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.v()) << 32) ^ (Float.floatToIntBits(vertex.atlasU()) & 0xffffffffL));
+			hash = mix64(hash, ((long)Float.floatToIntBits(vertex.atlasV()) << 32) ^ (vertex.shaderBlockId() & 0xffffffffL));
+			hash = mix64(hash, ((long)vertex.shaderMaterialType() << 32) ^ (vertex.colorArgb() & 0xffffffffL));
+			hash = mix64(hash, ((long)vertex.normalPacked() << 32) ^ (vertex.light() & 0xffffffffL));
+			// The compact Rust-owned voxel source retains this terrain semantic
+			// alongside positions and material IDs. A rebuild that changes it
+			// must therefore advance the shared mesh generation as well.
+			hash = mix64(hash, vertex.midBlockPacked());
 		}
-		hash = fnv64Bytes(hash, indexBytes);
+		hash = mix64(hash, sections.size());
+		for (VulkanicGalBridge.WorldMeshSectionRecord section : sections) {
+			hash = mix64(hash, ((long)section.materialId() << 32) ^ (section.textureId() & 0xffffffffL));
+			hash = mix64(hash, ((long)section.materialMode() << 32) ^ (section.cullPolicy() & 0xffffffffL));
+			hash = mix64(hash, ((long)section.winding() << 32) ^ (section.indexOffset() & 0xffffffffL));
+			hash = mix64(hash, ((long)section.indexCount() << 32) ^ (section.sourceFacing() & 0xffffffffL));
+		}
+		hash = mix64(hash, indexBytes.length);
+		ByteBuffer indices = ByteBuffer.wrap(indexBytes).order(ByteOrder.LITTLE_ENDIAN);
+		int offset = 0;
+		for (; offset + Long.BYTES <= indexBytes.length; offset += Long.BYTES) {
+			hash = mix64(hash, indices.getLong(offset));
+		}
+		for (; offset < indexBytes.length; offset++) {
+			hash = mix64(hash, indexBytes[offset] & 0xffL);
+		}
 		return hash == 0L ? 1L : hash;
+	}
+
+	private static long mix64(long hash, long value) {
+		hash = (hash ^ value) * 0x9E3779B97F4A7C15L;
+		return hash ^ (hash >>> 29);
 	}
 
 	static List<VulkanicGalBridge.WorldMeshTextureAssetRecord> atlasTextureUpdatePayload(WaterTextureBinding waterBinding) {

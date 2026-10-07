@@ -61,11 +61,9 @@ impl GuiFrontend {
                 reusable_items.insert(item_key);
             }
         }
-        let mut prepared = if reusable_items.is_empty() {
-            prepare_gui_mesh_draws(&mesh_batches)?
-        } else {
-            prepare_gui_mesh_draws_with_reuse(&mesh_batches, &reusable_items)?
-        };
+        let mut prepared = self
+            .prepared_geometry
+            .prepare_draws_with_reuse(&mesh_batches, &reusable_items)?;
         // Resolve exact owner incarnations before allocating any mesh resources.
         // The geometry keeps original sprite-local UVs until this native boundary.
         for (batch, draw) in mesh_batches.iter().zip(&mut prepared) {

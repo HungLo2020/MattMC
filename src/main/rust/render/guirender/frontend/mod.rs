@@ -61,9 +61,10 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::guirender::atlas_reference::{
     AcceptedAtlasIncarnation, GuiAtlasOwner, GuiAtlasReference, GuiAtlasReferences,
 };
+#[cfg(test)]
+use crate::render::guirender::mesh::prepare_draws as prepare_gui_mesh_draws;
 use crate::render::guirender::mesh::{
-    geometry_fingerprint as gui_mesh_geometry_fingerprint, prepare_draws as prepare_gui_mesh_draws,
-    prepare_draws_with_reuse as prepare_gui_mesh_draws_with_reuse,
+    geometry_fingerprint as gui_mesh_geometry_fingerprint,
     resolved_item_raster as resolve_gui_mesh_item_raster, GuiMeshBatchRequest,
     GuiMeshCompositeResources, GuiMeshLightingMode, GuiMeshMaterialMode,
     GuiMeshOffscreenTargetCache, GuiMeshPassResources, GuiMeshPreparedDraw, GuiMeshSharedProgram,
@@ -105,6 +106,8 @@ pub struct GuiFrontend {
     cached_pass: Option<CachedPass>,
     mesh_targets: GuiMeshOffscreenTargetCache,
     mesh_rasters: BTreeMap<GuiMeshRasterKey, GuiMeshPassResources>,
+    /// Prepared geometry of recent explicit meshes without a reusable raster.
+    prepared_geometry: crate::render::guirender::mesh::PreparedGeometryMemo,
     mesh_geometry_streams: Option<(Handle, Handle)>,
     mesh_shared_programs: BTreeMap<GuiMeshSharedProgramKey, GuiMeshSharedProgram>,
     mesh_composites: BTreeMap<GuiMeshCompositeKey, GuiMeshCompositeResources>,

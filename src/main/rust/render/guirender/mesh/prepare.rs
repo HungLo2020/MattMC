@@ -32,6 +32,146 @@ pub(crate) fn prepare_draws_with_reuse(
         .collect()
 }
 
+/// Prepared geometry of recent explicit meshes (no reusable raster, no foil),
+/// keyed by everything vertex and index preparation reads. An unchanged mesh
+/// (e.g. a captured gun model drawn every frame) then skips per-vertex work;
+/// placement and ordering fields still come from each frame's request.
+/// Entries unused for 64 preparation calls are dropped once the memo is half full.
+#[derive(Default)]
+pub(crate) struct PreparedGeometryMemo {
+    frame: u64,
+    entries: std::collections::HashMap<u64, MemoizedGeometry>,
+}
+
+struct MemoizedGeometry {
+    last_frame: u64,
+    vertices: Vec<GuiMeshPreparedVertex>,
+    indices: Vec<u32>,
+    front_face: crate::render::vulkanic::resources::FrontFace,
+}
+
+/// Smaller meshes prepare faster than they hash and copy.
+const MEMO_MIN_VERTICES: usize = 64;
+const MEMO_MAX_ENTRIES: usize = 256;
+
+impl PreparedGeometryMemo {
+    pub(crate) fn prepare_draws_with_reuse(
+        &mut self,
+        batches: &[GuiMeshBatchRequest],
+        reusable_items: &BTreeSet<(u32, u64)>,
+    ) -> GalResult<Vec<GuiMeshPreparedDraw>> {
+        validate_batches(batches)?;
+        self.frame = self.frame.wrapping_add(1);
+        let draws = batches
+            .iter()
+            .map(|batch| {
+                if reusable_items.contains(&(batch.stratum, batch.sequence)) {
+                    prepare_reused_draw(batch)
+                } else {
+                    self.prepare(batch)
+                }
+            })
+            .collect();
+        if self.entries.len() > MEMO_MAX_ENTRIES / 2 {
+            let frame = self.frame;
+            self.entries.retain(|_, entry| frame.wrapping_sub(entry.last_frame) <= 64);
+        }
+        draws
+    }
+
+    fn prepare(&mut self, batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
+        if batch.item_foil.is_some()
+            || batch.decal_foil.is_some()
+            || batch.vertices.len() < MEMO_MIN_VERTICES
+        {
+            return prepare_draw(batch);
+        }
+        let (_, model_transform, _) = resolved_item_raster(batch)?;
+        let key = geometry_request_key(batch, model_transform);
+        if let Some(entry) = self.entries.get_mut(&key) {
+            entry.last_frame = self.frame;
+            // Placement, ordering and raster fields come from this request.
+            let mut draw = prepare_reused_draw(batch)?;
+            draw.vertices = entry.vertices.clone();
+            draw.indices = entry.indices.clone();
+            draw.front_face = entry.front_face;
+            return Ok(draw);
+        }
+        let draw = prepare_draw(batch)?;
+        if self.entries.len() < MEMO_MAX_ENTRIES {
+            self.entries.insert(key, MemoizedGeometry {
+                last_frame: self.frame,
+                vertices: draw.vertices.clone(),
+                indices: draw.indices.clone(),
+                front_face: draw.front_face,
+            });
+        }
+        Ok(draw)
+    }
+}
+
+/// Everything `prepare_draw` reads to build vertices, indices and winding.
+fn geometry_request_key(batch: &GuiMeshBatchRequest, model_transform: [f32; 16]) -> u64 {
+    thread_local! {
+        static BYTES: std::cell::RefCell<Vec<u8>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    BYTES.with(|bytes| {
+        let mut bytes = bytes.borrow_mut();
+        bytes.clear();
+        bytes.reserve(192 + batch.vertices.len() * 44 + batch.indices.len() * 4);
+        for value in model_transform {
+            bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+        }
+        bytes.push(batch.lighting_mode as u8);
+        bytes.push(batch.material_mode as u8);
+        bytes.extend_from_slice(&batch.item_raster_scale.to_le_bytes());
+        match batch.block_item_raster {
+            Some(block) => {
+                bytes.push(1);
+                for value in block.model_min.iter().chain(&block.model_max) {
+                    bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+                }
+                bytes.extend_from_slice(&block.gui_scale.to_le_bytes());
+                bytes.push(u8::from(block.oversized_gui));
+            }
+            None => bytes.push(0),
+        }
+        match batch.item_lighting {
+            Some(lighting) => {
+                bytes.push(1);
+                bytes.extend_from_slice(&lighting.lightmap_generation.to_le_bytes());
+                for value in lighting.rgb {
+                    bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+                }
+            }
+            None => bytes.push(0),
+        }
+        bytes.extend_from_slice(&(batch.vertices.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(&(batch.indices.len() as u64).to_le_bytes());
+        for source in &batch.vertices {
+            for word in [
+                source.position[0].to_bits(),
+                source.position[1].to_bits(),
+                source.position[2].to_bits(),
+                source.atlas_uv[0].to_bits(),
+                source.atlas_uv[1].to_bits(),
+                source.local_uv[0].to_bits(),
+                source.local_uv[1].to_bits(),
+                source.color_argb,
+                source.normal_packed,
+                source.source_face,
+                source.source_foil_type,
+            ] {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        for index in &batch.indices {
+            bytes.extend_from_slice(&index.to_le_bytes());
+        }
+        xxhash_rust::xxh3::xxh3_64(&bytes)
+    })
+}
+
 pub(super) fn prepare_reused_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
     let (render_extent, _model_transform, guard_pixels) = resolved_item_raster(batch)?;
     Ok(GuiMeshPreparedDraw {
