@@ -207,6 +207,8 @@ struct SectionNode {
     visit_epoch: u32,
     /// Interned animated-sprite list of its accepted build (0: none).
     sprite_list: u32,
+    /// `source::NEEDS_BUILD` / `source::URGENT` bookkeeping bits.
+    build_flags: u8,
 }
 
 /// One visited section of a traversal, in visit order.
@@ -296,6 +298,7 @@ impl SectionGraph {
                 incoming: 0,
                 visit_epoch: 0,
                 sprite_list: 0,
+                build_flags: 0,
             };
             let slot = match self.free.pop() {
                 Some(slot) => {

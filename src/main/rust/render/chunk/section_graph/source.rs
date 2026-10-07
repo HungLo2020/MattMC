@@ -15,6 +15,11 @@ use crate::render::vulkanic::gal::AccessHashBuilder;
 
 type PositionSet = HashSet<[i32; 3], AccessHashBuilder>;
 
+/// Node bit: the section's current build is missing or stale.
+const NEEDS_BUILD: u8 = 1;
+/// Node bit: a rebuild of an already-built section (block edit), requested first.
+const URGENT: u8 = 2;
+
 /// `RenderSectionFlags.HAS_BLOCK_ENTITIES` (culled block entities).
 pub const FLAG_BLOCK_ENTITIES: u8 = 1 << 1;
 
@@ -30,9 +35,8 @@ pub enum BuildCompletion {
 #[derive(Debug, Default)]
 pub struct SourceState {
     columns: HashSet<[i32; 2], AccessHashBuilder>,
-    needs_build: PositionSet,
-    /// Rebuilds of already-built sections (block edits): requested first.
-    urgent: PositionSet,
+    /// Nodes with `NEEDS_BUILD` set (the flags live on the nodes).
+    needs_build_count: usize,
     in_flight: PositionSet,
     stale_in_flight: PositionSet,
     /// Sections with off-screen block entities, in first-build order.
@@ -45,6 +49,7 @@ pub struct SourceState {
     pub(in crate::render::chunk) sprite_lists: Vec<Box<[u32]>>,
     /// Outputs of the latest camera search.
     pub build_requests: Vec<i64>,
+    urgent_requests: Vec<i64>,
     pub block_entity_sections: Vec<i64>,
     visit_epoch: u32,
 }
@@ -61,7 +66,8 @@ impl SectionGraph {
         for y in self.min_section_y..=self.max_section_y {
             let bit = (y - self.min_section_y) as u32;
             if bit < 64 && non_air_mask & (1 << bit) != 0 {
-                self.source.needs_build.insert([x, y, z]);
+                let slot = self.slot([x, y, z]).expect("ready column section exists");
+                self.mark_needs_build(slot);
             } else {
                 self.set_info([x, y, z], Some(SectionInfo::EMPTY));
             }
@@ -75,13 +81,16 @@ impl SectionGraph {
         if !self.source.columns.remove(&[x, z]) {
             return false;
         }
+        for y in self.min_section_y..=self.max_section_y {
+            if let Some(slot) = self.slot([x, y, z]) {
+                self.clear_build_flags(slot);
+            }
+        }
         self.remove_column(x, z);
         let mut removed_global = false;
         for y in self.min_section_y..=self.max_section_y {
             let position = [x, y, z];
             let source = &mut self.source;
-            source.needs_build.remove(&position);
-            source.urgent.remove(&position);
             if source.in_flight.contains(&position) {
                 source.stale_in_flight.insert(position);
             }
@@ -108,9 +117,10 @@ impl SectionGraph {
         {
             return false;
         }
-        self.source.needs_build.insert(position);
-        if self.is_built(position) {
-            self.source.urgent.insert(position);
+        let slot = self.slot(position).expect("ready column section exists");
+        self.mark_needs_build(slot);
+        if self.nodes[slot as usize].info.is_some() {
+            self.nodes[slot as usize].build_flags |= URGENT;
         }
         if self.source.in_flight.contains(&position) {
             self.source.stale_in_flight.insert(position);
@@ -139,10 +149,9 @@ impl SectionGraph {
         let sprite_list = self.intern_sprite_list(sprites);
         if let Some(slot) = self.slot(position) {
             self.nodes[slot as usize].sprite_list = sprite_list;
+            self.clear_build_flags(slot);
         }
         let source = &mut self.source;
-        source.needs_build.remove(&position);
-        source.urgent.remove(&position);
         let key = section_key(position);
         if global_block_entities {
             if source.global_block_entity_set.insert(key) {
@@ -192,25 +201,44 @@ impl SectionGraph {
         }
         let in_flight: Vec<_> = self.source.in_flight.iter().copied().collect();
         self.source.stale_in_flight.extend(in_flight);
-        let geometry: Vec<[i32; 3]> = self
+        let geometry: Vec<u32> = self
             .slots
-            .iter()
-            .filter(|(_, &slot)| self.section_flags(slot).is_some_and(|flags| flags != 0))
-            .map(|(&position, _)| position)
+            .values()
+            .copied()
+            .filter(|&slot| self.section_flags(slot).is_some_and(|flags| flags != 0))
             .collect();
-        self.source.needs_build.extend(geometry);
+        for slot in geometry {
+            self.mark_needs_build(slot);
+        }
+    }
+
+    fn mark_needs_build(&mut self, slot: u32) {
+        let node = &mut self.nodes[slot as usize];
+        if node.build_flags & NEEDS_BUILD == 0 {
+            node.build_flags |= NEEDS_BUILD;
+            self.source.needs_build_count += 1;
+        }
+    }
+
+    fn clear_build_flags(&mut self, slot: u32) {
+        let node = &mut self.nodes[slot as usize];
+        if node.build_flags & NEEDS_BUILD != 0 {
+            self.source.needs_build_count -= 1;
+        }
+        node.build_flags = 0;
     }
 
     /// The client loading gate: the section's current build was accepted and
     /// no rebuild is outstanding.
     pub fn section_ready(&self, position: [i32; 3]) -> bool {
-        self.is_built(position)
-            && !self.source.needs_build.contains(&position)
-            && !self.source.in_flight.contains(&position)
+        self.slot(position).is_some_and(|slot| {
+            let node = &self.nodes[slot as usize];
+            node.info.is_some() && node.build_flags & NEEDS_BUILD == 0
+        }) && !self.source.in_flight.contains(&position)
     }
 
     pub fn needs_build_count(&self) -> usize {
-        self.source.needs_build.len()
+        self.source.needs_build_count
     }
 
     pub fn in_flight_count(&self) -> usize {
@@ -219,10 +247,6 @@ impl SectionGraph {
 
     pub fn global_block_entity_sections(&self) -> &[i64] {
         &self.source.global_block_entities
-    }
-
-    fn is_built(&self, position: [i32; 3]) -> bool {
-        self.slot(position).is_some_and(|slot| self.nodes[slot as usize].info.is_some())
     }
 
     /// Records the camera search's visits: the build requests (block edits
@@ -234,16 +258,16 @@ impl SectionGraph {
         self.source.visit_epoch = epoch;
         let source = &mut self.source;
         source.build_requests.clear();
+        source.urgent_requests.clear();
         source.block_entity_sections.clear();
-        let mut urgent = 0;
         for visit in visits {
-            self.nodes[visit.slot as usize].visit_epoch = epoch;
+            let node = &mut self.nodes[visit.slot as usize];
+            node.visit_epoch = epoch;
             let position = visit.position;
-            if source.needs_build.contains(&position) && !source.in_flight.contains(&position) {
+            if node.build_flags & NEEDS_BUILD != 0 && !source.in_flight.contains(&position) {
                 let key = section_key(position);
-                if source.urgent.contains(&position) {
-                    source.build_requests.insert(urgent, key);
-                    urgent += 1;
+                if node.build_flags & URGENT != 0 {
+                    source.urgent_requests.push(key);
                 } else {
                     source.build_requests.push(key);
                 }
@@ -251,6 +275,10 @@ impl SectionGraph {
             if visit.info.is_some_and(|info| info.flags & FLAG_BLOCK_ENTITIES != 0) {
                 source.block_entity_sections.push(section_key(position));
             }
+        }
+        if !source.urgent_requests.is_empty() {
+            source.urgent_requests.append(&mut source.build_requests);
+            std::mem::swap(&mut source.urgent_requests, &mut source.build_requests);
         }
     }
 
