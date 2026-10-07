@@ -161,3 +161,40 @@ fn alias_remapping_matches_dense_encoding_and_rejects_bad_indices() {
     assert_eq!(actual, expected);
     assert!(pack::encode(&ids, 4, &mut actual, Some(&remap[..1])).is_err());
 }
+
+#[test]
+fn identity_labels_match_an_identity_table() {
+    let mut seed = 0x9e3779b97f4a7c15u64;
+    for (bits, count) in [(0usize, 1usize), (4, 9), (5, 31), (8, 256), (15, 31809)] {
+        let per = if bits == 0 { 1 } else { 64 / bits };
+        let words: Vec<u64> = if bits == 0 {
+            Vec::new()
+        } else {
+            (0..4096usize.div_ceil(per))
+                .map(|_| {
+                    let mut word = 0u64;
+                    for i in 0..per {
+                        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                        word |= (seed >> 33) % count as u64 % (1 << bits) << (i * bits);
+                    }
+                    word
+                })
+                .collect()
+        };
+        let labels: Vec<u32> = (0..count as u32).collect();
+        let (mut a, mut b) = (vec![0i32; count], vec![0i32; count]);
+        let (mut x, mut y) = (vec![0u32; 8192], vec![0u32; 8192]);
+        assert_eq!(pack::compact(&words, bits, &labels, &mut a, &mut x), pack::compact_identity(&words, bits, count, &mut b, &mut y));
+        assert_eq!(x, y);
+        let ffi = unsafe {
+            super::ffi::mattmc_palette_compact(words.as_ptr(), words.len() as i32, bits as i32, std::ptr::null(), count as i32,
+                b.as_mut_ptr(), count as i32, y.as_mut_ptr(), 8192)
+        };
+        assert_eq!(ffi as usize, pack::compact(&words, bits, &labels, &mut a, &mut x).unwrap());
+    }
+    // An id at or beyond the palette size is rejected, as with a table.
+    let mut lookup = vec![0i32; 2];
+    let mut out = vec![0u32; 8192];
+    assert!(pack::compact_identity(&[0x2222222222222222; 256], 4, 2, &mut lookup, &mut out).is_err());
+}
+

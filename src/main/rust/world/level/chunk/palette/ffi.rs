@@ -1,5 +1,6 @@
 //! Ordinary calls with disjoint caller-owned buffers. No allocation or retained pointers.
 /// Compact exactly one block section; negative results publish no Java result.
+/// A null `labels` makes each of the `label_len` palette ids its own label.
 ///
 /// # Safety
 /// Non-null pointers must cover the supplied lengths, be aligned and live for
@@ -18,7 +19,6 @@ pub unsafe extern "C" fn mattmc_palette_compact(
     out_len: i32,
 ) -> i32 {
     if words.is_null()
-        || labels.is_null()
         || lookup.is_null()
         || out.is_null()
         || words as usize % 8 != 0
@@ -39,12 +39,15 @@ pub unsafe extern "C" fn mattmc_palette_compact(
         return -1;
     }
     let words = std::slice::from_raw_parts(words, word_len as usize);
-    let labels = std::slice::from_raw_parts(labels, label_len as usize);
     let lookup = std::slice::from_raw_parts_mut(lookup, lookup_len as usize);
     let out = std::slice::from_raw_parts_mut(out, out_len as usize);
-    super::pack::compact(words, bits as usize, labels, lookup, out)
-        .map(|n| n as i32)
-        .unwrap_or(-2)
+    let result = if labels.is_null() {
+        super::pack::compact_identity(words, bits as usize, label_len as usize, lookup, out)
+    } else {
+        let labels = std::slice::from_raw_parts(labels, label_len as usize);
+        super::pack::compact(words, bits as usize, labels, lookup, out)
+    };
+    result.map(|n| n as i32).unwrap_or(-2)
 }
 /// Write the complete padded packed-word output for one block section.
 ///

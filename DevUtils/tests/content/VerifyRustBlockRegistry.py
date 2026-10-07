@@ -78,7 +78,7 @@ def reference_tree(out):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', default='build/block-registry-migration/acceptance')
+    parser.add_argument('--output', default='build/block-registry-migration')
     parser.add_argument('--forks', type=int, default=3)
     parser.add_argument('--startup-samples', type=int, default=8, help='fresh JVMs per tree per comparison')
     parser.add_argument('--cpu', type=int, default=5)

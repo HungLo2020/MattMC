@@ -1,3 +1,5 @@
+/// `PalettedContainer.pack`'s compaction: distinct labels in first-use order.
+/// `labels` gives each palette id's label (equal labels are the same value).
 pub(super) fn compact(
     words: &[u64],
     bits: usize,
@@ -5,10 +7,31 @@ pub(super) fn compact(
     lookup: &mut [i32],
     out: &mut [u32],
 ) -> Result<usize, ()> {
+    compact_with(words, bits, |id| labels.get(id).map(|&l| l as usize), lookup, out)
+}
+
+/// [`compact`] where each of the `count` palette ids is its own label.
+pub(super) fn compact_identity(
+    words: &[u64],
+    bits: usize,
+    count: usize,
+    lookup: &mut [i32],
+    out: &mut [u32],
+) -> Result<usize, ()> {
+    compact_with(words, bits, |id| (id < count).then_some(id), lookup, out)
+}
+
+fn compact_with(
+    words: &[u64],
+    bits: usize,
+    label_of: impl Fn(usize) -> Option<usize>,
+    lookup: &mut [i32],
+    out: &mut [u32],
+) -> Result<usize, ()> {
     lookup.fill(-1);
     let (order, indices) = out.split_at_mut(4096);
     if bits == 0 {
-        let label = *labels.first().ok_or(())? as usize;
+        let label = label_of(0).ok_or(())?;
         if label >= lookup.len() {
             return Err(());
         }
@@ -24,7 +47,7 @@ pub(super) fn compact(
         let mut value = *word;
         for _ in 0..per.min(4096 - at) {
             let id = (value & mask) as usize;
-            let label = *labels.get(id).ok_or(())? as usize;
+            let label = label_of(id).ok_or(())?;
             let slot = lookup.get_mut(label).ok_or(())?;
             if *slot == -1 {
                 *slot = count as i32;

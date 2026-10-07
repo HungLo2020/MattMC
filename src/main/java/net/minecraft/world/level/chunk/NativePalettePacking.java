@@ -48,13 +48,11 @@ final class NativePalettePacking {
                             ValueLayout.JAVA_INT,
                             ValueLayout.ADDRESS,
                             ValueLayout.JAVA_INT));
-    // Identity labels: local palette ids, and global ones, which are state ids of
-    // distinct states once NativeBlockRegistry has verified the registry.
-    private static final MemorySegment LABELS = createLabels(32768);
+    private static final MemorySegment LOCAL_LABELS = createLocalLabels();
 
-    private static MemorySegment createLabels(int count) {
-        var labels = Arena.ofAuto().allocate(count * 4L, 4);
-        for (int i = 0; i < count; i++) labels.setAtIndex(ValueLayout.JAVA_INT, i, i);
+    private static MemorySegment createLocalLabels() {
+        var labels = Arena.ofAuto().allocate(256 * 4, 4);
+        for (int i = 0; i < 256; i++) labels.setAtIndex(ValueLayout.JAVA_INT, i, i);
         return labels.asReadOnly();
     }
 
@@ -115,6 +113,9 @@ final class NativePalettePacking {
             int count,
             Scratch scratch) {
         // Compact used source IDs first. Do not inspect unused palette entries.
+        // Global ids are state ids of distinct states (NativeBlockRegistry verified
+        // that), so each is its own label: Rust needs no label table (null).
+        MemorySegment labels = global ? MemorySegment.NULL : LOCAL_LABELS;
         var raw = storage.getRaw();
         MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, raw.length * 8L);
         int unique;
@@ -125,7 +126,7 @@ final class NativePalettePacking {
                                     scratch.words,
                                     raw.length,
                                     storage.getBits(),
-                                    LABELS,
+                                    labels,
                                     count,
                                     scratch.lookup,
                                     count,
