@@ -187,10 +187,10 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             vertices,
             indices: indices.to_vec(),
         };
-        validate_gui_mesh_batch(&request)?;
         owned.push(request);
     }
     compact_gui_mesh_item_layers(&mut owned);
+    // Validates every batch, then the item layer structure.
     validate_gui_mesh_batches(&owned)?;
     Ok(owned)
 }

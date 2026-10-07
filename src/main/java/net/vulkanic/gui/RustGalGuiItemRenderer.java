@@ -700,7 +700,10 @@ public final class RustGalGuiItemRenderer {
 		private int totalQuads() { return batches.stream().mapToInt(batch -> batch.vertices.length / 12).sum(); }
 
 		private List<PreparedBatch> prepareStatic(int guiScale, int pixelWidth, int pixelHeight, float originX, float originY) {
-			return prepareBatches(guiScale, pixelWidth, pixelHeight, originX, originY, null, 0xffffffff);
+			List<PreparedBatch> prepared = prepareBatches(guiScale, pixelWidth, pixelHeight, originX, originY, null, 0xffffffff);
+			// Static captures are cached and reused unchanged every frame.
+			for (PreparedBatch batch : prepared) VulkanicGalBridge.markStableGuiMeshGeometry(batch.vertices());
+			return prepared;
 		}
 
 		private List<PreparedBatch> prepareBatches(

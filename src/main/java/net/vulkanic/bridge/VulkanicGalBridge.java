@@ -856,7 +856,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		GuiMeshBatchRecord batch, List<GuiMeshVertexRecord> vertices, List<Integer> indices
 	) {
 		GuiItemCacheRecord cache = batch.itemCache;
-		if (cache == null || (!cache.stableGeometry() && (cache.animated() || batch.itemFoil != null))) return null;
+		boolean stableList = vertices instanceof PackedGuiMeshVertices packed && packed.stable;
+		if (!stableList && (cache == null || (!cache.stableGeometry() && (cache.animated() || batch.itemFoil != null)))) return null;
 		IdentityHashMap<List<Integer>, PackedGuiMeshTopology> byIndices = persistentGuiMeshTopologies.get(vertices);
 		if (byIndices != null) {
 			PackedGuiMeshTopology existing = byIndices.get(indices);
@@ -5330,6 +5331,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	/** Copies a dense CPU index stream into the matching immutable list contract. */
+	/**
+	 * Marks a packed vertex list owned by a long-lived cache (for example a
+	 * cached TACZ GUI capture). Its identity is then stable, so it encodes once
+	 * into persistent native memory even without an item raster identity.
+	 */
+	public static void markStableGuiMeshGeometry(List<GuiMeshVertexRecord> vertices) {
+		if (vertices instanceof PackedGuiMeshVertices packed) packed.stable = true;
+	}
+
 	public static List<Integer> packedGuiMeshIndices(int[] indices, int indexCount) {
 		return new PackedGuiMeshIndices(indices, indexCount);
 	}
@@ -5340,6 +5350,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private final float[] localUvs;
 		private final int[] colors;
 		private final int[] normals;
+		/** Owned by a long-lived cache: identity-stable, so it may encode persistently. */
+		private volatile boolean stable;
 
 		private PackedGuiMeshVertices(
 			float[] positions, float[] atlasUvs, float[] localUvs, int[] colors, int[] normals, int vertexCount
