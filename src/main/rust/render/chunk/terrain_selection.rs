@@ -12,7 +12,8 @@
 //!   section centre (stable, so equal distances keep visit order);
 //! - every mesh key appears once;
 //! - shadow candidates: every other section with geometry, nearest
-//!   `max_shadow_candidates` by (centre distance, key) when over the limit.
+//!   `max_shadow_candidates` by (centre distance, key) when over the limit;
+//! - animated sprites: the ids of drawn sections' animated sprites, each once.
 
 use std::collections::{HashMap, HashSet};
 
@@ -55,6 +56,8 @@ pub struct TerrainSelectionParams {
     pub layer_ordinals: [u32; 3],
     pub shadow_candidates: bool,
     pub max_shadow_candidates: usize,
+    /// Compute the layer fingerprint receipt (diagnostics and readiness).
+    pub receipts: bool,
 }
 
 /// Benchmark receipts of the camera stream, matching Java's producer
@@ -74,8 +77,11 @@ pub struct TerrainSelection {
     /// Section key and layer slot of each `sections` entry.
     pub section_layers: Vec<SelectedLayer>,
     pub casters: Vec<FfiStaticTerrainShadowCaster>,
-    /// Sections whose animated sprites this frame uses, camera then casters.
-    pub animated: Vec<[i32; 3]>,
+    /// Animated sprite ids this frame uses, each once in first-use order
+    /// (camera sections, then casters).
+    pub animated: Vec<u32>,
+    sprite_seen: Vec<u32>,
+    sprite_epoch: u32,
     pub receipts: TerrainSelectionReceipts,
     visible: Vec<(i64, [i32; 3], u8)>,
     visible_keys: HashSet<i64, AccessHashBuilder>,
@@ -120,6 +126,9 @@ impl TerrainSelection {
         self.section_layers.push(SelectedLayer { section_key: key, layer: layer as u32, reserved: 0 });
         let receipts = &mut self.receipts;
         receipts.layer_submissions += 1;
+        if !params.receipts {
+            return;
+        }
         let ordinal = u64::from(params.layer_ordinals[layer]);
         for value in [key as u64, meshes.keys[layer], meshes.generations[layer], ordinal] {
             receipts.fingerprint = fingerprint(receipts.fingerprint, value);
@@ -150,6 +159,11 @@ impl SectionGraph {
         out.section_layers.clear();
         out.casters.clear();
         out.animated.clear();
+        out.sprite_epoch = out.sprite_epoch.wrapping_add(1);
+        if out.sprite_epoch == 0 {
+            out.sprite_seen.fill(0);
+            out.sprite_epoch = 1;
+        }
         out.receipts = TerrainSelectionReceipts { fingerprint: 0xcbf2_9ce4_8422_2325, ..Default::default() };
         out.visible.clear();
         out.visible_keys.clear();
@@ -182,7 +196,7 @@ impl SectionGraph {
                 }
             }
             if submitted && flags & FLAG_ANIMATED_SPRITES != 0 {
-                out.animated.push(position);
+                self.use_sprites(position, out);
             }
             if meshes.keys[TRANSLUCENT] != 0 {
                 out.translucent.push((centre_distance(position, params.camera), key, position));
@@ -197,8 +211,8 @@ impl SectionGraph {
             if out.seen_meshes.insert(meshes.keys[TRANSLUCENT]) {
                 out.push_section(position, key, TRANSLUCENT, &meshes, params);
                 let flags = self.slot(position).and_then(|slot| self.section_flags(slot)).unwrap_or(0);
-                if flags & FLAG_ANIMATED_SPRITES != 0 && out.animated.last() != Some(&position) {
-                    out.animated.push(position);
+                if flags & FLAG_ANIMATED_SPRITES != 0 {
+                    self.use_sprites(position, out);
                 }
             }
         }
@@ -207,6 +221,23 @@ impl SectionGraph {
 
         if params.shadow_candidates {
             self.select_shadow_candidates(params, out);
+        }
+    }
+
+    /// Appends the section's animated sprites not yet used this frame.
+    fn use_sprites(&self, position: [i32; 3], out: &mut TerrainSelection) {
+        let Some(sprites) = self.source.sprites.get(&position) else {
+            return;
+        };
+        for &sprite in sprites.iter() {
+            let index = sprite as usize;
+            if index >= out.sprite_seen.len() {
+                out.sprite_seen.resize(index + 1, 0);
+            }
+            if out.sprite_seen[index] != out.sprite_epoch {
+                out.sprite_seen[index] = out.sprite_epoch;
+                out.animated.push(sprite);
+            }
         }
     }
 
@@ -245,7 +276,7 @@ impl SectionGraph {
                 }
             }
             if flags & FLAG_ANIMATED_SPRITES != 0 {
-                out.animated.push(position);
+                self.use_sprites(position, out);
             }
         }
         out.candidates = candidates;

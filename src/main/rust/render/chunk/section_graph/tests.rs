@@ -1,4 +1,5 @@
 use super::*;
+use crate::render::chunk::terrain_selection::section_key;
 
 /// An orthographic frustum so wide that every test box passes: each plane is
 /// `axis * 1e-6 + 1`, i.e. `|axis| <= 1e6` after normalisation.
@@ -229,4 +230,116 @@ fn intersect_aab_distinguishes_inside_intersect_and_outside() {
     assert_eq!(frustum.intersect_aab([-1.0; 3], [1.0; 3]), BoxIntersection::Inside);
     assert_eq!(frustum.intersect_aab([30.0, -1.0, -1.0], [34.0, 1.0, 1.0]), BoxIntersection::Intersect);
     assert_eq!(frustum.intersect_aab([33.0, -1.0, -1.0], [34.0, 1.0, 1.0]), BoxIntersection::Outside);
+}
+
+fn record(graph: &mut SectionGraph, positions: &[[i32; 3]]) {
+    let visits = positions
+        .iter()
+        .map(|&position| {
+            let slot = graph.slot(position).unwrap();
+            graph.visited(slot)
+        })
+        .collect::<Vec<_>>();
+    graph.record_visits(&visits);
+}
+
+#[test]
+fn ready_columns_build_air_sections_empty_and_request_the_rest() {
+    let mut graph = SectionGraph::new(0, 3);
+    // Sections 1 and 3 hold blocks; 0 and 2 are air.
+    assert!(graph.add_ready_column(0, 0, 0b1010));
+    assert!(!graph.add_ready_column(0, 0, 0b1111));
+    assert!(graph.section_ready([0, 0, 0]));
+    assert!(!graph.section_ready([0, 1, 0]));
+    assert_eq!(2, graph.needs_build_count());
+    record(&mut graph, &[[0, 3, 0], [0, 0, 0], [0, 1, 0]]);
+    assert_eq!(vec![section_key([0, 3, 0]), section_key([0, 1, 0])], graph.source.build_requests);
+
+    // In-flight sections are not requested again.
+    graph.build_started([0, 3, 0]);
+    record(&mut graph, &[[0, 3, 0], [0, 1, 0]]);
+    assert_eq!(vec![section_key([0, 1, 0])], graph.source.build_requests);
+    assert_eq!(BuildCompletion::Current, graph.finish_build([0, 3, 0]));
+    graph.accept_build([0, 3, 0], SectionInfo { flags: 1, visibility: 0 }, false, &[]);
+    assert!(graph.section_ready([0, 3, 0]));
+    assert_eq!(1, graph.needs_build_count());
+    assert_eq!(0, graph.in_flight_count());
+}
+
+#[test]
+fn edits_are_urgent_and_make_in_flight_builds_stale() {
+    let mut graph = SectionGraph::new(0, 1);
+    graph.add_ready_column(0, 0, 0b11);
+    graph.accept_build([0, 0, 0], SectionInfo { flags: 1, visibility: 0 }, false, &[]);
+    graph.build_started([0, 1, 0]);
+    // Outside a ready column or the level height nothing is marked.
+    assert!(!graph.schedule_rebuild([5, 0, 5]));
+    assert!(!graph.schedule_rebuild([0, 2, 0]));
+    assert!(graph.schedule_rebuild([0, 1, 0]));
+    assert!(graph.schedule_rebuild([0, 0, 0]));
+    assert_eq!(BuildCompletion::Stale, graph.finish_build([0, 1, 0]));
+    // The rebuild of the built section (an edit) is requested first.
+    record(&mut graph, &[[0, 1, 0], [0, 0, 0]]);
+    assert_eq!(vec![section_key([0, 0, 0]), section_key([0, 1, 0])], graph.source.build_requests);
+    assert!(!graph.section_ready([0, 0, 0]));
+
+    // Unloading a column makes its in-flight builds stale and forgets it.
+    graph.build_started([0, 0, 0]);
+    assert!(graph.remove_ready_column(0, 0));
+    assert!(!graph.remove_ready_column(0, 0));
+    assert_eq!(BuildCompletion::Stale, graph.finish_build([0, 0, 0]));
+    assert_eq!(0, graph.needs_build_count());
+}
+
+#[test]
+fn reload_rebuilds_geometry_and_stales_or_cancels_in_flight_builds() {
+    let mut graph = SectionGraph::new(0, 1);
+    graph.add_ready_column(0, 0, 0b11);
+    graph.accept_build([0, 0, 0], SectionInfo { flags: 1, visibility: 0 }, false, &[]);
+    graph.build_started([0, 1, 0]);
+    graph.reload_resources(false);
+    assert_eq!(2, graph.needs_build_count());
+    assert_eq!(BuildCompletion::Stale, graph.finish_build([0, 1, 0]));
+
+    graph.build_started([0, 1, 0]);
+    graph.reload_resources(true);
+    assert_eq!(0, graph.in_flight_count());
+}
+
+#[test]
+fn block_entity_sections_follow_visits_and_first_build_order() {
+    let mut graph = SectionGraph::new(0, 0);
+    for x in 0..3 {
+        graph.add_ready_column(x, 0, 1);
+    }
+    let culled = SectionInfo { flags: 1 | source::FLAG_BLOCK_ENTITIES, visibility: 0 };
+    graph.accept_build([2, 0, 0], culled, true, &[]);
+    graph.accept_build([0, 0, 0], culled, false, &[]);
+    graph.accept_build([1, 0, 0], SectionInfo { flags: 1, visibility: 0 }, true, &[]);
+    record(&mut graph, &[[1, 0, 0], [0, 0, 0], [2, 0, 0]]);
+    assert_eq!(vec![section_key([0, 0, 0]), section_key([2, 0, 0])], graph.source.block_entity_sections);
+    assert_eq!(&[section_key([2, 0, 0]), section_key([1, 0, 0])], graph.global_block_entity_sections());
+    // A rebuild keeps its place; losing and regaining globals moves it last.
+    graph.accept_build([2, 0, 0], culled, true, &[]);
+    assert_eq!(&[section_key([2, 0, 0]), section_key([1, 0, 0])], graph.global_block_entity_sections());
+    graph.accept_build([2, 0, 0], culled, false, &[]);
+    graph.accept_build([2, 0, 0], culled, true, &[]);
+    assert_eq!(&[section_key([1, 0, 0]), section_key([2, 0, 0])], graph.global_block_entity_sections());
+    graph.remove_ready_column(1, 0);
+    assert_eq!(&[section_key([2, 0, 0])], graph.global_block_entity_sections());
+}
+
+#[test]
+fn box_visibility_tests_only_the_latest_search() {
+    let mut graph = SectionGraph::new(0, 1);
+    assert!(!graph.box_visible([0, 0, 0], [0, 0, 0]));
+    graph.add_ready_column(0, 0, 0);
+    graph.add_ready_column(1, 0, 0);
+    record(&mut graph, &[[0, 1, 0]]);
+    assert!(graph.box_visible([0, 0, 0], [0, 1, 0]));
+    assert!(!graph.box_visible([0, 0, 0], [1, 0, 0]));
+    assert!(!graph.box_visible([5, 0, 5], [6, 1, 6]));
+    record(&mut graph, &[[1, 0, 0]]);
+    assert!(!graph.box_visible([0, 1, 0], [0, 1, 0]));
+    assert!(graph.box_visible([0, 0, 0], [1, 0, 0]));
 }

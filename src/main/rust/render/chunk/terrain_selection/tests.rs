@@ -10,6 +10,7 @@ fn params(shadow_candidates: bool, max_shadow_candidates: usize) -> TerrainSelec
         layer_ordinals: [0, 1, 3],
         shadow_candidates,
         max_shadow_candidates,
+        receipts: true,
     }
 }
 
@@ -47,7 +48,9 @@ fn camera_layers_follow_visit_order_then_translucent_back_to_front() {
     let far = [3, 0, 0];
     let unbuilt = [1, 0, 0];
     let empty = [2, 0, 0];
-    let mut graph = graph(&[(near, GEOMETRY | FLAG_ANIMATED_SPRITES), (far, GEOMETRY), (empty, 0)]);
+    let mut graph = graph(&[(near, GEOMETRY | FLAG_ANIMATED_SPRITES), (far, GEOMETRY | FLAG_ANIMATED_SPRITES), (empty, 0)]);
+    graph.source.sprites.insert(near, [5, 3].into());
+    graph.source.sprites.insert(far, [3, 9].into());
     graph.set_meshes(near, Some(meshes(100, true)));
     graph.set_meshes(far, Some(meshes(200, true)));
     graph.set_meshes(unbuilt, Some(meshes(300, false)));
@@ -64,7 +67,8 @@ fn camera_layers_follow_visit_order_then_translucent_back_to_front() {
     assert_eq!(vec![10, 11, 10, 11, 12, 12], out.sections.iter().map(|s| s.depth_policy).collect::<Vec<_>>());
     assert_eq!(CAMERA_SORTED_QUADS, out.sections[4].flags);
     assert_eq!(0, out.sections[0].flags);
-    assert_eq!(vec![near], out.animated);
+    // Each drawn section's sprites once, in first-use (visit) order.
+    assert_eq!(vec![3, 9, 5], out.animated);
     assert_eq!(6, out.receipts.layer_submissions);
     assert_eq!(2 * 2 + 2, out.receipts.layer_probes);
     assert_eq!(section_key(near), out.section_layers[5].section_key);
@@ -78,6 +82,7 @@ fn shadow_candidates_are_other_geometry_sections_nearest_first_when_limited() {
     let b = [4, 0, 0];
     let c = [-2, 0, 0];
     let mut graph = graph(&[(visible, GEOMETRY), (a, GEOMETRY | FLAG_ANIMATED_SPRITES), (b, GEOMETRY), (c, GEOMETRY)]);
+    graph.source.sprites.insert(a, [4].into());
     for (index, position) in [visible, a, b, c].into_iter().enumerate() {
         graph.set_meshes(position, Some(meshes(100 * (index as u64 + 1), false)));
     }
@@ -87,7 +92,7 @@ fn shadow_candidates_are_other_geometry_sections_nearest_first_when_limited() {
     // Signed key order, as Java's radix sort: x is the top bits, so x = -2 sorts first.
     let keys = out.casters.iter().map(|caster| caster.mesh_key).collect::<Vec<_>>();
     assert_eq!(vec![400, 401, 200, 201, 300, 301], keys);
-    assert_eq!(vec![a], out.animated);
+    assert_eq!(vec![4], out.animated);
 
     // Over the limit, the nearest centres survive: a (16 blocks), c (32).
     graph.select_terrain(&visits, &params(true, 2), &mut out);
@@ -111,4 +116,20 @@ fn duplicate_mesh_keys_draw_once_and_cleared_rows_disappear() {
     graph.set_meshes(second, None);
     graph.select_terrain(&visits, &params(false, 0), &mut out);
     assert!(out.sections.is_empty());
+}
+
+#[test]
+fn receipts_off_skip_the_fingerprint_but_keep_counts() {
+    let position = [0, 0, 0];
+    let mut graph = graph(&[(position, GEOMETRY)]);
+    graph.set_meshes(position, Some(meshes(100, false)));
+    let visits = [visit(&graph, position)];
+    let mut out = TerrainSelection::default();
+    let mut quiet = params(false, 0);
+    quiet.receipts = false;
+    graph.select_terrain(&visits, &quiet, &mut out);
+    assert_eq!(2, out.receipts.layer_submissions);
+    assert_eq!(0xcbf2_9ce4_8422_2325, out.receipts.fingerprint);
+    graph.select_terrain(&visits, &params(false, 0), &mut out);
+    assert_ne!(0xcbf2_9ce4_8422_2325, out.receipts.fingerprint);
 }

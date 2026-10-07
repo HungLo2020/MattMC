@@ -162,28 +162,38 @@ Camera-pass terrain visibility is Frozen's Sodium search, ported exactly to
 Rust: [`chunk/section_graph.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/section_graph.rs)
 (occlusion BFS waves, angle and outward masks, distance cylinder, ±9.125
 frustum boxes, the nearby pass, and tree traversal when the camera section is
-unbuilt). [`RustGalWholeFrameTerrainSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java)
-mirrors Sodium's `ChunkTracker` column readiness and each accepted build's flags
-and visibility data into the graph through a standalone handle
+unbuilt). The graph also owns the terrain source's bookkeeping
+([`section_graph/source.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/section_graph/source.rs)):
+ready columns, which sections need a build, are urgent, in flight or stale,
+readiness for the loading gate, block-entity section lists, each section's
+animated sprite ids, and the visit set entity culling tests.
+[`RustGalWholeFrameTerrainSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java)
+reports `ChunkTracker` column events (with a non-air section mask), block
+edits, dispatched and finished builds, and accepted build flags through a
+standalone handle
 ([`RustSectionGraph`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustSectionGraph.java)),
 which is outside any bridge context so selecting never joins a pipelined frame.
+Java keeps only what Rust cannot hold: the meshing workers, and the
+`BlockEntity` and sprite objects that Rust's lists name by section key or id.
 
 - Visible sections are visited sections that are built with geometry.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
   Java mirrors each section's published layer meshes into the graph, and Rust
-  emits the compact camera layers (graph visit order, translucent back
-  to front),
-  shader shadow casters and animated-sprite sections in the frame records'
-  native layout. Java copies these records without rebuilding each section's
-  record. It still mirrors readiness and published mesh rows, schedules builds,
-  and marks the selected animated sprites; entity culling can lazily read the
-  visits. Diagnostic, fault, reload, explicit per-record and readiness-receipt
-  frames keep the Java producer. The implementation author reports byte-identical
-  records over 1,800 frames per mode; this review did not rerun that comparison.
+  emits the compact camera layers (near-to-far visit order, translucent back
+  to front), shader shadow casters and the frame's animated sprite ids (each
+  once) in the frame records' native layout. Java copies these records without
+  rebuilding each section's record and does not read the visits. The layer
+  fingerprint receipt is computed only when terrain diagnostics are active.
+  Diagnostic, fault, reload, explicit per-record and readiness-receipt frames
+  keep the Java producer, which asks the search to copy its visits. The
+  implementation author reports byte-identical records over 1,800 frames per
+  mode; this review did not rerun that comparison.
   [Selection eligibility and handoff](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L4921-L4979)
-- Builds are requested in visit order; block-edit rebuilds go first. In-flight
-  builds are capped at twice the worker count.
+- Rust lists the build requests in visit order, block-edit rebuilds first and
+  sections already in flight skipped. Java dispatches them while in-flight
+  builds stay below twice the worker count, and asks Rust whether each
+  finished build is stale (edited, reloaded or unloaded meanwhile).
 - All-air sections of a ready column are built as empty at once, as in Frozen,
   so the search crosses them immediately.
 - Shader shadow casters are built geometry sections the camera did not select.
@@ -192,19 +202,19 @@ which is outside any bridge context so selecting never joins a pipelined frame.
   ([`RustGalEntityCullingHook`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalEntityCullingHook.java)):
   when the Sodium entity-culling option is enabled, a camera-pass entity whose
   expanded culling box touches no section visited this frame is rejected before
-  the ordinary frustum test. Glowing/name-visible entities, very large boxes, boxes
-  outside level height and checks without an active frame search bypass this
-  additional rejection. The hook declares that it does not affect the shadow
-  pass; Java still extracts retained entities and their geometry.
-- With shader execution inactive and a current section search, block entities
-  are extracted as Frozen's Sodium does
-  (`RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity`): the culled
-  block entities of each visited built section, then the global ones of every
-  built section. Moving pistons arrive the same way. Shader frames still scan
-  every loaded chunk in range, because the shadow pass takes its block
-  entities from that list; unavailable-search cases also keep the fallback.
-  The author reports vanilla A/B 455→516 FPS; no dedicated block-entity-selection
-  regression was added in this interval. See [the route gate](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/minecraft/client/renderer/LevelRenderer.java#L2051-L2064).
+  the ordinary frustum test. Rust answers the box test from the search's visit
+  stamps. Glowing/name-visible entities, very large boxes, boxes outside level
+  height and checks without an active frame search bypass this additional
+  rejection. The hook declares that it does not affect the shadow pass; Java
+  still extracts retained entities and their geometry.
+- Without a shader pack, block entities are extracted as Frozen's Sodium does
+  (`RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity`): Rust lists the
+  visited built sections with culled block entities, then every built section
+  with global ones in first-build order. Moving pistons arrive the same way.
+  Shader frames still scan every loaded chunk in range, because the shadow pass
+  takes its block entities from that list; unavailable-search cases also keep
+  the fallback. The author reports vanilla A/B 455→516 FPS; no dedicated
+  block-entity-selection regression was added in this interval. See [the route gate](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/minecraft/client/renderer/LevelRenderer.java#L2051-L2064).
 
 Keep the graph's behaviour identical to Frozen: its unit tests in
 `section_graph/tests.rs` pin each rule, so run

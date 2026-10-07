@@ -9,21 +9,29 @@ import net.minecraft.util.NativeLibraryLoader;
 
 /**
  * Rust-owned chunk-section graph with Frozen's camera-pass selection
- * (Sodium's occlusion culler and section tree). Java reports column
- * readiness and build results; Rust answers which sections the camera pass
- * visits, in Frozen's visit order. Render thread only.
+ * (Sodium's occlusion culler and section tree) and the terrain source's
+ * bookkeeping: ready columns, which sections need a build or have one in
+ * flight, block-entity sections, animated sprites per section and the visit
+ * set entity culling tests. Java drives the meshing workers and reports
+ * their results. Render thread only.
  */
 final class RustSectionGraph implements AutoCloseable {
 	private static final int OK = 0;
 	private static final int ERR_CAPACITY = -3;
-	/** {@code FfiSectionGraphInfo}: x, y, z, built, flags, reserved, visibility. */
-	private static final long INFO_BYTES = 32;
+	/** {@code FfiSectionBuild}: x, y, z, flags, visibility, global, sprite count, sprites. */
+	private static final long BUILD_BYTES = 40;
+	/** {@code FfiSectionGraphFrame}: nine 8-byte fields. */
+	private static final long FRAME_BYTES = 72;
+	private static final int OP_SCHEDULE_REBUILD = 0;
+	private static final int OP_BUILD_STARTED = 1;
+	private static final int OP_FINISH_BUILD = 2;
+	private static final int OP_SECTION_READY = 3;
 	/** {@code FfiSectionGraphVisit}: x, y, z, built, flags. */
 	private static final long VISIT_BYTES = 20;
 	/** {@code FfiSectionMeshes}: x, y, z, flags, keys[3], generations[3]. */
 	private static final long MESHES_BYTES = 64;
-	/** {@code FfiTerrainSelectionParams}: camera[3] f64, depth policies[3], layer ordinals[3], shadow, max shadow. */
-	private static final long SELECTION_PARAMS_BYTES = 56;
+	/** {@code FfiTerrainSelectionParams}: camera[3] f64, depth policies[3], layer ordinals[3], shadow, max shadow, receipts, reserved. */
+	private static final long SELECTION_PARAMS_BYTES = 64;
 	/** {@code FfiTerrainSelectionView}: ten 8-byte fields. */
 	private static final long SELECTION_VIEW_BYTES = 80;
 	/** {@code SelectedLayer}: section key, layer, reserved. */
@@ -35,10 +43,30 @@ final class RustSectionGraph implements AutoCloseable {
 	private static final MethodHandle DESTROY = NativeLibraryLoader.downcallHandle("mattmc_rust",
 		"mattmc_sodium_section_graph_destroy",
 		FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-	private static final MethodHandle UPDATE = NativeLibraryLoader.downcallHandle("mattmc_rust",
-		"mattmc_sodium_section_graph_update",
-		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-			ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+	private static final MethodHandle ADD_COLUMN = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_add_column",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+			ValueLayout.JAVA_LONG));
+	private static final MethodHandle REMOVE_COLUMN = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_remove_column",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+	private static final MethodHandle SECTION_OP = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_section_op",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+			ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+	private static final MethodHandle ACCEPT_BUILD = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_accept_build",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+	private static final MethodHandle RELOAD = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_reload",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+	private static final MethodHandle BOX_VISIBLE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_box_visible",
+		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+			ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+	private static final MethodHandle BUILD_COUNTS = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_sodium_section_graph_build_counts",
+		FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 	private static final MethodHandle SELECT = NativeLibraryLoader.downcallHandle("mattmc_rust",
 		"mattmc_sodium_section_graph_select",
 		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
@@ -57,21 +85,25 @@ final class RustSectionGraph implements AutoCloseable {
 	private MemorySegment graph;
 	private final MemorySegment camera = this.arena.allocate(ValueLayout.JAVA_DOUBLE, 3);
 	private final MemorySegment matrix = this.arena.allocate(ValueLayout.JAVA_FLOAT, 16);
-	private final MemorySegment count = this.arena.allocate(ValueLayout.JAVA_INT);
-	private MemorySegment removed = MemorySegment.NULL;
-	private MemorySegment added = MemorySegment.NULL;
-	private MemorySegment infos = MemorySegment.NULL;
+	private final MemorySegment frame = this.arena.allocate(FRAME_BYTES, 8);
+	private final MemorySegment build = this.arena.allocate(BUILD_BYTES, 8);
+	private MemorySegment sprites = MemorySegment.NULL;
 	private MemorySegment visits = MemorySegment.NULL;
 	private MemorySegment meshRows = MemorySegment.NULL;
 	private final MemorySegment selectionParams = this.arena.allocate(SELECTION_PARAMS_BYTES, 8);
 	private final MemorySegment selectionView = this.arena.allocate(SELECTION_VIEW_BYTES, 8);
 	private int meshRowCount;
 	private boolean clearMeshes;
-	private int removedCount;
-	private int addedCount;
-	private int infoCount;
 	private int visitCapacity;
 	private int visitCount;
+	private MemorySegment buildRequests = MemorySegment.NULL;
+	private int buildRequestCount;
+	private MemorySegment blockEntitySections = MemorySegment.NULL;
+	private int blockEntitySectionCount;
+	private MemorySegment globalBlockEntitySections = MemorySegment.NULL;
+	private int globalBlockEntitySectionCount;
+	private int needsBuildCount;
+	private int inFlightCount;
 
 	RustSectionGraph(int minSectionY, int maxSectionY) {
 		try {
@@ -84,34 +116,116 @@ final class RustSectionGraph implements AutoCloseable {
 		}
 	}
 
-	/** Queues a column that stopped being ready (applied before additions). */
-	void removeColumn(int x, int z) {
-		this.removed = ensure(this.removed, (this.removedCount + 1) * 8L);
-		this.removed.set(ValueLayout.JAVA_INT, this.removedCount * 8L, x);
-		this.removed.set(ValueLayout.JAVA_INT, this.removedCount * 8L + 4, z);
-		this.removedCount++;
+	/**
+	 * A column became ready: sections with a set {@code nonAirMask} bit
+	 * ({@code y - minSectionY}) need a build, the rest are built as empty.
+	 * False when it was already ready.
+	 */
+	boolean addColumn(int x, int z, long nonAirMask) {
+		try {
+			return check((int) ADD_COLUMN.invokeExact(this.graph, x, z, nonAirMask), "add column") == 1;
+		} catch (Throwable throwable) {
+			throw failure("add column", throwable);
+		}
 	}
 
-	/** Queues a newly ready column: all its sections, unbuilt. */
-	void addColumn(int x, int z) {
-		this.added = ensure(this.added, (this.addedCount + 1) * 8L);
-		this.added.set(ValueLayout.JAVA_INT, this.addedCount * 8L, x);
-		this.added.set(ValueLayout.JAVA_INT, this.addedCount * 8L + 4, z);
-		this.addedCount++;
+	/** A column stopped being ready; its in-flight builds become stale. False when it was not ready. */
+	boolean removeColumn(int x, int z) {
+		try {
+			return check((int) REMOVE_COLUMN.invokeExact(this.graph, x, z), "remove column") == 1;
+		} catch (Throwable throwable) {
+			throw failure("remove column", throwable);
+		}
 	}
 
-	/** Queues a section's build information; {@code built=false} clears it. */
-	void setInfo(int x, int y, int z, boolean built, int flags, long visibility) {
-		this.infos = ensure(this.infos, (this.infoCount + 1) * INFO_BYTES);
-		long base = this.infoCount * INFO_BYTES;
-		this.infos.set(ValueLayout.JAVA_INT, base, x);
-		this.infos.set(ValueLayout.JAVA_INT, base + 4, y);
-		this.infos.set(ValueLayout.JAVA_INT, base + 8, z);
-		this.infos.set(ValueLayout.JAVA_INT, base + 12, built ? 1 : 0);
-		this.infos.set(ValueLayout.JAVA_INT, base + 16, built ? flags : 0);
-		this.infos.set(ValueLayout.JAVA_INT, base + 20, 0);
-		this.infos.set(ValueLayout.JAVA_LONG, base + 24, built ? visibility : 0L);
-		this.infoCount++;
+	/** Sodium's {@code scheduleRebuild}; true when the section belongs to a ready column. */
+	boolean scheduleRebuild(int x, int y, int z) {
+		return this.sectionOp(OP_SCHEDULE_REBUILD, x, y, z) == 1;
+	}
+
+	/** A requested section was handed to a meshing worker. */
+	void buildStarted(int x, int y, int z) {
+		this.sectionOp(OP_BUILD_STARTED, x, y, z);
+	}
+
+	/** A worker delivered a build; true when it is stale (edited, reloaded or unloaded meanwhile). */
+	boolean finishBuild(int x, int y, int z) {
+		return this.sectionOp(OP_FINISH_BUILD, x, y, z) == 1;
+	}
+
+	/** Whether the section's current build was accepted and no rebuild is outstanding. */
+	boolean sectionReady(int x, int y, int z) {
+		return this.sectionOp(OP_SECTION_READY, x, y, z) == 1;
+	}
+
+	private int sectionOp(int op, int x, int y, int z) {
+		try {
+			return check((int) SECTION_OP.invokeExact(this.graph, op, x, y, z), "section operation");
+		} catch (Throwable throwable) {
+			throw failure("section operation", throwable);
+		}
+	}
+
+	/** Accepts a section's newest build (an empty one included) with its animated sprite ids. */
+	void acceptBuild(int x, int y, int z, int flags, long visibility, boolean globalBlockEntities,
+			int[] spriteIds, int spriteCount) {
+		if (spriteCount > 0) {
+			this.sprites = ensure(this.sprites, spriteCount * 4L);
+			MemorySegment.copy(spriteIds, 0, this.sprites, ValueLayout.JAVA_INT, 0, spriteCount);
+		}
+		this.build.set(ValueLayout.JAVA_INT, 0, x);
+		this.build.set(ValueLayout.JAVA_INT, 4, y);
+		this.build.set(ValueLayout.JAVA_INT, 8, z);
+		this.build.set(ValueLayout.JAVA_INT, 12, flags);
+		this.build.set(ValueLayout.JAVA_LONG, 16, visibility);
+		this.build.set(ValueLayout.JAVA_INT, 24, globalBlockEntities ? 1 : 0);
+		this.build.set(ValueLayout.JAVA_INT, 28, spriteCount);
+		this.build.set(ValueLayout.ADDRESS, 32, spriteCount > 0 ? this.sprites : MemorySegment.NULL);
+		try {
+			check((int) ACCEPT_BUILD.invokeExact(this.graph, this.build), "accept build");
+		} catch (Throwable throwable) {
+			throw failure("accept build", throwable);
+		}
+	}
+
+	/** Resource reload; {@code cancelInFlight} when the worker pool was replaced. */
+	void reloadResources(boolean cancelInFlight) {
+		try {
+			check((int) RELOAD.invokeExact(this.graph, cancelInFlight ? 1 : 0), "reload");
+		} catch (Throwable throwable) {
+			throw failure("reload", throwable);
+		}
+	}
+
+	/** Whether the latest search visited any section of the inclusive section-coordinate box. */
+	boolean boxVisible(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		try {
+			return check((int) BOX_VISIBLE.invokeExact(this.graph, minX, minY, minZ, maxX, maxY, maxZ),
+				"box visibility") == 1;
+		} catch (Throwable throwable) {
+			throw failure("box visibility", throwable);
+		}
+	}
+
+	/** Current counts: {@code needsBuild << 32 | inFlight}. */
+	long buildCounts() {
+		try {
+			return (long) BUILD_COUNTS.invokeExact(this.graph);
+		} catch (Throwable throwable) {
+			throw failure("build counts", throwable);
+		}
+	}
+
+	private static int check(int status, String operation) {
+		if (status < 0) {
+			throw new IllegalStateException("Rust section graph " + operation + " rejected with status " + status);
+		}
+		return status;
+	}
+
+	private static IllegalStateException failure(String operation, Throwable throwable) {
+		return throwable instanceof IllegalStateException state ? state
+			: new IllegalStateException("Rust section graph " + operation + " failed", throwable);
 	}
 
 	/**
@@ -141,60 +255,52 @@ final class RustSectionGraph implements AutoCloseable {
 		this.meshRowCount = 0;
 	}
 
-	/** Applies every queued change, in queue order (removals, additions, infos, mesh rows). */
+	/** Applies the queued mesh rows. */
 	void flush() {
-		if (this.clearMeshes || this.meshRowCount != 0) {
-			int status;
-			try {
-				status = (int) SET_MESHES.invokeExact(this.graph, this.clearMeshes ? 1 : 0, this.meshRows,
-					this.meshRowCount);
-			} catch (Throwable throwable) {
-				throw new IllegalStateException("Rust section graph mesh update failed", throwable);
-			}
-			if (status != OK) {
-				throw new IllegalStateException("Rust section graph mesh update rejected with status " + status);
-			}
-			this.clearMeshes = false;
-			this.meshRowCount = 0;
-		}
-		if (this.removedCount == 0 && this.addedCount == 0 && this.infoCount == 0) {
+		if (!this.clearMeshes && this.meshRowCount == 0) {
 			return;
 		}
 		int status;
 		try {
-			status = (int) UPDATE.invokeExact(this.graph, this.removed, this.removedCount, this.added,
-				this.addedCount, this.infos, this.infoCount);
+			status = (int) SET_MESHES.invokeExact(this.graph, this.clearMeshes ? 1 : 0, this.meshRows,
+				this.meshRowCount);
 		} catch (Throwable throwable) {
-			throw new IllegalStateException("Rust section graph update failed", throwable);
+			throw new IllegalStateException("Rust section graph mesh update failed", throwable);
 		}
 		if (status != OK) {
-			throw new IllegalStateException("Rust section graph update rejected with status " + status);
+			throw new IllegalStateException("Rust section graph mesh update rejected with status " + status);
 		}
-		this.removedCount = 0;
-		this.addedCount = 0;
-		this.infoCount = 0;
+		this.clearMeshes = false;
+		this.meshRowCount = 0;
 	}
 
 	/**
-	 * Runs Frozen's camera-pass selection; afterwards {@link #visitCount()}
-	 * sections are readable in visit order.
+	 * Runs Frozen's camera-pass selection and records its bookkeeping (build
+	 * requests, block-entity sections, entity-culling visit set). With
+	 * {@code copyVisits} the visited sections are also readable in visit order.
 	 */
 	void select(double cameraX, double cameraY, double cameraZ, float[] cullingMatrix, float searchDistance,
-			boolean useOcclusionCulling) {
+			boolean useOcclusionCulling, boolean copyVisits) {
 		this.flush();
 		this.camera.set(ValueLayout.JAVA_DOUBLE, 0, cameraX);
 		this.camera.set(ValueLayout.JAVA_DOUBLE, 8, cameraY);
 		this.camera.set(ValueLayout.JAVA_DOUBLE, 16, cameraZ);
 		MemorySegment.copy(cullingMatrix, 0, this.matrix, ValueLayout.JAVA_FLOAT, 0, 16);
+		if (copyVisits && this.visits.equals(MemorySegment.NULL)) {
+			this.visitCapacity = 4096;
+			this.visits = this.arena.allocate(this.visitCapacity * VISIT_BYTES, 8);
+		}
 		while (true) {
+			// invokeExact needs a statically typed MemorySegment, not a conditional.
+			MemorySegment out = copyVisits ? this.visits : MemorySegment.NULL;
 			int status;
 			try {
 				status = (int) SELECT.invokeExact(this.graph, this.camera, this.matrix, searchDistance,
-					useOcclusionCulling ? 1 : 0, this.visits, this.visitCapacity, this.count);
+					useOcclusionCulling ? 1 : 0, out, copyVisits ? this.visitCapacity : 0, this.frame);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Rust section graph selection failed", throwable);
 			}
-			int required = this.count.get(ValueLayout.JAVA_INT, 0);
+			int required = Math.toIntExact(this.frame.get(ValueLayout.JAVA_LONG, 64));
 			if (status == ERR_CAPACITY) {
 				this.visitCapacity = Math.max(required, this.visitCapacity * 2);
 				this.visits = this.arena.allocate(this.visitCapacity * VISIT_BYTES, 8);
@@ -203,11 +309,59 @@ final class RustSectionGraph implements AutoCloseable {
 			if (status != OK) {
 				throw new IllegalStateException("Rust section graph selection rejected with status " + status);
 			}
-			this.visitCount = required;
+			this.visitCount = copyVisits ? required : 0;
+			MemorySegment view = this.frame;
+			this.buildRequestCount = Math.toIntExact(view.get(ValueLayout.JAVA_LONG, 8));
+			this.buildRequests = view.get(ValueLayout.ADDRESS, 0).reinterpret(this.buildRequestCount * 8L);
+			this.blockEntitySectionCount = Math.toIntExact(view.get(ValueLayout.JAVA_LONG, 24));
+			this.blockEntitySections = view.get(ValueLayout.ADDRESS, 16).reinterpret(this.blockEntitySectionCount * 8L);
+			this.globalBlockEntitySectionCount = Math.toIntExact(view.get(ValueLayout.JAVA_LONG, 40));
+			this.globalBlockEntitySections = view.get(ValueLayout.ADDRESS, 32)
+				.reinterpret(this.globalBlockEntitySectionCount * 8L);
+			this.needsBuildCount = Math.toIntExact(view.get(ValueLayout.JAVA_LONG, 48));
+			this.inFlightCount = Math.toIntExact(view.get(ValueLayout.JAVA_LONG, 56));
 			return;
 		}
 	}
 
+	/** Section keys to build after the latest selection: block edits first, otherwise visit order. */
+	int buildRequestCount() {
+		return this.buildRequestCount;
+	}
+
+	long buildRequest(int index) {
+		return this.buildRequests.get(ValueLayout.JAVA_LONG, index * 8L);
+	}
+
+	/** Visited built sections with culled block entities, in visit order. */
+	int blockEntitySectionCount() {
+		return this.blockEntitySectionCount;
+	}
+
+	long blockEntitySection(int index) {
+		return this.blockEntitySections.get(ValueLayout.JAVA_LONG, index * 8L);
+	}
+
+	/** Built sections with off-screen block entities, in first-build order. */
+	int globalBlockEntitySectionCount() {
+		return this.globalBlockEntitySectionCount;
+	}
+
+	long globalBlockEntitySection(int index) {
+		return this.globalBlockEntitySections.get(ValueLayout.JAVA_LONG, index * 8L);
+	}
+
+	/** Sections needing a build, at the latest selection. */
+	int needsBuildCount() {
+		return this.needsBuildCount;
+	}
+
+	/** Builds in flight, at the latest selection. */
+	int inFlightCount() {
+		return this.inFlightCount;
+	}
+
+	/** Visited sections copied by the latest {@code select(..., copyVisits=true)}. */
 	int visitCount() {
 		return this.visitCount;
 	}
@@ -227,26 +381,21 @@ final class RustSectionGraph implements AutoCloseable {
 			return this.sectionLayers.get(ValueLayout.JAVA_INT, index * SELECTED_LAYER_BYTES + 8);
 		}
 
-		int animatedX(int index) {
-			return this.animated.get(ValueLayout.JAVA_INT, index * 12L);
-		}
-
-		int animatedY(int index) {
-			return this.animated.get(ValueLayout.JAVA_INT, index * 12L + 4);
-		}
-
-		int animatedZ(int index) {
-			return this.animated.get(ValueLayout.JAVA_INT, index * 12L + 8);
+		/** The frame's animated sprite ids, each once in first-use order. */
+		int animatedSprite(int index) {
+			return this.animated.get(ValueLayout.JAVA_INT, index * 4L);
 		}
 	}
 
 	/**
 	 * Builds the frame's static terrain from the latest {@link #select}: camera
 	 * layers in draw order, off-camera shadow casters when requested, and the
-	 * sections whose animated sprites the frame uses.
+	 * animated sprites the frame uses. {@code receipts} computes the layer
+	 * fingerprint for diagnostics.
 	 */
 	TerrainSelection selectTerrain(double cameraX, double cameraY, double cameraZ, int[] depthPolicies,
-			int[] layerOrdinals, boolean shadowCandidates, int maxShadowCandidates, long sectionBytes, long casterBytes) {
+			int[] layerOrdinals, boolean shadowCandidates, int maxShadowCandidates, boolean receipts,
+			long sectionBytes, long casterBytes) {
 		this.selectionParams.set(ValueLayout.JAVA_DOUBLE, 0, cameraX);
 		this.selectionParams.set(ValueLayout.JAVA_DOUBLE, 8, cameraY);
 		this.selectionParams.set(ValueLayout.JAVA_DOUBLE, 16, cameraZ);
@@ -256,6 +405,8 @@ final class RustSectionGraph implements AutoCloseable {
 		}
 		this.selectionParams.set(ValueLayout.JAVA_INT, 48, shadowCandidates ? 1 : 0);
 		this.selectionParams.set(ValueLayout.JAVA_INT, 52, maxShadowCandidates);
+		this.selectionParams.set(ValueLayout.JAVA_INT, 56, receipts ? 1 : 0);
+		this.selectionParams.set(ValueLayout.JAVA_INT, 60, 0);
 		int status;
 		try {
 			status = (int) SELECT_TERRAIN.invokeExact(this.graph, this.selectionParams, this.selectionView);
@@ -275,7 +426,7 @@ final class RustSectionGraph implements AutoCloseable {
 			sectionCount,
 			view.get(ValueLayout.ADDRESS, 24).reinterpret(casterCount * casterBytes),
 			casterCount,
-			view.get(ValueLayout.ADDRESS, 40).reinterpret(animatedCount * 12L),
+			view.get(ValueLayout.ADDRESS, 40).reinterpret(animatedCount * 4L),
 			animatedCount,
 			view.get(ValueLayout.JAVA_LONG, 56),
 			view.get(ValueLayout.JAVA_LONG, 64),

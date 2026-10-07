@@ -1,7 +1,6 @@
 package net.vulkanic.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -11,7 +10,6 @@ import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.Vec3;
 import net.sodium.client.render.StaticTerrainParityDiagnostics;
@@ -38,10 +36,13 @@ import org.joml.Vector3d;
  * section of a ready column (Sodium's {@link ChunkTracker}: the chunk and its
  * eight neighbours carry block and light data) exists in the Rust section
  * graph; all-air sections are built immediately as empty; every other section
- * needs a build. Each frame Rust selects the camera pass's sections in Sodium's
- * visit order ({@link RustSectionGraph}); visited sections that need a build
- * are dispatched to Sodium's pure meshing task, and visited built sections with
- * geometry form the visible list.
+ * needs a build. The graph ({@link RustSectionGraph}) owns that bookkeeping:
+ * column readiness, which sections need a build or have one in flight, stale
+ * results, block-entity sections, animated sprites and the visit set entity
+ * culling tests. Each frame Rust selects the camera pass's sections in Sodium's
+ * visit order and lists the build requests; Java dispatches them to Sodium's
+ * meshing task, reports results, and keeps only the Java objects (block
+ * entities, sprites) the graph's lists name.
  */
 public final class RustGalWholeFrameTerrainSource {
 	private static final int MAX_SEMANTIC_MESH_WORKERS = 8;
@@ -69,39 +70,31 @@ public final class RustGalWholeFrameTerrainSource {
 	private long observedResourceReloadEpoch;
 	private int buildFrame;
 
-	/** Ready columns (chunk positions) mirrored into the graph. */
-	private final LongOpenHashSet readyColumns = new LongOpenHashSet();
-	/** Built sections of ready columns, including empty ones. */
-	private final Long2ObjectOpenHashMap<RenderSection> sections = new Long2ObjectOpenHashMap<>();
-	/** The subset of {@link #sections} with geometry (flags != 0). */
+	/**
+	 * Built sections with geometry (flags != 0); read only by the diagnostic
+	 * Java visible list. Which sections are ready, need a build, are in
+	 * flight or visible lives in {@link #graph}.
+	 */
 	private final Long2ObjectOpenHashMap<RenderSection> geometrySections = new Long2ObjectOpenHashMap<>();
-	/** Animated sprites already recorded this frame (identity). */
-	private final it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<net.minecraft.client.renderer.texture.TextureAtlasSprite>
-		frameAnimatedSprites = new it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<>();
-	/** Built sections with off-screen block entities, in first-build order (Sodium's set). */
-	private final it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<RenderSection> globalBlockEntitySections =
-		new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
-	/** Sections of ready columns whose current build is missing or stale. */
-	private final LongOpenHashSet needsBuild = new LongOpenHashSet();
-	/** Rebuilds of already-built sections (block edits): dispatched first. */
-	private final LongOpenHashSet urgentRebuilds = new LongOpenHashSet();
-	private final LongOpenHashSet inFlight = new LongOpenHashSet();
-	/** In-flight builds whose result is stale (edited or column removed). */
-	private final LongOpenHashSet staleInFlight = new LongOpenHashSet();
+	/** Built sections holding block entities (the Java objects the graph's lists name). */
+	private final Long2ObjectOpenHashMap<RenderSection> blockEntitySections = new Long2ObjectOpenHashMap<>();
+	/** Dense ids of animated sprites; the graph stores each section's ids. */
+	private final it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap<net.minecraft.client.renderer.texture.TextureAtlasSprite>
+		animatedSpriteIds = new it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap<>();
+	private final ArrayList<net.minecraft.client.renderer.texture.TextureAtlasSprite> animatedSprites = new ArrayList<>();
+	private int[] spriteScratch = new int[16];
+	/** Builds in flight: the graph's count at selection plus this frame's dispatches. */
+	private int inFlightCount;
 	private final ConcurrentLinkedQueue<CompletedBuild> completedBuilds = new ConcurrentLinkedQueue<>();
 	private final float[] cullingMatrix = new float[16];
 	private final ArrayList<RenderSection> visibleSections = new ArrayList<>();
 	private final LongOpenHashSet visibleKeys = new LongOpenHashSet();
 	/** Whether the graph holds every published section mesh row. */
 	private boolean graphMeshesPublished;
-	/** Every section the current camera search visited, as Sodium's last-visible frame. */
-	private final LongOpenHashSet visitedKeySet = new LongOpenHashSet();
-	private boolean visitedKeySetCurrent;
 	/** The source whose search belongs to the frame now extracting entities. */
 	private static volatile RustGalWholeFrameTerrainSource entityCullingSource;
 	// The volume of a section multiplied by the number of sections to be checked at most.
 	private static final double MAX_ENTITY_CHECK_VOLUME = 16 * 16 * 16 * 15;
-	private final LongArrayList buildRequests = new LongArrayList();
 	private final SectionKeyOrder sectionKeyOrder = new SectionKeyOrder();
 	private int completedBuildsConsumedThisFrame;
 	private long lastQueueLogNanos;
@@ -120,6 +113,9 @@ public final class RustGalWholeFrameTerrainSource {
 			this.workerSeparateAo = RustGalTerrainRenderer.copiedShaderPackSeparateAo();
 			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, this.workerSeparateAo,
 				semanticMeshWorkerCount());
+			if (level.getSectionsCount() > 64) {
+				throw new IllegalStateException("Rust section graph columns hold at most 64 sections");
+			}
 			this.graph = new RustSectionGraph(level.getMinSectionY(), level.getMaxSectionY());
 			this.graphMeshesPublished = false;
 		}
@@ -217,67 +213,77 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	private void addColumn(int chunkX, int chunkZ) {
-		if (!this.readyColumns.add(ChunkPos.asLong(chunkX, chunkZ))) {
-			return;
-		}
-		this.graph.addColumn(chunkX, chunkZ);
 		LevelChunkSection[] chunkSections = this.level.getChunk(chunkX, chunkZ).getSections();
+		long nonAirMask = 0L;
 		for (int sectionY = this.level.getMinSectionY(); sectionY <= this.level.getMaxSectionY(); sectionY++) {
 			int index = this.level.getSectionIndexFromSectionY(sectionY);
-			long key = SectionPos.asLong(chunkX, sectionY, chunkZ);
 			LevelChunkSection chunkSection = index >= 0 && index < chunkSections.length ? chunkSections[index] : null;
-			if (chunkSection == null || chunkSection.hasOnlyAir()) {
-				this.acceptBuiltSection(key, emptySection(chunkX, sectionY, chunkZ));
-			} else {
-				this.needsBuild.add(key);
+			if (chunkSection != null && !chunkSection.hasOnlyAir()) {
+				nonAirMask |= 1L << (sectionY - this.level.getMinSectionY());
 			}
 		}
-		wholeFrameSurfaceQueueDrained = false;
-		wholeFrameTerrainQueueDrained = false;
+		if (this.graph.addColumn(chunkX, chunkZ, nonAirMask)) {
+			wholeFrameSurfaceQueueDrained = false;
+			wholeFrameTerrainQueueDrained = false;
+		}
 	}
 
 	private void removeColumn(int chunkX, int chunkZ) {
-		if (!this.readyColumns.remove(ChunkPos.asLong(chunkX, chunkZ))) {
+		if (!this.graph.removeColumn(chunkX, chunkZ)) {
 			return;
 		}
-		this.graph.removeColumn(chunkX, chunkZ);
 		for (int sectionY = this.level.getMinSectionY(); sectionY <= this.level.getMaxSectionY(); sectionY++) {
 			long key = SectionPos.asLong(chunkX, sectionY, chunkZ);
-			RenderSection section = this.sections.remove(key);
 			this.geometrySections.remove(key);
-			this.globalBlockEntitySections.remove(key);
-			if (section != null || RustGalTerrainRenderer.hasSectionAsset(key)) {
+			this.blockEntitySections.remove(key);
+			if (RustGalTerrainRenderer.hasSectionAsset(key)) {
 				RustGalTerrainRenderer.removeSection(chunkX, sectionY, chunkZ, "cpu-source-column-unready");
-			}
-			this.needsBuild.remove(key);
-			this.urgentRebuilds.remove(key);
-			if (this.inFlight.contains(key)) {
-				this.staleInFlight.add(key);
 			}
 		}
 	}
 
-	private static RenderSection emptySection(int x, int y, int z) {
-		RenderSection section = new RenderSection(null, x, y, z);
-		section.setInfo(BuiltSectionInfo.EMPTY);
-		return section;
+	/** Records an accepted empty build (all air, or nothing to mesh). */
+	private void acceptEmptySection(int x, int y, int z) {
+		long key = SectionPos.asLong(x, y, z);
+		this.geometrySections.remove(key);
+		this.blockEntitySections.remove(key);
+		this.graph.acceptBuild(x, y, z, BuiltSectionInfo.EMPTY.flags, BuiltSectionInfo.EMPTY.visibilityData,
+			false, this.spriteScratch, 0);
 	}
 
 	/** Records a section's newest accepted build in Java and in the graph. */
 	private void acceptBuiltSection(long key, RenderSection section) {
-		this.sections.put(key, section);
 		if (section.getFlags() != 0) {
 			this.geometrySections.put(key, section);
 		} else {
 			this.geometrySections.remove(key);
 		}
-		if (section.getGlobalBlockEntities() != null) {
-			this.globalBlockEntitySections.put(key, section);
+		boolean globals = section.getGlobalBlockEntities() != null;
+		if (globals || section.getCulledBlockEntities() != null) {
+			this.blockEntitySections.put(key, section);
 		} else {
-			this.globalBlockEntitySections.remove(key);
+			this.blockEntitySections.remove(key);
 		}
-		this.graph.setInfo(section.getChunkX(), section.getChunkY(), section.getChunkZ(), true,
-			section.getFlags(), section.getVisibilityData());
+		var sprites = section.getAnimatedSprites();
+		int spriteCount = sprites == null ? 0 : sprites.length;
+		if (spriteCount > this.spriteScratch.length) {
+			this.spriteScratch = new int[Math.max(spriteCount, this.spriteScratch.length * 2)];
+		}
+		for (int index = 0; index < spriteCount; index++) {
+			this.spriteScratch[index] = this.animatedSpriteId(sprites[index]);
+		}
+		this.graph.acceptBuild(section.getChunkX(), section.getChunkY(), section.getChunkZ(), section.getFlags(),
+			section.getVisibilityData(), globals, this.spriteScratch, spriteCount);
+	}
+
+	private int animatedSpriteId(net.minecraft.client.renderer.texture.TextureAtlasSprite sprite) {
+		int id = this.animatedSpriteIds.getOrDefault(sprite, -1);
+		if (id < 0) {
+			id = this.animatedSprites.size();
+			this.animatedSprites.add(sprite);
+			this.animatedSpriteIds.put(sprite, id);
+		}
+		return id;
 	}
 
 	/** Frozen's camera-pass selection and the visible list it implies. */
@@ -287,39 +293,28 @@ public final class RustGalWholeFrameTerrainSource {
 		RustGalTerrainRenderer.drainGraphMeshRows(this.graph, !this.graphMeshesPublished);
 		this.graphMeshesPublished = true;
 		frustum.copyCullingMatrix(this.cullingMatrix);
+		// Rust records the search's build requests, block-entity sections and
+		// entity-culling visit set; Java reads visits only for the diagnostic list.
 		this.graph.select(frustum.cameraX(), frustum.cameraY(), frustum.cameraZ(), this.cullingMatrix,
-			searchDistance, useOcclusionCulling);
+			searchDistance, useOcclusionCulling, javaVisibleList);
+		this.inFlightCount = this.graph.inFlightCount();
 		this.visibleSections.clear();
 		this.visibleKeys.clear();
-		this.buildRequests.clear();
-		this.visitedKeySetCurrent = false;
 		entityCullingSource = this;
-		if (!javaVisibleList && this.needsBuild.isEmpty()) {
-			// Rust selects the frame's terrain; with nothing to build, Java
-			// needs no per-section pass over the visits.
-			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
-			return;
-		}
-		int urgent = 0;
-		for (int index = 0, count = this.graph.visitCount(); index < count; index++) {
-			long key = SectionPos.asLong(this.graph.visitX(index), this.graph.visitY(index), this.graph.visitZ(index));
-			if (this.needsBuild.contains(key) && !this.inFlight.contains(key)) {
-				// Block edits are important rebuilds; everything else keeps visit order.
-				if (this.urgentRebuilds.contains(key)) {
-					this.buildRequests.add(urgent++, key);
-				} else {
-					this.buildRequests.add(key);
+		if (javaVisibleList) {
+			for (int index = 0, count = this.graph.visitCount(); index < count; index++) {
+				if (!this.graph.visitBuilt(index) || this.graph.visitFlags(index) == 0) {
+					continue;
 				}
-			}
-			if (javaVisibleList && this.graph.visitBuilt(index) && this.graph.visitFlags(index) != 0) {
-				RenderSection section = this.sections.get(key);
+				long key = SectionPos.asLong(this.graph.visitX(index), this.graph.visitY(index), this.graph.visitZ(index));
+				RenderSection section = this.geometrySections.get(key);
 				if (section != null && this.visibleKeys.add(key)) {
 					this.visibleSections.add(section);
 				}
 			}
+			// Canonical order: an identical visible set must reach Rust identically.
+			this.sectionKeyOrder.sort(this.visibleSections, RenderSection::getPositionAsLong);
 		}
-		// Canonical order: an identical visible set must reach Rust identically.
-		this.sectionKeyOrder.sort(this.visibleSections, RenderSection::getPositionAsLong);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
 	}
 
@@ -334,24 +329,15 @@ public final class RustGalWholeFrameTerrainSource {
 			camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
 			RustGalTerrainRenderer.selectionDepthPolicies(), RustGalTerrainRenderer.SELECTION_LAYER_ORDINALS,
 			shadowCandidates, RustGalTerrainRenderer.MAX_SELECTION_SHADOW_CANDIDATES,
+			RustGalTerrainRenderer.selectionReceiptsRequested(),
 			net.vulkanic.bridge.VulkanicGalBridge.Struct.STATIC_TERRAIN_SECTION.byteSize(),
 			net.vulkanic.bridge.VulkanicGalBridge.Struct.STATIC_TERRAIN_SHADOW_CASTER.byteSize());
-		// Sprite use is a set per animation tick (never reset mid-frame), and
-		// most animated sections share the same few sprites: record each once.
-		this.frameAnimatedSprites.clear();
+		// Sprite use is a set per animation tick (never reset mid-frame); Rust
+		// lists each animated sprite of the drawn sections once.
 		for (int index = 0; index < selection.animatedCount(); index++) {
-			RenderSection section = this.sections.get(SectionPos.asLong(
-				selection.animatedX(index), selection.animatedY(index), selection.animatedZ(index)));
-			var sprites = section == null ? null : section.getAnimatedSprites();
-			if (sprites == null) {
-				continue;
-			}
-			for (var sprite : sprites) {
-				if (this.frameAnimatedSprites.add(sprite)) {
-					RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
-						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
-				}
-			}
+			var sprite = this.animatedSprites.get(selection.animatedSprite(index));
+			RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+				sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
 		}
 		RustGalTerrainRenderer.enqueueWholeFrameTerrainSelection(selection, camera);
 	}
@@ -392,13 +378,8 @@ public final class RustGalWholeFrameTerrainSource {
 			return false;
 		}
 		RustSectionGraph graph = source.graph;
-		for (int index = 0, count = graph.visitCount(); index < count; index++) {
-			if (!graph.visitBuilt(index)
-					|| (graph.visitFlags(index) & net.sodium.client.render.chunk.RenderSectionFlags.MASK_HAS_BLOCK_ENTITIES) == 0) {
-				continue;
-			}
-			RenderSection section = source.sections.get(
-				SectionPos.asLong(graph.visitX(index), graph.visitY(index), graph.visitZ(index)));
+		for (int index = 0, count = graph.blockEntitySectionCount(); index < count; index++) {
+			RenderSection section = source.blockEntitySections.get(graph.blockEntitySection(index));
 			var blockEntities = section == null ? null : section.getCulledBlockEntities();
 			if (blockEntities != null) {
 				for (var blockEntity : blockEntities) {
@@ -406,8 +387,9 @@ public final class RustGalWholeFrameTerrainSource {
 				}
 			}
 		}
-		for (RenderSection section : source.globalBlockEntitySections.values()) {
-			var blockEntities = section.getGlobalBlockEntities();
+		for (int index = 0, count = graph.globalBlockEntitySectionCount(); index < count; index++) {
+			RenderSection section = source.blockEntitySections.get(graph.globalBlockEntitySection(index));
+			var blockEntities = section == null ? null : section.getGlobalBlockEntities();
 			if (blockEntities != null) {
 				for (var blockEntity : blockEntities) {
 					consumer.accept(blockEntity);
@@ -427,61 +409,35 @@ public final class RustGalWholeFrameTerrainSource {
 		if (y2 < this.level.getMinY() + 0.5D || y1 > this.level.getMaxY() - 0.5D) {
 			return true;
 		}
-		if (!this.visitedKeySetCurrent) {
-			this.visitedKeySet.clear();
-			for (int index = 0, count = this.graph.visitCount(); index < count; index++) {
-				this.visitedKeySet.add(SectionPos.asLong(
-					this.graph.visitX(index), this.graph.visitY(index), this.graph.visitZ(index)));
-			}
-			this.visitedKeySetCurrent = true;
-		}
-		int minX = SectionPos.posToSectionCoord(x1 - 0.5D);
-		int minY = SectionPos.posToSectionCoord(y1 - 0.5D);
-		int minZ = SectionPos.posToSectionCoord(z1 - 0.5D);
-		int maxX = SectionPos.posToSectionCoord(x2 + 0.5D);
-		int maxY = SectionPos.posToSectionCoord(y2 + 0.5D);
-		int maxZ = SectionPos.posToSectionCoord(z2 + 0.5D);
-		for (int x = minX; x <= maxX; x++) {
-			for (int z = minZ; z <= maxZ; z++) {
-				for (int y = minY; y <= maxY; y++) {
-					if (this.visitedKeySet.contains(SectionPos.asLong(x, y, z))) {
-						return true;
-					}
-				}
-			}
-		}
-		return false;
+		return this.graph.boxVisible(
+			SectionPos.posToSectionCoord(x1 - 0.5D), SectionPos.posToSectionCoord(y1 - 0.5D),
+			SectionPos.posToSectionCoord(z1 - 0.5D), SectionPos.posToSectionCoord(x2 + 0.5D),
+			SectionPos.posToSectionCoord(y2 + 0.5D), SectionPos.posToSectionCoord(z2 + 0.5D));
 	}
 
 	private void scheduleBuilds(Camera camera) {
 		int capacity = Math.max(1, this.workerBuilder.getTotalThreadCount() * 2);
-		for (int index = 0; index < this.buildRequests.size() && this.inFlight.size() < capacity; index++) {
-			this.scheduleBuild(SectionPos.of(this.buildRequests.getLong(index)), camera);
+		for (int index = 0; index < this.graph.buildRequestCount() && this.inFlightCount < capacity; index++) {
+			this.scheduleBuild(SectionPos.of(this.graph.buildRequest(index)), camera);
 		}
 	}
 
 	private void scheduleBuild(SectionPos sectionPos, Camera camera) {
-		long key = sectionPos.asLong();
-		if (!this.inFlight.add(key)) {
-			return;
-		}
 		ChunkRenderContext renderContext;
 		try {
 			renderContext = LevelSlice.prepare(this.level, sectionPos, this.sectionCache);
 		} catch (RuntimeException error) {
 			this.recordTerrainFailure("prepare", sectionPos, error);
 			// Stays needing a build; retried when visited again.
-			this.inFlight.remove(key);
 			return;
 		}
 		if (renderContext == null) {
 			// LevelSlice reports an empty section with null.
-			this.inFlight.remove(key);
-			this.needsBuild.remove(key);
-			this.urgentRebuilds.remove(key);
-			this.acceptBuiltSection(key, emptySection(sectionPos.getX(), sectionPos.getY(), sectionPos.getZ()));
+			this.acceptEmptySection(sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
 			return;
 		}
+		this.graph.buildStarted(sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
+		this.inFlightCount++;
 		RenderSection section = new RenderSection(null, sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
 		Vec3 cameraPos = camera.getPosition();
 		ChunkBuilderMeshingTask task = new ChunkBuilderMeshingTask(section, ++this.buildFrame,
@@ -492,7 +448,8 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	private void drainCompletedBuilds() {
-		int publishLimit = this.needsBuild.size() + this.inFlight.size() > BACKLOG_THRESHOLD
+		long counts = this.graph.buildCounts();
+		int publishLimit = (int) (counts >>> 32) + (int) counts > BACKLOG_THRESHOLD
 			? Math.max(MAX_COMPLETED_BUILDS_PER_FRAME, MAX_BACKLOG_COMPLETED_BUILDS_PER_FRAME)
 			: MAX_COMPLETED_BUILDS_PER_FRAME;
 		CompletedBuild completed;
@@ -500,8 +457,9 @@ public final class RustGalWholeFrameTerrainSource {
 				&& (completed = this.completedBuilds.poll()) != null) {
 			this.completedBuildsConsumedThisFrame++;
 			long key = completed.sectionPos().asLong();
-			this.inFlight.remove(key);
-			boolean stale = this.staleInFlight.remove(key);
+			// Stale when edited, reloaded or its column unloaded meanwhile.
+			boolean stale = this.graph.finishBuild(completed.sectionPos().getX(), completed.sectionPos().getY(),
+				completed.sectionPos().getZ());
 			ChunkBuildOutput output;
 			try {
 				output = completed.result().unwrap();
@@ -513,13 +471,10 @@ public final class RustGalWholeFrameTerrainSource {
 				continue;
 			}
 			try {
-				if (stale || !this.readyColumns.contains(ChunkPos.asLong(completed.sectionPos().getX(),
-						completed.sectionPos().getZ()))) {
+				if (stale) {
 					continue;
 				}
 				completed.section().setInfo(output.info);
-				this.needsBuild.remove(key);
-				this.urgentRebuilds.remove(key);
 				this.acceptBuiltSection(key, completed.section());
 				StaticTerrainParityDiagnostics.recordChunkBuildOutput(output);
 				if (!output.meshes.isEmpty()) {
@@ -535,8 +490,8 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	private void updateDrainedState() {
-		boolean visibleWorkPending = !this.buildRequests.isEmpty();
-		wholeFrameSurfaceQueueDrained = !visibleWorkPending && this.inFlight.isEmpty();
+		boolean visibleWorkPending = this.graph.buildRequestCount() > 0;
+		wholeFrameSurfaceQueueDrained = !visibleWorkPending && this.inFlightCount == 0;
 		wholeFrameTerrainQueueDrained = wholeFrameSurfaceQueueDrained && this.completedBuilds.isEmpty();
 		if (wholeFrameTerrainQueueDrained && !RustGalTerrainRenderer.finishResourceReloadIfReady()) {
 			// CPU work is complete, but the bounded native uploader has not accepted
@@ -545,14 +500,13 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		if (StaticTerrainParityDiagnostics.isEnabled()
 				|| net.minecraft.client.dev.DeterministicCameraCapture.isActiveForDiagnostics()) {
-			wholeFrameTerrainQueueSummary = "visitRequests=" + this.buildRequests.size()
-				+ ",needsBuild=" + this.needsBuild.size()
-				+ ",urgentRebuilds=" + this.urgentRebuilds.size()
-				+ ",inFlight=" + this.inFlight.size()
+			long counts = this.graph.buildCounts();
+			wholeFrameTerrainQueueSummary = "visitRequests=" + this.graph.buildRequestCount()
+				+ ",needsBuild=" + (counts >>> 32)
+				+ ",inFlight=" + (int) counts
 				+ ",completed=" + this.completedBuilds.size()
-				+ ",readyColumns=" + this.readyColumns.size()
-				+ ",retained=" + this.sections.size()
 				+ ",retainedGeometry=" + this.geometrySections.size()
+				+ ",blockEntitySections=" + this.blockEntitySections.size()
 				+ ",visible=" + this.visibleSections.size()
 				+ ",scheduledJobs=" + this.workerBuilder.getScheduledJobCount()
 				+ ",busyWorkers=" + this.workerBuilder.getBusyThreadCount()
@@ -572,8 +526,9 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 	}
 
+	/** Built sections with geometry. */
 	public int sectionCount() {
-		return this.sections.size();
+		return this.geometrySections.size();
 	}
 
 	public static boolean isWholeFrameTerrainQueueDrained() {
@@ -595,12 +550,11 @@ public final class RustGalWholeFrameTerrainSource {
 	 * been consumed (an empty section counts) and no rebuild is outstanding.
 	 */
 	public boolean isSectionReady(BlockPos blockPos) {
-		if (blockPos == null || this.level == null) {
+		if (blockPos == null || this.level == null || this.graph == null) {
 			return false;
 		}
-		long key = SectionPos.asLong(SectionPos.blockToSectionCoord(blockPos.getX()),
+		return this.graph.sectionReady(SectionPos.blockToSectionCoord(blockPos.getX()),
 			SectionPos.blockToSectionCoord(blockPos.getY()), SectionPos.blockToSectionCoord(blockPos.getZ()));
-		return this.sections.containsKey(key) && !this.needsBuild.contains(key) && !this.inFlight.contains(key);
 	}
 
 	public void invalidate(int sectionX, int sectionY, int sectionZ) {
@@ -617,21 +571,12 @@ public final class RustGalWholeFrameTerrainSource {
 	 * completes, and an unbuilt one already needs its first build.
 	 */
 	private void scheduleRebuild(int sectionX, int sectionY, int sectionZ) {
-		if (this.level == null || this.sectionCache == null) {
+		if (this.level == null || this.sectionCache == null || this.graph == null) {
 			return;
 		}
 		this.sectionCache.invalidate(sectionX, sectionY, sectionZ);
-		if (!this.readyColumns.contains(ChunkPos.asLong(sectionX, sectionZ))
-				|| sectionY < this.level.getMinSectionY() || sectionY > this.level.getMaxSectionY()) {
+		if (!this.graph.scheduleRebuild(sectionX, sectionY, sectionZ)) {
 			return;
-		}
-		long key = SectionPos.asLong(sectionX, sectionY, sectionZ);
-		this.needsBuild.add(key);
-		if (this.sections.containsKey(key)) {
-			this.urgentRebuilds.add(key);
-		}
-		if (this.inFlight.contains(key)) {
-			this.staleInFlight.add(key);
 		}
 		// A capture must not photograph a frame while a dirty section's
 		// replacement CPU mesh is outstanding.
@@ -653,18 +598,14 @@ public final class RustGalWholeFrameTerrainSource {
 			this.graph.close();
 			this.graph = null;
 		}
-		this.readyColumns.clear();
-		this.sections.clear();
 		this.geometrySections.clear();
-		this.globalBlockEntitySections.clear();
-		this.needsBuild.clear();
-		this.urgentRebuilds.clear();
-		this.inFlight.clear();
-		this.staleInFlight.clear();
+		this.blockEntitySections.clear();
+		this.animatedSpriteIds.clear();
+		this.animatedSprites.clear();
+		this.inFlightCount = 0;
 		this.destroyCompletedBuilds();
 		this.visibleSections.clear();
 		this.visibleKeys.clear();
-		this.buildRequests.clear();
 		this.buildFrame = 0;
 		this.level = null;
 	}
@@ -676,18 +617,16 @@ public final class RustGalWholeFrameTerrainSource {
 	 */
 	private void resetForResourceReload() {
 		boolean requestedSeparateAo = RustGalTerrainRenderer.copiedShaderPackSeparateAo();
-		if (requestedSeparateAo != this.workerSeparateAo) {
+		boolean replacePool = requestedSeparateAo != this.workerSeparateAo;
+		if (replacePool) {
 			this.workerBuilder.shutdown();
 			// Cancelled jobs of the retired pool deliver no completion.
 			this.destroyCompletedBuilds();
-			this.inFlight.clear();
-			this.staleInFlight.clear();
 			this.workerSeparateAo = requestedSeparateAo;
 			this.workerBuilder = new ChunkBuilder(this.level, ChunkMeshFormats.COMPACT, requestedSeparateAo,
 				semanticMeshWorkerCount());
 		}
-		this.staleInFlight.addAll(this.inFlight);
-		this.needsBuild.addAll(this.geometrySections.keySet());
+		this.graph.reloadResources(replacePool);
 		wholeFrameSurfaceQueueDrained = false;
 		wholeFrameTerrainQueueDrained = false;
 	}

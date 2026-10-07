@@ -4991,6 +4991,11 @@ public final class RustGalTerrainRenderer {
 			&& !net.sodium.client.render.StaticTerrainParityDiagnostics.isEnabled();
 	}
 
+	/** Whether the Rust selection must compute its layer fingerprint receipt. */
+	static boolean selectionReceiptsRequested() {
+		return terrainCountersEnabled("");
+	}
+
 	/** Depth policies of the solid, cutout and translucent rows. */
 	static int[] selectionDepthPolicies() {
 		return new int[] {

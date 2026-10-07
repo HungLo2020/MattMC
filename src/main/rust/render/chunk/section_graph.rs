@@ -203,6 +203,8 @@ struct SectionNode {
     info: Option<SectionInfo>,
     last_visible_frame: u32,
     incoming: u8,
+    /// `SourceState` epoch of the latest search that visited this section.
+    visit_epoch: u32,
 }
 
 /// One visited section of a traversal, in visit order.
@@ -225,6 +227,8 @@ pub struct SectionGraph {
     /// The latest camera selection's visits and the terrain built from them.
     pub(super) last_visits: Vec<VisitedSection>,
     pub(super) terrain: super::terrain_selection::TerrainSelection,
+    /// Build, block-entity and visit bookkeeping (see `source`).
+    pub(super) source: source::SourceState,
     nodes: Vec<SectionNode>,
     free: Vec<u32>,
     /// Shared per traversal; never 0 after the first traversal.
@@ -245,6 +249,7 @@ impl SectionGraph {
             meshes: HashMap::default(),
             last_visits: Vec::new(),
             terrain: Default::default(),
+            source: Default::default(),
             nodes: Vec::new(),
             free: Vec::new(),
             frame: 0,
@@ -282,6 +287,7 @@ impl SectionGraph {
                 info: None,
                 last_visible_frame: 0,
                 incoming: 0,
+                visit_epoch: 0,
             };
             let slot = match self.free.pop() {
                 Some(slot) => {
@@ -920,3 +926,6 @@ fn is_within_render_distance(camera: &CameraTransform, position: [i32; 3], max_d
 
 #[cfg(test)]
 mod tests;
+
+mod source;
+pub use source::BuildCompletion;
