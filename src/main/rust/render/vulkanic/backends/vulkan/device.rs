@@ -15,6 +15,9 @@ pub(super) struct VulkanContext {
     pub(super) physical_device: vk::PhysicalDevice,
     pub(super) device: ash::Device,
     pub(super) debug_utils: Option<ash::ext::debug_utils::Device>,
+    /// Per-frame command labels cost a format, an allocation and a driver
+    /// call each; emit them only for debugging tools and validation runs.
+    pub(super) command_labels: bool,
     pub(super) queue_family_index: u32,
     pub(super) queue: vk::Queue,
     pub(super) memory_properties: vk::PhysicalDeviceMemoryProperties,
@@ -282,6 +285,7 @@ impl VulkanContext {
             instance,
             physical_device,
             device,
+            command_labels: debug_utils.is_some() && command_labels_requested(),
             debug_utils,
             queue_family_index,
             queue,
@@ -410,7 +414,7 @@ impl VulkanContext {
     }
 
     pub(super) unsafe fn begin_label(&self, command_buffer: vk::CommandBuffer, name: &str) {
-        let Some(debug_utils) = &self.debug_utils else {
+        let Some(debug_utils) = self.debug_utils.as_ref().filter(|_| self.command_labels) else {
             return;
         };
         let Ok(name) = CString::new(name) else {
@@ -423,10 +427,21 @@ impl VulkanContext {
     }
 
     pub(super) unsafe fn end_label(&self, command_buffer: vk::CommandBuffer) {
-        if let Some(debug_utils) = &self.debug_utils {
+        if let Some(debug_utils) = self.debug_utils.as_ref().filter(|_| self.command_labels) {
             unsafe { debug_utils.cmd_end_debug_utils_label(command_buffer) };
         }
     }
+}
+
+/// Command labels are for RenderDoc/Nsight captures and validation runs:
+/// `MATTMC_VULKAN_DEBUG_LABELS=1`, RenderDoc capture (ours or RenderDoc's
+/// own launcher variable) or GAL validation enables them.
+fn command_labels_requested() -> bool {
+    let set = |name: &str| std::env::var_os(name).is_some_and(|value| !value.is_empty() && value != "0");
+    set("MATTMC_VULKAN_DEBUG_LABELS")
+        || set("MATTMC_RENDERDOC_CAPTURE")
+        || set("ENABLE_VULKAN_RENDERDOC_CAPTURE")
+        || crate::render::vulkanic::gal::per_frame_validation()
 }
 
 fn queue_timestamp_valid_bits(

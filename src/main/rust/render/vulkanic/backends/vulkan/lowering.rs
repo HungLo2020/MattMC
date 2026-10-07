@@ -309,12 +309,14 @@ impl SubmissionLowerer {
                     .command_buffer_begin_nanos
                     .saturating_add(elapsed_nanos_u64(begin_started));
                 let recording_started = std::time::Instant::now();
-                unsafe {
-                    self.context.begin_label(
-                        command_buffer,
-                        &format!("gal.batch.{}", sanitize_label(&batch.label)),
-                    )
-                };
+                if self.context.command_labels {
+                    unsafe {
+                        self.context.begin_label(
+                            command_buffer,
+                            &format!("gal.batch.{}", sanitize_label(&batch.label)),
+                        )
+                    };
+                }
                 if index == 0 {
                     if let (Some(pool), true) = (self.timestamp_pool, timestamp_set.active) {
                         unsafe {
@@ -354,12 +356,14 @@ impl SubmissionLowerer {
                             list.operations.len()
                         ));
                     }
-                    unsafe {
-                        self.context.begin_label(
-                            command_buffer,
-                            &format!("gal.command-list.{}", sanitize_label(&list.label)),
-                        )
-                    };
+                    if self.context.command_labels {
+                        unsafe {
+                            self.context.begin_label(
+                                command_buffer,
+                                &format!("gal.command-list.{}", sanitize_label(&list.label)),
+                            )
+                        };
+                    }
                     let mut op_index = 0usize;
                     while op_index < list.operations.len() {
                         // Consecutive barriers have no intervening command that
@@ -1386,8 +1390,10 @@ impl SubmissionLowerer {
                         .statistics_scope
                         .filter(|scope| usize::from(*scope) < GPU_PROFILE_SCOPE_COUNT);
                     self.switch_timestamp_pass(command_buffer, state, timestamp_pass);
-                    self.context
-                        .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));
+                    if self.context.command_labels {
+                        self.context
+                            .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));
+                    }
                     if pass_object.target != *target {
                         return Err(GalError::backend(
                             "render pass target mismatch during lowering",

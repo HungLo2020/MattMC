@@ -1,10 +1,10 @@
 # Rust vs Frozen Java speed (updated 2026-10-07)
 
-| Scenario (moving camera) | Rust/Vulkan | Frozen Java/OpenGL |
+| Scenario (moving camera, same settings both sides) | Rust/Vulkan | Frozen Java/OpenGL |
 | --- | --- | --- |
 | Shaders (Complementary), 1,800 frames: FPS / median | 291–305 FPS / 3.06–3.10 ms | 307–309 FPS / 2.99 ms |
-| Shaders GPU frame time (GPU at 100%) | 2.93–3.0 ms | ~3.0 ms |
 | Vanilla, 1,800 frames after 240 warm-up: FPS / median | 492–517 FPS / 1.56–1.66 ms | 937 FPS / 0.84 ms |
-| Vanilla, steady state (6,000 warm-up): FPS / median | 1003 FPS / 0.84 ms (was 809 / 1.06) | 1395 FPS / 0.66 ms |
+| Vanilla, 1,800 frames after 6,000 warm-up | 912 FPS / 0.94 ms (was 860 / 1.04) | 1395 FPS / 0.66 ms |
+| Vanilla, 30,000 frames after 6,000 warm-up | 1334 FPS / 0.64 ms (was 1079 / 0.81) | 1462 FPS / 0.52 ms |
 
-Shaders: GPU-bound, ~2% behind. Vanilla: native worker bounds at steady state (world record + GUI + GAL encode), Java JIT warm-up dominates short runs.
+Shaders: GPU-bound (100%), ~2% behind. Vanilla: native worker bounds (world record + GUI + GAL encode); Java JIT warm-up dominates short runs.

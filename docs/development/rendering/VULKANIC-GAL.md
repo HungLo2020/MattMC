@@ -87,7 +87,14 @@ Creation-time descriptor checks, batch/list limits, normalization, backend
 submission and in-flight lifetime tracking still run. The environment setting
 is read once per process (`1`, `true` and `on` enable it), so set it before
 launch. GAL checks are separate from Vulkan's validation layers; enable the
-appropriate checks for the run. Run new rendering work under a validation
+appropriate checks for the run.
+
+Vulkan command labels (`gal.batch.*`, `gal.command-list.*`, `gal.pass.*`) are
+emitted only when validation is on, a RenderDoc capture is requested
+(`MATTMC_RENDERDOC_CAPTURE` or RenderDoc's `ENABLE_VULKAN_RENDERDOC_CAPTURE`) or
+`MATTMC_VULKAN_DEBUG_LABELS=1` is set; set the last one before attaching another
+tool. Object names are always set
+([`command_labels_requested`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/backends/vulkan/device.rs)). Run new rendering work under a validation
 capture before trusting it.
 
 For CPU changes to hazard tracking, set `MATTMC_GAL_VALIDATION=1` and compare

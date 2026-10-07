@@ -31,6 +31,7 @@ mod test_hooks;
 use self::arena::*;
 pub(crate) use self::buffers_textures::*;
 use self::submission::*;
+pub(crate) use self::submission::per_frame_validation;
 pub(crate) use self::hazards::*;
 pub(in crate::render::vulkanic) use self::normalization::*;
 use self::profiling::*;
