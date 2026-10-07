@@ -404,8 +404,10 @@ fn mesh_frame_uniform_carries_the_semantic_cutout_threshold() {
         .map(|word| f32::from_le_bytes(word.try_into().unwrap()))
         .collect::<Vec<_>>();
     assert_eq!(&values[..4], &[34.0, 18.0, 0.5, 1.0]);
-    assert_eq!(values.len(), 12);
+    assert_eq!(values.len(), 20);
     assert_eq!(&values[4..7], &[-0.933_439_2, 0.262_694_72, -0.244_300_16]);
+    // Identity foil UV transform rows.
+    assert_eq!(&values[12..20], &[1., 0., 0., 0., 0., 1., 0., 0.]);
 }
 
 #[test]
@@ -2157,9 +2159,10 @@ fn native_model_entity_foil_keeps_depth_and_uses_original_atlas_coordinates() {
     {
         assert_eq!(base.position, output.position);
         assert_eq!(output.color, [0.375, 0.375, 0.375, 1.0]);
-        assert_eq!(
-            output.local_uv,
-            semantics.texture_uv(input.atlas_uv).unwrap()
+        assert_eq!(output.local_uv, input.atlas_uv);
+        assert_uv_close(
+            shader_uv(&draws[1], output),
+            semantics.texture_uv(input.atlas_uv).unwrap(),
         );
     }
     let mut legacy = foil.clone();
@@ -2443,9 +2446,7 @@ fn native_flat_decal_projection_is_scale_and_layout_independent() {
                 let expected = foil
                     .texture_uv([source.position[0] / 64., -source.position[1] / 64.])
                     .unwrap();
-                for axis in 0..2 {
-                    assert!((output.local_uv[axis] - expected[axis]).abs() < 1e-6);
-                }
+                assert_uv_close(shader_uv(&draw, output), expected);
             }
             request.decal_foil = GuiDecalFoilProjection::decode(
                 1,
@@ -2493,9 +2494,9 @@ fn decal_foil_lowering_uses_semantic_poses_not_caller_uvs_or_colors() {
     request.vertices[0].color_argb = 0;
     let draw = prepare_draws(&[request.clone()]).unwrap().remove(0);
     assert_eq!(draw.vertices[0].position, [2., 3., 5.]);
-    assert_eq!(
-        draw.vertices[0].local_uv,
-        foil.texture_uv([4. / 128., 10. / 128.]).unwrap()
+    assert_uv_close(
+        shader_uv(&draw, &draw.vertices[0]),
+        foil.texture_uv([4. / 128., 10. / 128.]).unwrap(),
     );
     assert_eq!(draw.vertices[0].color, foil.color().unwrap());
     request.vertices[0].atlas_uv = [-9., 11.];
@@ -2520,10 +2521,11 @@ fn decal_foil_lowering_uses_semantic_poses_not_caller_uvs_or_colors() {
     );
     request.item_foil.as_mut().unwrap().clock_millis += 1000;
     let changed_clock = prepare_draws(&[request.clone()]).unwrap().remove(0);
-    assert_ne!(
+    assert_eq!(
         geometry_fingerprint(&changed_model_pose),
         geometry_fingerprint(&changed_clock)
     );
+    assert_ne!(changed_model_pose.uv_transform, changed_clock.uv_transform);
     request.item_foil.as_mut().unwrap().strength = 0.75;
     let changed_strength = prepare_draws(&[request]).unwrap().remove(0);
     assert_ne!(
@@ -2559,7 +2561,7 @@ fn decal_foil_rejects_missing_material_semantics_and_invalid_poses() {
 }
 
 #[test]
-fn semantic_item_foil_animation_and_strength_invalidate_prepared_geometry() {
+fn semantic_item_foil_animation_is_a_uniform_and_strength_invalidates_geometry() {
     let mut request = batch();
     request.material_mode = GuiMeshMaterialMode::Glint;
     request.lighting_mode = GuiMeshLightingMode::Flat;
@@ -2573,10 +2575,12 @@ fn semantic_item_foil_animation_and_strength_invalidate_prepared_geometry() {
     let original = prepare_draws(&[request.clone()]).unwrap().remove(0);
     request.item_foil.as_mut().unwrap().clock_millis = 12_345;
     let animated = prepare_draws(&[request.clone()]).unwrap().remove(0);
-    assert_ne!(
+    // Animation moves only the per-draw UV transform, keeping geometry resident.
+    assert_eq!(
         geometry_fingerprint(&original),
         geometry_fingerprint(&animated)
     );
+    assert_ne!(original.uv_transform, animated.uv_transform);
     request.item_foil.as_mut().unwrap().strength = 0.25;
     let dimmed = prepare_draws(&[request.clone()]).unwrap().remove(0);
     assert_ne!(
@@ -2589,6 +2593,7 @@ fn semantic_item_foil_animation_and_strength_invalidate_prepared_geometry() {
     request.item_foil.as_mut().unwrap().clock_millis = 555_555;
     let later = prepare_draws(&[request]).unwrap().remove(0);
     assert_eq!(geometry_fingerprint(&stopped), geometry_fingerprint(&later));
+    assert_eq!(stopped.uv_transform, later.uv_transform);
 }
 
 #[test]
@@ -2610,9 +2615,11 @@ fn semantic_item_foil_prepares_original_uvs_and_unquantized_strength() {
         vertex.color_argb = 0x11223344;
     }
     let draw = prepare_draws(&[request.clone()]).unwrap().remove(0);
-    for vertex in draw.vertices {
-        assert!((vertex.local_uv[0] - 0.478817225).abs() <= 0.000002);
-        assert!((vertex.local_uv[1] - 6.902142525).abs() <= 0.000002);
+    for vertex in &draw.vertices {
+        assert_eq!(vertex.local_uv, [0.25, 0.75]);
+        let uv = shader_uv(&draw, vertex);
+        assert!((uv[0] - 0.478817225).abs() <= 0.000002);
+        assert!((uv[1] - 6.902142525).abs() <= 0.000002);
         assert_eq!(vertex.color, [0.5, 0.5, 0.5, 1.0]);
     }
     request.material_mode = GuiMeshMaterialMode::Opaque;
@@ -3017,4 +3024,20 @@ fn source_quad_winding_selects_the_per_face_front_face_without_disabling_culling
         crate::render::vulkanic::resources::FrontFace::CounterClockwise
     );
     assert_eq!(gui_mesh_raster_state(draw.material_mode).0, CullMode::Back);
+}
+
+/// Mirrors the GUI mesh vertex shader's `uv_transform` application.
+fn shader_uv(draw: &GuiMeshPreparedDraw, vertex: &GuiMeshPreparedVertex) -> [f32; 2] {
+    let [c0, c1, t] = draw.uv_transform;
+    let [u, v] = vertex.local_uv;
+    [c0[0] * u + c1[0] * v + t[0], c0[1] * u + c1[1] * v + t[1]]
+}
+
+fn assert_uv_close(actual: [f32; 2], expected: [f32; 2]) {
+    for axis in 0..2 {
+        assert!(
+            (actual[axis] - expected[axis]).abs() < 1e-5,
+            "{actual:?} != {expected:?}"
+        );
+    }
 }

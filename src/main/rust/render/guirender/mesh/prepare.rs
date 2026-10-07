@@ -59,6 +59,7 @@ pub(super) fn prepare_reused_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiM
         clip_height: batch.clip_height,
         vertices: Vec::new(),
         indices: Vec::new(),
+        uv_transform: GUI_MESH_IDENTITY_UV_TRANSFORM,
     })
 }
 
@@ -121,7 +122,11 @@ pub(super) fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPrep
                 } else {
                     vertex.atlas_uv
                 };
-                foil.texture_uv(source_uv)?
+                if source_uv.iter().any(|value| !value.is_finite()) {
+                    return Err(GalError::invalid_argument("non-finite item foil source UV"));
+                }
+                // The animated foil transform is a per-draw uniform.
+                source_uv
             } else {
                 vertex.local_uv
             };
@@ -165,7 +170,12 @@ pub(super) fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPrep
         )
     };
     trace_prepared_item_vertices(batch, &vertices, model_transform, render_extent);
+    let uv_transform = match batch.item_foil {
+        Some(foil) => foil.texture_transform()?,
+        None => GUI_MESH_IDENTITY_UV_TRANSFORM,
+    };
     Ok(GuiMeshPreparedDraw {
+        uv_transform,
         item_cache: batch.item_cache,
         stratum: batch.stratum,
         layer_index: batch.layer_index,

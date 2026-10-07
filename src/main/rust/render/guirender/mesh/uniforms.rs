@@ -90,10 +90,33 @@ pub(super) fn draw_frame_uniform_bytes(draw: &GuiMeshPreparedDraw, extent: [f32;
     if draw.material_mode == GuiMeshMaterialMode::ModelOverlay {
         bytes[12..16].copy_from_slice(&3.0_f32.to_le_bytes());
     }
+    bytes.truncate(GUI_MESH_FRAME_UNIFORM_BYTES - 32);
+    push_uv_transform(&mut bytes, draw.uv_transform);
     bytes
 }
 
+/// The two `GuiMeshFrame` UV-transform rows: u' = row0.xyz . (u, v, 1),
+/// v' = row1.xyz . (u, v, 1).
+fn push_uv_transform(bytes: &mut Vec<u8>, transform: [[f32; 2]; 3]) {
+    for row in 0..2 {
+        for value in [transform[0][row], transform[1][row], transform[2][row], 0.0] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+}
+
 pub(super) fn frame_uniform_bytes(
+    extent: [f32; 2],
+    alpha_cutoff: f32,
+    lighting_mode: GuiMeshLightingMode,
+) -> Vec<u8> {
+    let mut bytes = frame_lighting_uniform_bytes(extent, alpha_cutoff, lighting_mode);
+    push_uv_transform(&mut bytes, GUI_MESH_IDENTITY_UV_TRANSFORM);
+    debug_assert_eq!(bytes.len(), GUI_MESH_FRAME_UNIFORM_BYTES);
+    bytes
+}
+
+fn frame_lighting_uniform_bytes(
     extent: [f32; 2],
     alpha_cutoff: f32,
     lighting_mode: GuiMeshLightingMode,

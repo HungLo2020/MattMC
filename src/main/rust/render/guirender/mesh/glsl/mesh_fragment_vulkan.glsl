@@ -1,7 +1,7 @@
 #version 450
 layout(set = 0, binding = 2) uniform texture2D GuiMeshTexture;
 layout(set = 0, binding = 3) uniform sampler GuiMeshSampler;
-layout(set = 0, binding = 1, std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(set = 0, binding = 1, std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; vec4 uv_transform_u; vec4 uv_transform_v; };
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_color;
 layout(location = 2) in vec3 v_normal;

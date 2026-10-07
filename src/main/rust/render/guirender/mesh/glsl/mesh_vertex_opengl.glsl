@@ -1,6 +1,6 @@
 #version 430 core
 layout(std430, binding = 0) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
-layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; vec4 uv_transform_u; vec4 uv_transform_v; };
 out vec2 v_uv;
 out vec4 v_color;
 out vec3 v_normal;
@@ -15,7 +15,9 @@ void main() {
     // negated into OpenGL clip depth. Keep that convention in the OpenGL
     // lowering so the nearest item face wins its private depth test.
     gl_Position = vec4((position_u.x / raster_extent.x) * 2.0 - 1.0, top_left_y, -position_u.z / 1000.0, 1.0);
-    v_uv = vec2(position_u.w, uv_color_rg.x);
+    // Animated item foil transforms its static UVs here (identity otherwise).
+    vec3 uv_affine = vec3(position_u.w, uv_color_rg.x, 1.0);
+    v_uv = vec2(dot(uv_transform_u.xyz, uv_affine), dot(uv_transform_v.xyz, uv_affine));
     v_color = vec4(uv_color_rg.y, uv_color_rg.z, uv_color_rg.w, color_ba_normal.x);
     v_normal = color_ba_normal.yzw;
 }

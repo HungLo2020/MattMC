@@ -1,6 +1,6 @@
 #version 430 core
 layout(binding = 2) uniform sampler2D Sampler0;
-layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; vec4 uv_transform_u; vec4 uv_transform_v; };
 in vec2 v_uv;
 in vec4 v_color;
 in vec3 v_normal;

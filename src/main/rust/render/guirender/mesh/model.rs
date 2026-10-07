@@ -317,7 +317,14 @@ pub struct GuiMeshPreparedDraw {
     pub clip_height: i32,
     pub vertices: Vec<GuiMeshPreparedVertex>,
     pub indices: Vec<u32>,
+    /// Affine texture transform applied to `local_uv` in the vertex shader
+    /// (`[column0, column1, translation]`). Standard item foil animates only
+    /// this per-draw uniform, so its geometry stays resident across frames.
+    pub uv_transform: [[f32; 2]; 3],
 }
+
+/// Identity `GuiMeshPreparedDraw::uv_transform`.
+pub const GUI_MESH_IDENTITY_UV_TRANSFORM: [[f32; 2]; 3] = [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]];
 
 /// Stable process-local identity for copied GUI geometry. Transform, clip,
 /// and layer fields are intentionally excluded: those remain per-draw
