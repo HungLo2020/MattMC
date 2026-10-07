@@ -219,7 +219,7 @@ pub struct VisitedSection {
 pub struct SectionGraph {
     min_section_y: i32,
     max_section_y: i32,
-    pub(super) slots: HashMap<[i32; 3], u32>,
+    pub(super) slots: HashMap<[i32; 3], u32, crate::render::vulkanic::gal::AccessHashBuilder>,
     /// Published layer meshes per section (see `terrain_selection`).
     pub(super) meshes: super::terrain_selection::SectionMeshTable,
     /// The latest camera selection's visits and the terrain built from them.
@@ -241,8 +241,8 @@ impl SectionGraph {
         Self {
             min_section_y,
             max_section_y,
-            slots: HashMap::new(),
-            meshes: HashMap::new(),
+            slots: HashMap::default(),
+            meshes: HashMap::default(),
             last_visits: Vec::new(),
             terrain: Default::default(),
             nodes: Vec::new(),

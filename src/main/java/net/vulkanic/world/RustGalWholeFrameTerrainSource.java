@@ -75,6 +75,9 @@ public final class RustGalWholeFrameTerrainSource {
 	private final Long2ObjectOpenHashMap<RenderSection> sections = new Long2ObjectOpenHashMap<>();
 	/** The subset of {@link #sections} with geometry (flags != 0). */
 	private final Long2ObjectOpenHashMap<RenderSection> geometrySections = new Long2ObjectOpenHashMap<>();
+	/** Animated sprites already recorded this frame (identity). */
+	private final it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<net.minecraft.client.renderer.texture.TextureAtlasSprite>
+		frameAnimatedSprites = new it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<>();
 	/** Built sections with off-screen block entities, in first-build order (Sodium's set). */
 	private final it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<RenderSection> globalBlockEntitySections =
 		new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
@@ -333,11 +336,21 @@ public final class RustGalWholeFrameTerrainSource {
 			shadowCandidates, RustGalTerrainRenderer.MAX_SELECTION_SHADOW_CANDIDATES,
 			net.vulkanic.bridge.VulkanicGalBridge.Struct.STATIC_TERRAIN_SECTION.byteSize(),
 			net.vulkanic.bridge.VulkanicGalBridge.Struct.STATIC_TERRAIN_SHADOW_CASTER.byteSize());
+		// Sprite use is a set per animation tick (never reset mid-frame), and
+		// most animated sections share the same few sprites: record each once.
+		this.frameAnimatedSprites.clear();
 		for (int index = 0; index < selection.animatedCount(); index++) {
 			RenderSection section = this.sections.get(SectionPos.asLong(
 				selection.animatedX(index), selection.animatedY(index), selection.animatedZ(index)));
-			if (section != null) {
-				RustGalTerrainRenderer.recordAnimatedSpriteUse(section);
+			var sprites = section == null ? null : section.getAnimatedSprites();
+			if (sprites == null) {
+				continue;
+			}
+			for (var sprite : sprites) {
+				if (this.frameAnimatedSprites.add(sprite)) {
+					RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				}
 			}
 		}
 		RustGalTerrainRenderer.enqueueWholeFrameTerrainSelection(selection, camera);

@@ -16,6 +16,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::render::vulkanic::gal::AccessHashBuilder;
+
 
 use super::section_graph::{SectionGraph, VisitedSection};
 use crate::render::bridge::abi::{FfiStaticTerrainSection, FfiStaticTerrainShadowCaster};
@@ -76,8 +78,8 @@ pub struct TerrainSelection {
     pub animated: Vec<[i32; 3]>,
     pub receipts: TerrainSelectionReceipts,
     visible: Vec<(i64, [i32; 3], u8)>,
-    visible_keys: HashSet<i64>,
-    seen_meshes: HashSet<u64>,
+    visible_keys: HashSet<i64, AccessHashBuilder>,
+    seen_meshes: HashSet<u64, AccessHashBuilder>,
     translucent: Vec<(f64, i64, [i32; 3])>,
     candidates: Vec<(i64, [i32; 3], u8)>,
 }
@@ -251,7 +253,8 @@ impl SectionGraph {
 }
 
 /// Mesh rows mirrored from Java, keyed by section position.
-pub type SectionMeshTable = HashMap<[i32; 3], SectionMeshes>;
+/// Section meshes by position; a fast non-cryptographic hasher (per-frame lookups).
+pub type SectionMeshTable = HashMap<[i32; 3], SectionMeshes, AccessHashBuilder>;
 
 #[cfg(test)]
 mod tests;
