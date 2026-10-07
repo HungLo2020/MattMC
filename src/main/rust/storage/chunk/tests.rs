@@ -43,3 +43,21 @@ fn compact_keeps_first_occurrence_and_merges_equal_labels() {
     assert_eq!(&indices[..5], &[0, 1, 0, 0, 0]);
     assert!(lookup.iter().all(|&v| v == -1));
 }
+
+#[test]
+fn rejected_container_leaves_the_lookup_clean_for_the_next_one() {
+    // Ids 0 and 1 are valid, then id 5 is outside the two-entry palette.
+    let mut bad = vec![0u64; 256];
+    bad[0] = 0 | 1 << 4 | 5 << 8;
+    let (mut lookup, mut order, mut indices) = (Vec::new(), Vec::new(), Vec::new());
+    let rejected = Container { bits: 4, words: &bad, labels: &[10, 11] };
+    assert_eq!(compact(&rejected, 4096, &mut lookup, &mut order, &mut indices), Err(Error::Unsupported));
+    assert!(lookup.iter().all(|&v| v == -1), "a rejection must not leave labels marked as seen");
+    // The next container on this lookup sees both labels fresh, in its own order.
+    let mut good = vec![0u64; 256];
+    good[0] = 1 | 0 << 4;
+    let valid = Container { bits: 4, words: &good, labels: &[10, 11] };
+    compact(&valid, 4096, &mut lookup, &mut order, &mut indices).unwrap();
+    assert_eq!(order, vec![1, 0]);
+    assert_eq!(&indices[..3], &[0, 1, 1]);
+}

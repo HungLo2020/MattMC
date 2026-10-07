@@ -26,4 +26,9 @@ public final class SectionFingerprint {
         return container(section.getStates()) + "|" + biomes + "|" + section.hasOnlyAir() + section.isRandomlyTicking() + section.isRandomlyTickingBlocks()
             + section.isRandomlyTickingFluids();
     }
+
+    /** The container's live storage words, for tests that corrupt saved data. */
+    public static long[] rawWords(PalettedContainer<?> container) {
+        return container.dataForNativeScan().storage().getRaw();
+    }
 }

@@ -88,9 +88,9 @@ promise of fallback after every exception.
   - missing palette entries, even unused ones
   - strategies with other entry counts
 
-  Fallback invokes the retained Java encoder; this does not guarantee recovery
-  of native scratch or completion of the enclosing save future (see the tracked
-  limits below). Reading the containers takes each container's lock and calls
+  Fallback invokes the retained Java encoder. A Rust rejection partway through
+  packing clears every lookup slot it set, so later encodes on the thread are
+  unaffected. Reading the containers takes each container's lock and calls
   `DataLayer.getData()` on the snapshot's light layers before a decline, as
   `write()` does; neither is undone.
 - Status handling: a decline (`-2`) or a `RuntimeException` caught inside
@@ -98,11 +98,14 @@ promise of fallback after every exception.
   scratch setup outside that catch do not share this recovery rule. A
   too-small output buffer (`1`) retries
   with the reported size. Invalid ABI input (`-1`) and downcall failures throw
-  instead of falling back; see the
-  [bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeChunkSections.java).
-  An `IOException` from the Java tape writer now surfaces from `encode()` on the
-  background executor (as `UncheckedIOException`), not from the IO thread's
-  region write.
+  from the
+  [bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeChunkSections.java);
+  `SerializableChunkData.encode()` then falls back to Java encoding.
+- `encode()` throws only `write()`'s own failures. The original built the tag
+  at that point too, and such a failure leaves the save future pending, as it
+  always has. A tape-writer failure is carried in `Encoded.failure`. The IO
+  thread's region write then reports it and completes the save exceptionally,
+  without writing, where the original wrote the tape.
 - `-Dmattmc.storage.javaChunkSections=true` keeps Java section encoding and
   decoding. `NativeChunkSections.setEnabled` toggles both in tests. This
   migration changes chunk-section saves and loads; other storage owners keep
@@ -239,15 +242,28 @@ labels can leave native lookup entries that affect a later encode on the same
 thread, and an encode supplier that throws through `IOWorker.submitTask` can
 leave the returned save future pending. Ordinary setter-produced palettes do
 not create that malformed-input trigger. No runtime reproduction or world damage
-was observed in this review. Acceptance needs deterministic rejection-then-valid
-encoding and exceptional-completion regressions, alongside pending/coalescing,
-reopen and concurrent-save coverage; the successful fixtures above do not close
-those requirements. That earlier review did not cover loading.
+was observed in this review. That earlier review did not cover loading.
 
 [The current load review](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6029878781)
 at `313e7a8a` reconstructed eight existing Java files from twenty-eight declared
 rewrites against `5c02fd82`. It inspected loading and confirmed both #818 save
-paths remain unchanged; `loadForParse` uses a separate throwing-task wrapper.
-No Java/Rust suite, benchmark, live save/load or recovery regression was rerun.
-Decode scratch, weak registry-name handles, pending native decoded results and
-the process-lifetime vocabulary still require lifecycle/memory evidence.
+paths remained unchanged at that commit; `loadForParse` uses a separate
+throwing-task wrapper. No Java/Rust suite, benchmark, live save/load or recovery
+regression was rerun. Decode scratch, weak registry-name handles, pending native
+decoded results and the process-lifetime vocabulary still require
+lifecycle/memory evidence.
+
+Both #818 problems were fixed after that review, each with a regression test
+that fails without its fix:
+- Rust packing clears its lookup on every exit.
+  `rejectedSectionThenValidChunkOnTheSameThread` corrupts a section's storage
+  with an ID outside its palette, checks both routes fail alike, then saves
+  ordinary chunks on the same thread. A Rust unit test checks the cleared
+  lookup directly.
+- Tape-writer failures are carried to the region write.
+  `unwritableTapeFailsTheStore` checks that the store completes exceptionally
+  with the failure and writes nothing.
+
+Still open: pending-write coalescing, reopen and concurrent-save coverage.
+Failures of `write()` itself still leave the future pending, exactly as in the
+original.

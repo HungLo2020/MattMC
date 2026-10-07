@@ -301,6 +301,57 @@ class NativeChunkSectionsTest {
         }
     }
 
+    /** #818: a section Rust rejects partway through packing (a storage ID
+     * outside its palette, after valid ones) must not affect the next save
+     * on the same thread. */
+    @Test void rejectedSectionThenValidChunkOnTheSameThread() throws Exception {
+        var stone = Blocks.STONE.defaultBlockState();
+        var air = Blocks.AIR.defaultBlockState();
+        var states = factory.createForBlockStates();
+        states.getAndSetUnchecked(1, 0, 0, stone); // palette [air, stone]
+        var section = new LevelChunkSection(states, factory.createForBiomes());
+        // Then storage ids 0 and 1, then 5: no palette entry (as corrupted saved data could hold).
+        long[] words = net.minecraft.world.level.chunk.SectionFingerprint.rawWords(states);
+        assertEquals(256, words.length, "four-bit storage");
+        words[0] = 0L | 1L << 4 | 5L << 8;
+        var broken = chunk(List.of(new SerializableChunkData.SectionData(0, section, null, null)));
+        Class<?>[] failures = new Class<?>[2];
+        for (int route = 0; route < 2; route++) {
+            NativeChunkSections.setEnabled(route == 1);
+            try {
+                broken.encode();
+            } catch (RuntimeException expected) {
+                failures[route] = expected.getClass();
+            } finally {
+                NativeChunkSections.setEnabled(true);
+            }
+        }
+        assertNotNull(failures[0], "the original encoding rejects the section");
+        assertEquals(failures[0], failures[1]);
+        // The same thread then saves ordinary chunks exactly as Java does.
+        for (CompoundTag tag : corpus().subList(0, 6)) {
+            byte[][] tapes = tapes(parse(tag));
+            assertArrayEquals(tapes[0], tapes[1]);
+        }
+    }
+
+    /** #818: a tape the writer could not produce fails the store at the region
+     * write, as the original's region write did; the future does not stay pending. */
+    @Test void unwritableTapeFailsTheStore(@TempDir Path dir) throws Exception {
+        var data = parse(corpus().getFirst());
+        var info = new RegionStorageInfo("failure", net.minecraft.world.level.Level.OVERWORLD, "chunk");
+        try (var worker = new IOWorker(info, dir, false)) {
+            var failure = new java.io.IOException("tape writer failed");
+            var stored = worker.storeEncoded(data.chunkPos(), () -> new SerializableChunkData.Encoded(null, data::write, failure));
+            var error = assertThrows(java.util.concurrent.CompletionException.class,
+                () -> stored.orTimeout(30, java.util.concurrent.TimeUnit.SECONDS).join());
+            assertSame(failure, error.getCause());
+            // Nothing was written.
+            worker.synchronize(true).join();
+            assertTrue(worker.loadAsync(data.chunkPos()).join().isEmpty());
+        }
+    }
+
     @Test void pendingReadsAndDiskRoundTripMatchTheTag(@TempDir Path dir) throws Exception {
         var tags = corpus();
         var info = new RegionStorageInfo("test", net.minecraft.world.level.Level.OVERWORLD, "chunk");

@@ -512,23 +512,35 @@ public record SerializableChunkData(
 	}
 
 	/** A saved chunk's tape for its region file, with the tag built only if a
-	 * pending read asks for it. */
-	public record Encoded(byte[] tape, java.util.function.Supplier<CompoundTag> tag) {
+	 * pending read asks for it. A {@code failure} is the tape writer's: the
+	 * region write reports it, where the original wrote the tape. */
+	public record Encoded(@Nullable byte[] tape, java.util.function.Supplier<CompoundTag> tag, @Nullable Exception failure) {
+		public Encoded(byte[] tape, java.util.function.Supplier<CompoundTag> tag) {
+			this(tape, tag, null);
+		}
 	}
 
 	/** {@code NativeNbtRegionAccess.writeTape(write())}, with the sections list
 	 * encoded by Rust ({@link net.minecraft.world.level.chunk.NativeChunkSections})
-	 * and spliced into the tape. */
+	 * and spliced into the tape. Only {@code write()}'s own failures are thrown,
+	 * as when the original built the tag here; a Rust failure keeps Java's
+	 * encoding, and a tape writer failure is carried to the region write. */
 	public Encoded encode() {
+		byte[] sections;
 		try {
-			byte[] sections = net.minecraft.world.level.chunk.NativeChunkSections.encode(this.sectionData, this.containerFactory);
-			if (sections == null) {
-				return new Encoded(net.minecraft.nbt.NativeNbtRegionAccess.writeTape(this.write()), this::write);
-			}
-			ListTag placeholder = new ListTag();
-			return new Encoded(net.minecraft.nbt.NativeNbtRegionAccess.writeTape(this.write(placeholder), placeholder, sections), this::write);
-		} catch (java.io.IOException exception) {
-			throw new java.io.UncheckedIOException(exception);
+			sections = net.minecraft.world.level.chunk.NativeChunkSections.encode(this.sectionData, this.containerFactory);
+		} catch (RuntimeException exception) {
+			sections = null;
+		}
+		ListTag placeholder = sections == null ? null : new ListTag();
+		CompoundTag root = this.write(placeholder);
+		try {
+			byte[] tape = placeholder == null
+				? net.minecraft.nbt.NativeNbtRegionAccess.writeTape(root)
+				: net.minecraft.nbt.NativeNbtRegionAccess.writeTape(root, placeholder, sections);
+			return new Encoded(tape, this::write, null);
+		} catch (java.io.IOException | RuntimeException exception) {
+			return new Encoded(null, this::write, exception);
 		}
 	}
 

@@ -127,6 +127,7 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 					pendingStore.data = compoundTag;
 					pendingStore.tape = null;
 					pendingStore.lazyData = null;
+					pendingStore.failure = null;
 					return pendingStore.result;
 				}
 			)
@@ -145,6 +146,7 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 					pendingStore.data = null;
 					pendingStore.tape = encoded.tape();
 					pendingStore.lazyData = encoded.tag();
+					pendingStore.failure = encoded.failure();
 					return pendingStore.result;
 				}
 			)
@@ -283,7 +285,10 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	private void runStore(ChunkPos chunkPos, IOWorker.PendingStore pendingStore) {
 		try {
-			if (pendingStore.tape != null) {
+			if (pendingStore.failure != null) {
+				// The tape could not be written: the store fails as the original region write did.
+				throw pendingStore.failure;
+			} else if (pendingStore.tape != null) {
 				this.storage.writeTape(chunkPos, pendingStore.tape);
 			} else {
 				this.storage.write(chunkPos, pendingStore.data);
@@ -324,6 +329,9 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 		byte[] tape;
 		@Nullable
 		Supplier<CompoundTag> lazyData;
+		// An encoded chunk whose tape could not be written; the store reports it.
+		@Nullable
+		Exception failure;
 		final CompletableFuture<Void> result = new CompletableFuture();
 
 		public PendingStore(@Nullable CompoundTag compoundTag) {

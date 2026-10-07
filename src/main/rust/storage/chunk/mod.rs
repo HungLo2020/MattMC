@@ -98,22 +98,28 @@ fn compact(container: &Container, entries: usize, lookup: &mut Vec<i32>, order: 
             lookup.resize(label as usize + 1, -1);
         }
     }
+    // Every slot set here is cleared again on every exit: the lookup is reused
+    // by later containers and encodes on this thread.
     let mut touched = Vec::new();
+    let mut result = Ok(());
     for at in 0..entries {
         let id = (container.words[at / per] >> (at % per * bits) & mask) as usize;
-        let label = *container.labels.get(id).ok_or(Error::Unsupported)? as usize;
-        let slot = &mut lookup[label];
+        let Some(&label) = container.labels.get(id) else {
+            result = Err(Error::Unsupported);
+            break;
+        };
+        let slot = &mut lookup[label as usize];
         if *slot == -1 {
             *slot = order.len() as i32;
             order.push(id as u32);
-            touched.push(label);
+            touched.push(label as usize);
         }
         indices.push(*slot as u32);
     }
     for label in touched {
         lookup[label] = -1;
     }
-    Ok(())
+    result
 }
 
 /// `SimpleBitStorage(bits, entries, indices).getRaw()`.
