@@ -26,7 +26,9 @@ that flattening was the largest Java cost of saving. The Java bridge is
    where the placeholder is.
 4. `IOWorker` keeps the tape as the pending write. It builds the
    `CompoundTag` (`write()`) only if a pending read (`loadAsync`, `scanChunk`)
-   asks for it. The region file writes the tape directly.
+   asks for it. The region file writes the tape directly. An encoded
+   tape-writer failure is retained instead of tape; `runStore` reports it and
+   completes the store exceptionally before any region write.
 
 Rust owns the section layout: which keys exist, `CompoundTag` key order,
 packing and tape records. Java supplies vocabulary built once:
@@ -89,23 +91,28 @@ promise of fallback after every exception.
   - strategies with other entry counts
 
   Fallback invokes the retained Java encoder. A Rust rejection partway through
-  packing clears every lookup slot it set, so later encodes on the thread are
-  unaffected. Reading the containers takes each container's lock and calls
+  packing now clears the lookup slots touched before its unsupported-input
+  return; successful compaction clears them too. The new regressions cover
+  rejected-then-valid use on the same thread. Reading the containers takes each container's lock and calls
   `DataLayer.getData()` on the snapshot's light layers before a decline, as
   `write()` does; neither is undone.
 - Status handling: a decline (`-2`) or a `RuntimeException` caught inside
-  section-input gathering falls back to Java encoding. Strategy checks and
-  scratch setup outside that catch do not share this recovery rule. A
+  section-input gathering makes the bridge decline. Its strategy checks and
+  scratch setup are outside that inner catch; the caller now catches native
+  encoder `RuntimeException`s and uses Java encoding. A
   too-small output buffer (`1`) retries
   with the reported size. Invalid ABI input (`-1`) and downcall failures throw
   from the
   [bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeChunkSections.java);
-  `SerializableChunkData.encode()` then falls back to Java encoding.
-- `encode()` throws only `write()`'s own failures. The original built the tag
-  at that point too, and such a failure leaves the save future pending, as it
-  always has. A tape-writer failure is carried in `Encoded.failure`. The IO
-  thread's region write then reports it and completes the save exceptionally,
-  without writing, where the original wrote the tape.
+  `SerializableChunkData.encode()` catches the resulting `RuntimeException`
+  for Java fallback. `Error` subclasses are not covered by that catch; load
+  decoding keeps its separate throwing contract above.
+- The root `write(placeholder)` runs outside the tape-writer catch. Its failures
+  can still escape, and a throwing supplier passed through `IOWorker.submitTask`
+  can leave the save future pending. Tape-writer `IOException` and
+  `RuntimeException` instead travel in `Encoded.failure`; `runStore` reports
+  them and completes the store exceptionally without writing. This repairs
+  that tape-failure path, not every save-future failure.
 - `-Dmattmc.storage.javaChunkSections=true` keeps Java section encoding and
   decoding. `NativeChunkSections.setEnabled` toggles both in tests. This
   migration changes chunk-section saves and loads; other storage owners keep
@@ -150,8 +157,9 @@ It also stores eight encoded chunks through `IOWorker`, queues `scanChunk`,
 `loadAsync` and `loadForParse`, then synchronizes and reads back through the
 same worker against
 `write()` (tag equality, not region-file bytes; region headers carry write
-timestamps). The test does not force or observe the pending-write branch, reopen
-storage, or exercise same-chunk coalescing and injected failures.
+timestamps). That eight-chunk round-trip fixture does not force or observe the
+pending-write branch, reopen storage, or exercise same-chunk coalescing and
+injected failures.
 
 These tests start from `SerializableChunkData` built by `parse` or directly.
 They do not run `ChunkMap.save`'s `copyOf` from live chunks, a full server, or
@@ -181,7 +189,8 @@ success alone is not performance acceptance.
 
 ## Status
 
-The implementation author recorded release acceptance on 2026-10-06: Ryzen 5
+The implementation author recorded the following release acceptance on
+2026-10-06, before the later `8db0fd82` recovery changes: Ryzen 5
 5600G, Linux x86_64, OpenJDK 25, with `passes: true` for all three cases.
 
 Parity: seven Java tests and three Rust tests passed.
@@ -244,7 +253,7 @@ leave the returned save future pending. Ordinary setter-produced palettes do
 not create that malformed-input trigger. No runtime reproduction or world damage
 was observed in this review. That earlier review did not cover loading.
 
-[The current load review](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6029878781)
+[The earlier load review](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6029878781)
 at `313e7a8a` reconstructed eight existing Java files from twenty-eight declared
 rewrites against `5c02fd82`. It inspected loading and confirmed both #818 save
 paths remained unchanged at that commit; `loadForParse` uses a separate
@@ -253,17 +262,25 @@ regression was rerun. Decode scratch, weak registry-name handles, pending native
 decoded results and the process-lifetime vocabulary still require
 lifecycle/memory evidence.
 
-Both #818 problems were fixed after that review, each with a regression test
-that fails without its fix:
-- Rust packing clears its lookup on every exit.
-  `rejectedSectionThenValidChunkOnTheSameThread` corrupts a section's storage
-  with an ID outside its palette, checks both routes fail alike, then saves
-  ordinary chunks on the same thread. A Rust unit test checks the cleared
-  lookup directly.
-- Tape-writer failures are carried to the region write.
-  `unwritableTapeFailsTheStore` checks that the store completes exceptionally
-  with the failure and writes nothing.
+The later [recovery commit `8db0fd82`](https://github.com/HungLo2020/MattMC/commit/8db0fd82c52acd01cd6b787e5775d64fca8c3d25)
+repairs rejected-compaction cleanup and the encoded tape-failure path. The commit
+author reports that its regressions fail without their fixes; this maintenance
+review inspected their definitions but did not rerun them:
 
-Still open: pending-write coalescing, reopen and concurrent-save coverage.
-Failures of `write()` itself still leave the future pending, exactly as in the
-original.
+- `rejectedSectionThenValidChunkOnTheSameThread` injects invalid storage IDs
+  into a block-state container, compares Java/native failure classes, then
+  compares tapes for six ordinary chunks on the same thread. The Rust unit
+  test checks touched lookup entries are cleared and reuses the same labels
+  in reversed order.
+- `unwritableTapeFailsTheStore` directly constructs `Encoded.failure` with an
+  `IOException`, asserts that exact cause within a thirty-second timeout, then
+  synchronizes and confirms no stored chunk. It does not induce an actual
+  tape-writer exception or test a supplier that throws before returning
+  `Encoded`.
+
+[#818](https://github.com/HungLo2020/MattMC/issues/818) therefore retains a broader
+completion boundary, as recorded in [the current progress review](https://github.com/HungLo2020/MattMC/issues/818#issuecomment-6034310140):
+`write()`/supplier failures still need exceptional future completion, and deterministic pending-write coalescing, reopen, concurrent-save
+and failure-recovery coverage remain separate. The new load throwing-task wrapper
+does not repair `submitTask` for saves. No runtime reproduction, live save test
+or world-damage observation is claimed by this documentation review.
