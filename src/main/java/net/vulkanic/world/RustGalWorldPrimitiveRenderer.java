@@ -711,6 +711,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static long paintingAtlasFrameSequence = -1L;
 	private static long paintingAtlasFrameGeneration = -1L;
 	private static final Set<Integer> DIRTY_WORLD_MESH_TEXTURES = new LinkedHashSet<>();
+	/**
+	 * Bumped whenever accepted upload state is withdrawn (a retirement, a
+	 * rejected generation or a reload), invalidating cached rig upload proofs.
+	 */
+	private static long worldMeshUploadWithdrawals;
 	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Long> UPLOADED_WORLD_MESH_GENERATIONS =
 		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	/** Texture identity to its own accepted native upload generation (not the latest batch). */
@@ -1567,6 +1572,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				// generation, even when extraction produces identical bytes. Clearing
 				// this set loses that work while the acceptance receipts below are reset.
 				UPLOADED_WORLD_MESH_TEXTURES.clear();
+				worldMeshUploadWithdrawals++;
 				ATLAS_ANIMATION_PUBLICATIONS.clear();
 				registerWorldSkyTextureAssetsLocked(resourceManager);
 				PENDING_MESH_INSTANCES.clear();
@@ -10511,7 +10517,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private static void ensureMeshAssetLocked(BlockMeshExtraction extraction) {
+	/** Admits the asset; true when its resident records were already current. */
+	private static boolean ensureMeshAssetLocked(BlockMeshExtraction extraction) {
 		VulkanicGalBridge.WorldMeshAssetRecord previousAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
 		// A stable ModelPart topology reuses these exact, previously validated
 		// records for every pose and pattern layer. The full admission below is
@@ -10530,7 +10537,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			DYNAMIC_WORLD_MESH_LIFETIME.observe(
 				extraction.meshKey(), previousAsset.meshGeneration(), Math.max(1L, semanticFrameSequence)
 			);
-			return;
+			return true;
 		}
 		// Mesh admission is one semantic transaction across the texture and mesh
 		// registries.  Preflight both budgets and reject conflicting duplicate
@@ -10597,6 +10604,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (changed) {
 			markWorldMeshAssetsChangedLocked();
 		}
+		return false;
 	}
 
 	/** Reuse the already validated immutable payload across distinct stable model topologies. */
@@ -10632,6 +10640,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			WORLD_MESH_SORTED_INDICES.remove(retirement.meshKey());
 			DIRTY_WORLD_MESH_SORTED_INDICES.remove(retirement.meshKey());
 			Long uploadedGeneration = UPLOADED_WORLD_MESH_GENERATIONS.remove(retirement.meshKey());
+			worldMeshUploadWithdrawals++;
 			if (uploadedGeneration != null && uploadedGeneration.longValue() == retirement.meshGeneration()) {
 				PENDING_WORLD_MESH_RETIREMENTS.put(retirement.meshKey(), retirement.meshGeneration());
 			}
@@ -10925,6 +10934,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_WORLD_MESH_RETIREMENTS.put(meshKey, removedGeneration);
 				DIRTY_WORLD_MESH_ASSETS.remove(meshKey);
 				UPLOADED_WORLD_MESH_GENERATIONS.remove(meshKey);
+				worldMeshUploadWithdrawals++;
 				WORLD_MESH_SORTED_INDICES.remove(meshKey);
 				DIRTY_WORLD_MESH_SORTED_INDICES.remove(meshKey);
 				for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
@@ -12625,7 +12635,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		for (int node = 0; node < meshes.length; node++) {
 			BlockMeshExtraction mesh = meshes[node];
 			if (mesh == null) continue;
-			ensureMeshAssetLocked(mesh);
+			if (!ensureMeshAssetLocked(mesh)) {
+				topology.rigUploadProof = -1L;
+			}
 			VulkanicGalBridge.WorldMeshAssetRecord admitted = WORLD_MESH_ASSETS.get(mesh.meshKey());
 			long generation = admitted == null ? mesh.meshGeneration() : admitted.meshGeneration();
 			if (generations[node] != generation) {
@@ -12647,6 +12659,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			retireModelRig(topology);
 			topology.rigId = rigId;
 			topology.rigGenerations = generations;
+			topology.rigUploadProof = -1L;
 			MODEL_RIGS.put(rigId, topology);
 		}
 		return topology.rigId;
@@ -12701,7 +12714,19 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Whether every part mesh of a rig instance has crossed with the rig's current generations. */
 	private static boolean isModelRigUploadedLocked(long rigId) {
 		CachedModelTopology topology = MODEL_RIGS.get(rigId);
-		return topology != null && isModelRigMeshesUploadedLocked(topology);
+		if (topology == null) {
+			return false;
+		}
+		// Proven once per registration until an upload is withdrawn or a part
+		// is re-admitted (see prepareModelRigLocked).
+		if (topology.rigUploadProof == worldMeshUploadWithdrawals) {
+			return true;
+		}
+		if (!isModelRigMeshesUploadedLocked(topology)) {
+			return false;
+		}
+		topology.rigUploadProof = worldMeshUploadWithdrawals;
+		return true;
 	}
 
 	private static boolean isModelRigMeshesUploadedLocked(CachedModelTopology topology) {
@@ -13757,6 +13782,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		/** Registered Rust rig and the mesh generations it names; guarded by LOCK. */
 		private long rigId;
 		private long[] rigGenerations;
+		/** `worldMeshUploadWithdrawals` when every part was proven uploaded, or -1. */
+		private long rigUploadProof = -1L;
 
 		private CachedModelTopology(ModelPart[] nodes, int[] parents, BlockMeshExtraction[] meshes,
 				Map<String, BlockMeshExtraction> meshesByPath) {
