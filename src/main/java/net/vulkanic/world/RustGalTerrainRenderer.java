@@ -2206,6 +2206,40 @@ public final class RustGalTerrainRenderer {
 		if (vertexCount > bufferVertexCapacity) {
 			throw new IllegalArgumentException("static terrain vertex segments require " + vertexCount + " vertices but buffer holds " + bufferVertexCapacity);
 		}
+		// Each vertex record is built once with its final semantics: the
+		// canonical primitive identity (previously a second pass), and its
+		// segment normal and fault-adjusted color (previously a third pass).
+		int[] primitiveMetadata = mesh.getPrimitiveMetadata();
+		int metadataStride = NativeSectionMeshBuilder.PRIMITIVE_METADATA_RECORD_INTS;
+		if (vertexCount % 4 != 0) {
+			throw new IllegalArgumentException("static terrain semantic vertices are not quad-aligned");
+		}
+		if (primitiveMetadata.length != vertexCount / 4 * metadataStride) {
+			throw new IllegalArgumentException("static terrain primitive metadata count " + primitiveMetadata.length
+				+ " does not match assembled primitive count " + vertexCount / 4);
+		}
+		int[] vertexNormals = new int[vertexCount];
+		boolean[] vertexTopFace = new boolean[vertexCount];
+		for (int i = 0, segmentStart = 0; i < vertexSegments.length; i += 2) {
+			int segmentVertexCount = vertexSegments[i];
+			if (segmentVertexCount <= 0) {
+				continue;
+			}
+			if (segmentStart + segmentVertexCount > vertexCount) {
+				throw new IllegalArgumentException("static terrain vertex segments exceed vertex payload");
+			}
+			int facing = vertexSegments[i + 1];
+			int normalPacked = normalForSegment(buffer, vertexStride, segmentStart, segmentVertexCount, facing);
+			if ("inverted-normal".equals(fault)) {
+				normalPacked = invertPackedNormal(normalPacked);
+			}
+			java.util.Arrays.fill(vertexNormals, segmentStart, segmentStart + segmentVertexCount, normalPacked);
+			if (facing == 1) {
+				java.util.Arrays.fill(vertexTopFace, segmentStart, segmentStart + segmentVertexCount, true);
+			}
+			segmentStart += segmentVertexCount;
+		}
+		boolean hasPackedMidBlock = midBlockOffset != 0;
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>(vertexCount);
 		float minX = Float.POSITIVE_INFINITY;
 		float minY = Float.POSITIVE_INFINITY;
@@ -2263,10 +2297,26 @@ public final class RustGalTerrainRenderer {
 			minV = Math.min(minV, v);
 			maxU = Math.max(maxU, u);
 			maxV = Math.max(maxV, v);
-			int packedShaderBlock = shaderBlockIdOffset == 0 ? 0 : buffer.getInt(offset + shaderBlockIdOffset);
-			int shaderBlockId = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderBlockId(packedShaderBlock);
-			int shaderMaterialType = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderRenderType(packedShaderBlock);
-			int midBlockPacked = midBlockOffset == 0 ? 0 : buffer.getInt(offset + midBlockOffset);
+			// Semantic identity from the copied primitive metadata (never the
+			// Iris-private packed shader block; see applyPrimitiveSemanticFallback).
+			int metadataOffset = vertexIndex / 4 * metadataStride;
+			int blockId = primitiveMetadata[metadataOffset + 2];
+			int blockEmission = primitiveMetadata[metadataOffset + 9];
+			if (blockEmission < 0 || blockEmission > 0xff) {
+				throw new IllegalArgumentException("static terrain primitive " + vertexIndex / 4
+					+ " has invalid semantic block emission " + blockEmission);
+			}
+			if (blockId < 0) {
+				throw new IllegalArgumentException("static terrain primitive " + vertexIndex / 4
+					+ " lacks a canonical native block-state identity");
+			}
+			int midBlockPacked = hasPackedMidBlock
+				? buffer.getInt(offset + midBlockOffset)
+				: semanticMidBlockPacked(x, y, z, primitiveMetadata[metadataOffset + 3],
+					primitiveMetadata[metadataOffset + 4], primitiveMetadata[metadataOffset + 5], blockEmission);
+			if ("wrong-top-face-shade".equals(fault) && vertexTopFace[vertexIndex]) {
+				color = multiplyArgbRgb(color, 0x80);
+			}
 			vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 				x,
 				y,
@@ -2275,22 +2325,15 @@ public final class RustGalTerrainRenderer {
 				v,
 				u,
 				v,
-				shaderBlockId,
-				shaderMaterialType,
+				blockId,
+				primitiveMetadata[metadataOffset + 6] & 1,
 				decodeTerrainMaterialBits(lightMaterial, separateAo),
 				color,
-				0,
+				vertexNormals[vertexIndex],
 				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault)),
 				midBlockPacked
 			));
 		}
-		applyPrimitiveSemanticFallback(
-			mesh.getPrimitiveMetadata(),
-			vertices,
-			vertexCount,
-			shaderBlockIdOffset != 0,
-			midBlockOffset != 0
-		);
 		List<Integer> indices = new ArrayList<>(Math.max(6, vertexCount / 4 * 6));
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
 		int cursor = 0;
@@ -2310,9 +2353,7 @@ public final class RustGalTerrainRenderer {
 			}
 			int firstIndex = indices.size();
 			int facing = vertexSegments[i + 1];
-			int normalPacked = normalForSegment(vertices, cursor, segmentVertexCount, facing);
 			if ("inverted-normal".equals(fault)) {
-				normalPacked = invertPackedNormal(normalPacked);
 				normalContractValid = false;
 			}
 			switch (facing) {
@@ -2324,17 +2365,6 @@ public final class RustGalTerrainRenderer {
 			}
 			if ("wrong-top-face-shade".equals(fault) && facing == 1) {
 				topFaceShadeContractValid = false;
-			}
-			for (int vertex = cursor; vertex < cursor + segmentVertexCount; vertex++) {
-				VulkanicGalBridge.WorldMeshVertexRecord original = vertices.get(vertex);
-				int color = original.colorArgb();
-				if ("wrong-top-face-shade".equals(fault) && facing == 1) {
-					color = multiplyArgbRgb(color, 0x80);
-				}
-				vertices.set(vertex, new VulkanicGalBridge.WorldMeshVertexRecord(
-					original.x(), original.y(), original.z(), original.u(), original.v(), original.atlasU(), original.atlasV(),
-					original.shaderBlockId(), original.shaderMaterialType(), original.terrainMaterialBits(), color, normalPacked, original.light(), original.midBlockPacked()
-				));
 			}
 			for (int quadBase = cursor; quadBase + 3 < cursor + segmentVertexCount; quadBase += 4) {
 				indices.add(quadBase);
@@ -3729,6 +3759,21 @@ public final class RustGalTerrainRenderer {
 		return (byte)((normalPacked >>> shift) & 0xff) / 127.0F;
 	}
 
+	/** Segment normal from the source vertex buffer (first three positions for unassigned facings). */
+	private static int normalForSegment(ByteBuffer buffer, int stride, int start, int count, int facing) {
+		if (facing >= 0 && facing <= 5 || count < 3) {
+			return normalForSegment(List.of(), start, count, facing);
+		}
+		float[] p = new float[9];
+		for (int vertex = 0; vertex < 3; vertex++) {
+			int offset = (start + vertex) * stride;
+			int hi = buffer.getInt(offset + POSITION_OFFSET);
+			int lo = buffer.getInt(offset + POSITION_OFFSET + 4);
+			for (int axis = 0; axis < 3; axis++) p[vertex * 3 + axis] = decodePosition(hi, lo, axis);
+		}
+		return computedNormal(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]);
+	}
+
 	private static int normalForSegment(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int start, int count, int facing) {
 		return switch (facing) {
 			case 0 -> packNormal(1, 0, 0);
@@ -3746,12 +3791,17 @@ public final class RustGalTerrainRenderer {
 		VulkanicGalBridge.WorldMeshVertexRecord b,
 		VulkanicGalBridge.WorldMeshVertexRecord c
 	) {
-		float ax = b.x() - a.x();
-		float ay = b.y() - a.y();
-		float az = b.z() - a.z();
-		float bx = c.x() - a.x();
-		float by = c.y() - a.y();
-		float bz = c.z() - a.z();
+		return computedNormal(a.x(), a.y(), a.z(), b.x(), b.y(), b.z(), c.x(), c.y(), c.z());
+	}
+
+	private static int computedNormal(float axp, float ayp, float azp, float bxp, float byp, float bzp,
+		float cxp, float cyp, float czp) {
+		float ax = bxp - axp;
+		float ay = byp - ayp;
+		float az = bzp - azp;
+		float bx = cxp - axp;
+		float by = cyp - ayp;
+		float bz = czp - azp;
 		float nx = ay * bz - az * by;
 		float ny = az * bx - ax * bz;
 		float nz = ax * by - ay * bx;
