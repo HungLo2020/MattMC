@@ -54,6 +54,10 @@ REM Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
 "%JAVA_CMD%" -Xmx8G -Xms4G ^
     -XX:+UseZGC ^
     -XX:+UseCompactObjectHeaders ^
+    -XX:Tier3InvocationThreshold=100 ^
+    -XX:Tier4InvocationThreshold=600 ^
+    -XX:Tier4MinInvocationThreshold=300 ^
+    -XX:Tier4CompileThreshold=700 ^
     --enable-native-access=ALL-UNNAMED ^
     -Dmattmc.rust.natives.dir="%SCRIPT_DIR%\natives" ^
     -Dfabric.development=true ^

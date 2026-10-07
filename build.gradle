@@ -767,6 +767,18 @@ if (isMacOS) {
 	clientJvmArgs += '-XX:ZUncommitDelay=5'
 }
 
+// Per-frame render code runs once per frame, so with HotSpot's default tiers it
+// stays in profiling C1 code for the first ~5,000 frames after a world loads.
+// Earlier C2 compilation cut the 1,800-frame moving vanilla benchmark's Java
+// frame time ~20% (588 -> 679/749 FPS); steady state is unchanged. Keep in step
+// with packaging/run-mattmc.{sh,bat}.
+clientJvmArgs += [
+    '-XX:Tier3InvocationThreshold=100',
+    '-XX:Tier4InvocationThreshold=600',
+    '-XX:Tier4MinInvocationThreshold=300',
+    '-XX:Tier4CompileThreshold=700'
+]
+
 // Add macOS-specific JVM arguments for LWJGL/GLFW
 if (isMacOS) {
     clientJvmArgs += '-XstartOnFirstThread'

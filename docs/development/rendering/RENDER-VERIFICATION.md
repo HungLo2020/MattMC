@@ -797,6 +797,17 @@ recording retirement; standalone GAL submit counters have a narrower scope.
 Compare creation/destruction alongside deferred destroys when diagnosing churn.
 Older submit-only artifacts may report zero despite per-frame preparation.
 
+Short runs measure warm-up. The camera turns 0.35° per frame, so 1,800 frames
+see the same views as 60,000, yet early frames cost several times more: Java
+phases sum to the whole frame interval and each runs 3–4× slower than in steady
+state, because once-per-frame methods need thousands of calls before C2
+compiles them. The client therefore lowers HotSpot's tier thresholds
+(`clientJvmArgs` in `build.gradle`, mirrored in `packaging/run-mattmc.*`):
+1,800-frame vanilla 588→679–749 FPS, shaders unchanged (GPU-bound). Same-build
+short vanilla runs still vary by roughly ±10% (545–676 FPS seen), with every
+phase moving together; compare phase means, repeat runs, or use a long run
+(`--measure-frames 60000`) before crediting a change with a few percent.
+
 Check the recorded runtime FPS limit before comparing throughput. For the
 capture runner, `MATTMC_CAPTURE_MAX_FPS=260` selects the unlimited slider value;
 out-of-range values such as 1000 decode to the default 120. Validation and
