@@ -196,6 +196,14 @@ Java keeps only what Rust cannot hold: the meshing workers, and the
   implementation author reports byte-identical records over 1,800 frames per
   mode; this review did not rerun that comparison.
   [Selection eligibility and handoff](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L4921-L4979)
+- A finished build's layer meshes are decoded in Rust
+  ([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs)):
+  compact positions, colour/AO, light, copied-atlas UVs, segment normals, the
+  canonical block identity and mid-block words, plus the static-terrain audit's
+  fault injections. It matched Java's former decoder bit for bit on 1,500+ real
+  section layers in vanilla and shader modes; `cargo test --lib terrain::intake`
+  pins the contract. Java publishes the result (keys, generations, translucent
+  order, residency).
 - Rust lists the build requests in visit order, block-edit rebuilds first and
   sections already in flight skipped. Java dispatches them while in-flight
   builds stay below twice the worker count, and asks Rust whether each

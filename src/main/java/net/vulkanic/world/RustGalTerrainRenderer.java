@@ -2218,122 +2218,31 @@ public final class RustGalTerrainRenderer {
 			throw new IllegalArgumentException("static terrain primitive metadata count " + primitiveMetadata.length
 				+ " does not match assembled primitive count " + vertexCount / 4);
 		}
-		int[] vertexNormals = new int[vertexCount];
-		boolean[] vertexTopFace = new boolean[vertexCount];
-		for (int i = 0, segmentStart = 0; i < vertexSegments.length; i += 2) {
-			int segmentVertexCount = vertexSegments[i];
-			if (segmentVertexCount <= 0) {
-				continue;
-			}
-			if (segmentStart + segmentVertexCount > vertexCount) {
-				throw new IllegalArgumentException("static terrain vertex segments exceed vertex payload");
-			}
-			int facing = vertexSegments[i + 1];
-			int normalPacked = normalForSegment(buffer, vertexStride, segmentStart, segmentVertexCount, facing);
-			if ("inverted-normal".equals(fault)) {
-				normalPacked = invertPackedNormal(normalPacked);
-			}
-			java.util.Arrays.fill(vertexNormals, segmentStart, segmentStart + segmentVertexCount, normalPacked);
-			if (facing == 1) {
-				java.util.Arrays.fill(vertexTopFace, segmentStart, segmentStart + segmentVertexCount, true);
-			}
-			segmentStart += segmentVertexCount;
-		}
-		boolean hasPackedMidBlock = midBlockOffset != 0;
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>(vertexCount);
-		float minX = Float.POSITIVE_INFINITY;
-		float minY = Float.POSITIVE_INFINITY;
-		float minZ = Float.POSITIVE_INFINITY;
-		float maxX = Float.NEGATIVE_INFINITY;
-		float maxY = Float.NEGATIVE_INFINITY;
-		float maxZ = Float.NEGATIVE_INFINITY;
-		float minU = Float.POSITIVE_INFINITY;
-		float minV = Float.POSITIVE_INFINITY;
-		float maxU = Float.NEGATIVE_INFINITY;
-		float maxV = Float.NEGATIVE_INFINITY;
-		int separateAoVertexCount = 0;
-		float minAo = 1.0F;
-		float maxAo = 0.0F;
-		boolean aoContractValid = true;
-		boolean blockSkyLightContractValid = true;
-		for (int vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
-			int offset = vertexIndex * vertexStride;
-			int positionHi = buffer.getInt(offset + POSITION_OFFSET);
-			int positionLo = buffer.getInt(offset + POSITION_OFFSET + 4);
-			int compactColor = buffer.getInt(offset + COLOR_OFFSET);
-			int color = decodeCompactTerrainColorForRust(compactColor, separateAo, "inverted-ao".equals(fault), "doubled-face-shade".equals(fault));
-			int texture = buffer.getInt(offset + TEXTURE_OFFSET);
-			int lightMaterial = buffer.getInt(offset + LIGHT_MATERIAL_OFFSET);
-			float ao = separateAo ? ((compactColor >>> 24) & 0xff) / 255.0F : 1.0F;
-			if ("inverted-ao".equals(fault)) {
-				ao = 1.0F - ao;
-			}
-			if (separateAo) {
-				separateAoVertexCount++;
-				minAo = Math.min(minAo, ao);
-				maxAo = Math.max(maxAo, ao);
-				if (((color >>> 24) & 0xff) != ((compactColor >>> 24) & 0xff)) {
-					aoContractValid = false;
-				}
-			}
-			if ("inverted-ao".equals(fault) || "doubled-face-shade".equals(fault)) {
-				aoContractValid = false;
-			}
-			if ("swapped-block-sky-light".equals(fault)) {
-				blockSkyLightContractValid = false;
-			}
-			float x = decodePosition(positionHi, positionLo, 0);
-			float y = decodePosition(positionHi, positionLo, 1);
-			float z = decodePosition(positionHi, positionLo, 2);
-			float u = decodeTextureForCopiedAtlas(texture & 0xffff, copiedAtlasWidth);
-			float v = decodeTextureForCopiedAtlas((texture >>> 16) & 0xffff, copiedAtlasHeight);
-			minX = Math.min(minX, x);
-			minY = Math.min(minY, y);
-			minZ = Math.min(minZ, z);
-			maxX = Math.max(maxX, x);
-			maxY = Math.max(maxY, y);
-			maxZ = Math.max(maxZ, z);
-			minU = Math.min(minU, u);
-			minV = Math.min(minV, v);
-			maxU = Math.max(maxU, u);
-			maxV = Math.max(maxV, v);
-			// Semantic identity from the copied primitive metadata (never the
-			// Iris-private packed shader block; see applyPrimitiveSemanticFallback).
-			int metadataOffset = vertexIndex / 4 * metadataStride;
-			int blockId = primitiveMetadata[metadataOffset + 2];
-			int blockEmission = primitiveMetadata[metadataOffset + 9];
-			if (blockEmission < 0 || blockEmission > 0xff) {
-				throw new IllegalArgumentException("static terrain primitive " + vertexIndex / 4
-					+ " has invalid semantic block emission " + blockEmission);
-			}
-			if (blockId < 0) {
-				throw new IllegalArgumentException("static terrain primitive " + vertexIndex / 4
-					+ " lacks a canonical native block-state identity");
-			}
-			int midBlockPacked = hasPackedMidBlock
-				? buffer.getInt(offset + midBlockOffset)
-				: semanticMidBlockPacked(x, y, z, primitiveMetadata[metadataOffset + 3],
-					primitiveMetadata[metadataOffset + 4], primitiveMetadata[metadataOffset + 5], blockEmission);
-			if ("wrong-top-face-shade".equals(fault) && vertexTopFace[vertexIndex]) {
-				color = multiplyArgbRgb(color, 0x80);
-			}
-			vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
-				x,
-				y,
-				z,
-				u,
-				v,
-				u,
-				v,
-				blockId,
-				primitiveMetadata[metadataOffset + 6] & 1,
-				decodeTerrainMaterialBits(lightMaterial, separateAo),
-				color,
-				vertexNormals[vertexIndex],
-				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault)),
-				midBlockPacked
-			));
-		}
+		int faultBits = ("inverted-ao".equals(fault) ? RustTerrainIntake.FAULT_INVERTED_AO : 0)
+			| ("doubled-face-shade".equals(fault) ? RustTerrainIntake.FAULT_DOUBLED_FACE_SHADE : 0)
+			| ("swapped-block-sky-light".equals(fault) ? RustTerrainIntake.FAULT_SWAPPED_BLOCK_SKY_LIGHT : 0)
+			| ("inverted-normal".equals(fault) ? RustTerrainIntake.FAULT_INVERTED_NORMAL : 0)
+			| ("wrong-top-face-shade".equals(fault) ? RustTerrainIntake.FAULT_WRONG_TOP_FACE_SHADE : 0);
+		// Rust decodes every vertex (worldrender/terrain/intake.rs).
+		RustTerrainIntake.DecodedVertices decoded = RustTerrainIntake.decode(buffer, vertexStride, separateAo,
+			copiedAtlasWidth, copiedAtlasHeight, midBlockOffset, faultBits, vertexSegments, primitiveMetadata,
+			metadataStride, vertexCount);
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = decoded.records();
+		float minX = decoded.minX();
+		float minY = decoded.minY();
+		float minZ = decoded.minZ();
+		float maxX = decoded.maxX();
+		float maxY = decoded.maxY();
+		float maxZ = decoded.maxZ();
+		float minU = decoded.minU();
+		float minV = decoded.minV();
+		float maxU = decoded.maxU();
+		float maxV = decoded.maxV();
+		int separateAoVertexCount = decoded.separateAoVertices();
+		float minAo = decoded.minAo();
+		float maxAo = decoded.maxAo();
+		boolean aoContractValid = decoded.aoContractValid();
+		boolean blockSkyLightContractValid = !"swapped-block-sky-light".equals(fault);
 		List<Integer> indices = new ArrayList<>(Math.max(6, vertexCount / 4 * 6));
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
 		int cursor = 0;
@@ -3670,151 +3579,9 @@ public final class RustGalTerrainRenderer {
 		return (value & 0x7fff) / (float)TEXTURE_MAX_VALUE;
 	}
 
-	/**
-	 * Resolves Sodium's compact UV and its high-bit direction into the exact
-	 * copied-atlas coordinate consumed by Rust. Frozen's block-layer vertex
-	 * stage performs this as {@code base + direction * u_TexCoordShrink}; the
-	 * result is semantic vertex data, never a borrowed Java texture or sampler.
-	 */
-	static float decodeTextureForCopiedAtlas(int packedValue, int atlasExtent) {
-		if (atlasExtent <= 0) {
-			throw new IllegalArgumentException("copied atlas extent must be positive");
-		}
-		float base = decodeTexture(packedValue);
-		float direction = (packedValue & 0x8000) == 0 ? -1.0F : 1.0F;
-		float shrink = (1.0F / TEXTURE_MAX_VALUE)
-			- (1.0F / (atlasExtent * (float)COMPACT_TEXTURE_SUB_TEXEL_PRECISION));
-		return base + direction * shrink;
-	}
-
-
-	static int decodeLight(int lightMaterial, boolean swapBlockAndSky) {
-		int block = lightMaterial & 0xff;
-		int sky = (lightMaterial >>> 8) & 0xff;
-		if (swapBlockAndSky) {
-			int swapped = block;
-			block = sky;
-			sky = swapped;
-		}
-		// These are UV2 byte coordinates, not integer light levels. Smooth
-		// lighting may use every low bit; quantizing changes texture sampling.
-		return block | (sky << 16);
-	}
-
-	/** Sodium's compact terrain material byte: mip policy and alpha cutoff. */
-	static int decodeTerrainMaterialBits(int lightMaterial) {
-		return (lightMaterial >>> 16) & 0xff;
-	}
-
-	static int decodeTerrainMaterialBits(int lightMaterial, boolean separateAo) {
-		return decodeTerrainMaterialBits(lightMaterial) | (separateAo ? 0x100 : 0);
-	}
-
-	static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo) {
-		return decodeCompactTerrainColorForRust(compactAbgr, separateAo, false, false);
-	}
-
-	private static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo, boolean invertAo, boolean doubleShade) {
-		int alphaOrAo = (compactAbgr >>> 24) & 0xff;
-		int blue = (compactAbgr >>> 16) & 0xff;
-		int green = (compactAbgr >>> 8) & 0xff;
-		int red = compactAbgr & 0xff;
-		int alpha = alphaOrAo;
-		if (separateAo) {
-			if (invertAo) {
-				alphaOrAo = 255 - alphaOrAo;
-			}
-			if (doubleShade) {
-				red = multiplyColorByte(red, alphaOrAo);
-				green = multiplyColorByte(green, alphaOrAo);
-				blue = multiplyColorByte(blue, alphaOrAo);
-			}
-			alpha = alphaOrAo;
-		}
-		return (alpha << 24) | (red << 16) | (green << 8) | blue;
-	}
-
-	private static int multiplyColorByte(int color, int factor) {
-		return Math.max(0, Math.min(255, (color * factor + 255) >>> 8));
-	}
-
-	private static int multiplyArgbRgb(int argb, int factor) {
-		int alpha = argb & 0xff000000;
-		int red = multiplyColorByte((argb >>> 16) & 0xff, factor);
-		int green = multiplyColorByte((argb >>> 8) & 0xff, factor);
-		int blue = multiplyColorByte(argb & 0xff, factor);
-		return alpha | (red << 16) | (green << 8) | blue;
-	}
-
-	private static int invertPackedNormal(int normalPacked) {
-		float x = -unpackPackedNormalComponent(normalPacked, 0);
-		float y = -unpackPackedNormalComponent(normalPacked, 8);
-		float z = -unpackPackedNormalComponent(normalPacked, 16);
-		return packNormal(x, y, z);
-	}
 
 	private static float unpackPackedNormalComponent(int normalPacked, int shift) {
 		return (byte)((normalPacked >>> shift) & 0xff) / 127.0F;
-	}
-
-	/** Segment normal from the source vertex buffer (first three positions for unassigned facings). */
-	private static int normalForSegment(ByteBuffer buffer, int stride, int start, int count, int facing) {
-		if (facing >= 0 && facing <= 5 || count < 3) {
-			return normalForSegment(List.of(), start, count, facing);
-		}
-		float[] p = new float[9];
-		for (int vertex = 0; vertex < 3; vertex++) {
-			int offset = (start + vertex) * stride;
-			int hi = buffer.getInt(offset + POSITION_OFFSET);
-			int lo = buffer.getInt(offset + POSITION_OFFSET + 4);
-			for (int axis = 0; axis < 3; axis++) p[vertex * 3 + axis] = decodePosition(hi, lo, axis);
-		}
-		return computedNormal(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]);
-	}
-
-	private static int normalForSegment(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int start, int count, int facing) {
-		return switch (facing) {
-			case 0 -> packNormal(1, 0, 0);
-			case 1 -> packNormal(0, 1, 0);
-			case 2 -> packNormal(0, 0, 1);
-			case 3 -> packNormal(-1, 0, 0);
-			case 4 -> packNormal(0, -1, 0);
-			case 5 -> packNormal(0, 0, -1);
-			default -> count >= 3 ? computedNormal(vertices.get(start), vertices.get(start + 1), vertices.get(start + 2)) : packNormal(0, 1, 0);
-		};
-	}
-
-	private static int computedNormal(
-		VulkanicGalBridge.WorldMeshVertexRecord a,
-		VulkanicGalBridge.WorldMeshVertexRecord b,
-		VulkanicGalBridge.WorldMeshVertexRecord c
-	) {
-		return computedNormal(a.x(), a.y(), a.z(), b.x(), b.y(), b.z(), c.x(), c.y(), c.z());
-	}
-
-	private static int computedNormal(float axp, float ayp, float azp, float bxp, float byp, float bzp,
-		float cxp, float cyp, float czp) {
-		float ax = bxp - axp;
-		float ay = byp - ayp;
-		float az = bzp - azp;
-		float bx = cxp - axp;
-		float by = cyp - ayp;
-		float bz = czp - azp;
-		float nx = ay * bz - az * by;
-		float ny = az * bx - ax * bz;
-		float nz = ax * by - ay * bx;
-		float length = (float)Math.sqrt(nx * nx + ny * ny + nz * nz);
-		if (length <= 0.00001F) {
-			return packNormal(0, 1, 0);
-		}
-		return packNormal(nx / length, ny / length, nz / length);
-	}
-
-	private static int packNormal(float x, float y, float z) {
-		int ix = Math.max(-127, Math.min(127, Math.round(x * 127.0F))) & 0xff;
-		int iy = Math.max(-127, Math.min(127, Math.round(y * 127.0F))) & 0xff;
-		int iz = Math.max(-127, Math.min(127, Math.round(z * 127.0F))) & 0xff;
-		return ix | (iy << 8) | (iz << 16);
 	}
 
 	private static byte[] packU16(List<Integer> indices) {

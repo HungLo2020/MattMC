@@ -104,8 +104,12 @@ entries (see [Java Bridge](JAVA-BRIDGE.md)). Ordinary frames now form them in
 Java copies the native records into its frame/request storage. At the
 [`20e157ca` checkpoint](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection.rs),
 solid/cutout layers preserve graph visit order while translucent layers remain
-back to front; this supersedes the earlier key-order equality report. Java still owns
-readiness/build scheduling, mesh publication, animated-sprite marking and the
+back to front; this supersedes the earlier key-order equality report. The section
+graph owns readiness and build bookkeeping and the frame's animated sprites,
+and Rust decodes every compact section vertex
+([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs)).
+Java still dispatches the meshing workers, publishes the decoded meshes
+(keys, generations, translucent order and residency) and runs the
 ineligible-frame producer. Native record selection and retained GPU scene drawing
 are separate steps. When the shader route is armed, admission
 (`frame/static_terrain.rs`) keeps them compact: `take_scene_terrain` turns

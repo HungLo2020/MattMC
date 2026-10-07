@@ -35,12 +35,6 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertEquals(1, RustGalTerrainRenderer.decodeIrisShaderRenderType(packed));
 	}
 
-	@Test
-	void preservesSodiumCompactTerrainMaterialByte() {
-		assertEquals(0b101, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x0005_0000));
-		assertEquals(0xff, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x00ff_0000));
-		assertEquals(0, RustGalTerrainRenderer.decodeTerrainMaterialBits(0xff00_0000));
-	}
 
 	@Test
 	void shaderPackDepthFarUsesEffectiveRenderDistanceScalar() {
@@ -55,28 +49,8 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertTrue(source.contains("Math.max(1.0F, effectiveRenderDistance * 16.0F)"));
 	}
 
-	@Test
-	public void compactTerrainColorConvertsSodiumAbgrToSemanticArgb() {
-		int compactAbgr = 0x80402010;
 
-		assertEquals(0x80102040, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, false));
-	}
 
-	@Test
-	public void separateAoTerrainColorPreservesRawTintAndAoForSourceShaders() {
-		int compactAbgr = 0x80402010;
-
-		assertEquals(0x80102040, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, true));
-		assertEquals(0x105, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x0005_0000, true));
-		assertEquals(0x05, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x0005_0000, false));
-	}
-
-	@Test
-	public void fullSeparateAoLeavesOpaqueWhiteVertexWhite() {
-		int compactAbgr = 0xffffffff;
-
-		assertEquals(0xffffffff, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, true));
-	}
 
 	@Test
 	void wholeFrameTerrainSnapshotDeduplicatesCanonicalSectionPositions() {
@@ -119,18 +93,6 @@ public class RustGalTerrainRendererLightingContractTest {
 			"a vertically mirrored compact V coordinate selects an unrelated copied-atlas row");
 	}
 
-	@Test
-	public void compactTerrainAtlasCoordinatesPreserveSodiumSubTexelDirection() {
-		int atlasExtent = 1024;
-		int lowDirection = 16_384;
-		int highDirection = lowDirection | 0x8000;
-		float shrink = (1.0F / (1 << 15)) - (1.0F / (atlasExtent * 256.0F));
-
-		assertEquals(RustGalTerrainRenderer.decodeTexture(lowDirection) - shrink,
-			RustGalTerrainRenderer.decodeTextureForCopiedAtlas(lowDirection, atlasExtent), 1.0e-7F);
-		assertEquals(RustGalTerrainRenderer.decodeTexture(highDirection) + shrink,
-			RustGalTerrainRenderer.decodeTextureForCopiedAtlas(highDirection, atlasExtent), 1.0e-7F);
-	}
 
 	@Test
 	public void copiedPbrAtlasIsBoundedBeforeBaseAndDerivedImageAllocation() throws Exception {
