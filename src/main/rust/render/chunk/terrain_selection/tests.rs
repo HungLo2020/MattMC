@@ -49,8 +49,8 @@ fn camera_layers_follow_visit_order_then_translucent_back_to_front() {
     let unbuilt = [1, 0, 0];
     let empty = [2, 0, 0];
     let mut graph = graph(&[(near, GEOMETRY | FLAG_ANIMATED_SPRITES), (far, GEOMETRY | FLAG_ANIMATED_SPRITES), (empty, 0)]);
-    graph.source.sprites.insert(near, [5, 3].into());
-    graph.source.sprites.insert(far, [3, 9].into());
+    graph.set_sprites_for_test(near, &[5, 3]);
+    graph.set_sprites_for_test(far, &[3, 9]);
     graph.set_meshes(near, Some(meshes(100, true)));
     graph.set_meshes(far, Some(meshes(200, true)));
     graph.set_meshes(unbuilt, Some(meshes(300, false)));
@@ -82,7 +82,7 @@ fn shadow_candidates_are_other_geometry_sections_nearest_first_when_limited() {
     let b = [4, 0, 0];
     let c = [-2, 0, 0];
     let mut graph = graph(&[(visible, GEOMETRY), (a, GEOMETRY | FLAG_ANIMATED_SPRITES), (b, GEOMETRY), (c, GEOMETRY)]);
-    graph.source.sprites.insert(a, [4].into());
+    graph.set_sprites_for_test(a, &[4]);
     for (index, position) in [visible, a, b, c].into_iter().enumerate() {
         graph.set_meshes(position, Some(meshes(100 * (index as u64 + 1), false)));
     }
@@ -132,4 +132,28 @@ fn receipts_off_skip_the_fingerprint_but_keep_counts() {
     assert_eq!(0xcbf2_9ce4_8422_2325, out.receipts.fingerprint);
     graph.select_terrain(&visits, &params(false, 0), &mut out);
     assert_ne!(0xcbf2_9ce4_8422_2325, out.receipts.fingerprint);
+}
+
+#[test]
+fn sections_sharing_a_sprite_list_expand_it_once_and_casters_exclude_visible_sections() {
+    let first = [0, 0, 0];
+    let second = [1, 0, 0];
+    let hidden = [2, 0, 0];
+    let animated = GEOMETRY | FLAG_ANIMATED_SPRITES;
+    let mut graph = graph(&[(first, animated), (second, animated), (hidden, animated)]);
+    for (index, position) in [first, second, hidden].into_iter().enumerate() {
+        graph.set_meshes(position, Some(meshes(100 * (index as u64 + 1), false)));
+        graph.set_sprites_for_test(position, &[7, 8]);
+    }
+    graph.set_sprites_for_test(hidden, &[8, 9]);
+    let visits = [first, second].map(|position| visit(&graph, position));
+    let mut out = TerrainSelection::default();
+    graph.select_terrain(&visits, &params(true, 16), &mut out);
+    assert_eq!(vec![7, 8, 9], out.animated);
+    // Only the unvisited section casts shadows.
+    assert_eq!(vec![300, 301], out.casters.iter().map(|caster| caster.mesh_key).collect::<Vec<_>>());
+    // A second selection reuses the stamps and lists.
+    graph.select_terrain(&visits, &params(true, 16), &mut out);
+    assert_eq!(vec![7, 8, 9], out.animated);
+    assert_eq!(2, out.casters.len());
 }

@@ -81,13 +81,16 @@ pub struct TerrainSelection {
     /// (camera sections, then casters).
     pub animated: Vec<u32>,
     sprite_seen: Vec<u32>,
+    sprite_list_seen: Vec<u32>,
     sprite_epoch: u32,
     pub receipts: TerrainSelectionReceipts,
-    visible: Vec<(i64, [i32; 3], u8)>,
-    visible_keys: HashSet<i64, AccessHashBuilder>,
+    visible: Vec<(i64, [i32; 3], u8, u32)>,
+    /// `visible_epoch` at each slot selected as visible this call.
+    visible_stamps: Vec<u32>,
+    visible_epoch: u32,
     seen_meshes: HashSet<u64, AccessHashBuilder>,
-    translucent: Vec<(f64, i64, [i32; 3])>,
-    candidates: Vec<(i64, [i32; 3], u8)>,
+    translucent: Vec<(f64, i64, [i32; 3], u32)>,
+    candidates: Vec<(i64, [i32; 3], u8, u32)>,
 }
 
 /// `SectionPos.asLong`.
@@ -160,11 +163,19 @@ impl SectionGraph {
         out.sprite_epoch = out.sprite_epoch.wrapping_add(1);
         if out.sprite_epoch == 0 {
             out.sprite_seen.fill(0);
+            out.sprite_list_seen.fill(0);
             out.sprite_epoch = 1;
+        }
+        out.visible_epoch = out.visible_epoch.wrapping_add(1);
+        if out.visible_epoch == 0 {
+            out.visible_stamps.fill(0);
+            out.visible_epoch = 1;
+        }
+        if out.visible_stamps.len() < self.slot_capacity() {
+            out.visible_stamps.resize(self.slot_capacity(), 0);
         }
         out.receipts = TerrainSelectionReceipts { fingerprint: 0xcbf2_9ce4_8422_2325, ..Default::default() };
         out.visible.clear();
-        out.visible_keys.clear();
         out.seen_meshes.clear();
         out.translucent.clear();
 
@@ -172,16 +183,17 @@ impl SectionGraph {
             let Some(info) = visit.info.filter(|info| info.flags != 0) else {
                 continue;
             };
-            let key = section_key(visit.position);
-            if out.visible_keys.insert(key) {
-                out.visible.push((key, visit.position, info.flags));
+            let stamp = &mut out.visible_stamps[visit.slot as usize];
+            if *stamp != out.visible_epoch {
+                *stamp = out.visible_epoch;
+                out.visible.push((section_key(visit.position), visit.position, info.flags, visit.slot));
             }
         }
         // Keep the graph's breadth-first visit order: it is near-to-far from
         // the camera, so solid and cutout layers get early depth rejection.
 
         let visible = std::mem::take(&mut out.visible);
-        for &(key, position, flags) in &visible {
+        for &(key, position, flags, slot) in &visible {
             out.receipts.layer_probes += 2;
             let Some(meshes) = self.meshes.get(&position) else {
                 continue;
@@ -194,23 +206,22 @@ impl SectionGraph {
                 }
             }
             if submitted && flags & FLAG_ANIMATED_SPRITES != 0 {
-                self.use_sprites(position, out);
+                self.use_sprites(slot, out);
             }
             if meshes.keys[TRANSLUCENT] != 0 {
-                out.translucent.push((centre_distance(position, params.camera), key, position));
+                out.translucent.push((centre_distance(position, params.camera), key, position, slot));
             }
         }
         // Back to front; the stable sort keeps key order for equal distances.
         out.translucent.sort_by(|a, b| b.0.total_cmp(&a.0));
         let translucent = std::mem::take(&mut out.translucent);
-        for &(_, key, position) in &translucent {
+        for &(_, key, position, slot) in &translucent {
             out.receipts.layer_probes += 1;
             let meshes = self.meshes[&position];
             if out.seen_meshes.insert(meshes.keys[TRANSLUCENT]) {
                 out.push_section(position, key, TRANSLUCENT, &meshes, params);
-                let flags = self.slot(position).and_then(|slot| self.section_flags(slot)).unwrap_or(0);
-                if flags & FLAG_ANIMATED_SPRITES != 0 {
-                    self.use_sprites(position, out);
+                if self.section_flags(slot).unwrap_or(0) & FLAG_ANIMATED_SPRITES != 0 {
+                    self.use_sprites(slot, out);
                 }
             }
         }
@@ -223,11 +234,20 @@ impl SectionGraph {
     }
 
     /// Appends the section's animated sprites not yet used this frame.
-    fn use_sprites(&self, position: [i32; 3], out: &mut TerrainSelection) {
-        let Some(sprites) = self.source.sprites.get(&position) else {
+    fn use_sprites(&self, slot: u32, out: &mut TerrainSelection) {
+        let list = self.sprite_list(slot) as usize;
+        if list == 0 {
             return;
-        };
-        for &sprite in sprites.iter() {
+        }
+        // Sections share a few interned lists: expand each list once.
+        if list >= out.sprite_list_seen.len() {
+            out.sprite_list_seen.resize(list + 1, 0);
+        }
+        if out.sprite_list_seen[list] == out.sprite_epoch {
+            return;
+        }
+        out.sprite_list_seen[list] = out.sprite_epoch;
+        for &sprite in self.source.sprite_lists[list - 1].iter() {
             let index = sprite as usize;
             if index >= out.sprite_seen.len() {
                 out.sprite_seen.resize(index + 1, 0);
@@ -246,9 +266,8 @@ impl SectionGraph {
             let Some(flags) = self.section_flags(slot).filter(|flags| *flags != 0) else {
                 continue;
             };
-            let key = section_key(position);
-            if !out.visible_keys.contains(&key) {
-                candidates.push((key, position, flags));
+            if out.visible_stamps[slot as usize] != out.visible_epoch {
+                candidates.push((section_key(position), position, flags, slot));
             }
         }
         if candidates.len() > params.max_shadow_candidates {
@@ -259,8 +278,8 @@ impl SectionGraph {
             });
             candidates.truncate(params.max_shadow_candidates);
         }
-        candidates.sort_unstable_by_key(|(key, _, _)| *key);
-        for &(_, position, flags) in &candidates {
+        candidates.sort_unstable_by_key(|(key, _, _, _)| *key);
+        for &(_, position, flags, slot) in &candidates {
             if let Some(meshes) = self.meshes.get(&position) {
                 for layer in 0..3 {
                     if meshes.keys[layer] != 0 {
@@ -274,7 +293,7 @@ impl SectionGraph {
                 }
             }
             if flags & FLAG_ANIMATED_SPRITES != 0 {
-                self.use_sprites(position, out);
+                self.use_sprites(slot, out);
             }
         }
         out.candidates = candidates;

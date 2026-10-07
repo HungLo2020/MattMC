@@ -205,6 +205,8 @@ struct SectionNode {
     incoming: u8,
     /// `SourceState` epoch of the latest search that visited this section.
     visit_epoch: u32,
+    /// Interned animated-sprite list of its accepted build (0: none).
+    sprite_list: u32,
 }
 
 /// One visited section of a traversal, in visit order.
@@ -263,6 +265,11 @@ impl SectionGraph {
         self.slots.len()
     }
 
+    /// One past the highest slot index ever allocated.
+    pub(super) fn slot_capacity(&self) -> usize {
+        self.nodes.len()
+    }
+
     pub fn slot(&self, position: [i32; 3]) -> Option<u32> {
         self.slots.get(&position).copied()
     }
@@ -288,6 +295,7 @@ impl SectionGraph {
                 last_visible_frame: 0,
                 incoming: 0,
                 visit_epoch: 0,
+                sprite_list: 0,
             };
             let slot = match self.free.pop() {
                 Some(slot) => {

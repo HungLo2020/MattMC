@@ -38,8 +38,11 @@ pub struct SourceState {
     /// Sections with off-screen block entities, in first-build order.
     global_block_entities: Vec<i64>,
     global_block_entity_set: HashSet<i64, AccessHashBuilder>,
-    /// Animated sprite ids of each built section (Java's sprite registry).
-    pub(in crate::render::chunk) sprites: std::collections::HashMap<[i32; 3], Box<[u32]>, AccessHashBuilder>,
+    /// Interned animated-sprite lists (Java's sprite registry ids); a
+    /// section's node names its list, and id `n` is `sprite_lists[n - 1]`.
+    /// Most animated sections share a handful of lists (water, lava, fire).
+    sprite_list_ids: std::collections::HashMap<Box<[u32]>, u32, AccessHashBuilder>,
+    pub(in crate::render::chunk) sprite_lists: Vec<Box<[u32]>>,
     /// Outputs of the latest camera search.
     pub build_requests: Vec<i64>,
     pub block_entity_sections: Vec<i64>,
@@ -79,7 +82,6 @@ impl SectionGraph {
             let source = &mut self.source;
             source.needs_build.remove(&position);
             source.urgent.remove(&position);
-            source.sprites.remove(&position);
             if source.in_flight.contains(&position) {
                 source.stale_in_flight.insert(position);
             }
@@ -134,14 +136,13 @@ impl SectionGraph {
 
     /// Accepts a section's newest build (including an empty one).
     pub fn accept_build(&mut self, position: [i32; 3], info: SectionInfo, global_block_entities: bool, sprites: &[u32]) {
+        let sprite_list = self.intern_sprite_list(sprites);
+        if let Some(slot) = self.slot(position) {
+            self.nodes[slot as usize].sprite_list = sprite_list;
+        }
         let source = &mut self.source;
         source.needs_build.remove(&position);
         source.urgent.remove(&position);
-        if sprites.is_empty() {
-            source.sprites.remove(&position);
-        } else {
-            source.sprites.insert(position, sprites.into());
-        }
         let key = section_key(position);
         if global_block_entities {
             if source.global_block_entity_set.insert(key) {
@@ -151,6 +152,34 @@ impl SectionGraph {
             source.global_block_entities.retain(|other| *other != key);
         }
         self.set_info(position, Some(info));
+    }
+
+    /// The interned id of a sprite list (0 for none).
+    pub(in crate::render::chunk) fn intern_sprite_list(&mut self, sprites: &[u32]) -> u32 {
+        if sprites.is_empty() {
+            return 0;
+        }
+        let source = &mut self.source;
+        if let Some(&id) = source.sprite_list_ids.get(sprites) {
+            return id;
+        }
+        source.sprite_lists.push(sprites.into());
+        let id = source.sprite_lists.len() as u32;
+        source.sprite_list_ids.insert(sprites.into(), id);
+        id
+    }
+
+    /// Test hook: gives a section an animated sprite list directly.
+    #[cfg(test)]
+    pub(in crate::render::chunk) fn set_sprites_for_test(&mut self, position: [i32; 3], sprites: &[u32]) {
+        let list = self.intern_sprite_list(sprites);
+        let slot = self.slot(position).expect("test section exists");
+        self.nodes[slot as usize].sprite_list = list;
+    }
+
+    /// The interned sprite list of a live slot (0: none).
+    pub(in crate::render::chunk) fn sprite_list(&self, slot: u32) -> u32 {
+        self.nodes[slot as usize].sprite_list
     }
 
     /// Resource reload: every built section with geometry needs a rebuild and
