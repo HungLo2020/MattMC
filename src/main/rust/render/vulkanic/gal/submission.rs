@@ -2,9 +2,12 @@
 
 use super::*;
 
-pub(super) fn submission_trace(message: &str) {
-    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
-        crate::core::console::stderr(format_args!("{message}"));
+/// Whole-frame submission tracing (`MATTMC_TRACE_WHOLE_FRAME`, read once).
+/// The message is built only when tracing is on.
+pub(super) fn submission_trace(message: impl FnOnce() -> String) {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some()) {
+        crate::core::console::stderr(format_args!("{}", message()));
     }
 }
 
@@ -173,7 +176,7 @@ impl VulkanicGal {
         let validated = ValidatedSubmissionBatch::from(batch);
         let id = SubmissionId(self.next_submission);
         self.next_submission += 1;
-        submission_trace(&format!(
+        submission_trace(|| format!(
             "gal.submit.encode.begin id={} label={} pre_encode_nanos={}",
             id.0,
             validated.label,
@@ -181,7 +184,7 @@ impl VulkanicGal {
         ));
         let backend_encode_started = std::time::Instant::now();
         self.backend.encode_passes(&validated)?;
-        submission_trace(&format!(
+        submission_trace(|| format!(
             "gal.submit.encode.end id={} elapsed_nanos={}",
             id.0,
             elapsed_nanos_u64(backend_encode_started)
@@ -192,14 +195,14 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(backend_encode_started));
         }
         let backend_submit_started = std::time::Instant::now();
-        submission_trace(&format!("gal.submit.queue.begin id={}", id.0));
+        submission_trace(|| format!("gal.submit.queue.begin id={}", id.0));
         self.backend.submit(id, &validated)?;
         self.latest_accepted_submission = id;
         self.buffer_upload_capture.accept(id);
         for usage in &submission_usages {
             usage.accept(id);
         }
-        submission_trace(&format!(
+        submission_trace(|| format!(
             "gal.submit.queue.end id={} elapsed_nanos={}",
             id.0,
             elapsed_nanos_u64(backend_submit_started)
