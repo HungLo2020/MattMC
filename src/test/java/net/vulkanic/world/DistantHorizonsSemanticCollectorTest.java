@@ -984,6 +984,49 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void frameCompletingAfterTheWorldUnloadsDropsItsDhReceiptInsteadOfFailing() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.resetForTest();
+		long columnKey = DhSectionPos.encode((byte) 6, 0, 0);
+		DhBlockPos origin = new DhBlockPos(
+			DhSectionPos.getMinCornerBlockX(columnKey), 64, DhSectionPos.getMinCornerBlockZ(columnKey)
+		);
+		var stone = new ColumnRenderSource.SemanticMaterialIdentity("minecraft:stone_STATE_", "minecraft:plains");
+		var empty = new LodQuadBuilder.VertexBufferBuild(List.of(), List.of());
+		var original = new LodQuadBuilder.VertexBufferBuild(
+			List.of(fourQuadBuffer()), List.of(new int[] { 1, 1, 1, 1 })
+		);
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, origin, List.of(stone), original, empty, empty, empty
+		);
+		publishPendingForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(columnKey);
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
+		var submitted = DistantHorizonsSemanticCollector.consumeVisibleSegments();
+		long lifecycle = DistantHorizonsSemanticCollector.consumeVisibleFrame().lifecycle();
+		int executions = DistantHorizonsSemanticCollector.routeExecutionCount();
+
+		// Pipelined completion within the same lifecycle: recorded even though
+		// the route is no longer selected by the time the frame completes.
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordRustMaterialRouteExecution(
+			41L, 98L, 6L, submitted.size(), submitted.size(), 0, 0, true, submitted, lifecycle
+		);
+		assertEquals(executions + 1, DistantHorizonsSemanticCollector.routeExecutionCount());
+
+		// Save and quit: the world unloads while that frame is still queued.
+		DistantHorizonsSemanticCollector.clear();
+		long staleBefore = DistantHorizonsSemanticCollector.staleRouteExecutionReceipts();
+		DistantHorizonsSemanticCollector.recordRustMaterialRouteExecution(
+			42L, 99L, 7L, submitted.size(), submitted.size(), 0, 0, true, submitted, lifecycle
+		);
+		assertEquals(staleBefore + 1, DistantHorizonsSemanticCollector.staleRouteExecutionReceipts());
+		assertEquals(List.of(), DistantHorizonsSemanticCollector.executedVisibleSegmentsForTest(42L),
+			"a receipt from an unloaded world must not be recorded against the next lifecycle");
+	}
+
+	@Test
 	void executedFrameRetainsMaterialSidecarsAcrossAPostHandoffColumnReplacement() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		long columnKey = DhSectionPos.encode((byte) 6, 0, 0);

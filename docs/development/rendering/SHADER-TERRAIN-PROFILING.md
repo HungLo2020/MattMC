@@ -255,6 +255,13 @@ changing the remaining preparation work:
   (destroying parked plans and refusing later parking) before a color-target
   promotion or discard retires their views
   ([`fullscreen/pipelines.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/runtime/fullscreen/pipelines.rs)).
+  A parked plan's pack-resources set also binds runtime-owned inputs (voxel
+  volumes, source depth/shadow/color samplers, source assets), so every
+  runtime path that destroys or replaces one first calls
+  `release_parked_fullscreen_plans`. Without it, world unload/reload fails
+  with `DependencyViolation` on the input sampler. Dependency errors raised
+  during command recording list every dependent, including ones already
+  queued for destruction in the same batch.
 
 Equivalence tests pin each rule (`lazy_mesh_batch_index_*`,
 `covering_selection_*`, `terrain_voxel_source_volume_cull_*`,

@@ -278,6 +278,8 @@ public final class DistantHorizonsSemanticCollector {
 	 * overwrites routeReason, so reset/retirement proof must have its own
 	 * monotonic receipt instead of relying on transient route state. */
 	private static long lifecycleResetCount;
+	/** Completed frames whose DH lifecycle ended before they completed (dropped receipts). */
+	private static long staleRouteExecutionReceipts;
 	private static long resourceReloadResetCount;
 	private static long worldUnloadResetCount;
 	private static String lastLifecycleResetReason = "none";
@@ -2252,14 +2254,26 @@ public final class DistantHorizonsSemanticCollector {
 	 * otherwise a route reset between calls can combine visible instances from
 	 * one generation with disabled flags from the next one.
 	 */
+	/** A consumed frame's DH semantics and the collector lifecycle they belong to. */
 	public record ConsumedVisibleFrame(
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments,
-		VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame
+		VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame,
+		long lifecycle
 	) {}
+
+	/** Completed-frame DH receipts dropped because their lifecycle had ended. */
+	public static long staleRouteExecutionReceipts() {
+		synchronized (COLUMNS) {
+			return staleRouteExecutionReceipts;
+		}
+	}
 
 	public static ConsumedVisibleFrame consumeVisibleFrame() {
 		if (!enabled()) {
-			return new ConsumedVisibleFrame(List.of(), VulkanicGalBridge.WorldLodRenderFrameRecord.disabled());
+			synchronized (COLUMNS) {
+				return new ConsumedVisibleFrame(List.of(), VulkanicGalBridge.WorldLodRenderFrameRecord.disabled(),
+					lifecycleResetCount);
+			}
 		}
 		synchronized (COLUMNS) {
 			VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame = PENDING_RENDER_FRAME;
@@ -2283,7 +2297,7 @@ public final class DistantHorizonsSemanticCollector {
 				: List.of();
 			PENDING_VISIBLE_SEGMENTS.clear();
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-			ConsumedVisibleFrame consumed = new ConsumedVisibleFrame(result, renderFrame);
+			ConsumedVisibleFrame consumed = new ConsumedVisibleFrame(result, renderFrame, lifecycleResetCount);
 			writeSemanticPayloadReceiptLocked(routeFrame, result);
 			return consumed;
 		}
@@ -2569,14 +2583,45 @@ public final class DistantHorizonsSemanticCollector {
 		boolean frameSemanticsEnabled,
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> submittedSegments
 	) {
+		long lifecycle;
+		synchronized (COLUMNS) {
+			lifecycle = lifecycleResetCount;
+		}
+		recordRustMaterialRouteExecution(worldFrame, submission, captureFrame, instances, opaqueInstances,
+			transparentInstances, waterInstances, frameSemanticsEnabled, submittedSegments, lifecycle);
+	}
+
+	/**
+	 * Records a completed frame's DH execution. {@code lifecycle} is the DH
+	 * lifecycle the frame was consumed under ({@link ConsumedVisibleFrame#lifecycle()}):
+	 * frames are pipelined, so a frame produced while the route was selected
+	 * can complete after a world unload or resource reload cleared the
+	 * collector (save and quit, a reload). That receipt describes columns
+	 * that no longer exist and is dropped, never recorded against the new
+	 * lifecycle. Within one lifecycle the frame's own segments prove the route
+	 * was selected when it was consumed, whatever the route state is now.
+	 */
+	public static void recordRustMaterialRouteExecution(
+		long worldFrame,
+		long submission,
+		long captureFrame,
+		int instances,
+		int opaqueInstances,
+		int transparentInstances,
+		int waterInstances,
+		boolean frameSemanticsEnabled,
+		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> submittedSegments,
+		long lifecycle
+	) {
 		if (worldFrame < 0L || submission <= 0L || captureFrame < 0L || instances <= 0
 			|| opaqueInstances < 0 || transparentInstances < 0 || waterInstances < 0
 			|| opaqueInstances + transparentInstances + waterInstances != instances || !frameSemanticsEnabled) {
 			throw new IllegalArgumentException("invalid successful Rust DH material-route execution correlation");
 		}
 		synchronized (COLUMNS) {
-			if (!routeSelected) {
-				throw new IllegalStateException("cannot record Rust DH execution without the selected route");
+			if (lifecycle != lifecycleResetCount) {
+				staleRouteExecutionReceipts++;
+				return;
 			}
 			lastExecutedRouteFrame = routeFrame;
 			lastExecutedWorldFrame = worldFrame;
@@ -5156,6 +5201,7 @@ public final class DistantHorizonsSemanticCollector {
 			semanticColumnsReplaced = 0L;
 			lastPayloadDifference = "none";
 			lifecycleResetCount = 0L;
+			staleRouteExecutionReceipts = 0L;
 			resourceReloadResetCount = 0L;
 			worldUnloadResetCount = 0L;
 			lastLifecycleResetReason = "none";

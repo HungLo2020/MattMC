@@ -155,9 +155,11 @@ impl ShaderPackRuntimeExecutor {
         }
         let replacement = TerrainOccupancyRuntime::create(gal, descriptor, materials)?;
         if let Some(previous) = self.terrain_colored_light.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         if let Some(previous) = self.terrain_occupancy.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -178,9 +180,11 @@ impl ShaderPackRuntimeExecutor {
         }
         let replacement = TerrainColoredLightRuntime::create(gal, descriptor, materials, emission)?;
         if let Some(previous) = self.terrain_occupancy.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         if let Some(previous) = self.terrain_colored_light.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -274,6 +278,7 @@ impl ShaderPackRuntimeExecutor {
         }
         let replacement = TerrainPuddleRuntime::create(gal, descriptor)?;
         if let Some(previous) = self.terrain_puddle.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(true)
@@ -284,6 +289,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.terrain_puddle.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -297,6 +303,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.terrain_colored_light.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())

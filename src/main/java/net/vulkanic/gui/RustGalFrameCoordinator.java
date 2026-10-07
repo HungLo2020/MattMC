@@ -1374,7 +1374,8 @@ public final class RustGalFrameCoordinator {
 					transparentInstances,
 					waterInstances,
 					primitiveFrame.lodRenderFrame().enabled(),
-					primitiveFrame.lodInstances()
+					primitiveFrame.lodInstances(),
+					primitiveFrame.distantHorizonsLifecycle()
 				);
 				net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame(
 					"distant-horizons", "rust-vulkan-whole-frame:material-lod"

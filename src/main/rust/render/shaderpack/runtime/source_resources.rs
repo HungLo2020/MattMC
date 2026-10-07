@@ -384,6 +384,7 @@ impl ShaderPackRuntimeExecutor {
             &resource_binding_plans,
         )?;
         if let Some(previous) = self.source_asset_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(true)
@@ -407,6 +408,7 @@ impl ShaderPackRuntimeExecutor {
         self.clear_candidate_source_shadow_color_resources(gal)?;
         self.clear_candidate_source_material_texture_resources(gal)?;
         if let Some(previous) = self.source_asset_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -725,6 +727,9 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         let resources = std::mem::take(&mut self.source_material_texture_resources);
+        if !resources.is_empty() {
+            self.release_parked_fullscreen_plans(gal);
+        }
         for (_, resource) in resources {
             gal.destroy(resource.combined_sampler)?;
         }
@@ -880,6 +885,7 @@ impl ShaderPackRuntimeExecutor {
             }
         };
         if let Some(previous) = self.source_shadow_depth_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         self.source_shadow_depth_resources
@@ -893,6 +899,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.source_shadow_depth_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -987,6 +994,7 @@ impl ShaderPackRuntimeExecutor {
             }
         };
         if let Some(previous) = self.source_shadow_color_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         self.source_shadow_color_resources
@@ -1000,6 +1008,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.source_shadow_color_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -1214,6 +1223,7 @@ impl ShaderPackRuntimeExecutor {
             }
         };
         if let Some(previous) = self.source_main_depth_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         self.source_main_depth_resources
@@ -1227,6 +1237,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.source_main_depth_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())

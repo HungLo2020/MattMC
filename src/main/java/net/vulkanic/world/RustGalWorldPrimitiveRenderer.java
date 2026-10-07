@@ -18539,7 +18539,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				pendingStaticTerrainCamera,
 				shadowCasters,
 				terrainSections,
-				takeModelRigPosesLocked()
+				takeModelRigPosesLocked(),
+				consumedDistantHorizons.lifecycle()
 			);
 			worldTextDiagnostic = worldTextDiagnostic.withConsumed(semanticFrameSequence, frame.textQuads().size());
 			ORB_SEMANTICS.clearFrame();
@@ -18787,7 +18788,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			frame.terrainFrameCamera(),
 			frame.staticTerrainShadowCasters(),
 			frame.staticTerrainSections(),
-			frame.modelRigPoses()
+			frame.modelRigPoses(),
+			frame.distantHorizonsLifecycle()
 		);
 	}
 
@@ -18831,7 +18833,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.TerrainFrameCamera terrainFrameCamera,
 		VulkanicGalBridge.StaticTerrainShadowCasters staticTerrainShadowCasters,
 		VulkanicGalBridge.StaticTerrainSections staticTerrainSections,
-		VulkanicGalBridge.ModelRigPoses modelRigPoses
+		VulkanicGalBridge.ModelRigPoses modelRigPoses,
+		/** DH collector lifecycle this frame's LOD semantics were consumed under. */
+		long distantHorizonsLifecycle
 	) {
 		public PrimitiveFrame {
 			if (modelRigPoses == null) {
@@ -18883,7 +18887,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				shaderEnvironmentFrame, featureCoverage, lodInstances, lodRenderFrame, entityFlameQuadCount,
 				firstPersonFrame, firstPersonMeshInstances, particleQuads, orbInstances,
 				distantHorizonsGenericBoxes, null, VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY,
-				VulkanicGalBridge.StaticTerrainSections.EMPTY, VulkanicGalBridge.ModelRigPoses.EMPTY);
+				VulkanicGalBridge.StaticTerrainSections.EMPTY, VulkanicGalBridge.ModelRigPoses.EMPTY, 0L);
 		}
 	public PrimitiveFrame(
 		int viewportWidth,

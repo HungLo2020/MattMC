@@ -161,6 +161,16 @@ impl VulkanicGal {
                 .get(handle)
                 .map(|record| record.desc.label.as_str())
                 .unwrap_or("<stale-resource-set>"),
+            Some(HandleKind::CombinedTextureSampler) => self
+                .combined_texture_samplers
+                .get(handle)
+                .map(|record| record.desc.label.as_str())
+                .unwrap_or("<stale-combined-texture-sampler>"),
+            Some(HandleKind::Texture) => self
+                .textures
+                .get(handle)
+                .map(|record| record.desc.label.as_str())
+                .unwrap_or("<stale-texture>"),
             _ => "<unlabeled-resource>",
         }
     }

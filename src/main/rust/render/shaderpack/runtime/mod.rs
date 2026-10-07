@@ -303,6 +303,16 @@ impl ShaderPackRuntimeExecutor {
         (self.source_candidate_epoch, self.distant_horizons_source_candidate_epoch)
     }
 
+    /// Parked fullscreen plans keep pack-resources sets that bind this
+    /// runtime's sampled inputs (voxel volumes, source depth/shadow/color
+    /// samplers, source assets). Drop them before any of those inputs is
+    /// destroyed or replaced; the GAL refuses to destroy a sampler that a
+    /// live set still binds (world unload, reload, resize). Plans staged
+    /// before the release are refused when they try to park.
+    pub(crate) fn release_parked_fullscreen_plans(&self, gal: &mut VulkanicGal) {
+        self.fullscreen_pipeline_cache.destroy_parked(gal);
+    }
+
     pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) -> GalResult<()> {
         self.fullscreen_pipeline_cache.destroy(gal);
         self.discard_vanilla_lightmap_submission(gal);

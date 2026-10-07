@@ -1,12 +1,13 @@
 //! Terrain mesh intake: decodes a section layer's compact Sodium vertices
-//! (as Rust meshing assembled them) straight into the world-mesh vertex ABI,
+//! (as Rust meshing assembled them) straight into world-mesh vertices,
 //! with the same semantics as Java's `RustGalTerrainRenderer.decodeMesh`:
 //! segment normals, AO/colour/light decoding, copied-atlas UV shrink, the
 //! canonical block identity from the primitive metadata, mid-block packing,
 //! and the diagnostic fault injections. Java no longer builds a record per
-//! vertex or encodes one field at a time.
+//! vertex or encodes one field at a time. The C export that writes the
+//! vertex ABI lives in `bridge/world/terrain_intake.rs`.
 
-use crate::render::bridge::abi::FfiWorldMeshVertex;
+use crate::render::scene::mesh::WorldMeshVertex;
 
 const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
 const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
@@ -169,7 +170,7 @@ pub fn decode_compact_terrain_vertices(
     params: &FfiCompactTerrainDecodeParams,
     segments: &[i32],
     metadata: &[i32],
-    out: &mut Vec<FfiWorldMeshVertex>,
+    out: &mut Vec<WorldMeshVertex>,
     stats: &mut FfiCompactTerrainDecodeStats,
 ) -> Result<usize, DecodeError> {
     let stride = params.vertex_stride as usize;
@@ -295,18 +296,13 @@ pub fn decode_compact_terrain_vertices(
             if faults & FAULT_WRONG_TOP_FACE_SHADE != 0 && top_face {
                 color = multiply_argb_rgb(color, 0x80);
             }
-            out.push(FfiWorldMeshVertex {
-                byte_size: std::mem::size_of::<FfiWorldMeshVertex>() as u32,
+            out.push(WorldMeshVertex {
                 color_argb: color,
                 normal_packed: normal,
                 light: decode_light(light_material, swap_light),
-                x: position[0],
-                y: position[1],
-                z: position[2],
-                u,
-                v,
-                atlas_u: u,
-                atlas_v: v,
+                position,
+                uv: [u, v],
+                shader_atlas_uv: [u, v],
                 shader_block_id: block_id,
                 shader_material_type: primitive[6] & 1,
                 terrain_material_bits: ((light_material >> 16) & 0xff) | if separate_ao { 0x100 } else { 0 },
@@ -316,59 +312,6 @@ pub fn decode_compact_terrain_vertices(
         segment_start += count;
     }
     Ok(vertex_count)
-}
-
-/// Decodes into `out` (`capacity` vertices) and `stats`. Returns the vertex
-/// count, or -2 for invalid input (including insufficient capacity).
-///
-/// # Safety
-/// Each pointer addresses its stated element count; `params` and `stats`
-/// one record each.
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_terrain_decode_compact_vertices(
-    buffer: *const u8,
-    buffer_len: u64,
-    params: *const FfiCompactTerrainDecodeParams,
-    segments: *const i32,
-    segment_ints: u32,
-    metadata: *const i32,
-    metadata_ints: u32,
-    out: *mut FfiWorldMeshVertex,
-    capacity: u32,
-    stats: *mut FfiCompactTerrainDecodeStats,
-) -> i32 {
-    if buffer.is_null() || params.is_null() || stats.is_null() || (capacity != 0 && out.is_null())
-        || (segment_ints != 0 && segments.is_null()) || (metadata_ints != 0 && metadata.is_null())
-    {
-        return -2;
-    }
-    let slice = |pointer: *const i32, count: u32| {
-        if count == 0 { &[][..] } else { std::slice::from_raw_parts(pointer, count as usize) }
-    };
-    let buffer = std::slice::from_raw_parts(buffer, buffer_len as usize);
-    let params = std::ptr::read_unaligned(params);
-    thread_local! {
-        static SCRATCH: std::cell::RefCell<Vec<FfiWorldMeshVertex>> = const { std::cell::RefCell::new(Vec::new()) };
-    }
-    SCRATCH.with(|scratch| {
-        let mut vertices = scratch.borrow_mut();
-        let mut decoded_stats = FfiCompactTerrainDecodeStats::default();
-        match decode_compact_terrain_vertices(
-            buffer,
-            &params,
-            slice(segments, segment_ints),
-            slice(metadata, metadata_ints),
-            &mut vertices,
-            &mut decoded_stats,
-        ) {
-            Ok(count) if count <= capacity as usize => {
-                std::ptr::copy_nonoverlapping(vertices.as_ptr(), out, count);
-                std::ptr::write_unaligned(stats, decoded_stats);
-                count as i32
-            }
-            _ => -2,
-        }
-    })
 }
 
 #[cfg(test)]

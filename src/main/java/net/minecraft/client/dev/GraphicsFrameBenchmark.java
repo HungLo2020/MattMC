@@ -2144,6 +2144,7 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"transparentSegments\": ").append(route.transparentSegments()).append(",\n");
 		json.append("    \"waterSegments\": ").append(route.waterSegments()).append(",\n");
 		json.append("    \"lifecycleResetCount\": ").append(route.lifecycleResetCount()).append(",\n");
+		json.append("    \"staleRouteExecutionReceipts\": ").append(net.vulkanic.world.DistantHorizonsSemanticCollector.staleRouteExecutionReceipts()).append(",\n");
 		json.append("    \"resourceReloadResetCount\": ").append(route.resourceReloadResetCount()).append(",\n");
 		field(json, "lastLifecycleResetReason", route.lastLifecycleResetReason(), 4, true);
 		json.append("    \"lastLifecycleRetirementsAcknowledged\": ").append(route.lastLifecycleRetirementsAcknowledged()).append(",\n");

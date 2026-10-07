@@ -197,7 +197,9 @@ Java keeps only what Rust cannot hold: the meshing workers, and the
   mode; this review did not rerun that comparison.
   [Selection eligibility and handoff](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L4921-L4979)
 - A finished build's layer meshes are decoded in Rust
-  ([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs)):
+  ([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs);
+  its C export, which writes the vertex ABI, is
+  [`bridge/world/terrain_intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/terrain_intake.rs)):
   compact positions, colour/AO, light, copied-atlas UVs, segment normals, the
   canonical block identity and mid-block words, plus the static-terrain audit's
   fault injections. It matched Java's former decoder bit for bit on 1,500+ real

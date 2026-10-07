@@ -43,7 +43,7 @@ fn metadata(block_id: i32, local: [i32; 3], material_type: i32, emission: i32) -
 
 const TOP: [[f32; 3]; 4] = [[0.0, 1.0, 0.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0], [1.0, 1.0, 0.0]];
 
-fn decode(buffer: &[u8], params: FfiCompactTerrainDecodeParams, segments: &[i32], meta: &[i32]) -> (Vec<FfiWorldMeshVertex>, FfiCompactTerrainDecodeStats) {
+fn decode(buffer: &[u8], params: FfiCompactTerrainDecodeParams, segments: &[i32], meta: &[i32]) -> (Vec<WorldMeshVertex>, FfiCompactTerrainDecodeStats) {
     let mut out = Vec::new();
     let mut stats = FfiCompactTerrainDecodeStats::default();
     decode_compact_terrain_vertices(buffer, &params, segments, meta, &mut out, &mut stats).unwrap();
@@ -87,7 +87,7 @@ fn segments_carry_facing_normals_positions_and_semantic_mid_blocks() {
     let (vertices, stats) = decode(&buffer, params(false, 0), &[4, 1], &metadata(3, [0, 0, 0], 0, 15));
     assert_eq!(4, vertices.len());
     assert!(vertices.iter().all(|vertex| vertex.normal_packed == pack_normal(0.0, 1.0, 0.0)));
-    assert_eq!([0.0, 1.0, 0.0], [vertices[0].x, vertices[0].y, vertices[0].z]);
+    assert_eq!([0.0, 1.0, 0.0], vertices[0].position);
     // Mid-block offset from the block centre (0.5, 0.5, 0.5), 1/64 units, plus emission.
     assert_eq!(32 | ((-32i32 as u32 & 0xff) << 8) | (32 << 16) | (15 << 24), vertices[0].mid_block_packed);
     assert_eq!([0.0, 1.0, 0.0], stats.min_position);

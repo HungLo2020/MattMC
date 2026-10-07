@@ -259,7 +259,7 @@ impl FullscreenPipelineCache {
 
     /// Destroys every parked plan, returning their stage leases, and refuses
     /// plans staged before now.
-    fn destroy_parked(&self, gal: &mut VulkanicGal) {
+    pub(crate) fn destroy_parked(&self, gal: &mut VulkanicGal) {
         let parked = {
             let mut parked = match self.parked.lock() {
                 Ok(parked) => parked,

@@ -17758,6 +17758,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		json.append("\"semanticColumnsReplaced\": ").append(route.semanticColumnsReplaced()).append(", ");
 		appendField(json, "lastPayloadDifference", route.lastPayloadDifference(), 0).append(", ");
 		json.append("\"lifecycleResetCount\": ").append(route.lifecycleResetCount()).append(", ");
+		json.append("\"staleRouteExecutionReceipts\": ").append(net.vulkanic.world.DistantHorizonsSemanticCollector.staleRouteExecutionReceipts()).append(", ");
 		json.append("\"resourceReloadResetCount\": ").append(route.resourceReloadResetCount()).append(", ");
 		json.append("\"worldUnloadResetCount\": ").append(route.worldUnloadResetCount()).append(", ");
 		appendField(json, "lastLifecycleResetReason", route.lastLifecycleResetReason(), 0).append(", ");

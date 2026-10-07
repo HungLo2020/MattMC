@@ -1150,3 +1150,46 @@ fn stage_cache_reuses_frame_invariant_objects_for_one_live_plan_at_a_time() {
     pipelines.destroy(&mut gal);
     targets_cache.destroy(&mut gal);
 }
+
+#[test]
+fn destroying_parked_plans_releases_their_input_sets_before_inputs_retire() {
+    // A parked plan's pack-resources set binds the frame's inputs (voxel
+    // volumes, source depth samplers). Runtime input teardown on world
+    // unload drops parked plans first so those inputs can be destroyed.
+    let source = source(
+        "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+    );
+    let program = program(&source);
+    let mut gal = crate::render::vulkanic::test_support::mock_gal();
+    let (manifest, targets, mut targets_cache) = staged(&source, &mut gal, true);
+    let pipelines = FullscreenPipelineCache::default();
+    let extent = Extent3d { width: 16, height: 16, depth: 1 };
+    let stage = |gal: &mut VulkanicGal| {
+        FullscreenSourceExecutionPlan::stage_cached(
+            gal,
+            &program,
+            &manifest,
+            &targets,
+            std::iter::once(empty_source_resource_snapshot(&source)),
+            extent,
+            Some((&pipelines, (1, 1))),
+        )
+        .unwrap()
+    };
+
+    let first = stage(&mut gal);
+    let parked_pack_set = first.bound.pack_resources_set;
+    first.destroy(&mut gal);
+
+    pipelines.destroy_parked(&mut gal);
+    assert!(gal.destroy(parked_pack_set).is_err(), "the parked plan's input set is already destroyed");
+
+    // The stage itself stays cached; the next frame binds fresh inputs.
+    let next = stage(&mut gal);
+    assert!(next.stage_lease.is_some());
+    assert_ne!(parked_pack_set, next.bound.pack_resources_set);
+    next.destroy(&mut gal);
+
+    pipelines.destroy(&mut gal);
+    targets_cache.destroy(&mut gal);
+}

@@ -275,6 +275,13 @@ prepares. This is Java-side backpressure; the native FIFO channel itself is
 unbounded. Capture, screenshot and RenderDoc frames drain the queue and run synchronously. While a
 frame is queued, completion takes retirement from the present result instead
 of querying the bridge. Submission acceptance is not presentation completion.
+
+A queued frame can complete after the world it was prepared for is gone (save
+and quit, resource reload). Completion receipts must not assert current
+renderer state: the DH material-route receipt carries the collector lifecycle
+captured when the frame was consumed (`PrimitiveFrame.distantHorizonsLifecycle`)
+and is dropped and counted (`staleRouteExecutionReceipts`, also in capture and
+benchmark JSON) when that lifecycle has been reset.
 The caller-side decode and arena closure are visible in
 [`world/exports.rs`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/rust/render/bridge/world/exports.rs#L200-L239)
 and [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2394-L2437).
