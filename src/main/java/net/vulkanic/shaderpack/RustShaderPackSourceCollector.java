@@ -148,6 +148,31 @@ public final class RustShaderPackSourceCollector {
 	 * produce a complete immutable snapshot.
 	 */
 	public static Optional<String> activeConfiguredPackName() {
+		// One disk check per render frame: the frame start and its submit
+		// receipts share it. Epoch 0 (no frame begun, e.g. tests) never memoizes.
+		long epoch = frameEpoch;
+		ActivePackMemo memo = activePackMemo;
+		if (epoch != 0L && memo != null && memo.epoch() == epoch) {
+			return memo.value();
+		}
+		Optional<String> value = activeConfiguredPackNameUncached();
+		if (epoch != 0L) {
+			activePackMemo = new ActivePackMemo(epoch, value);
+		}
+		return value;
+	}
+
+	private record ActivePackMemo(long epoch, Optional<String> value) {}
+
+	private static volatile long frameEpoch;
+	private static volatile ActivePackMemo activePackMemo;
+
+	/** Starts a render frame; configuration reads within it share one disk check. */
+	public static void beginFrameEpoch() {
+		frameEpoch++;
+	}
+
+	private static Optional<String> activeConfiguredPackNameUncached() {
 		try {
 			Optional<String> postEffect = activeVanillaPostEffectId();
 			if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
@@ -421,6 +446,7 @@ public final class RustShaderPackSourceCollector {
 	/** Called after an in-process settings write. */
 	public static void invalidateIrisProperties() {
 		irisPropertiesSnapshot = null;
+		activePackMemo = null;
 	}
 
 	/**

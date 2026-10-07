@@ -803,6 +803,7 @@ public final class RustGalFrameCoordinator {
 				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.consume-and-flush-world");
 				synchronized (LOCK) {
 					GraphicsFrameBenchmark.beginPhase("rust-gal.frame.refresh-pack-sources");
+					RustShaderPackSourceCollector.beginFrameEpoch();
 					refreshConfiguredShaderPackSourcesLocked();
 					GraphicsFrameBenchmark.endPhase("rust-gal.frame.refresh-pack-sources");
 					GraphicsFrameBenchmark.beginPhase("rust-gal.frame.flush-pending-assets");

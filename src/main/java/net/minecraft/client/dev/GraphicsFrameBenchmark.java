@@ -179,6 +179,8 @@ public final class GraphicsFrameBenchmark {
 	private static final int PHASE_SEGMENTS = Integer.getInteger("mattmc.dev.benchmark.phaseSegments", 0);
 	private static final Map<String, PhaseStats> EXCLUSIVE_PHASES = new LinkedHashMap<>();
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
+	/** Nested and exclusive stats by phase-name instance (names are literals); cleared with the maps. */
+	private static final java.util.IdentityHashMap<String, PhaseStats[]> PHASE_STATS_BY_NAME = new java.util.IdentityHashMap<>();
 	private static final Map<String, PhaseStats> COUNTER_SAMPLES = new LinkedHashMap<>();
 	private static final List<FrameTimelineEvent> FRAME_TIMELINE_EVENTS = new ArrayList<>();
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
@@ -507,6 +509,7 @@ public final class GraphicsFrameBenchmark {
 		FRAME_NANOS.clear();
 		EXCLUSIVE_PHASES.clear();
 		NESTED_PHASES.clear();
+		PHASE_STATS_BY_NAME.clear();
 		COUNTER_SAMPLES.clear();
 		lastDhSemanticColumnsBuilt = -1L;
 		lastDhSemanticColumnsReused = -1L;
@@ -716,8 +719,9 @@ public final class GraphicsFrameBenchmark {
 		}
 		if (measurementFrame) {
 			String label = phase.name().equals(name) ? name : phase.name() + "/ended-as/" + name;
-			NESTED_PHASES.computeIfAbsent(label, ignored -> new PhaseStats()).add(inclusive);
-			EXCLUSIVE_PHASES.computeIfAbsent(label, ignored -> new PhaseStats()).add(exclusive);
+			PhaseStats[] stats = phaseStats(label);
+			stats[0].add(inclusive);
+			stats[1].add(exclusive);
 			if (exclusiveAllocated >= 0L) {
 				COUNTER_SAMPLES.computeIfAbsent("java.alloc.phase." + label + "-bytes", ignored -> new PhaseStats())
 					.add(exclusiveAllocated);
@@ -725,12 +729,26 @@ public final class GraphicsFrameBenchmark {
 		}
 	}
 
+	private static PhaseStats[] phaseStats(String name) {
+		PhaseStats[] stats = PHASE_STATS_BY_NAME.get(name);
+		if (stats == null) {
+			stats = new PhaseStats[] {
+				NESTED_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()),
+				EXCLUSIVE_PHASES.computeIfAbsent(name, ignored -> new PhaseStats())
+			};
+			// Dynamic names are new instances each time; bound the identity cache.
+			if (PHASE_STATS_BY_NAME.size() < 4096) PHASE_STATS_BY_NAME.put(name, stats);
+		}
+		return stats;
+	}
+
 	public static void recordPhaseSample(String name, long nanos) {
 		if (!ENABLED || !frameActive || !measurementFrame || name == null || nanos < 0L) {
 			return;
 		}
-		NESTED_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
-		EXCLUSIVE_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
+		PhaseStats[] stats = phaseStats(name);
+		stats[0].add(nanos);
+		stats[1].add(nanos);
 	}
 
 	public static void recordCounterSample(String name, long value) {

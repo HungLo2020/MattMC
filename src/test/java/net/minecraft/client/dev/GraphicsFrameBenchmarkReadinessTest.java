@@ -64,12 +64,17 @@ class GraphicsFrameBenchmarkReadinessTest {
                 field.setAccessible(true);
                 var value = field.get(null);
                 if (!Modifier.isFinal(field.getModifiers())) values.put(field, value);
-                if (value instanceof Collection<?> collection) {
+                // Immutable constants (e.g. the GC bean list) need no restore.
+                if (value instanceof Collection<?> collection && !immutable(collection)) {
                     collections.put((Collection<Object>) collection, new ArrayList<>(collection));
                 } else if (value instanceof Map<?, ?> map) {
                     maps.put((Map<Object, Object>) map, new LinkedHashMap<>((Map<Object, Object>) map));
                 }
             }
+        }
+
+        private static boolean immutable(Collection<?> collection) {
+            return collection.getClass().getName().startsWith("java.util.ImmutableCollections");
         }
 
         @Override public void close() throws Exception {
