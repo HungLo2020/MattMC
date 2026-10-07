@@ -67,8 +67,8 @@ large camera origins, exact double values and dirty storage.
 ABI 69 appends `world_static_terrain_shadow_casters` (struct 112, 32-byte
 records: mesh key, generation, section origin, depth policy) and the frame's
 `static_terrain_camera` to the whole-frame request (struct 53, fields 47–48).
-The camera is required whenever casters are present. Java copies the caster
-arrays once per frame; Rust validates them and sorts them by key. Eligible
+The camera is required whenever casters are present. The current producer packs
+caster records before request encoding; Rust validates them and sorts them by key. Eligible
 resident casters stay compact for the shader-route scene; other resident
 casters expand into shadow-only instances. Rebuild Java and native code together.
 
@@ -95,8 +95,7 @@ See [the semantic collector](https://github.com/HungLo2020/MattMC/blob/master/sr
 ## Standalone query handles
 
 Some render-thread questions are answered by handles that share no context
-state with a pipelined frame, so asking never joins it. They use plain
-pointer arguments rather than ABI records.
+state with a pipelined frame, so asking never joins it. They use standalone pointer-based calls outside the context request protocol.
 
 - **Entity shadow query**
   ([`EntityShadowQuery.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/EntityShadowQuery.java),
@@ -108,8 +107,19 @@ pointer arguments rather than ABI records.
   pass admits. The frame plan applies the same admission again. "Undecided"
   (no policy, unresolved hooks) means Java keeps every candidate. The bridge
   owns the handle and destroys it before its context.
-- **Section graph** (Frozen's camera terrain search): see
-  [Render architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+- **Section graph** (Frozen's camera terrain search and ordinary compact terrain
+  selection): Java mirrors readiness/build facts and published solid/cutout/
+  translucent mesh rows. After camera search, `select_terrain` returns graph-owned
+  buffers for camera layers, optional off-camera shadow candidates and animated
+  section positions, plus producer counters. Camera/caster buffers use the same
+  ABI 70/69 layouts as the whole-frame request. Their views are valid only until
+  the next selection; Java copies them into packed pending storage, takes an
+  owned frame copy and copies that block into the request arena. Queued submission
+  then decodes/copies before the arena is released. This is a compact handoff,
+  not a retained borrow or zero-copy frame. See
+  [selection and lifetime](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustSectionGraph.java#L215-L282),
+  [packed frame storage](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L511-L591)
+  and [selection scope](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
 
 ## Rules the boundary tests enforce
 

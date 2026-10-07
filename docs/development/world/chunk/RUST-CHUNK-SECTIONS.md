@@ -1,6 +1,6 @@
 # Rust chunk section serialization
 
-Saving and loading a chunk now handle its `sections` list in Rust. In
+Eligible chunk saves and current-version loads handle the `sections` list in Rust. In
 [`storage/chunk/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/storage/chunk),
 each section is written straight as NBT tape:
 
@@ -53,7 +53,7 @@ packing and tape records. Java supplies vocabulary built once:
    way the codecs do: `PalettedContainer.unpack` with the decoded palette and
    words, `new DataLayer(bytes)`, and default containers for missing keys.
    `parse` reads everything else from the root.
-4. Java falls back to its original route in three cases: an older data
+4. Java falls back to its original route for tag-only input, a non-current data
    version, a Rust decline, or an `unpack` that does not succeed cleanly. It
    upgrades the full tag and parses it, so logging, partial results and
    exceptions are the original ones.
@@ -65,7 +65,10 @@ Rust declines, so Java decodes the chunk, for:
 - a `Y`, light layer, palette or `data` of an unexpected type or length
 
 Unknown keys, out-of-height sections (their containers are never read) and
-missing containers follow `parse` exactly and stay on Rust.
+missing containers are supported by the native route when the other eligibility
+checks pass. Native decode declines (`-2`) retain the original path; invalid
+status, result-transfer and downcall failures throw instead. A decline is not a
+promise of fallback after every exception.
 
 ## Constraints when changing this code
 
@@ -100,9 +103,10 @@ missing containers follow `parse` exactly and stay on Rust.
   An `IOException` from the Java tape writer now surfaces from `encode()` on the
   background executor (as `UncheckedIOException`), not from the IO thread's
   region write.
-- `-Dmattmc.storage.javaChunkSections=true` keeps Java encoding.
-  `NativeChunkSections.setEnabled` toggles this in tests. This migration
-  changes chunk-section saves; other storage owners keep their existing paths.
+- `-Dmattmc.storage.javaChunkSections=true` keeps Java section encoding and
+  decoding. `NativeChunkSections.setEnabled` toggles both in tests. This
+  migration changes chunk-section saves and loads; other storage owners keep
+  their existing paths.
   In particular, [POI already has a separate native tape route](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/world/entity/ai/village/poi/PoiManager.java#L80-L119).
 
 ## Verify a change
@@ -122,17 +126,22 @@ python3 DevUtils/tests/storage/VerifyRustChunkSections.py --forks 3
   and biomes; sections without containers; absent, lazy and explicit light.
 - an all-empty section list and a palette that names one state twice
 
-Loading is compared with a fingerprint of everything `parse` built:
+Loading compares a fingerprint of re-encoded data and selected section state:
 - the tape it re-encodes to
-- every section's palette class and entries (by identity), storage class,
-  bits and raw words, block counters, light layers and `Y`
+- every section's palette class and entry identity hashes, storage class,
+  bits and raw words, air/random-ticking flags, light layers and `Y`
+
+Identity hashes are not direct reference-equality assertions or a proof that
+all object identities match.
 
 The checks:
 - The 40 saved and 64 synthetic chunks are written to a region file and
   loaded on both routes. Every chunk must use Rust.
-- 24 edited chunks cover the decline and keep cases above. When the original
-  throws (a short light layer), both routes throw the same exception.
-- An older `DataVersion` must go through the upgrade function.
+- 24 edited chunks cover eight edits across three inputs. When the original
+  throws (a short light layer), both routes throw the same exception. The test
+  asserts at least twelve aggregate native loads, not each edit's exact route.
+- An older `DataVersion` must call an upgrade callback. That fixture uses an
+  identity callback with a counter, not an actual data-fixer migration.
 
 It also stores eight encoded chunks through `IOWorker`, queues `scanChunk`,
 `loadAsync` and `loadForParse`, then synchronizes and reads back through the
@@ -146,16 +155,19 @@ They do not run `ChunkMap.save`'s `copyOf` from live chunks, a full server, or
 concurrent saves and pending reads of the same chunk.
 
 The benchmark (`NativeChunkSectionsVerification`) times the 40 saved chunks in
-two cases:
+three cases:
 
 - `encode`: chunk data to tape
 - `save`: `encode` plus direct region file writes with `sync=false`
 - `load`: reading every chunk back from its region file and `parseLoaded`,
   including the unchanged Rust region read and decompression
 
-Parsing, live snapshots, `IOWorker` scheduling and final close/flush are outside
-the measured operations. The `save` and `load` results are not durable
-end-to-end save/load throughput.
+Initial corpus parsing, live snapshots, `IOWorker` scheduling and final
+close/flush are outside the measured operations. The `load` case does include
+`parseLoaded`, while its file creation is setup. Its checksum samples section
+count, chunk position and one block rather than the parity test's detailed
+fingerprint. The `save` and `load` results are not durable end-to-end save/load
+throughput.
 
 Three independent JVM pairs alternate the route order on the same CPUs. Each
 case must save at least 5% in every pair and at the upper 95% bootstrap
@@ -173,8 +185,9 @@ Parity: seven Java tests and three Rust tests passed.
 - Saving: byte-identical tapes for 40 saved chunks (960 sections, 1.8 MB of
   tape) and 64 synthetic chunks.
 - Loading: identical fingerprints for all 40 saved and 64 synthetic chunks,
-  every one through Rust. Of the 24 edited chunks, the 12 expected cases
-  stayed on Rust and the rest fell back with identical results or exceptions.
+  every one through Rust. The author reports twelve edited cases staying native
+  and twelve falling back with equal results or exceptions; the checked-in test
+  only enforces the weaker aggregate route condition described above.
 
 Mutation checks:
 - Saving: eleven semantic mutations were caught. They covered hash tie
@@ -206,13 +219,14 @@ remaining time. `load`'s pairs varied widely, from 21% to 54% saved.
 
 A few measured rounds overlapped JIT compilation (2, 4 and 4 of 180 samples
 per case). These are warmed subsystem timings on this machine and corpus, not
-whole-server claims. The benchmark's route guard requires some native chunks
-in native mode and zero in Java mode; the separate parity helper requires one
-native encoding per tested fixture. Those checks have different strength.
+whole-server claims. Benchmark guards require nonzero native encodes or loads
+in the relevant native mode and zero in Java mode. The encode and saved/synthetic
+load parity fixtures assert route use per fixture; edited-load cases use the
+aggregate condition above. These checks have different strength.
 
 ## Current review and recovery limits
 
-[The source review for #774](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6027620399)
+[The earlier save-only source review for #774](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6027620399)
 matched nineteen declared rewrites across eight production Java files against
 `5c02fd82`. That checks the edit boundary; this maintenance review did not rerun
 Java/Rust tests, mutation checks, benchmarks or live saves. Thread-local scratch
@@ -228,4 +242,12 @@ not create that malformed-input trigger. No runtime reproduction or world damage
 was observed in this review. Acceptance needs deterministic rejection-then-valid
 encoding and exceptional-completion regressions, alongside pending/coalescing,
 reopen and concurrent-save coverage; the successful fixtures above do not close
-those requirements. The load route added afterwards was not part of that review.
+those requirements. That earlier review did not cover loading.
+
+[The current load review](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6029878781)
+at `313e7a8a` reconstructed eight existing Java files from twenty-eight declared
+rewrites against `5c02fd82`. It inspected loading and confirmed both #818 save
+paths remain unchanged; `loadForParse` uses a separate throwing-task wrapper.
+No Java/Rust suite, benchmark, live save/load or recovery regression was rerun.
+Decode scratch, weak registry-name handles, pending native decoded results and
+the process-lifetime vocabulary still require lifecycle/memory evidence.

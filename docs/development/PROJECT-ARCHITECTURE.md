@@ -56,7 +56,8 @@ src/main/rust/
     │       └── raycast/
     └── level/
         ├── biome/
-        │   └── climate/
+        │   ├── climate/
+        │   └── search/
         ├── chunk/
         │   └── palette/
         ├── lighting/
@@ -98,6 +99,9 @@ World simulation and world data helpers belong here. Current code includes
 `world/level/color_map_color_util.rs` for Java color-map behavior,
 `world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md) (with the
 [biome fill](world/biome/RUST-BIOME-FILL.md) in `world/level/levelgen/biome_fill/`),
+[eligible biome searches](world/biome/RUST-BIOME-SEARCH.md) in
+`world/level/biome/search/` for compiled climate sampling and search traversal
+while Java retains acceptance preparation and horizontal random selection,
 [skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) and
 [block/sky light propagation and sky seeding](world/lighting/RUST-LIGHT-PROPAGATION.md)
 under `world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
@@ -205,8 +209,11 @@ to encode eligible section palettes, packed values, light layers and section Y
 straight into NBT tape. Java still snapshots live chunks, supplies registry
 vocabulary and biome names, builds the remaining root compound and owns save
 scheduling. Pending writes retain tape and create Java tags lazily when read;
-unsupported section inputs keep the Java encoding route. This boundary does
-not migrate the complete chunk lifecycle or establish concurrent-save parity.
+unsupported section inputs keep the Java encoding route. Eligible current-version
+loads also decode section tape natively; Java reconstructs containers and the
+remaining chunk state, with non-current/noncanonical input retaining upgrade
+and parse compatibility. This boundary does not migrate the complete chunk
+lifecycle or establish concurrent-save parity.
 The `nbt/`, `poi/` and `region/` modules retain their separate responsibilities.
 
 ### `platform/`

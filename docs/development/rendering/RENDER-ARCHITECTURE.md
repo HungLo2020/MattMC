@@ -95,12 +95,15 @@ their lifetime; this does not transfer semantic color ownership to Rust.
 See [`ClientLevel`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L952-L1004)
 and [`AirBasedFogEnvironment`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/renderer/fog/environment/AirBasedFogEnvironment.java#L20-L41).
 
-Java emits camera-visible terrain sections in ascending section-key order
-(`SectionKeyOrder`). Hash-map iteration order shifted as sections streamed, so
-identical sets missed Rust's batch-plan cache; opaque and shadow terrain do not
-depend on submission order, and translucent sections keep their camera-distance
-sort. Off-camera shadow casters cross as compact arrays (mesh key, generation,
-section origin, depth policy; ABI 69) instead of per-instance records. The
+Ordinary frames select camera-visible terrain layers in the Rust section graph,
+in ascending section-key order with translucent layers sorted back to front.
+The retained Java producer uses the same ordering (`SectionKeyOrder`) for
+ineligible diagnostic, fault, reload and readiness-receipt frames. Canonical
+ordering avoids cache misses caused by changing hash-map iteration order as
+sections stream; opaque and shadow terrain do not depend on submission order.
+Camera layers and off-camera shadow casters cross as packed compact records
+(mesh key, generation, section origin, depth policy; camera layers also carry
+flags), rather than per-instance records. The
 frontend retains compact entries on the armed shader route. Described resident
 sections become scene entries; only entries that cannot use that path expand
 into ordinary instances. Frames leaving the shader route, vanilla and Fabulous
@@ -162,9 +165,13 @@ which is outside any bridge context so selecting never joins a pipelined frame.
   Java mirrors each section's published layer meshes into the graph, and Rust
   emits the compact camera layers (key order, translucent back to front),
   shader shadow casters and animated-sprite sections in the frame records'
-  native layout. Java copies them into the request without a per-section
-  pass. Diagnostic, fault, reload and readiness-receipt frames keep the Java
-  producer; the two produce identical records.
+  native layout. Java copies these records without rebuilding each section's
+  record. It still mirrors readiness and published mesh rows, schedules builds,
+  and marks the selected animated sprites; entity culling can lazily read the
+  visits. Diagnostic, fault, reload, explicit per-record and readiness-receipt
+  frames keep the Java producer. The implementation author reports byte-identical
+  records over 1,800 frames per mode; this review did not rerun that comparison.
+  [Selection eligibility and handoff](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L4921-L4979)
 - Builds are requested in visit order; block-edit rebuilds go first. In-flight
   builds are capped at twice the worker count.
 - All-air sections of a ready column are built as empty at once, as in Frozen,
@@ -173,22 +180,35 @@ which is outside any bridge context so selecting never joins a pipelined frame.
   The shadow pass never schedules builds; Rust applies the shadow-pass test.
 - Entities follow Frozen's Sodium entity culling
   ([`RustGalEntityCullingHook`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalEntityCullingHook.java)):
-  a camera-pass entity whose culling box touches no section visited this frame
-  is not extracted. Glowing and named entities, very large boxes and the
-  shadow pass skip the check.
+  when the Sodium entity-culling option is enabled, a camera-pass entity whose
+  expanded culling box touches no section visited this frame is rejected before
+  the ordinary frustum test. Glowing/name-visible entities, very large boxes, boxes
+  outside level height and checks without an active frame search bypass this
+  additional rejection. The hook declares that it does not affect the shadow
+  pass; Java still extracts retained entities and their geometry.
 
 Keep the graph's behaviour identical to Frozen: its unit tests in
 `section_graph/tests.rs` pin each rule, so run
-`cargo test --lib section_graph` in `src/main/rust` after any change.
+`cargo test --lib section_graph` in `src/main/rust` after any change. Also run
+`cargo test --lib terrain_selection` for compact ordering, layer flags,
+empty/unbuilt exclusion, animation selection, shadow bounds and mesh-row removal.
+These numerical/record tests do not establish image or gameplay acceptance.
 
-The surrounding integration remains bounded: Java allows at most 4,096 camera
-sections (overflow throws) and 12,288 shadow-candidate sections (nearest candidates
-are retained when truncated). A port of the selection rules does not establish
-unbounded or end-to-end Frozen equivalence. Region draw order, Iris's
-non-culling frustum and moving the visible list into the scene remain work in
-the [retained-scene plan](RETAINED-SCENE.md#phases).
-[Capacity constants](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L109-L117)
-· [Overflow handling](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L1025-L1067)
+The integration remains bounded. The retained Java producer limits camera
+sections to 4,096 and throws on overflow; ordinary native selection bypasses
+that Java snapshot. Both producers limit off-camera shadow candidates to 12,288
+sections, retaining the nearest before restoring key order. Packed terrain
+entries share the 65,536-entry whole-frame budget with admitted mesh and orb
+instances; this counts layers/instances, not sections.
+[Current selection bound](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/rust/render/chunk/terrain_selection.rs#L203-L227)
+· [Combined frame budget](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L18027-L18038)
+
+A port of the selection rules does not establish unbounded or end-to-end Frozen
+equivalence. Region draw order, Iris's non-culling frustum and complete scene-owned
+visibility remain work in the [retained-scene plan](RETAINED-SCENE.md#phases).
+The earlier Java-path [capacity constants](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L109-L117)
+and [overflow handling](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L1025-L1067)
+remain historical reference for that producer.
 
 Source shadow terrain applies its existing dimension, distance and light-frustum
 policy before constructing batches. Validate every shadow candidate's asset
@@ -348,14 +368,18 @@ not preserve the scene or its depth. Keep this source policy in
 [`contracts/material.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/contracts/material.rs)
 and the prepared shader, outside the game-neutral GAL.
 
-On the direct (no shader pack) route, particle material quads draw in a late
-pass after translucent terrain, the DH vanilla-fade composites and receiver
-shadows, as Frozen's separate particles frame pass does
+On the direct, non-G-buffer route, material quads tagged
+`WORLD_MATERIAL_SOURCE_PARTICLES` draw in a late pass after translucent terrain,
+the DH vanilla-fade composites and receiver shadows, following Frozen's separate
+particles frame pass
 ([`vanilla/recording.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/vanilla/recording.rs)).
 A fade composite reconstructs distance from the vanilla depth/colour snapshot;
 a particle drawn before it is faded as if it were the terrain behind it.
-`direct_dh_fade_composites_run_before_particle_draws` pins the order. Clouds
-and weather still draw with the early material pass.
+`direct_dh_fade_composites_run_before_particle_draws` checks command order for
+single- and double-pass fading, not particle pixels or temporal stability.
+Clouds and weather remain in the early material pass. The change does not
+relocate model-mesh particles, Fabulous/G-buffer forward materials or selected
+shader-source passes; those routes need their own evidence.
 
 Named-source terrain packs one immutable CPU uniform block per used material
 pass and one for shadows in each frame. The block borrows its exact Rust source

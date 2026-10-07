@@ -2,15 +2,18 @@
 
 **Goal 5 remains incomplete.** The current review covers retained-scene,
 queued-frame, compact-terrain, visibility and rendering-cost work through
-[`121ad13c`](https://github.com/HungLo2020/MattMC/commit/121ad13c84e45555c34814d54a8199194b37f39c).
-It adds substantial native ownership and author-recorded workload improvements;
+[`313e7a8a`](https://github.com/HungLo2020/MattMC/commit/313e7a8a82a34dc915c4924a78da77c720af2f7e),
+including native compact terrain selection, camera entity culling and direct-route
+particle ordering. It adds native ownership and author-recorded workload improvements;
 it does not establish broad visual/temporal parity, full scene migration,
 long-run resource bounds or resolution of the earlier independent native crash.
 
 Java still supplies world/entity semantics, graph updates and build scheduling.
-Rust now performs camera section-graph selection and an off-camera entity-shadow
-prefilter, alongside native frame execution and GPU resource ownership. The
-visited terrain list still returns to Java. The final target remains one Rust
+Rust now performs camera section-graph search, ordinary compact terrain/caster
+selection and an off-camera entity-shadow prefilter, alongside native frame
+execution and GPU resource ownership. Java still reads visits for pending build
+work and lazy entity-culling checks, marks animated sprites and retains the
+ineligible-frame terrain producer. The final target remains one Rust
 executable supporting client and server, at most one separately loaded Rust
 library, and no Java. See [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
@@ -25,7 +28,26 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 7 source review
+
+- **Ordinary terrain selection:** Rust now forms compact camera layers, optional off-camera shadow candidates and animated-section positions from graph visits and mirrored published mesh rows. Java copies native-layout records without its ordinary visible-list/per-section record construction. It still owns readiness/build scheduling, mesh publication, animated-sprite marking and semantic producers; diagnostics, faults, reloads, explicit per-record mode and identity-receipt frames retain the Java producer. This advances the visibility phase without completing all retained-scene phases. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries) · [Bridge lifetime](JAVA-BRIDGE.md#standalone-query-handles)
+- **Camera entity culling:** the Sodium option gates an additional visited-section rejection before the ordinary frustum check. Glowing/name-visible entities and other documented bypass cases bypass the added rejection; the hook does not affect shadow-pass admission. This avoids some Java extraction work without moving entity semantics or adding Citadel model transport. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **Direct DH particle order:** particle-source material quads draw after the direct non-G-buffer route's DH vanilla-fade composites, translucent terrain and receiver shadows. The regression checks command order for both fade modes; the fixture supports live tint/mip/rotation inspection. Model-mesh particles, Fabulous/G-buffer and selected shader-source paths remain separate. The earlier [#748 selected-shader alpha review](https://github.com/HungLo2020/MattMC/issues/748#issuecomment-5972310449) is not replaced by this ordering repair. [Particle scope](RENDER-ARCHITECTURE.md#shader-controls-at-startup) · [Verification](RENDER-VERIFICATION.md)
+
+This review inspected source and test definitions at `313e7a8a`; it did not rerun
+native/Java tests, capture live gameplay or independently inspect the author's
+unbundled comparison/video artifacts. The three terrain-selection tests cover
+ordering/flags, empty or unbuilt sections, animation selection, bounded shadow
+candidates and duplicate/cleared mesh rows. The entity-culling commit adds no
+dedicated camera-hook regression. Neither those definitions nor the particle
+command-order check establish broad visual or temporal acceptance.
+
 ### October 6 source review
+
+The following bullets preserve the earlier
+[`121ad13c` checkpoint](https://github.com/HungLo2020/MattMC/commit/121ad13c84e45555c34814d54a8199194b37f39c). In particular,
+its Java-visible-list and camera-limit descriptions predate ordinary native
+record selection; use the October 7 scope above for current ownership.
 
 - **Queued whole frames:** the calling thread decodes and copies the queued request before Java releases its arena. The native FIFO then acquires, executes and presents frames, ordered with queued mesh updates and atlas ticks. Java keeps at most one frame queued ahead; non-queued context-registry access joins pending work and standalone queries remain separate. Captures drain to the synchronous route. The earlier worker-decode/borrowed-arena contract remains only for the single in-flight fallback when queuing is disabled. This does not establish all cancellation/failure recovery. [Bridge lifetime](JAVA-BRIDGE.md#pipelined-frames)
 - **Compact and retained terrain:** ABI 69/70 carries compact shadow casters and camera sections. Admitted shader frames use current-generation retained records and per-facing scene groups; pending, undescribed or camera-sorted entries retain ordinary expansion. Vanilla, Fabulous and frames leaving that route expand compact terrain. Diagnostic/fault/reload paths still support per-record data. These are partial scene capabilities, not completion of every planned phase. [Current scene route](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route)
@@ -71,6 +93,34 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### Updated October 6 summary reviewed October 7
+
+The [updated source-pinned summary](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/SUMMARY.md)
+still describes moving-camera workloads of 1,800 frames:
+
+| Reported workload | Rust/Vulkan | Frozen Java/OpenGL |
+| --- | --- | --- |
+| Complementary shader FPS / median frame | 280–294 FPS (latest 294) / 3.28 ms | 307 FPS / 2.99 ms |
+| Shader last 600 frames, mean frame time | 3.10–3.24 ms | 3.20 ms |
+| Shader GPU frame time | 3.18–3.23 ms | About 3.0 ms |
+| Vanilla FPS / median frame | 469–492 FPS / 1.73 ms | 937 FPS / 0.84 ms |
+
+The [same revision's progress log](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/PROGRESS.md#L13)
+reports the native terrain-selection comparison as one pair per mode:
+398→469 FPS vanilla and 280→294 FPS shaders, plus byte-identical compact records
+over 1,800 frames in each mode. These local pairs and the summary's ranges are
+different reports, not repeated independent confirmation or additive gains.
+Its entity-culling record explicitly rejects the unusually low vanilla error
+0.045 as entity evidence because that capture contains no entities; the later
+RGB error 0.202/0.347/0.382 is attributed to the usual water-animation variance.
+
+The falling-leaf fix has an author-reported fixture/window-video before/after
+and a source command-order regression. None was rerun by this documentation
+review. The last-600-frame slice does not establish full-run parity, and vanilla
+worker/GPU timings (1.4/0.69 ms) are component measurements, not independent
+costs to add to the frame median. Broad parity, repeated performance acceptance,
+long-run resource bounds and the independent crash remain open.
 
 #### October 6 speed summary
 
@@ -143,7 +193,15 @@ For source-input investigations use [RenderDoc observations](RENDERDOC-INPUTS.md
 
 ## Tracked follow-up
 
-The latest [ownership review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6027569797)
+The October 7 [terrain-selection review](https://github.com/HungLo2020/MattMC/issues/520#issuecomment-6029873623),
+[performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6029874156)
+and [DH particle-order review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6029874814)
+cover the `313e7a8a` source snapshot without closing those issues. They retain
+Java/retained-scene limits, the single-pair performance provenance and the
+direct-route particle scope. Source and test-definition inspection does not
+establish new runtime, image or temporal acceptance.
+
+The earlier [ownership review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6027569797)
 and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6027581285)
 cover `121ad13c` without closing either issue. They distinguish source/test
 inspection from the implementation author's measurements and captures; no
@@ -151,7 +209,8 @@ runtime suite or benchmark was rerun during this maintenance review.
 
 The previously verified source-review comments record bounded progress without
 closing these issues. They keep their original checkpoint scope; the October 6
-source and speed-summary reconciliation above does not update tracker state:
+source and speed-summary reconciliation and the October 7 source review above
+do not themselves update tracker state:
 
 | Topic | Verified comment link |
 | --- | --- |

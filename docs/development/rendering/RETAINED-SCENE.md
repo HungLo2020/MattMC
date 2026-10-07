@@ -2,8 +2,9 @@
 
 **Status: shader-route retained terrain and the Rust visibility search are
 implemented in part; the full scene target remains open (October 2026).**
-ABI 70 carries compact terrain, while diagnostic and other routes retain
-their documented expansion paths. The phase list separates remaining targets
+ABI 70 carries compact terrain, and ordinary frames now select those compact
+camera layers and shadow candidates in the Rust section graph. Diagnostic and
+other routes retain their documented producer and expansion paths. The phase list separates remaining targets
 from the current implementation; it is not a declaration of parity completion.
 
 ## Why
@@ -85,18 +86,25 @@ Static chunk sections whose meshes are resident are drawn by
 - Camera runs carry shadow twins; the camera sections' unselected faces and
   the light-frustum casters become shadow-only runs. Translucent runs keep
   frame order and split on any state change.
-- Shadow casters follow Frozen: Java offers only sections the camera
-  traversal has built (no shadow-only builds), and every section, camera
-  visible or not, casts only if it passes Sodium's shadow-tree leaf test
-  (`source_shadow_origin_intersects`: centre ±8, no distance cylinder).
+- Shadow candidates come from sections the camera traversal has built, with
+  no shadow-only builds. Ordinary frames select them from Rust's mirrored graph
+  meshes; diagnostic and other ineligible frames retain the Java producer.
+  Every section, camera visible or not, casts only if it passes Sodium's
+  shadow-tree leaf test (`source_shadow_origin_intersects`: centre ±8, no
+  distance cylinder).
 - Undescribed sections (first frame after upload, changed material ids, a
   pending upload) and camera-sorted translucent sections keep the batch path.
 - Terrain coverage receipts subtract the scene's indices
   (`SourceTerrainDrawCoverage::without_scene`); the scene covers its own by
   construction (`scene_terrain` and `indexed_indirect_runs_*` tests).
 
-Since ABI 70, Java sends visible sections and casters as compact entries (see
-[Java Bridge](JAVA-BRIDGE.md)). When the shader route is armed, admission
+Since ABI 70, visible section layers and casters cross the Java bridge as compact
+entries (see [Java Bridge](JAVA-BRIDGE.md)). Ordinary frames now form them in
+[`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/rust/render/chunk/terrain_selection.rs);
+Java copies the native records into its frame/request storage. Java still owns
+readiness/build scheduling, mesh publication, animated-sprite marking and the
+ineligible-frame producer. Native record selection and retained GPU scene drawing
+are separate steps. When the shader route is armed, admission
 (`frame/static_terrain.rs`) keeps them compact: `take_scene_terrain` turns
 described sections and casters into scene entries and expands only the rest
 into instances. A frame that leaves the shader route, and every other route,
@@ -122,11 +130,15 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
 3. **Visibility in Rust.** Port Frozen's Sodium occlusion search exactly onto
    the scene's section graph; Java sends only camera and frustum. Removes the
    Java terrain enqueue (~1.2 ms).
-   *Status:* the search runs in Rust (`chunk/section_graph.rs`) with
-   Frozen-identical camera selection. Java still copies the visited list back
-   to build its visible list and schedule builds; render-list region order,
-   Iris's non-culling frustum and moving the visible list into the scene
-   remain.
+   *Status:* the search runs in Rust (`chunk/section_graph.rs`), and ordinary
+   frames also select compact camera layers, shadow candidates and animated
+   sections in `chunk/terrain_selection.rs`. Java skips its visible-list and
+   per-section record construction on that route. It still consumes visits
+   when scheduling needed builds or lazily checking entity visibility, mirrors
+   published mesh rows and marks selected animated sprites. Diagnostic/fault/
+   reload/readiness-receipt frames keep the Java producer. Render-list region
+   order, Iris's non-culling frustum and complete scene-owned visibility remain;
+   this does not complete every phase or remove Java.
 4. **Static instance data.** World origins become persistent per-section data
    and the camera a per-frame uniform, so nothing per-section is written while
    only the camera moves.

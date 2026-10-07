@@ -471,6 +471,23 @@ from frame to frame. `MATTMC_TRACE_PARTICLE_QUADS=N` logs the first N decoded
 particle quads per frame (texture, surface, UVs, ARGB, light, centre) to stderr;
 stable values there with changing pixels point at a GPU pass, not the producer.
 
+The new ordering regression is limited to direct, non-G-buffer particle material
+quads. Run from the repository root:
+
+```sh
+(cd src/main/rust && cargo test --lib direct_dh_fade_composites_run_before_particle_draws)
+./gradlew test --tests net.minecraft.client.particle.GraphicsAuditLeafParticleFixtureTest
+```
+
+The Rust test checks a particle draw after the last DH fade snapshot for both
+single- and double-pass modes; it does not compare output pixels. The three Java
+fixture tests check positions and invalid look direction, not tint rendering or
+live frame stability. Retain live DH-on/off, shader-disabled evidence for the
+leaf fix; model particles, Fabulous/G-buffer and selected shader-source behavior
+need separate checks. The earlier selected-shader hidden/visible cutout evidence
+also remains separate. Source/test inspection here is not a rerun of either test
+command or the author's before/after window video.
+
 ## 3. Real-config session
 
 Set diagnostic environment options before launching. Production renderer

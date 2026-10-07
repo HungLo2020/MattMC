@@ -5,8 +5,11 @@ Rust. The BIOMES stage of plain multi-noise chunks also samples and searches in
 Rust, in one call per chunk; see [biome fill](RUST-BIOME-FILL.md). Section generation batches its 64 queries when sampling uses known built-in
 density functions, packing each sample immediately without retaining a batch of
 temporary sample objects. Blending, retrogen, and extension callbacks keep their original
-call order; individual default climate searches still use Rust. Single-leaf trees
-return their sole Java value directly because there is no search to perform.
+call order; individual default climate searches still use Rust. Individual
+single-leaf lookups return their sole Java value directly. Eligible
+[horizontal and closest-biome searches](RUST-BIOME-SEARCH.md) instead combine
+compiled sampling and climate traversal in one native call, retaining Java's
+acceptance preparation and horizontal random-result selection.
 
 ## Changing the evaluator
 
@@ -77,7 +80,10 @@ The oracle instruments Java climate-sampling/search entry points. The later
 and bypasses those hooks, so `--biome-oracle` alone does not directly verify
 its internal samples or searches. Use `NativeBiomeFillTest` for focused stage-output
 and previous-leaf parity; stored-biome full-world hashes are a separate
-observable.
+observable. The later [native biome-search loop](RUST-BIOME-SEARCH.md) also
+samples and searches inside Rust, so these Java hooks do not directly audit
+its internal calls. Its focused search fixtures compare results, random state
+and previous-leaf state under their documented caller/coverage limits.
 See the [world-generation guide](../levelgen/RUST-WORLDGEN-ORGANIZATION.md)
 for standalone Rust tests without renderer dependencies. Finite test corpora establish
 exact agreement for tested cases, not a proof covering every possible world seed,

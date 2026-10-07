@@ -12,8 +12,9 @@ the climate searches and the visiting order. The Java bridge is
 ## What runs where
 
 - Rust samples each position with the `RandomState` sampler's six functions,
-  compiled once per sampler as a point program. Those functions have no cache
-  markers, so it evaluates them directly. It quantizes climate as
+  cached by sampler identity as a point program. Concurrent first lookups can
+  compile more than once before one program wins insertion. Those functions
+  have no cache markers, so it evaluates them directly. It quantizes climate as
   `Climate.target` does: a float cast, then ×10000.
 - Rust searches the climate tree in visiting order from the thread's previous
   leaf. A single-leaf list returns its leaf without searching, as Java does.
@@ -40,11 +41,14 @@ the climate searches and the visiting order. The Java bridge is
   variant keep the Java loop.
 - Only an exact `MultiNoiseBiomeSource` with an exact `Climate.ParameterList`
   is eligible, and only when every sampler function compiles.
-- The debug flags `DEBUG_ONLY_GENERATE_HALF_THE_WORLD` and
-  `debugGenerateSquareTerrainWithoutNoise` keep Java.
+- Horizontal searches keep Java under `DEBUG_ONLY_GENERATE_HALF_THE_WORLD`
+  or `debugGenerateSquareTerrainWithoutNoise`. The closest-search bridge does
+  not apply those two guards. Horizontal grids above 2²² samples and closest
+  spirals with radius/step above 2²⁰ also retain Java.
 - If a sample fails or a climate search finds no leaf, Rust writes nothing
   back and Java runs the whole search itself, reproducing the original
-  outcome. Invalid ABI input throws instead.
+  outcome. Invalid ABI status and downcall failures throw instead; this is
+  not a blanket exception fallback.
 - Sampling is pure, so Rust may sample a column's remaining Ys after the match
   that ends a 3D search. Only searched samples move the previous leaf.
 - `-Dmattmc.worldgen.javaBiomeSearch=true` keeps Java searching.
@@ -65,9 +69,11 @@ and the thread's previous leaf afterwards. Worlds:
 - large biomes
 - custom single-leaf and three-point lists
 
-Searches use random centres, radii, steps, vertical steps and accepted sets,
-including empty sets. The `HolderSet` overload is checked against the original
-predicate search. All ring positions of two overworld seeds are compared
+Searches use random centres, radii, steps, vertical steps and accepted sets.
+Empty acceptance is covered by horizontal searches; the closest-search fixture
+replaces an empty set with a biome and calls the protected search through a test
+bridge. It does not exercise public predicate/vertical-position preparation.
+The `HolderSet` overload is checked against the original predicate search. All ring positions of two overworld seeds are compared
 through `ChunkGeneratorStructureState`.
 
 The ring placement runs on the background executor. Each thread's previous
@@ -76,15 +82,19 @@ routes alike. The single-threaded comparisons fix that state.
 
 The benchmark (`NativeBiomeSearchVerification`) has two cases:
 
-- `rings`: an overworld's concentric-ring positions through
-  `ChunkGeneratorStructureState`, wall time on three CPUs
-- `locate`: twelve `/locate biome`-style spiral searches for rare biomes
+- `rings`: construction of an overworld structure state through completed
+  concentric-ring positions, wall time with a three-CPU process mask
+- `locate`: twelve rare-biome spiral searches through the protected test accessor,
+  excluding the public method's predicate-set and vertical-position preparation
 
 Three independent JVM pairs alternate the route order on the same CPUs. Each
 case must save at least 5% in every pair and at the upper 95% bootstrap bound.
 Results are written to `build/biome-search-migration/acceptance/`. Inspect
 `results.json` → `performance` → each case's `passes` value: the driver
-records a failed performance gate without failing its process.
+records a failed performance gate without failing its process. Timing guards
+require a nonzero native completion count, not a native completion for every
+timed search. The shared process CPU mask does not establish individual
+caller/worker affinity.
 
 ## Status
 
@@ -93,7 +103,8 @@ The implementation author recorded release acceptance on 2026-10-06: Ryzen 5
 
 Parity: three Java tests passed with identical outcomes for 216 horizontal
 searches, 108 closest searches and 256 ring positions. Eight Rust biome tests
-also passed.
+also passed; that broader biome filter includes two new search tests for spiral
+order and float quantization.
 
 Mutation checks: eight semantic mutations were all caught.
 - Spiral direction order, horizontal axes and closest-search Y quarts.
@@ -117,3 +128,13 @@ and 88.6% (`locate`). `rings` is wall time across the background executor's
 threads. JIT compilation on those threads overlapped 51 of its 180 measured
 samples, which are included; `locate` had none. These are warmed timings on
 this machine, not whole-server claims.
+
+## Source-review boundary
+
+[The current #775 review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6029879854)
+reconstructed three existing Java files from nine declared rewrites against
+`121ad13c`. This verifies the edit boundary, not runtime parity. The Java/native
+fixtures, mutation outcomes and timing table above are implementation-author
+records; no suites, benchmarks or live locate/structure generation were rerun
+by this maintenance review. Weak-key program lifetime, concurrent first-use and
+world/registry transitions retain separate acceptance requirements.
