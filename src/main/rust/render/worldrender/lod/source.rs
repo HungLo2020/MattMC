@@ -7,7 +7,8 @@ use crate::render::worldrender::lod::*;
 /// deliberately does not participate in this cache key.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) struct WorldLodSourceProgramKey {
-    pub(in crate::render::worldrender::lod) identity: String,
+    /// Shared, so the per-draw key clones are reference-count bumps.
+    pub(in crate::render::worldrender::lod) identity: std::sync::Arc<str>,
     pub(in crate::render::worldrender::lod) shader_pack_generation: u64,
     pub(in crate::render::worldrender::lod) color_format: TextureFormat,
     pub(in crate::render::worldrender::lod) cull_mode: u32,
@@ -23,7 +24,7 @@ impl WorldLodSourceProgramKey {
         color_format: TextureFormat,
     ) -> GalResult<Self> {
         Ok(Self {
-            identity: program.identity.as_str().to_string(),
+            identity: std::sync::Arc::from(program.identity.as_str()),
             shader_pack_generation: program.shader_pack_generation,
             color_format,
             // This probe is diagnostic-only. It is deliberately part of the
@@ -38,8 +39,10 @@ impl WorldLodSourceProgramKey {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) struct WorldLodSourceDrawKey {
-    pub(in crate::render::worldrender::lod) program: WorldLodSourceProgramKey,
+    // The column draw orders first: draws of one program then compare
+    // integers instead of the program's identical (string-bearing) key.
     pub(in crate::render::worldrender::lod) draw: WorldLodDrawResourceKey,
+    pub(in crate::render::worldrender::lod) program: WorldLodSourceProgramKey,
 }
 
 /// Stable, semantic set-one identity for one source-derived DH program. The
