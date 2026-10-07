@@ -13,8 +13,10 @@ their tables from it.
 
 Still separate:
 - items, entity types, tags and biomes: no Rust registry yet
-- rendering's meshing-state records and shader-pack state-name snapshot,
-  which still come from rendering's own bridges
+- rendering's own meshing-state columns (models, materials, passes,
+  shader-pack IDs, tint, sprites), which rendering owns by design; their
+  block facts come from the registry
+- the shader-pack state-name snapshot
 
 ## Proposal
 

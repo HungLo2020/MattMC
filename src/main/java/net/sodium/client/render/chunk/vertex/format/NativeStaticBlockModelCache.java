@@ -4,6 +4,8 @@ import net.minecraft.util.NativeLibraryLoader;
 import org.lwjgl.system.MemoryUtil;
 
 import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.ByteBuffer;
@@ -69,7 +71,40 @@ public final class NativeStaticBlockModelCache {
                     ValueLayout.JAVA_FLOAT,
                     ValueLayout.JAVA_INT));
 
+    // Rendering's own columns; Rust takes the block facts from its block registry.
+    // Critical: the sprite floats are a heap array borrowed for the call.
+    private static final MethodHandle REGISTER_STATE_VIEW = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_native_meshing_state_register_view",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+            Linker.Option.critical(true));
+    /** {@link #registerStateView} controls: fluids forced to Java; a fluid the native producer supports. */
+    public static final int CONTROL_JAVA_FLUIDS = 1;
+    public static final int CONTROL_NATIVE_FLUID = 1 << 1;
+
     private NativeStaticBlockModelCache() {
+    }
+
+    /** Registers a state from rendering's own columns; Rust fills its block facts
+     * (air, solid render, occlusion, block entity, motion, emission, fluid,
+     * offsets) from the block registry. {@code flags} holds only the
+     * render-owned bits; {@code sprites} the still, flow and overlay fluid
+     * sprites (u0, u1, v0, v1, shrink each). False when Rust cannot describe the
+     * state; register it with {@link #registerState} instead. */
+    public static boolean registerStateView(int stateId, int selectorId, int flags, int materialBits, int passId,
+            int renderType, int blockId, int fluidMaterialBits, int fluidPassId, int fluidBlockId, int skipGroup,
+            int skipMask, int tintType, int control, float[] sprites, int fluidOverlayValid) {
+        if (sprites.length != 15) throw new IllegalArgumentException("Expected 15 sprite values");
+        try {
+            return (int) REGISTER_STATE_VIEW.invokeExact(stateId, selectorId, flags, materialBits, passId, renderType,
+                    blockId, fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, skipMask, tintType, control,
+                    MemorySegment.ofArray(sprites), fluidOverlayValid) == OK;
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native meshing state view register downcall failed", throwable);
+        }
     }
 
     public static void clear() {

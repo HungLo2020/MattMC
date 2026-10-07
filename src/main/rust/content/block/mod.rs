@@ -50,7 +50,7 @@ pub const DIRECTIONS: usize = 6;
 /// Boolean facts about a state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(transparent)]
-pub struct StateFlags(pub u8);
+pub struct StateFlags(pub u16);
 
 impl StateFlags {
     /// `isAir()`.
@@ -68,10 +68,64 @@ impl StateFlags {
     /// A `BlockState` subclass. Its answers are not plain data, so consumers
     /// leave these states to Java.
     pub const CUSTOM: StateFlags = StateFlags(64);
-    pub(crate) const ALL: u8 = 127;
+    /// `isSolidRender()`.
+    pub const SOLID_RENDER: StateFlags = StateFlags(128);
+    /// `canOcclude()`.
+    pub const CAN_OCCLUDE: StateFlags = StateFlags(256);
+    /// `hasBlockEntity()`.
+    pub const BLOCK_ENTITY: StateFlags = StateFlags(512);
+    /// The fluid state's `FALLING` property is true.
+    pub const FLUID_FALLING: StateFlags = StateFlags(1024);
+    pub(crate) const ALL: u16 = 2047;
 
     pub const fn contains(self, flag: StateFlags) -> bool {
         self.0 & flag.0 != 0
+    }
+}
+
+/// A state's fluid: `getFluidState()`'s type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum FluidKind {
+    #[default]
+    None = 0,
+    /// `Fluids.WATER` or `Fluids.FLOWING_WATER`.
+    Water = 1,
+    /// `Fluids.LAVA` or `Fluids.FLOWING_LAVA`.
+    Lava = 2,
+    Other = 3,
+}
+
+impl FluidKind {
+    pub(crate) fn from_u8(value: u8) -> Option<Self> {
+        Some(match value {
+            0 => Self::None,
+            1 => Self::Water,
+            2 => Self::Lava,
+            3 => Self::Other,
+            _ => return None,
+        })
+    }
+}
+
+/// `BlockBehaviour.OffsetType`: how a state's model is offset by position.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum OffsetType {
+    #[default]
+    None = 0,
+    Xz = 1,
+    Xyz = 2,
+}
+
+impl OffsetType {
+    pub(crate) fn from_u8(value: u8) -> Option<Self> {
+        Some(match value {
+            0 => Self::None,
+            1 => Self::Xz,
+            2 => Self::Xyz,
+            _ => return None,
+        })
     }
 }
 
@@ -85,6 +139,10 @@ pub struct StateFacts {
     pub emission: u8,
     /// `LightEngine.getOcclusionShape(state, direction)` per direction.
     pub light_faces: [FaceId; DIRECTIONS],
+    pub fluid: FluidKind,
+    /// `getFluidState().getOwnHeight()` as `f32` bits (0 without a fluid).
+    pub fluid_height_bits: u32,
+    pub offset: OffsetType,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -120,6 +178,8 @@ pub struct Block {
     /// Properties in name order; the last varies fastest, as in
     /// `StateDefinition`'s state expansion.
     slots: Vec<Slot>,
+    /// `getMaxHorizontalOffset()` and `getMaxVerticalOffset()` as `f32` bits.
+    max_offset_bits: [u32; 2],
 }
 
 impl Block {
@@ -129,6 +189,16 @@ impl Block {
 
     pub fn default_state(&self) -> StateId {
         self.default
+    }
+
+    /// `getMaxHorizontalOffset()`.
+    pub fn max_horizontal_offset(&self) -> f32 {
+        f32::from_bits(self.max_offset_bits[0])
+    }
+
+    /// `getMaxVerticalOffset()`.
+    pub fn max_vertical_offset(&self) -> f32 {
+        f32::from_bits(self.max_offset_bits[1])
     }
 
     pub fn states(&self) -> impl ExactSizeIterator<Item = StateId> {
@@ -167,6 +237,9 @@ pub struct BlockRegistry {
     light_block: Vec<u8>,
     emission: Vec<u8>,
     light_faces: Vec<[FaceId; DIRECTIONS]>,
+    fluid: Vec<FluidKind>,
+    fluid_height_bits: Vec<u32>,
+    offset: Vec<OffsetType>,
     face_count: usize,
     occludes: Vec<u8>,
     air: Option<BlockId>,
@@ -220,6 +293,19 @@ impl BlockRegistry {
 
     pub fn light_face(&self, state: StateId, direction: usize) -> FaceId {
         self.light_faces[state.index()][direction]
+    }
+
+    pub fn fluid(&self, state: StateId) -> FluidKind {
+        self.fluid[state.index()]
+    }
+
+    /// `getFluidState().getOwnHeight()`.
+    pub fn fluid_height(&self, state: StateId) -> f32 {
+        f32::from_bits(self.fluid_height_bits[state.index()])
+    }
+
+    pub fn offset(&self, state: StateId) -> OffsetType {
+        self.offset[state.index()]
     }
 
     /// Columns for consumers that scan every state.
@@ -347,9 +433,18 @@ impl Builder {
             count: count as u16,
             default: StateId((first + default as usize) as u16),
             slots,
+            max_offset_bits: [0.25f32.to_bits(), 0.2f32.to_bits()],
         });
         self.states.extend(states.into_iter().map(|facts| (BlockId(id), facts)));
         Ok(BlockId(id))
+    }
+
+    /// Sets a block's `getMaxHorizontalOffset()` and `getMaxVerticalOffset()`
+    /// (by default Java's 0.25 and 0.2).
+    pub fn max_offsets(&mut self, block: BlockId, horizontal: f32, vertical: f32) -> Result<(), Error> {
+        let block = self.blocks.get_mut(block.0 as usize).ok_or(Error::Invalid("block id"))?;
+        block.max_offset_bits = [horizontal.to_bits(), vertical.to_bits()];
+        Ok(())
     }
 
     /// Validates and freezes the registry with the face truth table
@@ -378,6 +473,9 @@ impl Builder {
             light_block: Vec::with_capacity(n),
             emission: Vec::with_capacity(n),
             light_faces: Vec::with_capacity(n),
+            fluid: Vec::with_capacity(n),
+            fluid_height_bits: Vec::with_capacity(n),
+            offset: Vec::with_capacity(n),
             face_count,
             occludes,
         };
@@ -392,6 +490,9 @@ impl Builder {
             registry.light_block.push(facts.light_block);
             registry.emission.push(facts.emission);
             registry.light_faces.push(facts.light_faces);
+            registry.fluid.push(facts.fluid);
+            registry.fluid_height_bits.push(facts.fluid_height_bits);
+            registry.offset.push(facts.offset);
         }
         Ok(registry)
     }

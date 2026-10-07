@@ -153,11 +153,12 @@ fn empty_clear_preserves_every_padding_bit() {
 fn tables_intern_up_and_down_faces_in_state_order() {
     use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
     // Registry faces: 0 empty, 1 full, 2 bottom slab top, 3 a side face.
-    let state = |light_block: u8, faces: [u16; 6], flags: u8| StateFacts {
+    let state = |light_block: u8, faces: [u16; 6], flags: u16| StateFacts {
         flags: StateFlags(flags),
         light_block,
         emission: 0,
         light_faces: faces.map(FaceId),
+        ..StateFacts::default()
     };
     let mut b = Builder::new();
     b.block("minecraft:air", &[], 0, vec![state(0, [0; 6], 0)]).unwrap();
@@ -189,7 +190,7 @@ fn tables_decline_too_many_faces() {
     use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
     let mut b = Builder::new();
     let states = (0..300u16)
-        .map(|i| StateFacts { flags: StateFlags(0), light_block: 0, emission: 0, light_faces: [FaceId(2 * i + 1), FaceId(2 * i + 2), FaceId(0), FaceId(0), FaceId(0), FaceId(0)] })
+        .map(|i| StateFacts { flags: StateFlags(0), light_block: 0, emission: 0, light_faces: [FaceId(2 * i + 1), FaceId(2 * i + 2), FaceId(0), FaceId(0), FaceId(0), FaceId(0)], ..StateFacts::default() })
         .collect::<Vec<_>>();
     let values: Vec<String> = (0..300).map(|i| i.to_string()).collect();
     let p = b.property("i", &values.iter().map(String::as_str).collect::<Vec<_>>()).unwrap();

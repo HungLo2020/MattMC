@@ -62,9 +62,42 @@ class NativeBlockRegistryTest {
             assertEquals((boolean)isEmptyShape.invoke(null, s), (f & NativeBlockRegistry.LIGHT_EMPTY_SHAPE) != 0);
             assertEquals(s.getBlock() instanceof LeavesBlock, (f & NativeBlockRegistry.LEAVES) != 0);
             assertEquals(s.getClass() != BlockState.class, (f & NativeBlockRegistry.CUSTOM) != 0);
+            assertEquals(s.isSolidRender(), (f & NativeBlockRegistry.SOLID_RENDER) != 0);
+            assertEquals(s.canOcclude(), (f & NativeBlockRegistry.CAN_OCCLUDE) != 0);
+            assertEquals(s.hasBlockEntity(), (f & NativeBlockRegistry.BLOCK_ENTITY) != 0);
+            var fluid = s.getFluidState();
+            assertEquals(fluid.hasProperty(net.minecraft.world.level.material.FlowingFluid.FALLING)
+                && fluid.getValue(net.minecraft.world.level.material.FlowingFluid.FALLING), (f & NativeBlockRegistry.FLUID_FALLING) != 0);
             assertEquals(s.getLightBlock(), lightBlock[id], "light block of " + id);
             assertEquals(s.getLightEmission(), emission[id], "emission of " + id);
         }
+    }
+
+    @Test
+    void fluidsAndOffsetsMatchEveryState() {
+        int[] kinds = NativeBlockRegistry.column(9), heights = NativeBlockRegistry.column(10), offsets = NativeBlockRegistry.column(11);
+        int[] maxOffsets = NativeBlockRegistry.column(12);
+        int water = 0, lava = 0, offset = 0;
+        for (int id = 0; id < states; id++) {
+            BlockState s = state(id);
+            var fluid = s.getFluidState();
+            int kind = fluid.isEmpty() ? 0 : fluid.is(net.minecraft.world.level.material.Fluids.WATER)
+                || fluid.is(net.minecraft.world.level.material.Fluids.FLOWING_WATER) ? 1
+                : fluid.is(net.minecraft.world.level.material.Fluids.LAVA) || fluid.is(net.minecraft.world.level.material.Fluids.FLOWING_LAVA) ? 2 : 3;
+            assertEquals(kind, kinds[id], "fluid of " + s);
+            assertEquals(Float.floatToRawIntBits(fluid.isEmpty() ? 0.0F : fluid.getOwnHeight()), heights[id], "fluid height of " + s);
+            assertEquals(s.sodium$getOffsetType().ordinal(), offsets[id], "offset of " + s);
+            water += kind == 1 ? 1 : 0;
+            lava += kind == 2 ? 1 : 0;
+            offset += offsets[id] != 0 ? 1 : 0;
+        }
+        assertEquals(BuiltInRegistries.BLOCK.size() * 2, maxOffsets.length);
+        for (Block block : BuiltInRegistries.BLOCK) {
+            int b = BuiltInRegistries.BLOCK.getId(block);
+            assertEquals(Float.floatToRawIntBits(block.defaultBlockState().sodium$getMaxHorizontalOffset()), maxOffsets[b * 2], "offset of " + block);
+            assertEquals(Float.floatToRawIntBits(block.defaultBlockState().sodium$getMaxVerticalOffset()), maxOffsets[b * 2 + 1], "offset of " + block);
+        }
+        System.out.println("BLOCK_REGISTRY_FLUIDS water=" + water + " lava=" + lava + " offset_states=" + offset);
     }
 
     @Test

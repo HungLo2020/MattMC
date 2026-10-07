@@ -24,9 +24,13 @@ exports the frozen registries once and Rust installs them.
 - **Per-state columns:**
   - the owning block
   - `StateFlags`: air, blocks motion, has fluid, random ticks, light-empty
-    shape, leaves, and custom `BlockState` subclass
+    shape, leaves, custom `BlockState` subclass, solid render, can occlude,
+    block entity, and falling fluid
   - light block and emission
   - six light occlusion faces
+  - fluid kind (none, water, lava, other) and the fluid's own height
+  - model offset type; each block also has its maximum horizontal and
+    vertical offsets
 - **Faces:** the light occlusion faces (`LightEngine.getOcclusionShape`) interned
   by exact box list, with face 0 empty. The face table holds
   `Shapes.faceShapeOccludes` for every pair; Java computes it at export.
@@ -48,9 +52,21 @@ its code, and Java passes state IDs:
 | [Carvers](../world/levelgen/carver/index.md) | the block column | nothing |
 | [Chunk sections](../world/chunk/RUST-CHUNK-SECTIONS.md) | each state's `BlockState.CODEC` tape fragment and palette storage bits | state IDs as labels |
 | [Palette packing](../world/chunk/RUST-PALETTE-PACKING.md) | none: a global palette's state IDs are their own labels | no label table for global palettes |
+| Terrain meshing states (`render/chunk/meshing`) | the block facts of each meshing state | rendering's own columns (below) |
 
-Rendering keeps its own meshing-state tables until its owner and this plan are
-reconciled.
+**Terrain meshing states** mix rendering's own columns with block facts.
+`NativeStaticBlockModelRegistry` sends only rendering's columns through
+`registerStateView`: the model selector, materials and passes, shader-pack
+IDs, tint, skip groups, fluid sprites, and the model, cullable and
+fluid-overlay flags. Two controls say whether fluids are forced to Java and
+whether the native producer supports the state's fluid.
+[`state_from_registry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/meshing/cache.rs)
+fills in the rest from the registry: air, solid render, occlusion, block
+entity, motion, emission, fluid type, height and falling, and offsets. The
+explicit `registerState` remains for corpus replays, benchmarks, and states
+Rust declines (custom subclasses, or no registry).
+`NativeMeshingStateViewTest` checks that both give the same record for
+every state.
 
 ## Adding a column or a consumer
 

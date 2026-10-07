@@ -29,7 +29,9 @@ pub unsafe extern "C" fn mattmc_block_registry_install(ints: *const i32, int_len
 /// Columns of the installed registry, for verification: 0 block ID, 1 flags,
 /// 2 light block, 3 emission, 4 six face IDs, 5 each property's value index
 /// (block property order), 6 `with_value` for each property and value index,
-/// 7 default state per block, 8 the face truth table. Writes when `out_len` is large enough and
+/// 7 default state per block, 8 the face truth table, 9 fluid kind, 10 fluid
+/// height (`f32` bits), 11 offset type, 12 each block's maximum horizontal
+/// and vertical offsets (`f32` bits). Writes when `out_len` is large enough and
 /// returns the value count; -1 when nothing is installed or `kind` is unknown.
 /// # Safety
 /// `out` addresses `out_len` values.
@@ -64,6 +66,14 @@ fn column(registry: &BlockRegistry, kind: i32) -> Option<Vec<i32>> {
             .collect(),
         7 => registry.blocks().iter().map(|b| b.default_state().0 as i32).collect(),
         8 => registry.face_matrix().iter().map(|&o| o as i32).collect(),
+        9 => states().map(|s| registry.fluid(s) as i32).collect(),
+        10 => states().map(|s| registry.fluid_height(s).to_bits() as i32).collect(),
+        11 => states().map(|s| registry.offset(s) as i32).collect(),
+        12 => registry
+            .blocks()
+            .iter()
+            .flat_map(|b| [b.max_horizontal_offset().to_bits() as i32, b.max_vertical_offset().to_bits() as i32])
+            .collect(),
         _ => return None,
     })
 }

@@ -95,11 +95,12 @@ fn sky_section_fills_above_sources_and_enqueues_edges() {
 #[test]
 fn registry_tables_number_types_in_state_order() {
     use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
-    let state = |flags: u8, light_block: u8, emission: u8, face: u16| StateFacts {
+    let state = |flags: u16, light_block: u8, emission: u8, face: u16| StateFacts {
         flags: StateFlags(flags),
         light_block,
         emission,
         light_faces: [FaceId(face); 6],
+        ..StateFacts::default()
     };
     let empty = StateFlags::LIGHT_EMPTY_SHAPE.0;
     let mut b = Builder::new();

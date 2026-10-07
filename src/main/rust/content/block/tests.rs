@@ -1,8 +1,8 @@
 use super::export::{decode, FORMAT};
 use super::*;
 
-fn facts(flags: u8, light_block: u8) -> StateFacts {
-    StateFacts { flags: StateFlags(flags), light_block, emission: 0, light_faces: [FaceId(0); DIRECTIONS] }
+fn facts(flags: u16, light_block: u8) -> StateFacts {
+    StateFacts { flags: StateFlags(flags), light_block, ..StateFacts::default() }
 }
 
 /// air; stone; a crop (age 0..3); stairs-like (facing × half × waterlogged).
@@ -14,8 +14,12 @@ fn sample() -> BlockRegistry {
     let wet = b.property("waterlogged", &["true", "false"]).unwrap();
     b.block("minecraft:air", &[], 0, vec![facts(1, 0)]).unwrap();
     b.block("minecraft:stone", &[], 0, vec![facts(2, 15)]).unwrap();
-    b.block("minecraft:wheat", &[age], 0, (0..4).map(|a| facts(8, a)).collect()).unwrap();
-    b.block("minecraft:oak_stairs", &[facing, half, wet], 3, (0..16).map(|_| facts(2, 0)).collect()).unwrap();
+    let wheat = b.block("minecraft:wheat", &[age], 0, (0..4).map(|a| StateFacts { offset: OffsetType::Xz, ..facts(8, a) }).collect()).unwrap();
+    b.max_offsets(wheat, 0.5, 0.125).unwrap();
+    // Waterlogged ("true", the first value) stairs hold a still water source.
+    b.block("minecraft:oak_stairs", &[facing, half, wet], 3, (0..16)
+        .map(|i| if i % 2 == 0 { StateFacts { fluid: FluidKind::Water, fluid_height_bits: (8.0f32 / 9.0).to_bits(), ..facts(2 | 4, 0) } } else { facts(2, 0) })
+        .collect()).unwrap();
     b.finish(1, vec![0]).unwrap()
 }
 
@@ -31,6 +35,11 @@ fn ids_are_contiguous_per_block() {
     assert_eq!(r.block_of(StateId(21)), BlockId(3));
     assert_eq!(r.light_block(StateId(1)), 15);
     assert_eq!(r.light_block(StateId(4)), 2);
+    assert_eq!((r.offset(StateId(3)), r.block(BlockId(2)).max_horizontal_offset(), r.block(BlockId(2)).max_vertical_offset()),
+        (OffsetType::Xz, 0.5, 0.125));
+    assert_eq!((r.block(BlockId(1)).max_horizontal_offset(), r.block(BlockId(1)).max_vertical_offset()), (0.25, 0.2));
+    assert_eq!((r.fluid(StateId(6)), r.fluid_height(StateId(6))), (FluidKind::Water, 8.0 / 9.0));
+    assert_eq!((r.fluid(StateId(7)), r.fluid_height(StateId(7))), (FluidKind::None, 0.0));
 }
 
 #[test]
@@ -90,7 +99,7 @@ fn builder_rejects_inconsistent_input() {
     b.block("x", &[], 0, vec![StateFacts { light_faces: [FaceId(1); 6], ..facts(0, 0) }]).unwrap();
     assert!(b.finish(1, vec![0]).is_err());
     let mut b = Builder::new();
-    b.block("x", &[], 0, vec![facts(128, 0)]).unwrap();
+    b.block("x", &[], 0, vec![facts(1 << 15, 0)]).unwrap();
     assert!(b.finish(1, vec![0]).is_err());
     let mut b = Builder::new();
     b.block("x", &[], 0, vec![facts(0, 0)]).unwrap();
@@ -127,6 +136,8 @@ fn export(r: &BlockRegistry) -> (Vec<i32>, Vec<u16>, Vec<u8>) {
     for b in r.blocks() {
         put(b.name(), &mut ints);
         ints.push((b.default_state().0 - b.state_range().start as u16) as i32);
+        ints.push(b.max_horizontal_offset().to_bits() as i32);
+        ints.push(b.max_vertical_offset().to_bits() as i32);
         ints.push(b.properties().len() as i32);
         ints.extend(b.properties().map(|p| p.0 as i32));
     }
@@ -138,7 +149,9 @@ fn export(r: &BlockRegistry) -> (Vec<i32>, Vec<u16>, Vec<u8>) {
     for s in 0..r.state_count() {
         let s = StateId(s as u16);
         ints.extend((0..DIRECTIONS).map(|d| r.light_face(s, d).0 as i32));
-        bytes.extend([r.flags(s).0, r.light_block(s), r.emission(s)]);
+        ints.push(r.flags(s).0 as i32);
+        ints.push(r.fluid_height(s).to_bits() as i32);
+        bytes.extend([r.light_block(s), r.emission(s), r.fluid(s) as u8, r.offset(s) as u8]);
     }
     bytes.extend_from_slice(r.face_matrix());
     (ints, chars, bytes)
@@ -165,7 +178,7 @@ fn export_rejects_damage() {
     assert!(decode(&format, &chars, &bytes).is_err());
     // A value index that is not the arithmetic layout (two stair states swapped).
     let mut swapped = ints.clone();
-    let values_at = ints.len() - 22 * DIRECTIONS - (16 * 3 + 4);
+    let values_at = ints.len() - 22 * (DIRECTIONS + 2) - (16 * 3 + 4);
     let first_stairs = values_at + 4;
     swapped.swap(first_stairs + 2, first_stairs + 5);
     assert_eq!(decode(&swapped, &chars, &bytes), Err(Error::Invalid("export state layout")));

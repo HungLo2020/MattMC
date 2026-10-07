@@ -26,9 +26,11 @@ production-path benchmark, and docs.
   own parity tests. Evidence is in
   [block registry verification](BLOCK-REGISTRY-VERIFICATION.md).
 
+- Rendering's terrain meshing states take their block facts from the
+  registry. Rendering keeps its own columns: models, materials, passes,
+  shader-pack IDs, tint and sprites.
+
 Not done in Phase 1, by design:
-- Rendering's meshing-state columns wait for the plan to be reconciled with
-  the rendering work.
 - Items with default components, entity types, tags and biomes have no Rust
   consumer yet. Each joins the registry with its first consumer; items
   arrive with Phase 2's definitions. Adding them earlier would be unused code.
@@ -72,8 +74,10 @@ tint, model-selector and shader-pack material tables. In this plan:
   render types and pack material IDs.
 - **Those columns are keyed by the shared `StateId`**, built from
   `content::Registries` instead of raw integers and text snapshots.
-- The rendering agent is working on its own tables now. Once this plan is
-  final, the two are reconciled before Phase 1 touches render tables.
+- Done for terrain meshing states: their block facts come from the registry,
+  and rendering sends only its own columns (see the
+  [registry's consumers](RUST-BLOCK-REGISTRY.md#consumers)). The shader-pack
+  state-name snapshot is still separate.
 
 ## Decided
 

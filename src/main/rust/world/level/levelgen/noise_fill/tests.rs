@@ -181,7 +181,7 @@ fn random_sources_follow_java_rules() {
 fn state_flags_follow_the_registry() {
     use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
     use crate::world::level::levelgen::proto_chunk::FLAG_AIR_BLOCK;
-    let state = |flags: u8| StateFacts { flags: StateFlags(flags), light_block: 0, emission: 0, light_faces: [FaceId(0); 6] };
+    let state = |flags: u16| StateFacts { flags: StateFlags(flags), light_block: 0, emission: 0, light_faces: [FaceId(0); 6], ..StateFacts::default() };
     let mut b = Builder::new();
     b.block("minecraft:air", &[], 0, vec![state(StateFlags::AIR.0)]).unwrap();
     b.block("minecraft:cave_air", &[], 0, vec![state(StateFlags::AIR.0)]).unwrap();

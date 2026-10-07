@@ -84,7 +84,7 @@ fn block_storage_bits_follow_the_block_strategy() {
 #[test]
 fn vocabulary_fragments_omit_default_properties_and_keep_hash_order() {
     use crate::content::block::{Builder, FaceId, StateFacts, StateFlags, StateId};
-    let facts = StateFacts { flags: StateFlags(0), light_block: 0, emission: 0, light_faces: [FaceId(0); 6] };
+    let facts = StateFacts { flags: StateFlags(0), light_block: 0, emission: 0, light_faces: [FaceId(0); 6], ..StateFacts::default() };
     let mut b = Builder::new();
     let lit = b.property("lit", &["true", "false"]).unwrap();
     let facing = b.property("facing", &["north", "south"]).unwrap();

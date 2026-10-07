@@ -207,3 +207,98 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
     });
     OK
 }
+
+/// Registers a state from rendering's own columns; the block facts (air,
+/// solid render, occlusion, block entity, motion, emission, fluid and
+/// offsets) come from the installed block registry. `flags` carries only the
+/// render-owned bits; `control` says whether fluids are forced to Java and
+/// whether the native producer supports this state's fluid. Returns
+/// `ERR_INVALID_ARGUMENT` without a registry or for a state it cannot
+/// describe; Java then registers the state with explicit facts.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register_view(
+    state_id: i32,
+    selector_id: i32,
+    flags: i32,
+    material_bits: i32,
+    pass_id: i32,
+    render_type: i32,
+    block_id: i32,
+    fluid_material_bits: i32,
+    fluid_pass_id: i32,
+    fluid_block_id: i32,
+    skip_group: i32,
+    skip_mask: i32,
+    tint_type: i32,
+    control: i32,
+    sprites: *const f32,
+    fluid_overlay_valid: i32,
+) -> i32 {
+    if sprites.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    let s = std::slice::from_raw_parts(sprites, 15);
+    let sprite = |i: usize| FluidSprite { u0: s[i], u1: s[i + 1], v0: s[i + 2], v1: s[i + 3], shrink: s[i + 4] };
+    let render = RenderColumns {
+        selector_id,
+        flags,
+        material_bits,
+        pass_id,
+        render_type,
+        block_id,
+        fluid_material_bits,
+        fluid_pass_id,
+        fluid_block_id,
+        skip_group,
+        skip_mask,
+        tint_type,
+        fluid_still: sprite(0),
+        fluid_flow: sprite(5),
+        fluid_overlay: sprite(10),
+        fluid_overlay_valid,
+    };
+    let Some(registry) = crate::content::block::installed() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let Some(state) = state_from_registry(registry, state_id, render, control) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let Ok(mut states) = native_meshing_states().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let Ok(index) = ensure_table_slot(&mut states, state_id) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    states[index] = Some(state);
+    OK
+}
+
+/// Verification: a registered state's fields. `ints` receives selector, flags,
+/// material bits, pass, emission, render type, block ID, fluid material bits,
+/// fluid pass, fluid block ID, skip group, skip mask, fluid type, falling,
+/// offset type, tint type and overlay validity (17); `floats` receives fluid
+/// height, maximum horizontal and vertical offsets, then the still, flow and
+/// overlay sprites (18). Returns `OK`, or `ERR_INVALID_ARGUMENT` when the
+/// state is not registered.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_snapshot(state_id: i32, ints: *mut i32, floats: *mut f32) -> i32 {
+    if ints.is_null() || floats.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    let Ok(states) = native_meshing_states().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let Some(s) = state_by_id(&states, state_id) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let values = [s.selector_id, s.flags, s.material_bits, s.pass_id, s.block_emission, s.render_type, s.block_id, s.fluid_material_bits,
+        s.fluid_pass_id, s.fluid_block_id, s.skip_group, s.skip_mask, s.fluid_type, s.fluid_falling, s.offset_type, s.tint_type,
+        s.fluid_overlay_valid];
+    std::slice::from_raw_parts_mut(ints, values.len()).copy_from_slice(&values);
+    let mut f = vec![s.fluid_own_height, s.max_horizontal_offset, s.max_vertical_offset];
+    for sprite in [s.fluid_still, s.fluid_flow, s.fluid_overlay] {
+        f.extend([sprite.u0, sprite.u1, sprite.v0, sprite.v1, sprite.shrink]);
+    }
+    std::slice::from_raw_parts_mut(floats, f.len()).copy_from_slice(&f);
+    OK
+}

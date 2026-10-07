@@ -16,6 +16,9 @@ import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.lighting.LightEngine;
+import net.minecraft.world.level.material.FlowingFluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -26,10 +29,13 @@ import org.jetbrains.annotations.Nullable;
  * pass state IDs and let Rust derive their tables from it; when it is not
  * {@link #ready()} they keep their Java paths. Layout: {@code content/block/export.rs}. */
 public final class NativeBlockRegistry {
-    private static final int FORMAT = 1;
+    private static final int FORMAT = 2;
     private static final int MAX_STATES = 65535;
     // Flag bits, shared with content/block/mod.rs StateFlags.
-    static final int AIR = 1, BLOCKS_MOTION = 2, HAS_FLUID = 4, RANDOM_TICKS = 8, LIGHT_EMPTY_SHAPE = 16, LEAVES = 32, CUSTOM = 64;
+    static final int AIR = 1, BLOCKS_MOTION = 2, HAS_FLUID = 4, RANDOM_TICKS = 8, LIGHT_EMPTY_SHAPE = 16, LEAVES = 32, CUSTOM = 64,
+        SOLID_RENDER = 128, CAN_OCCLUDE = 256, BLOCK_ENTITY = 512, FLUID_FALLING = 1024;
+    // Fluid kinds, shared with content/block/mod.rs FluidKind.
+    static final int FLUID_NONE = 0, FLUID_WATER = 1, FLUID_LAVA = 2, FLUID_OTHER = 3;
     private static final MethodHandle INSTALL = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_block_registry_install",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
@@ -122,6 +128,8 @@ public final class NativeBlockRegistry {
             ints.add(name.length());
             chars.append(name);
             ints.add(Block.BLOCK_STATE_REGISTRY.getId(block.defaultBlockState()) - Block.BLOCK_STATE_REGISTRY.getId(possible.get(0)));
+            ints.add(Float.floatToRawIntBits(block.defaultBlockState().sodium$getMaxHorizontalOffset()));
+            ints.add(Float.floatToRawIntBits(block.defaultBlockState().sodium$getMaxVerticalOffset()));
             var blockProperties = block.getStateDefinition().getProperties();
             ints.add(blockProperties.size());
             for (Property<?> property : blockProperties) ints.add(properties.get(property));
@@ -137,15 +145,19 @@ public final class NativeBlockRegistry {
         var ids = new HashMap<List<AABB>, Integer>();
         var shapes = new ArrayList<VoxelShape>();
         face(Shapes.empty(), seen, ids, shapes);
-        var bytes = new ByteArrayOutputStream(stateCount * 3);
+        var bytes = new ByteArrayOutputStream(stateCount * 4);
         Direction[] directions = Direction.values();
         for (int id = 0; id < stateCount; id++) {
             BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
             for (Direction direction : directions) ints.add(face(LightEngine.getOcclusionShape(state, direction), seen, ids, shapes));
             if (shapes.size() > 65535) return null;
-            bytes.write(flags(state));
+            ints.add(flags(state));
+            FluidState fluid = state.getFluidState();
+            ints.add(Float.floatToRawIntBits(fluid.isEmpty() ? 0.0F : fluid.getOwnHeight()));
             bytes.write(state.getLightBlock());
             bytes.write(state.getLightEmission());
+            bytes.write(fluidKind(fluid));
+            bytes.write(state.sodium$getOffsetType().ordinal());
         }
         int faces = shapes.size();
         ints.set(4, faces);
@@ -168,7 +180,19 @@ public final class NativeBlockRegistry {
         if (!state.canOcclude() || !state.useShapeForLightOcclusion()) flags |= LIGHT_EMPTY_SHAPE;
         if (state.getBlock() instanceof LeavesBlock) flags |= LEAVES;
         if (state.getClass() != BlockState.class) flags |= CUSTOM;
+        if (state.isSolidRender()) flags |= SOLID_RENDER;
+        if (state.canOcclude()) flags |= CAN_OCCLUDE;
+        if (state.hasBlockEntity()) flags |= BLOCK_ENTITY;
+        FluidState fluid = state.getFluidState();
+        if (fluid.hasProperty(FlowingFluid.FALLING) && fluid.getValue(FlowingFluid.FALLING)) flags |= FLUID_FALLING;
         return flags;
+    }
+
+    static int fluidKind(FluidState fluid) {
+        if (fluid.isEmpty()) return FLUID_NONE;
+        if (fluid.is(Fluids.WATER) || fluid.is(Fluids.FLOWING_WATER)) return FLUID_WATER;
+        if (fluid.is(Fluids.LAVA) || fluid.is(Fluids.FLOWING_LAVA)) return FLUID_LAVA;
+        return FLUID_OTHER;
     }
 
     private static <T extends Comparable<T>> List<String> valueNames(Property<T> property) {
