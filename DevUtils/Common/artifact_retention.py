@@ -407,6 +407,96 @@ def remove_copied_game_dirs(root: Path, scope: Path | None = None) -> list[Path]
     return removed
 
 
+def retire_completed_fixtures(root: Path) -> dict[str, list[str]]:
+    """Called only after the invocation's comparisons finish; keep input receipts.
+
+    Capture preservation protects evidence, not regenerable workspace copies.
+    Unknown fixtures, external paths and live process workspaces are retained.
+    """
+    root = assert_marked_root(root)
+    removed: list[str] = []
+    retained: list[str] = []
+    candidates: list[Path] = []
+    for directory, dirs, _ in os.walk(root):
+        for name in list(dirs):
+            candidate = Path(directory) / name
+            if name == CANONICAL_FIXTURE_DIR_NAME:
+                if candidate.is_symlink():
+                    retained.append(str(candidate))
+                    dirs.remove(name)
+                    continue
+                for fixture in candidate.iterdir():
+                    manifest_path = fixture / "fixture_manifest.json"
+                    run = fixture / "run"
+                    if not run.is_dir():
+                        continue
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                        source = canonical(Path(manifest["source_run"]))
+                        known = (manifest.get("schema") == "mattmc-cross-repo-fixture-v2"
+                                 and canonical(Path(manifest["run_root"])) == canonical(run)
+                                 and not source.is_relative_to(canonical(run))
+                                 and not canonical(run).is_relative_to(source))
+                    except (OSError, ValueError, KeyError, TypeError):
+                        known = False
+                    if known and not fixture.is_symlink() and not run.is_symlink():
+                        candidates.append(run)
+                    else:
+                        retained.append(str(run))
+                dirs.remove(name)
+            elif name.startswith(COPIED_GAME_DIR_PREFIXES):
+                candidates.append(candidate)
+                dirs.remove(name)
+    for candidate in candidates:
+        if candidate.is_symlink():
+            retained.append(str(candidate))
+            continue
+        candidate = assert_inside_marked_root(root, candidate)
+        # Without process visibility, leave workspace ownership unproven.
+        if not Path("/proc").is_dir() or _live_process_references(candidate, str(candidate)):
+            retained.append(str(candidate))
+            continue
+        # Native crash receipts can be emitted inside a copied game directory.
+        crash_files = [*candidate.glob("hs_err_pid*.log"), *candidate.glob("core*"),
+                       *candidate.glob("crash-reports/*")]
+        if any(path.is_file() for path in crash_files):
+            if not (root / ".keep").exists():
+                (root / ".keep").write_text("Native crash evidence; unpin after its investigation is resolved.\n")
+            retained.append(str(candidate))
+            continue
+        shutil.rmtree(candidate)
+        removed.append(str(candidate))
+    return {"removed_workspaces": removed, "retained_workspaces": retained}
+
+
+def retire_old_invocations(current: Path, schema: str, *, protected_labels: Iterable[str] = ()) -> list[str]:
+    """Keep the latest success and failure of this driver, plus explicit pins.
+
+    Only completed, marked invocations with the exact driver's schema qualify.
+    Unknown/older tools and live work remain outside automatic retirement.
+    """
+    current = assert_marked_root(current)
+    groups: dict[bool, list[Path]] = {}
+    for candidate in current.parent.iterdir():
+        if (not candidate.is_dir() or candidate.is_symlink() or candidate.name in protected_labels
+                or (candidate / ".keep").exists() or not (candidate / MARKER_NAME).is_file()):
+            continue
+        try:
+            summary = json.loads((candidate / "summary.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(summary, dict) and summary.get("schema") == schema and type(summary.get("passed")) is bool:
+            groups.setdefault(summary["passed"], []).append(candidate)
+    removed: list[str] = []
+    for group in groups.values():
+        for candidate in sorted(group, key=lambda path: (path / "summary.json").stat().st_mtime, reverse=True)[1:]:
+            if candidate == current or not Path("/proc").is_dir() or _live_process_references(candidate, str(candidate)):
+                continue
+            shutil.rmtree(candidate)
+            removed.append(str(candidate))
+    return removed
+
+
 def capture_run_ids(scope: Path) -> set[str]:
     if not scope.exists():
         return set()

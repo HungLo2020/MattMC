@@ -2,7 +2,10 @@
 
 This document describes the Rust source layout for MattMC. It intentionally does not mirror the Java package tree. Rust code is organized by subsystem ownership so the tree can grow toward the long-term native engine architecture.
 
-The completed runtime target is **one Rust executable** supporting client and dedicated-server modes, **at most one separately loaded Rust library**, and **no Java**. Current Java bridges, configuration and CPU semantic producers describe the incremental migration, not completion of that target. See the [Goal 5 rendering checkpoint](rendering/GOAL-5-STATUS.md) for the current rendering boundary and evidence limits.
+The completed runtime target is **one Rust executable** supporting client and dedicated-server modes, **one Rust library**, and **no Java**. Current Java bridges, configuration and CPU semantic producers describe the incremental migration, not completion of that target. See the [Goal 5 rendering checkpoint](rendering/GOAL-5-STATUS.md) for the current rendering boundary and evidence limits.
+
+The active [Rust migration milestones](RUST-MIGRATION.md) target one Rust library
+and one executable and specify ownership and acceptance for the whole project.
 
 ## Rust Source Layout
 

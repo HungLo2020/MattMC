@@ -61,7 +61,7 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
 ```
 
-The [driver at `697b0a3c`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/DevUtils/tests/rendering/RunValidation.py)
+The [driver](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/RunValidation.py)
 orchestrates a bounded set of tests and workloads:
 
 1. Java tests in `net.vulkanic.*`, `net.sodium.*`, `com.seibel.*` and
@@ -82,7 +82,10 @@ orchestrates a bounded set of tests and workloads:
    it requests one 1,800-frame current-client run in each of four modes.
    `--perf` instead requests current/Frozen/current/Frozen (ABAB), two runs per
    side and mode with 6,000 measured frames each. `--perf-repeats` changes the
-   repetitions. Both protocols request 360 settle and 240 warm-up frames.
+   repetitions (at least two per side). Both protocols request 360 settle and
+   240 warm-up frames. `--perf` requires all four modes to meet Frozen's paired
+   median average FPS and not worsen paired median p99. A healthy run alone
+   does not meet this performance check; desktop noise requires more evidence.
 
 The Java native-library build and current-client capture/FPS commands request
 the release profile, with line-table debug information and stripping disabled
@@ -96,27 +99,23 @@ labels are refused): `summary.md`, `summary.json`, step logs and timings.
 All four input paths must exist even when associated steps are skipped:
 `--run-source`, `--vanilla-run-source`, `--shader-pack`, and the fixed sibling
 Frozen checkout `../MattMC_JavaPerfTesting/MattMC`. The driver refuses existing
-matching client JVMs at startup. Its later cleanup sends `SIGKILL` to any
-`java` process whose command line contains `KnotClient` or `devlaunchinjector`,
-without tracking whether this driver launched it. Use an isolated session and
-do not start another matching client during the run.
+matching client JVMs at startup. Later cleanup targets matching Java clients
+whose working directories lie inside this invocation's output tree, checking
+process start identity and using pidfds where available. An owned orphan
+rejects acceptance. Repeat `--jvm-arg=<option>` for current-client options;
+these are not forwarded into Frozen's gameplay benchmark.
 
 Treat the summary as an index into evidence, not an all-checks certificate:
 
-- A recorded failing step makes the aggregate fail, but an exception in the
-  background thread can omit the requested Rust/wiki results and leave the
-  remaining steps reporting PASS. Verify every intended step is present and
-  completed, including its logs. The independently isolated seven Python
-  driver tests pass; a fully mocked orchestration check reproduces this false
-  PASS after a background `OSError`, without running clients, builds or cleanup.
-  [#822](https://github.com/HungLo2020/MattMC/issues/822) tracks this orchestration
-  defect; helper-test success does not establish aggregate completeness.
-- FPS health rejects recognized exceptions, nonzero reported terrain failures
-  and reported VUIDs. Missing matching logs, absent VUID counts and missing
-  terrain counters can still appear clean. It does not itself require the
-  expected measured-frame count or validate every exit/core receipt; inspect
-  the underlying Gameplay artifacts and retain the checks in
-  [performance A/B](#4-performance-ab).
+- Every requested step must be present and pass; background exceptions become
+  explicit failed results. The lifecycle summary must contain every requested
+  scenario. Mocked orchestration tests cover the prior background-`OSError`
+  false PASS described in [#822](https://github.com/HungLo2020/MattMC/issues/822).
+- FPS health requires explicit zero VUIDs, successful capture exit, complete
+  publishable/crash-free/device-loss-free sampler receipts, exact measured-frame
+  count, valid positive timings and no orphan/RSS guard. Missing health fields
+  fail. Inspect actual receipts and the [performance A/B](#4-performance-ab)
+  equivalence checks; these fields do not prove all workload equivalence.
 - The parity reader consumes the latest matching numeric report and current
   VUID records; it does not visually inspect PNGs. Review the listed
   side-by-side images (water, DH, sky and clouds), effective mode, frame
@@ -128,8 +127,24 @@ minutes) on an RTX 2070 desktop: Java tests about 17 s, gate 7 min, parity
 The earlier manual workflow reportedly took about 35 minutes. These are dated
 workflow observations, not independently reproduced timings or guarantees.
 The Python fixtures inspect command generation, ABAB ordering, named-failure
-parsing and synthetic artifact readers; they do not execute the complete live
-validation workflow. See the [integration records](#october-7-integration-batch-checks).
+parsing, artifact readers, mocked orchestration and owned-process cleanup;
+they do not execute the complete live validation workflow. See the
+[integration records](#october-7-integration-batch-checks).
+
+Feature fixtures beyond the coast poses:
+
+```sh
+python3 DevUtils/tests/rendering/RunFeatureParity.py --label <new-label>
+```
+
+Repeat `--scenario <name>` for an explicit subset. `--repo-root`, `--run-source`,
+`--shader-pack` and `--frozen-repo` support isolated checkouts. Every requested
+capture must complete and pass Frozen with valid visual measurements.
+`--compare <prior-label>` additionally checks historical regressions;
+improvements do not fail, but unchanged historical failures still fail absolute
+parity. Incomplete feature coverage is not full rendering acceptance.
+Both drivers retire finished fixture copies and superseded marked invocations;
+see [capture storage](ARTIFACT-STORAGE.md) for pins and recovery limits.
 
 ### Lifecycle gate
 

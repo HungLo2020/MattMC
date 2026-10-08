@@ -9,6 +9,7 @@ and link to source for implementation details. Follow the
 [documentation maintenance guide](DOCUMENTATION.md) when adding or updating pages.
 
 - [Project Architecture](PROJECT-ARCHITECTURE.md)
+- [Rust Migration](RUST-MIGRATION.md)
 - [Documentation Maintenance](DOCUMENTATION.md)
 - [Developer Tooling](tooling/index.md)
 - [Rendering](rendering/index.md)
