@@ -1,7 +1,8 @@
 //! The ledger's half of DH's per-frame render list (`RenderBufferHandler`
-//! and `LodRenderer`): from the quadtree walk's candidate columns, one call
-//! requests publication, records visibility, sorts near to far and admits the
-//! visible segments, in the order Java made those calls one column at a time.
+//! and `LodRenderer`): from the quadtree walk's drawable containers, one call
+//! keeps those that still own their generation, requests publication, records
+//! visibility, sorts near to far and admits the visible segments, in the
+//! order Java made those calls one container at a time.
 use super::{Counts, Failure, Ledger, Result, Visible};
 
 /// `MAX_PENDING_VISIBLE_COLUMN_KEYS`: larger candidate lists are not recorded.
@@ -30,6 +31,8 @@ fn manhattan(a: [i32; 2], b: [i32; 2]) -> i32 {
 /// One frame's render-list result.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct VisibleFrame {
+    /// Walked containers that no longer own their generation.
+    pub stale: i32,
     /// Candidate columns near to far.
     pub sorted: Vec<i64>,
     pub unpublished: i32,
@@ -42,13 +45,23 @@ pub(crate) struct VisibleFrame {
 }
 
 impl Ledger {
-    /// `buildRenderList`'s publication requests and visibility record, then
-    /// (with `admit`) `recordVisibleMaterialColumn` for each column in order.
-    /// `enabled` is the collector's `enabled()`; `center` the quadtree's
-    /// center block. An admission failure ends the call, as Java's exception did.
-    pub(crate) fn collect_visible_frame(&mut self, candidates: &[i64], center: [i32; 2], enabled: bool, admit: bool) -> Result<VisibleFrame> {
+    /// `buildRenderList`'s lifecycle checks, publication requests and
+    /// visibility record, then (with `admit`) `recordVisibleMaterialColumn`
+    /// for each candidate in order. `walked` holds each published, drawable
+    /// container's (key, generation) in walk order; one whose generation is no
+    /// longer the ledger's is skipped, as `rustSemanticBuildLifecycleCurrent`
+    /// skipped it. `enabled` is the collector's `enabled()`; `center` the
+    /// quadtree's center block. An admission failure ends the call, as Java's
+    /// exception did.
+    pub(crate) fn collect_visible_frame(&mut self, walked: &[(i64, i64)], center: [i32; 2], enabled: bool, admit: bool) -> Result<VisibleFrame> {
         let mut frame = VisibleFrame::default();
-        for &key in candidates {
+        let mut candidates = Vec::with_capacity(walked.len());
+        for &(key, generation) in walked {
+            if !self.has_column_generation(key, generation) {
+                frame.stale += 1;
+                continue;
+            }
+            candidates.push(key);
             if self.has_published_column(key) {
                 continue;
             }
@@ -65,7 +78,7 @@ impl Ledger {
                 }
             }
         }
-        frame.sorted = candidates.to_vec();
+        frame.sorted = candidates;
         frame.sorted.sort_by(|&a, &b| {
             manhattan(section_center(a), center).wrapping_sub(manhattan(section_center(b), center)).cmp(&0)
         });

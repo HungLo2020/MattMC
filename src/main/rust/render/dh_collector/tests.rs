@@ -336,13 +336,58 @@ fn the_visible_frame_sorts_stably_and_requests_unpublished_columns_in_walk_order
     }
     publish_all(&mut l, c);
     l.record_built(c, a, built(4, 4), &mut e).unwrap();
-    let missing = section(6, 5, 5);
+    let pending = section(6, 5, 5);
+    l.record_built(c, pending, built(5, 5), &mut e).unwrap();
     l.begin_frame(Some(0), "", "finite", "detail");
-    let frame = l.collect_visible_frame(&[b, missing, a, near], [0, 0], true, true).unwrap();
-    assert_eq!(frame.sorted, vec![near, b, a, missing]);
-    assert_eq!(frame.unpublished, 1, "only the column with no snapshot stays unpublished");
+    // The container still holding generation 7 of `near` is stale.
+    let walked = [(b, 2), (pending, 5), (a, 4), (near, 3), (near, 7)];
+    let frame = l.collect_visible_frame(&walked, [0, 0], true, true).unwrap();
+    assert_eq!(frame.sorted, vec![near, b, a, pending]);
+    assert_eq!(frame.stale, 1);
+    assert_eq!(frame.unpublished, 1, "only the never-published column stays unpublished");
     assert_eq!(frame.counts, Counts { opaque: 3, ..Counts::default() });
     assert_eq!(l.route.candidate_columns, 4);
-    let disabled = l.collect_visible_frame(&[missing], [0, 0], false, true).unwrap();
-    assert_eq!((disabled.unpublished, disabled.counts), (1, Counts::default()));
+    // Ties keep walk order either way round.
+    assert_eq!(l.collect_visible_frame(&[(a, 4), (b, 2)], [0, 0], true, false).unwrap().sorted, vec![a, b]);
+    // A container whose generation was replaced and retired is stale.
+    assert_eq!(l.collect_visible_frame(&[(b, 9)], [0, 0], true, false).unwrap().stale, 1);
+}
+
+#[test]
+fn visible_publication_follows_the_walk_order_of_requests() {
+    // Without the whole-frame route a build marks no visible demand, so the
+    // frame's requests alone order the visible publication.
+    let c = Config::default();
+    let (first, second) = (section(6, 3, 0), section(6, 0, 3));
+    for walk in [[(first, 2), (second, 1)], [(second, 1), (first, 2)]] {
+        let mut l = Ledger::new();
+        let mut e = Vec::new();
+        l.record_built(c, second, built(1, 1), &mut e).unwrap();
+        l.record_built(c, first, built(2, 2), &mut e).unwrap();
+        l.begin_frame(Some(0), "", "finite", "detail");
+        let frame = l.collect_visible_frame(&walk, [0, 0], true, false).unwrap();
+        assert_eq!(frame.unpublished, 2);
+        let update = l.peek_pending_update(true).unwrap().expect("visible demand");
+        let order: Vec<i64> = walk.iter().map(|&(key, _)| key).collect();
+        assert_eq!(update.assets.iter().map(|a| a.column_key).collect::<Vec<_>>(), order);
+    }
+    // A disabled collector neither requests nor records: no visible demand.
+    let mut l = Ledger::new();
+    let mut e = Vec::new();
+    l.record_built(c, first, built(1, 1), &mut e).unwrap();
+    assert_eq!(l.collect_visible_frame(&[(first, 1)], [0, 0], false, false).unwrap().unpublished, 1);
+    assert!(l.peek_pending_update(true).unwrap().is_none());
+}
+
+#[test]
+fn the_lifecycle_check_touches_the_column_lru_in_walk_order() {
+    let mut l = Ledger::new();
+    let c = Config::default();
+    let mut e = Vec::new();
+    for key in 1..=3 {
+        l.record_built(c, key, built(key, key as u8), &mut e).unwrap();
+    }
+    l.collect_visible_frame(&[(1, 1), (3, 3)], [0, 0], true, false).unwrap();
+    // hasColumn's get, then requestPublication's get, for 1 then 3.
+    assert_eq!(l.column_keys().collect::<Vec<_>>(), vec![2, 1, 3]);
 }

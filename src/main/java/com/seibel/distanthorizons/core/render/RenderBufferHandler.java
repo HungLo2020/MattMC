@@ -47,8 +47,8 @@ public class RenderBufferHandler implements AutoCloseable
 	public final LodQuadTree lodQuadTree;
 	
 	private final SortedArraySet<LodBufferContainer> loadedNearToFarBuffers;
-	/** The walk's semantic candidate columns, reused across frames. */
-	private long[] semanticCandidates = new long[256];
+	/** The walk's drawable containers as (key, generation) pairs, reused across frames. */
+	private long[] semanticCandidates = new long[512];
 	/** The last walk's semantic render list (see {@link DistantHorizonsSemanticCollector#collectVisibleFrame}). */
 	private DistantHorizonsSemanticCollector.VisibleFrame semanticVisibleFrame = DistantHorizonsSemanticCollector.VisibleFrame.EMPTY;
 	
@@ -260,16 +260,18 @@ public class RenderBufferHandler implements AutoCloseable
 					}
 					// A closed/replaced container may remain attached to a stale
 					// render-enabled node until the next quadtree update. It owns no
-					// publishable generation and must not enter this frame's demand set.
-					if (!bufferContainer.rustSemanticBuildLifecycleCurrent()) {
+					// publishable generation and must not enter this frame's demand
+					// set; the collector drops containers whose generation is no
+					// longer current.
+					long generation = bufferContainer.rustSemanticWalkGeneration();
+					if (generation < 0L) {
 						nullBufferCount++;
 						continue;
 					}
 					// A completed empty section participates in DH's parent/child
 					// quadtree transition but owns no draw or native asset. Do not count
 					// it as an unpublished visible candidate forever.
-					if (bufferContainer != null
-						&& bufferContainer.rustSemanticBuildHasNoDrawableGeometry()) {
+					if (generation == 0L) {
 						continue;
 					}
 					// A semantic DH build may retain the Java container as a CPU-side
@@ -282,10 +284,12 @@ public class RenderBufferHandler implements AutoCloseable
 					// without re-entering LodRenderSection#canRender, so the collector
 					// reasserts publication demand for every unpublished candidate,
 					// immediately before the coordinator's bounded visible-only flush.
-					if (semanticCandidateCount == this.semanticCandidates.length) {
-						this.semanticCandidates = Arrays.copyOf(this.semanticCandidates, semanticCandidateCount * 2);
+					if (semanticCandidateCount * 2 == this.semanticCandidates.length) {
+						this.semanticCandidates = Arrays.copyOf(this.semanticCandidates, semanticCandidateCount * 4);
 					}
-					this.semanticCandidates[semanticCandidateCount++] = renderSection.pos;
+					this.semanticCandidates[semanticCandidateCount * 2] = renderSection.pos;
+					this.semanticCandidates[semanticCandidateCount * 2 + 1] = generation;
+					semanticCandidateCount++;
 					continue;
 				}
 				if (bufferContainer == null)

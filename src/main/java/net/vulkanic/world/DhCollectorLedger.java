@@ -397,12 +397,13 @@ final class DhCollectorLedger {
 	static final int VISIBLE_FRAME_ENABLED = 1;
 	static final int VISIBLE_FRAME_ADMIT = 2;
 
-	/** One frame's render list from the walk's first {@code count} candidate
-	 * keys: [unpublished, request failures, first failed key, its error code,
-	 * opaque, side, up, water, then the keys near to far]. */
-	static long[] visibleFrame(long[] keys, int count, int centerX, int centerZ, int flags) {
+	/** One frame's render list from the walk's first {@code count} (key,
+	 * generation) pairs: [unpublished, request failures, first failed key, its
+	 * error code, opaque, side, up, water, stale containers, then the keys near
+	 * to far]. */
+	static long[] visibleFrame(long[] walked, int count, int centerX, int centerZ, int flags) {
 		try {
-			return takeOutput(check((int)VISIBLE_FRAME.invokeExact(MemorySegment.ofArray(keys), count, centerX, centerZ, flags)));
+			return takeOutput(check((int)VISIBLE_FRAME.invokeExact(MemorySegment.ofArray(walked), count, centerX, centerZ, flags)));
 		} catch (RuntimeException error) {
 			throw error;
 		} catch (Throwable error) {

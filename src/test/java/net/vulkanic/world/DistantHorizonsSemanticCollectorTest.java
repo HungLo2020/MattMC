@@ -478,19 +478,24 @@ class DistantHorizonsSemanticCollectorTest {
 			DhSectionPos.encode((byte) 6, 1, -2)
 		};
 		java.util.function.Supplier<Object> perColumn = () -> {
-			buildRenderListFixture(walk);
+			long[] walked = buildRenderListFixture(walk);
 			DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 			int unpublished = 0;
-			for (long key : walk) {
+			List<Long> candidates = new java.util.ArrayList<>();
+			for (int index = 0; index < walked.length; index += 2) {
+				long key = walked[index];
+				// rustSemanticBuildLifecycleCurrent, then the candidate's requests.
+				if (!DistantHorizonsSemanticCollector.hasColumn(key, walked[index + 1])) continue;
+				candidates.add(key);
 				if (!DistantHorizonsSemanticCollector.hasPublishedColumn(key)
 					&& !DistantHorizonsSemanticCollector.requestColumnPublication(key)) {
 					unpublished++;
 				}
 			}
-			List<Long> sorted = new java.util.ArrayList<>(java.util.Arrays.stream(walk).boxed().toList());
+			List<Long> sorted = new java.util.ArrayList<>(candidates);
 			sorted.sort(java.util.Comparator.comparingInt(key ->
 				Math.abs(DhSectionPos.getCenterBlockPosX(key) - centerX) + Math.abs(DhSectionPos.getCenterBlockPosZ(key) - centerZ)));
-			DistantHorizonsSemanticCollector.recordRenderListVisibilityStats(walk.length, unpublished, sorted);
+			DistantHorizonsSemanticCollector.recordRenderListVisibilityStats(sorted.size(), unpublished, sorted);
 			int[] counts = new int[3];
 			for (long key : sorted) {
 				var segments = DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(key);
@@ -501,10 +506,10 @@ class DistantHorizonsSemanticCollectorTest {
 			return renderListOutcome(sorted.stream().mapToLong(Long::longValue).toArray(), unpublished, counts);
 		};
 		java.util.function.Supplier<Object> oneCall = () -> {
-			buildRenderListFixture(walk);
+			long[] walked = buildRenderListFixture(walk);
 			DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
-			long[] candidates = java.util.Arrays.copyOf(walk, walk.length + 3);
-			var frame = DistantHorizonsSemanticCollector.collectVisibleFrame(candidates, walk.length, centerX, centerZ);
+			long[] reused = java.util.Arrays.copyOf(walked, walked.length + 6);
+			var frame = DistantHorizonsSemanticCollector.collectVisibleFrame(reused, walked.length / 2, centerX, centerZ);
 			assertEquals(!exactAtlas, frame.admitted());
 			assertEquals(0, frame.requestFailures());
 			var segments = frame.segments();
@@ -522,21 +527,36 @@ class DistantHorizonsSemanticCollectorTest {
 		String expected = perColumn.get().toString();
 		DistantHorizonsSemanticCollector.resetForTest();
 		assertEquals(expected, oneCall.get().toString());
-		assertTrue(expected.contains("unpublished=2"), expected);
+		assertTrue(expected.contains("unpublished=1"), expected);
 		assertFalse(expected.contains("counts=[0, 0, 0]"), expected);
 		assertFalse(expected.startsWith("order=" + java.util.Arrays.toString(walk)), "the fixture must reorder: " + expected);
 	}
 
 	/** Publishes the first five walk columns, then rebuilds one (pending
-	 * replacement) and builds one more (never published); the last key has no
-	 * column. Run against a fresh collector so generations repeat. */
-	private static void buildRenderListFixture(long[] walk) {
+	 * replacement) and builds one more (never published); the last walk entry
+	 * is a container whose generation was closed. Returns the walk as (key,
+	 * generation) pairs, including the replaced container. Run against a fresh
+	 * collector so generations repeat. */
+	private static long[] buildRenderListFixture(long[] walk) {
+		LodBufferContainer[] containers = new LodBufferContainer[walk.length];
 		for (int index = 0; index < 5; index++) {
-			buildSemanticContainer(walk[index], 0xff557733 + index);
+			containers[index] = buildSemanticContainer(walk[index], 0xff557733 + index);
 		}
 		publishPendingForTest();
-		buildSemanticContainer(walk[1], 0xff000001);
-		buildSemanticContainer(walk[5], 0xff000002);
+		LodBufferContainer replaced = containers[1];
+		containers[1] = buildSemanticContainer(walk[1], 0xff000001);
+		containers[5] = buildSemanticContainer(walk[5], 0xff000002);
+		containers[6] = buildSemanticContainer(walk[6], 0xff000003);
+		long closed = containers[6].rustSemanticWalkGeneration();
+		containers[6].close();
+		long[] walked = new long[(walk.length + 1) * 2];
+		for (int index = 0; index < walk.length; index++) {
+			walked[index * 2] = walk[index];
+			walked[index * 2 + 1] = index == 6 ? closed : containers[index].rustSemanticWalkGeneration();
+		}
+		walked[walk.length * 2] = walk[1];
+		walked[walk.length * 2 + 1] = replaced.rustSemanticWalkGeneration();
+		return walked;
 	}
 
 	private static String renderListOutcome(long[] nearToFar, int unpublished, int[] counts) {
