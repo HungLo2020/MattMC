@@ -8,7 +8,8 @@
 The [Rust block registry](RUST-BLOCK-REGISTRY.md) holds every block, property
 and block state with typed IDs (`BlockId`, `StateId(u16)`, `PropertyId`,
 `FaceId`) and per-state columns. [Native definitions](BLOCK-DEFINITIONS.md)
-own names, order, domains and defaults. Java exports remaining state facts
+own names, order, domains and defaults; [physical settings](BLOCK-PHYSICS.md)
+also originate in Rust. Java exports remaining state facts
 once, lazily on the first `NativeBlockRegistry.ready()` call after its
 compatibility registries are frozen. Lighting, heightmaps, worldgen and chunk saving
 derive their tables from it; terrain meshing combines its facts with

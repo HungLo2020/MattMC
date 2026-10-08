@@ -61,7 +61,6 @@ import net.alexscaves.server.block.DinosaurChopBlock;
 import net.alexscaves.server.block.AmbersolLightBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraft.world.level.material.PushReaction;
 
 public class Blocks {
 	private static final BlockBehaviour.StatePredicate NOT_CLOSED_SHULKER = (blockStatex, blockGetter, blockPos) -> blockGetter.getBlockEntity(blockPos) instanceof ShulkerBoxBlockEntity shulkerBoxBlockEntity
@@ -70,42 +69,41 @@ public class Blocks {
 	private static final BlockBehaviour.StatePredicate NOT_EXTENDED_PISTON = (blockStatex, blockGetter, blockPos) -> !(Boolean)blockStatex.getValue(
 		PistonBaseBlock.EXTENDED
 	);
-	public static final Block AIR = register("air", AirBlock::new, BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().air());
+	public static final Block AIR = register("air", AirBlock::new, BlockBehaviour.Properties.of().noLootTable());
 	public static final Block STONE = register(
-		"stone", BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		"stone", BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block GRANITE = register(
-		"granite", BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		"granite", BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block POLISHED_GRANITE = register(
 		"polished_granite",
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DIORITE = register(
 		"diorite",
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block POLISHED_DIORITE = register(
 		"polished_diorite",
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block ANDESITE = register(
 		"andesite",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block POLISHED_ANDESITE = register(
 		"polished_andesite",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
-	
 	// Alex's Caves Limestone blocks
 	public static final Block LIMESTONE = register(
 		"limestone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_YELLOW).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.2F, 4.5F).sound(SoundType.DRIPSTONE_BLOCK)
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_YELLOW).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.DRIPSTONE_BLOCK)
 	);
 	public static final Block LIMESTONE_STAIRS = registerLegacyStair("limestone_stairs", LIMESTONE);
 	public static final Block LIMESTONE_SLAB = register("limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE));
-	public static final Block LIMESTONE_WALL = register("limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE).forceSolidOn());
+	public static final Block LIMESTONE_WALL = register("limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE));
 	public static final Block LIMESTONE_PILLAR = register(
 		"limestone_pillar",
 		RotatedPillarBlock::new,
@@ -123,163 +121,145 @@ public class Blocks {
 	);
 	public static final Block SMOOTH_LIMESTONE_STAIRS = registerLegacyStair("smooth_limestone_stairs", SMOOTH_LIMESTONE);
 	public static final Block SMOOTH_LIMESTONE_SLAB = register("smooth_limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE));
-	public static final Block SMOOTH_LIMESTONE_WALL = register("smooth_limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE).forceSolidOn());
-	
+	public static final Block SMOOTH_LIMESTONE_WALL = register("smooth_limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE));
 	public static final Block GRASS_BLOCK = register(
-		"grass_block", GrassBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).randomTicks().strength(0.6F).sound(SoundType.GRASS)
+		"grass_block", GrassBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).sound(SoundType.GRASS)
 	);
-	public static final Block DIRT = register("dirt", BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.5F).sound(SoundType.GRAVEL));
-	public static final Block COARSE_DIRT = register("coarse_dirt", BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.5F).sound(SoundType.GRAVEL));
+	public static final Block DIRT = register("dirt", BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).sound(SoundType.GRAVEL));
+	public static final Block COARSE_DIRT = register("coarse_dirt", BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).sound(SoundType.GRAVEL));
 	public static final Block PODZOL = register(
-		"podzol", SnowyDirtBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).strength(0.5F).sound(SoundType.GRAVEL)
+		"podzol", SnowyDirtBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).sound(SoundType.GRAVEL)
 	);
 	public static final Block COBBLESTONE = register(
 		"cobblestone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block OAK_PLANKS = register(
 		"oak_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block SPRUCE_PLANKS = register(
 		"spruce_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BIRCH_PLANKS = register(
 		"birch_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block JUNGLE_PLANKS = register(
 		"jungle_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block ACACIA_PLANKS = register(
 		"acacia_planks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_PLANKS = register(
 		"cherry_planks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_WHITE)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.CHERRY_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_PLANKS = register(
 		"dark_oak_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block PALE_OAK_WOOD = register(
 		"pale_oak_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block PALE_OAK_PLANKS = register(
 		"pale_oak_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block MANGROVE_PLANKS = register(
 		"mangrove_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BAMBOO_PLANKS = register(
 		"bamboo_planks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.BAMBOO_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_MOSAIC = register(
 		"bamboo_mosaic",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.BAMBOO_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block OAK_SAPLING = register(
 		"oak_sapling",
 		properties -> new SaplingBlock(TreeGrower.OAK, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block SPRUCE_SAPLING = register(
 		"spruce_sapling",
 		properties -> new SaplingBlock(TreeGrower.SPRUCE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block PEWEN_SAPLING = register(
 		"pewen_sapling",
 		properties -> new SaplingBlock(PewenGrower.GROWER, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).sound(SoundType.GRASS)
 	);
 	public static final Block ANCIENT_SAPLING = register(
 		"ancient_sapling",
 		properties -> new SaplingBlock(AncientTreeGrower.GROWER, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).sound(SoundType.GRASS)
 	);
 	public static final Block BIRCH_SAPLING = register(
 		"birch_sapling",
 		properties -> new SaplingBlock(TreeGrower.BIRCH, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block JUNGLE_SAPLING = register(
 		"jungle_sapling",
 		properties -> new SaplingBlock(TreeGrower.JUNGLE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block ACACIA_SAPLING = register(
 		"acacia_sapling",
 		properties -> new SaplingBlock(TreeGrower.ACACIA, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block CHERRY_SAPLING = register(
 		"cherry_sapling",
 		properties -> new SaplingBlock(TreeGrower.CHERRY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PINK)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.CHERRY_SAPLING)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block DARK_OAK_SAPLING = register(
 		"dark_oak_sapling",
 		properties -> new SaplingBlock(TreeGrower.DARK_OAK, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block PALE_OAK_SAPLING = register(
 		"pale_oak_sapling",
 		properties -> new SaplingBlock(TreeGrower.PALE_OAK, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).sound(SoundType.GRASS)
 	);
 	public static final Block MANGROVE_PROPAGULE = register(
 		"mangrove_propagule",
 		properties -> new MangrovePropaguleBlock(TreeGrower.MANGROVE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BEDROCK = register(
 		"bedrock",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.strength(-1.0F, 3600000.0F)
 			.noLootTable()
 			.isValidSpawn(Blocks::never)
 	);
@@ -288,12 +268,7 @@ public class Blocks {
 		properties -> new LiquidBlock(Fluids.WATER, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WATER)
-			.replaceable()
-			.noCollision()
-			.strength(100.0F)
-			.pushReaction(PushReaction.DESTROY)
 			.noLootTable()
-			.liquid()
 			.sound(SoundType.EMPTY)
 	);
 	public static final Block LAVA = register(
@@ -301,20 +276,14 @@ public class Blocks {
 		properties -> new LiquidBlock(Fluids.LAVA, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.FIRE)
-			.replaceable()
-			.noCollision()
-			.randomTicks()
-			.strength(100.0F)
 			.lightLevel(blockStatex -> 15)
-			.pushReaction(PushReaction.DESTROY)
 			.noLootTable()
-			.liquid()
 			.sound(SoundType.EMPTY)
 	);
 	public static final Block SAND = register(
 		"sand",
 		properties -> new SandBlock(new ColorRGBA(14406560), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block SUSPICIOUS_SAND = register(
 		"suspicious_sand",
@@ -322,19 +291,17 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.instrument(NoteBlockInstrument.SNARE)
-			.strength(0.25F)
 			.sound(SoundType.SUSPICIOUS_SAND)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block RED_SAND = register(
 		"red_sand",
 		properties -> new SandBlock(new ColorRGBA(11098145), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block GRAVEL = register(
 		"gravel",
 		properties -> new ColoredFallingBlock(new ColorRGBA(-8356741), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.SNARE).strength(0.6F).sound(SoundType.GRAVEL)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.GRAVEL)
 	);
 	public static final Block SUSPICIOUS_GRAVEL = register(
 		"suspicious_gravel",
@@ -342,39 +309,37 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.SNARE)
-			.strength(0.25F)
 			.sound(SoundType.SUSPICIOUS_GRAVEL)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block GOLD_ORE = register(
 		"gold_ore",
 		properties -> new DropExperienceBlock(ConstantInt.of(0), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DEEPSLATE_GOLD_ORE = register(
 		"deepslate_gold_ore",
 		properties -> new DropExperienceBlock(ConstantInt.of(0), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(GOLD_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(GOLD_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block IRON_ORE = register(
 		"iron_ore",
 		properties -> new DropExperienceBlock(ConstantInt.of(0), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DEEPSLATE_IRON_ORE = register(
 		"deepslate_iron_ore",
 		properties -> new DropExperienceBlock(ConstantInt.of(0), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(IRON_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(IRON_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block COAL_ORE = register(
 		"coal_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(0, 2), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DEEPSLATE_COAL_ORE = register(
 		"deepslate_coal_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(0, 2), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(COAL_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(COAL_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block NETHER_GOLD_ORE = register(
 		"nether_gold_ore",
@@ -382,8 +347,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(3.0F, 3.0F)
 			.sound(SoundType.NETHER_GOLD_ORE)
 	);
 	public static final Block OAK_LOG = register("oak_log", RotatedPillarBlock::new, logProperties(MapColor.WOOD, MapColor.PODZOL, SoundType.WOOD));
@@ -407,18 +370,14 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PODZOL)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(0.7F)
 			.sound(SoundType.MANGROVE_ROOTS)
-			.noOcclusion()
 			.isSuffocating(Blocks::never)
 			.isViewBlocking(Blocks::never)
-			.noOcclusion()
-			.ignitedByLava()
 	);
 	public static final Block MUDDY_MANGROVE_ROOTS = register(
 		"muddy_mangrove_roots",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).strength(0.7F).sound(SoundType.MUDDY_MANGROVE_ROOTS)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).sound(SoundType.MUDDY_MANGROVE_ROOTS)
 	);
 	public static final Block BAMBOO_BLOCK = register(
 		"bamboo_block", RotatedPillarBlock::new, logProperties(MapColor.COLOR_YELLOW, MapColor.PLANT, SoundType.BAMBOO_WOOD)
@@ -454,27 +413,27 @@ public class Blocks {
 	public static final Block OAK_WOOD = register(
 		"oak_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block SPRUCE_WOOD = register(
 		"spruce_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BIRCH_WOOD = register(
 		"birch_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block JUNGLE_WOOD = register(
 		"jungle_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block ACACIA_WOOD = register(
 		"acacia_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block CHERRY_WOOD = register(
 		"cherry_wood",
@@ -482,44 +441,42 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_GRAY)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F)
 			.sound(SoundType.CHERRY_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_WOOD = register(
 		"dark_oak_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block MANGROVE_WOOD = register(
 		"mangrove_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_OAK_WOOD = register(
 		"stripped_oak_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_SPRUCE_WOOD = register(
 		"stripped_spruce_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_BIRCH_WOOD = register(
 		"stripped_birch_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_JUNGLE_WOOD = register(
 		"stripped_jungle_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_ACACIA_WOOD = register(
 		"stripped_acacia_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_CHERRY_WOOD = register(
 		"stripped_cherry_wood",
@@ -527,14 +484,12 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_PINK)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F)
 			.sound(SoundType.CHERRY_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block STRIPPED_DARK_OAK_WOOD = register(
 		"stripped_dark_oak_wood",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STRIPPED_PALE_OAK_WOOD = register(
 		"stripped_pale_oak_wood",
@@ -542,9 +497,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block STRIPPED_MANGROVE_WOOD = register(
 		"stripped_mangrove_wood", RotatedPillarBlock::new, logProperties(MapColor.COLOR_RED, MapColor.COLOR_RED, SoundType.WOOD)
@@ -569,15 +522,10 @@ public class Blocks {
 		properties -> new UntintedParticleLeavesBlock(0.1F, ParticleTypes.CHERRY_LEAVES, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PINK)
-			.strength(0.2F)
-			.randomTicks()
 			.sound(SoundType.CHERRY_LEAVES)
-			.noOcclusion()
 			.isValidSpawn(Blocks::ocelotOrParrot)
 			.isSuffocating(Blocks::never)
 			.isViewBlocking(Blocks::never)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block DARK_OAK_LEAVES = register(
@@ -588,15 +536,10 @@ public class Blocks {
 		properties -> new UntintedParticleLeavesBlock(0.02F, ParticleTypes.PALE_OAK_LEAVES, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.strength(0.2F)
-			.randomTicks()
 			.sound(SoundType.GRASS)
-			.noOcclusion()
 			.isValidSpawn(Blocks::ocelotOrParrot)
 			.isSuffocating(Blocks::never)
 			.isViewBlocking(Blocks::never)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block MANGROVE_LEAVES = register(
@@ -613,19 +556,17 @@ public class Blocks {
 		leavesProperties(SoundType.AZALEA_LEAVES)
 	);
 	public static final Block SPONGE = register(
-		"sponge", SpongeBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.6F).sound(SoundType.SPONGE)
+		"sponge", SpongeBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.SPONGE)
 	);
 	public static final Block WET_SPONGE = register(
-		"wet_sponge", WetSpongeBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.6F).sound(SoundType.WET_SPONGE)
+		"wet_sponge", WetSpongeBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.WET_SPONGE)
 	);
 	public static final Block GLASS = register(
 		"glass",
 		TransparentBlock::new,
 		BlockBehaviour.Properties.of()
 			.instrument(NoteBlockInstrument.HAT)
-			.strength(0.3F)
 			.sound(SoundType.GLASS)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
 			.isRedstoneConductor(Blocks::never)
 			.isSuffocating(Blocks::never)
@@ -634,35 +575,35 @@ public class Blocks {
 	public static final Block LAPIS_ORE = register(
 		"lapis_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(2, 5), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DEEPSLATE_LAPIS_ORE = register(
 		"deepslate_lapis_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(2, 5), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(LAPIS_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(LAPIS_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block LAPIS_BLOCK = register(
-		"lapis_block", BlockBehaviour.Properties.of().mapColor(MapColor.LAPIS).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		"lapis_block", BlockBehaviour.Properties.of().mapColor(MapColor.LAPIS)
 	);
 	public static final Block DISPENSER = register(
 		"dispenser",
 		DispenserBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.5F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SANDSTONE = register(
-		"sandstone", BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		"sandstone", BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CHISELED_SANDSTONE = register(
 		"chiseled_sandstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CUT_SANDSTONE = register(
-		"cut_sandstone", BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		"cut_sandstone", BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block NOTE_BLOCK = register(
 		"note_block",
 		NoteBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD).strength(0.8F).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block WHITE_BED = registerBed("white_bed", DyeColor.WHITE);
 	public static final Block ORANGE_BED = registerBed("orange_bed", DyeColor.ORANGE);
@@ -681,10 +622,10 @@ public class Blocks {
 	public static final Block RED_BED = registerBed("red_bed", DyeColor.RED);
 	public static final Block BLACK_BED = registerBed("black_bed", DyeColor.BLACK);
 	public static final Block POWERED_RAIL = register(
-		"powered_rail", PoweredRailBlock::new, BlockBehaviour.Properties.of().noCollision().strength(0.7F).sound(SoundType.METAL)
+		"powered_rail", PoweredRailBlock::new, BlockBehaviour.Properties.of().sound(SoundType.METAL)
 	);
 	public static final Block DETECTOR_RAIL = register(
-		"detector_rail", DetectorRailBlock::new, BlockBehaviour.Properties.of().noCollision().strength(0.7F).sound(SoundType.METAL)
+		"detector_rail", DetectorRailBlock::new, BlockBehaviour.Properties.of().sound(SoundType.METAL)
 	);
 	public static final Block STICKY_PISTON = register("sticky_piston", properties -> new PistonBaseBlock(true, properties), pistonProperties());
 	public static final Block COBWEB = register(
@@ -693,237 +634,175 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOL)
 			.sound(SoundType.COBWEB)
-			.forceSolidOn()
-			.noCollision()
-			.requiresCorrectToolForDrops()
-			.strength(4.0F)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SHORT_GRASS = register(
 		"short_grass",
 		TallGrassBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XYZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block FERN = register(
 		"fern",
 		TallGrassBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XYZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block DEAD_BUSH = register(
 		"dead_bush",
 		DryVegetationBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
-	
 	// Alex's Caves primordial blocks - plants
-	public static final Block FIDDLEHEAD = register("fiddlehead", FiddleheadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().instabreak().sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
-	public static final Block FLYTRAP = register("flytrap", FlytrapBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instabreak().sound(SoundType.ROOTS).randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).noOcclusion().noCollision());
-	public static final Block TREE_STAR = register("tree_star", TreeStarBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instabreak().sound(SoundType.GRASS).noOcclusion().noCollision());
-	public static final Block CYCAD = register("cycad", CycadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).dynamicShape().strength(1F, 2.0F).sound(SoundType.WOOD).offsetType(BlockBehaviour.OffsetType.XZ));
-	
+	public static final Block FIDDLEHEAD = register("fiddlehead", FiddleheadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block FLYTRAP = register("flytrap", FlytrapBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.ROOTS).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block TREE_STAR = register("tree_star", TreeStarBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.GRASS));
+	public static final Block CYCAD = register("cycad", CycadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).sound(SoundType.WOOD).offsetType(BlockBehaviour.OffsetType.XZ));
 	public static final Block BUSH = register(
 		"bush",
 		BushBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SHORT_DRY_GRASS = register(
 		"short_dry_grass",
 		ShortDryGrassBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
-			.ignitedByLava()
 			.offsetType(BlockBehaviour.OffsetType.XYZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block TALL_DRY_GRASS = register(
 		"tall_dry_grass",
 		TallDryGrassBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
-			.ignitedByLava()
 			.offsetType(BlockBehaviour.OffsetType.XYZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SEAGRASS = register(
 		"seagrass",
 		SeagrassBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WATER)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.WET_GRASS)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block TALL_SEAGRASS = register(
 		"tall_seagrass",
 		TallSeagrassBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WATER)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.WET_GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block PISTON = register("piston", properties -> new PistonBaseBlock(false, properties), pistonProperties());
 	public static final Block PISTON_HEAD = register(
-		"piston_head", PistonHeadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(1.5F).noLootTable().pushReaction(PushReaction.BLOCK)
+		"piston_head", PistonHeadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.STONE).noLootTable()
 	);
 	public static final Block WHITE_WOOL = register(
 		"white_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block ORANGE_WOOL = register(
 		"orange_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block MAGENTA_WOOL = register(
 		"magenta_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block LIGHT_BLUE_WOOL = register(
 		"light_blue_wool",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_LIGHT_BLUE)
 			.instrument(NoteBlockInstrument.GUITAR)
-			.strength(0.8F)
 			.sound(SoundType.WOOL)
-			.ignitedByLava()
 	);
 	public static final Block YELLOW_WOOL = register(
 		"yellow_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block LIME_WOOL = register(
 		"lime_wool",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_LIGHT_GREEN)
 			.instrument(NoteBlockInstrument.GUITAR)
-			.strength(0.8F)
 			.sound(SoundType.WOOL)
-			.ignitedByLava()
 	);
 	public static final Block PINK_WOOL = register(
 		"pink_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block GRAY_WOOL = register(
 		"gray_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block LIGHT_GRAY_WOOL = register(
 		"light_gray_wool",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_LIGHT_GRAY)
 			.instrument(NoteBlockInstrument.GUITAR)
-			.strength(0.8F)
 			.sound(SoundType.WOOL)
-			.ignitedByLava()
 	);
 	public static final Block CYAN_WOOL = register(
 		"cyan_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block PURPLE_WOOL = register(
 		"purple_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block BLUE_WOOL = register(
 		"blue_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block BROWN_WOOL = register(
 		"brown_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block GREEN_WOOL = register(
 		"green_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block RED_WOOL = register(
 		"red_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block BLACK_WOOL = register(
 		"black_wool",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.GUITAR).strength(0.8F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.GUITAR).sound(SoundType.WOOL)
 	);
 	public static final Block MOVING_PISTON = register(
 		"moving_piston",
 		MovingPistonBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
-			.forceSolidOn()
-			.strength(-1.0F)
-			.dynamicShape()
 			.noLootTable()
-			.noOcclusion()
 			.isRedstoneConductor(Blocks::never)
 			.isSuffocating(Blocks::never)
 			.isViewBlocking(Blocks::never)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block DANDELION = register(
 		"dandelion",
 		properties -> new FlowerBlock(MobEffects.SATURATION, 0.35F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block TORCHFLOWER = register(
 		"torchflower",
 		properties -> new FlowerBlock(MobEffects.NIGHT_VISION, 5.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 			.lightLevel(state -> 7)
 	);
 	public static final Block POPPY = register(
@@ -931,165 +810,119 @@ public class Blocks {
 		properties -> new FlowerBlock(MobEffects.NIGHT_VISION, 5.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BLUE_ORCHID = register(
 		"blue_orchid",
 		properties -> new FlowerBlock(MobEffects.SATURATION, 0.35F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ALLIUM = register(
 		"allium",
 		properties -> new FlowerBlock(MobEffects.FIRE_RESISTANCE, 3.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block AZURE_BLUET = register(
 		"azure_bluet",
 		properties -> new FlowerBlock(MobEffects.BLINDNESS, 11.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block RED_TULIP = register(
 		"red_tulip",
 		properties -> new FlowerBlock(MobEffects.WEAKNESS, 7.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ORANGE_TULIP = register(
 		"orange_tulip",
 		properties -> new FlowerBlock(MobEffects.WEAKNESS, 7.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block WHITE_TULIP = register(
 		"white_tulip",
 		properties -> new FlowerBlock(MobEffects.WEAKNESS, 7.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block PINK_TULIP = register(
 		"pink_tulip",
 		properties -> new FlowerBlock(MobEffects.WEAKNESS, 7.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block OXEYE_DAISY = register(
 		"oxeye_daisy",
 		properties -> new FlowerBlock(MobEffects.REGENERATION, 7.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CORNFLOWER = register(
 		"cornflower",
 		properties -> new FlowerBlock(MobEffects.JUMP_BOOST, 5.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block WITHER_ROSE = register(
 		"wither_rose",
 		properties -> new WitherRoseBlock(MobEffects.WITHER, 7.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block LILY_OF_THE_VALLEY = register(
 		"lily_of_the_valley",
 		properties -> new FlowerBlock(MobEffects.POISON, 11.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BROWN_MUSHROOM = register(
 		"brown_mushroom",
 		properties -> new MushroomBlock(TreeFeatures.HUGE_BROWN_MUSHROOM, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BROWN)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.lightLevel(blockStatex -> 1)
 			.hasPostProcess(Blocks::always)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block RED_MUSHROOM = register(
 		"red_mushroom",
 		properties -> new MushroomBlock(TreeFeatures.HUGE_RED_MUSHROOM, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_RED)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.hasPostProcess(Blocks::always)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block GOLD_BLOCK = register(
 		"gold_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.GOLD)
 			.instrument(NoteBlockInstrument.BELL)
-			.requiresCorrectToolForDrops()
-			.strength(3.0F, 6.0F)
 			.sound(SoundType.METAL)
 	);
 	public static final Block IRON_BLOCK = register(
@@ -1097,21 +930,19 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
 			.instrument(NoteBlockInstrument.IRON_XYLOPHONE)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F, 6.0F)
 			.sound(SoundType.IRON)
 	);
 	public static final Block BRICKS = register(
 		"bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block TNT = register(
 		"tnt",
 		TntBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.FIRE).instabreak().sound(SoundType.GRASS).ignitedByLava().isRedstoneConductor(Blocks::never)
+		BlockBehaviour.Properties.of().mapColor(MapColor.FIRE).sound(SoundType.GRASS).isRedstoneConductor(Blocks::never)
 	);
 	public static final Block BOOKSHELF = register(
-		"bookshelf", BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(1.5F).sound(SoundType.WOOD).ignitedByLava()
+		"bookshelf", BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block CHISELED_BOOKSHELF = register(
 		"chiseled_bookshelf",
@@ -1119,111 +950,101 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(1.5F)
 			.sound(SoundType.CHISELED_BOOKSHELF)
-			.ignitedByLava()
 	);
 	public static final Block ACACIA_SHELF = register(
 		"acacia_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block BAMBOO_SHELF = register(
 		"bamboo_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block BIRCH_SHELF = register(
 		"birch_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block CHERRY_SHELF = register(
 		"cherry_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block CRIMSON_SHELF = register(
 		"crimson_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block DARK_OAK_SHELF = register(
 		"dark_oak_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block JUNGLE_SHELF = register(
 		"jungle_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block MANGROVE_SHELF = register(
 		"mangrove_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block OAK_SHELF = register(
 		"oak_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block PALE_OAK_SHELF = register(
 		"pale_oak_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block SPRUCE_SHELF = register(
 		"spruce_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block WARPED_SHELF = register(
 		"warped_shelf",
 		ShelfBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF).ignitedByLava().strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.SHELF)
 	);
 	public static final Block MOSSY_COBBLESTONE = register(
 		"mossy_cobblestone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block OBSIDIAN = register(
 		"obsidian",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(50.0F, 1200.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block TORCH = register(
 		"torch",
 		properties -> new TorchBlock(ParticleTypes.FLAME, properties),
-		BlockBehaviour.Properties.of().noCollision().instabreak().lightLevel(blockStatex -> 14).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().lightLevel(blockStatex -> 14).sound(SoundType.WOOD)
 	);
 	public static final Block WALL_TORCH = register(
 		"wall_torch",
 		properties -> new WallTorchBlock(ParticleTypes.FLAME, properties),
-		wallVariant(TORCH, true).noCollision().instabreak().lightLevel(blockStatex -> 14).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		wallVariant(TORCH, true).lightLevel(blockStatex -> 14).sound(SoundType.WOOD)
 	);
 	public static final Block FIRE = register(
 		"fire",
 		FireBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.FIRE)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.lightLevel(blockStatex -> 15)
 			.sound(SoundType.WOOL)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SOUL_FIRE = register(
 		"soul_fire",
 		SoulFireBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_LIGHT_BLUE)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.lightLevel(blockStatex -> 10)
 			.sound(SoundType.WOOL)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SPAWNER = register(
 		"spawner",
@@ -1231,61 +1052,52 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F)
 			.sound(SoundType.SPAWNER)
-			.noOcclusion()
 	);
 	public static final Block CREAKING_HEART = register(
 		"creaking_heart",
 		CreakingHeartBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).strength(10.0F).sound(SoundType.CREAKING_HEART)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.CREAKING_HEART)
 	);
 	public static final Block OAK_STAIRS = registerLegacyStair("oak_stairs", OAK_PLANKS);
 	public static final Block CHEST = register(
 		"chest",
 		properties -> new ChestBlock(() -> BlockEntityType.CHEST, SoundEvents.CHEST_OPEN, SoundEvents.CHEST_CLOSE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block REDSTONE_WIRE = register(
-		"redstone_wire", RedStoneWireBlock::new, BlockBehaviour.Properties.of().noCollision().instabreak().pushReaction(PushReaction.DESTROY)
+		"redstone_wire", RedStoneWireBlock::new, BlockBehaviour.Properties.of()
 	);
 	public static final Block DIAMOND_ORE = register(
 		"diamond_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(3, 7), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DEEPSLATE_DIAMOND_ORE = register(
 		"deepslate_diamond_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(3, 7), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(DIAMOND_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(DIAMOND_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block DIAMOND_BLOCK = register(
-		"diamond_block", BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).requiresCorrectToolForDrops().strength(5.0F, 6.0F).sound(SoundType.METAL)
+		"diamond_block", BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).sound(SoundType.METAL)
 	);
 	public static final Block CRAFTING_TABLE = register(
 		"crafting_table",
 		CraftingTableBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block WHEAT = register(
 		"wheat",
 		CropBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(blockStatex -> blockStatex.getValue(CropBlock.AGE) >= 6 ? MapColor.COLOR_YELLOW : MapColor.PLANT)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.CROP)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block FARMLAND = register(
 		"farmland",
 		FarmBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.DIRT)
-			.randomTicks()
-			.strength(0.6F)
 			.sound(SoundType.GRAVEL)
 			.isViewBlocking(Blocks::always)
 			.isSuffocating(Blocks::always)
@@ -1296,107 +1108,73 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(3.5F)
 			.lightLevel(litBlockEmission(13))
 	);
 	public static final Block OAK_SIGN = register(
 		"oak_sign",
 		properties -> new StandingSignBlock(WoodType.OAK, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block SPRUCE_SIGN = register(
 		"spruce_sign",
 		properties -> new StandingSignBlock(WoodType.SPRUCE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(SPRUCE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BIRCH_SIGN = register(
 		"birch_sign",
 		properties -> new StandingSignBlock(WoodType.BIRCH, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block ACACIA_SIGN = register(
 		"acacia_sign",
 		properties -> new StandingSignBlock(WoodType.ACACIA, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_SIGN = register(
 		"cherry_sign",
 		properties -> new StandingSignBlock(WoodType.CHERRY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(CHERRY_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block JUNGLE_SIGN = register(
 		"jungle_sign",
 		properties -> new StandingSignBlock(WoodType.JUNGLE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(JUNGLE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_SIGN = register(
 		"dark_oak_sign",
 		properties -> new StandingSignBlock(WoodType.DARK_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(DARK_OAK_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block PALE_OAK_SIGN = register(
 		"pale_oak_sign",
 		properties -> new StandingSignBlock(WoodType.PALE_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block MANGROVE_SIGN = register(
 		"mangrove_sign",
 		properties -> new StandingSignBlock(WoodType.MANGROVE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MANGROVE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_SIGN = register(
 		"bamboo_sign",
 		properties -> new StandingSignBlock(WoodType.BAMBOO, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(BAMBOO_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block OAK_DOOR = register(
 		"oak_door",
@@ -1404,488 +1182,322 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block LADDER = register(
 		"ladder",
 		LadderBlock::new,
-		BlockBehaviour.Properties.of().forceSolidOff().strength(0.4F).sound(SoundType.LADDER).noOcclusion().pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().sound(SoundType.LADDER)
 	);
-	public static final Block RAIL = register("rail", RailBlock::new, BlockBehaviour.Properties.of().noCollision().strength(0.7F).sound(SoundType.METAL));
+	public static final Block RAIL = register("rail", RailBlock::new, BlockBehaviour.Properties.of().sound(SoundType.METAL));
 	public static final Block COBBLESTONE_STAIRS = registerLegacyStair("cobblestone_stairs", COBBLESTONE);
 	public static final Block OAK_WALL_SIGN = register(
 		"oak_wall_sign",
 		properties -> new WallSignBlock(WoodType.OAK, properties),
-		wallVariant(OAK_SIGN, true).mapColor(MapColor.WOOD).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F).ignitedByLava()
+		wallVariant(OAK_SIGN, true).mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block SPRUCE_WALL_SIGN = register(
 		"spruce_wall_sign",
 		properties -> new WallSignBlock(WoodType.SPRUCE, properties),
 		wallVariant(SPRUCE_SIGN, true)
 			.mapColor(SPRUCE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BIRCH_WALL_SIGN = register(
 		"birch_wall_sign",
 		properties -> new WallSignBlock(WoodType.BIRCH, properties),
-		wallVariant(BIRCH_SIGN, true).mapColor(MapColor.SAND).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F).ignitedByLava()
+		wallVariant(BIRCH_SIGN, true).mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block ACACIA_WALL_SIGN = register(
 		"acacia_wall_sign",
 		properties -> new WallSignBlock(WoodType.ACACIA, properties),
 		wallVariant(ACACIA_SIGN, true)
 			.mapColor(MapColor.COLOR_ORANGE)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_WALL_SIGN = register(
 		"cherry_wall_sign",
 		properties -> new WallSignBlock(WoodType.CHERRY, properties),
 		wallVariant(CHERRY_SIGN, true)
 			.mapColor(CHERRY_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block JUNGLE_WALL_SIGN = register(
 		"jungle_wall_sign",
 		properties -> new WallSignBlock(WoodType.JUNGLE, properties),
 		wallVariant(JUNGLE_SIGN, true)
 			.mapColor(JUNGLE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_WALL_SIGN = register(
 		"dark_oak_wall_sign",
 		properties -> new WallSignBlock(WoodType.DARK_OAK, properties),
 		wallVariant(DARK_OAK_SIGN, true)
 			.mapColor(DARK_OAK_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block PALE_OAK_WALL_SIGN = register(
 		"pale_oak_wall_sign",
 		properties -> new WallSignBlock(WoodType.PALE_OAK, properties),
 		wallVariant(PALE_OAK_SIGN, true)
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block MANGROVE_WALL_SIGN = register(
 		"mangrove_wall_sign",
 		properties -> new WallSignBlock(WoodType.MANGROVE, properties),
 		wallVariant(MANGROVE_SIGN, true)
 			.mapColor(MANGROVE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_WALL_SIGN = register(
 		"bamboo_wall_sign",
 		properties -> new WallSignBlock(WoodType.BAMBOO, properties),
 		wallVariant(BAMBOO_SIGN, true)
 			.mapColor(BAMBOO_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block OAK_HANGING_SIGN = register(
 		"oak_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(OAK_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block SPRUCE_HANGING_SIGN = register(
 		"spruce_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.SPRUCE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(SPRUCE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BIRCH_HANGING_SIGN = register(
 		"birch_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.BIRCH, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block ACACIA_HANGING_SIGN = register(
 		"acacia_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.ACACIA, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_HANGING_SIGN = register(
 		"cherry_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.CHERRY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_PINK)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block JUNGLE_HANGING_SIGN = register(
 		"jungle_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.JUNGLE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(JUNGLE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_HANGING_SIGN = register(
 		"dark_oak_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.DARK_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(DARK_OAK_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block PALE_OAK_HANGING_SIGN = register(
 		"pale_oak_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.PALE_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block CRIMSON_HANGING_SIGN = register(
 		"crimson_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.CRIMSON, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_STEM).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_STEM).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block WARPED_HANGING_SIGN = register(
 		"warped_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.WARPED, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_STEM).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_STEM).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block MANGROVE_HANGING_SIGN = register(
 		"mangrove_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.MANGROVE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MANGROVE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_HANGING_SIGN = register(
 		"bamboo_hanging_sign",
 		properties -> new CeilingHangingSignBlock(WoodType.BAMBOO, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block OAK_WALL_HANGING_SIGN = register(
 		"oak_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.OAK, properties),
 		wallVariant(OAK_HANGING_SIGN, true)
 			.mapColor(OAK_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block SPRUCE_WALL_HANGING_SIGN = register(
 		"spruce_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.SPRUCE, properties),
 		wallVariant(SPRUCE_HANGING_SIGN, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block BIRCH_WALL_HANGING_SIGN = register(
 		"birch_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.BIRCH, properties),
 		wallVariant(BIRCH_HANGING_SIGN, true)
 			.mapColor(MapColor.SAND)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block ACACIA_WALL_HANGING_SIGN = register(
 		"acacia_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.ACACIA, properties),
 		wallVariant(ACACIA_HANGING_SIGN, true)
 			.mapColor(MapColor.COLOR_ORANGE)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_WALL_HANGING_SIGN = register(
 		"cherry_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.CHERRY, properties),
 		wallVariant(CHERRY_HANGING_SIGN, true)
 			.mapColor(MapColor.TERRACOTTA_PINK)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block JUNGLE_WALL_HANGING_SIGN = register(
 		"jungle_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.JUNGLE, properties),
 		wallVariant(JUNGLE_HANGING_SIGN, true)
 			.mapColor(JUNGLE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_WALL_HANGING_SIGN = register(
 		"dark_oak_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.DARK_OAK, properties),
 		wallVariant(DARK_OAK_HANGING_SIGN, true)
 			.mapColor(DARK_OAK_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block PALE_OAK_WALL_HANGING_SIGN = register(
 		"pale_oak_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.PALE_OAK, properties),
 		wallVariant(PALE_OAK_HANGING_SIGN, true)
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block MANGROVE_WALL_HANGING_SIGN = register(
 		"mangrove_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.MANGROVE, properties),
 		wallVariant(MANGROVE_HANGING_SIGN, true)
 			.mapColor(MANGROVE_LOG.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block CRIMSON_WALL_HANGING_SIGN = register(
 		"crimson_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.CRIMSON, properties),
-		wallVariant(CRIMSON_HANGING_SIGN, true).mapColor(MapColor.CRIMSON_STEM).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F)
+		wallVariant(CRIMSON_HANGING_SIGN, true).mapColor(MapColor.CRIMSON_STEM).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block WARPED_WALL_HANGING_SIGN = register(
 		"warped_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.WARPED, properties),
-		wallVariant(WARPED_HANGING_SIGN, true).mapColor(MapColor.WARPED_STEM).forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollision().strength(1.0F)
+		wallVariant(WARPED_HANGING_SIGN, true).mapColor(MapColor.WARPED_STEM).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block BAMBOO_WALL_HANGING_SIGN = register(
 		"bamboo_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.BAMBOO, properties),
 		wallVariant(BAMBOO_HANGING_SIGN, true)
 			.mapColor(MapColor.COLOR_YELLOW)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
-			.ignitedByLava()
 	);
 	public static final Block LEVER = register(
-		"lever", LeverBlock::new, BlockBehaviour.Properties.of().noCollision().strength(0.5F).sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
+		"lever", LeverBlock::new, BlockBehaviour.Properties.of().sound(SoundType.STONE)
 	);
 	public static final Block STONE_PRESSURE_PLATE = register(
 		"stone_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.STONE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.noCollision()
-			.strength(0.5F)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block IRON_DOOR = register(
 		"iron_door",
 		properties -> new DoorBlock(BlockSetType.IRON, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(5.0F).noOcclusion().pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL)
 	);
 	public static final Block OAK_PRESSURE_PLATE = register(
 		"oak_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SPRUCE_PRESSURE_PLATE = register(
 		"spruce_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.SPRUCE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(SPRUCE_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BIRCH_PRESSURE_PLATE = register(
 		"birch_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.BIRCH, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(BIRCH_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block JUNGLE_PRESSURE_PLATE = register(
 		"jungle_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.JUNGLE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(JUNGLE_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ACACIA_PRESSURE_PLATE = register(
 		"acacia_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.ACACIA, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(ACACIA_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CHERRY_PRESSURE_PLATE = register(
 		"cherry_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.CHERRY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(CHERRY_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block DARK_OAK_PRESSURE_PLATE = register(
 		"dark_oak_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.DARK_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(DARK_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block PALE_OAK_PRESSURE_PLATE = register(
 		"pale_oak_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.PALE_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block MANGROVE_PRESSURE_PLATE = register(
 		"mangrove_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.MANGROVE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MANGROVE_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BAMBOO_PRESSURE_PLATE = register(
 		"bamboo_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.BAMBOO, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(BAMBOO_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block REDSTONE_ORE = register(
 		"redstone_ore",
@@ -1893,25 +1505,22 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.randomTicks()
 			.lightLevel(litBlockEmission(9))
-			.strength(3.0F, 3.0F)
 	);
 	public static final Block DEEPSLATE_REDSTONE_ORE = register(
 		"deepslate_redstone_ore",
 		RedStoneOreBlock::new,
-		BlockBehaviour.Properties.ofLegacyCopy(REDSTONE_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(REDSTONE_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block REDSTONE_TORCH = register(
 		"redstone_torch",
 		RedstoneTorchBlock::new,
-		BlockBehaviour.Properties.of().noCollision().instabreak().lightLevel(litBlockEmission(7)).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().lightLevel(litBlockEmission(7)).sound(SoundType.WOOD)
 	);
 	public static final Block REDSTONE_WALL_TORCH = register(
 		"redstone_wall_torch",
 		RedstoneWallTorchBlock::new,
-		wallVariant(REDSTONE_TORCH, true).noCollision().instabreak().lightLevel(litBlockEmission(7)).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		wallVariant(REDSTONE_TORCH, true).lightLevel(litBlockEmission(7)).sound(SoundType.WOOD)
 	);
 	public static final Block STONE_BUTTON = register("stone_button", properties -> new ButtonBlock(BlockSetType.STONE, 20, properties), buttonProperties());
 	public static final Block SNOW = register(
@@ -1919,70 +1528,53 @@ public class Blocks {
 		SnowLayerBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SNOW)
-			.replaceable()
-			.forceSolidOff()
-			.randomTicks()
-			.strength(0.1F)
-			.requiresCorrectToolForDrops()
 			.sound(SoundType.SNOW)
 			.isViewBlocking((blockStatex, blockGetter, blockPos) -> (Integer)blockStatex.getValue(SnowLayerBlock.LAYERS) >= 8)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ICE = register(
 		"ice",
 		IceBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.ICE)
-			.friction(0.98F)
-			.randomTicks()
-			.strength(0.5F)
 			.sound(SoundType.GLASS)
-			.noOcclusion()
 			.isValidSpawn((blockStatex, blockGetter, blockPos, entityType) -> entityType == EntityType.POLAR_BEAR)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block SNOW_BLOCK = register(
-		"snow_block", BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).requiresCorrectToolForDrops().strength(0.2F).sound(SoundType.SNOW)
+		"snow_block", BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).sound(SoundType.SNOW)
 	);
 	public static final Block CACTUS = register(
 		"cactus",
 		CactusBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).randomTicks().strength(0.4F).sound(SoundType.WOOL).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.WOOL)
 	);
 	public static final Block CACTUS_FLOWER = register(
 		"cactus_flower",
 		CactusFlowerBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PINK)
-			.noCollision()
-			.instabreak()
-			.ignitedByLava()
 			.sound(SoundType.CACTUS_FLOWER)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CLAY = register(
-		"clay", BlockBehaviour.Properties.of().mapColor(MapColor.CLAY).instrument(NoteBlockInstrument.FLUTE).strength(0.6F).sound(SoundType.GRAVEL)
+		"clay", BlockBehaviour.Properties.of().mapColor(MapColor.CLAY).instrument(NoteBlockInstrument.FLUTE).sound(SoundType.GRAVEL)
 	);
 	public static final Block SUGAR_CANE = register(
 		"sugar_cane",
 		SugarCaneBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.GRASS)
 	);
 	public static final Block JUKEBOX = register(
 		"jukebox",
 		JukeboxBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).strength(2.0F, 6.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block OAK_FENCE = register(
 		"oak_fence",
 		FenceBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block NETHERRACK = register(
 		"netherrack",
@@ -1990,8 +1582,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(0.4F)
 			.sound(SoundType.NETHERRACK)
 	);
 	public static final Block SOUL_SAND = register(
@@ -2000,8 +1590,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BROWN)
 			.instrument(NoteBlockInstrument.COW_BELL)
-			.strength(0.5F)
-			.speedFactor(0.4F)
 			.sound(SoundType.SOUL_SAND)
 			.isValidSpawn(Blocks::always)
 			.isRedstoneConductor(Blocks::always)
@@ -2009,7 +1597,7 @@ public class Blocks {
 			.isSuffocating(Blocks::always)
 	);
 	public static final Block SOUL_SOIL = register(
-		"soul_soil", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(0.5F).sound(SoundType.SOUL_SOIL)
+		"soul_soil", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).sound(SoundType.SOUL_SOIL)
 	);
 	public static final Block BASALT = register(
 		"basalt",
@@ -2017,8 +1605,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 			.sound(SoundType.BASALT)
 	);
 	public static final Block POLISHED_BASALT = register(
@@ -2027,36 +1613,33 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 			.sound(SoundType.BASALT)
 	);
 	public static final Block SOUL_TORCH = register(
 		"soul_torch",
 		properties -> new TorchBlock(ParticleTypes.SOUL_FIRE_FLAME, properties),
-		BlockBehaviour.Properties.of().noCollision().instabreak().lightLevel(blockStatex -> 10).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().lightLevel(blockStatex -> 10).sound(SoundType.WOOD)
 	);
 	public static final Block SOUL_WALL_TORCH = register(
 		"soul_wall_torch",
 		properties -> new WallTorchBlock(ParticleTypes.SOUL_FIRE_FLAME, properties),
-		wallVariant(SOUL_TORCH, true).noCollision().instabreak().lightLevel(blockStatex -> 10).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		wallVariant(SOUL_TORCH, true).lightLevel(blockStatex -> 10).sound(SoundType.WOOD)
 	);
 	public static final Block COPPER_TORCH = register(
 		"copper_torch",
 		properties -> new TorchBlock(ParticleTypes.COPPER_FIRE_FLAME, properties),
-		BlockBehaviour.Properties.of().noCollision().instabreak().lightLevel(blockStatex -> 14).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().lightLevel(blockStatex -> 14).sound(SoundType.WOOD)
 	);
 	public static final Block COPPER_WALL_TORCH = register(
 		"copper_wall_torch",
 		properties -> new WallTorchBlock(ParticleTypes.COPPER_FIRE_FLAME, properties),
-		wallVariant(COPPER_TORCH, true).noCollision().instabreak().lightLevel(blockStatex -> 14).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		wallVariant(COPPER_TORCH, true).lightLevel(blockStatex -> 14).sound(SoundType.WOOD)
 	);
 	public static final Block GLOWSTONE = register(
 		"glowstone",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.instrument(NoteBlockInstrument.PLING)
-			.strength(0.3F)
 			.sound(SoundType.GLASS)
 			.lightLevel(blockStatex -> 15)
 			.isRedstoneConductor(Blocks::never)
@@ -2065,60 +1648,48 @@ public class Blocks {
 		"nether_portal",
 		NetherPortalBlock::new,
 		BlockBehaviour.Properties.of()
-			.noCollision()
-			.randomTicks()
-			.strength(-1.0F)
 			.sound(SoundType.GLASS)
 			.lightLevel(blockStatex -> 11)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block PRIMORDIAL_CAVES_PORTAL = register(
 		"primordial_caves_portal",
 		PrimordialCavesPortalBlock::new,
 		BlockBehaviour.Properties.of()
-			.noCollision()
-			.randomTicks()
-			.strength(-1.0F)
 			.sound(SoundType.GLASS)
 			.lightLevel(blockStatex -> 11)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block CARVED_PUMPKIN = register(
 		"carved_pumpkin",
 		CarvedPumpkinBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
 			.isValidSpawn(Blocks::always)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block JACK_O_LANTERN = register(
 		"jack_o_lantern",
 		CarvedPumpkinBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
 			.lightLevel(blockStatex -> 15)
 			.isValidSpawn(Blocks::always)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CAKE = register(
-		"cake", CakeBlock::new, BlockBehaviour.Properties.of().forceSolidOn().strength(0.5F).sound(SoundType.WOOL).pushReaction(PushReaction.DESTROY)
+		"cake", CakeBlock::new, BlockBehaviour.Properties.of().sound(SoundType.WOOL)
 	);
 	public static final Block DINOSAUR_CHOP = register(
 		"dinosaur_chop",
 		properties -> new DinosaurChopBlock(properties, 3, 0.2F, false),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(1F, 1.0F).sound(SoundType.CANDLE).noOcclusion().dynamicShape().randomTicks()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.CANDLE)
 	);
 	public static final Block COOKED_DINOSAUR_CHOP = register(
 		"cooked_dinosaur_chop",
 		properties -> new DinosaurChopBlock(properties, 7, 0.35F, true),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(1F, 1.0F).sound(SoundType.CANDLE).noOcclusion().dynamicShape()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).sound(SoundType.CANDLE)
 	);
 	public static final Block REPEATER = register(
-		"repeater", RepeaterBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
+		"repeater", RepeaterBlock::new, BlockBehaviour.Properties.of().sound(SoundType.STONE)
 	);
 	public static final Block WHITE_STAINED_GLASS = registerStainedGlass("white_stained_glass", DyeColor.WHITE);
 	public static final Block ORANGE_STAINED_GLASS = registerStainedGlass("orange_stained_glass", DyeColor.ORANGE);
@@ -2142,10 +1713,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block SPRUCE_TRAPDOOR = register(
 		"spruce_trapdoor",
@@ -2153,10 +1721,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PODZOL)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block BIRCH_TRAPDOOR = register(
 		"birch_trapdoor",
@@ -2164,10 +1729,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block JUNGLE_TRAPDOOR = register(
 		"jungle_trapdoor",
@@ -2175,10 +1737,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.DIRT)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block ACACIA_TRAPDOOR = register(
 		"acacia_trapdoor",
@@ -2186,10 +1745,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_TRAPDOOR = register(
 		"cherry_trapdoor",
@@ -2197,10 +1753,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_WHITE)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_TRAPDOOR = register(
 		"dark_oak_trapdoor",
@@ -2208,10 +1761,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BROWN)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block PALE_OAK_TRAPDOOR = register(
 		"pale_oak_trapdoor",
@@ -2219,10 +1769,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block MANGROVE_TRAPDOOR = register(
 		"mangrove_trapdoor",
@@ -2230,10 +1777,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_RED)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_TRAPDOOR = register(
 		"bamboo_trapdoor",
@@ -2241,35 +1785,30 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.ignitedByLava()
 	);
 	public static final Block STONE_BRICKS = register(
 		"stone_bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block MOSSY_STONE_BRICKS = register(
 		"mossy_stone_bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CRACKED_STONE_BRICKS = register(
 		"cracked_stone_bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CHISELED_STONE_BRICKS = register(
 		"chiseled_stone_bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
-	public static final Block PACKED_MUD = register("packed_mud", BlockBehaviour.Properties.ofLegacyCopy(DIRT).strength(1.0F, 3.0F).sound(SoundType.PACKED_MUD));
+	public static final Block PACKED_MUD = register("packed_mud", BlockBehaviour.Properties.ofLegacyCopy(DIRT).sound(SoundType.PACKED_MUD));
 	public static final Block MUD_BRICKS = register(
 		"mud_bricks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_LIGHT_GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 3.0F)
 			.sound(SoundType.MUD_BRICKS)
 	);
 	public static final Block INFESTED_STONE = register(
@@ -2293,42 +1832,42 @@ public class Blocks {
 	public static final Block BROWN_MUSHROOM_BLOCK = register(
 		"brown_mushroom_block",
 		HugeMushroomBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).strength(0.2F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block RED_MUSHROOM_BLOCK = register(
 		"red_mushroom_block",
 		HugeMushroomBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).strength(0.2F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block MUSHROOM_STEM = register(
 		"mushroom_stem",
 		HugeMushroomBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOL).instrument(NoteBlockInstrument.BASS).strength(0.2F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOL).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block IRON_BARS = register(
-		"iron_bars", IronBarsBlock::new, BlockBehaviour.Properties.of().requiresCorrectToolForDrops().strength(5.0F, 6.0F).sound(SoundType.IRON).noOcclusion()
+		"iron_bars", IronBarsBlock::new, BlockBehaviour.Properties.of().sound(SoundType.IRON)
 	);
 	public static final WeatheringCopperBlocks COPPER_BARS = WeatheringCopperBlocks.create(
 		"copper_bars",
 		Blocks::register,
 		IronBarsBlock::new,
 		WeatheringCopperBarsBlock::new,
-		weatherState -> BlockBehaviour.Properties.of().requiresCorrectToolForDrops().strength(5.0F, 6.0F).sound(SoundType.COPPER).noOcclusion()
+		weatherState -> BlockBehaviour.Properties.of().sound(SoundType.COPPER)
 	);
 	public static final Block IRON_CHAIN = register(
 		"iron_chain",
 		ChainBlock::new,
-		BlockBehaviour.Properties.of().forceSolidOn().requiresCorrectToolForDrops().strength(5.0F, 6.0F).sound(SoundType.CHAIN).noOcclusion()
+		BlockBehaviour.Properties.of().sound(SoundType.CHAIN)
 	);
 	public static final WeatheringCopperBlocks COPPER_CHAIN = WeatheringCopperBlocks.create(
 		"copper_chain",
 		Blocks::register,
 		ChainBlock::new,
 		WeatheringCopperChainBlock::new,
-		weatherState -> BlockBehaviour.Properties.of().forceSolidOn().requiresCorrectToolForDrops().strength(5.0F, 6.0F).sound(SoundType.CHAIN).noOcclusion()
+		weatherState -> BlockBehaviour.Properties.of().sound(SoundType.CHAIN)
 	);
 	public static final Block GLASS_PANE = register(
-		"glass_pane", IronBarsBlock::new, BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		"glass_pane", IronBarsBlock::new, BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block PUMPKIN = register(
 		net.minecraft.references.Blocks.PUMPKIN,
@@ -2336,115 +1875,82 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
 			.instrument(NoteBlockInstrument.DIDGERIDOO)
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block MELON = register(
 		net.minecraft.references.Blocks.MELON,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).strength(1.0F).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).sound(SoundType.WOOD)
 	);
 	public static final Block ATTACHED_PUMPKIN_STEM = register(
 		net.minecraft.references.Blocks.ATTACHED_PUMPKIN_STEM,
 		properties -> new AttachedStemBlock(net.minecraft.references.Blocks.PUMPKIN_STEM, net.minecraft.references.Blocks.PUMPKIN, Items.PUMPKIN_SEEDS, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().instabreak().sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.WOOD)
 	);
 	public static final Block ATTACHED_MELON_STEM = register(
 		net.minecraft.references.Blocks.ATTACHED_MELON_STEM,
 		properties -> new AttachedStemBlock(net.minecraft.references.Blocks.MELON_STEM, net.minecraft.references.Blocks.MELON, Items.MELON_SEEDS, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().instabreak().sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.WOOD)
 	);
 	public static final Block PUMPKIN_STEM = register(
 		net.minecraft.references.Blocks.PUMPKIN_STEM,
 		properties -> new StemBlock(net.minecraft.references.Blocks.PUMPKIN, net.minecraft.references.Blocks.ATTACHED_PUMPKIN_STEM, Items.PUMPKIN_SEEDS, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.HARD_CROP)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block MELON_STEM = register(
 		net.minecraft.references.Blocks.MELON_STEM,
 		properties -> new StemBlock(net.minecraft.references.Blocks.MELON, net.minecraft.references.Blocks.ATTACHED_MELON_STEM, Items.MELON_SEEDS, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.HARD_CROP)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block VINE = register(
 		"vine",
 		VineBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.replaceable()
-			.noCollision()
-			.randomTicks()
-			.strength(0.2F)
 			.sound(SoundType.VINE)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block GLOW_LICHEN = register(
 		"glow_lichen",
 		GlowLichenBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.GLOW_LICHEN)
-			.replaceable()
-			.noCollision()
-			.strength(0.2F)
 			.sound(SoundType.GLOW_LICHEN)
 			.lightLevel(GlowLichenBlock.emission(7))
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SKUNK_SPRAY = register(
 		"skunk_spray",
 		BlockSkunkSpray::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_LIGHT_GREEN)
-			.noOcclusion()
-			.randomTicks()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.FROGSPAWN)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block RESIN_CLUMP = register(
 		"resin_clump",
 		MultifaceBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
-			.replaceable()
-			.noCollision()
 			.sound(SoundType.RESIN)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block OAK_FENCE_GATE = register(
 		"oak_fence_gate",
 		properties -> new FenceGateBlock(WoodType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block BRICK_STAIRS = registerLegacyStair("brick_stairs", BRICKS);
 	public static final Block STONE_BRICK_STAIRS = registerLegacyStair("stone_brick_stairs", STONE_BRICKS);
 	public static final Block MUD_BRICK_STAIRS = registerLegacyStair("mud_brick_stairs", MUD_BRICKS);
 	public static final Block MYCELIUM = register(
-		"mycelium", MyceliumBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).randomTicks().strength(0.6F).sound(SoundType.GRASS)
+		"mycelium", MyceliumBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).sound(SoundType.GRASS)
 	);
 	public static final Block LILY_PAD = register(
 		"lily_pad",
 		WaterlilyBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).instabreak().sound(SoundType.LILY_PAD).noOcclusion().pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.LILY_PAD)
 	);
 	public static final Block RESIN_BLOCK = register(
 		"resin_block", BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.RESIN)
@@ -2454,9 +1960,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.sound(SoundType.RESIN_BRICKS)
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block RESIN_BRICK_STAIRS = registerLegacyStair("resin_brick_stairs", RESIN_BRICKS);
 	public static final Block RESIN_BRICK_SLAB = register(
@@ -2465,9 +1969,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.sound(SoundType.RESIN_BRICKS)
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block RESIN_BRICK_WALL = register(
 		"resin_brick_wall",
@@ -2475,26 +1977,20 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.sound(SoundType.RESIN_BRICKS)
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block CHISELED_RESIN_BRICKS = register(
 		"chiseled_resin_bricks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.sound(SoundType.RESIN_BRICKS)
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block NETHER_BRICKS = register(
 		"nether_bricks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.NETHER_BRICKS)
 	);
 	public static final Block NETHER_BRICK_FENCE = register(
@@ -2503,15 +1999,13 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.NETHER_BRICKS)
 	);
 	public static final Block NETHER_BRICK_STAIRS = registerLegacyStair("nether_brick_stairs", NETHER_BRICKS);
 	public static final Block NETHER_WART = register(
 		"nether_wart",
 		NetherWartBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).noCollision().randomTicks().sound(SoundType.NETHER_WART).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.NETHER_WART)
 	);
 	public static final Block ENCHANTING_TABLE = register(
 		"enchanting_table",
@@ -2519,15 +2013,13 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_RED)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.lightLevel(blockStatex -> 7)
-			.strength(5.0F, 1200.0F)
 	);
 	public static final Block BREWING_STAND = register(
-		"brewing_stand", BrewingStandBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(0.5F).lightLevel(blockStatex -> 1).noOcclusion()
+		"brewing_stand", BrewingStandBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).lightLevel(blockStatex -> 1)
 	);
 	public static final Block CAULDRON = register(
-		"cauldron", CauldronBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.STONE).requiresCorrectToolForDrops().strength(2.0F).noOcclusion()
+		"cauldron", CauldronBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.STONE)
 	);
 	public static final Block WATER_CAULDRON = register(
 		"water_cauldron",
@@ -2547,11 +2039,8 @@ public class Blocks {
 		EndPortalBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
-			.noCollision()
 			.lightLevel(blockStatex -> 15)
-			.strength(-1.0F, 3600000.0F)
 			.noLootTable()
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block END_PORTAL_FRAME = register(
 		"end_portal_frame",
@@ -2561,22 +2050,18 @@ public class Blocks {
 			.instrument(NoteBlockInstrument.BASEDRUM)
 			.sound(SoundType.GLASS)
 			.lightLevel(blockStatex -> 1)
-			.strength(-1.0F, 3600000.0F)
 			.noLootTable()
 	);
 	public static final Block END_STONE = register(
 		"end_stone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 9.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DRAGON_EGG = register(
 		"dragon_egg",
 		DragonEggBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
-			.strength(3.0F, 9.0F)
 			.lightLevel(blockStatex -> 1)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block REDSTONE_LAMP = register(
 		"redstone_lamp",
@@ -2584,7 +2069,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
 			.lightLevel(litBlockEmission(15))
-			.strength(0.3F)
 			.sound(SoundType.GLASS)
 			.isValidSpawn(Blocks::always)
 	);
@@ -2593,41 +2077,35 @@ public class Blocks {
 		CocoaBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.randomTicks()
-			.strength(0.2F, 3.0F)
 			.sound(SoundType.WOOD)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SANDSTONE_STAIRS = registerLegacyStair("sandstone_stairs", SANDSTONE);
 	public static final Block EMERALD_ORE = register(
 		"emerald_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(3, 7), properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DEEPSLATE_EMERALD_ORE = register(
 		"deepslate_emerald_ore",
 		properties -> new DropExperienceBlock(UniformInt.of(3, 7), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(EMERALD_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(EMERALD_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block ENDER_CHEST = register(
 		"ender_chest",
 		EnderChestBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).strength(22.5F, 600.0F).lightLevel(blockStatex -> 7)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).lightLevel(blockStatex -> 7)
 	);
 	public static final Block TRIPWIRE_HOOK = register(
-		"tripwire_hook", TripWireHookBlock::new, BlockBehaviour.Properties.of().noCollision().sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)
+		"tripwire_hook", TripWireHookBlock::new, BlockBehaviour.Properties.of().sound(SoundType.WOOD)
 	);
 	public static final Block TRIPWIRE = register(
-		"tripwire", properties -> new TripWireBlock(TRIPWIRE_HOOK, properties), BlockBehaviour.Properties.of().noCollision().pushReaction(PushReaction.DESTROY)
+		"tripwire", properties -> new TripWireBlock(TRIPWIRE_HOOK, properties), BlockBehaviour.Properties.of()
 	);
 	public static final Block EMERALD_BLOCK = register(
 		"emerald_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.EMERALD)
 			.instrument(NoteBlockInstrument.BIT)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F, 6.0F)
 			.sound(SoundType.METAL)
 	);
 	public static final Block SPRUCE_STAIRS = registerLegacyStair("spruce_stairs", SPRUCE_PLANKS);
@@ -2636,7 +2114,7 @@ public class Blocks {
 	public static final Block COMMAND_BLOCK = register(
 		"command_block",
 		properties -> new CommandBlock(false, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).requiresCorrectToolForDrops().strength(-1.0F, 3600000.0F).noLootTable()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).noLootTable()
 	);
 	public static final Block BEACON = register(
 		"beacon",
@@ -2644,14 +2122,12 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.DIAMOND)
 			.instrument(NoteBlockInstrument.HAT)
-			.strength(3.0F)
 			.lightLevel(blockStatex -> 15)
-			.noOcclusion()
 			.isRedstoneConductor(Blocks::never)
 	);
-	public static final Block COBBLESTONE_WALL = register("cobblestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLESTONE).forceSolidOn());
+	public static final Block COBBLESTONE_WALL = register("cobblestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLESTONE));
 	public static final Block MOSSY_COBBLESTONE_WALL = register(
-		"mossy_cobblestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLESTONE).forceSolidOn()
+		"mossy_cobblestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLESTONE)
 	);
 	public static final Block FLOWER_POT = register("flower_pot", properties -> new FlowerPotBlock(AIR, properties), flowerPotProperties());
 	public static final Block POTTED_TORCHFLOWER = register("potted_torchflower", properties -> new FlowerPotBlock(TORCHFLOWER, properties), flowerPotProperties());
@@ -2715,12 +2191,12 @@ public class Blocks {
 	public static final Block CARROTS = register(
 		"carrots",
 		CarrotBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.CROP).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.CROP)
 	);
 	public static final Block POTATOES = register(
 		"potatoes",
 		PotatoBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.CROP).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.CROP)
 	);
 	public static final Block OAK_BUTTON = register("oak_button", properties -> new ButtonBlock(BlockSetType.OAK, 30, properties), buttonProperties());
 	public static final Block SPRUCE_BUTTON = register("spruce_button", properties -> new ButtonBlock(BlockSetType.SPRUCE, 30, properties), buttonProperties());
@@ -2741,130 +2217,119 @@ public class Blocks {
 	public static final Block SKELETON_SKULL = register(
 		"skeleton_skull",
 		properties -> new SkullBlock(SkullBlock.Types.SKELETON, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.SKELETON).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.SKELETON)
 	);
 	public static final Block SKELETON_WALL_SKULL = register(
 		"skeleton_wall_skull",
 		properties -> new WallSkullBlock(SkullBlock.Types.SKELETON, properties),
-		wallVariant(SKELETON_SKULL, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		wallVariant(SKELETON_SKULL, true)
 	);
 	public static final Block WITHER_SKELETON_SKULL = register(
 		"wither_skeleton_skull",
 		WitherSkullBlock::new,
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.WITHER_SKELETON).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.WITHER_SKELETON)
 	);
 	public static final Block WITHER_SKELETON_WALL_SKULL = register(
-		"wither_skeleton_wall_skull", WitherWallSkullBlock::new, wallVariant(WITHER_SKELETON_SKULL, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		"wither_skeleton_wall_skull", WitherWallSkullBlock::new, wallVariant(WITHER_SKELETON_SKULL, true)
 	);
 	public static final Block ZOMBIE_HEAD = register(
 		"zombie_head",
 		properties -> new SkullBlock(SkullBlock.Types.ZOMBIE, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.ZOMBIE).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.ZOMBIE)
 	);
 	public static final Block ZOMBIE_WALL_HEAD = register(
 		"zombie_wall_head",
 		properties -> new WallSkullBlock(SkullBlock.Types.ZOMBIE, properties),
-		wallVariant(ZOMBIE_HEAD, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		wallVariant(ZOMBIE_HEAD, true)
 	);
 	public static final Block PLAYER_HEAD = register(
 		"player_head",
 		PlayerHeadBlock::new,
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.CUSTOM_HEAD).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.CUSTOM_HEAD)
 	);
 	public static final Block PLAYER_WALL_HEAD = register(
-		"player_wall_head", PlayerWallHeadBlock::new, wallVariant(PLAYER_HEAD, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		"player_wall_head", PlayerWallHeadBlock::new, wallVariant(PLAYER_HEAD, true)
 	);
 	public static final Block CREEPER_HEAD = register(
 		"creeper_head",
 		properties -> new SkullBlock(SkullBlock.Types.CREEPER, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.CREEPER).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.CREEPER)
 	);
 	public static final Block CREEPER_WALL_HEAD = register(
 		"creeper_wall_head",
 		properties -> new WallSkullBlock(SkullBlock.Types.CREEPER, properties),
-		wallVariant(CREEPER_HEAD, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		wallVariant(CREEPER_HEAD, true)
 	);
 	public static final Block DRAGON_HEAD = register(
 		"dragon_head",
 		properties -> new SkullBlock(SkullBlock.Types.DRAGON, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.DRAGON).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.DRAGON)
 	);
 	public static final Block DRAGON_WALL_HEAD = register(
 		"dragon_wall_head",
 		properties -> new WallSkullBlock(SkullBlock.Types.DRAGON, properties),
-		wallVariant(DRAGON_HEAD, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		wallVariant(DRAGON_HEAD, true)
 	);
 	public static final Block PIGLIN_HEAD = register(
 		"piglin_head",
 		properties -> new SkullBlock(SkullBlock.Types.PIGLIN, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.PIGLIN).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.PIGLIN)
 	);
 	public static final Block PIGLIN_WALL_HEAD = register(
-		"piglin_wall_head", PiglinWallSkullBlock::new, wallVariant(PIGLIN_HEAD, true).strength(1.0F).pushReaction(PushReaction.DESTROY)
+		"piglin_wall_head", PiglinWallSkullBlock::new, wallVariant(PIGLIN_HEAD, true)
 	);
 	public static final Block ANVIL = register(
 		"anvil",
 		AnvilBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F, 1200.0F)
 			.sound(SoundType.ANVIL)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block CHIPPED_ANVIL = register(
 		"chipped_anvil",
 		AnvilBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F, 1200.0F)
 			.sound(SoundType.ANVIL)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block DAMAGED_ANVIL = register(
 		"damaged_anvil",
 		AnvilBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F, 1200.0F)
 			.sound(SoundType.ANVIL)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block TRAPPED_CHEST = register(
 		"trapped_chest",
 		TrappedChestBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block LIGHT_WEIGHTED_PRESSURE_PLATE = register(
 		"light_weighted_pressure_plate",
 		properties -> new WeightedPressurePlateBlock(15, BlockSetType.GOLD, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.GOLD).forceSolidOn().noCollision().strength(0.5F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.GOLD)
 	);
 	public static final Block HEAVY_WEIGHTED_PRESSURE_PLATE = register(
 		"heavy_weighted_pressure_plate",
 		properties -> new WeightedPressurePlateBlock(150, BlockSetType.IRON, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).forceSolidOn().noCollision().strength(0.5F).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL)
 	);
 	public static final Block COMPARATOR = register(
-		"comparator", ComparatorBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
+		"comparator", ComparatorBlock::new, BlockBehaviour.Properties.of().sound(SoundType.STONE)
 	);
 	public static final Block REDSTONE_RANDOMIZER = register(
-		"redstone_randomizer", RedstoneRandomizerBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
+		"redstone_randomizer", RedstoneRandomizerBlock::new, BlockBehaviour.Properties.of().sound(SoundType.STONE)
 	);
 	public static final Block DAYLIGHT_DETECTOR = register(
 		"daylight_detector",
 		DaylightDetectorBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(0.2F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block REDSTONE_BLOCK = register(
 		"redstone_block",
 		PoweredBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.FIRE)
-			.requiresCorrectToolForDrops()
-			.strength(5.0F, 6.0F)
 			.sound(SoundType.METAL)
 			.isRedstoneConductor(Blocks::never)
 	);
@@ -2874,240 +2339,208 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(3.0F, 3.0F)
 			.sound(SoundType.NETHER_ORE)
 	);
 	public static final Block HOPPER = register(
 		"hopper",
 		HopperBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).requiresCorrectToolForDrops().strength(3.0F, 4.8F).sound(SoundType.METAL).noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).sound(SoundType.METAL)
 	);
 	public static final Block QUARTZ_BLOCK = register(
 		"quartz_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CHISELED_QUARTZ_BLOCK = register(
 		"chiseled_quartz_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block QUARTZ_PILLAR = register(
 		"quartz_pillar",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block QUARTZ_STAIRS = registerLegacyStair("quartz_stairs", QUARTZ_BLOCK);
 	public static final Block ACTIVATOR_RAIL = register(
-		"activator_rail", PoweredRailBlock::new, BlockBehaviour.Properties.of().noCollision().strength(0.7F).sound(SoundType.METAL)
+		"activator_rail", PoweredRailBlock::new, BlockBehaviour.Properties.of().sound(SoundType.METAL)
 	);
 	public static final Block DROPPER = register(
 		"dropper",
 		DropperBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.5F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block WHITE_TERRACOTTA = register(
 		"white_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_WHITE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block ORANGE_TERRACOTTA = register(
 		"orange_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_ORANGE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block MAGENTA_TERRACOTTA = register(
 		"magenta_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_MAGENTA)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block LIGHT_BLUE_TERRACOTTA = register(
 		"light_blue_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_LIGHT_BLUE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block YELLOW_TERRACOTTA = register(
 		"yellow_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_YELLOW)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block LIME_TERRACOTTA = register(
 		"lime_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_LIGHT_GREEN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block PINK_TERRACOTTA = register(
 		"pink_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_PINK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block GRAY_TERRACOTTA = register(
 		"gray_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block LIGHT_GRAY_TERRACOTTA = register(
 		"light_gray_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_LIGHT_GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block CYAN_TERRACOTTA = register(
 		"cyan_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_CYAN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block PURPLE_TERRACOTTA = register(
 		"purple_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_PURPLE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block BLUE_TERRACOTTA = register(
 		"blue_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_BLUE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block BROWN_TERRACOTTA = register(
 		"brown_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_BROWN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block GREEN_TERRACOTTA = register(
 		"green_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_GREEN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block RED_TERRACOTTA = register(
 		"red_terracotta",
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_RED).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.25F, 4.2F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_RED).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BLACK_TERRACOTTA = register(
 		"black_terracotta",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_BLACK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.25F, 4.2F)
 	);
 	public static final Block WHITE_STAINED_GLASS_PANE = register(
 		"white_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.WHITE, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block ORANGE_STAINED_GLASS_PANE = register(
 		"orange_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.ORANGE, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block MAGENTA_STAINED_GLASS_PANE = register(
 		"magenta_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.MAGENTA, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block LIGHT_BLUE_STAINED_GLASS_PANE = register(
 		"light_blue_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.LIGHT_BLUE, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block YELLOW_STAINED_GLASS_PANE = register(
 		"yellow_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.YELLOW, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block LIME_STAINED_GLASS_PANE = register(
 		"lime_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.LIME, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block PINK_STAINED_GLASS_PANE = register(
 		"pink_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.PINK, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block GRAY_STAINED_GLASS_PANE = register(
 		"gray_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.GRAY, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block LIGHT_GRAY_STAINED_GLASS_PANE = register(
 		"light_gray_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.LIGHT_GRAY, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block CYAN_STAINED_GLASS_PANE = register(
 		"cyan_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.CYAN, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block PURPLE_STAINED_GLASS_PANE = register(
 		"purple_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.PURPLE, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block BLUE_STAINED_GLASS_PANE = register(
 		"blue_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.BLUE, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block BROWN_STAINED_GLASS_PANE = register(
 		"brown_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.BROWN, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block GREEN_STAINED_GLASS_PANE = register(
 		"green_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.GREEN, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block RED_STAINED_GLASS_PANE = register(
 		"red_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.RED, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block BLACK_STAINED_GLASS_PANE = register(
 		"black_stained_glass_pane",
 		properties -> new StainedGlassPaneBlock(DyeColor.BLACK, properties),
-		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).strength(0.3F).sound(SoundType.GLASS).noOcclusion()
+		BlockBehaviour.Properties.of().instrument(NoteBlockInstrument.HAT).sound(SoundType.GLASS)
 	);
 	public static final Block ACACIA_STAIRS = registerLegacyStair("acacia_stairs", ACACIA_PLANKS);
 	public static final Block CHERRY_STAIRS = registerLegacyStair("cherry_stairs", CHERRY_PLANKS);
@@ -3117,47 +2550,40 @@ public class Blocks {
 	public static final Block BAMBOO_STAIRS = registerLegacyStair("bamboo_stairs", BAMBOO_PLANKS);
 	public static final Block BAMBOO_MOSAIC_STAIRS = registerLegacyStair("bamboo_mosaic_stairs", BAMBOO_MOSAIC);
 	public static final Block SLIME_BLOCK = register(
-		"slime_block", SlimeBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).friction(0.8F).sound(SoundType.SLIME_BLOCK).noOcclusion()
+		"slime_block", SlimeBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).sound(SoundType.SLIME_BLOCK)
 	);
 	public static final Block BARRIER = register(
 		"barrier",
 		BarrierBlock::new,
 		BlockBehaviour.Properties.of()
-			.strength(-1.0F, 3600000.8F)
 			.mapColor(waterloggedMapColor(MapColor.NONE))
 			.noLootTable()
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.noTerrainParticles()
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block LIGHT = register(
 		"light",
 		LightBlock::new,
 		BlockBehaviour.Properties.of()
-			.replaceable()
-			.strength(-1.0F, 3600000.8F)
 			.mapColor(waterloggedMapColor(MapColor.NONE))
 			.noLootTable()
-			.noOcclusion()
 			.lightLevel(LightBlock.LIGHT_EMISSION)
 	);
 	public static final Block IRON_TRAPDOOR = register(
 		"iron_trapdoor",
 		properties -> new TrapDoorBlock(BlockSetType.IRON, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).requiresCorrectToolForDrops().strength(5.0F).noOcclusion().isValidSpawn(Blocks::never)
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).isValidSpawn(Blocks::never)
 	);
 	public static final Block PRISMARINE = register(
 		"prismarine",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PRISMARINE_BRICKS = register(
 		"prismarine_bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DARK_PRISMARINE = register(
 		"dark_prismarine",
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PRISMARINE_STAIRS = registerLegacyStair("prismarine_stairs", PRISMARINE);
 	public static final Block PRISMARINE_BRICK_STAIRS = registerLegacyStair("prismarine_brick_stairs", PRISMARINE_BRICKS);
@@ -3165,24 +2591,23 @@ public class Blocks {
 	public static final Block PRISMARINE_SLAB = register(
 		"prismarine_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PRISMARINE_BRICK_SLAB = register(
 		"prismarine_brick_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block DARK_PRISMARINE_SLAB = register(
 		"dark_prismarine_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIAMOND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SEA_LANTERN = register(
 		"sea_lantern",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.QUARTZ)
 			.instrument(NoteBlockInstrument.HAT)
-			.strength(0.3F)
 			.sound(SoundType.GLASS)
 			.lightLevel(blockStatex -> 15)
 			.isRedstoneConductor(Blocks::never)
@@ -3190,590 +2615,436 @@ public class Blocks {
 	public static final Block HAY_BLOCK = register(
 		"hay_block",
 		HayBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).instrument(NoteBlockInstrument.BANJO).strength(0.5F).sound(SoundType.GRASS)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).instrument(NoteBlockInstrument.BANJO).sound(SoundType.GRASS)
 	);
 	public static final Block WHITE_CARPET = register(
 		"white_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.WHITE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).sound(SoundType.WOOL)
 	);
 	public static final Block ORANGE_CARPET = register(
 		"orange_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.ORANGE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.WOOL)
 	);
 	public static final Block MAGENTA_CARPET = register(
 		"magenta_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.MAGENTA, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).sound(SoundType.WOOL)
 	);
 	public static final Block LIGHT_BLUE_CARPET = register(
 		"light_blue_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.LIGHT_BLUE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).sound(SoundType.WOOL)
 	);
 	public static final Block YELLOW_CARPET = register(
 		"yellow_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.YELLOW, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.WOOL)
 	);
 	public static final Block LIME_CARPET = register(
 		"lime_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.LIME, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).sound(SoundType.WOOL)
 	);
 	public static final Block PINK_CARPET = register(
 		"pink_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.PINK, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).sound(SoundType.WOOL)
 	);
 	public static final Block GRAY_CARPET = register(
 		"gray_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.GRAY, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).sound(SoundType.WOOL)
 	);
 	public static final Block LIGHT_GRAY_CARPET = register(
 		"light_gray_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.LIGHT_GRAY, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).sound(SoundType.WOOL)
 	);
 	public static final Block CYAN_CARPET = register(
 		"cyan_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.CYAN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).sound(SoundType.WOOL)
 	);
 	public static final Block PURPLE_CARPET = register(
 		"purple_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.PURPLE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).sound(SoundType.WOOL)
 	);
 	public static final Block BLUE_CARPET = register(
 		"blue_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.BLUE, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).sound(SoundType.WOOL)
 	);
 	public static final Block BROWN_CARPET = register(
 		"brown_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.BROWN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).sound(SoundType.WOOL)
 	);
 	public static final Block GREEN_CARPET = register(
 		"green_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.GREEN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.WOOL)
 	);
 	public static final Block RED_CARPET = register(
 		"red_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.RED, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.WOOL)
 	);
 	public static final Block BLACK_CARPET = register(
 		"black_carpet",
 		properties -> new WoolCarpetBlock(DyeColor.BLACK, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(0.1F).sound(SoundType.WOOL).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).sound(SoundType.WOOL)
 	);
 	public static final Block TERRACOTTA = register(
 		"terracotta",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.25F, 4.2F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block COAL_BLOCK = register(
 		"coal_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(5.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PACKED_ICE = register(
 		"packed_ice",
-		BlockBehaviour.Properties.of().mapColor(MapColor.ICE).instrument(NoteBlockInstrument.CHIME).friction(0.98F).strength(0.5F).sound(SoundType.GLASS)
+		BlockBehaviour.Properties.of().mapColor(MapColor.ICE).instrument(NoteBlockInstrument.CHIME).sound(SoundType.GLASS)
 	);
 	public static final Block SUNFLOWER = register(
 		"sunflower",
 		TallFlowerBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block LILAC = register(
 		"lilac",
 		TallFlowerBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ROSE_BUSH = register(
 		"rose_bush",
 		TallFlowerBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block PEONY = register(
 		"peony",
 		TallFlowerBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block TALL_GRASS = register(
 		"tall_grass",
 		DoublePlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block LARGE_FERN = register(
 		"large_fern",
 		DoublePlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block WHITE_BANNER = register(
 		"white_banner",
 		properties -> new BannerBlock(DyeColor.WHITE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block ORANGE_BANNER = register(
 		"orange_banner",
 		properties -> new BannerBlock(DyeColor.ORANGE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block MAGENTA_BANNER = register(
 		"magenta_banner",
 		properties -> new BannerBlock(DyeColor.MAGENTA, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block LIGHT_BLUE_BANNER = register(
 		"light_blue_banner",
 		properties -> new BannerBlock(DyeColor.LIGHT_BLUE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block YELLOW_BANNER = register(
 		"yellow_banner",
 		properties -> new BannerBlock(DyeColor.YELLOW, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block LIME_BANNER = register(
 		"lime_banner",
 		properties -> new BannerBlock(DyeColor.LIME, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block PINK_BANNER = register(
 		"pink_banner",
 		properties -> new BannerBlock(DyeColor.PINK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block GRAY_BANNER = register(
 		"gray_banner",
 		properties -> new BannerBlock(DyeColor.GRAY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block LIGHT_GRAY_BANNER = register(
 		"light_gray_banner",
 		properties -> new BannerBlock(DyeColor.LIGHT_GRAY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block CYAN_BANNER = register(
 		"cyan_banner",
 		properties -> new BannerBlock(DyeColor.CYAN, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block PURPLE_BANNER = register(
 		"purple_banner",
 		properties -> new BannerBlock(DyeColor.PURPLE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BLUE_BANNER = register(
 		"blue_banner",
 		properties -> new BannerBlock(DyeColor.BLUE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BROWN_BANNER = register(
 		"brown_banner",
 		properties -> new BannerBlock(DyeColor.BROWN, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block GREEN_BANNER = register(
 		"green_banner",
 		properties -> new BannerBlock(DyeColor.GREEN, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block RED_BANNER = register(
 		"red_banner",
 		properties -> new BannerBlock(DyeColor.RED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BLACK_BANNER = register(
 		"black_banner",
 		properties -> new BannerBlock(DyeColor.BLACK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block WHITE_WALL_BANNER = register(
 		"white_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.WHITE, properties),
 		wallVariant(WHITE_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block ORANGE_WALL_BANNER = register(
 		"orange_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.ORANGE, properties),
 		wallVariant(ORANGE_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block MAGENTA_WALL_BANNER = register(
 		"magenta_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.MAGENTA, properties),
 		wallVariant(MAGENTA_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block LIGHT_BLUE_WALL_BANNER = register(
 		"light_blue_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.LIGHT_BLUE, properties),
 		wallVariant(LIGHT_BLUE_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block YELLOW_WALL_BANNER = register(
 		"yellow_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.YELLOW, properties),
 		wallVariant(YELLOW_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block LIME_WALL_BANNER = register(
 		"lime_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.LIME, properties),
 		wallVariant(LIME_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block PINK_WALL_BANNER = register(
 		"pink_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.PINK, properties),
 		wallVariant(PINK_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block GRAY_WALL_BANNER = register(
 		"gray_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.GRAY, properties),
 		wallVariant(GRAY_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block LIGHT_GRAY_WALL_BANNER = register(
 		"light_gray_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.LIGHT_GRAY, properties),
 		wallVariant(LIGHT_GRAY_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block CYAN_WALL_BANNER = register(
 		"cyan_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.CYAN, properties),
 		wallVariant(CYAN_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block PURPLE_WALL_BANNER = register(
 		"purple_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.PURPLE, properties),
 		wallVariant(PURPLE_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BLUE_WALL_BANNER = register(
 		"blue_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.BLUE, properties),
 		wallVariant(BLUE_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BROWN_WALL_BANNER = register(
 		"brown_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.BROWN, properties),
 		wallVariant(BROWN_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block GREEN_WALL_BANNER = register(
 		"green_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.GREEN, properties),
 		wallVariant(GREEN_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block RED_WALL_BANNER = register(
 		"red_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.RED, properties),
 		wallVariant(RED_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BLACK_WALL_BANNER = register(
 		"black_wall_banner",
 		properties -> new WallBannerBlock(DyeColor.BLACK, properties),
 		wallVariant(BLACK_BANNER, true)
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block RED_SANDSTONE = register(
 		"red_sandstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CHISELED_RED_SANDSTONE = register(
 		"chiseled_red_sandstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CUT_RED_SANDSTONE = register(
 		"cut_red_sandstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(0.8F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block RED_SANDSTONE_STAIRS = registerLegacyStair("red_sandstone_stairs", RED_SANDSTONE);
 	public static final Block OAK_SLAB = register(
 		"oak_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block SPRUCE_SLAB = register(
 		"spruce_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.PODZOL).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BIRCH_SLAB = register(
 		"birch_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block JUNGLE_SLAB = register(
 		"jungle_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block ACACIA_SLAB = register(
 		"acacia_slab",
@@ -3781,9 +3052,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_SLAB = register(
 		"cherry_slab",
@@ -3791,14 +3060,12 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_WHITE)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.CHERRY_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_SLAB = register(
 		"dark_oak_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block PALE_OAK_SLAB = register(
 		"pale_oak_slab",
@@ -3806,14 +3073,12 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.WOOD)
-			.ignitedByLava()
 	);
 	public static final Block MANGROVE_SLAB = register(
 		"mangrove_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BAMBOO_SLAB = register(
 		"bamboo_slab",
@@ -3821,9 +3086,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.BAMBOO_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_MOSAIC_SLAB = register(
 		"bamboo_mosaic_slab",
@@ -3831,49 +3094,47 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.BAMBOO_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block STONE_SLAB = register(
 		"stone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SMOOTH_STONE_SLAB = register(
 		"smooth_stone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SANDSTONE_SLAB = register(
 		"sandstone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CUT_SANDSTONE_SLAB = register(
 		"cut_sandstone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PETRIFIED_OAK_SLAB = register(
 		"petrified_oak_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block COBBLESTONE_SLAB = register(
 		"cobblestone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BRICK_SLAB = register(
 		"brick_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block STONE_BRICK_SLAB = register(
 		"stone_brick_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block MUD_BRICK_SLAB = register(
 		"mud_brick_slab",
@@ -3881,8 +3142,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_LIGHT_GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 3.0F)
 			.sound(SoundType.MUD_BRICKS)
 	);
 	public static final Block NETHER_BRICK_SLAB = register(
@@ -3891,135 +3150,106 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.NETHER_BRICKS)
 	);
 	public static final Block QUARTZ_SLAB = register(
 		"quartz_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block RED_SANDSTONE_SLAB = register(
 		"red_sandstone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CUT_RED_SANDSTONE_SLAB = register(
 		"cut_red_sandstone_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PURPUR_SLAB = register(
 		"purpur_slab",
 		SlabBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SMOOTH_STONE = register(
 		"smooth_stone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SMOOTH_SANDSTONE = register(
 		"smooth_sandstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SMOOTH_QUARTZ = register(
 		"smooth_quartz",
-		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SMOOTH_RED_SANDSTONE = register(
 		"smooth_red_sandstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(2.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block SPRUCE_FENCE_GATE = register(
 		"spruce_fence_gate",
 		properties -> new FenceGateBlock(WoodType.SPRUCE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(SPRUCE_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block BIRCH_FENCE_GATE = register(
 		"birch_fence_gate",
 		properties -> new FenceGateBlock(WoodType.BIRCH, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(BIRCH_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block JUNGLE_FENCE_GATE = register(
 		"jungle_fence_gate",
 		properties -> new FenceGateBlock(WoodType.JUNGLE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(JUNGLE_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block ACACIA_FENCE_GATE = register(
 		"acacia_fence_gate",
 		properties -> new FenceGateBlock(WoodType.ACACIA, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(ACACIA_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block CHERRY_FENCE_GATE = register(
 		"cherry_fence_gate",
 		properties -> new FenceGateBlock(WoodType.CHERRY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(CHERRY_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block DARK_OAK_FENCE_GATE = register(
 		"dark_oak_fence_gate",
 		properties -> new FenceGateBlock(WoodType.DARK_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(DARK_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block PALE_OAK_FENCE_GATE = register(
 		"pale_oak_fence_gate",
 		properties -> new FenceGateBlock(WoodType.PALE_OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block MANGROVE_FENCE_GATE = register(
 		"mangrove_fence_gate",
 		properties -> new FenceGateBlock(WoodType.MANGROVE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MANGROVE_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block BAMBOO_FENCE_GATE = register(
 		"bamboo_fence_gate",
 		properties -> new FenceGateBlock(WoodType.BAMBOO, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(BAMBOO_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 	);
 	public static final Block SPRUCE_FENCE = register(
 		"spruce_fence",
@@ -4027,8 +3257,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(SPRUCE_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block BIRCH_FENCE = register(
@@ -4037,8 +3265,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(BIRCH_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block JUNGLE_FENCE = register(
@@ -4047,8 +3273,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(JUNGLE_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block ACACIA_FENCE = register(
@@ -4057,8 +3281,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(ACACIA_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block CHERRY_FENCE = register(
@@ -4067,8 +3289,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(CHERRY_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block DARK_OAK_FENCE = register(
@@ -4077,8 +3297,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DARK_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block PALE_OAK_FENCE = register(
@@ -4087,8 +3305,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block MANGROVE_FENCE = register(
@@ -4097,8 +3313,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MANGROVE_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
-			.ignitedByLava()
 			.sound(SoundType.WOOD)
 	);
 	public static final Block BAMBOO_FENCE = register(
@@ -4107,9 +3321,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(BAMBOO_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.BAMBOO_WOOD)
-			.ignitedByLava()
 	);
 	public static final Block SPRUCE_DOOR = register(
 		"spruce_door",
@@ -4117,10 +3329,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(SPRUCE_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BIRCH_DOOR = register(
 		"birch_door",
@@ -4128,10 +3336,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(BIRCH_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block JUNGLE_DOOR = register(
 		"jungle_door",
@@ -4139,10 +3343,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(JUNGLE_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ACACIA_DOOR = register(
 		"acacia_door",
@@ -4150,10 +3350,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(ACACIA_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CHERRY_DOOR = register(
 		"cherry_door",
@@ -4161,10 +3357,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(CHERRY_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block DARK_OAK_DOOR = register(
 		"dark_oak_door",
@@ -4172,10 +3364,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DARK_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block PALE_OAK_DOOR = register(
 		"pale_oak_door",
@@ -4183,10 +3371,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block MANGROVE_DOOR = register(
 		"mangrove_door",
@@ -4194,10 +3378,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MANGROVE_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BAMBOO_DOOR = register(
 		"bamboo_door",
@@ -4205,115 +3385,92 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(BAMBOO_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block END_ROD = register(
-		"end_rod", EndRodBlock::new, BlockBehaviour.Properties.of().forceSolidOff().instabreak().lightLevel(blockStatex -> 14).sound(SoundType.WOOD).noOcclusion()
+		"end_rod", EndRodBlock::new, BlockBehaviour.Properties.of().lightLevel(blockStatex -> 14).sound(SoundType.WOOD)
 	);
 	public static final Block CHORUS_PLANT = register(
 		"chorus_plant",
 		ChorusPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PURPLE)
-			.forceSolidOff()
-			.strength(0.4F)
 			.sound(SoundType.WOOD)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CHORUS_FLOWER = register(
 		"chorus_flower",
 		properties -> new ChorusFlowerBlock(CHORUS_PLANT, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PURPLE)
-			.forceSolidOff()
-			.randomTicks()
-			.strength(0.4F)
 			.sound(SoundType.WOOD)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block PURPUR_BLOCK = register(
 		"purpur_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PURPUR_PILLAR = register(
 		"purpur_pillar",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_MAGENTA).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PURPUR_STAIRS = registerLegacyStair("purpur_stairs", PURPUR_BLOCK);
 	public static final Block END_STONE_BRICKS = register(
 		"end_stone_bricks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.0F, 9.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block TORCHFLOWER_CROP = register(
 		"torchflower_crop",
 		TorchflowerCropBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.CROP).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.CROP)
 	);
 	public static final Block PITCHER_CROP = register(
 		"pitcher_crop",
 		PitcherCropBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.CROP).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.CROP)
 	);
 	public static final Block PITCHER_PLANT = register(
 		"pitcher_plant",
 		DoublePlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.CROP)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BEETROOTS = register(
 		"beetroots",
 		BeetrootBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.CROP).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.CROP)
 	);
 	public static final Block DIRT_PATH = register(
 		"dirt_path",
 		DirtPathBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.65F).sound(SoundType.GRASS).isViewBlocking(Blocks::always).isSuffocating(Blocks::always)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).sound(SoundType.GRASS).isViewBlocking(Blocks::always).isSuffocating(Blocks::always)
 	);
 	public static final Block END_GATEWAY = register(
 		"end_gateway",
 		EndGatewayBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
-			.noCollision()
 			.lightLevel(blockStatex -> 15)
-			.strength(-1.0F, 3600000.0F)
 			.noLootTable()
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block REPEATING_COMMAND_BLOCK = register(
 		"repeating_command_block",
 		properties -> new CommandBlock(false, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).requiresCorrectToolForDrops().strength(-1.0F, 3600000.0F).noLootTable()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).noLootTable()
 	);
 	public static final Block CHAIN_COMMAND_BLOCK = register(
 		"chain_command_block",
 		properties -> new CommandBlock(true, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).requiresCorrectToolForDrops().strength(-1.0F, 3600000.0F).noLootTable()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).noLootTable()
 	);
 	public static final Block FROSTED_ICE = register(
 		"frosted_ice",
 		FrostedIceBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.ICE)
-			.friction(0.98F)
-			.strength(0.5F)
 			.sound(SoundType.GLASS)
-			.noOcclusion()
 			.isValidSpawn((blockStatex, blockGetter, blockPos, entityType) -> entityType == EntityType.POLAR_BEAR)
 			.isRedstoneConductor(Blocks::never)
 	);
@@ -4323,23 +3480,19 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.lightLevel(blockStatex -> 3)
-			.strength(0.5F)
 			.isValidSpawn((blockStatex, blockGetter, blockPos, entityType) -> entityType.fireImmune())
 			.hasPostProcess(Blocks::always)
 			.emissiveRendering(Blocks::always)
 	);
 	public static final Block NETHER_WART_BLOCK = register(
-		"nether_wart_block", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(1.0F).sound(SoundType.WART_BLOCK)
+		"nether_wart_block", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.WART_BLOCK)
 	);
 	public static final Block RED_NETHER_BRICKS = register(
 		"red_nether_bricks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.NETHER_BRICKS)
 	);
 	public static final Block BONE_BLOCK = register(
@@ -4348,8 +3501,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.instrument(NoteBlockInstrument.XYLOPHONE)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F)
 			.sound(SoundType.BONE_BLOCK)
 	);
 	public static final Block THIN_BONE = register(
@@ -4358,14 +3509,12 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.instrument(NoteBlockInstrument.XYLOPHONE)
-			.requiresCorrectToolForDrops()
-			.strength(0.4F)
 			.sound(SoundType.BONE_BLOCK)
 	);
 	public static final Block STRUCTURE_VOID = register(
 		"structure_void",
 		StructureVoidBlock::new,
-		BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().noTerrainParticles().pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().noLootTable()
 	);
 	public static final Block OBSERVER = register(
 		"observer",
@@ -4373,8 +3522,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.strength(3.0F)
-			.requiresCorrectToolForDrops()
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block SHULKER_BOX = register(
@@ -4434,9 +3581,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.WHITE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block ORANGE_GLAZED_TERRACOTTA = register(
 		"orange_glazed_terracotta",
@@ -4444,9 +3588,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.ORANGE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block MAGENTA_GLAZED_TERRACOTTA = register(
 		"magenta_glazed_terracotta",
@@ -4454,9 +3595,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.MAGENTA)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block LIGHT_BLUE_GLAZED_TERRACOTTA = register(
 		"light_blue_glazed_terracotta",
@@ -4464,9 +3602,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.LIGHT_BLUE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block YELLOW_GLAZED_TERRACOTTA = register(
 		"yellow_glazed_terracotta",
@@ -4474,9 +3609,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.YELLOW)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block LIME_GLAZED_TERRACOTTA = register(
 		"lime_glazed_terracotta",
@@ -4484,9 +3616,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.LIME)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block PINK_GLAZED_TERRACOTTA = register(
 		"pink_glazed_terracotta",
@@ -4494,9 +3623,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.PINK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block GRAY_GLAZED_TERRACOTTA = register(
 		"gray_glazed_terracotta",
@@ -4504,9 +3630,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block LIGHT_GRAY_GLAZED_TERRACOTTA = register(
 		"light_gray_glazed_terracotta",
@@ -4514,9 +3637,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.LIGHT_GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block CYAN_GLAZED_TERRACOTTA = register(
 		"cyan_glazed_terracotta",
@@ -4524,9 +3644,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.CYAN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block PURPLE_GLAZED_TERRACOTTA = register(
 		"purple_glazed_terracotta",
@@ -4534,9 +3651,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.PURPLE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block BLUE_GLAZED_TERRACOTTA = register(
 		"blue_glazed_terracotta",
@@ -4544,9 +3658,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.BLUE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block BROWN_GLAZED_TERRACOTTA = register(
 		"brown_glazed_terracotta",
@@ -4554,9 +3665,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.BROWN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block GREEN_GLAZED_TERRACOTTA = register(
 		"green_glazed_terracotta",
@@ -4564,9 +3672,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.GREEN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block RED_GLAZED_TERRACOTTA = register(
 		"red_glazed_terracotta",
@@ -4574,9 +3679,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.RED)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block BLACK_GLAZED_TERRACOTTA = register(
 		"black_glazed_terracotta",
@@ -4584,294 +3686,255 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.BLACK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.4F)
-			.pushReaction(PushReaction.PUSH_ONLY)
 	);
 	public static final Block WHITE_CONCRETE = register(
 		"white_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block ORANGE_CONCRETE = register(
 		"orange_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block MAGENTA_CONCRETE = register(
 		"magenta_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.MAGENTA).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.MAGENTA).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block LIGHT_BLUE_CONCRETE = register(
 		"light_blue_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_BLUE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_BLUE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block YELLOW_CONCRETE = register(
 		"yellow_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.YELLOW).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.YELLOW).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block LIME_CONCRETE = register(
-		"lime_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.LIME).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		"lime_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.LIME).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PINK_CONCRETE = register(
-		"pink_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.PINK).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		"pink_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.PINK).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block GRAY_CONCRETE = register(
-		"gray_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.GRAY).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		"gray_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.GRAY).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block LIGHT_GRAY_CONCRETE = register(
 		"light_gray_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_GRAY).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_GRAY).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block CYAN_CONCRETE = register(
-		"cyan_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.CYAN).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		"cyan_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.CYAN).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block PURPLE_CONCRETE = register(
 		"purple_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.PURPLE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.PURPLE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BLUE_CONCRETE = register(
-		"blue_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.BLUE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		"blue_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.BLUE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BROWN_CONCRETE = register(
 		"brown_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.BROWN).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.BROWN).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block GREEN_CONCRETE = register(
 		"green_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.GREEN).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.GREEN).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block RED_CONCRETE = register(
-		"red_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.RED).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		"red_concrete", BlockBehaviour.Properties.of().mapColor(DyeColor.RED).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BLACK_CONCRETE = register(
 		"black_concrete",
-		BlockBehaviour.Properties.of().mapColor(DyeColor.BLACK).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.BLACK).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block WHITE_CONCRETE_POWDER = register(
 		"white_concrete_powder",
 		properties -> new ConcretePowderBlock(WHITE_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block ORANGE_CONCRETE_POWDER = register(
 		"orange_concrete_powder",
 		properties -> new ConcretePowderBlock(ORANGE_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.ORANGE).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.ORANGE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block MAGENTA_CONCRETE_POWDER = register(
 		"magenta_concrete_powder",
 		properties -> new ConcretePowderBlock(MAGENTA_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.MAGENTA).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.MAGENTA).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block LIGHT_BLUE_CONCRETE_POWDER = register(
 		"light_blue_concrete_powder",
 		properties -> new ConcretePowderBlock(LIGHT_BLUE_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_BLUE).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_BLUE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block YELLOW_CONCRETE_POWDER = register(
 		"yellow_concrete_powder",
 		properties -> new ConcretePowderBlock(YELLOW_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.YELLOW).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.YELLOW).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block LIME_CONCRETE_POWDER = register(
 		"lime_concrete_powder",
 		properties -> new ConcretePowderBlock(LIME_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.LIME).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.LIME).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block PINK_CONCRETE_POWDER = register(
 		"pink_concrete_powder",
 		properties -> new ConcretePowderBlock(PINK_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.PINK).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.PINK).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block GRAY_CONCRETE_POWDER = register(
 		"gray_concrete_powder",
 		properties -> new ConcretePowderBlock(GRAY_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.GRAY).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.GRAY).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block LIGHT_GRAY_CONCRETE_POWDER = register(
 		"light_gray_concrete_powder",
 		properties -> new ConcretePowderBlock(LIGHT_GRAY_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_GRAY).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.LIGHT_GRAY).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block CYAN_CONCRETE_POWDER = register(
 		"cyan_concrete_powder",
 		properties -> new ConcretePowderBlock(CYAN_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.CYAN).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.CYAN).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block PURPLE_CONCRETE_POWDER = register(
 		"purple_concrete_powder",
 		properties -> new ConcretePowderBlock(PURPLE_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.PURPLE).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.PURPLE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block BLUE_CONCRETE_POWDER = register(
 		"blue_concrete_powder",
 		properties -> new ConcretePowderBlock(BLUE_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.BLUE).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.BLUE).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block BROWN_CONCRETE_POWDER = register(
 		"brown_concrete_powder",
 		properties -> new ConcretePowderBlock(BROWN_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.BROWN).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.BROWN).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block GREEN_CONCRETE_POWDER = register(
 		"green_concrete_powder",
 		properties -> new ConcretePowderBlock(GREEN_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.GREEN).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.GREEN).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block RED_CONCRETE_POWDER = register(
 		"red_concrete_powder",
 		properties -> new ConcretePowderBlock(RED_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.RED).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.RED).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block BLACK_CONCRETE_POWDER = register(
 		"black_concrete_powder",
 		properties -> new ConcretePowderBlock(BLACK_CONCRETE, properties),
-		BlockBehaviour.Properties.of().mapColor(DyeColor.BLACK).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.BLACK).instrument(NoteBlockInstrument.SNARE).sound(SoundType.SAND)
 	);
 	public static final Block ELEVATOR = register(
 		"elevator",
 		ElevatorBlock::new,
-		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block KELP = register(
 		"kelp",
 		KelpBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WATER)
-			.noCollision()
-			.randomTicks()
-			.instabreak()
 			.sound(SoundType.WET_GRASS)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block KELP_PLANT = register(
 		"kelp_plant",
 		KelpPlantBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WATER).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WATER).sound(SoundType.WET_GRASS)
 	);
 	public static final Block DRIED_KELP_BLOCK = register(
-		"dried_kelp_block", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.5F, 2.5F).sound(SoundType.GRASS)
+		"dried_kelp_block", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.GRASS)
 	);
 	public static final Block TURTLE_EGG = register(
 		"turtle_egg",
 		TurtleEggBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
-			.forceSolidOn()
-			.strength(0.5F)
 			.sound(SoundType.METAL)
-			.randomTicks()
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block TERRAPIN_EGG = register(
 		"terrapin_egg",
 		BlockTerrapinEgg::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
-			.forceSolidOn()
-			.strength(0.5F)
 			.sound(SoundType.METAL)
-			.randomTicks()
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CAIMAN_EGG = register(
 		"caiman_egg",
 		BlockCaimanEgg::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
-			.strength(0.5F)
 			.sound(SoundType.METAL)
-			.randomTicks()
-			.noOcclusion()
 	);
 	public static final Block PLATYPUS_EGG = register(
 		"platypus_egg",
 		BlockPlatypusEgg::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
-			.strength(0.5F)
 			.sound(SoundType.METAL)
-			.randomTicks()
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SNIFFER_EGG = register(
-		"sniffer_egg", SnifferEggBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.5F).sound(SoundType.METAL).noOcclusion()
+		"sniffer_egg", SnifferEggBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.METAL)
 	);
 	public static final Block SUBTERRANODON_EGG = register(
 		"subterranodon_egg",
 		SubterranodonEggBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).sound(SoundType.METAL)
 	);
 	public static final Block VALLUMRAPTOR_EGG = register(
 		"vallumraptor_egg",
 		VallumraptorEggBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).sound(SoundType.METAL)
 	);
 	public static final Block GROTTOCERATOPS_EGG = register(
 		"grottoceratops_egg",
 		GrottoceratopsEggBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).sound(SoundType.METAL)
 	);
 	public static final Block TREMORSAURUS_EGG = register(
 		"tremorsaurus_egg",
 		TremorsaurusEggBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).sound(SoundType.METAL)
 	);
 	public static final Block RELICHEIRUS_EGG = register(
 		"relicheirus_egg",
 		RelicheirusEggBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).sound(SoundType.METAL)
 	);
 	public static final Block DRIED_GHAST = register(
 		"dried_ghast",
 		DriedGhastBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).forceSolidOn().instabreak().sound(SoundType.DRIED_GHAST).noOcclusion().randomTicks()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).sound(SoundType.DRIED_GHAST)
 	);
 	public static final Block DEAD_TUBE_CORAL_BLOCK = register(
 		"dead_tube_coral_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block DEAD_BRAIN_CORAL_BLOCK = register(
 		"dead_brain_coral_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block DEAD_BUBBLE_CORAL_BLOCK = register(
 		"dead_bubble_coral_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block DEAD_FIRE_CORAL_BLOCK = register(
 		"dead_fire_coral_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block DEAD_HORN_CORAL_BLOCK = register(
 		"dead_horn_coral_block",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block TUBE_CORAL_BLOCK = register(
 		"tube_coral_block",
@@ -4879,8 +3942,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLUE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 			.sound(SoundType.CORAL_BLOCK)
 	);
 	public static final Block BRAIN_CORAL_BLOCK = register(
@@ -4889,8 +3950,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PINK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 			.sound(SoundType.CORAL_BLOCK)
 	);
 	public static final Block BUBBLE_CORAL_BLOCK = register(
@@ -4899,8 +3958,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PURPLE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 			.sound(SoundType.CORAL_BLOCK)
 	);
 	public static final Block FIRE_CORAL_BLOCK = register(
@@ -4909,8 +3966,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_RED)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 			.sound(SoundType.CORAL_BLOCK)
 	);
 	public static final Block HORN_CORAL_BLOCK = register(
@@ -4919,8 +3974,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_YELLOW)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 			.sound(SoundType.CORAL_BLOCK)
 	);
 	public static final Block DEAD_TUBE_CORAL = register(
@@ -4928,240 +3981,180 @@ public class Blocks {
 		BaseCoralPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_BRAIN_CORAL = register(
 		"dead_brain_coral",
 		BaseCoralPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_BUBBLE_CORAL = register(
 		"dead_bubble_coral",
 		BaseCoralPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_FIRE_CORAL = register(
 		"dead_fire_coral",
 		BaseCoralPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_HORN_CORAL = register(
 		"dead_horn_coral",
 		BaseCoralPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block TUBE_CORAL = register(
 		"tube_coral",
 		properties -> new CoralPlantBlock(DEAD_TUBE_CORAL, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).sound(SoundType.WET_GRASS)
 	);
 	public static final Block BRAIN_CORAL = register(
 		"brain_coral",
 		properties -> new CoralPlantBlock(DEAD_BRAIN_CORAL, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).sound(SoundType.WET_GRASS)
 	);
 	public static final Block BUBBLE_CORAL = register(
 		"bubble_coral",
 		properties -> new CoralPlantBlock(DEAD_BUBBLE_CORAL, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).sound(SoundType.WET_GRASS)
 	);
 	public static final Block FIRE_CORAL = register(
 		"fire_coral",
 		properties -> new CoralPlantBlock(DEAD_FIRE_CORAL, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.WET_GRASS)
 	);
 	public static final Block HORN_CORAL = register(
 		"horn_coral",
 		properties -> new CoralPlantBlock(DEAD_HORN_CORAL, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.WET_GRASS)
 	);
 	public static final Block DEAD_TUBE_CORAL_FAN = register(
 		"dead_tube_coral_fan",
 		BaseCoralFanBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_BRAIN_CORAL_FAN = register(
 		"dead_brain_coral_fan",
 		BaseCoralFanBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_BUBBLE_CORAL_FAN = register(
 		"dead_bubble_coral_fan",
 		BaseCoralFanBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_FIRE_CORAL_FAN = register(
 		"dead_fire_coral_fan",
 		BaseCoralFanBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_HORN_CORAL_FAN = register(
 		"dead_horn_coral_fan",
 		BaseCoralFanBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block TUBE_CORAL_FAN = register(
 		"tube_coral_fan",
 		properties -> new CoralFanBlock(DEAD_TUBE_CORAL_FAN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLUE).sound(SoundType.WET_GRASS)
 	);
 	public static final Block BRAIN_CORAL_FAN = register(
 		"brain_coral_fan",
 		properties -> new CoralFanBlock(DEAD_BRAIN_CORAL_FAN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).sound(SoundType.WET_GRASS)
 	);
 	public static final Block BUBBLE_CORAL_FAN = register(
 		"bubble_coral_fan",
 		properties -> new CoralFanBlock(DEAD_BUBBLE_CORAL_FAN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).sound(SoundType.WET_GRASS)
 	);
 	public static final Block FIRE_CORAL_FAN = register(
 		"fire_coral_fan",
 		properties -> new CoralFanBlock(DEAD_FIRE_CORAL_FAN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.WET_GRASS)
 	);
 	public static final Block HORN_CORAL_FAN = register(
 		"horn_coral_fan",
 		properties -> new CoralFanBlock(DEAD_HORN_CORAL_FAN, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.WET_GRASS)
 	);
 	public static final Block DEAD_TUBE_CORAL_WALL_FAN = register(
 		"dead_tube_coral_wall_fan",
 		BaseCoralWallFanBlock::new,
 		wallVariant(DEAD_TUBE_CORAL_FAN, false)
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_BRAIN_CORAL_WALL_FAN = register(
 		"dead_brain_coral_wall_fan",
 		BaseCoralWallFanBlock::new,
 		wallVariant(DEAD_BRAIN_CORAL_FAN, false)
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_BUBBLE_CORAL_WALL_FAN = register(
 		"dead_bubble_coral_wall_fan",
 		BaseCoralWallFanBlock::new,
 		wallVariant(DEAD_BUBBLE_CORAL_FAN, false)
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_FIRE_CORAL_WALL_FAN = register(
 		"dead_fire_coral_wall_fan",
 		BaseCoralWallFanBlock::new,
 		wallVariant(DEAD_FIRE_CORAL_FAN, false)
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block DEAD_HORN_CORAL_WALL_FAN = register(
 		"dead_horn_coral_wall_fan",
 		BaseCoralWallFanBlock::new,
 		wallVariant(DEAD_HORN_CORAL_FAN, false)
 			.mapColor(MapColor.COLOR_GRAY)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.noCollision()
-			.instabreak()
 	);
 	public static final Block TUBE_CORAL_WALL_FAN = register(
 		"tube_coral_wall_fan",
 		properties -> new CoralWallFanBlock(DEAD_TUBE_CORAL_WALL_FAN, properties),
-		wallVariant(TUBE_CORAL_FAN, false).mapColor(MapColor.COLOR_BLUE).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		wallVariant(TUBE_CORAL_FAN, false).mapColor(MapColor.COLOR_BLUE).sound(SoundType.WET_GRASS)
 	);
 	public static final Block BRAIN_CORAL_WALL_FAN = register(
 		"brain_coral_wall_fan",
 		properties -> new CoralWallFanBlock(DEAD_BRAIN_CORAL_WALL_FAN, properties),
-		wallVariant(BRAIN_CORAL_FAN, false).mapColor(MapColor.COLOR_PINK).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		wallVariant(BRAIN_CORAL_FAN, false).mapColor(MapColor.COLOR_PINK).sound(SoundType.WET_GRASS)
 	);
 	public static final Block BUBBLE_CORAL_WALL_FAN = register(
 		"bubble_coral_wall_fan",
 		properties -> new CoralWallFanBlock(DEAD_BUBBLE_CORAL_WALL_FAN, properties),
-		wallVariant(BUBBLE_CORAL_FAN, false).mapColor(MapColor.COLOR_PURPLE).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		wallVariant(BUBBLE_CORAL_FAN, false).mapColor(MapColor.COLOR_PURPLE).sound(SoundType.WET_GRASS)
 	);
 	public static final Block FIRE_CORAL_WALL_FAN = register(
 		"fire_coral_wall_fan",
 		properties -> new CoralWallFanBlock(DEAD_FIRE_CORAL_WALL_FAN, properties),
-		wallVariant(FIRE_CORAL_FAN, false).mapColor(MapColor.COLOR_RED).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		wallVariant(FIRE_CORAL_FAN, false).mapColor(MapColor.COLOR_RED).sound(SoundType.WET_GRASS)
 	);
 	public static final Block HORN_CORAL_WALL_FAN = register(
 		"horn_coral_wall_fan",
 		properties -> new CoralWallFanBlock(DEAD_HORN_CORAL_WALL_FAN, properties),
-		wallVariant(HORN_CORAL_FAN, false).mapColor(MapColor.COLOR_YELLOW).noCollision().instabreak().sound(SoundType.WET_GRASS).pushReaction(PushReaction.DESTROY)
+		wallVariant(HORN_CORAL_FAN, false).mapColor(MapColor.COLOR_YELLOW).sound(SoundType.WET_GRASS)
 	);
 	public static final Block SEA_PICKLE = register(
 		"sea_pickle",
@@ -5170,68 +4163,44 @@ public class Blocks {
 			.mapColor(MapColor.COLOR_GREEN)
 			.lightLevel(blockStatex -> SeaPickleBlock.isDead(blockStatex) ? 0 : 3 + 3 * (Integer)blockStatex.getValue(SeaPickleBlock.PICKLES))
 			.sound(SoundType.SLIME_BLOCK)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BLUE_ICE = register(
-		"blue_ice", HalfTransparentBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.ICE).strength(2.8F).friction(0.989F).sound(SoundType.GLASS)
+		"blue_ice", HalfTransparentBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.ICE).sound(SoundType.GLASS)
 	);
 	public static final Block CONDUIT = register(
 		"conduit",
 		ConduitBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.DIAMOND)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.HAT)
-			.strength(3.0F)
 			.lightLevel(blockStatex -> 15)
-			.noOcclusion()
 	);
 	public static final Block BAMBOO_SAPLING = register(
 		"bamboo_sapling",
 		BambooSaplingBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
-			.randomTicks()
-			.instabreak()
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.BAMBOO_SAPLING)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BAMBOO = register(
 		"bamboo",
 		BambooStalkBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.forceSolidOn()
-			.randomTicks()
-			.instabreak()
-			.strength(1.0F)
 			.sound(SoundType.BAMBOO)
-			.noOcclusion()
-			.dynamicShape()
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block POTTED_BAMBOO = register("potted_bamboo", properties -> new FlowerPotBlock(BAMBOO, properties), flowerPotProperties());
-	public static final Block VOID_AIR = register("void_air", AirBlock::new, BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().air());
-	public static final Block CAVE_AIR = register("cave_air", AirBlock::new, BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().air());
+	public static final Block VOID_AIR = register("void_air", AirBlock::new, BlockBehaviour.Properties.of().noLootTable());
+	public static final Block CAVE_AIR = register("cave_air", AirBlock::new, BlockBehaviour.Properties.of().noLootTable());
 	public static final Block BUBBLE_COLUMN = register(
 		"bubble_column",
 		BubbleColumnBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WATER)
-			.replaceable()
-			.noCollision()
 			.noLootTable()
-			.pushReaction(PushReaction.DESTROY)
-			.liquid()
 			.sound(SoundType.EMPTY)
 	);
 	public static final Block POLISHED_GRANITE_STAIRS = registerLegacyStair("polished_granite_stairs", POLISHED_GRANITE);
@@ -5269,50 +4238,47 @@ public class Blocks {
 		"polished_andesite_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_ANDESITE)
 	);
 	public static final Block DIORITE_SLAB = register("diorite_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DIORITE));
-	public static final Block BRICK_WALL = register("brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(BRICKS).forceSolidOn());
-	public static final Block PRISMARINE_WALL = register("prismarine_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(PRISMARINE).forceSolidOn());
+	public static final Block BRICK_WALL = register("brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(BRICKS));
+	public static final Block PRISMARINE_WALL = register("prismarine_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(PRISMARINE));
 	public static final Block RED_SANDSTONE_WALL = register(
-		"red_sandstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(RED_SANDSTONE).forceSolidOn()
+		"red_sandstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(RED_SANDSTONE)
 	);
 	public static final Block MOSSY_STONE_BRICK_WALL = register(
-		"mossy_stone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(MOSSY_STONE_BRICKS).forceSolidOn()
+		"mossy_stone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(MOSSY_STONE_BRICKS)
 	);
-	public static final Block GRANITE_WALL = register("granite_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(GRANITE).forceSolidOn());
-	public static final Block STONE_BRICK_WALL = register("stone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(STONE_BRICKS).forceSolidOn());
-	public static final Block MUD_BRICK_WALL = register("mud_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(MUD_BRICKS).forceSolidOn());
+	public static final Block GRANITE_WALL = register("granite_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(GRANITE));
+	public static final Block STONE_BRICK_WALL = register("stone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(STONE_BRICKS));
+	public static final Block MUD_BRICK_WALL = register("mud_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(MUD_BRICKS));
 	public static final Block NETHER_BRICK_WALL = register(
-		"nether_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(NETHER_BRICKS).forceSolidOn()
+		"nether_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(NETHER_BRICKS)
 	);
-	public static final Block ANDESITE_WALL = register("andesite_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(ANDESITE).forceSolidOn());
+	public static final Block ANDESITE_WALL = register("andesite_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(ANDESITE));
 	public static final Block RED_NETHER_BRICK_WALL = register(
-		"red_nether_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(RED_NETHER_BRICKS).forceSolidOn()
+		"red_nether_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(RED_NETHER_BRICKS)
 	);
-	public static final Block SANDSTONE_WALL = register("sandstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SANDSTONE).forceSolidOn());
+	public static final Block SANDSTONE_WALL = register("sandstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SANDSTONE));
 	public static final Block END_STONE_BRICK_WALL = register(
-		"end_stone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(END_STONE_BRICKS).forceSolidOn()
+		"end_stone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(END_STONE_BRICKS)
 	);
-	public static final Block DIORITE_WALL = register("diorite_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DIORITE).forceSolidOn());
+	public static final Block DIORITE_WALL = register("diorite_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DIORITE));
 	public static final Block SCAFFOLDING = register(
 		"scaffolding",
 		ScaffoldingBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
-			.noCollision()
 			.sound(SoundType.SCAFFOLDING)
-			.dynamicShape()
 			.isValidSpawn(Blocks::never)
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block LOOM = register(
 		"loom",
 		LoomBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BARREL = register(
 		"barrel",
 		BarrelBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block SMOKER = register(
 		"smoker",
@@ -5320,8 +4286,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(3.5F)
 			.lightLevel(litBlockEmission(13))
 	);
 	public static final Block BLAST_FURNACE = register(
@@ -5330,82 +4294,69 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(3.5F)
 			.lightLevel(litBlockEmission(13))
 	);
 	public static final Block CARTOGRAPHY_TABLE = register(
 		"cartography_table",
 		CartographyTableBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block FLETCHING_TABLE = register(
 		"fletching_table",
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block GRINDSTONE = register(
 		"grindstone",
 		GrindstoneBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.STONE)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block LECTERN = register(
 		"lectern",
 		LecternBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block LEAFCUTTER_ANTHILL = register(
 		"leafcutter_anthill",
 		BlockLeafcutterAnthill::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.5F).sound(SoundType.GRAVEL)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).sound(SoundType.GRAVEL)
 	);
 	public static final Block LEAFCUTTER_ANT_CHAMBER = register(
 		"leafcutter_ant_chamber",
 		BlockLeafcutterAntChamber::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.3F).sound(SoundType.SLIME_BLOCK)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.SLIME_BLOCK)
 	);
 	public static final Block SMITHING_TABLE = register(
 		"smithing_table",
 		SmithingTableBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block STONECUTTER = register(
 		"stonecutter",
 		StonecutterBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(3.5F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BELL = register(
 		"bell",
 		BellBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.GOLD).forceSolidOn().strength(5.0F).sound(SoundType.ANVIL).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.GOLD).sound(SoundType.ANVIL)
 	);
 	public static final Block LANTERN = register(
 		"lantern",
 		LanternBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.forceSolidOn()
-			.strength(3.5F)
 			.sound(SoundType.LANTERN)
 			.lightLevel(blockStatex -> 15)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SOUL_LANTERN = register(
 		"soul_lantern",
 		LanternBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.forceSolidOn()
-			.strength(3.5F)
 			.sound(SoundType.LANTERN)
 			.lightLevel(blockStatex -> 10)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final WeatheringCopperBlocks COPPER_LANTERN = WeatheringCopperBlocks.create(
 		"copper_lantern",
@@ -5414,12 +4365,8 @@ public class Blocks {
 		WeatheringLanternBlock::new,
 		weatherState -> BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.forceSolidOn()
-			.strength(3.5F)
 			.sound(SoundType.LANTERN)
 			.lightLevel(blockStatex -> 15)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CAMPFIRE = register(
 		"campfire",
@@ -5427,11 +4374,8 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PODZOL)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F)
 			.sound(SoundType.WOOD)
 			.lightLevel(litBlockEmission(15))
-			.noOcclusion()
-			.ignitedByLava()
 	);
 	public static final Block SOUL_CAMPFIRE = register(
 		"soul_campfire",
@@ -5439,28 +4383,25 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PODZOL)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F)
 			.sound(SoundType.WOOD)
 			.lightLevel(litBlockEmission(10))
-			.noOcclusion()
-			.ignitedByLava()
 	);
 	public static final Block SWEET_BERRY_BUSH = register(
 		"sweet_berry_bush",
 		SweetBerryBushBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).randomTicks().noCollision().sound(SoundType.SWEET_BERRY_BUSH).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.SWEET_BERRY_BUSH)
 	);
 	public static final Block WARPED_STEM = register("warped_stem", RotatedPillarBlock::new, netherStemProperties(MapColor.WARPED_STEM));
 	public static final Block STRIPPED_WARPED_STEM = register("stripped_warped_stem", RotatedPillarBlock::new, netherStemProperties(MapColor.WARPED_STEM));
 	public static final Block WARPED_HYPHAE = register(
 		"warped_hyphae",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_HYPHAE).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.STEM)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_HYPHAE).instrument(NoteBlockInstrument.BASS).sound(SoundType.STEM)
 	);
 	public static final Block STRIPPED_WARPED_HYPHAE = register(
 		"stripped_warped_hyphae",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_HYPHAE).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.STEM)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_HYPHAE).instrument(NoteBlockInstrument.BASS).sound(SoundType.STEM)
 	);
 	public static final Block WARPED_NYLIUM = register(
 		"warped_nylium",
@@ -5468,54 +4409,43 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WARPED_NYLIUM)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(0.4F)
 			.sound(SoundType.NYLIUM)
-			.randomTicks()
 	);
 	public static final Block WARPED_FUNGUS = register(
 		"warped_fungus",
 		properties -> new FungusBlock(TreeFeatures.WARPED_FUNGUS_PLANTED, WARPED_NYLIUM, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).instabreak().noCollision().sound(SoundType.FUNGUS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).sound(SoundType.FUNGUS)
 	);
 	public static final Block WARPED_WART_BLOCK = register(
-		"warped_wart_block", BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_WART_BLOCK).strength(1.0F).sound(SoundType.WART_BLOCK)
+		"warped_wart_block", BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_WART_BLOCK).sound(SoundType.WART_BLOCK)
 	);
 	public static final Block WARPED_ROOTS = register(
 		"warped_roots",
 		RootsBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_CYAN)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.ROOTS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block NETHER_SPROUTS = register(
 		"nether_sprouts",
 		NetherSproutsBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_CYAN)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.NETHER_SPROUTS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CRIMSON_STEM = register("crimson_stem", RotatedPillarBlock::new, netherStemProperties(MapColor.CRIMSON_STEM));
 	public static final Block STRIPPED_CRIMSON_STEM = register("stripped_crimson_stem", RotatedPillarBlock::new, netherStemProperties(MapColor.CRIMSON_STEM));
 	public static final Block CRIMSON_HYPHAE = register(
 		"crimson_hyphae",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_HYPHAE).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.STEM)
+		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_HYPHAE).instrument(NoteBlockInstrument.BASS).sound(SoundType.STEM)
 	);
 	public static final Block STRIPPED_CRIMSON_HYPHAE = register(
 		"stripped_crimson_hyphae",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_HYPHAE).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.STEM)
+		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_HYPHAE).instrument(NoteBlockInstrument.BASS).sound(SoundType.STEM)
 	);
 	public static final Block CRIMSON_NYLIUM = register(
 		"crimson_nylium",
@@ -5523,70 +4453,55 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.CRIMSON_NYLIUM)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(0.4F)
 			.sound(SoundType.NYLIUM)
-			.randomTicks()
 	);
 	public static final Block CRIMSON_FUNGUS = register(
 		"crimson_fungus",
 		properties -> new FungusBlock(TreeFeatures.CRIMSON_FUNGUS_PLANTED, CRIMSON_NYLIUM, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.NETHER).instabreak().noCollision().sound(SoundType.FUNGUS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.NETHER).sound(SoundType.FUNGUS)
 	);
 	public static final Block SHROOMLIGHT = register(
-		"shroomlight", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(1.0F).sound(SoundType.SHROOMLIGHT).lightLevel(blockStatex -> 15)
+		"shroomlight", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).sound(SoundType.SHROOMLIGHT).lightLevel(blockStatex -> 15)
 	);
 	public static final Block WEEPING_VINES = register(
 		"weeping_vines",
 		WeepingVinesBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
-			.randomTicks()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.WEEPING_VINES)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block WEEPING_VINES_PLANT = register(
 		"weeping_vines_plant",
 		WeepingVinesPlantBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.NETHER).noCollision().instabreak().sound(SoundType.WEEPING_VINES).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.NETHER).sound(SoundType.WEEPING_VINES)
 	);
 	public static final Block TWISTING_VINES = register(
 		"twisting_vines",
 		TwistingVinesBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_CYAN)
-			.randomTicks()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.WEEPING_VINES)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block TWISTING_VINES_PLANT = register(
 		"twisting_vines_plant",
 		TwistingVinesPlantBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).noCollision().instabreak().sound(SoundType.WEEPING_VINES).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).sound(SoundType.WEEPING_VINES)
 	);
 	public static final Block CRIMSON_ROOTS = register(
 		"crimson_roots",
 		RootsBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.ROOTS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CRIMSON_PLANKS = register(
 		"crimson_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_STEM).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.NETHER_WOOD)
+		BlockBehaviour.Properties.of().mapColor(MapColor.CRIMSON_STEM).instrument(NoteBlockInstrument.BASS).sound(SoundType.NETHER_WOOD)
 	);
 	public static final Block WARPED_PLANKS = register(
 		"warped_planks",
-		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_STEM).instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F).sound(SoundType.NETHER_WOOD)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WARPED_STEM).instrument(NoteBlockInstrument.BASS).sound(SoundType.NETHER_WOOD)
 	);
 	public static final Block CRIMSON_SLAB = register(
 		"crimson_slab",
@@ -5594,7 +4509,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(CRIMSON_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.NETHER_WOOD)
 	);
 	public static final Block WARPED_SLAB = register(
@@ -5603,7 +4517,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(WARPED_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.NETHER_WOOD)
 	);
 	public static final Block CRIMSON_PRESSURE_PLATE = register(
@@ -5611,22 +4524,14 @@ public class Blocks {
 		properties -> new PressurePlateBlock(BlockSetType.CRIMSON, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(CRIMSON_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block WARPED_PRESSURE_PLATE = register(
 		"warped_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.WARPED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(WARPED_PLANKS.defaultMapColor())
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(0.5F)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CRIMSON_FENCE = register(
 		"crimson_fence",
@@ -5634,7 +4539,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(CRIMSON_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.NETHER_WOOD)
 	);
 	public static final Block WARPED_FENCE = register(
@@ -5643,7 +4547,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(WARPED_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.NETHER_WOOD)
 	);
 	public static final Block CRIMSON_TRAPDOOR = register(
@@ -5652,8 +4555,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(CRIMSON_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block WARPED_TRAPDOOR = register(
@@ -5662,19 +4563,17 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(WARPED_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block CRIMSON_FENCE_GATE = register(
 		"crimson_fence_gate",
 		properties -> new FenceGateBlock(WoodType.CRIMSON, properties),
-		BlockBehaviour.Properties.of().mapColor(CRIMSON_PLANKS.defaultMapColor()).forceSolidOn().instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(CRIMSON_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block WARPED_FENCE_GATE = register(
 		"warped_fence_gate",
 		properties -> new FenceGateBlock(WoodType.WARPED, properties),
-		BlockBehaviour.Properties.of().mapColor(WARPED_PLANKS.defaultMapColor()).forceSolidOn().instrument(NoteBlockInstrument.BASS).strength(2.0F, 3.0F)
+		BlockBehaviour.Properties.of().mapColor(WARPED_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block CRIMSON_STAIRS = registerLegacyStair("crimson_stairs", CRIMSON_PLANKS);
 	public static final Block WARPED_STAIRS = registerLegacyStair("warped_stairs", WARPED_PLANKS);
@@ -5686,9 +4585,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(CRIMSON_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block WARPED_DOOR = register(
 		"warped_door",
@@ -5696,81 +4592,78 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(WARPED_PLANKS.defaultMapColor())
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(3.0F)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CRIMSON_SIGN = register(
 		"crimson_sign",
 		properties -> new StandingSignBlock(WoodType.CRIMSON, properties),
-		BlockBehaviour.Properties.of().mapColor(CRIMSON_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS).forceSolidOn().noCollision().strength(1.0F)
+		BlockBehaviour.Properties.of().mapColor(CRIMSON_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block WARPED_SIGN = register(
 		"warped_sign",
 		properties -> new StandingSignBlock(WoodType.WARPED, properties),
-		BlockBehaviour.Properties.of().mapColor(WARPED_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS).forceSolidOn().noCollision().strength(1.0F)
+		BlockBehaviour.Properties.of().mapColor(WARPED_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block CRIMSON_WALL_SIGN = register(
 		"crimson_wall_sign",
 		properties -> new WallSignBlock(WoodType.CRIMSON, properties),
-		wallVariant(CRIMSON_SIGN, true).mapColor(CRIMSON_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS).forceSolidOn().noCollision().strength(1.0F)
+		wallVariant(CRIMSON_SIGN, true).mapColor(CRIMSON_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block WARPED_WALL_SIGN = register(
 		"warped_wall_sign",
 		properties -> new WallSignBlock(WoodType.WARPED, properties),
-		wallVariant(WARPED_SIGN, true).mapColor(WARPED_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS).forceSolidOn().noCollision().strength(1.0F)
+		wallVariant(WARPED_SIGN, true).mapColor(WARPED_PLANKS.defaultMapColor()).instrument(NoteBlockInstrument.BASS)
 	);
 	public static final Block STRUCTURE_BLOCK = register(
 		"structure_block",
 		StructureBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).requiresCorrectToolForDrops().strength(-1.0F, 3600000.0F).noLootTable()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).noLootTable()
 	);
 	public static final Block JIGSAW = register(
 		"jigsaw",
 		JigsawBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).requiresCorrectToolForDrops().strength(-1.0F, 3600000.0F).noLootTable()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).noLootTable()
 	);
 	public static final Block TEST_BLOCK = register(
-		"test_block", TestBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).strength(-1.0F, 3600000.0F).noLootTable()
+		"test_block", TestBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).noLootTable()
 	);
 	public static final Block TEST_INSTANCE_BLOCK = register(
 		"test_instance_block",
 		TestInstanceBlock::new,
-		BlockBehaviour.Properties.of().noOcclusion().strength(-1.0F, 3600000.0F).noLootTable().isViewBlocking(Blocks::never)
+		BlockBehaviour.Properties.of().noLootTable().isViewBlocking(Blocks::never)
 	);
 	public static final Block COMPOSTER = register(
 		"composter",
 		ComposterBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(0.6F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block TARGET = register(
-		"target", TargetBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).strength(0.5F).sound(SoundType.GRASS)
+		"target", TargetBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).sound(SoundType.GRASS)
 	);
 	public static final Block BEE_NEST = register(
 		"bee_nest",
 		BeehiveBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).instrument(NoteBlockInstrument.BASS).strength(0.3F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block BEEHIVE = register(
 		"beehive",
 		BeehiveBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(0.6F).sound(SoundType.WOOD).ignitedByLava()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).sound(SoundType.WOOD)
 	);
 	public static final Block HONEY_BLOCK = register(
 		"honey_block",
 		HoneyBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).speedFactor(0.4F).jumpFactor(0.5F).noOcclusion().sound(SoundType.HONEY_BLOCK)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.HONEY_BLOCK)
 	);
 	public static final Block HONEYCOMB_BLOCK = register(
-		"honeycomb_block", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).strength(0.6F).sound(SoundType.CORAL_BLOCK)
+		"honeycomb_block", BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.CORAL_BLOCK)
 	);
 	public static final Block NETHERITE_BLOCK = register(
 		"netherite_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).requiresCorrectToolForDrops().strength(50.0F, 1200.0F).sound(SoundType.NETHERITE_BLOCK)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).sound(SoundType.NETHERITE_BLOCK)
 	);
 	public static final Block ANCIENT_DEBRIS = register(
 		"ancient_debris",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).requiresCorrectToolForDrops().strength(30.0F, 1200.0F).sound(SoundType.ANCIENT_DEBRIS)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).sound(SoundType.ANCIENT_DEBRIS)
 	);
 	public static final Block CRYING_OBSIDIAN = register(
 		"crying_obsidian",
@@ -5778,8 +4671,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(50.0F, 1200.0F)
 			.lightLevel(blockStatex -> 10)
 	);
 	public static final Block RESPAWN_ANCHOR = register(
@@ -5788,8 +4679,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(50.0F, 1200.0F)
 			.lightLevel(blockStatex -> RespawnAnchorBlock.getScaledChargeLevel(blockStatex, 15))
 	);
 	public static final Block POTTED_CRIMSON_FUNGUS = register(
@@ -5808,36 +4697,33 @@ public class Blocks {
 		"lodestone",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
-			.requiresCorrectToolForDrops()
-			.strength(3.5F)
 			.sound(SoundType.LODESTONE)
-			.pushReaction(PushReaction.BLOCK)
 	);
 	public static final Block BLACKSTONE = register(
 		"blackstone",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block BLACKSTONE_STAIRS = registerLegacyStair("blackstone_stairs", BLACKSTONE);
-	public static final Block BLACKSTONE_WALL = register("blackstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE).forceSolidOn());
+	public static final Block BLACKSTONE_WALL = register("blackstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE));
 	public static final Block BLACKSTONE_SLAB = register(
-		"blackstone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE).strength(2.0F, 6.0F)
+		"blackstone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE)
 	);
-	public static final Block POLISHED_BLACKSTONE = register("polished_blackstone", BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE).strength(2.0F, 6.0F));
+	public static final Block POLISHED_BLACKSTONE = register("polished_blackstone", BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE));
 	public static final Block POLISHED_BLACKSTONE_BRICKS = register(
-		"polished_blackstone_bricks", BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE).strength(1.5F, 6.0F)
+		"polished_blackstone_bricks", BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE)
 	);
 	public static final Block CRACKED_POLISHED_BLACKSTONE_BRICKS = register(
 		"cracked_polished_blackstone_bricks", BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE_BRICKS)
 	);
 	public static final Block CHISELED_POLISHED_BLACKSTONE = register(
-		"chiseled_polished_blackstone", BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE).strength(1.5F, 6.0F)
+		"chiseled_polished_blackstone", BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE)
 	);
 	public static final Block POLISHED_BLACKSTONE_BRICK_SLAB = register(
-		"polished_blackstone_brick_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE_BRICKS).strength(2.0F, 6.0F)
+		"polished_blackstone_brick_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE_BRICKS)
 	);
 	public static final Block POLISHED_BLACKSTONE_BRICK_STAIRS = registerLegacyStair("polished_blackstone_brick_stairs", POLISHED_BLACKSTONE_BRICKS);
 	public static final Block POLISHED_BLACKSTONE_BRICK_WALL = register(
-		"polished_blackstone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE_BRICKS).forceSolidOn()
+		"polished_blackstone_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE_BRICKS)
 	);
 	public static final Block GILDED_BLACKSTONE = register(
 		"gilded_blackstone", BlockBehaviour.Properties.ofLegacyCopy(BLACKSTONE).sound(SoundType.GILDED_BLACKSTONE)
@@ -5851,25 +4737,19 @@ public class Blocks {
 		properties -> new PressurePlateBlock(BlockSetType.POLISHED_BLACKSTONE, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.noCollision()
-			.strength(0.5F)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block POLISHED_BLACKSTONE_BUTTON = register(
 		"polished_blackstone_button", properties -> new ButtonBlock(BlockSetType.STONE, 20, properties), buttonProperties()
 	);
 	public static final Block POLISHED_BLACKSTONE_WALL = register(
-		"polished_blackstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE).forceSolidOn()
+		"polished_blackstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE)
 	);
 	public static final Block CHISELED_NETHER_BRICKS = register(
 		"chiseled_nether_bricks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.NETHER_BRICKS)
 	);
 	public static final Block CRACKED_NETHER_BRICKS = register(
@@ -5877,8 +4757,6 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(2.0F, 6.0F)
 			.sound(SoundType.NETHER_BRICKS)
 	);
 	public static final Block QUARTZ_BRICKS = register("quartz_bricks", BlockBehaviour.Properties.ofLegacyCopy(QUARTZ_BLOCK));
@@ -5953,36 +4831,26 @@ public class Blocks {
 	public static final Block AMETHYST_BLOCK = register(
 		"amethyst_block",
 		AmethystBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(1.5F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).sound(SoundType.AMETHYST)
 	);
-	
 	// Alex's Caves primordial blocks - decorative
-	public static final Block AMBER = register("amber", props -> new TransparentBlock(props), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).noOcclusion().requiresCorrectToolForDrops().strength(0.3F, 2.0F).sound(SoundType.GLASS));
-	public static final Block AMBERSOL = register("ambersol", AmbersolBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).requiresCorrectToolForDrops().strength(3F, 10.0F).randomTicks().sound(SoundType.GLASS).lightLevel((state) -> 15).emissiveRendering((state, getter, pos) -> true));
-	public static final Block AMBERSOL_LIGHT = register("ambersol_light", AmbersolLightBlock::new, BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().lightLevel((state) -> 15).air());
-	
+	public static final Block AMBER = register("amber", props -> new TransparentBlock(props), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.GLASS));
+	public static final Block AMBERSOL = register("ambersol", AmbersolBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.GLASS).lightLevel((state) -> 15).emissiveRendering((state, getter, pos) -> true));
+	public static final Block AMBERSOL_LIGHT = register("ambersol_light", AmbersolLightBlock::new, BlockBehaviour.Properties.of().noLootTable().lightLevel((state) -> 15));
 	public static final Block BUDDING_AMETHYST = register(
 		"budding_amethyst",
 		BuddingAmethystBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PURPLE)
-			.randomTicks()
-			.strength(1.5F)
 			.sound(SoundType.AMETHYST)
-			.requiresCorrectToolForDrops()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block AMETHYST_CLUSTER = register(
 		"amethyst_cluster",
 		properties -> new AmethystClusterBlock(7.0F, 10.0F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_PURPLE)
-			.forceSolidOn()
-			.noOcclusion()
 			.sound(SoundType.AMETHYST_CLUSTER)
-			.strength(1.5F)
 			.lightLevel(blockStatex -> 5)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block LARGE_AMETHYST_BUD = register(
 		"large_amethyst_bud",
@@ -6005,21 +4873,19 @@ public class Blocks {
 			.mapColor(MapColor.TERRACOTTA_GRAY)
 			.instrument(NoteBlockInstrument.BASEDRUM)
 			.sound(SoundType.TUFF)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 6.0F)
 	);
 	public static final Block TUFF_SLAB = register("tuff_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(TUFF));
 	public static final Block TUFF_STAIRS = register(
 		"tuff_stairs", properties -> new StairBlock(TUFF.defaultBlockState(), properties), BlockBehaviour.Properties.ofLegacyCopy(TUFF)
 	);
-	public static final Block TUFF_WALL = register("tuff_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(TUFF).forceSolidOn());
+	public static final Block TUFF_WALL = register("tuff_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(TUFF));
 	public static final Block POLISHED_TUFF = register("polished_tuff", BlockBehaviour.Properties.ofLegacyCopy(TUFF).sound(SoundType.POLISHED_TUFF));
 	public static final Block POLISHED_TUFF_SLAB = register("polished_tuff_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_TUFF));
 	public static final Block POLISHED_TUFF_STAIRS = register(
 		"polished_tuff_stairs", properties -> new StairBlock(POLISHED_TUFF.defaultBlockState(), properties), BlockBehaviour.Properties.ofLegacyCopy(POLISHED_TUFF)
 	);
 	public static final Block POLISHED_TUFF_WALL = register(
-		"polished_tuff_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_TUFF).forceSolidOn()
+		"polished_tuff_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_TUFF)
 	);
 	public static final Block CHISELED_TUFF = register("chiseled_tuff", BlockBehaviour.Properties.ofLegacyCopy(TUFF));
 	public static final Block TUFF_BRICKS = register("tuff_bricks", BlockBehaviour.Properties.ofLegacyCopy(TUFF).sound(SoundType.TUFF_BRICKS));
@@ -6027,7 +4893,7 @@ public class Blocks {
 	public static final Block TUFF_BRICK_STAIRS = register(
 		"tuff_brick_stairs", properties -> new StairBlock(TUFF_BRICKS.defaultBlockState(), properties), BlockBehaviour.Properties.ofLegacyCopy(TUFF_BRICKS)
 	);
-	public static final Block TUFF_BRICK_WALL = register("tuff_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(TUFF_BRICKS).forceSolidOn());
+	public static final Block TUFF_BRICK_WALL = register("tuff_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(TUFF_BRICKS));
 	public static final Block CHISELED_TUFF_BRICKS = register("chiseled_tuff_bricks", BlockBehaviour.Properties.ofLegacyCopy(TUFF_BRICKS));
 	public static final Block CALCITE = register(
 		"calcite",
@@ -6035,15 +4901,12 @@ public class Blocks {
 			.mapColor(MapColor.TERRACOTTA_WHITE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
 			.sound(SoundType.CALCITE)
-			.requiresCorrectToolForDrops()
-			.strength(0.75F)
 	);
 	public static final Block TINTED_GLASS = register(
 		"tinted_glass",
 		TintedGlassBlock::new,
 		BlockBehaviour.Properties.ofLegacyCopy(GLASS)
 			.mapColor(MapColor.COLOR_GRAY)
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
 			.isRedstoneConductor(Blocks::never)
 			.isSuffocating(Blocks::never)
@@ -6054,10 +4917,7 @@ public class Blocks {
 		PowderSnowBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SNOW)
-			.strength(0.25F)
 			.sound(SoundType.POWDER_SNOW)
-			.dynamicShape()
-			.noOcclusion()
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block SCULK_SENSOR = register(
@@ -6065,7 +4925,6 @@ public class Blocks {
 		SculkSensorBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_CYAN)
-			.strength(1.5F)
 			.sound(SoundType.SCULK_SENSOR)
 			.lightLevel(blockStatex -> 1)
 			.emissiveRendering((blockStatex, blockGetter, blockPos) -> SculkSensorBlock.getPhase(blockStatex) == SculkSensorPhase.ACTIVE)
@@ -6074,31 +4933,27 @@ public class Blocks {
 		"calibrated_sculk_sensor", CalibratedSculkSensorBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SCULK_SENSOR)
 	);
 	public static final Block SCULK = register(
-		"sculk", SculkBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(0.2F).sound(SoundType.SCULK)
+		"sculk", SculkBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).sound(SoundType.SCULK)
 	);
 	public static final Block SCULK_VEIN = register(
 		"sculk_vein",
 		SculkVeinBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_BLACK)
-			.forceSolidOn()
-			.noCollision()
-			.strength(0.2F)
 			.sound(SoundType.SCULK_VEIN)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SCULK_CATALYST = register(
 		"sculk_catalyst",
 		SculkCatalystBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(3.0F, 3.0F).sound(SoundType.SCULK_CATALYST).lightLevel(blockStatex -> 6)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).sound(SoundType.SCULK_CATALYST).lightLevel(blockStatex -> 6)
 	);
 	public static final Block SCULK_SHRIEKER = register(
-		"sculk_shrieker", SculkShriekerBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(3.0F, 3.0F).sound(SoundType.SCULK_SHRIEKER)
+		"sculk_shrieker", SculkShriekerBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).sound(SoundType.SCULK_SHRIEKER)
 	);
 	public static final Block COPPER_BLOCK = register(
 		"copper_block",
 		properties -> new WeatheringCopperFullBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).requiresCorrectToolForDrops().strength(3.0F, 6.0F).sound(SoundType.COPPER)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.COPPER)
 	);
 	public static final Block EXPOSED_COPPER = register(
 		"exposed_copper",
@@ -6121,7 +4976,7 @@ public class Blocks {
 	public static final Block DEEPSLATE_COPPER_ORE = register(
 		"deepslate_copper_ore",
 		properties -> new DropExperienceBlock(ConstantInt.of(0), properties),
-		BlockBehaviour.Properties.ofLegacyCopy(COPPER_ORE).mapColor(MapColor.DEEPSLATE).strength(4.5F, 3.0F).sound(SoundType.DEEPSLATE)
+		BlockBehaviour.Properties.ofLegacyCopy(COPPER_ORE).mapColor(MapColor.DEEPSLATE).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block OXIDIZED_CUT_COPPER = register(
 		"oxidized_cut_copper",
@@ -6226,21 +5081,21 @@ public class Blocks {
 	public static final Block WAXED_EXPOSED_CUT_COPPER_STAIRS = registerStair("waxed_exposed_cut_copper_stairs", WAXED_EXPOSED_CUT_COPPER);
 	public static final Block WAXED_CUT_COPPER_STAIRS = registerStair("waxed_cut_copper_stairs", WAXED_CUT_COPPER);
 	public static final Block WAXED_OXIDIZED_CUT_COPPER_SLAB = register(
-		"waxed_oxidized_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_OXIDIZED_CUT_COPPER).requiresCorrectToolForDrops()
+		"waxed_oxidized_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_OXIDIZED_CUT_COPPER)
 	);
 	public static final Block WAXED_WEATHERED_CUT_COPPER_SLAB = register(
-		"waxed_weathered_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_WEATHERED_CUT_COPPER).requiresCorrectToolForDrops()
+		"waxed_weathered_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_WEATHERED_CUT_COPPER)
 	);
 	public static final Block WAXED_EXPOSED_CUT_COPPER_SLAB = register(
-		"waxed_exposed_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_EXPOSED_CUT_COPPER).requiresCorrectToolForDrops()
+		"waxed_exposed_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_EXPOSED_CUT_COPPER)
 	);
 	public static final Block WAXED_CUT_COPPER_SLAB = register(
-		"waxed_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_CUT_COPPER).requiresCorrectToolForDrops()
+		"waxed_cut_copper_slab", SlabBlock::new, BlockBehaviour.Properties.ofFullCopy(WAXED_CUT_COPPER)
 	);
 	public static final Block COPPER_DOOR = register(
 		"copper_door",
 		properties -> new WeatheringCopperDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.UNAFFECTED, properties),
-		BlockBehaviour.Properties.of().mapColor(COPPER_BLOCK.defaultMapColor()).strength(3.0F, 6.0F).noOcclusion().pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(COPPER_BLOCK.defaultMapColor())
 	);
 	public static final Block EXPOSED_COPPER_DOOR = register(
 		"exposed_copper_door",
@@ -6274,9 +5129,6 @@ public class Blocks {
 		properties -> new WeatheringCopperTrapDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(COPPER_BLOCK.defaultMapColor())
-			.strength(3.0F, 6.0F)
-			.requiresCorrectToolForDrops()
-			.noOcclusion()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block EXPOSED_COPPER_TRAPDOOR = register(
@@ -6316,11 +5168,8 @@ public class Blocks {
 		"copper_grate",
 		properties -> new WeatheringCopperGrateBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
-			.strength(3.0F, 6.0F)
 			.sound(SoundType.COPPER_GRATE)
 			.mapColor(MapColor.COLOR_ORANGE)
-			.noOcclusion()
-			.requiresCorrectToolForDrops()
 			.isValidSpawn(Blocks::never)
 			.isRedstoneConductor(Blocks::never)
 			.isSuffocating(Blocks::never)
@@ -6358,9 +5207,7 @@ public class Blocks {
 		properties -> new WeatheringCopperBulbBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(COPPER_BLOCK.defaultMapColor())
-			.strength(3.0F, 6.0F)
 			.sound(SoundType.COPPER_BULB)
-			.requiresCorrectToolForDrops()
 			.isRedstoneConductor(Blocks::never)
 			.lightLevel(litBlockEmission(15))
 	);
@@ -6394,7 +5241,7 @@ public class Blocks {
 		properties -> new WeatheringCopperChestBlock(
 			WeatheringCopper.WeatherState.UNAFFECTED, SoundEvents.COPPER_CHEST_OPEN, SoundEvents.COPPER_CHEST_CLOSE, properties
 		),
-		BlockBehaviour.Properties.of().mapColor(COPPER_BLOCK.defaultMapColor()).strength(3.0F, 6.0F).sound(SoundType.COPPER).requiresCorrectToolForDrops()
+		BlockBehaviour.Properties.of().mapColor(COPPER_BLOCK.defaultMapColor()).sound(SoundType.COPPER)
 	);
 	public static final Block EXPOSED_COPPER_CHEST = register(
 		"exposed_copper_chest",
@@ -6444,9 +5291,7 @@ public class Blocks {
 		properties -> new WeatheringCopperGolemStatueBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(COPPER_BLOCK.defaultMapColor())
-			.strength(3.0F, 6.0F)
 			.sound(SoundType.COPPER_GOLEM_STATUE)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block EXPOSED_COPPER_GOLEM_STATUE = register(
 		"exposed_copper_golem_statue",
@@ -6488,11 +5333,7 @@ public class Blocks {
 		properties -> new WeatheringLightningRodBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_ORANGE)
-			.forceSolidOn()
-			.requiresCorrectToolForDrops()
-			.strength(3.0F, 6.0F)
 			.sound(SoundType.COPPER)
-			.noOcclusion()
 	);
 	public static final Block EXPOSED_LIGHTNING_ROD = register(
 		"exposed_lightning_rod",
@@ -6524,15 +5365,9 @@ public class Blocks {
 		PointedDripstoneBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_BROWN)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.noOcclusion()
 			.sound(SoundType.POINTED_DRIPSTONE)
-			.randomTicks()
-			.strength(1.5F, 3.0F)
-			.dynamicShape()
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block DRIPSTONE_BLOCK = register(
@@ -6541,114 +5376,93 @@ public class Blocks {
 			.mapColor(MapColor.TERRACOTTA_BROWN)
 			.instrument(NoteBlockInstrument.BASEDRUM)
 			.sound(SoundType.DRIPSTONE_BLOCK)
-			.requiresCorrectToolForDrops()
-			.strength(1.5F, 1.0F)
 	);
 	public static final Block CAVE_VINES = register(
 		"cave_vines",
 		CaveVinesBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.randomTicks()
-			.noCollision()
 			.lightLevel(CaveVines.emission(14))
-			.instabreak()
 			.sound(SoundType.CAVE_VINES)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block CAVE_VINES_PLANT = register(
 		"cave_vines_plant",
 		CaveVinesPlantBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
 			.lightLevel(CaveVines.emission(14))
-			.instabreak()
 			.sound(SoundType.CAVE_VINES)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block SPORE_BLOSSOM = register(
 		"spore_blossom",
 		SporeBlossomBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).instabreak().noCollision().sound(SoundType.SPORE_BLOSSOM).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.SPORE_BLOSSOM)
 	);
 	public static final Block AZALEA = register(
 		"azalea",
 		AzaleaBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).forceSolidOff().instabreak().sound(SoundType.AZALEA).noOcclusion().pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.AZALEA)
 	);
 	public static final Block FLOWERING_AZALEA = register(
 		"flowering_azalea",
 		AzaleaBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.forceSolidOff()
-			.instabreak()
 			.sound(SoundType.FLOWERING_AZALEA)
-			.noOcclusion()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block MOSS_CARPET = register(
 		"moss_carpet",
 		CarpetBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.1F).sound(SoundType.MOSS_CARPET).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.MOSS_CARPET)
 	);
 	public static final Block PINK_PETALS = register(
 		"pink_petals",
 		FlowerBedBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().sound(SoundType.PINK_PETALS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.PINK_PETALS)
 	);
 	public static final Block WILDFLOWERS = register(
 		"wildflowers",
 		FlowerBedBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().sound(SoundType.PINK_PETALS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.PINK_PETALS)
 	);
 	public static final Block LEAF_LITTER = register(
 		"leaf_litter",
 		LeafLitterBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).replaceable().noCollision().sound(SoundType.LEAF_LITTER).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).sound(SoundType.LEAF_LITTER)
 	);
 	public static final Block MOSS_BLOCK = register(
 		"moss_block",
 		properties -> new BonemealableFeaturePlacerBlock(CaveFeatures.MOSS_PATCH_BONEMEAL, properties),
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.1F).sound(SoundType.MOSS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.MOSS)
 	);
 	public static final Block BIG_DRIPLEAF = register(
 		"big_dripleaf",
 		BigDripleafBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).forceSolidOff().strength(0.1F).sound(SoundType.BIG_DRIPLEAF).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.BIG_DRIPLEAF)
 	);
 	public static final Block BIG_DRIPLEAF_STEM = register(
 		"big_dripleaf_stem",
 		BigDripleafStemBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().strength(0.1F).sound(SoundType.BIG_DRIPLEAF).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).sound(SoundType.BIG_DRIPLEAF)
 	);
 	public static final Block SMALL_DRIPLEAF = register(
 		"small_dripleaf",
 		SmallDripleafBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.SMALL_DRIPLEAF)
 			.offsetType(BlockBehaviour.OffsetType.XYZ)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block HANGING_ROOTS = register(
 		"hanging_roots",
 		HangingRootsBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.DIRT)
-			.replaceable()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.HANGING_ROOTS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ROOTED_DIRT = register(
-		"rooted_dirt", RootedDirtBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.5F).sound(SoundType.ROOTED_DIRT)
+		"rooted_dirt", RootedDirtBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).sound(SoundType.ROOTED_DIRT)
 	);
 	public static final Block MUD = register(
 		"mud",
@@ -6667,17 +5481,15 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.DEEPSLATE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
-			.strength(3.0F, 6.0F)
 			.sound(SoundType.DEEPSLATE)
 	);
-	public static final Block COBBLED_DEEPSLATE = register("cobbled_deepslate", BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE).strength(3.5F, 6.0F));
+	public static final Block COBBLED_DEEPSLATE = register("cobbled_deepslate", BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE));
 	public static final Block COBBLED_DEEPSLATE_STAIRS = registerLegacyStair("cobbled_deepslate_stairs", COBBLED_DEEPSLATE);
 	public static final Block COBBLED_DEEPSLATE_SLAB = register(
 		"cobbled_deepslate_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE)
 	);
 	public static final Block COBBLED_DEEPSLATE_WALL = register(
-		"cobbled_deepslate_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE).forceSolidOn()
+		"cobbled_deepslate_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE)
 	);
 	public static final Block POLISHED_DEEPSLATE = register(
 		"polished_deepslate", BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE).sound(SoundType.POLISHED_DEEPSLATE)
@@ -6687,7 +5499,7 @@ public class Blocks {
 		"polished_deepslate_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_DEEPSLATE)
 	);
 	public static final Block POLISHED_DEEPSLATE_WALL = register(
-		"polished_deepslate_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_DEEPSLATE).forceSolidOn()
+		"polished_deepslate_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_DEEPSLATE)
 	);
 	public static final Block DEEPSLATE_TILES = register(
 		"deepslate_tiles", BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE).sound(SoundType.DEEPSLATE_TILES)
@@ -6695,7 +5507,7 @@ public class Blocks {
 	public static final Block DEEPSLATE_TILE_STAIRS = registerLegacyStair("deepslate_tile_stairs", DEEPSLATE_TILES);
 	public static final Block DEEPSLATE_TILE_SLAB = register("deepslate_tile_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE_TILES));
 	public static final Block DEEPSLATE_TILE_WALL = register(
-		"deepslate_tile_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE_TILES).forceSolidOn()
+		"deepslate_tile_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE_TILES)
 	);
 	public static final Block DEEPSLATE_BRICKS = register(
 		"deepslate_bricks", BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE).sound(SoundType.DEEPSLATE_BRICKS)
@@ -6703,7 +5515,7 @@ public class Blocks {
 	public static final Block DEEPSLATE_BRICK_STAIRS = registerLegacyStair("deepslate_brick_stairs", DEEPSLATE_BRICKS);
 	public static final Block DEEPSLATE_BRICK_SLAB = register("deepslate_brick_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE_BRICKS));
 	public static final Block DEEPSLATE_BRICK_WALL = register(
-		"deepslate_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE_BRICKS).forceSolidOn()
+		"deepslate_brick_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(DEEPSLATE_BRICKS)
 	);
 	public static final Block CHISELED_DEEPSLATE = register(
 		"chiseled_deepslate", BlockBehaviour.Properties.ofLegacyCopy(COBBLED_DEEPSLATE).sound(SoundType.DEEPSLATE_BRICKS)
@@ -6718,15 +5530,15 @@ public class Blocks {
 	public static final Block SMOOTH_BASALT = register("smooth_basalt", BlockBehaviour.Properties.ofLegacyCopy(BASALT));
 	public static final Block RAW_IRON_BLOCK = register(
 		"raw_iron_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.RAW_IRON).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(5.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.RAW_IRON).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block RAW_COPPER_BLOCK = register(
 		"raw_copper_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(5.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block RAW_GOLD_BLOCK = register(
 		"raw_gold_block",
-		BlockBehaviour.Properties.of().mapColor(MapColor.GOLD).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(5.0F, 6.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.GOLD).instrument(NoteBlockInstrument.BASEDRUM)
 	);
 	public static final Block POTTED_AZALEA = register("potted_azalea_bush", properties -> new FlowerPotBlock(AZALEA, properties), flowerPotProperties());
 	public static final Block POTTED_FLOWERING_AZALEA = register(
@@ -6735,44 +5547,40 @@ public class Blocks {
 	public static final Block OCHRE_FROGLIGHT = register(
 		"ochre_froglight",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
 	);
 	public static final Block VERDANT_FROGLIGHT = register(
 		"verdant_froglight",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.GLOW_LICHEN).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
+		BlockBehaviour.Properties.of().mapColor(MapColor.GLOW_LICHEN).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
 	);
 	public static final Block PEARLESCENT_FROGLIGHT = register(
 		"pearlescent_froglight",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
 	);
 	public static final Block CARMINE_FROGLIGHT = register(
 		"carmine_froglight",
 		RotatedPillarBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
 	);
 	public static final Block FROGSPAWN = register(
 		"frogspawn",
 		FrogspawnBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WATER)
-			.instabreak()
-			.noOcclusion()
-			.noCollision()
 			.sound(SoundType.FROGSPAWN)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block REINFORCED_DEEPSLATE = register(
 		"reinforced_deepslate",
-		BlockBehaviour.Properties.of().mapColor(MapColor.DEEPSLATE).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.DEEPSLATE).strength(55.0F, 1200.0F)
+		BlockBehaviour.Properties.of().mapColor(MapColor.DEEPSLATE).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.DEEPSLATE)
 	);
 	public static final Block DECORATED_POT = register(
 		"decorated_pot",
 		DecoratedPotBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_RED).strength(0.0F, 0.0F).pushReaction(PushReaction.DESTROY).noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_RED)
 	);
-	public static final Block CRAFTER = register("crafter", CrafterBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(1.5F, 3.5F));
+	public static final Block CRAFTER = register("crafter", CrafterBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
 	public static final Block TRIAL_SPAWNER = register(
 		"trial_spawner",
 		TrialSpawnerBlock::new,
@@ -6780,10 +5588,8 @@ public class Blocks {
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
 			.lightLevel(blockStatex -> ((TrialSpawnerState)blockStatex.getValue(TrialSpawnerBlock.STATE)).lightLevel())
-			.strength(50.0F)
 			.sound(SoundType.TRIAL_SPAWNER)
 			.isViewBlocking(Blocks::never)
-			.noOcclusion()
 	);
 	public static final Block VAULT = register(
 		"vault",
@@ -6791,10 +5597,8 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.noOcclusion()
 			.sound(SoundType.VAULT)
 			.lightLevel(blockStatex -> ((VaultState)blockStatex.getValue(VaultBlock.STATE)).lightLevel())
-			.strength(50.0F)
 			.isViewBlocking(Blocks::never)
 	);
 	public static final Block HEAVY_CORE = register(
@@ -6804,91 +5608,70 @@ public class Blocks {
 			.mapColor(MapColor.METAL)
 			.instrument(NoteBlockInstrument.SNARE)
 			.sound(SoundType.HEAVY_CORE)
-			.strength(10.0F)
-			.pushReaction(PushReaction.NORMAL)
-			.explosionResistance(1200.0F)
 	);
 	public static final Block GUN_SMITH_TABLE = register(
 		"gun_smith_table",
 		TaczWorkbenchBlock.GunSmithTable::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD).noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.WOOD)
 	);
 	public static final Block AMMO_WORKBENCH = register(
 		"ammo_workbench",
 		TaczWorkbenchBlock.AmmoWorkbench::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD).noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.WOOD)
 	);
 	public static final Block ATTACHMENT_WORKBENCH = register(
 		"attachment_workbench",
 		TaczWorkbenchBlock.AttachmentWorkbench::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD).noOcclusion()
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).sound(SoundType.WOOD)
 	);
 	public static final Block PALE_MOSS_BLOCK = register(
 		"pale_moss_block",
 		properties -> new BonemealableFeaturePlacerBlock(VegetationFeatures.PALE_MOSS_PATCH_BONEMEAL, properties),
-		BlockBehaviour.Properties.of().ignitedByLava().mapColor(MapColor.COLOR_LIGHT_GRAY).strength(0.1F).sound(SoundType.MOSS).pushReaction(PushReaction.DESTROY)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).sound(SoundType.MOSS)
 	);
 	public static final Block PALE_MOSS_CARPET = register(
 		"pale_moss_carpet",
 		MossyCarpetBlock::new,
 		BlockBehaviour.Properties.of()
-			.ignitedByLava()
 			.mapColor(PALE_MOSS_BLOCK.defaultMapColor())
-			.strength(0.1F)
 			.sound(SoundType.MOSS_CARPET)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block PALE_HANGING_MOSS = register(
 		"pale_hanging_moss",
 		HangingMossBlock::new,
 		BlockBehaviour.Properties.of()
-			.ignitedByLava()
 			.mapColor(PALE_MOSS_BLOCK.defaultMapColor())
-			.noCollision()
 			.sound(SoundType.MOSS_CARPET)
-			.pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block OPEN_EYEBLOSSOM = register(
 		"open_eyeblossom",
 		properties -> new EyeblossomBlock(EyeblossomBlock.Type.OPEN, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(CREAKING_HEART.defaultMapColor())
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
-			.randomTicks()
 	);
 	public static final Block CLOSED_EYEBLOSSOM = register(
 		"closed_eyeblossom",
 		properties -> new EyeblossomBlock(EyeblossomBlock.Type.CLOSED, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(PALE_OAK_LEAVES.defaultMapColor())
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.pushReaction(PushReaction.DESTROY)
-			.randomTicks()
 	);
 	public static final Block POTTED_OPEN_EYEBLOSSOM = register(
-		"potted_open_eyeblossom", properties -> new FlowerPotBlock(OPEN_EYEBLOSSOM, properties), flowerPotProperties().randomTicks()
+		"potted_open_eyeblossom", properties -> new FlowerPotBlock(OPEN_EYEBLOSSOM, properties), flowerPotProperties()
 	);
 	public static final Block POTTED_CLOSED_EYEBLOSSOM = register(
-		"potted_closed_eyeblossom", properties -> new FlowerPotBlock(CLOSED_EYEBLOSSOM, properties), flowerPotProperties().randomTicks()
+		"potted_closed_eyeblossom", properties -> new FlowerPotBlock(CLOSED_EYEBLOSSOM, properties), flowerPotProperties()
 	);
 	public static final Block FIREFLY_BUSH = register(
 		"firefly_bush",
 		FireflyBushBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.ignitedByLava()
 			.lightLevel(blockStatex -> 2)
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.SWEET_BERRY_BUSH)
-			.pushReaction(PushReaction.DESTROY)
 	);
 
 	// Alex's Caves Blocks
@@ -6898,14 +5681,11 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.lightLevel(state -> 5)
-			.strength(0.5F)
 			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
 			.hasPostProcess((state, getter, pos) -> true)
 			.emissiveRendering((state, getter, pos) -> true)
 			.sound(ACSoundTypes.FLOOD_BASALT)
-			.randomTicks()
 	);
 	public static final Block FISSURE_PRIMAL_MAGMA = register(
 		"fissure_primal_magma",
@@ -6913,33 +5693,25 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
-			.requiresCorrectToolForDrops()
 			.lightLevel(state -> 5)
-			.strength(0.5F)
 			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
 			.hasPostProcess((state, getter, pos) -> true)
 			.emissiveRendering((state, getter, pos) -> true)
 			.sound(ACSoundTypes.FLOOD_BASALT)
-			.randomTicks()
 	);
 	public static final Block FLOOD_BASALT = register(
 		"flood_basalt",
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_RED)
-			.strength(3.0F, 100.0F)
 			.sound(ACSoundTypes.FLOOD_BASALT)
-			.requiresCorrectToolForDrops()
 	);
 	public static final Block ANCIENT_LEAVES = register(
 		"ancient_leaves",
 		properties -> new TintedParticleLeavesBlock(0.01F, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.GRASS)
-			.strength(0.2F)
-			.randomTicks()
 			.sound(SoundType.GRASS)
-			.noOcclusion()
 			.isSuffocating((blockState, getter, pos) -> false)
 	);
 	public static final Block ARCHAIC_VINE = register(
@@ -6947,9 +5719,6 @@ public class Blocks {
 		properties -> new ArchaicVineBlock(properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GREEN)
-			.randomTicks()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.VINE)
 	);
 	public static final Block ARCHAIC_VINE_PLANT = register(
@@ -6957,9 +5726,6 @@ public class Blocks {
 		properties -> new ArchaicVinePlantBlock(properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GREEN)
-			.randomTicks()
-			.noCollision()
-			.instabreak()
 			.sound(SoundType.VINE)
 	);
 	public static final Block FERN_THATCH = register(
@@ -6967,9 +5733,7 @@ public class Blocks {
 		Block::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GREEN)
-			.strength(0.5F)
 			.sound(SoundType.GRASS)
-			.noOcclusion()
 	);
 	// Pewen Wood Set
 	public static final Block PEWEN_LOG = register(
@@ -6977,7 +5741,6 @@ public class Blocks {
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.strength(2.0F)
 			.sound(SoundType.CHERRY_WOOD)
 			.instrument(NoteBlockInstrument.BASS)
 	);
@@ -6986,7 +5749,6 @@ public class Blocks {
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.strength(2.0F)
 			.sound(SoundType.CHERRY_WOOD)
 			.instrument(NoteBlockInstrument.BASS)
 	);
@@ -6995,7 +5757,6 @@ public class Blocks {
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.strength(2.0F)
 			.sound(SoundType.CHERRY_WOOD)
 			.instrument(NoteBlockInstrument.BASS)
 	);
@@ -7004,7 +5765,6 @@ public class Blocks {
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.strength(2.0F)
 			.sound(SoundType.CHERRY_WOOD)
 			.instrument(NoteBlockInstrument.BASS)
 	);
@@ -7012,7 +5772,6 @@ public class Blocks {
 		"pewen_planks",
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.strength(2.0F, 3.0F)
 			.sound(SoundType.CHERRY_WOOD)
 			.instrument(NoteBlockInstrument.BASS)
 	);
@@ -7030,43 +5789,37 @@ public class Blocks {
 	public static final Block PEWEN_FENCE_GATE = register(
 		"pewen_fence_gate",
 		properties -> new FenceGateBlock(WoodType.OAK, properties),
-		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).strength(2.0F, 3.0F).sound(SoundType.CHERRY_WOOD).forceSolidOn()
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block PEWEN_DOOR = register(
 		"pewen_door",
 		properties -> new DoorBlock(BlockSetType.CHERRY, properties),
-		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).strength(3.0F).sound(SoundType.CHERRY_WOOD).noOcclusion()
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block PEWEN_TRAPDOOR = register(
 		"pewen_trapdoor",
 		properties -> new TrapDoorBlock(BlockSetType.CHERRY, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.strength(3.0F)
 			.sound(SoundType.CHERRY_WOOD)
-			.noOcclusion()
 	);
 	public static final Block PEWEN_BUTTON = register(
 		"pewen_button",
 		properties -> new ButtonBlock(BlockSetType.CHERRY, 30, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.noCollision()
-			.strength(0.5F)
 			.sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block PEWEN_PRESSURE_PLATE = register(
 		"pewen_pressure_plate",
 		properties -> new PressurePlateBlock(BlockSetType.CHERRY, properties),
-		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).noCollision().strength(0.5F).sound(SoundType.CHERRY_WOOD)
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block PEWEN_SIGN = register(
 		"pewen_sign",
 		properties -> new StandingSignBlock(WoodType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block PEWEN_WALL_SIGN = register(
@@ -7074,8 +5827,6 @@ public class Blocks {
 		properties -> new WallSignBlock(WoodType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.noCollision()
-			.strength(1.0F)
 			.sound(SoundType.CHERRY_WOOD)
 	);
 	public static final Block PEWEN_HANGING_SIGN = register(
@@ -7083,42 +5834,29 @@ public class Blocks {
 		properties -> new CeilingHangingSignBlock(WoodType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 	);
 	public static final Block PEWEN_WALL_HANGING_SIGN = register(
 		"pewen_wall_hanging_sign",
 		properties -> new WallHangingSignBlock(WoodType.OAK, properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.WOOD)
-			.forceSolidOn()
 			.instrument(NoteBlockInstrument.BASS)
-			.noCollision()
-			.strength(1.0F)
 	);
 	public static final Block PEWEN_BRANCH = register(
 		"pewen_branch",
 		PewenBranchBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.GREEN)
-			.strength(1.0F)
 			.sound(ACSoundTypes.PEWEN_BRANCH)
-			.randomTicks()
 	);
 	public static final Block PEWEN_PINES = register(
 		"pewen_pines",
 		PewenPinesBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.GREEN)
-			.instabreak()
 			.sound(SoundType.ROOTS)
-			.randomTicks()
 			.offsetType(BlockBehaviour.OffsetType.XZ)
-			.noOcclusion()
-			.replaceable()
-			.noCollision()
 	);
 	public static final Block POTTED_PEWEN_PINES = register(
 		"potted_pewen_pines",
@@ -7153,10 +5891,6 @@ public class Blocks {
 			BlockBehaviour.Properties.of()
 				.mapColor(blockState -> blockState.getValue(BedBlock.PART) == BedPart.FOOT ? dyeColor.getMapColor() : MapColor.WOOL)
 				.sound(SoundType.WOOD)
-				.strength(0.2F)
-				.noOcclusion()
-				.ignitedByLava()
-				.pushReaction(PushReaction.DESTROY)
 		);
 	}
 
@@ -7164,13 +5898,12 @@ public class Blocks {
 		return BlockBehaviour.Properties.of()
 			.mapColor(blockState -> blockState.getValue(RotatedPillarBlock.AXIS) == Direction.Axis.Y ? mapColor : mapColor2)
 			.instrument(NoteBlockInstrument.BASS)
-			.strength(2.0F)
 			.sound(soundType)
-			.ignitedByLava();
+			;
 	}
 
 	public static BlockBehaviour.Properties netherStemProperties(MapColor mapColor) {
-		return BlockBehaviour.Properties.of().mapColor(blockState -> mapColor).instrument(NoteBlockInstrument.BASS).strength(2.0F).sound(SoundType.STEM);
+		return BlockBehaviour.Properties.of().mapColor(blockState -> mapColor).instrument(NoteBlockInstrument.BASS).sound(SoundType.STEM);
 	}
 
 	public static boolean always(BlockState blockState, BlockGetter blockGetter, BlockPos blockPos) {
@@ -7188,9 +5921,7 @@ public class Blocks {
 			BlockBehaviour.Properties.of()
 				.mapColor(dyeColor)
 				.instrument(NoteBlockInstrument.HAT)
-				.strength(0.3F)
 				.sound(SoundType.GLASS)
-				.noOcclusion()
 				.isValidSpawn(Blocks::never)
 				.isRedstoneConductor(Blocks::never)
 				.isSuffocating(Blocks::never)
@@ -7201,56 +5932,44 @@ public class Blocks {
 	public static BlockBehaviour.Properties leavesProperties(SoundType soundType) {
 		return BlockBehaviour.Properties.of()
 			.mapColor(MapColor.PLANT)
-			.strength(0.2F)
-			.randomTicks()
 			.sound(soundType)
-			.noOcclusion()
 			.isValidSpawn(Blocks::ocelotOrParrot)
 			.isSuffocating(Blocks::never)
 			.isViewBlocking(Blocks::never)
-			.ignitedByLava()
-			.pushReaction(PushReaction.DESTROY)
 			.isRedstoneConductor(Blocks::never);
 	}
 
 	private static BlockBehaviour.Properties shulkerBoxProperties(MapColor mapColor) {
 		return BlockBehaviour.Properties.of()
 			.mapColor(mapColor)
-			.forceSolidOn()
-			.strength(2.0F)
-			.dynamicShape()
-			.noOcclusion()
 			.isSuffocating(NOT_CLOSED_SHULKER)
 			.isViewBlocking(NOT_CLOSED_SHULKER)
-			.pushReaction(PushReaction.DESTROY);
+			;
 	}
 
 	private static BlockBehaviour.Properties pistonProperties() {
 		return BlockBehaviour.Properties.of()
 			.mapColor(MapColor.STONE)
-			.strength(1.5F)
 			.isRedstoneConductor(Blocks::never)
 			.isSuffocating(NOT_EXTENDED_PISTON)
 			.isViewBlocking(NOT_EXTENDED_PISTON)
-			.pushReaction(PushReaction.BLOCK);
+			;
 	}
 
 	public static BlockBehaviour.Properties buttonProperties() {
-		return BlockBehaviour.Properties.of().noCollision().strength(0.5F).pushReaction(PushReaction.DESTROY);
+		return BlockBehaviour.Properties.of();
 	}
 
 	public static BlockBehaviour.Properties flowerPotProperties() {
-		return BlockBehaviour.Properties.of().instabreak().noOcclusion().pushReaction(PushReaction.DESTROY);
+		return BlockBehaviour.Properties.of();
 	}
 
 	private static BlockBehaviour.Properties candleProperties(MapColor mapColor) {
 		return BlockBehaviour.Properties.of()
 			.mapColor(mapColor)
-			.noOcclusion()
-			.strength(0.1F)
 			.sound(SoundType.CANDLE)
 			.lightLevel(CandleBlock.LIGHT_EMISSION)
-			.pushReaction(PushReaction.DESTROY);
+			;
 	}
 
 	@Deprecated
@@ -7309,7 +6028,6 @@ public class Blocks {
 				blockState.initCache();
 			}
 		}
-		
 		// Initialize Alex's Caves tree features AFTER all blocks are registered
 		net.minecraft.world.level.levelgen.feature.ACFeatures.init();
 	}

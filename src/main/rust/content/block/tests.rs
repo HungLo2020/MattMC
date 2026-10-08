@@ -133,6 +133,10 @@ fn native_fact_install_uses_declared_layouts_and_shared_schemas() {
     assert_eq!(r.state_count(), 31809);
     assert_eq!(r.blocks().len(), 1235);
     assert_eq!(r.air(), Some(BlockId(0)));
+    assert!(r.flags(StateId(0)).contains(StateFlags::AIR));
+    assert!(!r.flags(StateId(0)).contains(StateFlags::CAN_OCCLUDE));
+    assert!(r.flags(StateId(1)).contains(StateFlags::CAN_OCCLUDE));
+    assert!(!r.flags(StateId(1)).contains(StateFlags::AIR));
     assert_eq!(r.by_name("minecraft:stone"), Some(BlockId(1)));
     assert_eq!(r.block(BlockId(1)).default_state(), StateId(1));
     let leaves = r.by_name("minecraft:oak_leaves").unwrap();
@@ -161,7 +165,7 @@ fn native_fact_export_rejects_damage() {
         *damaged.last_mut().unwrap() = invalid;
         assert!(decode(&damaged, &bytes).is_err());
     }
-    for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING] {
+    for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING, StateFlags::AIR, StateFlags::CAN_OCCLUDE] {
         let mut damaged = ints.clone();
         let at = damaged.len() - 2; damaged[at] = flag.0 as i32;
         assert!(decode(&damaged, &bytes).is_err());

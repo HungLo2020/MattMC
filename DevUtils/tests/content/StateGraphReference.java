@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -21,8 +22,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.lighting.LightEngine;
+import net.minecraft.world.level.EmptyBlockGetter;
 
-/** Same public-API observer on Current and Frozen; no Frozen source edits.
+/** Same API/immutable-field observer on Current and Frozen; no Frozen source edits.
  * Hashes every value, default and single-property transition in every graph. */
 public final class StateGraphReference {
     private static long states, transitions;
@@ -127,12 +129,51 @@ public final class StateGraphReference {
                 }
             }
         }
+        MessageDigest physicalDigest = MessageDigest.getInstance("SHA-256");
+        String[] physicalFields = {
+            "destroyTime", "explosionResistance", "friction", "speedFactor", "jumpFactor",
+            "hasCollision", "requiresCorrectToolForDrops", "isRandomlyTicking", "canOcclude",
+            "isAir", "ignitedByLava", "liquid", "forceSolidOff", "forceSolidOn",
+            "spawnTerrainParticles", "replaceable", "dynamicShape", "pushReaction"
+        };
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), physicalDigest))) {
+            for (var block : BuiltInRegistries.BLOCK) {
+                out.writeInt(BuiltInRegistries.BLOCK.getId(block));
+                out.writeUTF(BuiltInRegistries.BLOCK.getKey(block).toString());
+                for (String name : physicalFields) {
+                    var field = BlockBehaviour.Properties.class.getDeclaredField(name);
+                    field.setAccessible(true);
+                    Object value = field.get(block.properties());
+                    out.writeUTF(name);
+                    if (value instanceof Float f) out.writeInt(Float.floatToRawIntBits(f));
+                    else if (value instanceof Boolean b) out.writeBoolean(b);
+                    else if (value instanceof Enum<?> e) out.writeUTF(e.name());
+                    else throw new AssertionError("Unsupported physical field: " + name);
+                    try {
+                        var cached = BlockBehaviour.class.getDeclaredField(name);
+                        cached.setAccessible(true);
+                        if (!cached.get(block).equals(value)) throw new AssertionError("Cached physical value differs: " + block + "/" + name);
+                    } catch (NoSuchFieldException expected) { }
+                }
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    out.writeInt(Block.getId(state));
+                    out.writeInt(Float.floatToRawIntBits(state.getDestroySpeed(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)));
+                    out.writeBoolean(state.requiresCorrectToolForDrops());
+                    out.writeBoolean(state.ignitedByLava());
+                    out.writeBoolean(state.liquid());
+                    out.writeBoolean(state.shouldSpawnTerrainParticles());
+                    out.writeBoolean(state.canBeReplaced());
+                    out.writeUTF(state.getPistonPushReaction().name());
+                }
+            }
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
             + " fluid_states=" + fluidStates + " fluid_sha256=" + HexFormat.of().formatHex(fluidDigest.digest())
             + " property_definitions=" + propertyDefinitions + " property_sha256=" + HexFormat.of().formatHex(propertyDigest.digest())
             + " block_states=" + blockStates + " block_sha256=" + HexFormat.of().formatHex(blockDigest.digest())
+            + " physical_sha256=" + HexFormat.of().formatHex(physicalDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
     }
 

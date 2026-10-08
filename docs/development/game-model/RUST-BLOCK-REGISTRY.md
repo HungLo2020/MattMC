@@ -9,13 +9,16 @@ Rust owns one registry of every block, property and block state:
 Rust subsystems derive their per-state lookup tables from it. They no longer
 receive a private table from their own Java bridge. The
 [native definition registry](BLOCK-DEFINITIONS.md) declares block names, order,
-property sets and defaults. Java supplies behavior factories and remaining
-physical/world-dependent facts.
+property sets and defaults. Its [physical owner](BLOCK-PHYSICS.md) also supplies
+intrinsic settings. Java supplies behavior factories and remaining shape, light
+and world-dependent facts.
 [`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
 exports those remaining facts once, lazily on the first `ready()` call.
-The current wire format is **5**: block/state/face counts, offset bounds,
+The current wire format is **6**: block/state/face counts, offset bounds,
 per-state face IDs/flags/fluid associations, light values, offset types and the
 face truth table. Names, schemas, defaults and value indices are not exported.
+Air and can-occlude flags derive from native physical definitions; imported
+packets supplying those bits are rejected. Fluid flags likewise derive natively.
 Rust shares [property schemas](PROPERTY-DEFINITIONS.md) directly and resolves
 fluid facts from the [fluid registry](FLUID-DEFINITIONS.md).
 

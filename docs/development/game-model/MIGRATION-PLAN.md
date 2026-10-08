@@ -46,8 +46,9 @@ state values and transition IDs for block/fluid definitions and shared
 block-registry slot arithmetic. [Fluid definitions](FLUID-DEFINITIONS.md) now
 come from Rust, including all five registry entries and their 37 intrinsic
 state rows. [Block state definitions](BLOCK-DEFINITIONS.md) now supply the
-ordered catalog, property sets and defaults. Java still supplies factories,
-physical settings, codecs, state-object views and world-dependent gameplay. The
+ordered catalog, property sets and defaults. [Physical settings](BLOCK-PHYSICS.md)
+now also originate in Rust. Java still supplies factories, shapes/predicates,
+codecs, state-object views and world-dependent gameplay. The
 [134 property declarations](PROPERTY-DEFINITIONS.md) also originate
 in Rust; block registries share their schemas and fluids use their typed
 domains. This includes all 11 additional properties for integrated content.

@@ -5,8 +5,9 @@
 //! Java no longer exports names, defaults, properties or state value indices.
 use super::{definitions, BlockRegistry, Builder, Error, FaceId, OffsetType, PropertyId, StateFacts, StateFlags, DIRECTIONS};
 use crate::content::{fluid::FluidStateId, property};
+use definitions::physics::PhysicalFlags;
 
-pub(crate) const FORMAT: i32 = 5;
+pub(crate) const FORMAT: i32 = 6;
 const STATE_INTS: usize = DIRECTIONS + 2;
 
 struct Cursor<'a, T> { values: &'a [T], at: usize }
@@ -70,8 +71,14 @@ pub(crate) fn decode(ints: &[i32], bytes: &[u8]) -> Result<BlockRegistry, Error>
             for (face, &id) in light_faces.iter_mut().zip(&row[..DIRECTIONS]) {
                 *face = FaceId(u16::try_from(id).map_err(|_| Error::Invalid("export face"))?);
             }
+            let mut flags = u16::try_from(row[DIRECTIONS]).map_err(|_| Error::Invalid("export flags"))?;
+            if flags & (StateFlags::AIR.0 | StateFlags::CAN_OCCLUDE.0) != 0 {
+                return Err(Error::Invalid("native physical flags supplied by Java"));
+            }
+            if definition.physics.flags.contains(PhysicalFlags::AIR) { flags |= StateFlags::AIR.0; }
+            if definition.physics.flags.contains(PhysicalFlags::CAN_OCCLUDE) { flags |= StateFlags::CAN_OCCLUDE.0; }
             state_facts.push(StateFacts {
-                flags: StateFlags(u16::try_from(row[DIRECTIONS]).map_err(|_| Error::Invalid("export flags"))?),
+                flags: StateFlags(flags),
                 light_block: b[0], emission: b[1], light_faces,
                 fluid_state: FluidStateId(u16::try_from(row[DIRECTIONS + 1]).map_err(|_| Error::Invalid("fluid state id"))?),
                 offset: OffsetType::from_u8(b[2]).ok_or(Error::Invalid("export offset"))?,

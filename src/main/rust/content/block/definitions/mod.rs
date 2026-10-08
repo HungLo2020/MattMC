@@ -3,6 +3,7 @@
 mod catalog;
 mod ffi;
 mod templates;
+pub mod physics;
 #[cfg(test)]
 mod tests;
 
@@ -21,6 +22,7 @@ pub struct Definition {
     pub name: &'static str,
     pub first_state: StateId,
     pub template: u16,
+    pub physics: &'static physics::Physics,
 }
 
 pub struct Registry {
@@ -28,20 +30,22 @@ pub struct Registry {
     templates: Vec<Template>,
     graphs: Vec<StateGraph>,
     by_name: HashMap<&'static str, BlockId>,
-    header: [i32; 7],
+    header: [i32; 8],
     rows: Vec<i32>,
     template_rows: Vec<i32>,
     properties: Vec<i32>,
     graph_headers: Vec<[i32; 5]>,
     names: Vec<u8>,
+    physics_rows: Vec<i32>,
 }
 
 impl Registry {
     fn build() -> Self {
         let mut r = Self {
             definitions: Vec::new(), templates: Vec::new(), graphs: Vec::new(), by_name: HashMap::new(),
-            header: [0; 7], rows: Vec::new(), template_rows: Vec::new(), properties: Vec::new(),
+            header: [0; 8], rows: Vec::new(), template_rows: Vec::new(), properties: Vec::new(),
             graph_headers: Vec::new(), names: Vec::new(),
+            physics_rows: physics::PROFILES.iter().flat_map(physics::Physics::words).collect(),
         };
         // Pure index/transition graphs depend only on ordered cardinalities.
         // The finite declaration table bounds this pool; there is no runtime
@@ -69,19 +73,19 @@ impl Registry {
             r.templates.push(Template { properties, default_local, graph });
         }
         let mut next_state = 0;
-        for &(name, template) in catalog::BLOCKS {
+        for &(name, template, physical) in catalog::BLOCKS {
             let id = BlockId(u16::try_from(r.definitions.len()).expect("bounded native block IDs"));
             let t = &r.templates[template as usize];
             let states = r.graph_headers[t.graph as usize][0] as usize;
             assert!(next_state + states <= u16::MAX as usize, "native block state ceiling");
             assert!(r.by_name.insert(name, id).is_none(), "duplicate native block name");
-            r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32]);
+            r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32, physical as i32]);
             r.names.extend_from_slice(name.as_bytes());
-            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16 });
+            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize] });
             next_state += states;
         }
-        r.header = [1, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
-            r.properties.len() as i32, r.names.len() as i32, r.graphs.len() as i32];
+        r.header = [2, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
+            r.properties.len() as i32, r.names.len() as i32, r.graphs.len() as i32, physics::PROFILES.len() as i32];
         r
     }
 

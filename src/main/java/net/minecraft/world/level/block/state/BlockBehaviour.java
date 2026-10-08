@@ -103,6 +103,9 @@ public abstract class BlockBehaviour implements FeatureElement {
 	protected final String descriptionId;
 
 	public BlockBehaviour(BlockBehaviour.Properties properties) {
+        // Registered blocks obtain physical policy from Rust before either
+        // block or per-state compatibility views cache these values.
+        if (properties.nativeDefinition() != null) properties.nativeDefinition().applyPhysics(properties);
 		this.hasCollision = properties.hasCollision;
 		this.drops = properties.effectiveDrops();
 		this.descriptionId = properties.effectiveDescriptionId();

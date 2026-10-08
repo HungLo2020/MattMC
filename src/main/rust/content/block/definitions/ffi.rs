@@ -2,7 +2,7 @@
 use std::ffi::c_void;
 
 /// Selectors: 0 header, 1 block rows, 2 template rows, 3 property IDs (i32),
-/// 4 UTF-8 names. Counts are elements. Invalid selectors return null/zero.
+/// 4 UTF-8 names, 5 physical profiles (seven i32 words each). Counts are elements. Invalid selectors return null/zero.
 /// # Safety
 /// `length` is null or addresses one writable i32.
 #[no_mangle]
@@ -15,6 +15,7 @@ pub unsafe extern "C" fn mattmc_block_definitions_buffer(kind: i32, length: *mut
         2 => (r.template_rows.as_ptr().cast(), r.template_rows.len()),
         3 => (r.properties.as_ptr().cast(), r.properties.len()),
         4 => (r.names.as_ptr().cast(), r.names.len()),
+        5 => (r.physics_rows.as_ptr().cast(), r.physics_rows.len()),
         _ => (std::ptr::null(), 0),
     };
     *length = len as i32;
