@@ -9,7 +9,8 @@
 
 [`content/block/definitions`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/content/block/definitions)
 contains the ordered catalog and 131 shared property/default sets. Definitions
-also select immutable [physical settings](BLOCK-PHYSICS.md). Their state templates
+also select immutable [physical settings](BLOCK-PHYSICS.md) and
+[intrinsic state rules](BLOCK-INTRINSICS.md). Their state templates
 use typed [native properties](PROPERTY-DEFINITIONS.md) and serialized default
 values; Rust derives all 31,809 contiguous state IDs. Keep existing catalog
 order and append new entries to preserve IDs.
@@ -35,9 +36,9 @@ graphs. Dynamically constructed graphs still use automatic arenas; see
 [state graph ownership](STATE-GRAPHS.md). Neither path owns rendering resources.
 
 The [block registry](RUST-BLOCK-REGISTRY.md) now imports only remaining state
-facts and face data. Its format 6 packet contains block/state/face counts,
-offset bounds, per-state face IDs/flags/fluid associations, light values and
-offset types. Names, property schemas, defaults and value indices no longer
+facts and face data. Its format 7 packet contains block/state/face counts,
+offset bounds, per-state face IDs/flags, blocked-light values and offset types.
+Emitted light and fluid associations now derive from native intrinsic rules. Names, property schemas, defaults and value indices no longer
 make a native-to-Java-to-native trip. Air and can-occlude flags derive directly
 from native physical definitions; incoming packets must not supply them.
 
@@ -67,7 +68,9 @@ block state's flags, lighting, fluid association, two sampled offsets and six
 light-occlusion face box lists. They do not prove all contextual collision or
 gameplay behavior; use real world/client checks as well. Version 5 additionally
 checks every block’s physical settings and constructor caches; its follow-up
-verification is recorded in [physical settings](BLOCK-PHYSICS.md).
+verification is recorded in [physical settings](BLOCK-PHYSICS.md). Version 6
+also checks map colors and copied color/emission functions; see
+[intrinsic state rules](BLOCK-INTRINSICS.md) for current verification status.
 
 The following results predate the physical-settings follow-up. The
 pre-integration control at published `df6c6dc77` matched Frozen in three

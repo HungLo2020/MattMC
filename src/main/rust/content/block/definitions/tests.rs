@@ -21,7 +21,7 @@ fn shared_graph_buffers_are_local_and_never_caller_owned() {
         assert!(ffi::mattmc_block_definition_graph_buffer(0, 4, &mut length).is_null());
         assert_eq!(length, 0);
         assert!(ffi::mattmc_block_definition_graph_buffer(0, 0, std::ptr::null_mut()).is_null());
-        assert!(ffi::mattmc_block_definitions_buffer(6, &mut length).is_null());
+        assert!(ffi::mattmc_block_definitions_buffer(11, &mut length).is_null());
         assert_eq!(length, 0);
         assert!(ffi::mattmc_block_definitions_buffer(0, std::ptr::null_mut()).is_null());
     }
@@ -48,5 +48,24 @@ fn physical_profiles_are_shared_independently_of_state_domains() {
         assert_eq!(length as usize, physics::PROFILES.len() * 7);
         assert_eq!(rows, r.physics_rows.as_ptr().cast());
         assert_eq!(ffi::mattmc_block_definitions_buffer(5, &mut length), rows);
+    }
+}
+
+#[test]
+fn intrinsic_and_rule_buffers_are_bounded_process_lifetime_views() {
+    let r = registry();
+    assert_eq!(r.intrinsic_states.len(), r.intrinsic_rows.len());
+    assert_eq!(r.rule_refs.len(), r.definitions.len() * 2);
+    assert!(r.state_traits(StateId(u16::MAX)).is_none());
+    unsafe {
+        let mut length = -1;
+        for (kind, values) in [(6, &r.intrinsic_rows), (7, &r.rule_refs), (8, &r.rule_rows), (9, &r.rule_properties), (10, &r.rule_values)] {
+            let first = ffi::mattmc_block_definitions_buffer(kind, &mut length);
+            assert_eq!(length as usize, values.len());
+            assert_eq!(first, values.as_ptr().cast());
+            assert_eq!(ffi::mattmc_block_definitions_buffer(kind, &mut length), first);
+        }
+        assert!(ffi::mattmc_block_definitions_buffer(11, &mut length).is_null());
+        assert_eq!(length, 0);
     }
 }

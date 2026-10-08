@@ -14,6 +14,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.MapColor;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.block.state.properties.Property;
@@ -29,6 +33,7 @@ import net.minecraft.world.level.EmptyBlockGetter;
 public final class StateGraphReference {
     private static long states, transitions;
 
+    @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         var bean = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
         long thread = Thread.currentThread().threadId();
@@ -167,6 +172,26 @@ public final class StateGraphReference {
                 }
             }
         }
+        MessageDigest intrinsicDigest = MessageDigest.getInstance("SHA-256");
+        var colorField = BlockBehaviour.Properties.class.getDeclaredField("mapColor");
+        var lightField = BlockBehaviour.Properties.class.getDeclaredField("lightEmission");
+        colorField.setAccessible(true); lightField.setAccessible(true);
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), intrinsicDigest))) {
+            for (var block : BuiltInRegistries.BLOCK) {
+                var copied = BlockBehaviour.Properties.ofFullCopy(block);
+                var color = (Function<BlockState, MapColor>) colorField.get(copied);
+                var light = (ToIntFunction<BlockState>) lightField.get(copied);
+                out.writeInt(BuiltInRegistries.BLOCK.getId(block));
+                out.writeInt(block.defaultMapColor().id);
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    out.writeInt(Block.getId(state));
+                    out.writeInt(state.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).id);
+                    out.writeInt(color.apply(state).id);
+                    out.writeInt(state.getLightEmission()); out.writeInt(light.applyAsInt(state));
+                    out.writeInt(Fluid.FLUID_STATE_REGISTRY.getId(state.getFluidState()));
+                }
+            }
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
@@ -174,6 +199,7 @@ public final class StateGraphReference {
             + " property_definitions=" + propertyDefinitions + " property_sha256=" + HexFormat.of().formatHex(propertyDigest.digest())
             + " block_states=" + blockStates + " block_sha256=" + HexFormat.of().formatHex(blockDigest.digest())
             + " physical_sha256=" + HexFormat.of().formatHex(physicalDigest.digest())
+            + " intrinsic_sha256=" + HexFormat.of().formatHex(intrinsicDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
     }
 

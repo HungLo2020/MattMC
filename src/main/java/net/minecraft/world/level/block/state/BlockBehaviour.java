@@ -105,7 +105,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 	public BlockBehaviour(BlockBehaviour.Properties properties) {
         // Registered blocks obtain physical policy from Rust before either
         // block or per-state compatibility views cache these values.
-        if (properties.nativeDefinition() != null) properties.nativeDefinition().applyPhysics(properties);
+        if (properties.nativeDefinition() != null) properties.nativeDefinition().applyProperties(properties);
 		this.hasCollision = properties.hasCollision;
 		this.drops = properties.effectiveDrops();
 		this.descriptionId = properties.effectiveDescriptionId();
@@ -450,6 +450,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		@Nullable
 		private BlockBehaviour.BlockStateBase.Cache cache;
 		private FluidState fluidState = Fluids.EMPTY.defaultFluidState();
+        private final boolean nativeIntrinsicState;
 		private boolean isRandomlyTicking;
 		private boolean solidRender;
 		private VoxelShape occlusionShape;
@@ -458,15 +459,20 @@ public abstract class BlockBehaviour implements FeatureElement {
 		private int lightBlock;
 
 		protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec) {
+            this(block, reference2ObjectArrayMap, mapCodec, -1);
+        }
+
+        protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec, int nativeTraits) {
 			super(block, reference2ObjectArrayMap, mapCodec);
+            this.nativeIntrinsicState = nativeTraits >= 0;
 			BlockBehaviour.Properties properties = block.properties;
-			this.lightEmission = properties.lightEmission.applyAsInt(this.asState());
+			this.lightEmission = nativeTraits >= 0 ? (nativeTraits >>> 8) & 15 : properties.lightEmission.applyAsInt(this.asState());
 			this.useShapeForLightOcclusion = block.useShapeForLightOcclusion(this.asState());
 			this.isAir = properties.isAir;
 			this.ignitedByLava = properties.ignitedByLava;
 			this.liquid = properties.liquid;
 			this.pushReaction = properties.pushReaction;
-			this.mapColor = (MapColor)properties.mapColor.apply(this.asState());
+			this.mapColor = nativeTraits >= 0 ? MapColor.byId(nativeTraits & 255) : (MapColor)properties.mapColor.apply(this.asState());
 			this.destroySpeed = properties.destroyTime;
 			this.requiresCorrectToolForDrops = properties.requiresCorrectToolForDrops;
 			this.canOcclude = properties.canOcclude;
@@ -480,6 +486,10 @@ public abstract class BlockBehaviour implements FeatureElement {
 			this.spawnTerrainParticles = properties.spawnTerrainParticles;
 			this.instrument = properties.instrument;
 			this.replaceable = properties.replaceable;
+            if (nativeTraits >= 0) {
+                this.fluidState = Fluid.FLUID_STATE_REGISTRY.byId(nativeTraits >>> 12);
+                if (this.fluidState == null) throw new IllegalStateException("Missing canonical native fluid projection");
+            }
 		}
 
 		private boolean calculateSolid() {
@@ -501,7 +511,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public void initCache() {
-			this.fluidState = this.owner.getFluidState(this.asState());
+			if (!this.nativeIntrinsicState) this.fluidState = this.owner.getFluidState(this.asState());
 			this.isRandomlyTicking = this.owner.isRandomlyTicking(this.asState());
 			if (!this.getBlock().hasDynamicShape()) {
 				this.cache = new BlockBehaviour.BlockStateBase.Cache(this.asState());

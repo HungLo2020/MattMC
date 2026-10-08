@@ -186,7 +186,9 @@ beyond its block registry.
 Cartesian values and transition graphs. The shared registry and temporary
 Java block/fluid views use it. [Block state definitions](game-model/BLOCK-DEFINITIONS.md) now provide the
 registered catalog and shared graphs; [physical definitions](game-model/BLOCK-PHYSICS.md)
-supply intrinsic block settings. General gameplay remains Java.
+supply intrinsic block settings. [Intrinsic state rules](game-model/BLOCK-INTRINSICS.md)
+compute semantic map colors, emitted light and canonical fluid associations.
+General gameplay remains Java.
 
 [`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,
 registration order, property declarations, defaults and intrinsic state facts.
@@ -198,7 +200,7 @@ property declarations and ordered domains. The block registry shares immutable
 schemas directly; Java enum/property objects are temporary compatibility views.
 The 11 declarations for integrated content retain their distinct identities.
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/light/predicate functions and contextual gameplay, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/predicate functions and contextual gameplay, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
 
 ### `render/`
 

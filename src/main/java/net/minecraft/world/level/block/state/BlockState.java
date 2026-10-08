@@ -14,6 +14,10 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
 		super(block, reference2ObjectArrayMap, mapCodec);
 	}
 
+    BlockState(Block owner, Reference2ObjectArrayMap<Property<?>, Comparable<?>> values, MapCodec<BlockState> codec, int nativeTraits) {
+        super(owner, values, codec, nativeTraits);
+    }
+
 	@Override
 	protected BlockState asState() {
 		return this;

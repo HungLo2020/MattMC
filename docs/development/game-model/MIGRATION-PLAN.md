@@ -47,7 +47,8 @@ block-registry slot arithmetic. [Fluid definitions](FLUID-DEFINITIONS.md) now
 come from Rust, including all five registry entries and their 37 intrinsic
 state rows. [Block state definitions](BLOCK-DEFINITIONS.md) now supply the
 ordered catalog, property sets and defaults. [Physical settings](BLOCK-PHYSICS.md)
-now also originate in Rust. Java still supplies factories, shapes/predicates,
+and [intrinsic state rules](BLOCK-INTRINSICS.md) now also originate in Rust.
+The latter own map colors, emission and fluid associations. Java still supplies factories, shapes/predicates,
 codecs, state-object views and world-dependent gameplay. The
 [134 property declarations](PROPERTY-DEFINITIONS.md) also originate
 in Rust; block registries share their schemas and fluids use their typed
@@ -57,8 +58,8 @@ The remaining registry-definition migration below is unfinished.
 - Rust builds the registries from its own definitions (the builders in
   [adding content](ADDING-CONTENT.md)) in Java's order.
 - Java *verifies* against Rust at startup, then later reads IDs from it.
-- Per-state functions (light levels, map colors, predicates) are ported block
-  by block, with the parity test as the guard.
+- Remaining per-state shape/predicate functions are ported by family with
+  parity checks; map-color and emitted-light rules are already native-owned.
 
 ## Phase 3: behavior and components by family
 

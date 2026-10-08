@@ -10,9 +10,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
 import net.minecraft.world.level.block.state.properties.Property;
 
@@ -29,16 +32,61 @@ public final class NativeBlockDefinitions {
         public final int firstState;
         private final Template template;
         private final Physics physics;
-        private Definition(int id, String name, int firstState, Template template, Physics physics) {
+        private final ScalarRule mapColor, light;
+        private final MemorySegment intrinsicStates;
+        private Definition(int id, String name, int firstState, Template template, Physics physics, ScalarRule mapColor, ScalarRule light, MemorySegment intrinsicStates) {
             this.id = id; this.name = name; this.firstState = firstState; this.template = template; this.physics = physics;
+            this.mapColor = mapColor; this.light = light; this.intrinsicStates = intrinsicStates;
         }
-        void applyPhysics(BlockBehaviour.Properties properties) { this.physics.apply(properties); }
+        void applyProperties(BlockBehaviour.Properties properties) {
+            this.physics.apply(properties);
+            properties.mapColor = this.mapColor.colorView;
+            properties.lightEmission = this.light.lightView;
+        }
         public int stateCount() { return this.template.graph.stateCount; }
         public int defaultLocalState() { return this.template.defaultLocal; }
         public StateDefinition<Block, BlockState> createStates(Block owner) {
             var builder = new StateDefinition.Builder<Block, BlockState>(owner);
             builder.add(this.template.properties().toArray(Property<?>[]::new));
-            return builder.createWithGraph(Block::defaultBlockState, BlockState::new, this.template.graph);
+            return builder.createWithGraph(Block::defaultBlockState,
+                (block, values, codec, local) -> new BlockState(block, values, codec, word(this.intrinsicStates, this.firstState + local)),
+                this.template.graph);
+        }
+    }
+
+    /** Immutable CPU function projection for Properties copies and legacy
+     * constructor APIs. Declarations and evaluation tables originate in Rust. */
+    private static final class ScalarRule {
+        private final int[] propertyIds, values;
+        private volatile Property<?>[] propertyViews;
+        private final Function<BlockState, MapColor> colorView = state -> MapColor.byId(value(state));
+        private final ToIntFunction<BlockState> lightView = this::value;
+        private ScalarRule(int[] propertyIds, int[] values) { this.propertyIds = propertyIds; this.values = values; }
+        private Property<?>[] properties() {
+            var result = this.propertyViews;
+            if (result == null) synchronized (this) {
+                result = this.propertyViews;
+                if (result == null) {
+                    result = new Property<?>[this.propertyIds.length];
+                    int size = 1;
+                    for (int i = 0; i < result.length; i++) {
+                        result[i] = NativePropertyDefinitions.view(this.propertyIds[i]);
+                        size = Math.multiplyExact(size, result[i].getPossibleValues().size());
+                    }
+                    if (size != this.values.length) throw new IllegalStateException("Native rule domain changed");
+                    this.propertyViews = result;
+                }
+            }
+            return result;
+        }
+        private int value(BlockState state) {
+            if (this.propertyIds.length == 0) return this.values[0];
+            int at = 0;
+            for (Property<?> property : properties()) at = at * property.getPossibleValues().size() + index(state, property);
+            return this.values[at];
+        }
+        private static <T extends Comparable<T>> int index(BlockState state, Property<T> property) {
+            return property.getInternalIndex(state.getValue(property));
         }
     }
 
@@ -104,13 +152,16 @@ public final class NativeBlockDefinitions {
 
     private static Map<String, Definition> load() {
         try (Arena inputs = Arena.ofConfined()) {
-            MemorySegment header = buffer(0, 8, Integer.BYTES, inputs);
+            MemorySegment header = buffer(0, 12, Integer.BYTES, inputs);
             int count = word(header, 1), states = word(header, 2), templates = word(header, 3);
             int properties = word(header, 4), nameBytes = word(header, 5), graphs = word(header, 6);
             int physicalProfiles = word(header, 7);
-            if (word(header, 0) != 2 || count <= 0 || count > 65535 || states <= 0 || states > 65535
+            int rules = word(header, 8), ruleProperties = word(header, 9), ruleValues = word(header, 10), fluidStates = word(header, 11);
+            if (word(header, 0) != 3 || count <= 0 || count > 65535 || states <= 0 || states > 65535
                 || templates <= 0 || templates > count || properties < 0 || properties > 1048576
-                || nameBytes <= 0 || nameBytes > 16777216 || graphs <= 0 || graphs > templates || physicalProfiles <= 0 || physicalProfiles > count) {
+                || nameBytes <= 0 || nameBytes > 16777216 || graphs <= 0 || graphs > templates || physicalProfiles <= 0 || physicalProfiles > count
+                || rules <= 0 || rules > count * 2 || ruleProperties < 0 || ruleProperties > 1048576
+                || ruleValues <= 0 || ruleValues > states * 2 || fluidStates <= 0 || fluidStates > 65535) {
                 throw new IllegalStateException("Unsupported native block schema");
             }
             MemorySegment rows = buffer(1, count * 5, Integer.BYTES, inputs);
@@ -134,6 +185,37 @@ public final class NativeBlockDefinitions {
                 }
                 physicalViews[id] = new Physics(hardness, resistance, friction, speed, jump, flags, reactions[reaction]);
             }
+            MemorySegment intrinsicStates = buffer(6, states, Integer.BYTES, inputs);
+            for (int state = 0; state < states; state++) {
+                int packed = word(intrinsicStates, state);
+                if (packed < 0 || (packed & 255) > 63 || (packed >>> 12) >= fluidStates) throw new IllegalStateException("Invalid native intrinsic state");
+            }
+            MemorySegment ruleRefs = buffer(7, count * 2, Integer.BYTES, inputs);
+            MemorySegment ruleRows = buffer(8, rules * 4, Integer.BYTES, inputs);
+            MemorySegment rulePropertyIds = buffer(9, ruleProperties, Integer.BYTES, inputs);
+            MemorySegment ruleOutputs = buffer(10, ruleValues, Integer.BYTES, inputs);
+            ScalarRule[] ruleViews = new ScalarRule[rules];
+            int nextRuleProperty = 0, nextRuleValue = 0;
+            for (int id = 0; id < rules; id++) {
+                int base = id * 4, first = word(ruleRows, base), size = word(ruleRows, base + 1);
+                int firstValue = word(ruleRows, base + 2), values = word(ruleRows, base + 3);
+                if (first != nextRuleProperty || size < 0 || (long) first + size > ruleProperties
+                    || firstValue != nextRuleValue || values <= 0 || (long) firstValue + values > ruleValues) {
+                    throw new IllegalStateException("Invalid native scalar rule");
+                }
+                int[] ids = new int[size], outputs = new int[values];
+                for (int i = 0; i < size; i++) {
+                    ids[i] = word(rulePropertyIds, first + i);
+                    if (ids[i] < 0 || ids[i] > 65535) throw new IllegalStateException("Invalid native rule property");
+                }
+                for (int i = 0; i < values; i++) {
+                    outputs[i] = word(ruleOutputs, firstValue + i);
+                    if (outputs[i] < 0 || outputs[i] > 63) throw new IllegalStateException("Invalid native rule output");
+                }
+                ruleViews[id] = new ScalarRule(ids, outputs);
+                nextRuleProperty += size; nextRuleValue += values;
+            }
+            if (nextRuleProperty != ruleProperties || nextRuleValue != ruleValues) throw new IllegalStateException("Incomplete native scalar rules");
             NativeStateGraph[] graphViews = new NativeStateGraph[graphs];
             for (int id = 0; id < graphs; id++) graphViews[id] = NativeStateGraph.borrowBlockGraph(id);
             Template[] views = new Template[templates];
@@ -161,8 +243,11 @@ public final class NativeBlockDefinitions {
                     || template < 0 || template >= templates || physical < 0 || physical >= physicalProfiles) throw new IllegalStateException("Invalid native block row: " + id);
                 Template t = views[template];
                 if ((long) nextState + t.graph.stateCount > states) throw new IllegalStateException("Invalid native block range");
+                int colorRule = word(ruleRefs, id * 2), lightRule = word(ruleRefs, id * 2 + 1);
+                if (colorRule < 0 || colorRule >= rules || lightRule < 0 || lightRule >= rules) throw new IllegalStateException("Invalid native block rule binding");
+                for (int value : ruleViews[lightRule].values) if (value > 15) throw new IllegalStateException("Native emission outside range");
                 String name = new String(names.asSlice(start, length).toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8);
-                if (result.put(name, new Definition(id, name, firstState, t, physicalViews[physical])) != null) throw new IllegalStateException("Duplicate native block name: " + name);
+                if (result.put(name, new Definition(id, name, firstState, t, physicalViews[physical], ruleViews[colorRule], ruleViews[lightRule], intrinsicStates)) != null) throw new IllegalStateException("Duplicate native block name: " + name);
                 nextState += t.graph.stateCount;
             }
             if (nextState != states) throw new IllegalStateException("Incomplete native block states");

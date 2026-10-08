@@ -179,6 +179,22 @@ impl Registry {
         registry
     }
 
+    /// Resolve canonical fluid identity from semantic traits without guessing
+    /// registry offsets. Impossible combinations have no state.
+    pub fn state_by_traits(&self, family: Family, source: bool, falling: bool, amount: u8) -> Option<FluidStateId> {
+        let d = self.definitions.iter().find(|d| d.family == family && d.source == source)?;
+        if family == Family::Empty {
+            return (!falling && amount == 0).then_some(d.first_state);
+        }
+        if (source && amount != 8) || (!source && !(1..=8).contains(&amount)) { return None; }
+        let mut local = 0;
+        for (property, slot) in d.properties.iter().zip(d.layout.slots()) {
+            let value = match property { Property::Falling => u16::from(!falling), Property::Level => u16::from(amount - 1) };
+            local += value * slot.stride;
+        }
+        Some(FluidStateId(d.first_state.0 + local))
+    }
+
     pub fn definitions(&self) -> &[Definition] {
         &self.definitions
     }
@@ -198,6 +214,23 @@ pub fn registry() -> &'static Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn semantic_state_selection_round_trips_every_canonical_fluid() {
+        let r = registry();
+        for d in r.definitions() {
+            for local in 0..d.state_count() {
+                let id = FluidStateId(d.first_state.0 + local as u16);
+                let traits = r.state(id).unwrap();
+                assert_eq!(r.state_by_traits(d.family, traits.source, traits.falling, traits.amount), Some(id));
+            }
+        }
+        assert_eq!(r.state_by_traits(Family::Empty, false, true, 0), None);
+        assert_eq!(r.state_by_traits(Family::Empty, true, false, 8), None);
+        assert_eq!(r.state_by_traits(Family::Water, true, false, 7), None);
+        assert_eq!(r.state_by_traits(Family::Lava, false, false, 0), None);
+        assert_eq!(r.state_by_traits(Family::Water, false, false, 9), None);
+    }
 
     #[test]
     fn ordered_ids_defaults_and_all_traits_match_reference_domains() {

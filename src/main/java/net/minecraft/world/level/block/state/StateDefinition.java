@@ -30,10 +30,10 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 	private final ImmutableList<S> states;
 
 	protected StateDefinition(Function<O, S> function, O object, StateDefinition.Factory<O, S> factory, Map<String, Property<?>> map) {
-		this(function, object, factory, map, null);
+		this(function, object, (owner, values, codec, index) -> factory.create(owner, values, codec), map, null);
 	}
 
-	private StateDefinition(Function<O, S> function, O object, StateDefinition.Factory<O, S> factory, Map<String, Property<?>> map, NativeStateGraph sharedGraph) {
+	private StateDefinition(Function<O, S> function, O object, StateDefinition.IndexedFactory<O, S> factory, Map<String, Property<?>> map, NativeStateGraph sharedGraph) {
 		this.owner = object;
 		this.propertiesByName = ImmutableSortedMap.copyOf(map);
 		Supplier<S> supplier = () -> function.apply(object);
@@ -54,7 +54,7 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 				Property<?> p = properties.get(property);
 				values.put(p, p.getPossibleValues().get(graph.value(state, property)));
 			}
-			list.add(factory.create(object, values, mapCodec2));
+			list.add(factory.create(object, values, mapCodec2, state));
 		}
 		this.states = ImmutableList.copyOf(list);
 		for (int state = 0; state < this.states.size(); state++) {
@@ -142,7 +142,7 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 			}
 		}
 
-		StateDefinition<O, S> createWithGraph(Function<O, S> function, StateDefinition.Factory<O, S> factory, NativeStateGraph graph) {
+		StateDefinition<O, S> createWithGraph(Function<O, S> function, StateDefinition.IndexedFactory<O, S> factory, NativeStateGraph graph) {
 			return new StateDefinition<>(function, this.owner, factory, this.properties, graph);
 		}
 
@@ -150,6 +150,10 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 			return new StateDefinition<>(function, this.owner, factory, this.properties);
 		}
 	}
+
+    interface IndexedFactory<O, S> {
+        S create(O owner, Reference2ObjectArrayMap<Property<?>, Comparable<?>> values, MapCodec<S> codec, int localState);
+    }
 
 	public interface Factory<O, S> {
 		S create(O object, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<S> mapCodec);

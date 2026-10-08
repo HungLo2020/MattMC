@@ -118,11 +118,11 @@ fn the_state_ceiling_is_enforced() {
 }
 
 /// Remaining state facts for the entire native declaration table, with no
-/// layout/default/name input. This fixture deliberately uses empty fluid facts.
+/// layout/default/name input. Intrinsic light and fluid facts are always native.
 fn native_fact_packet() -> (Vec<i32>, Vec<u8>) {
     let mut ints = vec![FORMAT, 1235, 31809, 1];
-    ints.extend(std::iter::repeat_n(0, 1235 * 2 + 31809 * (DIRECTIONS + 2)));
-    (ints, vec![0; 31809 * 3 + 1])
+    ints.extend(std::iter::repeat_n(0, 1235 * 2 + 31809 * (DIRECTIONS + 1)));
+    (ints, vec![0; 31809 * 2 + 1])
 }
 
 #[test]
@@ -160,14 +160,9 @@ fn native_fact_export_rejects_damage() {
         let mut damaged = ints.clone(); damaged[at] = value;
         assert!(decode(&damaged, &bytes).is_err());
     }
-    for invalid in [-1, 37, 65535, 65536] {
-        let mut damaged = ints.clone();
-        *damaged.last_mut().unwrap() = invalid;
-        assert!(decode(&damaged, &bytes).is_err());
-    }
     for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING, StateFlags::AIR, StateFlags::CAN_OCCLUDE] {
         let mut damaged = ints.clone();
-        let at = damaged.len() - 2; damaged[at] = flag.0 as i32;
+        let at = damaged.len() - 1; damaged[at] = flag.0 as i32;
         assert!(decode(&damaged, &bytes).is_err());
     }
 }

@@ -4,7 +4,7 @@
 > block states, items, block entities and entities should be represented in
 > Rust. Phase 1, the [Rust block registry](RUST-BLOCK-REGISTRY.md), is current
 > behavior. Native state graphs, property declarations, fluid definitions and
-> registered block state definitions and physical settings are implemented ownership slices; remaining definitions, behavior and component systems remain proposals.
+> registered block state definitions, physical settings and intrinsic state rules are implemented ownership slices; remaining definitions, behavior and component systems remain proposals.
 > “Implemented” describes source ownership, not completion of every acceptance
 > check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
 > The surveys behind the proposal are dated 2026-10-07.
@@ -95,6 +95,8 @@ one set of systems.
   block catalog, shared domain/default sets and bounded graph reuse.
 - [Native block physical settings](BLOCK-PHYSICS.md) (current work): shared
   intrinsic configurations, Java views and directly derived native flags.
+- [Native intrinsic state rules](BLOCK-INTRINSICS.md) (current work): map colors,
+  emitted light, fluid associations and temporary compatibility projections.
 - [Native state graphs](STATE-GRAPHS.md) (current work): shared state construction,
   temporary Java projections, CPU buffer ownership and verification.
 - [Shared property definitions](PROPERTY-DEFINITIONS.md) (current work): native

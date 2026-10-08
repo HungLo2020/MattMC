@@ -2,7 +2,9 @@
 use std::ffi::c_void;
 
 /// Selectors: 0 header, 1 block rows, 2 template rows, 3 property IDs (i32),
-/// 4 UTF-8 names, 5 physical profiles (seven i32 words each). Counts are elements. Invalid selectors return null/zero.
+/// 4 UTF-8 names, 5 physical profiles (seven i32 words), 6 packed intrinsic states,
+/// 7 block color/light rule IDs, 8 rule rows, 9 rule property IDs, 10 rule values.
+/// Counts are elements. Invalid selectors return null/zero.
 /// # Safety
 /// `length` is null or addresses one writable i32.
 #[no_mangle]
@@ -16,6 +18,11 @@ pub unsafe extern "C" fn mattmc_block_definitions_buffer(kind: i32, length: *mut
         3 => (r.properties.as_ptr().cast(), r.properties.len()),
         4 => (r.names.as_ptr().cast(), r.names.len()),
         5 => (r.physics_rows.as_ptr().cast(), r.physics_rows.len()),
+        6 => (r.intrinsic_rows.as_ptr().cast(), r.intrinsic_rows.len()),
+        7 => (r.rule_refs.as_ptr().cast(), r.rule_refs.len()),
+        8 => (r.rule_rows.as_ptr().cast(), r.rule_rows.len()),
+        9 => (r.rule_properties.as_ptr().cast(), r.rule_properties.len()),
+        10 => (r.rule_values.as_ptr().cast(), r.rule_values.len()),
         _ => (std::ptr::null(), 0),
     };
     *length = len as i32;

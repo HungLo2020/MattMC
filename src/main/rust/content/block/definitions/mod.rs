@@ -4,6 +4,7 @@ mod catalog;
 mod ffi;
 mod templates;
 pub mod physics;
+pub mod intrinsic;
 #[cfg(test)]
 mod tests;
 
@@ -30,22 +31,30 @@ pub struct Registry {
     templates: Vec<Template>,
     graphs: Vec<StateGraph>,
     by_name: HashMap<&'static str, BlockId>,
-    header: [i32; 8],
+    header: [i32; 12],
     rows: Vec<i32>,
     template_rows: Vec<i32>,
     properties: Vec<i32>,
     graph_headers: Vec<[i32; 5]>,
     names: Vec<u8>,
     physics_rows: Vec<i32>,
+    intrinsic_states: Vec<intrinsic::StateTraits>,
+    intrinsic_rows: Vec<i32>,
+    rule_refs: Vec<i32>,
+    rule_rows: Vec<i32>,
+    rule_properties: Vec<i32>,
+    rule_values: Vec<i32>,
 }
 
 impl Registry {
     fn build() -> Self {
         let mut r = Self {
             definitions: Vec::new(), templates: Vec::new(), graphs: Vec::new(), by_name: HashMap::new(),
-            header: [0; 8], rows: Vec::new(), template_rows: Vec::new(), properties: Vec::new(),
+            header: [0; 12], rows: Vec::new(), template_rows: Vec::new(), properties: Vec::new(),
             graph_headers: Vec::new(), names: Vec::new(),
             physics_rows: physics::PROFILES.iter().flat_map(physics::Physics::words).collect(),
+            intrinsic_states: Vec::new(), intrinsic_rows: Vec::new(),
+            rule_refs: Vec::new(), rule_rows: Vec::new(), rule_properties: Vec::new(), rule_values: Vec::new(),
         };
         // Pure index/transition graphs depend only on ordered cardinalities.
         // The finite declaration table bounds this pool; there is no runtime
@@ -73,7 +82,7 @@ impl Registry {
             r.templates.push(Template { properties, default_local, graph });
         }
         let mut next_state = 0;
-        for &(name, template, physical) in catalog::BLOCKS {
+        for &(name, template, physical, intrinsic) in catalog::BLOCKS {
             let id = BlockId(u16::try_from(r.definitions.len()).expect("bounded native block IDs"));
             let t = &r.templates[template as usize];
             let states = r.graph_headers[t.graph as usize][0] as usize;
@@ -82,13 +91,58 @@ impl Registry {
             r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32, physical as i32]);
             r.names.extend_from_slice(name.as_bytes());
             r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize] });
+            let values = r.graphs[t.graph as usize].buffer(0).expect("native graph values");
+            let rules = &intrinsic::PROFILES[intrinsic as usize];
+            for local in 0..states {
+                let width = t.properties.len();
+                let facts = rules.evaluate(&t.properties, &values[local * width..(local + 1) * width]);
+                r.intrinsic_rows.push(facts.packed());
+                r.intrinsic_states.push(facts);
+            }
             next_state += states;
         }
-        r.header = [2, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
-            r.properties.len() as i32, r.names.len() as i32, r.graphs.len() as i32, physics::PROFILES.len() as i32];
+        // A finite projection of native rules supports temporary Java property
+        // function copies without duplicating declarations or making downcalls.
+        let mut rule_ids = HashMap::<(Vec<u16>, Vec<i32>), u16>::new();
+        for d in &r.definitions {
+            let t = &r.templates[d.template as usize];
+            let rules = &intrinsic::PROFILES[catalog::BLOCKS[d.id.0 as usize].3 as usize];
+            let graph = &r.graphs[t.graph as usize];
+            let states = r.graph_headers[t.graph as usize][0] as usize;
+            let indices = graph.buffer(0).expect("native graph values");
+            for emission in [false, true] {
+                let dependencies = rules.dependencies(emission);
+                let positions: Vec<_> = dependencies.iter().map(|p| t.properties.iter().position(|q| p == q).expect("rule dependency")).collect();
+                let layout = StateLayout::new(&dependencies.iter().map(|p| p.domain().count()).collect::<Vec<_>>()).expect("rule projection size");
+                let mut values = vec![-1; layout.state_count()];
+                for local in 0..states {
+                    let row = &indices[local * t.properties.len()..(local + 1) * t.properties.len()];
+                    let at: usize = positions.iter().zip(layout.slots()).map(|(&p, slot)| row[p] as usize * slot.stride as usize).sum();
+                    let state = r.intrinsic_states[d.first_state.0 as usize + local];
+                    let value = if emission { state.emission as i32 } else { state.map_color as i32 };
+                    assert!(values[at] == -1 || values[at] == value, "incomplete native rule dependencies");
+                    values[at] = value;
+                }
+                assert!(values.iter().all(|&v| v >= 0), "incomplete native rule projection");
+                let key = (dependencies.iter().map(|&p| p as u16).collect(), values);
+                let id = *rule_ids.entry(key.clone()).or_insert_with(|| {
+                    let id = u16::try_from(r.rule_rows.len() / 4).expect("bounded rule identity");
+                    r.rule_rows.extend([r.rule_properties.len() as i32, key.0.len() as i32, r.rule_values.len() as i32, key.1.len() as i32]);
+                    r.rule_properties.extend(key.0.iter().map(|&p| p as i32));
+                    r.rule_values.extend(&key.1);
+                    id
+                });
+                r.rule_refs.push(id as i32);
+            }
+        }
+        r.header = [3, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
+            r.properties.len() as i32, r.names.len() as i32, r.graphs.len() as i32, physics::PROFILES.len() as i32,
+            (r.rule_rows.len() / 4) as i32, r.rule_properties.len() as i32, r.rule_values.len() as i32,
+            crate::content::fluid::registry().definitions().iter().map(|d| d.state_count()).sum::<usize>() as i32];
         r
     }
 
+    pub fn state_traits(&self, id: StateId) -> Option<&intrinsic::StateTraits> { self.intrinsic_states.get(id.0 as usize) }
     pub fn definitions(&self) -> &[Definition] { &self.definitions }
     pub fn definition(&self, id: BlockId) -> Option<&Definition> { self.definitions.get(id.0 as usize) }
     pub fn find(&self, name: &str) -> Option<&Definition> { self.by_name.get(name).and_then(|&id| self.definition(id)) }

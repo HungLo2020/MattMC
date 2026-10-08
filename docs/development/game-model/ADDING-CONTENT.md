@@ -2,16 +2,21 @@
 
 > Proposal; not implemented. See the [game model index](index.md).
 
-## Today (Java)
+## Current transition
 
-Adding the three TaCZ workbenches took:
+New registered blocks need a [native definition](BLOCK-DEFINITIONS.md),
+[physical settings](BLOCK-PHYSICS.md) and [intrinsic state rules](BLOCK-INTRINSICS.md),
+plus the remaining Java behavior/codec/item bindings and assets. The single-file
+builder below is still proposed.
+
+Before these ownership slices, adding the three TaCZ workbenches took:
 - edits to `Blocks.java`, `BlockTypes.java` (codec), `Items.java`,
   `CreativeModeTabs`, `MenuType`
 - a block class, a menu, a recipe type and a screen
 - per block: blockstate JSON, item JSON, block and item models, loot table,
   recipe and lang key
 
-A plain block still needs five Java registries touched in the right order.
+The remaining Java registries still require ordered bindings during migration.
 
 ## Proposed: one Rust file plus assets
 
