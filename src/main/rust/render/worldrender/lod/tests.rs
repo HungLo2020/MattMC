@@ -2203,7 +2203,11 @@ fn frozen_forward_transparent_cache_keeps_equal_bucket_ordinals_distinct() {
             )
             .unwrap();
     }
-    assert_eq!(2, pass_resources.inner_up.draws.len());
+    // Packed-uniform sets bind only the vertex page and the shared uniform
+    // arena, so equal ordinals of different buckets in one page share a set;
+    // each draw keeps its own vertex base and uniform offset.
+    assert_eq!(1, pass_resources.inner_up.draws.len());
+    assert!(pass_resources.inner_up.draws.keys().all(|key| key.is_page()));
     // A shader toggle rebinds this owner to the HDR G-buffer format: the
     // format-bound pipeline and draw sets are rebuilt rather than failing.
     assert!(pass_resources.inner_up.pipeline.is_some());

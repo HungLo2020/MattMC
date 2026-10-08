@@ -209,6 +209,11 @@ impl VulkanContext {
             supported_features.features.fragment_stores_and_atomics == vk::TRUE;
         let multi_draw_indirect_supported =
             supported_features.features.multi_draw_indirect == vk::TRUE;
+        // Multi-draw records address per-draw data with `firstInstance`
+        // (terrain instance streams, DH draw records); Vulkan requires this
+        // feature for a non-zero first instance in indirect commands.
+        let draw_indirect_first_instance_supported =
+            supported_features.features.draw_indirect_first_instance == vk::TRUE;
         let pipeline_statistics_supported =
             supported_features.features.pipeline_statistics_query == vk::TRUE;
         let provoking_vertex_last =
@@ -216,6 +221,7 @@ impl VulkanContext {
         let core_features = vk::PhysicalDeviceFeatures::default()
             .independent_blend(independent_blend_supported)
             .multi_draw_indirect(multi_draw_indirect_supported)
+            .draw_indirect_first_instance(draw_indirect_first_instance_supported)
             .pipeline_statistics_query(pipeline_statistics_supported)
             .vertex_pipeline_stores_and_atomics(vertex_storage_writes)
             .fragment_stores_and_atomics(fragment_storage_writes);

@@ -317,6 +317,7 @@ impl WorldLodExactAtlasPassResources {
                     uniform_buffer: Some(uniform_buffer),
                     resource_set,
                     last_uniform_bytes: None,
+                    last_used_frame: 0,
                 },
             );
         }
