@@ -559,6 +559,22 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             "DH generic box semantic count exceeds expanded frame bound",
         ));
     }
+    let raw_dh_generic_group_instances = read_slice(
+        request.world_dh_generic_group_instances,
+        true,
+        "DH generic group instances",
+    )?;
+    let retained_dh_generic_boxes = super::dh_generic_groups::expand_dh_generic_groups(
+        raw_dh_generic_group_instances,
+        request.dh_generic_camera,
+    )?;
+    if raw_dh_generic_boxes.len() + retained_dh_generic_boxes.len()
+        > FFI_MAX_BATCH_ITEMS / DH_GENERIC_BOX_FACE_COUNT
+    {
+        return Err(GalError::invalid_argument(
+            "DH generic box semantic count exceeds expanded frame bound",
+        ));
+    }
     // Material quads have their own frame bound (clouds at the default
     // cloud range exceed the generic 65,536 FFI item bound).
     let max_material_quads = crate::render::worldrender::WORLD_MAX_MATERIAL_QUADS;
@@ -596,7 +612,11 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         .len()
         .checked_add(raw_compact_materials.len())
         .and_then(|count| count.checked_add(raw_particles.len()))
-        .and_then(|count| count.checked_add(raw_dh_generic_boxes.len() * DH_GENERIC_BOX_FACE_COUNT))
+        .and_then(|count| {
+            count.checked_add(
+                (raw_dh_generic_boxes.len() + retained_dh_generic_boxes.len()) * DH_GENERIC_BOX_FACE_COUNT,
+            )
+        })
         .ok_or_else(|| {
             GalError::ffi(
                 StatusCode::LengthOverflow,
@@ -1042,7 +1062,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             });
         }
     }
-    let decoded_dh_generic_boxes = decode_dh_generic_box_semantics(raw_dh_generic_boxes)?;
+    let mut decoded_dh_generic_boxes = decode_dh_generic_box_semantics(raw_dh_generic_boxes)?;
+    decoded_dh_generic_boxes.extend(retained_dh_generic_boxes);
     if !raw_particles.is_empty() {
         material_quads = merge_particle_semantics(
             material_quads,

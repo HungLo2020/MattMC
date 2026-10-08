@@ -89,6 +89,10 @@ pub struct FfiWholeFrameSubmitRequest {
     /// ABI v71: raw part poses of the frame's model-rig instances; Rust
     /// composes each rig's hierarchy and expands its part instances.
     pub world_model_rig_poses: FfiSlice<FfiModelRigPose>,
+    /// ABI v72: the frame's active DH generic groups (boxes retained in Rust,
+    /// see `bridge/world/dh_generic_groups.rs`), placed with `dh_generic_camera`.
+    pub world_dh_generic_group_instances: FfiSlice<FfiDhGenericGroupInstance>,
+    pub dh_generic_camera: [f64; 3],
 }
 
 #[repr(C)]

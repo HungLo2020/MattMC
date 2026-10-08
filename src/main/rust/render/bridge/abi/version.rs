@@ -124,7 +124,9 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// longer sends a per-section terrain instance record.
 /// v71 appends model-rig part poses: Java sends one instance per entity model
 /// and Rust expands the registered part hierarchy.
-pub const FFI_ABI_VERSION: u32 = 71;
+/// v72 appends retained DH generic group instances: group boxes are
+/// registered once and each frame sends only the groups' origins.
+pub const FFI_ABI_VERSION: u32 = 72;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

@@ -161,6 +161,17 @@ public class RenderableBoxGroup
 		
 		@Override 
 		public void triggerBoxChange() { this.vertexDataDirty = true; }
+		/**
+		 * Whether the boxes changed since the last call (clears the flag). The
+		 * Rust renderer re-registers a retained group only then, as DH's own
+		 * renderer re-uploaded its instance data.
+		 */
+		public boolean consumeVertexDataDirty()
+		{
+			boolean dirty = this.vertexDataDirty;
+			this.vertexDataDirty = false;
+			return dirty;
+		}
 		
 		@Override
 		public void setActive(boolean active) { this.active = active; }

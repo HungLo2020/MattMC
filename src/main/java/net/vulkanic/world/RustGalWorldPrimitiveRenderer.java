@@ -998,10 +998,13 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static int enqueueDistantHorizonsGenericBoxes(
 		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> boxes
 	) {
-		if (boxes == null || boxes.size() > MAX_DH_GENERIC_BOXES) {
+		// Retained groups (ABI v72) count their registered boxes, not records.
+		int boxCount = boxes instanceof VulkanicGalBridge.PackedDhGenericBoxes packed
+			? packed.totalBoxCount() : boxes == null ? 0 : boxes.size();
+		if (boxes == null || boxCount > MAX_DH_GENERIC_BOXES) {
 			throw new IllegalStateException("Rust DH generic-box bound exceeded " + MAX_DH_GENERIC_BOXES);
 		}
-		if (boxes.isEmpty()) {
+		if (boxCount == 0) {
 			return 0;
 		}
 		synchronized (LOCK) {
@@ -1010,8 +1013,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				|| pendingViewportHeight > MAX_SEMANTIC_VIEWPORT_AXIS) {
 				throw new IllegalStateException("Rust DH generic boxes require a seeded bounded world primitive frame");
 			}
-			long faceCount = (long) boxes.size() * 6L;
-			long pendingFaceCount = (long) PENDING_DH_GENERIC_BOXES.size() * 6L;
+			long faceCount = (long) boxCount * 6L;
+			long pendingFaceCount = (long) PENDING_DH_GENERIC_BOXES.totalBoxCount() * 6L;
 			if (faceCount > Integer.MAX_VALUE
 				|| faceCount + pendingFaceCount > MAX_RUST_WORLD_MATERIAL_QUADS
 					- PENDING_MATERIAL_QUADS.size() - PENDING_PARTICLE_QUADS.size()) {
@@ -1030,9 +1033,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		DeterministicCameraCapture.recordSubmittedWorkIdentity(
 			"distant-horizons-generic-boxes",
-			"rust-vulkan-whole-frame:boxes=" + boxes.size() + ":faces=" + (boxes.size() * 6)
+			"rust-vulkan-whole-frame:boxes=" + boxCount + ":faces=" + (boxCount * 6)
 		);
-		return boxes.size() * 6;
+		return boxCount * 6;
 	}
 
 	/** Records that DH supplied its cloud boxes to the private DH pass. */

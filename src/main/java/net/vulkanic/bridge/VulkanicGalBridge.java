@@ -120,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 71;
+	public static final int ABI_VERSION = 72;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -2337,6 +2337,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 46,
 			encodeDistantHorizonsGenericBoxes(arena, worldDistantHorizonsGenericBoxes),
 			worldDistantHorizonsGenericBoxes.size());
+		if (worldDistantHorizonsGenericBoxes instanceof PackedDhGenericBoxes packed) {
+			packed.writeInstances(arena, request);
+		}
 		writeStaticTerrainShadowCasters(arena, request, staticTerrainShadowCasters, terrainFrameCamera);
 		writeStaticTerrainSections(arena, request, staticTerrainSections, terrainFrameCamera);
 		writeModelRigPoses(arena, request, modelRigPoses == null ? ModelRigPoses.EMPTY : modelRigPoses);
@@ -4200,10 +4203,101 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private float[] floats = new float[0];
 		private int[] ints = new int[0];
 		private int size;
+		// ABI v72 retained groups: one instance per active group (boxes held in Rust).
+		private long[] instanceIds = new long[0];
+		private long[] instanceGenerations = new long[0];
+		private double[] instanceOrigins = new double[0];
+		private int[] instanceLights = new int[0];
+		private int[] instanceFlags = new int[0];
+		private float[] instanceShading = new float[0];
+		private int instanceCount;
+		private int retainedBoxes;
+		private double cameraX;
+		private double cameraY;
+		private double cameraZ;
 
+		/** Boxes sent as records; {@link #totalBoxCount()} includes retained groups. */
 		@Override public int size() { return size; }
 
-		@Override public void clear() { size = 0; }
+		@Override public void clear() {
+			size = 0;
+			instanceCount = 0;
+			retainedBoxes = 0;
+		}
+
+		public int instanceCount() { return instanceCount; }
+
+		/** Record boxes plus the boxes of the frame's retained group instances. */
+		public int totalBoxCount() { return size + retainedBoxes; }
+
+		/** The frame camera the retained group instances are placed against. */
+		public void setCamera(double x, double y, double z) {
+			cameraX = x;
+			cameraY = y;
+			cameraZ = z;
+		}
+
+		/**
+		 * Appends one active retained group, in draw order (its index is the
+		 * render-group ordinal). {@code boxCount} is the registered group's size.
+		 */
+		public void addGroupInstance(long groupId, long generation, double originX, double originY, double originZ,
+				int packedLight, boolean ssaoEnabled, float northShading, float southShading, float eastShading,
+				float westShading, float topShading, float bottomShading, int boxCount) {
+			if (!Double.isFinite(originX) || !Double.isFinite(originY) || !Double.isFinite(originZ)
+				|| !Float.isFinite(northShading) || !Float.isFinite(southShading) || !Float.isFinite(eastShading)
+				|| !Float.isFinite(westShading) || !Float.isFinite(topShading) || !Float.isFinite(bottomShading)
+				|| boxCount < 0 || groupId == 0L || generation == 0L) {
+				throw new IllegalArgumentException("invalid DH generic group instance");
+			}
+			if (instanceCount == instanceIds.length) {
+				int capacity = Math.max(16, instanceCount * 2);
+				instanceIds = Arrays.copyOf(instanceIds, capacity);
+				instanceGenerations = Arrays.copyOf(instanceGenerations, capacity);
+				instanceOrigins = Arrays.copyOf(instanceOrigins, capacity * 3);
+				instanceLights = Arrays.copyOf(instanceLights, capacity);
+				instanceFlags = Arrays.copyOf(instanceFlags, capacity);
+				instanceShading = Arrays.copyOf(instanceShading, capacity * 6);
+			}
+			int i = instanceCount;
+			instanceIds[i] = groupId;
+			instanceGenerations[i] = generation;
+			instanceOrigins[i * 3] = originX; instanceOrigins[i * 3 + 1] = originY; instanceOrigins[i * 3 + 2] = originZ;
+			instanceLights[i] = packedLight;
+			instanceFlags[i] = ssaoEnabled ? 1 : 0;
+			instanceShading[i * 6] = northShading; instanceShading[i * 6 + 1] = southShading;
+			instanceShading[i * 6 + 2] = eastShading; instanceShading[i * 6 + 3] = westShading;
+			instanceShading[i * 6 + 4] = topShading; instanceShading[i * 6 + 5] = bottomShading;
+			instanceCount++;
+			retainedBoxes += boxCount;
+		}
+
+		private MemorySegment encodeInstances(Arena arena) {
+			var layout = Struct.WORLD_DH_GENERIC_GROUP_INSTANCE;
+			MemorySegment records = layout.array(arena, instanceCount);
+			long stride = layout.byteSize();
+			for (int index = 0; index < instanceCount; index++) {
+				long base = index * stride;
+				records.set(ValueLayout.JAVA_LONG, base + layout.offset(0), instanceIds[index]);
+				records.set(ValueLayout.JAVA_LONG, base + layout.offset(1), instanceGenerations[index]);
+				MemorySegment.copy(instanceOrigins, index * 3, records, ValueLayout.JAVA_DOUBLE, base + layout.offset(2), 3);
+				records.set(ValueLayout.JAVA_INT, base + layout.offset(3), instanceLights[index]);
+				records.set(ValueLayout.JAVA_INT, base + layout.offset(4), instanceFlags[index]);
+				MemorySegment.copy(instanceShading, index * 6, records, ValueLayout.JAVA_FLOAT, base + layout.offset(5), 6);
+			}
+			return records;
+		}
+
+		private void writeInstances(Arena arena, MemorySegment request) {
+			if (instanceCount == 0) {
+				return;
+			}
+			Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 51, encodeInstances(arena), instanceCount);
+			long camera = Struct.WHOLE_FRAME_SUBMIT.offset(52);
+			request.set(ValueLayout.JAVA_DOUBLE, camera, cameraX);
+			request.set(ValueLayout.JAVA_DOUBLE, camera + 8, cameraY);
+			request.set(ValueLayout.JAVA_DOUBLE, camera + 16, cameraZ);
+		}
 
 		private void reserve(int added) {
 			int required = size + added;
@@ -4254,12 +4348,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return true;
 		}
 
-		/** Appends every box of {@code other}, which was validated on its own append. */
+		/** Appends every box and group instance of {@code other} (validated on their own append). */
 		public void addAllPacked(PackedDhGenericBoxes other) {
 			reserve(other.size);
 			System.arraycopy(other.floats, 0, floats, size * FLOATS, other.size * FLOATS);
 			System.arraycopy(other.ints, 0, ints, size * INTS, other.size * INTS);
 			size += other.size;
+			if (other.instanceCount > 0) {
+				if (instanceCount > 0 && (cameraX != other.cameraX || cameraY != other.cameraY || cameraZ != other.cameraZ)) {
+					throw new IllegalArgumentException("DH generic group instances of one frame must share its camera");
+				}
+				for (int i = 0; i < other.instanceCount; i++) {
+					addGroupInstance(other.instanceIds[i], other.instanceGenerations[i], other.instanceOrigins[i * 3],
+						other.instanceOrigins[i * 3 + 1], other.instanceOrigins[i * 3 + 2], other.instanceLights[i],
+						other.instanceFlags[i] != 0, other.instanceShading[i * 6], other.instanceShading[i * 6 + 1],
+						other.instanceShading[i * 6 + 2], other.instanceShading[i * 6 + 3],
+						other.instanceShading[i * 6 + 4], other.instanceShading[i * 6 + 5], 0);
+				}
+				retainedBoxes += other.retainedBoxes;
+				setCamera(other.cameraX, other.cameraY, other.cameraZ);
+			}
 		}
 
 		@Override public WorldDistantHorizonsGenericBoxRecord get(int index) {
@@ -6483,6 +6591,47 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Native.modelRigRelease(rigId);
 	}
 
+	/**
+	 * Registers (or replaces) a DH generic box group's boxes in Rust, in the
+	 * group's own coordinates: six doubles (min xyz, max xyz) per box in
+	 * {@code bounds}, with its ARGB color and DH material index.
+	 */
+	public static void setDhGenericGroup(long groupId, long generation, double[] bounds, int[] colors, int[] materials,
+			int count) {
+		if (count < 0 || bounds.length < count * 6L || colors.length < count || materials.length < count) {
+			throw new IllegalArgumentException("DH generic group arrays are not parallel");
+		}
+		var layout = Struct.WORLD_DH_GENERIC_GROUP_BOX;
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment boxes = count == 0 ? MemorySegment.NULL : layout.array(arena, count);
+			long stride = layout.byteSize();
+			for (int index = 0; index < count; index++) {
+				long base = index * stride;
+				MemorySegment.copy(bounds, index * 6, boxes, ValueLayout.JAVA_DOUBLE, base + layout.offset(0), 3);
+				MemorySegment.copy(bounds, index * 6 + 3, boxes, ValueLayout.JAVA_DOUBLE, base + layout.offset(1), 3);
+				boxes.set(ValueLayout.JAVA_INT, base + layout.offset(2), colors[index]);
+				boxes.set(ValueLayout.JAVA_INT, base + layout.offset(3), materials[index]);
+			}
+			int status = Native.dhGenericGroupSet(groupId, generation, boxes, count);
+			if (status != 0) {
+				throw new IllegalStateException("Rust DH generic group " + groupId + " registration rejected with status " + status);
+			}
+		}
+	}
+
+	public static void releaseDhGenericGroup(long groupId) {
+		Native.dhGenericGroupRelease(groupId);
+	}
+
+	public static void clearDhGenericGroups() {
+		Native.dhGenericGroupsClear();
+	}
+
+	/** Whether Rust saw an unknown group generation (cleared on read): re-register every group. */
+	public static boolean takeDhGenericGroupResend() {
+		return Native.dhGenericGroupsTakeResend();
+	}
+
 	/** Immutable semantic section origin; frame camera and Rust matrix lowering remain separate. */
 	public record TerrainSectionPlacement(int x, int y, int z) {
 		public TerrainSectionPlacement {
@@ -7877,6 +8026,48 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle MODEL_RIG_RELEASE = downcall("mattmc_vulkanic_world_model_rig_release",
 			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
 
+		private static final MethodHandle DH_GENERIC_GROUP_SET = downcall("mattmc_vulkanic_dh_generic_group_set",
+			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
+				ValueLayout.JAVA_INT));
+		private static final MethodHandle DH_GENERIC_GROUP_RELEASE = downcall("mattmc_vulkanic_dh_generic_group_release",
+			FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+		private static final MethodHandle DH_GENERIC_GROUPS_CLEAR = downcall("mattmc_vulkanic_dh_generic_groups_clear",
+			FunctionDescriptor.ofVoid());
+		private static final MethodHandle DH_GENERIC_GROUPS_TAKE_RESEND = downcall(
+			"mattmc_vulkanic_dh_generic_groups_take_resend", FunctionDescriptor.of(ValueLayout.JAVA_INT));
+
+		static int dhGenericGroupSet(long id, long generation, MemorySegment boxes, int count) {
+			try {
+				return (int) DH_GENERIC_GROUP_SET.invokeExact(id, generation, boxes, count);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to register a Rust DH generic group", throwable);
+			}
+		}
+
+		static void dhGenericGroupRelease(long id) {
+			try {
+				DH_GENERIC_GROUP_RELEASE.invokeExact(id);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to release a Rust DH generic group", throwable);
+			}
+		}
+
+		static void dhGenericGroupsClear() {
+			try {
+				DH_GENERIC_GROUPS_CLEAR.invokeExact();
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to clear Rust DH generic groups", throwable);
+			}
+		}
+
+		static boolean dhGenericGroupsTakeResend() {
+			try {
+				return (int) DH_GENERIC_GROUPS_TAKE_RESEND.invokeExact() != 0;
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to read the Rust DH generic resend flag", throwable);
+			}
+		}
+
 		static int modelRigRegister(long rigId, MemorySegment nodes, int count) {
 			try {
 				return (int) MODEL_RIG_REGISTER.invokeExact(rigId, nodes, count);
@@ -8014,6 +8205,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			STATIC_TERRAIN_SECTION(113),
 			MODEL_RIG_NODE(114),
 			MODEL_RIG_POSE(115),
+			WORLD_DH_GENERIC_GROUP_BOX(116),
+			WORLD_DH_GENERIC_GROUP_INSTANCE(117),
 			WORLD_CRACK_QUAD_REQUEST(51),
 			WORLD_BORDER_QUAD_REQUEST(52),
 			WHOLE_FRAME_SUBMIT(53),

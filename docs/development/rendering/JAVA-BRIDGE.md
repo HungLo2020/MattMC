@@ -266,6 +266,11 @@ also share persistent instance arrays. This was the default at the earlier
   queued submission copying on the caller before return; preserve both when
   changing queue depth. The new packed-box tests assert ABI equality and value
   validation, not ring-wraparound or queue-lifetime behavior.
+  Since ABI 72 the same object also carries the frame's retained-group
+  instances and camera (`addGroupInstance`, `setCamera`; fields 51 and 52 of
+  the whole-frame request). The group boxes themselves are registered once,
+  through `VulkanicGalBridge.setDhGenericGroup`, and placed by Rust. See
+  [Render Architecture](RENDER-ARCHITECTURE.md).
   [Pending ring](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L467-L483)
   · [Queue drain](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java#L745-L761)
 - Non-queued context-registry entry points join pending work first (`with_registry*`),

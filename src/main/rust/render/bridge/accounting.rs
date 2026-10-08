@@ -291,6 +291,12 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
                 .count
                 .saturating_mul(size_of::<FfiModelRigPose>() as u64),
         )
+        .saturating_add(
+            request
+                .world_dh_generic_group_instances
+                .count
+                .saturating_mul(size_of::<FfiDhGenericGroupInstance>() as u64),
+        )
         .saturating_add(request.post_effect_id.len)
 }
 

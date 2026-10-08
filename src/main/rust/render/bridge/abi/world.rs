@@ -530,6 +530,33 @@ pub struct FfiModelRigPose {
     pub flags: u32,
 }
 
+/// ABI v72: one box of a retained DH generic group, in the group's own
+/// coordinates (DH `DhApiRenderableBox`). Sent only when the group changes.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiDhGenericGroupBox {
+    pub min: [f64; 3],
+    pub max: [f64; 3],
+    pub color_argb: u32,
+    /// DH `EDhApiBlockMaterial` index.
+    pub material: u32,
+}
+
+/// ABI v72: one active DH generic group this frame, in draw order: the
+/// retained group's identity plus its per-frame origin, light and shading.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiDhGenericGroupInstance {
+    pub group_id: u64,
+    pub generation: u64,
+    pub origin: [f64; 3],
+    pub packed_light: u32,
+    /// Bit 0: SSAO.
+    pub flags: u32,
+    /// North, south, east, west, top, bottom directional multipliers.
+    pub shading: [f32; 6],
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiStaticTerrainSection {

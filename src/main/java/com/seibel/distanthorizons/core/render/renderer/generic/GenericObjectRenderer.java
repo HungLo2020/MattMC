@@ -86,6 +86,18 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	private final VulkanicGalBridge.PackedDhGenericBoxes rustSemanticBoxes =
 		new VulkanicGalBridge.PackedDhGenericBoxes();
 	private final ArrayList<RenderableBoxGroup> rustSemanticGroupsToPostRender = new ArrayList<>();
+	/**
+	 * Groups whose boxes Rust retains (bridge/world/dh_generic_groups.rs):
+	 * id -> {generation, box count}. A group is re-registered only when DH
+	 * marks it changed (triggerBoxChange) or its box count changes, as DH's
+	 * own renderer re-uploaded instance data; each frame sends only origins.
+	 */
+	private final java.util.HashMap<Long, long[]> rustRetainedGroups = new java.util.HashMap<>();
+	private static final java.util.concurrent.atomic.AtomicLong RUST_GROUP_GENERATIONS =
+		new java.util.concurrent.atomic.AtomicLong();
+	private double[] rustGroupBounds = new double[0];
+	private int[] rustGroupColors = new int[0];
+	private int[] rustGroupMaterials = new int[0];
 	
 	
 	
@@ -188,6 +200,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	public IDhApiRenderableBoxGroup remove(long id) { return this.boxGroupById.remove(id); }
 	
 	public void clear() {
+		for (long id : this.rustRetainedGroups.keySet())
+		{
+			VulkanicGalBridge.releaseDhGenericGroup(id);
+		}
+		this.rustRetainedGroups.clear();
 		this.boxGroupById.clear();
 		this.rustSemanticDiagnosticFixture = null;
 		this.rustSemanticGroupIds.clear();
@@ -238,6 +255,20 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		ids.sort(Long::compare);
 		VulkanicGalBridge.PackedDhGenericBoxes semanticBoxes = this.rustSemanticBoxes;
 		semanticBoxes.clear();
+		semanticBoxes.setCamera(camPos.x, camPos.y, camPos.z);
+		if (VulkanicGalBridge.takeDhGenericGroupResend())
+		{
+			// A frame referenced a registration Rust never received: re-register all.
+			this.rustRetainedGroups.clear();
+		}
+		this.rustRetainedGroups.keySet().removeIf(id -> {
+			if (this.boxGroupById.containsKey(id))
+			{
+				return false;
+			}
+			VulkanicGalBridge.releaseDhGenericGroup(id);
+			return true;
+		});
 		ArrayList<RenderableBoxGroup> groupsToPostRender = this.rustSemanticGroupsToPostRender;
 		groupsToPostRender.clear();
 		int activeGroups = 0;
@@ -269,7 +300,6 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 					continue;
 				}
 				boolean cloudGroup = "Clouds".equals(boxGroup.resourceLocationPath);
-				int groupBoxStart = semanticBoxes.size();
 
 				DhApiVec3d origin = boxGroup.getOriginBlockPos();
 				DhApiRenderableBoxGroupShading shading = boxGroup.shading;
@@ -277,54 +307,40 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 				{
 					shading = DhApiRenderableBoxGroupShading.getUnshaded();
 				}
-				for (int index = 0; index < boxGroup.size(); index++)
+				if (!finite(shading.north) || !finite(shading.south) || !finite(shading.east)
+					|| !finite(shading.west) || !finite(shading.top) || !finite(shading.bottom)
+					|| !finite(origin.x) || !finite(origin.y) || !finite(origin.z))
 				{
-					DhApiRenderableBox box;
-					try
-					{
-						box = boxGroup.get(index);
-					}
-					catch (IndexOutOfBoundsException concurrentMutation)
-					{
-						return false;
-					}
-					if (box == null || box.minPos == null || box.maxPos == null || box.color == null)
-					{
-						return false;
-					}
-					if (!finite(box.minPos.x) || !finite(box.minPos.y) || !finite(box.minPos.z)
-						|| !finite(box.maxPos.x) || !finite(box.maxPos.y) || !finite(box.maxPos.z)
-						|| box.minPos.x > box.maxPos.x || box.minPos.y > box.maxPos.y || box.minPos.z > box.maxPos.z
-						|| semanticBoxes.size() >= 10_000)
+					return false;
+				}
+				int boxCount = boxGroup.size();
+				if (semanticBoxes.totalBoxCount() + boxCount > 10_000)
+				{
+					return false;
+				}
+				long[] retained = this.rustRetainedGroups.get(id);
+				// Consume the flag every frame so a change is seen exactly once.
+				boolean changed = boxGroup.consumeVertexDataDirty();
+				if (changed || retained == null || retained[1] != boxCount)
+				{
+					retained = this.registerRustGroup(id, boxGroup, boxCount);
+					if (retained == null)
 					{
 						return false;
-					}
-					if (!finite(shading.north) || !finite(shading.south) || !finite(shading.east)
-						|| !finite(shading.west) || !finite(shading.top) || !finite(shading.bottom))
-					{
-						return false;
-					}
-					semanticBoxes.addBox(
-						(float)(box.minPos.x + origin.x - camPos.x),
-						(float)(box.minPos.y + origin.y - camPos.y),
-						(float)(box.minPos.z + origin.z - camPos.z),
-						(float)(box.maxPos.x + origin.x - camPos.x),
-						(float)(box.maxPos.y + origin.y - camPos.y),
-						(float)(box.maxPos.z + origin.z - camPos.z),
-						box.color.getRGB(), LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight),
-						shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom,
-						boxGroup.ssaoEnabled, box.material & 0xff, (activeGroups - 1) & 0xffff
-					);
-					if (boxGroup.ssaoEnabled)
-					{
-						ssaoBoxes++;
-					}
-					else
-					{
-						nonSsaoBoxes++;
 					}
 				}
-				if (cloudGroup && semanticBoxes.size() > groupBoxStart)
+				semanticBoxes.addGroupInstance(id, retained[0], origin.x, origin.y, origin.z,
+					LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight), boxGroup.ssaoEnabled,
+					shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom, boxCount);
+				if (boxGroup.ssaoEnabled)
+				{
+					ssaoBoxes += boxCount;
+				}
+				else
+				{
+					nonSsaoBoxes += boxCount;
+				}
+				if (cloudGroup && boxCount > 0)
 				{
 					cloudGroups++;
 				}
@@ -356,8 +372,8 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 			+ ":active=" + activeGroups
 			+ ":cloudDelegated=0"
 			+ ":cloudPrivate=" + cloudGroups
-			+ ":boxes=" + semanticBoxes.size()
-			+ ":faces=" + (semanticBoxes.size() * 6)
+			+ ":boxes=" + semanticBoxes.totalBoxCount()
+			+ ":faces=" + (semanticBoxes.totalBoxCount() * 6)
 			+ ":ssaoBoxes=" + ssaoBoxes
 			+ ":nonSsaoBoxes=" + nonSsaoBoxes;
 		// This receipt records collector execution even when the current saved
@@ -365,12 +381,62 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		// for the stronger positive "boxes actually copied" signal.
 		DeterministicCameraCapture.recordSubmittedWorkIdentity("distant-horizons-generic-semantics", identity);
 		GraphicsFrameBenchmark.recordSubmittedWorkIdentity("distant-horizons-generic-semantics", identity);
-		if (!semanticBoxes.isEmpty())
+		if (semanticBoxes.totalBoxCount() > 0)
 		{
 			DeterministicCameraCapture.recordSubmittedWorkIdentity("distant-horizons-generic-boxes", identity);
 			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("distant-horizons-generic-boxes", identity);
 		}
 		return true;
+	}
+
+	/**
+	 * Registers {@code boxGroup}'s boxes with Rust in group coordinates under a
+	 * new generation. Returns {generation, box count}, or null when a box is
+	 * missing, non-finite or inverted (the frame then rejects the Rust route).
+	 */
+	private long[] registerRustGroup(long id, RenderableBoxGroup boxGroup, int boxCount)
+	{
+		if (this.rustGroupColors.length < boxCount)
+		{
+			int capacity = Math.max(boxCount, this.rustGroupColors.length * 2);
+			this.rustGroupBounds = new double[capacity * 6];
+			this.rustGroupColors = new int[capacity];
+			this.rustGroupMaterials = new int[capacity];
+		}
+		for (int index = 0; index < boxCount; index++)
+		{
+			DhApiRenderableBox box;
+			try
+			{
+				box = boxGroup.get(index);
+			}
+			catch (IndexOutOfBoundsException concurrentMutation)
+			{
+				return null;
+			}
+			if (box == null || box.minPos == null || box.maxPos == null || box.color == null
+				|| !finite(box.minPos.x) || !finite(box.minPos.y) || !finite(box.minPos.z)
+				|| !finite(box.maxPos.x) || !finite(box.maxPos.y) || !finite(box.maxPos.z)
+				|| box.minPos.x > box.maxPos.x || box.minPos.y > box.maxPos.y || box.minPos.z > box.maxPos.z)
+			{
+				return null;
+			}
+			int b = index * 6;
+			this.rustGroupBounds[b] = box.minPos.x;
+			this.rustGroupBounds[b + 1] = box.minPos.y;
+			this.rustGroupBounds[b + 2] = box.minPos.z;
+			this.rustGroupBounds[b + 3] = box.maxPos.x;
+			this.rustGroupBounds[b + 4] = box.maxPos.y;
+			this.rustGroupBounds[b + 5] = box.maxPos.z;
+			this.rustGroupColors[index] = box.color.getRGB();
+			this.rustGroupMaterials[index] = box.material & 0xff;
+		}
+		long generation = RUST_GROUP_GENERATIONS.incrementAndGet();
+		VulkanicGalBridge.setDhGenericGroup(id, generation, this.rustGroupBounds, this.rustGroupColors,
+			this.rustGroupMaterials, boxCount);
+		long[] retained = { generation, boxCount };
+		this.rustRetainedGroups.put(id, retained);
+		return retained;
 	}
 
 	private void ensureRustSemanticDiagnosticFixture(Vec3d camPos)

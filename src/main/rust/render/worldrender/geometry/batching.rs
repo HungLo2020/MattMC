@@ -2172,33 +2172,57 @@ pub(in crate::render::worldrender) fn packed_dh_generic_box_uniforms_for_batch(
         push_f32(&mut out, value);
     }
     // 64 bytes per box: min.xyz,0, max.xyz,0, six shaded face colors, light, 0.
+    // Boxes of one group share color and shading (clouds: thousands per
+    // frame), so the six shaded face colors are memoized on the last pair.
+    let mut memo: Option<(u32, [u32; 6], [u32; 6])> = None;
     for index in &batch.indices {
         let item = &frame.dh_generic_boxes[*index];
-        let mut block = [0u8; 64];
-        let mut words = block.chunks_exact_mut(4);
-        let mut put = |bits: u32| words.next().expect("64-byte box block").copy_from_slice(&bits.to_le_bytes());
-        for value in [item.min[0], item.min[1], item.min[2], 0.0, item.max[0], item.max[1], item.max[2], 0.0] {
-            put(f32::to_bits(value));
+        let shading_bits = item.shading.map(f32::to_bits);
+        let faces = match memo {
+            Some((color, bits, faces)) if color == item.color_argb && bits == shading_bits => faces,
+            _ => {
+                let faces = [
+                    item.shading[0],
+                    item.shading[1],
+                    item.shading[3],
+                    item.shading[2],
+                    item.shading[5],
+                    item.shading[4],
+                ]
+                .map(|shading| {
+                    let shade = |component: u32| -> u32 {
+                        ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
+                    };
+                    (item.color_argb & 0xff00_0000)
+                        | (shade((item.color_argb >> 16) & 0xff) << 16)
+                        | (shade((item.color_argb >> 8) & 0xff) << 8)
+                        | shade(item.color_argb & 0xff)
+                });
+                memo = Some((item.color_argb, shading_bits, faces));
+                faces
+            }
+        };
+        let words: [u32; 16] = [
+            item.min[0].to_bits(),
+            item.min[1].to_bits(),
+            item.min[2].to_bits(),
+            0,
+            item.max[0].to_bits(),
+            item.max[1].to_bits(),
+            item.max[2].to_bits(),
+            0,
+            faces[0],
+            faces[1],
+            faces[2],
+            faces[3],
+            faces[4],
+            faces[5],
+            item.packed_light,
+            0,
+        ];
+        for word in words {
+            out.extend_from_slice(&word.to_le_bytes());
         }
-        for shading in [
-            item.shading[0],
-            item.shading[1],
-            item.shading[3],
-            item.shading[2],
-            item.shading[5],
-            item.shading[4],
-        ] {
-            let shade = |component: u32| -> u32 {
-                ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
-            };
-            put((item.color_argb & 0xff00_0000)
-                | (shade((item.color_argb >> 16) & 0xff) << 16)
-                | (shade((item.color_argb >> 8) & 0xff) << 8)
-                | shade(item.color_argb & 0xff));
-        }
-        put(item.packed_light);
-        put(0);
-        out.extend_from_slice(&block);
     }
     out
 }

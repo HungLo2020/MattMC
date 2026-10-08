@@ -418,6 +418,17 @@ not a new late-translucent-order assertion.
 
 Generic boxes group by four `(SSAO, translucency)` key classes and pack fixed
 uniform blocks; Java uses the [packed-buffer transport](JAVA-BRIDGE.md).
+DH generic groups (clouds, beacons, API objects) are retained in Rust
+([`bridge/world/dh_generic_groups.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/dh_generic_groups.rs), ABI 72):
+- `GenericObjectRenderer` registers a group's boxes, in group coordinates,
+  only when DH marks it changed (`triggerBoxChange`), its box count changes,
+  or it is new. That's the same contract DH's own renderer used for re-uploads.
+- Each frame then sends one instance per active group (origin, light, shading,
+  SSAO). The whole-frame decode expands them into the frame's camera-relative
+  boxes as `(box + origin) - camera` in f64. Clouds, which only move their
+  origin, no longer resend about 2,600 boxes per frame.
+- An instance whose group generation Rust lacks is skipped and raises a resend
+  flag. Java then re-registers every group on the next frame.
 [Ordinary DH source pack sets](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/lod/source.rs#L741-L761)
 retire only when their recorded resource generations bind a released role.
 Their draw sets, pipelines and frame rings stay intact. The [shared teardown](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/source/programs/teardown.rs#L186-L217)

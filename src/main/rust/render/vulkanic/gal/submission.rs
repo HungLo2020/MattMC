@@ -353,14 +353,18 @@ impl VulkanicGal {
                 self.samplers.get_mut_record(handle)?.last_submission = Some(id)
             }
             Some(HandleKind::CombinedTextureSampler) => {
-                let pair = self.combined_texture_samplers.get(handle)?.desc.clone();
+                // Copy the two handles; cloning the descriptor allocated its label.
+                let pair = {
+                    let desc = &self.combined_texture_samplers.get(handle)?.desc;
+                    (desc.texture_view, desc.sampler)
+                };
                 self.combined_texture_samplers
                     .get_mut_record(handle)?
                     .last_submission = Some(id);
                 self.texture_views
-                    .get_mut_record(pair.texture_view)?
+                    .get_mut_record(pair.0)?
                     .last_submission = Some(id);
-                self.samplers.get_mut_record(pair.sampler)?.last_submission = Some(id);
+                self.samplers.get_mut_record(pair.1)?.last_submission = Some(id);
             }
             Some(HandleKind::ShaderModule) => {
                 self.shaders.get_mut_record(handle)?.last_submission = Some(id)

@@ -1284,7 +1284,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
         texture.field_offsets[15]
     );
-    assert_eq!(51, whole_frame.field_count);
+    assert_eq!(53, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
         whole_frame.field_offsets[45]
@@ -1316,6 +1316,16 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
     );
     assert_eq!(size_of::<FfiModelRigNode>(), 24);
     assert_eq!(size_of::<FfiModelRigPose>(), 40);
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_dh_generic_group_instances) as u32,
+        whole_frame.field_offsets[51]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, dh_generic_camera) as u32,
+        whole_frame.field_offsets[52]
+    );
+    assert_eq!(size_of::<FfiDhGenericGroupBox>(), 56);
+    assert_eq!(size_of::<FfiDhGenericGroupInstance>(), 72);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
         whole_frame.field_offsets[37]
@@ -2257,6 +2267,11 @@ fn whole_frame_request(
             ptr: std::ptr::null(),
             count: 0,
         },
+        world_dh_generic_group_instances: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        dh_generic_camera: [0.0; 3],
         world_model_rig_poses: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,

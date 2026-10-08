@@ -781,7 +781,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_static_terrain_shadow_casters,
                 static_terrain_camera,
                 world_static_terrain_sections,
-                world_model_rig_poses
+                world_model_rig_poses,
+                world_dh_generic_group_instances,
+                dh_generic_camera
             ]
         ),
         89 => layout!(
@@ -1637,6 +1639,12 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         ),
         114 => layout!(114, FfiModelRigNode, [parent, flags, mesh_key, mesh_generation]),
         115 => layout!(115, FfiModelRigPose, [offset, rotation, scale, flags]),
+        116 => layout!(116, FfiDhGenericGroupBox, [min, max, color_argb, material]),
+        117 => layout!(
+            117,
+            FfiDhGenericGroupInstance,
+            [group_id, generation, origin, packed_light, flags, shading]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,

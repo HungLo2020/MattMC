@@ -7,6 +7,7 @@ mod meshes;
 mod first_person;
 mod lod;
 mod dh_boxes;
+mod dh_generic_groups;
 mod environment;
 mod assets;
 mod background;
