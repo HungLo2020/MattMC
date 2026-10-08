@@ -1140,11 +1140,10 @@ public final class RustGalTerrainRenderer {
 	}
 
 	/**
-	 * Rust owns opaque/cutout geometry after its explicit asset update is
-	 * accepted. Keep the section's generation and draw metadata for the visible
-	 * semantic callsite, but discard Java's duplicate vertex/index payload. A
-	 * translucent section is deliberately excluded because its copied CPU index
-	 * stream is required for the explicit camera-relative sort producer.
+	 * Rust owns section geometry after its explicit asset update is accepted
+	 * (translucent order included: Rust re-sorts per frame). Keep the section's
+	 * generation and draw metadata for the visible semantic callsite, but
+	 * discard Java's duplicate vertex/index payload.
 	 */
 	public static void releaseUploadedStaticTerrainPayload(long meshKey, long meshGeneration) {
 		TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(meshKey);
@@ -1153,8 +1152,7 @@ public final class RustGalTerrainRenderer {
 		}
 		LayerKey layerKey = identity.layerKey();
 		TerrainSectionAsset asset = identity.asset();
-		if (asset.meshGeneration() != meshGeneration || layerKey.layer() == ChunkSectionLayer.TRANSLUCENT
-			|| asset.asset() == null) {
+		if (asset.meshGeneration() != meshGeneration || asset.asset() == null) {
 			return;
 		}
 		TerrainSectionAsset released = asset.releaseCpuPayload();
@@ -2106,8 +2104,7 @@ public final class RustGalTerrainRenderer {
 				boolean stagingReload = resourceReloadStaging;
 				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(
 					asset.asset(), stagingReload ? List.of()
-						: atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute())),
-					layer == ChunkSectionLayer.TRANSLUCENT
+						: atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute()))
 				);
 				if (stagingReload) {
 					RESOURCE_RELOAD_SECTION_ASSETS.put(
@@ -2148,7 +2145,7 @@ public final class RustGalTerrainRenderer {
 					output.render.getOriginY() + 8.0D,
 					output.render.getOriginZ() + 8.0D,
 					layer == ChunkSectionLayer.TRANSLUCENT ? Math.max(0, asset.indexCount() / 6) : 0,
-						layer == ChunkSectionLayer.TRANSLUCENT ? sortedIndexHash(asset.asset().indexBytes()) : 0L,
+						layer == ChunkSectionLayer.TRANSLUCENT ? asset.translucentIndexHash() : 0L,
 						layer == ChunkSectionLayer.TRANSLUCENT ? asset.initialSortGeneration() : 0L,
 					0
 					);
@@ -2350,6 +2347,8 @@ public final class RustGalTerrainRenderer {
 			orderedTranslucentMesh == null ? "" : orderedTranslucentMesh.accountingReason(),
 			orderedTranslucentMesh == null ? 0 : orderedTranslucentMesh.unsupportedPrimitiveCount(),
 			translucentSourceSegmentQuadCounts,
+			layer == ChunkSectionLayer.TRANSLUCENT ? indexBytes.length : 0,
+			layer == ChunkSectionLayer.TRANSLUCENT ? assembled.retainedHash() : 0L,
 			new VulkanicGalBridge.WorldMeshAssetRecord(
 				meshKey,
 				generation,
@@ -3282,34 +3281,21 @@ public final class RustGalTerrainRenderer {
 
 
 
-		private static RustGalWorldPrimitiveRenderer.StaticTerrainSortedIndexSnapshot sortedIndexSnapshot(long meshKey) {
-			return RustGalWorldPrimitiveRenderer.staticTerrainSortedIndexSnapshot(meshKey);
-		}
-
 		private static TranslucentSortSnapshot currentTranslucentSortSnapshot(TerrainSectionAsset asset) {
 			if (asset == null) {
 				return null;
 			}
-			RustGalWorldPrimitiveRenderer.StaticTerrainSortedIndexSnapshot sortedIndex = sortedIndexSnapshot(asset.meshKey());
-			if (sortedIndex != null) {
-				return new TranslucentSortSnapshot(
-					sortedIndex.meshGeneration(),
-					sortedIndex.indexGeneration(),
-					sortedIndex.indexType(),
-					sortedIndex.indexBytes(),
-					sortedIndex.indexHash()
-				);
-			}
-			byte[] indexBytes = asset.asset().indexBytes();
-			if (asset.initialSortGeneration() <= 0L || indexBytes.length == 0) {
+			// Rust orders translucent geometry per frame from this initial
+			// order; the payload itself may already be released from Java.
+			if (asset.initialSortGeneration() <= 0L || asset.translucentIndexBytes() == 0) {
 				return null;
 			}
 			return new TranslucentSortSnapshot(
 				asset.meshGeneration(),
 				asset.initialSortGeneration(),
 				asset.indexType(),
-				indexBytes.length,
-				sortedIndexHash(indexBytes)
+				asset.translucentIndexBytes(),
+				asset.translucentIndexHash()
 			);
 		}
 
@@ -4535,6 +4521,8 @@ public final class RustGalTerrainRenderer {
 		String translucentPrimitiveAccountingReason,
 		int unsupportedPrimitiveCount,
 		int[] translucentSourceSegmentQuadCounts,
+		int translucentIndexBytes,
+		long translucentIndexHash,
 			VulkanicGalBridge.WorldMeshAssetRecord asset
 		) {
 		TerrainSectionAsset releaseCpuPayload() {
@@ -4549,7 +4537,8 @@ public final class RustGalTerrainRenderer {
 				separateAoVertexCount, minAo, maxAo, positiveYNormalSections,
 				negativeYNormalSections, horizontalNormalSections, sectionOriginX,
 				sectionOriginY, sectionOriginZ, translucentSortType, translucentPrimitiveAccountingReason,
-				unsupportedPrimitiveCount, translucentSourceSegmentQuadCounts, null
+				unsupportedPrimitiveCount, translucentSourceSegmentQuadCounts, translucentIndexBytes,
+				translucentIndexHash, null
 			);
 		}
 	}

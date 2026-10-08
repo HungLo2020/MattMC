@@ -20,6 +20,7 @@ options. The DH radius stays the world's own unless --dh-radius is given.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import os
 import re
@@ -76,8 +77,14 @@ def capture_command(artifact_root: Path, scenario: str, shaders: bool, dh: bool)
 def scan_logs(artifact_root: Path) -> dict[str, int]:
     patterns = {**FAILURE_PATTERNS, **REPORT_PATTERNS}
     counts = {name: 0 for name in patterns}
-    for log in artifact_root.glob("**/current-rust-*/capture/run-01/capture/runClient_*.log"):
-        text = log.read_text(errors="replace")
+    # Large client logs are kept gzipped; scan both forms.
+    for log in artifact_root.glob("**/current-rust-*/capture/run-01/capture/runClient_*.log*"):
+        if log.suffix == ".gz":
+            text = gzip.decompress(log.read_bytes()).decode(errors="replace")
+        elif log.suffix == ".log":
+            text = log.read_text(errors="replace")
+        else:
+            continue
         for name, pattern in patterns.items():
             counts[name] += len(pattern.findall(text))
     return counts

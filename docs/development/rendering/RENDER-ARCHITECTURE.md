@@ -229,7 +229,8 @@ move world/entity semantics or resource-reload publication into the graph.
     or inspect the unbundled comparisons.
   - Java receives encoded vertices, copied index bytes/range records and a
     receipt, and still publishes the asset (residency, upload acknowledgement,
-    reload staging). It supplies sorter output, atlas identity and water sprite
+    reload staging), then drops the payload once Rust acknowledges the upload
+    (translucent included). It supplies sorter output, atlas identity and water sprite
     rectangles; native assembly performs the water/material classification and
     rewrites. This supersedes the `7a6009f8` Java water/index assembly boundary.
     It does not eliminate all copies. [Intake handoff](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/java/net/vulkanic/world/RustTerrainIntake.java).
@@ -311,9 +312,12 @@ retains bounded capacity, frame epochs and completion-gated reuse. Changing
 record packing must preserve descriptor alignment in mixed direct/multi-draw
 allocations as well as exact staged bytes and indirect instance indexing.
 
-Keep upload data and its owner retryable until submission succeeds. Mesh and
-sorted-index replacements must validate and submit before publishing the new
-CPU state or retiring old assets. Atlas recovery replays accepted updates in
+Keep upload data and its owner retryable until submission succeeds. Mesh
+replacements must validate and submit before publishing the new CPU state or
+retiring old assets. Java drops every static-terrain vertex/index payload
+(translucent included) once Rust acknowledges its upload; Rust orders
+translucent geometry per frame from the build order, so Java sends no sorted
+indices (the bridge's sorted-index list is always empty). Atlas recovery replays accepted updates in
 order; rejected uploads must not advance animation clocks or lose pending work.
 
 DH asset preflight runs after the real quadtree selects visible generations.

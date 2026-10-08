@@ -690,8 +690,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<StaticTerrainMeshResidency> ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY =
 		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
-	private static final Map<Long, VulkanicGalBridge.WorldMeshSortedIndexRecord> WORLD_MESH_SORTED_INDICES = new LinkedHashMap<>();
-	private static final Set<Long> DIRTY_WORLD_MESH_SORTED_INDICES = new LinkedHashSet<>();
 	/** Explicit Rust resource retirements awaiting the next immutable mesh update. */
 	private static final Map<Long, Long> PENDING_WORLD_MESH_RETIREMENTS = new LinkedHashMap<>();
 	private static final MembershipJournaledMap<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES =
@@ -1787,7 +1785,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			if (bridge == null || (ORB_SEMANTICS.dirtyAssets().isEmpty() && DIRTY_WORLD_MESH_ASSETS.isEmpty()
 				&& DIRTY_WORLD_MESH_TEXTURES.isEmpty()
-				&& DIRTY_WORLD_MESH_SORTED_INDICES.isEmpty()
 				&& PENDING_WORLD_MESH_RETIREMENTS.isEmpty())) {
 				return null;
 			}
@@ -1802,7 +1799,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				);
 				List<VulkanicGalBridge.WorldMeshTextureAssetRecord> dirtyTextures = dirtyWorldMeshTextureAssetsLocked();
 				var dirtyOrbs = ORB_SEMANTICS.dirtyAssets();
-				List<VulkanicGalBridge.WorldMeshSortedIndexRecord> dirtySortedIndices = dirtyWorldMeshSortedIndicesLocked(dirtyMeshes);
+				// Rust orders translucent geometry per frame; Java never sends sorted indices.
+				List<VulkanicGalBridge.WorldMeshSortedIndexRecord> dirtySortedIndices = List.of();
 				List<VulkanicGalBridge.WorldMeshAssetRetirementRecord> retirements = pendingWorldMeshRetirementsLocked(
 					MAX_WORLD_MESH_RETIREMENTS_PER_UPLOAD,
 					protectedGenerations
@@ -1831,9 +1829,6 @@ public final class RustGalWorldPrimitiveRenderer {
 						}
 						DIRTY_WORLD_MESH_ASSETS.remove(mesh.meshKey());
 						releaseUploadedStaticTerrainPayloadLocked(mesh.meshKey(), mesh.meshGeneration());
-					}
-					for (VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex : dirtySortedIndices) {
-						DIRTY_WORLD_MESH_SORTED_INDICES.remove(sortedIndex.meshKey());
 					}
 					for (VulkanicGalBridge.WorldMeshAssetRetirementRecord retirement : retirements) {
 						PENDING_WORLD_MESH_RETIREMENTS.remove(retirement.meshKey(), retirement.meshGeneration());
@@ -4215,8 +4210,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			for (Long key : WORLD_MESH_ASSETS.keysAddedSince(checkpoint.meshAssets)) {
 				if (WORLD_MESH_ASSETS.remove(key) == null) continue;
 				DIRTY_WORLD_MESH_ASSETS.remove(key);
-				WORLD_MESH_SORTED_INDICES.remove(key);
-				DIRTY_WORLD_MESH_SORTED_INDICES.remove(key);
 			}
 			for (Integer key : WORLD_MESH_TEXTURES.keysAddedSince(checkpoint.textureAssets)) {
 				if (WORLD_MESH_TEXTURES.remove(key) == null) continue;
@@ -10637,8 +10630,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			WORLD_MESH_ASSETS.remove(retirement.meshKey());
 			DIRTY_WORLD_MESH_ASSETS.remove(retirement.meshKey());
-			WORLD_MESH_SORTED_INDICES.remove(retirement.meshKey());
-			DIRTY_WORLD_MESH_SORTED_INDICES.remove(retirement.meshKey());
 			Long uploadedGeneration = UPLOADED_WORLD_MESH_GENERATIONS.remove(retirement.meshKey());
 			worldMeshUploadWithdrawals++;
 			if (uploadedGeneration != null && uploadedGeneration.longValue() == retirement.meshGeneration()) {
@@ -10651,23 +10642,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	public static void registerStaticTerrainMeshAsset(
-		VulkanicGalBridge.WorldMeshAssetRecord asset,
-		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures
-	) {
-		registerStaticTerrainMeshAsset(asset, textures, false);
-	}
-
 	/**
-	 * Registers a copied static-terrain asset.  Translucent meshes retain their
-	 * CPU index payload because camera-relative sorting may explicitly replace
-	 * it later; opaque and cutout meshes are released from Java immediately
-	 * after Rust acknowledges their upload.
+	 * Registers a copied static-terrain asset. Java's vertex/index payload is
+	 * released as soon as Rust acknowledges its upload.
 	 */
 	public static void registerStaticTerrainMeshAsset(
 		VulkanicGalBridge.WorldMeshAssetRecord asset,
-		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures,
-		boolean retainCpuPayloadForDynamicSort
+		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures
 	) {
 		 synchronized (LOCK) {
 			validateWorldMeshIdentity(asset, "static terrain");
@@ -10718,7 +10699,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				// sameMeshPayload caches sameStaticTerrainPayload(previous, asset),
 				// including its potentially large vertex and index comparison.
 				sameMeshPayload ? previous.meshGeneration() : asset.meshGeneration(),
-				textureIds(asset), retainCpuPayloadForDynamicSort
+				textureIds(asset)
 			));
 			PENDING_WORLD_MESH_RETIREMENTS.remove(asset.meshKey());
 			if (sameMeshPayload) {
@@ -10728,8 +10709,6 @@ public final class RustGalWorldPrimitiveRenderer {
 				return;
 				}
 				WORLD_MESH_ASSETS.put(asset.meshKey(), asset);
-				WORLD_MESH_SORTED_INDICES.remove(asset.meshKey());
-				DIRTY_WORLD_MESH_SORTED_INDICES.remove(asset.meshKey());
 				DIRTY_WORLD_MESH_ASSETS.add(asset.meshKey());
 			markWorldMeshAssetsChangedLocked();
 			String sourceSemantics = selectedSourceDiagnosticsEnabled()
@@ -10900,23 +10879,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	public static StaticTerrainSortedIndexSnapshot staticTerrainSortedIndexSnapshot(long meshKey) {
-		synchronized (LOCK) {
-			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
-			if (sortedIndex == null) {
-				return null;
-			}
-			byte[] indexBytes = sortedIndex.indexBytes();
-			return new StaticTerrainSortedIndexSnapshot(
-				sortedIndex.meshKey(),
-				sortedIndex.meshGeneration(),
-				sortedIndex.indexGeneration(),
-				sortedIndex.indexType(),
-				indexBytes.length,
-				RustGalTerrainRenderer.sortedIndexHash(indexBytes)
-			);
-		}
-	}
 
 	public static void removeStaticTerrainMeshAsset(long meshKey) {
 		synchronized (LOCK) {
@@ -10935,8 +10897,6 @@ public final class RustGalWorldPrimitiveRenderer {
 				DIRTY_WORLD_MESH_ASSETS.remove(meshKey);
 				UPLOADED_WORLD_MESH_GENERATIONS.remove(meshKey);
 				worldMeshUploadWithdrawals++;
-				WORLD_MESH_SORTED_INDICES.remove(meshKey);
-				DIRTY_WORLD_MESH_SORTED_INDICES.remove(meshKey);
 				for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
 					if (PENDING_MESH_INSTANCES.get(index).meshKey() == meshKey) {
 						PENDING_MESH_INSTANCES.remove(index);
@@ -11316,7 +11276,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static void markWorldMeshAssetsChangedLocked() {
 		worldMeshAssetGeneration++;
 		attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
-		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + DIRTY_WORLD_MESH_TEXTURES.size() + DIRTY_WORLD_MESH_SORTED_INDICES.size();
+		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + DIRTY_WORLD_MESH_TEXTURES.size();
 		lastWorldMeshAssetPayloadBytes = 0L;
 		for (long meshKey : DIRTY_WORLD_MESH_ASSETS) {
 			VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(meshKey);
@@ -11325,13 +11285,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			lastWorldMeshAssetPayloadBytes += mesh.indexByteLength();
 			lastWorldMeshAssetPayloadBytes += (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
-		}
-		for (long meshKey : DIRTY_WORLD_MESH_SORTED_INDICES) {
-			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
-			if (sortedIndex == null) {
-				continue;
-			}
-			lastWorldMeshAssetPayloadBytes += sortedIndex.indexByteLength();
 		}
 		for (int textureId : DIRTY_WORLD_MESH_TEXTURES) {
 			VulkanicGalBridge.WorldMeshTextureAssetRecord texture = WORLD_MESH_TEXTURES.get(textureId);
@@ -11490,31 +11443,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		return textures;
 	}
 
-	private static List<VulkanicGalBridge.WorldMeshSortedIndexRecord> dirtyWorldMeshSortedIndicesLocked(
-		List<VulkanicGalBridge.WorldMeshAssetRecord> uploadedMeshes
-	) {
-		if (DIRTY_WORLD_MESH_SORTED_INDICES.isEmpty()) {
-			return List.of();
-		}
-		Set<Long> uploadedMeshKeys = new LinkedHashSet<>();
-		for (VulkanicGalBridge.WorldMeshAssetRecord mesh : uploadedMeshes) {
-			uploadedMeshKeys.add(mesh.meshKey());
-		}
-		List<VulkanicGalBridge.WorldMeshSortedIndexRecord> sortedIndices = new ArrayList<>(DIRTY_WORLD_MESH_SORTED_INDICES.size());
-		for (long meshKey : DIRTY_WORLD_MESH_SORTED_INDICES) {
-			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
-			if (sortedIndex == null) {
-				continue;
-			}
-			Long uploadedGeneration = UPLOADED_WORLD_MESH_GENERATIONS.get(meshKey);
-			if (!uploadedMeshKeys.contains(meshKey)
-				&& (uploadedGeneration == null || uploadedGeneration.longValue() != sortedIndex.meshGeneration())) {
-				continue;
-			}
-			sortedIndices.add(sortedIndex);
-		}
-		return sortedIndices;
-	}
 
 	private static List<VulkanicGalBridge.WorldMeshAssetRetirementRecord> pendingWorldMeshRetirementsLocked(
 		int limit,
@@ -19124,7 +19052,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Called only after native acceptance while LOCK is held. */
 	private static void releaseUploadedStaticTerrainPayloadLocked(long meshKey, long meshGeneration) {
 		StaticTerrainMeshResidency residency = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
-		if (residency == null || residency.meshGeneration() != meshGeneration || residency.retainCpuPayloadForDynamicSort()) {
+		if (residency == null || residency.meshGeneration() != meshGeneration) {
 			return;
 		}
 		VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
@@ -19138,11 +19066,10 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private record StaticTerrainMeshResidency(
 		long meshGeneration,
-		int[] textureIds,
-		boolean retainCpuPayloadForDynamicSort
+		int[] textureIds
 	) {
 		private StaticTerrainMeshResidency copy() {
-			return new StaticTerrainMeshResidency(meshGeneration, textureIds.clone(), retainCpuPayloadForDynamicSort);
+			return new StaticTerrainMeshResidency(meshGeneration, textureIds.clone());
 		}
 	}
 
@@ -19255,15 +19182,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	) {
 	}
 
-	public record StaticTerrainSortedIndexSnapshot(
-		long meshKey,
-		long meshGeneration,
-		long indexGeneration,
-		int indexType,
-		int indexBytes,
-		long indexHash
-	) {
-	}
 
 	private record WorldBorderAssetResolution(byte[] payload, String sourcePack, String sha256, boolean fallback, boolean preserveLastValid) {
 		private static WorldBorderAssetResolution fallback(String sourcePack) {
