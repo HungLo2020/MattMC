@@ -10,6 +10,7 @@ pub mod diagnostics;
 pub mod materials;
 pub mod mesh_cache;
 pub mod placement;
+pub mod publication;
 pub mod resources;
 pub mod section;
 pub mod staging;

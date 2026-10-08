@@ -92,12 +92,6 @@ public final class RustGalTerrainRenderer {
 	 * re-reads the authoritative layer entry, so concurrent writers converge.
 	 */
 	private static final ConcurrentHashMap<Long, TerrainSectionAsset[]> SECTION_ASSET_ROWS = new ConcurrentHashMap<>();
-	/**
-	 * Primitive shadow-caster view of {@link #SECTION_ASSET_ROWS}: mesh key and
-	 * generation per {@link #rowSlot} (key zero means absent). Off-camera caster
-	 * collection reads only this array, not the three asset objects.
-	 */
-	private static final ConcurrentHashMap<Long, long[]> SECTION_SHADOW_IDENTITIES = new ConcurrentHashMap<>();
 	/** Direct semantic identity lookup for post-submit receipts and sort metadata. */
 	private static final Map<Long, TerrainAssetIdentity> SECTION_ASSETS_BY_MESH_KEY = new ConcurrentHashMap<>();
 	/** Replacement generation built off-screen while the published atlas remains live. */
@@ -249,6 +243,9 @@ public final class RustGalTerrainRenderer {
 
 	private static final class TerrainSetScratch {
 		final LongOpenHashSet seenPositions = new LongOpenHashSet();
+		/** Shadow candidates whose publication rows one read fetches, and those rows. */
+		long[] shadowRowSections = new long[256];
+		long[] shadowRows = new long[256 * 6];
 		final LongOpenHashSet visibleMeshKeys = new LongOpenHashSet();
 		final LongOpenHashSet visibleSubmissions = new LongOpenHashSet();
 		final LongOpenHashSet cachedOpaqueMeshKeys = new LongOpenHashSet();
@@ -788,19 +785,31 @@ public final class RustGalTerrainRenderer {
 			for (int slot = 0; slot < depthPolicies.length; slot++) {
 				depthPolicies[slot] = terrainDepthPolicy(SHADOW_CANDIDATE_LAYERS[slot]);
 			}
+			// A camera-visible section already contributed every layer asset.
+			// Candidate sections are distinct and mesh keys are unique per
+			// section layer, so no key here can repeat a visible or earlier one.
+			// One publication read covers every other candidate's row.
+			int lookups = 0;
+			for (RenderSection section : shadowCandidates) {
+				if (section == null || !section.isBuilt() || scratch.seenPositions.contains(section.getPositionAsLong())) continue;
+				if (lookups == scratch.shadowRowSections.length) {
+					scratch.shadowRowSections = Arrays.copyOf(scratch.shadowRowSections, lookups * 2);
+				}
+				scratch.shadowRowSections[lookups++] = section.getPositionAsLong();
+			}
+			if (scratch.shadowRows.length < lookups * 6) {
+				scratch.shadowRows = new long[scratch.shadowRowSections.length * 6];
+			}
+			RustTerrainPublication.rows(scratch.shadowRowSections, lookups, scratch.shadowRows);
+			int lookup = 0;
 			for (RenderSection section : shadowCandidates) {
 				if (section == null || !section.isBuilt()) continue;
-				long sectionPos = section.getPositionAsLong();
-				// A camera-visible section already contributed every layer asset.
-				// Candidate sections are distinct and mesh keys are unique per
-				// section layer, so no key here can repeat a visible or earlier one.
-				long[] identities = scratch.seenPositions.contains(sectionPos)
-					? null : SECTION_SHADOW_IDENTITIES.get(rowKey(sectionPos));
-				if (identities != null) {
+				if (!scratch.seenPositions.contains(section.getPositionAsLong())) {
+					int row = lookup++ * 6;
 					for (int slot = 0; slot < SHADOW_CANDIDATE_LAYERS.length; slot++) {
-						long meshKey = identities[slot * 2];
+						long meshKey = scratch.shadowRows[row + slot * 2];
 						if (meshKey == 0L) continue;
-						scratch.shadows.append(meshKey, identities[slot * 2 + 1],
+						scratch.shadows.append(meshKey, scratch.shadowRows[row + slot * 2 + 1],
 							section.getOriginX(), section.getOriginY(), section.getOriginZ(),
 							depthPolicies[slot], 0);
 					}
@@ -1128,6 +1137,7 @@ public final class RustGalTerrainRenderer {
 		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
 			removeLayer(key.sectionPos(), key.layer(), "world-unload");
 		}
+		RustTerrainPublication.clear();
 		invalidations.incrementAndGet();
 			recordEvent(0L, ChunkSectionLayer.SOLID, 0L, 0L, 0L, atlasGeneration, null, 0, 0, 0, 0.0F, 0.0F, 0.0F, "world-unload");
 	}
@@ -3482,11 +3492,10 @@ public final class RustGalTerrainRenderer {
 			confirmAtlasPayloadRegistered(atlasGeneration);
 			List<TerrainSectionAsset> previous = List.copyOf(SECTION_ASSETS.values());
 			rebuildMeshKeyIdentityIndex(replacement);
+			replacePublication(replacement);
 			SECTION_ASSETS.clear();
 			SECTION_ASSETS.putAll(replacement);
 			SECTION_ASSET_ROWS.clear();
-			SECTION_SHADOW_IDENTITIES.clear();
-			queueGraphMeshReset();
 			for (LayerKey key : replacement.keySet()) {
 				mirrorSectionAssetRow(key);
 			}
@@ -3510,12 +3519,18 @@ public final class RustGalTerrainRenderer {
 		RESOURCE_RELOAD_SECTION_ASSETS.clear();
 	}
 
+	/** Rust's publication registry owns each section's solid, cutout and
+	 * translucent row (and rejects a mesh key another section layer holds);
+	 * the camera section graph reads its rows from there. */
 	private static void publishSectionAsset(LayerKey layerKey, TerrainSectionAsset asset) {
 		TerrainAssetIdentity identity = new TerrainAssetIdentity(layerKey, asset);
-		TerrainAssetIdentity collision = SECTION_ASSETS_BY_MESH_KEY.get(asset.meshKey());
-		if (collision != null && !collision.layerKey().equals(layerKey)) {
+		int slot = rowSlot(layerKey.layer());
+		long[] collision = RustTerrainPublication.publish(layerKey.sectionPos(), slot, asset.meshKey(),
+			asset.meshGeneration(), publicationFlags(layerKey.layer(), asset));
+		if (collision != null) {
 			throw new IllegalStateException("Rust terrain mesh key maps to multiple section layers: meshKey="
-				+ asset.meshKey() + " existing=" + collision.layerKey() + " replacement=" + layerKey);
+				+ asset.meshKey() + " existing=" + new LayerKey(collision[1], ROW_LAYERS[(int)collision[2]])
+				+ " replacement=" + layerKey);
 		}
 		TerrainSectionAsset replaced = SECTION_ASSETS.put(layerKey, asset);
 		mirrorSectionAssetRow(layerKey);
@@ -3525,6 +3540,26 @@ public final class RustGalTerrainRenderer {
 			);
 		}
 		SECTION_ASSETS_BY_MESH_KEY.put(asset.meshKey(), identity);
+	}
+
+	/** Swaps Rust's publication rows for the reload's, at once. */
+	private static void replacePublication(Map<LayerKey, TerrainSectionAsset> assets) {
+		long[] layers = new long[assets.size() * 5];
+		int count = 0;
+		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : assets.entrySet()) {
+			LayerKey key = entry.getKey();
+			TerrainSectionAsset asset = entry.getValue();
+			layers[count * 5] = key.sectionPos();
+			layers[count * 5 + 1] = rowSlot(key.layer());
+			layers[count * 5 + 2] = asset.meshKey();
+			layers[count * 5 + 3] = asset.meshGeneration();
+			layers[count * 5 + 4] = publicationFlags(key.layer(), asset);
+			count++;
+		}
+		// rebuildMeshKeyIdentityIndex has already rejected duplicate keys.
+		if (RustTerrainPublication.replace(layers, count) != null) {
+			throw new IllegalStateException("Rust terrain reload publication contains a duplicate mesh key");
+		}
 	}
 
 	private static void rebuildMeshKeyIdentityIndex(Map<LayerKey, TerrainSectionAsset> assets) {
@@ -3543,6 +3578,10 @@ public final class RustGalTerrainRenderer {
 
 	private static void removeLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
 		LayerKey layerKey = new LayerKey(sectionPos, layer);
+		int slot = rowSlot(layer);
+		if (slot >= 0) {
+			RustTerrainPublication.remove(sectionPos, slot);
+		}
 		TerrainSectionAsset removed = SECTION_ASSETS.remove(layerKey);
 		mirrorSectionAssetRow(layerKey);
 		if (removed != null) {
@@ -4263,85 +4302,28 @@ public final class RustGalTerrainRenderer {
 		if (slot < 0) {
 			return;
 		}
-		queueGraphMeshRow(layerKey.sectionPos());
 		SECTION_ASSET_ROWS.compute(rowKey(layerKey.sectionPos()), (rowKey, row) -> {
 			TerrainSectionAsset[] next = row == null ? new TerrainSectionAsset[3] : row.clone();
 			next[slot] = SECTION_ASSETS.get(layerKey);
-			if (next[0] == null && next[1] == null && next[2] == null) {
-				SECTION_SHADOW_IDENTITIES.remove(rowKey);
-				return null;
-			}
-			long[] identities = new long[6];
-			for (int index = 0; index < 3; index++) {
-				if (next[index] != null) {
-					identities[index * 2] = next[index].meshKey();
-					identities[index * 2 + 1] = next[index].meshGeneration();
-				}
-			}
-			// Written inside the row's compute so both views change together.
-			SECTION_SHADOW_IDENTITIES.put(rowKey, identities);
-			return next;
+			return next[0] == null && next[1] == null && next[2] == null ? null : next;
 		});
 	}
 
-	// Section rows changed since the section graph last drained them. The
-	// graph re-reads each current row, so a position needs listing only once.
-	private static final Object GRAPH_MESH_ROWS_LOCK = new Object();
-	private static final it.unimi.dsi.fastutil.longs.LongArrayList GRAPH_MESH_ROW_POSITIONS =
-		new it.unimi.dsi.fastutil.longs.LongArrayList();
-	private static boolean graphMeshRowsReset = true;
+	/** The row layer of each {@link #rowSlot}. */
+	private static final ChunkSectionLayer[] ROW_LAYERS = {
+		ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT_MIPPED, ChunkSectionLayer.TRANSLUCENT
+	};
 
-	private static void queueGraphMeshRow(long sectionPos) {
-		synchronized (GRAPH_MESH_ROWS_LOCK) {
-			if (!graphMeshRowsReset) {
-				GRAPH_MESH_ROW_POSITIONS.add(sectionPos);
-			}
-		}
-	}
-
-	private static void queueGraphMeshReset() {
-		synchronized (GRAPH_MESH_ROWS_LOCK) {
-			GRAPH_MESH_ROW_POSITIONS.clear();
-			graphMeshRowsReset = true;
-		}
+	private static int publicationFlags(ChunkSectionLayer layer, TerrainSectionAsset asset) {
+		return terrainCameraSortRequested(layer, asset.translucentSortType()) ? RustTerrainPublication.FLAG_CAMERA_SORTED : 0;
 	}
 
 	/**
-	 * Mirrors changed section asset rows into {@code graph}; after a reset, or
-	 * with {@code republish} for a new graph, every current row.
+	 * Applies Rust's changed publication rows to {@code graph}; after a reset,
+	 * or with {@code republish} for a new graph, every current row.
 	 */
 	static void drainGraphMeshRows(RustSectionGraph graph, boolean republish) {
-		long[] positions;
-		boolean reset;
-		synchronized (GRAPH_MESH_ROWS_LOCK) {
-			reset = graphMeshRowsReset || republish;
-			graphMeshRowsReset = false;
-			positions = reset ? null : GRAPH_MESH_ROW_POSITIONS.toLongArray();
-			GRAPH_MESH_ROW_POSITIONS.clear();
-		}
-		if (reset) {
-			graph.clearMeshes();
-			LongOpenHashSet all = new LongOpenHashSet();
-			for (LayerKey key : SECTION_ASSETS.keySet()) {
-				if (rowSlot(key.layer()) >= 0) {
-					all.add(key.sectionPos());
-				}
-			}
-			positions = all.toLongArray();
-		}
-		for (long sectionPos : positions) {
-			TerrainSectionAsset[] row = sectionAssetRow(sectionPos);
-			TerrainSectionAsset solid = row == null ? null : row[0];
-			TerrainSectionAsset cutout = row == null ? null : row[1];
-			TerrainSectionAsset translucent = row == null ? null : row[2];
-			graph.setMeshes(SectionPos.x(sectionPos), SectionPos.y(sectionPos), SectionPos.z(sectionPos),
-				translucent != null && terrainCameraSortRequested(ChunkSectionLayer.TRANSLUCENT,
-					translucent.translucentSortType()),
-				solid == null ? 0L : solid.meshKey(), solid == null ? 0L : solid.meshGeneration(),
-				cutout == null ? 0L : cutout.meshKey(), cutout == null ? 0L : cutout.meshGeneration(),
-				translucent == null ? 0L : translucent.meshKey(),
-				translucent == null ? 0L : translucent.meshGeneration());
-		}
+		graph.syncPublishedMeshes(republish);
 	}
 
 	/**

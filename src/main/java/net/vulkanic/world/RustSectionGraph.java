@@ -29,7 +29,6 @@ final class RustSectionGraph implements AutoCloseable {
 	/** {@code FfiSectionGraphVisit}: x, y, z, built, flags. */
 	private static final long VISIT_BYTES = 20;
 	/** {@code FfiSectionMeshes}: x, y, z, flags, keys[3], generations[3]. */
-	private static final long MESHES_BYTES = 64;
 	/** {@code FfiTerrainSelectionParams}: camera[3] f64, depth policies[3], layer ordinals[3], shadow, max shadow, receipts, reserved. */
 	private static final long SELECTION_PARAMS_BYTES = 64;
 	/** {@code FfiTerrainSelectionView}: ten 8-byte fields. */
@@ -73,10 +72,6 @@ final class RustSectionGraph implements AutoCloseable {
 			ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
 			ValueLayout.ADDRESS));
 
-	private static final MethodHandle SET_MESHES = NativeLibraryLoader.downcallHandle("mattmc_rust",
-		"mattmc_sodium_section_graph_set_meshes",
-		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
-			ValueLayout.JAVA_INT));
 	private static final MethodHandle SELECT_TERRAIN = NativeLibraryLoader.downcallHandle("mattmc_rust",
 		"mattmc_sodium_section_graph_select_terrain",
 		FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -89,11 +84,8 @@ final class RustSectionGraph implements AutoCloseable {
 	private final MemorySegment build = this.arena.allocate(BUILD_BYTES, 8);
 	private MemorySegment sprites = MemorySegment.NULL;
 	private MemorySegment visits = MemorySegment.NULL;
-	private MemorySegment meshRows = MemorySegment.NULL;
 	private final MemorySegment selectionParams = this.arena.allocate(SELECTION_PARAMS_BYTES, 8);
 	private final MemorySegment selectionView = this.arena.allocate(SELECTION_VIEW_BYTES, 8);
-	private int meshRowCount;
-	private boolean clearMeshes;
 	private int visitCapacity;
 	private int visitCount;
 	private MemorySegment buildRequests = MemorySegment.NULL;
@@ -229,49 +221,11 @@ final class RustSectionGraph implements AutoCloseable {
 	}
 
 	/**
-	 * Queues a section's published layer meshes (solid, cutout, translucent;
-	 * zero keys are absent layers, all-zero keys clear the section).
+	 * Applies the terrain publication's changed rows (published layer meshes
+	 * per section) to this graph; with {@code republish}, every row.
 	 */
-	void setMeshes(int x, int y, int z, boolean translucentCameraSorted, long solidKey, long solidGeneration,
-			long cutoutKey, long cutoutGeneration, long translucentKey, long translucentGeneration) {
-		this.meshRows = ensure(this.meshRows, (this.meshRowCount + 1) * MESHES_BYTES);
-		long base = this.meshRowCount * MESHES_BYTES;
-		this.meshRows.set(ValueLayout.JAVA_INT, base, x);
-		this.meshRows.set(ValueLayout.JAVA_INT, base + 4, y);
-		this.meshRows.set(ValueLayout.JAVA_INT, base + 8, z);
-		this.meshRows.set(ValueLayout.JAVA_INT, base + 12, translucentCameraSorted ? 1 : 0);
-		this.meshRows.set(ValueLayout.JAVA_LONG, base + 16, solidKey);
-		this.meshRows.set(ValueLayout.JAVA_LONG, base + 24, cutoutKey);
-		this.meshRows.set(ValueLayout.JAVA_LONG, base + 32, translucentKey);
-		this.meshRows.set(ValueLayout.JAVA_LONG, base + 40, solidGeneration);
-		this.meshRows.set(ValueLayout.JAVA_LONG, base + 48, cutoutGeneration);
-		this.meshRows.set(ValueLayout.JAVA_LONG, base + 56, translucentGeneration);
-		this.meshRowCount++;
-	}
-
-	/** Drops every published mesh row before the queued ones apply. */
-	void clearMeshes() {
-		this.clearMeshes = true;
-		this.meshRowCount = 0;
-	}
-
-	/** Applies the queued mesh rows. */
-	void flush() {
-		if (!this.clearMeshes && this.meshRowCount == 0) {
-			return;
-		}
-		int status;
-		try {
-			status = (int) SET_MESHES.invokeExact(this.graph, this.clearMeshes ? 1 : 0, this.meshRows,
-				this.meshRowCount);
-		} catch (Throwable throwable) {
-			throw new IllegalStateException("Rust section graph mesh update failed", throwable);
-		}
-		if (status != OK) {
-			throw new IllegalStateException("Rust section graph mesh update rejected with status " + status);
-		}
-		this.clearMeshes = false;
-		this.meshRowCount = 0;
+	void syncPublishedMeshes(boolean republish) {
+		RustTerrainPublication.syncGraph(this.graph, republish);
 	}
 
 	/**
@@ -281,7 +235,6 @@ final class RustSectionGraph implements AutoCloseable {
 	 */
 	void select(double cameraX, double cameraY, double cameraZ, float[] cullingMatrix, float searchDistance,
 			boolean useOcclusionCulling, boolean copyVisits) {
-		this.flush();
 		this.camera.set(ValueLayout.JAVA_DOUBLE, 0, cameraX);
 		this.camera.set(ValueLayout.JAVA_DOUBLE, 8, cameraY);
 		this.camera.set(ValueLayout.JAVA_DOUBLE, 16, cameraZ);

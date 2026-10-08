@@ -154,6 +154,12 @@ impl SectionGraph {
         self.meshes.clear();
     }
 
+    /// A section's published layer meshes (tests).
+    #[cfg(test)]
+    pub(crate) fn published_meshes(&self, position: [i32; 3]) -> Option<SectionMeshes> {
+        self.meshes.get(&position).copied()
+    }
+
     /// Builds `out` from the camera selection's `visits` (see module docs).
     pub fn select_terrain(&self, visits: &[VisitedSection], params: &TerrainSelectionParams, out: &mut TerrainSelection) {
         out.sections.clear();
