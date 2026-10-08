@@ -739,11 +739,25 @@ pub(super) struct WorldLodUploadTransaction {
 
 impl WorldLodUploadTransaction {
     fn push(&mut self, page: Handle, page_offset: u64, bytes: &[u8], index: bool) {
-        let staging_offset = self.payload.len() as u64;
-        self.payload.extend_from_slice(bytes);
+        self.push_parts(page, page_offset, [bytes], index);
+    }
+
+    /// Stages `parts` back to back as one block copied to `page_offset`.
+    fn push_parts<'a>(
+        &mut self,
+        page: Handle,
+        page_offset: u64,
+        parts: impl IntoIterator<Item = &'a [u8]>,
+        index: bool,
+    ) {
+        let staging_offset = self.payload.len();
+        for part in parts {
+            self.payload.extend_from_slice(part);
+        }
+        let bytes = (self.payload.len() - staging_offset) as u64;
         // Keep each staged block four-byte aligned for the copy offsets.
         self.payload.resize(self.payload.len().next_multiple_of(4), 0);
-        self.copies.push((staging_offset, page, page_offset, bytes.len() as u64, index));
+        self.copies.push((staging_offset as u64, page, page_offset, bytes, index));
     }
 
     fn written_pages(&self) -> Vec<Handle> {
@@ -757,7 +771,7 @@ impl WorldLodUploadTransaction {
     /// a confirmed submission transitions from its read state; a new page
     /// from `Undefined`. Ranges being written are never read by pending work.
     fn finish(
-        &self,
+        &mut self,
         gal: &mut VulkanicGal,
         initialized: &BTreeSet<Handle>,
     ) -> GalResult<(Option<Handle>, Vec<CommandOp>)> {
@@ -771,7 +785,8 @@ impl WorldLodUploadTransaction {
             usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
         })?;
         let mut ops = Vec::with_capacity(self.copies.len() + 8);
-        ops.push(CommandOp::HostWriteBuffer { buffer: staging, offset: 0, data: self.payload.clone() });
+        // Move the payload: it can hold megabytes of prefetched columns.
+        ops.push(CommandOp::HostWriteBuffer { buffer: staging, offset: 0, data: std::mem::take(&mut self.payload) });
         ops.push(CommandOp::Barrier(buffer_barrier(
             staging,
             TextureUsageState::TransferDst,
@@ -860,7 +875,6 @@ pub(super) fn create_column_resources(
         }
     };
     let page_vertex_base = vertex_range.offset / WORLD_LOD_GPU_VERTEX_BYTES as u64;
-    let mut vertex_payload = Vec::with_capacity(vertex_bytes as usize);
     let mut index_payload = Vec::with_capacity(index_bytes as usize);
     let mut segments = Vec::with_capacity(asset.segments.len());
     let mut vertex_base = page_vertex_base;
@@ -873,11 +887,15 @@ pub(super) fn create_column_resources(
             index_offset: index_range.offset + local_index_offset,
         });
         vertex_base += segment.vertex_count as u64;
-        vertex_payload.extend_from_slice(&segment.vertex_bytes);
         index_payload.resize(local_index_offset as usize, 0);
         index_payload.extend_from_slice(&segment.index_bytes);
     }
-    upload.push(vertex_range.buffer, vertex_range.offset, &vertex_payload, false);
+    upload.push_parts(
+        vertex_range.buffer,
+        vertex_range.offset,
+        asset.segments.iter().map(|segment| segment.vertex_bytes.as_slice()),
+        false,
+    );
     upload.push(index_range.buffer, index_range.offset, &index_payload, true);
     Ok(WorldLodGpuColumnResources {
         column_generation: asset.column_generation,
