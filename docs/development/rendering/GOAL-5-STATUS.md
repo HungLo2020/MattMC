@@ -1,12 +1,14 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`697b0a3c`](https://github.com/HungLo2020/MattMC/commit/697b0a3c6200151830a565c73aaee88d323eb484):
-native terrain publication rows, batched DH lifecycle checks, reload payload
-release, lease-only DH retirement and late-build rejection, shared DH geometry
-pages, and the validation driver. Source inspection and author-recorded checks
-do not establish broad visual/temporal parity, complete scene migration,
-long-run resource bounds or resolution of the independent native crash.
+[`97e30922`](https://github.com/HungLo2020/MattMC/commit/97e3092269ed29854c8175a480a819fb1896c311):
+stricter verification, feature-parity fixtures, artifact retention and the
+whole-project migration plan. This tooling/documentation milestone changes no
+Java or Rust runtime code; the rendering ownership below retains its
+[`697b0a3c`](https://github.com/HungLo2020/MattMC/commit/697b0a3c6200151830a565c73aaee88d323eb484)
+implementation scope. Source inspection and author-recorded checks do not
+establish broad visual/temporal parity, complete scene migration, long-run
+resource bounds or resolution of the independent native crash.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
@@ -15,8 +17,9 @@ world/entity semantics and animation, meshing dispatch and inputs, full terrain
 asset/reload bookkeeping, DH quadtree/frustum candidates, frame parameters and
 material-provenance diagnostics. Terrain staging and DH native publication
 retain copied/diagnostic paths; neither is a zero-copy contract.
-The final target remains one Rust executable supporting client and server,
-at most one separately loaded Rust library, and no Java. See
+The final target remains one Rust executable supporting client and dedicated
+server, at most one separately loaded Rust library, and no Java/JVM. See the
+[whole-project migration plan](../RUST-MIGRATION.md),
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
@@ -24,11 +27,19 @@ The current [terrain publication](https://github.com/HungLo2020/MattMC/issues/74
 [DH lifecycle](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6053379365),
 [shared pages](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6053380774)
 and [validation/performance](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6053382027)
-checkpoints remain open. [#822](https://github.com/HungLo2020/MattMC/issues/822)
-tracks the validation driver's false PASS when requested background results are
-omitted after an exception; a fully mocked check reproduced it without clients
-or game builds. Verify expected-step completeness as described in
-[the driver guide](RENDER-VERIFICATION.md#one-command-validation).
+checkpoints retain their open acceptance work.
+[#822 is closed after focused tooling verification](https://github.com/HungLo2020/MattMC/issues/822#issuecomment-6065782881).
+Its false PASS when an exception omitted requested background results is now
+historical: at `97e30922`, background exceptions become failed steps and the
+aggregate rejects missing requested results. The closure covers that defect,
+not runtime acceptance; see
+[the driver guide](RENDER-VERIFICATION.md#one-command-validation) for the
+current checks and their remaining limits.
+
+The [October 8 acceptance/roadmap review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6065826232)
+and [recorded-candidate performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6065805242)
+retain the distinction between repaired tooling, proposed ownership and missing
+runtime acceptance evidence.
 
 The earlier `f13239e1` [terrain staging](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6051134159),
 [DH ledger](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6051203728),
@@ -50,6 +61,23 @@ Those source checkpoints are
 and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806ddedd4fb3c3b4fbc44716).
 
 ## What changed
+
+### October 8 verification and migration checkpoint
+
+The `1216f060` → `97e30922` interval changes acceptance tooling and its
+planning/evidence records, not the runtime implementation:
+
+- **Verification:** requested background checks can no longer disappear into a passing aggregate. The combined driver also checks the complete lifecycle scenario set, stricter FPS/parity receipts and paired performance floors. These guards address specific evidence failures; they do not prove all workload equivalence or inspect images. [Canonical workflow](RENDER-VERIFICATION.md#one-command-validation)
+- **Feature parity:** `RunFeatureParity.py` adds block-entity, equipment, held-item and hand fixtures. Every requested scenario must pass Frozen; an unchanged historical failure is not absolute parity. The current working record reports chest/chest-shaders/sign/trident passes, but bed/banner/zombie/held-item coverage remains incomplete or failed. Prior shield/hand attempts stopped at disk preflight and zombie equipment-reference processing raised an exception; distinguish those harness failures from renderer defects. [Pinned working record](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/PROGRESS.md)
+- **Evidence storage:** completed generated fixtures and superseded marked invocations can retire automatically. Preserve current acceptance, unresolved diagnostics and required input sources using the [storage and pinning rules](ARTIFACT-STORAGE.md#verification-driver-retention); retired evidence is not replayable merely because its summary survives.
+- **Migration scope:** the [staged plan](../RUST-MIGRATION.md) extends through content, world ownership, gameplay, presentation/services and Rust application startup. Verification/storage is the current milestone; content definitions and state construction are the next planned ownership slice. Existing native rendering and bridge ownership do not complete the application migration.
+
+The refreshed root records describe a separate `d7ee0335d` runtime candidate,
+not a new runtime result from this source commit. Its raw benchmark receipts
+are unavailable, so recorded health and FPS do not independently re-establish
+acceptance. See the [October 8 candidate summary](#october-8-recorded-candidate-summary).
+This documentation review inspected source and retained text records, not live
+clients, captures, Java/Rust runtime suites or the unbundled benchmark artifacts.
 
 ### October 7 source review
 
@@ -218,6 +246,32 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 8 recorded candidate summary
+
+The [refreshed summary at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/SUMMARY.md)
+records candidate `d7ee0335d` from a separate original checkout on the RTX 2070:
+moving camera, ABAB and 6,000 measured frames per run. The source milestone
+itself changes no runtime code.
+
+| Mode | Recorded Rust/Vulkan candidate FPS, run 1 / run 2 | Recorded Frozen Java/OpenGL FPS, run 1 / run 2 |
+| --- | --- | --- |
+| Vanilla | 1,123.0 / 1,067.9 | 1,200.4 / 1,174.9 |
+| Vanilla + DH | 601.7 / 705.0 | 740.2 / 682.4 |
+| Shaders | 352.4 / 348.7 | 320.9 / 316.1 |
+| Shaders + DH | 252.3 / 243.3 | 227.7 / 225.9 |
+
+Each slash separates runs. The retained record is
+`artifacts/graphics-captures/validation/batch2/summary.json` in that original
+checkout; raw benchmark receipts are unavailable. Median average FPS is below
+Frozen by **7.8% vanilla** and **8.1% vanilla+DH**, and above it by **10.1%
+shaders** and **9.3% shaders+DH**. These reported medians do not establish
+all-mode performance acceptance, verified per-run health or matching p99.
+Fresh complete paired evidence is required under the
+[current performance controls](SHADER-TERRAIN-PROFILING.md#october-8-acceptance-controls).
+The older tables below retain their own revision/session scope; do not combine
+them with this separate candidate record or infer a runtime gain from the
+verification-only source change.
 
 #### October 7 late-evening interleaved summary
 

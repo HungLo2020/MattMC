@@ -5,14 +5,54 @@ Java OpenGL. Static captures, validation, RenderDoc and temporary timers are
 correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
-The [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary)
-and [October 7 late-evening summary](GOAL-5-STATUS.md#october-7-late-evening-interleaved-summary)
-separate their dated reported timings from the historical profiles below; none of
-these rows is a substitute for rerunning the same workload on a new revision.
+The [October 8 candidate record](GOAL-5-STATUS.md#october-8-recorded-candidate-summary)
+has no raw benchmark receipts available. The
+[October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary) and
+[October 7 late-evening summary](GOAL-5-STATUS.md#october-7-late-evening-interleaved-summary)
+retain their dated revision/session scope. None substitutes for complete paired
+evidence on the runtime revision being evaluated.
+
+## October 8 acceptance controls
+
+The [`97e30922` milestone](https://github.com/HungLo2020/MattMC/commit/97e3092269ed29854c8175a480a819fb1896c311)
+changes verification and documentation only; it adds no runtime performance
+claim. The refreshed root summary instead records a separate `d7ee0335d`
+candidate: median average FPS trails Frozen by 7.8% vanilla and 8.1% vanilla+DH,
+while shader modes lead by 10.1% and 9.3%. Raw benchmark receipts are unavailable,
+so neither run health nor performance acceptance can be re-established from
+that summary. See the [recorded values and provenance](GOAL-5-STATUS.md#october-8-recorded-candidate-summary).
+
+The current driver's `--perf` comparison requires at least two clean paired
+repeats per side in every mode. For each mode, the median of Current's per-run
+average FPS must meet Frozen's, and the median of Current's per-run p99 frame
+time must not worsen. These are separate checks; matching a median frame time
+or a selected portion of a run does not establish either. Desktop noise calls
+for more paired evidence, not a waiver of the floor.
+
+After separate correctness checks, request the bounded four-mode comparison
+with a fresh label and retained inputs:
+
+```sh
+python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --perf \
+  --run-source /absolute/path/retained/shader-run \
+  --vanilla-run-source /absolute/path/retained/vanilla-run \
+  --shader-pack /absolute/path/original-pack.zip \
+  --skip java-tests --skip rust-tests --skip wiki --skip gate --skip parity
+```
+
+Skipping Java tests still prebuilds the release library and classes; the fixed
+sibling Frozen checkout must also exist. This subset evaluates only the build
+and FPS steps. Preserve effective inputs, hashes, settings, logs and complete
+measured-frame receipts. The current artifact reader rejects missing health
+fields and wrong measured-frame counts, but it cannot establish all workload
+equivalence or substitute for the separate visual/temporal checks. Follow the
+[canonical validation and receipt rules](RENDER-VERIFICATION.md#one-command-validation)
+and [artifact retention guidance](ARTIFACT-STORAGE.md#verification-driver-retention)
+so evidence needed for a later comparison remains available.
 
 ## October 7 comparison controls
 
-The latest [22:36 summary at `697b0a3c`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/SUMMARY.md) reports two
+The historical [22:36 summary at `697b0a3c`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/SUMMARY.md) reports two
 6,000-frame runs per side and mode, interleaved current/Frozen/current/Frozen
 on the RTX 2070 desktop. Rust/Frozen per-run FPS is vanilla 1,171/1,130 versus
 1,226/1,123; vanilla+DH 757/770 versus 736/599; shaders 343/351 versus 318/316;
@@ -27,21 +67,6 @@ used one 6,000-frame run per side and reported vanilla+DH 617 versus 736 FPS,
 with about ±25% noise. Preserve that single-run result alongside the later
 ABAB reversal; do not average it into the newer session. No benchmark or
 artifact replay was performed by this documentation review.
-
-To request the driver's bounded four-mode comparison after separate correctness
-checks, use a fresh label:
-
-```sh
-python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --perf \
-  --skip java-tests --skip rust-tests --skip wiki --skip gate --skip parity
-```
-
-Skipping Java tests still prebuilds the release library and classes. All fixture
-and Frozen-checkout paths are still required; retain effective inputs, hashes,
-settings, logs and complete measured-frame receipts. The driver waits for its
-background checks before FPS, but its summary is not an independent check of
-all external load or missing health evidence. See
-[validation scope](RENDER-VERIFICATION.md#one-command-validation).
 
 The following `f13239e1` record predates both equal-window integration reports.
 

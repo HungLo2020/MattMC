@@ -61,7 +61,7 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
 ```
 
-The [driver](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/RunValidation.py)
+The [driver at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/DevUtils/tests/rendering/RunValidation.py)
 orchestrates a bounded set of tests and workloads:
 
 1. Java tests in `net.vulkanic.*`, `net.sodium.*`, `com.seibel.*` and
@@ -83,9 +83,12 @@ orchestrates a bounded set of tests and workloads:
    `--perf` instead requests current/Frozen/current/Frozen (ABAB), two runs per
    side and mode with 6,000 measured frames each. `--perf-repeats` changes the
    repetitions (at least two per side). Both protocols request 360 settle and
-   240 warm-up frames. `--perf` requires all four modes to meet Frozen's paired
-   median average FPS and not worsen paired median p99. A healthy run alone
-   does not meet this performance check; desktop noise requires more evidence.
+   240 warm-up frames. `--perf` requires all four modes to meet Frozen's median
+   average FPS across equal repeat counts and not worsen its median of run p99
+   frame times. These are medians of per-side runs, not median paired deltas or
+   pooled-frame tails. There is no noise allowance in this numeric gate; a
+   passing gate still needs the workload and variability checks below. Without
+   `--perf`, the FPS step checks only current-client health.
 
 The Java native-library build and current-client capture/FPS commands request
 the release profile, with line-table debug information and stripping disabled
@@ -96,30 +99,55 @@ and can be repeated. A subset run verifies only its executed steps.
 
 Output goes to `artifacts/graphics-captures/validation/<label>/` (existing
 labels are refused): `summary.md`, `summary.json`, step logs and timings.
-All four input paths must exist even when associated steps are skipped:
-`--run-source`, `--vanilla-run-source`, `--shader-pack`, and the fixed sibling
-Frozen checkout `../MattMC_JavaPerfTesting/MattMC`. The driver refuses existing
-matching client JVMs at startup. Later cleanup targets matching Java clients
-whose working directories lie inside this invocation's output tree, checking
-process start identity and using pidfds where available. An owned orphan
-rejects acceptance. Repeat `--jvm-arg=<option>` for current-client options;
+All four input paths must exist even when associated steps are skipped. The
+defaults, relative to this checkout, are:
+
+- `--run-source`: `artifacts/graphics-captures/goal5/terrain-look-direction/cold-source/run`
+- `--vanilla-run-source`: `artifacts/graphics-captures/goal5/shadow-orb-ordering-fix/copied-source/run`
+- `--shader-pack`: `artifacts/graphics-captures/goal5/rejected-source-shadow-depth/original-pack/ComplementaryHungLoIfied.zip`
+- Frozen: the fixed sibling checkout `../MattMC_JavaPerfTesting/MattMC`
+
+The first and third also accept `MATTMC_CAPTURE_RUN_SOURCE` and
+`MATTMC_CAPTURE_SHADER_PACK_SOURCE`. Override missing archived inputs with
+retained equivalent fixtures; existence checks do not prove equivalence.
+Run from the repository root with Java, Rust and capture prerequisites ready.
+Repeat `--jvm-arg=<option>` for gate, parity and current-client FPS options;
 these are not forwarded into Frozen's gameplay benchmark.
+
+The driver refuses client JVMs found at startup through Linux `/proc` whose
+process name is `java` and command contains `KnotClient` or `devlaunchinjector`.
+After each capture it sends `SIGKILL` only to those matches whose working
+directory lies inside this invocation's output tree, rechecking process start
+identity and using pidfds where available. A successful signal increments
+`owned_orphans` and fails that step; this count does not prove all possible
+orphans were discovered or that their exit was observed. Missing `/proc` or
+unreadable process records limit discovery. Keep runs isolated and inspect the
+actual client exit/core receipts as well as the summary.
 
 Treat the summary as an index into evidence, not an all-checks certificate:
 
-- Every requested step must be present and pass; background exceptions become
-  explicit failed results. The lifecycle summary must contain every requested
-  scenario. Mocked orchestration tests cover the prior background-`OSError`
-  false PASS described in [#822](https://github.com/HungLo2020/MattMC/issues/822).
+- Every requested step must be present and explicitly pass; an empty aggregate
+  fails. Rust/wiki background exceptions become failed results, and missing
+  requested results also fail. The combined driver requires all seven lifecycle
+  scenario names and each scenario's `passed: true`. This repairs the prior
+  background-`OSError` false PASS described in
+  [#822](https://github.com/HungLo2020/MattMC/issues/822); it does not strengthen
+  every underlying lifecycle receipt. A foreground launch or malformed-input
+  exception can still abort before a final summary is written.
 - FPS health requires explicit zero VUIDs, successful capture exit, complete
   publishable/crash-free/device-loss-free sampler receipts, exact measured-frame
   count, valid positive timings and no orphan/RSS guard. Missing health fields
-  fail. Inspect actual receipts and the [performance A/B](#4-performance-ab)
-  equivalence checks; these fields do not prove all workload equivalence.
-- The parity reader consumes the latest matching numeric report and current
-  VUID records; it does not visually inspect PNGs. Review the listed
-  side-by-side images (water, DH, sky and clouds), effective mode, frame
-  correlation and the requested DH extension. Gate limits remain below.
+  fail for these required fields. The separate log scan still accepts absent
+  matching logs and absent terrain-failure counters; inspect retained logs and
+  actual receipts alongside the [performance A/B](#4-performance-ab) equivalence
+  checks. Health fields do not prove workload equivalence.
+- The parity reader takes the first pair from the lexically last matching
+  report, requiring report success, three finite nonnegative RGB errors and
+  nonempty current-client VUID records containing explicit integer zeroes.
+  Iris+DH also requires a passing DH extension. It neither recomputes the
+  image threshold nor visually inspects PNGs. Review the listed side-by-side
+  images (water, DH, sky and clouds), effective mode, frame correlation and
+  requested extension. Gate limits remain below.
 
 The implementation author reports a default run taking 14m20 (about 14½
 minutes) on an RTX 2070 desktop: Java tests about 17 s, gate 7 min, parity
@@ -127,9 +155,16 @@ minutes) on an RTX 2070 desktop: Java tests about 17 s, gate 7 min, parity
 The earlier manual workflow reportedly took about 35 minutes. These are dated
 workflow observations, not independently reproduced timings or guarantees.
 The Python fixtures inspect command generation, ABAB ordering, named-failure
-parsing, artifact readers, mocked orchestration and owned-process cleanup;
-they do not execute the complete live validation workflow. See the
-[integration records](#october-7-integration-batch-checks).
+parsing, artifact readers, mocked orchestration and owned-process cleanup.
+At `97e30922`, an independent isolated review passed all 11 supplied driver
+tests and nine additional mocked orchestration cases, including Rust/wiki
+launch errors, artifact parsing failure, nonzero Rust exit, wiki timeout,
+interrupted missing results, and skip combinations. These checks did not run
+Java/Rust suites, clients, live benchmarks or production cleanup. See the
+[integration records](#october-7-integration-batch-checks) for separate historical
+author reports.
+
+### Feature fixture parity
 
 Feature fixtures beyond the coast poses:
 
@@ -137,14 +172,48 @@ Feature fixtures beyond the coast poses:
 python3 DevUtils/tests/rendering/RunFeatureParity.py --label <new-label>
 ```
 
-Repeat `--scenario <name>` for an explicit subset. `--repo-root`, `--run-source`,
-`--shader-pack` and `--frozen-repo` support isolated checkouts. Every requested
-capture must complete and pass Frozen with valid visual measurements.
-`--compare <prior-label>` additionally checks historical regressions;
-improvements do not fail, but unchanged historical failures still fail absolute
-parity. Incomplete feature coverage is not full rendering acceptance.
-Both drivers retire finished fixture copies and superseded marked invocations;
-see [capture storage](ARTIFACT-STORAGE.md) for pins and recovery limits.
+The [feature driver at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/DevUtils/tests/rendering/RunFeatureParity.py)
+defaults to ten Current/Frozen scenarios: `chest`, `chest-shaders`, `bed`,
+`oak-sign`, `banner`, `zombie-armor-foil`, `held-trident-foil`, `held-shield`,
+`held-shield-foil` and `empty-hand`. Only `chest-shaders` enables shaders;
+this is not a shader-on/off matrix for every feature. Repeat
+`--scenario <name>` to request a subset.
+
+`--repo-root`, `--run-source`, `--shader-pack` and `--frozen-repo` must all exist,
+including the shader pack for shaders-off subsets. They default to the script's
+checkout, its `run/`, `run/shaderpacks/ComplementaryHungLoIfied.zip`, and the
+same Frozen sibling respectively; the source/pack environment overrides above
+also apply. The driver builds release native code and Java classes in the
+selected checkout before captures. Outputs remain in the **script's checkout**
+under `artifacts/graphics-captures/feature-parity/<label>/`, even with
+`--repo-root` pointing elsewhere. Use a fresh label. Results are `summary.json`,
+`build.log`, scenario logs and nested capture evidence; an early build failure
+returns without the final summary.
+
+Every requested scenario must be present, exit zero, report manifest success,
+have three finite nonnegative RGB errors and a passing
+`cross_repository_visual_parity` status. The driver relies on the capture
+manifest's parity decision; it does not independently recompute the threshold
+or require every optional crop, foil or equipment subreport. Inspect those
+reports and images for the feature being changed. `--compare <prior-label>`
+additionally requires requested scenarios in the baseline, rejects lost report
+coverage or previously passing status, and flags any RGB error channel more
+than 1.0 above baseline. Improvements do not fail, but unchanged historical
+failures still fail absolute parity. A comparison baseline must remain available
+beside the new output, with its `summary.json` intact.
+
+Feature capture timeouts set exit 124, but manifest parsing occurs before owned
+client cleanup and final summary writing. An independent mocked timeout with a
+truncated manifest raised `JSONDecodeError` before either occurred; treat a
+missing summary as incomplete evidence, not a pass, and check for owned clients
+after such an abort. The startup client check and post-capture cleanup have the
+same `/proc` limits described above; a signaled owned client rejects its
+scenario. All six Python feature fixtures passed independently, covering
+synthetic summary/status and comparison behavior, not live feature captures.
+Incomplete feature coverage is not full rendering acceptance. Both drivers
+retire finished fixture copies and superseded marked invocations; see
+[capture storage](ARTIFACT-STORAGE.md) for pins, destructive retirement and
+recovery limits before running either driver.
 
 ### Lifecycle gate
 

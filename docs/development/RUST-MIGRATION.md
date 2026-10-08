@@ -1,10 +1,10 @@
 # Completing the Rust migration
 
-The final runtime is **one Rust library and one Rust executable**, with client
-and dedicated-server modes and no Java/JVM. This is ongoing work. Current
-native kernels and Java bridges do not establish completion. Keep the root
-`PROGRESS.md` within 100 lines, `SUMMARY.md` within 10, and `ASSUMPTIONS.md`
-concise; put subsystem documentation beside its owner.
+The final runtime is **one Rust executable**, with client and dedicated-server
+modes, **at most one separately loaded Rust library**, and no Java/JVM. This is
+ongoing work. Current native kernels and Java bridges do not establish
+completion. Keep the root `PROGRESS.md` within 100 lines, `SUMMARY.md` within 10,
+and `ASSUMPTIONS.md` concise; put subsystem documentation beside its owner.
 
 ## Milestones
 

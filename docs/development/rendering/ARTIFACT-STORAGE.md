@@ -7,18 +7,22 @@ worlds as saves, even when their parent directory is named `cache`.
 
 ## Bulk retirement: 2026-10-08
 
-Free space rose from about 8.8 GiB to 304 GiB. The capture tree fell from
-339 GiB to about 62 GiB. This cleanup retired 1,081 inactive generated
-workspaces, 413 obsolete videos/raw readbacks, unused Cargo incremental
-caches, and 8,135 inactive Gradle daemon logs. It also replaced 2,669 large
-historical measurement/log/readback files with hash-verified `.gz` archives,
-recovering 42.26 GiB through compression alone.
+The [implementation author's cleanup record at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/docs/development/rendering/ARTIFACT-STORAGE.md)
+reports free space rising from about 8.8 GiB to 304 GiB and the capture tree
+falling from 339 GiB to about 62 GiB. It records retirement of 1,081 inactive
+generated workspaces, 413 obsolete videos/raw readbacks, unused Cargo incremental
+caches, and 8,135 inactive Gradle daemon logs. The record also attributes
+42.26 GiB of recovery to replacing 2,669 large historical measurement/log/readback
+files with hash-verified `.gz` archives.
 
-Current verification reports and frames, source worlds, original shader packs,
-retained reference assets, and unresolved crash evidence remain available.
-The ignored receipt directory `artifacts/graphics-captures/goal5/disk-cleanup-20261008/`
-records deleted paths, preserved fixture manifests, archive hashes, and
-before/after checks. Protected save/settings and shader-pack hashes matched.
+The author reports preserving current verification reports and frames, source
+worlds, original shader packs, retained reference assets and unresolved crash
+evidence. The ignored receipt directory
+`artifacts/graphics-captures/goal5/disk-cleanup-20261008/` is reported to contain
+deleted paths, preserved fixture manifests, archive hashes and before/after
+checks, with protected save/settings and shader-pack hashes matching. This
+documentation review did not inspect that unbundled receipt or the source
+filesystem, reproduce the cleanup, or independently establish those figures.
 Retired videos/readbacks cannot be restored from this receipt; old generated
 workspaces require regeneration from their recorded inputs.
 
@@ -26,27 +30,68 @@ After a paired verification invocation finishes, retire its generated fixture
 copies once its input sources and fixture manifests are retained. Keep recent
 acceptance evidence and representative unresolved failures; prune superseded
 captures regularly. Capture quotas exclude `.canonical-fixtures`, and
-`--artifact-preserve-current-run` bypasses retention cleanup, so neither bounds
+`--artifact-preserve-current-run` protects the current capture's extracted
+evidence while ordinary cleanup still removes managed temporary game directories;
+it does not bypass the verification-driver retirement below. Neither gives a bound on
 total workspace storage. Never retire a fixture between Current and Frozen
 rows or while a client/build still uses it.
 
 ## Verification-driver retention
 
-`RunValidation.py` and `RunFeatureParity.py` now retire completed generated
-fixture/game copies after their comparisons, keeping fixture manifests and
-capture evidence. This occurs even when capture evidence was preserved. Known
-fixtures require the v2 manifest and distinct retained source path; unknown
-fixtures, symlinks, live workspaces and crash-containing workspaces stay.
-Automatic workspace retirement requires `/proc` process visibility.
+The [retirement helpers at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/DevUtils/Common/artifact_retention.py#L410-L497)
+perform two separate destructive operations. `RunValidation.py` retires workspace
+copies while finishing its summary; `RunFeatureParity.py` does so after each
+scenario's pair and again at the end. Both prune older completed invocations
+after writing their summary. Failed comparisons are eligible too. A driver
+exception before these calls can leave copies and no final retention receipt.
 
-For newly marked invocations from these drivers, automatic retention keeps
-the latest successful run and latest failed run. A root `.keep` file pins an
-investigation or current published acceptance record; crash-containing copies
-pin their invocation automatically. `RunFeatureParity.py --compare` protects
-that baseline during the comparison. Remove obsolete pins when their purpose
-is resolved. Older/unknown driver summaries are excluded from this automatic
-retirement and need deliberate cleanup. Retired full invocations are deleted,
-not archived; capture readers cannot replay their removed evidence.
+For workspace retirement, only paths inside a marked invocation are candidates:
+
+- `.canonical-fixtures/<fixture>/run` requires a
+  `mattmc-cross-repo-fixture-v2` manifest with a matching resolved `run_root`
+  and `source_run` that is neither the run itself, its ancestor nor its
+  descendant. The manifest beside `run` remains after deletion.
+- Directories named `game_dir_*` or `region_validation_game_*` qualify by name;
+  they do not require the canonical-fixture manifest.
+- Unknown canonical fixtures and symlinked fixture/run candidates remain.
+  Cleanup also retains candidates when `/proc` is absent or a readable process
+  command/working directory references them. This is best-effort process
+  discovery: unreadable process records are not proof of inactivity, and open
+  files alone are not checked. Stop affected clients and builds before cleanup.
+- Files matching `hs_err_pid*.log`, `core*` or `crash-reports/*` at the candidate
+  workspace root retain that workspace and create a root `.keep` pin. This is
+  not a recursive search for every form or location of crash evidence.
+
+**Keep source saves outside retirement-managed outputs and verify them before
+running either driver.** The canonical-fixture check validates path relationships,
+not source existence, input hashes or recoverability. The drivers check source
+existence before creating a fresh output, and the capture harness requires a
+source world. The retirement helper does not revalidate source availability
+later or independently protect sources placed inside disposable output trees.
+Isolated synthetic fixtures confirm those helper limits; they do not reproduce
+data loss in a normal fresh-driver run. A manifest by itself is not a backup.
+
+Workspace retirement ignores capture preservation and root `.keep` pins;
+those pins protect the **full invocation** in the next operation. Among sibling
+invocations with the exact driver schema (`mattmc-validation-v2` or
+`mattmc-feature-parity-v2`), a generated-root marker and a Boolean `passed`,
+full-invocation retirement keeps the newest successful and failed summary by
+`summary.json` modification time. It also keeps the current invocation, root
+`.keep` pins, symlinked invocations and detected live work.
+`RunFeatureParity.py --compare <label>` protects that label during this call;
+add a root `.keep` if it must survive later runs that do not name it. A `.preserve`
+marker alone does not pin an invocation against this operation. Older/unknown,
+missing or unreadable summaries are excluded and need deliberate review.
+Remove obsolete `.keep` pins only after their investigation or published
+acceptance purpose is resolved.
+
+`summary.json` records the final workspace pass in `workspace_retention` and
+deleted old runs in `retired_invocations`; the feature driver's earlier
+per-scenario workspace passes are not accumulated in that final receipt.
+Retirement deletes files, without an archive or undo path. Keep the input sources
+and pin evidence needed to reproduce a comparison. Four independently run Python
+retention tests passed on temporary fixtures; their mocked process checks do
+not establish safe cleanup of the author's live filesystem.
 
 ## Lossless historical archives
 
