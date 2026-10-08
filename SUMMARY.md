@@ -1,10 +1,10 @@
-# Recorded Rust vs Frozen Java speed (2026-10-08; candidate d7ee0335d, RTX 2070, moving camera, ABAB, 6,000 frames; FPS per run)
+# Rust vs Frozen Java speed (2026-10-08; master 97e309226 + native state graphs, uncommitted; RTX 2070; moving camera; 6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,123.0 / 1,067.9 | 1,200.4 / 1,174.9 |
-| Vanilla + DH | 601.7 / 705.0 | 740.2 / 682.4 |
-| Shaders | 352.4 / 348.7 | 320.9 / 316.1 |
-| Shaders + DH | 252.3 / 243.3 | 227.7 / 225.9 |
-Recorded in `artifacts/graphics-captures/validation/batch2/summary.json` in the original checkout; raw benchmark receipts are unavailable.
-Vanilla/DH average-FPS floors remain unproven (paired medians −7.8%/−8.1%); shader medians +10.1%/+9.3%. Verification-only changes add no runtime speed claim.
-Reproduce with retained inputs: `python3 DevUtils/tests/rendering/RunValidation.py --label <new> --perf` (see rendering verification docs).
+| Vanilla | 1,080.0 / 1,052.2 | 1,114.6 / 1,162.8 |
+| Vanilla + DH | 597.7 / 618.9 | 597.2 / 817.0 |
+| Shaders | 337.0 / 328.3 | 312.0 / 309.9 |
+| Shaders + DH | 239.5 / 234.3 | 217.7 / 215.0 |
+Receipts under graphics captures: latest vanilla `goal5/dense-mesh-cache-measurement-v3/results.json` (control/Frozen rows); other modes `validation/state-graphs-master-20261008/summary.json` (ABAB). All listed runs clean, VUID0; rejected slot cache excluded.
+Performance FAIL: vanilla/DH FPS medians −6.4%/−14.0%; shader medians +7.0%/+9.5%. Latest vanilla p99 Current/Frozen3.595/3.206 ms; other failing tails remain vanilla+DH and shaders+DH.
+Full Java/Rust suites, seven lifecycle cases and visually reviewed vanilla/Iris+DH coast pairs pass; broader gameplay/memory parity and Rust-only application remain incomplete.

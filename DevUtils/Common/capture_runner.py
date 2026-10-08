@@ -581,6 +581,19 @@ class CaptureRunner:
             if path is None or not path.exists():
                 continue
             try:
+                if path.is_symlink():
+                    self.append_meta(f"artifact_retention_game_dir_cleanup=retained_symlink:{path}")
+                    continue
+                path = artifact_retention.assert_inside_marked_root(marker_root, path)
+                if (not Path("/proc").is_dir()
+                        or artifact_retention._live_process_references(path, str(path))):
+                    self.append_meta(f"artifact_retention_game_dir_cleanup=retained_live_or_unproven:{path}")
+                    continue
+                crash_files = [*path.glob("hs_err_pid*.log"), *path.glob("core*"),
+                               *path.glob("crash-reports/*")]
+                if any(item.is_file() for item in crash_files):
+                    self.append_meta(f"artifact_retention_game_dir_cleanup=retained_crash_evidence:{path}")
+                    continue
                 artifact_retention.remove_path(marker_root, path)
                 removed.append(path)
                 parent = path.parent

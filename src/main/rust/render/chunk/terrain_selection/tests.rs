@@ -119,6 +119,63 @@ fn duplicate_mesh_keys_draw_once_and_cleared_rows_disappear() {
 }
 
 #[test]
+fn mesh_slots_preserve_publication_before_readiness_and_slot_reuse() {
+    let first = [0, 0, 0];
+    let second = [1, 0, 0];
+    let mut graph = SectionGraph::new(0, 0);
+    graph.set_meshes(first, Some(meshes(100, true)));
+    graph.add_column(0, 0);
+    graph.set_info(first, Some(SectionInfo { flags: GEOMETRY, visibility: 0 }));
+    let old_visit = visit(&graph, first);
+    let mut out = TerrainSelection::default();
+    graph.select_terrain(&[old_visit], &params(false, 0), &mut out);
+    assert_eq!(vec![100, 101, 102], out.sections.iter().map(|s| s.mesh_key).collect::<Vec<_>>());
+
+    graph.remove_column(0, 0);
+    graph.add_column(1, 0);
+    graph.set_info(second, Some(SectionInfo { flags: GEOMETRY, visibility: 0 }));
+    assert_eq!(old_visit.slot, graph.slot(second).unwrap());
+    // The new occupant has no row; it must not inherit the previous mesh.
+    graph.select_terrain(&[visit(&graph, second)], &params(false, 0), &mut out);
+    assert!(out.sections.is_empty());
+    graph.set_meshes(second, Some(meshes(200, true)));
+    graph.select_terrain(&[visit(&graph, second)], &params(false, 0), &mut out);
+    assert_eq!(vec![200, 201, 202], out.sections.iter().map(|s| s.mesh_key).collect::<Vec<_>>());
+    // Older visits retain the canonical coordinate lookup's behavior even
+    // when their numeric slot now belongs to another column.
+    graph.select_terrain(&[old_visit], &params(false, 0), &mut out);
+    assert_eq!(vec![100, 101, 102], out.sections.iter().map(|s| s.mesh_key).collect::<Vec<_>>());
+    graph.set_meshes(first, None);
+    graph.select_terrain(&[old_visit], &params(false, 0), &mut out);
+    assert!(out.sections.is_empty());
+}
+
+#[test]
+fn clearing_and_replacing_mesh_rows_updates_camera_and_shadow_streams() {
+    let first = [0, 0, 0];
+    let second = [1, 0, 0];
+    let mut graph = graph(&[(first, GEOMETRY), (second, GEOMETRY)]);
+    graph.set_meshes(first, Some(meshes(100, true)));
+    graph.set_meshes(second, Some(meshes(200, false)));
+    let visits = [visit(&graph, first)];
+    let mut out = TerrainSelection::default();
+    graph.select_terrain(&visits, &params(true, 16), &mut out);
+    assert_eq!(3, out.sections.len());
+    assert_eq!(2, out.casters.len());
+    graph.clear_meshes();
+    graph.select_terrain(&visits, &params(true, 16), &mut out);
+    assert!(out.sections.is_empty());
+    assert!(out.casters.is_empty());
+    let mut replacement = meshes(300, true);
+    replacement.generations = [99; 3];
+    graph.set_meshes(second, Some(replacement));
+    graph.select_terrain(&visits, &params(true, 16), &mut out);
+    assert!(out.sections.is_empty());
+    assert_eq!(vec![300, 301, 302], out.casters.iter().map(|s| s.mesh_key).collect::<Vec<_>>());
+    assert!(out.casters.iter().all(|s| s.mesh_generation == 99));
+}
+
+#[test]
 fn receipts_off_skip_the_fingerprint_but_keep_counts() {
     let position = [0, 0, 0];
     let mut graph = graph(&[(position, GEOMETRY)]);

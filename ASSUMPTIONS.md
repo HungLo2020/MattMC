@@ -4,3 +4,4 @@
 - Preserve existing worlds, content and integrated features; follow the recorded game-model decisions.
 - Move complete subsystem ownership into Rust; bridges are temporary and new crates require approval.
 - Publish tested milestones to master; retain compact evidence and prune generated copies routinely.
+- Work on `master` in this MattMC checkout; do not use a separate migration checkout.

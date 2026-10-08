@@ -23,6 +23,30 @@ deleted paths, preserved fixture manifests, archive hashes and before/after
 checks, with protected save/settings and shader-pack hashes matching. This
 documentation review did not inspect that unbundled receipt or the source
 filesystem, reproduce the cleanup, or independently establish those figures.
+
+A follow-up reclaimed another 45.54 GiB, leaving about 348 GiB free. It removed
+41 unused build-output/cache directories and, after stopping the idle Gradle
+daemon, its regenerable compiler analysis cache. The active checkout's main
+build and staged native library remain available; retired build trees require
+recompilation. Another 1,237 historical logs, measurement files and raw
+readbacks became hash-verified `.gz` archives, saving 13.96 GiB. Nineteen exact
+duplicate archives now share storage through hardlinks. Recent validation,
+feature comparison baselines, source fixtures and crash evidence were excluded
+from this additional compression. All 28 protected source/save/settings/pack
+hashes matched, and cleanup left the worktree status unchanged before this
+documentation update. Follow-up receipts are in `bulk-followup/` below the
+receipt directory named below.
+
+A final sweep reclaimed another 10.90 GiB: 2,065 byte-identical historical
+artifact files now share storage, five inactive generated fixtures outside the
+main capture tree were retired, and unused Cargo profiles/incremental data were
+removed. The current release library and debug test outputs remain; rebuilding
+retired profiles recreates their caches. Free space measured 352.49 GiB after
+the recent builds and verification runs. Receipts in `final-dedup/` record
+duplicate hashes, original timestamps, removed paths and protected-file checks.
+Historical hardlinked artifacts are immutable: copy a file to a separate inode
+before editing it. Unique evidence and pinned investigations were retained.
+
 Retired videos/readbacks cannot be restored from this receipt; old generated
 workspaces require regeneration from their recorded inputs.
 
@@ -49,8 +73,8 @@ For workspace retirement, only paths inside a marked invocation are candidates:
 
 - `.canonical-fixtures/<fixture>/run` requires a
   `mattmc-cross-repo-fixture-v2` manifest with a matching resolved `run_root`
-  and `source_run` that is neither the run itself, its ancestor nor its
-  descendant. The manifest beside `run` remains after deletion.
+  and an existing `source_run` directory that is neither the run itself, its
+  ancestor nor its descendant. The manifest beside `run` remains after deletion.
 - Directories named `game_dir_*` or `region_validation_game_*` qualify by name;
   they do not require the canonical-fixture manifest.
 - Unknown canonical fixtures and symlinked fixture/run candidates remain.
@@ -64,10 +88,10 @@ For workspace retirement, only paths inside a marked invocation are candidates:
 
 **Keep source saves outside retirement-managed outputs and verify them before
 running either driver.** The canonical-fixture check validates path relationships,
-not source existence, input hashes or recoverability. The drivers check source
+plus source-directory existence, not input hashes or recoverability. The drivers check source
 existence before creating a fresh output, and the capture harness requires a
-source world. The retirement helper does not revalidate source availability
-later or independently protect sources placed inside disposable output trees.
+source world. The retirement helper does not compare recorded input hashes or independently
+protect sources placed inside disposable output trees.
 Isolated synthetic fixtures confirm those helper limits; they do not reproduce
 data loss in a normal fresh-driver run. A manifest by itself is not a backup.
 
@@ -89,9 +113,23 @@ acceptance purpose is resolved.
 deleted old runs in `retired_invocations`; the feature driver's earlier
 per-scenario workspace passes are not accumulated in that final receipt.
 Retirement deletes files, without an archive or undo path. Keep the input sources
-and pin evidence needed to reproduce a comparison. Four independently run Python
-retention tests passed on temporary fixtures; their mocked process checks do
-not establish safe cleanup of the author's live filesystem.
+and pin evidence needed to reproduce a comparison. The earlier documentation
+review independently ran four temporary-fixture tests with mocked process
+checks. Current verification passes nine retention tests, including a real
+child-process lifetime check, within 37 passing harness regressions. These
+bounded checks do not establish safe cleanup of every live filesystem state.
+
+The capture runner also retires its isolated game directories after shutdown.
+Its ownership-marker search now reaches parent directories; the former early
+return silently skipped this cleanup. Live process references, symlinks,
+missing `/proc` process visibility and crash-containing copies remain. Canonical
+fixture retirement also requires that its recorded source directory still
+exists. Check these paths with:
+
+```sh
+python3 -m unittest discover -s DevUtils/tests/rendering -p test_verification_artifacts.py
+```
+
 
 ## Lossless historical archives
 

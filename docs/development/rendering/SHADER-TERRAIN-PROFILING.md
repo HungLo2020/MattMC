@@ -50,6 +50,33 @@ equivalence or substitute for the separate visual/temporal checks. Follow the
 and [artifact retention guidance](ARTIFACT-STORAGE.md#verification-driver-retention)
 so evidence needed for a later comparison remains available.
 
+## October 8 native mesh lookup experiment (rejected)
+
+On master `97e309226` with uncommitted native state graphs, a derived
+slot-indexed mesh cache was compared with its previous implementation and
+Frozen OpenGL: control/candidate/Frozen/Frozen/candidate/control, 6,000 moving
+frames each, 360 settle and 240 warm-up frames. All six runs completed cleanly
+with zero VUIDs. Current clients' mapped library paths and SHA-256 values were
+verified; two earlier launch-override probes failed this identity check and
+are excluded. Gradle's later JavaExec configuration replaced the configuration
+time override, so the diagnostic set it immediately before JavaExec launched.
+
+| Version | FPS per run | Median p99 (ms) |
+| --- | --- | --- |
+| Previous native lookup | 1,080.0 / 1,052.2 | 3.595 |
+| Slot cache experiment | 1,022.0 / 1,068.5 | 4.028 |
+| Frozen OpenGL | 1,114.6 / 1,162.8 | 3.206 |
+
+Median native terrain semantic submission fell from 0.03750 to 0.03590 ms,
+but candidate median FPS was 1.96% lower and p99 12.04% higher than control.
+This did not demonstrate an overall win; the cache was removed. Publication,
+readiness, slot reuse and reload-clearing regressions remain. The previous
+lookup still trails Frozen; this vanilla-only diagnostic does not establish
+four-mode performance or visual acceptance. Compact receipts are under
+`artifacts/graphics-captures/goal5/dense-mesh-cache-measurement-v3/`; generated
+fixture copies retired after each run. Resume profiling from the retained
+whole-frame costs before implementing another optimization.
+
 ## October 7 comparison controls
 
 The historical [22:36 summary at `697b0a3c`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/SUMMARY.md) reports two

@@ -159,6 +159,12 @@ def nearest_marked_root(path: Path) -> Path | None:
     current = canonical(path)
     if current.is_file():
         current = current.parent
+    while True:
+        if (current / MARKER_NAME).is_file():
+            return current
+        if current.parent == current:
+            return None
+        current = current.parent
 
 
 def clear_auto_preserve_markers(root: Path) -> list[Path]:
@@ -175,12 +181,6 @@ def clear_auto_preserve_markers(root: Path) -> list[Path]:
             marker.unlink()
             removed.append(marker)
     return removed
-    while True:
-        if (current / MARKER_NAME).is_file():
-            return current
-        if current.parent == current:
-            return None
-        current = current.parent
 
 
 def assert_inside_marked_root(root: Path, candidate: Path) -> Path:
@@ -435,6 +435,7 @@ def retire_completed_fixtures(root: Path) -> dict[str, list[str]]:
                         source = canonical(Path(manifest["source_run"]))
                         known = (manifest.get("schema") == "mattmc-cross-repo-fixture-v2"
                                  and canonical(Path(manifest["run_root"])) == canonical(run)
+                                 and source.is_dir()
                                  and not source.is_relative_to(canonical(run))
                                  and not canonical(run).is_relative_to(source))
                     except (OSError, ValueError, KeyError, TypeError):
