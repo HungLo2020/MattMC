@@ -13,6 +13,11 @@ Java registries are frozen. Lighting, heightmaps, worldgen and chunk saving
 derive their tables from it; terrain meshing combines its facts with
 render-owned columns when registering each meshing state.
 
+The [fluid registry](FLUID-DEFINITIONS.md) is built natively: all five entries,
+property declarations, defaults and 37 intrinsic state rows use typed
+`FluidId`/`FluidStateId`. Java registers compatibility views in Rust order;
+world-dependent flow and ticks have not migrated.
+
 Still separate:
 - items, entity types, tags and biomes: no Rust registry yet
 - rendering's own meshing-state columns (models, materials, passes,

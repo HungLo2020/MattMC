@@ -26,10 +26,13 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class WaterFluid extends FlowingFluid {
+	protected WaterFluid(NativeFluidDefinitions.Definition definition) {
+		super(definition);
+	}
+
 	@Override
 	public Fluid getFlowing() {
 		return Fluids.FLOWING_WATER;
@@ -126,42 +129,19 @@ public abstract class WaterFluid extends FlowingFluid {
 	}
 
 	@Override
-	protected float getExplosionResistance() {
-		return 100.0F;
-	}
-
-	@Override
 	public Optional<SoundEvent> getPickupSound() {
 		return Optional.of(SoundEvents.BUCKET_FILL);
 	}
 
 	public static class Flowing extends WaterFluid {
-		@Override
-		protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
-			super.createFluidStateDefinition(builder);
-			builder.add(LEVEL);
-		}
-
-		@Override
-		public int getAmount(FluidState fluidState) {
-			return (Integer)fluidState.getValue(LEVEL);
-		}
-
-		@Override
-		public boolean isSource(FluidState fluidState) {
-			return false;
+		Flowing(NativeFluidDefinitions.Definition definition) {
+			super(definition);
 		}
 	}
 
 	public static class Source extends WaterFluid {
-		@Override
-		public int getAmount(FluidState fluidState) {
-			return 8;
-		}
-
-		@Override
-		public boolean isSource(FluidState fluidState) {
-			return true;
+		Source(NativeFluidDefinitions.Definition definition) {
+			super(definition);
 		}
 	}
 }

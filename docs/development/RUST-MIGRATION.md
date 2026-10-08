@@ -37,12 +37,18 @@ behavior/save tests. Isolated checkouts need explicit `--run-source`,
 `--vanilla-run-source` and `--shader-pack` pointing at retained inputs.
 `RunFeatureParity.py` adds held-item, equipment and block-entity fixtures.
 Preserve actual receipts and inspect images; reject incomplete, crashed,
-non-equivalent or pathological runs. Average FPS and p99 must meet Frozen
-across the four renderer modes. Desktop noise calls for more paired evidence,
-not an automatic acceptance waiver.
+non-equivalent or pathological runs. Average FPS and p99 meeting Frozen
+across the four renderer modes remains the performance acceptance target.
+Record failures honestly and use profiling to select further native ownership
+moves and compact data paths. An existing renderer performance gap does not
+halt migration or make all ownership milestones wait for the whole renderer
+floor to pass. Desktop noise calls for more paired evidence, not a performance
+pass without evidence.
 
 For runtime changes, measure before and after with equivalent realistic
-workloads and monitor memory/resources through repeated transitions. Tooling
+workloads and monitor memory/resources through repeated transitions. Diagnose
+regressions introduced by a slice and keep unresolved limits explicit; do not
+claim full parity until all required evidence passes. Tooling
 and documentation-only milestones make no new runtime performance claim.
 Update affected docs, run `python3 DevUtils/RunWiki.py check`, then commit and
 push tested milestones to master. Prune superseded evidence using the

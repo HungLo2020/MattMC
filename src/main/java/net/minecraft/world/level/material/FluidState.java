@@ -29,9 +29,12 @@ public final class FluidState extends StateHolder<Fluid, FluidState> {
 	public static final Codec<FluidState> CODEC = codec(BuiltInRegistries.FLUID.byNameCodec(), Fluid::defaultFluidState).stable();
 	public static final int AMOUNT_MAX = 9;
 	public static final int AMOUNT_FULL = 8;
+	private final NativeFluidDefinitions.Traits nativeTraits;
 
-	public FluidState(Fluid fluid, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<FluidState> mapCodec) {
+	FluidState(Fluid fluid, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<FluidState> mapCodec,
+		NativeFluidDefinitions.Traits nativeTraits) {
 		super(fluid, reference2ObjectArrayMap, mapCodec);
+		this.nativeTraits = nativeTraits;
 	}
 
 	public Fluid getType() {
@@ -39,11 +42,11 @@ public final class FluidState extends StateHolder<Fluid, FluidState> {
 	}
 
 	public boolean isSource() {
-		return this.getType().isSource(this);
+		return this.nativeTraits.source();
 	}
 
 	public boolean isSourceOfType(Fluid fluid) {
-		return this.owner == fluid && this.owner.isSource(this);
+		return this.owner == fluid && this.isSource();
 	}
 
 	public boolean isEmpty() {
@@ -55,11 +58,15 @@ public final class FluidState extends StateHolder<Fluid, FluidState> {
 	}
 
 	public float getOwnHeight() {
-		return this.getType().getOwnHeight(this);
+		return this.nativeTraits.ownHeight();
 	}
 
 	public int getAmount() {
-		return this.getType().getAmount(this);
+		return this.nativeTraits.amount();
+	}
+
+	int legacyLevel() {
+		return this.nativeTraits.legacyLevel();
 	}
 
 	public boolean shouldRenderBackwardUpFace(BlockGetter blockGetter, BlockPos blockPos) {

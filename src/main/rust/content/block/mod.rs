@@ -13,6 +13,7 @@ mod tests;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::OnceLock;
+use super::state::{StateLayout, StateSlot};
 
 /// A block, by its `BuiltInRegistries.BLOCK` ID.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -42,7 +43,7 @@ impl StateId {
 
 /// The most states a registry may hold. `u16::MAX` stays free so tables can
 /// use it as "no state".
-pub const MAX_STATES: usize = u16::MAX as usize;
+pub const MAX_STATES: usize = super::state::MAX_STATES;
 
 /// `Direction.values()` order: down, up, north, south, west, east.
 pub const DIRECTIONS: usize = 6;
@@ -165,8 +166,7 @@ impl Property {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Slot {
     property: PropertyId,
-    count: u16,
-    stride: u16,
+    state: StateSlot,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -347,18 +347,14 @@ impl BlockRegistry {
     pub fn value(&self, state: StateId, property: PropertyId) -> Option<u16> {
         let block = self.block(self.block_of(state));
         let slot = block.slot(property)?;
-        Some((state.0 - block.first) / slot.stride % slot.count)
+        Some(slot.state.value(state.0 - block.first))
     }
 
     /// `state.setValue(property, values[index])`.
     pub fn with_value(&self, state: StateId, property: PropertyId, index: u16) -> Option<StateId> {
         let block = self.block(self.block_of(state));
         let slot = block.slot(property)?;
-        if index >= slot.count {
-            return None;
-        }
-        let current = (state.0 - block.first) / slot.stride % slot.count;
-        Some(StateId(state.0 - current * slot.stride + index * slot.stride))
+        slot.state.with_value(state.0 - block.first, index).map(|local| StateId(block.first + local))
     }
 
     /// The state of `block` with each property (in name order) at `values`.
@@ -369,10 +365,10 @@ impl BlockRegistry {
         }
         let mut offset = 0;
         for (slot, &value) in block.slots.iter().zip(values) {
-            if value >= slot.count {
+            if value >= slot.state.count {
                 return None;
             }
-            offset += value * slot.stride;
+            offset += value * slot.state.stride;
         }
         Some(StateId(block.first + offset))
     }
@@ -409,17 +405,17 @@ impl Builder {
     /// `default` is the default state's offset within the block.
     pub fn block(&mut self, name: &str, properties: &[PropertyId], default: u16, states: Vec<StateFacts>) -> Result<BlockId, Error> {
         let id = u16::try_from(self.blocks.len()).map_err(|_| Error::Invalid("block count"))?;
-        let mut slots = Vec::with_capacity(properties.len());
-        let mut count: usize = 1;
-        for &property in properties.iter().rev() {
+        let mut counts = Vec::with_capacity(properties.len());
+        for (i, &property) in properties.iter().enumerate() {
             let values = self.properties.get(property.0 as usize).ok_or(Error::Invalid("property id"))?.values.len();
-            if slots.iter().any(|s: &Slot| s.property == property) {
+            if properties[..i].contains(&property) {
                 return Err(Error::Invalid("repeated property"));
             }
-            slots.push(Slot { property, count: values as u16, stride: count as u16 });
-            count = count.checked_mul(values).filter(|&c| c <= MAX_STATES).ok_or(Error::Invalid("state count"))?;
+            counts.push(values as u16);
         }
-        slots.reverse();
+        let layout = StateLayout::new(&counts).map_err(|_| Error::Invalid("state count"))?;
+        let count = layout.state_count();
+        let slots = properties.iter().zip(layout.slots()).map(|(&property, &state)| Slot { property, state }).collect();
         if states.len() != count || default as usize >= count {
             return Err(Error::Invalid("block states"));
         }

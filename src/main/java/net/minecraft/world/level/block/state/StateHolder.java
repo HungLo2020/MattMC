@@ -35,6 +35,8 @@ public abstract class StateHolder<O, S> {
 	protected final O owner;
 	private final Reference2ObjectArrayMap<Property<?>, Comparable<?>> values;
 	private Map<Property<?>, S[]> neighbours;
+	// Retains the immutable native graph behind this state's projected targets.
+	private NativeStateGraph nativeGraph;
 	protected final MapCodec<S> propertiesCodec;
 
 	protected StateHolder(O object, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<S> mapCodec) {
@@ -130,31 +132,25 @@ public abstract class StateHolder<O, S> {
 		}
 	}
 
-	public void populateNeighbours(Map<Map<Property<?>, Comparable<?>>, S> map) {
+	void populateNativeNeighbours(NativeStateGraph graph, int state, List<Property<?>> properties, List<S> states) {
 		if (this.neighbours != null) {
 			throw new IllegalStateException();
 		} else {
 			Map<Property<?>, S[]> map2 = new Reference2ObjectArrayMap<>(this.values.size());
 
-			for (Entry<Property<?>, Comparable<?>> entry : this.values.entrySet()) {
-				Property<?> property = (Property<?>)entry.getKey();
+			for (int p = 0; p < properties.size(); p++) {
+				Property<?> property = properties.get(p);
 				List<?> possibles = property.getPossibleValues();
 				S[] arr = (S[]) new StateHolder[possibles.size()];
-				int idx = 0;
-				for (Object comparable : possibles) {
-					arr[idx++] = map.get(this.makeNeighbourValues(property, (Comparable<?>) comparable));
+				for (int value = 0; value < possibles.size(); value++) {
+					arr[value] = states.get(graph.target(state, p, value));
 				}
 				map2.put(property, arr);
 			}
 
 			this.neighbours = map2;
+			this.nativeGraph = graph;
 		}
-	}
-
-	private Map<Property<?>, Comparable<?>> makeNeighbourValues(Property<?> property, Comparable<?> comparable) {
-		Map<Property<?>, Comparable<?>> map = new Reference2ObjectArrayMap<>(this.values);
-		map.put(property, comparable);
-		return map;
 	}
 
 	public Map<Property<?>, Comparable<?>> getValues() {

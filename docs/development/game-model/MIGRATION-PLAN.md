@@ -41,6 +41,14 @@ Not done in Phase 1, by design:
 
 ## Phase 2: Rust defines the registries
 
+The [native state graph constructor](STATE-GRAPHS.md) now supplies Cartesian
+state values and transition IDs for block/fluid definitions and shared
+block-registry slot arithmetic. [Fluid definitions](FLUID-DEFINITIONS.md) now
+come from Rust, including all five registry entries and their 37 intrinsic
+state rows. Java still supplies block declarations, factories, codecs,
+state-object views and world-dependent fluid simulation. The remaining
+registry-definition migration below is unfinished.
+
 - Rust builds the registries from its own definitions (the builders in
   [adding content](ADDING-CONTENT.md)) in Java's order.
 - Java *verifies* against Rust at startup, then later reads IDs from it.

@@ -4,7 +4,6 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Decoder;
@@ -12,7 +11,6 @@ import com.mojang.serialization.Encoder;
 import com.mojang.serialization.MapCodec;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -21,7 +19,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import com.google.common.collect.Maps;
 import net.minecraft.world.level.block.state.properties.Property;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,35 +40,22 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 		}
 
 		MapCodec<S> mapCodec2 = mapCodec;
-		Map<Map<Property<?>, Comparable<?>>, S> map2 = Maps.<Map<Property<?>, Comparable<?>>, S>newLinkedHashMap();
 		List<S> list = Lists.<S>newArrayList();
-		Stream<List<Pair<Property<?>, Comparable<?>>>> stream = Stream.of(Collections.emptyList());
-
-		for (Property<?> property : this.propertiesByName.values()) {
-			stream = stream.flatMap(listx -> property.getPossibleValues().stream().map(comparable -> {
-				List<Pair<Property<?>, Comparable<?>>> list2 = Lists.<Pair<Property<?>, Comparable<?>>>newArrayList(listx);
-				list2.add(Pair.of(property, comparable));
-				return list2;
-			}));
-		}
-
-		stream.forEach(list2 -> {
-			Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap = new Reference2ObjectArrayMap<>(list2.size());
-
-			for (Pair<Property<?>, Comparable<?>> pair : list2) {
-				reference2ObjectArrayMap.put(pair.getFirst(), pair.getSecond());
+		List<Property<?>> properties = List.copyOf(this.propertiesByName.values());
+		int[] counts = properties.stream().mapToInt(p -> p.getPossibleValues().size()).toArray();
+		NativeStateGraph graph = new NativeStateGraph(counts);
+		for (int state = 0; state < graph.stateCount; state++) {
+			Reference2ObjectArrayMap<Property<?>, Comparable<?>> values = new Reference2ObjectArrayMap<>(properties.size());
+			for (int property = 0; property < properties.size(); property++) {
+				Property<?> p = properties.get(property);
+				values.put(p, p.getPossibleValues().get(graph.value(state, property)));
 			}
-
-			S stateHolderx = factory.create(object, reference2ObjectArrayMap, mapCodec2);
-			map2.put(reference2ObjectArrayMap, stateHolderx);
-			list.add(stateHolderx);
-		});
-
-		for (S stateHolder : list) {
-			stateHolder.populateNeighbours(map2);
+			list.add(factory.create(object, values, mapCodec2));
 		}
-
 		this.states = ImmutableList.copyOf(list);
+		for (int state = 0; state < this.states.size(); state++) {
+			this.states.get(state).populateNativeNeighbours(graph, state, properties, this.states);
+		}
 	}
 
 	private static <S extends StateHolder<?, S>, T extends Comparable<T>> MapCodec<S> appendPropertyCodec(

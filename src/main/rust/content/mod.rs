@@ -2,3 +2,5 @@
 //! world, storage and gameplay code read instead of keeping their own copies.
 //! See docs/development/game-model/.
 pub mod block;
+pub mod fluid;
+pub mod state;

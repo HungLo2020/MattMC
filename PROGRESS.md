@@ -7,7 +7,7 @@
 ## Working state — 2026-10-08
 - Work takes place in `/home/matt/Documents/Repos/MattMC` on `master`; synced upstream documentation commit `7fdf1ebce` while preserving all native work and the user prompt edit.
 - Previous `batch` branch preserved at `d7ee0335d`; local documentation edits saved in stash `12345bcea835` and `build/migration-transfer-20261008/`. User prompt restored locally.
-- Master already owns Vulkan rendering, terrain visibility/assembly/publication, DH ledger/payloads and several world/storage kernels in Rust.
+- Master already owns Vulkan rendering, terrain visibility/assembly/publication, DH ledger/payloads and several world/storage kernels in Rust. Guard/test milestone published at `a0f5abeb2`; native content work below remains local.
 - Native block registry owns shared immutable tables; Java still defines and exports content. General gameplay, world orchestration, assets/platform startup and application lifecycle remain Java.
 - Cargo currently builds a cdylib only; `app/` is empty. Rust-only application and Java removal remain outstanding.
 ## Milestone 0 — trustworthy verification and storage (current)
@@ -33,7 +33,7 @@
 - Subsequent milestones: world storage/simulation, behavior/components by family, remaining rendering/assets/platform/network owners, native application lifecycle, then Java/bridge/build removal.
 - Renderer `batch` and ABI77 worktrees need measured integration before their runtime changes are promoted.
 
-## Milestone 1a — native state graph construction (uncommitted)
+## Milestone 1a — native state graph construction (publishing with 1b)
 - Rust `content/state` owns Cartesian enumeration and transition IDs for all block/fluid definitions; shared registry uses the same state-slot arithmetic.
 - Java state objects/transition-reference arrays remain temporary views; Java graph expansion and neighbour-map searches are removed. Block declarations and codecs still remain Java.
 - Native graph owners follow automatic-arena lifetimes; buffers immutable, 65,535-state ceiling, bounded materialized graph sizes.
@@ -42,9 +42,19 @@
 - Five unprofiled fresh-JVM pairs: bootstrap thread allocation Current958.90/Frozen1068.09 MB (−10.2%); median time2.322/2.271 s (+2.2%). No startup-speed improvement or gameplay-performance acceptance established.
 - Evidence moved to `build/state-graph-migration/evidence-before-transfer/`; transfer manifests preserve exact source hashes and original provenance.
 - Repeatable observer driver: `DevUtils/tests/content/VerifyStateGraphs.py`; all five pairs match Frozen, source/native hashes checked, reference unchanged. Receipt: `build/state-graph-master-verification-v2/results.json`.
-- Full gate `validation/state-graphs-master-20261008/` finished exit1: tests/wiki/lifecycle/parity pass; FPS floor fails. All 16 FPS receipts clean; 25 generated fixture copies retired automatically, investigation pinned. Publish only after acceptance.
+- Full gate `validation/state-graphs-master-20261008/` finished exit1: tests/wiki/lifecycle/parity pass; FPS floor fails. All 16 FPS receipts clean; 25 generated fixture copies retired automatically, investigation pinned. Remaining performance gap guides further native migration; it does not stop implementation.
 - All 7 lifecycle scenarios passed; visually reviewed coast pairs pass: vanilla RGB0.227/0.355/0.394, Iris+DH3.604/4.113/3.764 (DH subset3.692/3.985/3.870), VUID0, both client exits0.
 - Fresh ABAB/6,000: vanilla/DH FPS medians−3.7%/−14.0%; shader modes+7.0%/+9.5%. p99 Current/Frozen: vanilla3.606/3.580, DH7.186/5.431, shaders5.355/6.325, shaders+DH14.620/10.182 ms; `SUMMARY.md` has per-run FPS.
 - Profile receipts point to vanilla native mesh expansion/grouping0.144 ms/frame, DH command generation~0.30 ms, shader+DH resource preparation1.87–1.99 ms; inclusive scopes, not additive. Compact costs: `build/state-graph-migration/phase-costs.json`. Next: sampling/alloc diagnostics, actual fixes, repeat full floor.
 - Valid vanilla itimer/DWARF profile: 20.25 s wholly inside measured window, 10,126 render-thread samples; coordinator28.1% inclusive, terrain enqueue12.4%, selectVisible6.9%; mesh selection uses coordinate hashing despite dense graph slots. Evidence `goal5/state-graph-performance-profile-v3/`; older late-attachment profiles explicitly rejected. Next: inspect dense mesh lookup optimization, preserve ordering/lifecycle, measure against Frozen.
 - Rejected and removed slot-indexed mesh cache after 6 clean, mapped-library-verified runs: median candidate/control1045.3/1066.1 FPS, p994.028/3.595 ms; Frozen1138.7 FPS/p993.206 ms. Semantic-submit0.03750→0.03590 ms did not establish an overall win. Retained two publication/reuse/reload regressions; release rebuilt with exact measured control SHA, 138 chunk tests pass. Evidence `goal5/dense-mesh-cache-measurement-v3/`; 6 fixture copies and diagnostic binary copies retired.
+
+## Milestone 1b — native fluid definitions (verified ownership milestone; performance target unmet)
+- Rust `content/fluid` owns all five names/IDs, property declarations, defaults, resistance and all 37 intrinsic state rows; no Java definition export/input. Typed IDs and compact shared layouts are available to future native gameplay.
+- Java registry/state objects project native rows; removed Java property declarations and amount/source/height/legacy-level calculations. Hot getters use immutable cached views, with no native crossing. World-dependent flow/ticks/interactions still remain Java.
+- Preserve true-first falling domains and existing contiguous global IDs. Release build, 2 Rust fluid tests and 10 focused Java registry/graph/meshing tests pass; wiki2472/43 pass.
+- Five fresh-JVM pairs agree with untouched Frozen for every graph plus all fluid IDs/traits/legacy block IDs/codec outputs/canonical round trips; fluid digest `88ec5a63f0f0f999c863525582a4616c0772edf7fa41707e285ca1bfef7c05b6`. Receipt `build/fluid-definitions-master-verification-20261008/results.json`; median bootstrap2.267/2.233 s (+1.5%), main-thread allocation958.99/1066.39 MB (−10.1%, combined graph+fluid work).
+- Full workflow `validation/native-fluid-definitions-master-20261008/` completed exit1 solely for performance. Java1,697 passed/2 skipped; Rust2,351 passed/3 ignored; wiki2472/43 and all7 lifecycle scenarios pass. Reviewed coast pairs pass (vanilla RGB0.230/0.395/0.442, shaders+DH3.713/4.255/3.877; VUID0).
+- All16 FPS receipts clean/exact6000/exit0, no owned orphans; 25 generated fixture copies retired. Latest average-FPS medians vs Frozen: vanilla−6.0%, DH−18.6%, shaders+8.3%, shaders+DH+9.5%; all p99 comparisons fail. Shader-only p99 worsened versus earlier measurements; cause not established. `SUMMARY.md` preserves both repeats and the full performance gap.
+- User steering: move more ownership into Rust with sound compact data paths; continue migration while measuring/diagnosing performance. Do not stall the migration waiting for the entire renderer floor to pass.
+- Follow-on block→fluid-state association change prepared under `build/state-graph-migration/fluid-association-stage/`; 14 isolated native content tests pass, including all37 associations and invalid IDs/contradictory flags. Apply after this measurement finishes so its runtime stays consistent. Replaces duplicated kind/height columns with typed IDs and removes Java fluid-fact export.

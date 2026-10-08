@@ -23,7 +23,8 @@ and offset facts used by the meshing view.
   its properties in name order.
 - **Property arithmetic:** a state's value index for each property, `with_value` and
   `state(block, values)`. These are arithmetic on the state ID; the last
-  property varies fastest, as in `StateDefinition`.
+  property varies fastest. The [shared native state layout](STATE-GRAPHS.md)
+  also constructs the graph behind Java's temporary `StateDefinition` views.
 - **Per-state columns:**
   - the owning block
   - `StateFlags`: air, blocks motion, has fluid, random ticks, light-empty

@@ -182,7 +182,17 @@ beyond its block registry.
 
 ### `content/`
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, populated once by a lazy export from Java's frozen registries. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns content definitions, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
+[`content/state`](game-model/STATE-GRAPHS.md) owns ordered state domains,
+Cartesian values and transition graphs. The shared registry and temporary
+Java block/fluid views use it. Java block declarations and general gameplay
+remain outside this completed construction slice.
+
+[`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,
+registration order, property declarations, defaults and intrinsic state facts.
+Java projects compatibility objects; world-dependent fluid simulation remains
+Java. The registry is immutable and independent of its consumers.
+
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, populated once by a lazy export from Java's frozen registries. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block definitions, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
 
 ### `render/`
 
