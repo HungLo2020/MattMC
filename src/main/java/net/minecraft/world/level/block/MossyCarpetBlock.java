@@ -51,15 +51,17 @@ public class MossyCarpetBlock extends Block implements BonemealableBlock {
 
 	public MossyCarpetBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(BASE, true)
-				.setValue(NORTH, WallSide.NONE)
-				.setValue(EAST, WallSide.NONE)
-				.setValue(SOUTH, WallSide.NONE)
-				.setValue(WEST, WallSide.NONE)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(BASE, true)
+					.setValue(NORTH, WallSide.NONE)
+					.setValue(EAST, WallSide.NONE)
+					.setValue(SOUTH, WallSide.NONE)
+					.setValue(WEST, WallSide.NONE)
+			);
+		}
 		this.shapes = this.makeShapes();
 	}
 

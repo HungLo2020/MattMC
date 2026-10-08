@@ -31,7 +31,9 @@ public class BaseCoralWallFanBlock extends BaseCoralFanBlock {
 
 	public BaseCoralWallFanBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, true));
+		}
 	}
 
 	@Override

@@ -28,7 +28,9 @@ public class AmbersolLightBlock extends Block {
 
     public AmbersolLightBlock(Properties properties) {
         super(properties);
-        this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, Boolean.valueOf(false)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, Boolean.valueOf(false)));
+        }
     }
 
     public boolean propagatesSkylightDown(BlockState state, BlockGetter getter, BlockPos blockPos) {

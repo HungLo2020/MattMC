@@ -42,7 +42,9 @@ public class LightBlock extends Block implements SimpleWaterloggedBlock {
 
 	public LightBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 15).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 15).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

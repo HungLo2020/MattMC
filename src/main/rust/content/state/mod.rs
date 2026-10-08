@@ -116,7 +116,16 @@ impl StateGraph {
         })
     }
 
-    fn header(&self) -> [i32; 5] {
+    pub(crate) fn buffer(&self, kind: u8) -> Option<&[i32]> {
+        match kind {
+            0 => Some(&self.values),
+            1 => Some(&self.targets),
+            2 => Some(&self.offsets),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn header(&self) -> [i32; 5] {
         [
             self.layout.states as i32,
             self.layout.slots.len() as i32,

@@ -25,16 +25,18 @@ public class ChorusPlantBlock extends PipeBlock {
 
 	public ChorusPlantBlock(BlockBehaviour.Properties properties) {
 		super(10.0F, properties);
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(NORTH, false)
-				.setValue(EAST, false)
-				.setValue(SOUTH, false)
-				.setValue(WEST, false)
-				.setValue(UP, false)
-				.setValue(DOWN, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(NORTH, false)
+					.setValue(EAST, false)
+					.setValue(SOUTH, false)
+					.setValue(WEST, false)
+					.setValue(UP, false)
+					.setValue(DOWN, false)
+			);
+		}
 	}
 
 	@Override

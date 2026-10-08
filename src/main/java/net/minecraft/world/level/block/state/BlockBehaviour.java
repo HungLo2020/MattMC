@@ -1004,6 +1004,16 @@ public abstract class BlockBehaviour implements FeatureElement {
 		float jumpFactor = 1.0F;
 		@Nullable
 		private ResourceKey<Block> id;
+		@Nullable
+		private NativeBlockDefinitions.Definition nativeDefinition;
+
+		public BlockBehaviour.Properties nativeDefinition(NativeBlockDefinitions.Definition definition) {
+			this.nativeDefinition = definition;
+			return this;
+		}
+
+		@Nullable
+		public NativeBlockDefinitions.Definition nativeDefinition() { return this.nativeDefinition; }
 		private DependantName<Block, Optional<ResourceKey<LootTable>>> drops = resourceKey -> Optional.of(
 			ResourceKey.create(Registries.LOOT_TABLE, resourceKey.location().withPrefix("blocks/"))
 		);
@@ -1300,6 +1310,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 
 		public BlockBehaviour.Properties setId(ResourceKey<Block> resourceKey) {
 			this.id = resourceKey;
+			this.nativeDefinition = null;
 			return this;
 		}
 

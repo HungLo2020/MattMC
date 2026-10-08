@@ -63,9 +63,11 @@ public class CopperGolemStatueBlock extends BaseEntityBlock implements SimpleWat
 	public CopperGolemStatueBlock(WeatheringCopper.WeatherState weatherState, BlockBehaviour.Properties properties) {
 		super(properties);
 		this.weatheringState = weatherState;
-		this.registerDefaultState(
-			this.defaultBlockState().setValue(FACING, Direction.NORTH).setValue(POSE, CopperGolemStatueBlock.Pose.STANDING).setValue(WATERLOGGED, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.defaultBlockState().setValue(FACING, Direction.NORTH).setValue(POSE, CopperGolemStatueBlock.Pose.STANDING).setValue(WATERLOGGED, false)
+			);
+		}
 	}
 
 	@Override

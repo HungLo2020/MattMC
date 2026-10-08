@@ -40,6 +40,7 @@ import net.minecraft.world.level.block.piston.PistonBaseBlock;
 import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.NativeBlockDefinitions;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockSetType;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -7272,8 +7273,12 @@ public class Blocks {
 	}
 
 	public static Block register(ResourceKey<Block> resourceKey, Function<BlockBehaviour.Properties, Block> function, BlockBehaviour.Properties properties) {
-		Block block = (Block)function.apply(properties.setId(resourceKey));
-		return Registry.register(BuiltInRegistries.BLOCK, resourceKey, block);
+		NativeBlockDefinitions.Definition definition = NativeBlockDefinitions.require(resourceKey.location().toString());
+		if (BuiltInRegistries.BLOCK.size() != definition.id) throw new IllegalStateException("Native block registration order mismatch: " + definition.name);
+		Block block = (Block)function.apply(properties.setId(resourceKey).nativeDefinition(definition));
+		Block registered = Registry.register(BuiltInRegistries.BLOCK, resourceKey, block);
+		if (BuiltInRegistries.BLOCK.getId(registered) != definition.id) throw new IllegalStateException("Native block ID mismatch");
+		return registered;
 	}
 
 	public static Block register(ResourceKey<Block> resourceKey, BlockBehaviour.Properties properties) {
@@ -7293,9 +7298,14 @@ public class Blocks {
 	}
 
 	static {
+		if (BuiltInRegistries.BLOCK.size() != NativeBlockDefinitions.size()) throw new IllegalStateException("Incomplete native block views");
 		for (Block block : BuiltInRegistries.BLOCK) {
+			NativeBlockDefinitions.Definition definition = block.nativeDefinition();
+			if (definition == null || Block.BLOCK_STATE_REGISTRY.size() != definition.firstState) throw new IllegalStateException("Native block state range mismatch");
+			int local = 0;
 			for (BlockState blockState : block.getStateDefinition().getPossibleStates()) {
 				Block.BLOCK_STATE_REGISTRY.add(blockState);
+				if (Block.BLOCK_STATE_REGISTRY.getId(blockState) != definition.firstState + local++) throw new IllegalStateException("Native block state ID mismatch");
 				blockState.initCache();
 			}
 		}

@@ -40,7 +40,9 @@ public class ChorusFlowerBlock extends Block {
 	public ChorusFlowerBlock(Block block, BlockBehaviour.Properties properties) {
 		super(properties);
 		this.plant = block;
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		}
 	}
 
 	@Override

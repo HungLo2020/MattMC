@@ -34,7 +34,9 @@ public class DoublePlantBlock extends VegetationBlock {
 
 	public DoublePlantBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(HALF, DoubleBlockHalf.LOWER));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(HALF, DoubleBlockHalf.LOWER));
+		}
 	}
 
 	@Override

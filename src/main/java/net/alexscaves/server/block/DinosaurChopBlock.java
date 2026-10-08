@@ -52,7 +52,9 @@ public class DinosaurChopBlock extends Block implements SimpleWaterloggedBlock {
 
     public DinosaurChopBlock(BlockBehaviour.Properties properties, int foodAmount, float saturationAmount, boolean isCooked) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.UP).setValue(BITES, Integer.valueOf(0)).setValue(WATERLOGGED, false));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.UP).setValue(BITES, Integer.valueOf(0)).setValue(WATERLOGGED, false));
+        }
         this.foodAmount = foodAmount;
         this.saturationAmount = saturationAmount;
         this.isCooked = isCooked;

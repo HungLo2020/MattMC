@@ -62,7 +62,9 @@ public class DecoratedPotBlock extends BaseEntityBlock implements SimpleWaterlog
 
 	public DecoratedPotBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(HORIZONTAL_FACING, Direction.NORTH).setValue(WATERLOGGED, false).setValue(CRACKED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(HORIZONTAL_FACING, Direction.NORTH).setValue(WATERLOGGED, false).setValue(CRACKED, false));
+		}
 	}
 
 	@Override

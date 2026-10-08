@@ -48,7 +48,9 @@ public class CycadBlock extends BushBlock implements BonemealableBlock {
 
     public CycadBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(TOP, Boolean.valueOf(true)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(TOP, Boolean.valueOf(true)));
+        }
     }
 
     @Override

@@ -31,7 +31,9 @@ public class StructureBlock extends BaseEntityBlock implements GameMasterBlock {
 
 	public StructureBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(MODE, StructureMode.LOAD));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(MODE, StructureMode.LOAD));
+		}
 	}
 
 	@Override

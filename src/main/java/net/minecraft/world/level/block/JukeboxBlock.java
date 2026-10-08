@@ -38,7 +38,9 @@ public class JukeboxBlock extends BaseEntityBlock {
 
 	public JukeboxBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(HAS_RECORD, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(HAS_RECORD, false));
+		}
 	}
 
 	@Override

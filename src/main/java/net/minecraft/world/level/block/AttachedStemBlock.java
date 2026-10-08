@@ -46,7 +46,9 @@ public class AttachedStemBlock extends VegetationBlock {
 
 	public AttachedStemBlock(ResourceKey<Block> resourceKey, ResourceKey<Block> resourceKey2, ResourceKey<Item> resourceKey3, BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		}
 		this.stem = resourceKey;
 		this.fruit = resourceKey2;
 		this.seed = resourceKey3;

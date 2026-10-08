@@ -48,7 +48,9 @@ public class CommandBlock extends BaseEntityBlock implements GameMasterBlock {
 
 	public CommandBlock(boolean bl, BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(CONDITIONAL, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(CONDITIONAL, false));
+		}
 		this.automatic = bl;
 	}
 

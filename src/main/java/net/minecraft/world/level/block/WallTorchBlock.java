@@ -37,7 +37,9 @@ public class WallTorchBlock extends TorchBlock {
 
 	public WallTorchBlock(SimpleParticleType simpleParticleType, BlockBehaviour.Properties properties) {
 		super(simpleParticleType, properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Override

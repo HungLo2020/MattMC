@@ -46,7 +46,9 @@ public class CreakingHeartBlock extends BaseEntityBlock {
 
 	public CreakingHeartBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(AXIS, Direction.Axis.Y).setValue(STATE, CreakingHeartState.UPROOTED).setValue(NATURAL, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(AXIS, Direction.Axis.Y).setValue(STATE, CreakingHeartState.UPROOTED).setValue(NATURAL, false));
+		}
 	}
 
 	@Override

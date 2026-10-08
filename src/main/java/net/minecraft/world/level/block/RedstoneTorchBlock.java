@@ -37,7 +37,9 @@ public class RedstoneTorchBlock extends BaseTorchBlock {
 
 	public RedstoneTorchBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(LIT, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LIT, true));
+		}
 	}
 
 	@Override

@@ -30,6 +30,10 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 	private final ImmutableList<S> states;
 
 	protected StateDefinition(Function<O, S> function, O object, StateDefinition.Factory<O, S> factory, Map<String, Property<?>> map) {
+		this(function, object, factory, map, null);
+	}
+
+	private StateDefinition(Function<O, S> function, O object, StateDefinition.Factory<O, S> factory, Map<String, Property<?>> map, NativeStateGraph sharedGraph) {
 		this.owner = object;
 		this.propertiesByName = ImmutableSortedMap.copyOf(map);
 		Supplier<S> supplier = () -> function.apply(object);
@@ -42,8 +46,8 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 		MapCodec<S> mapCodec2 = mapCodec;
 		List<S> list = Lists.<S>newArrayList();
 		List<Property<?>> properties = List.copyOf(this.propertiesByName.values());
-		int[] counts = properties.stream().mapToInt(p -> p.getPossibleValues().size()).toArray();
-		NativeStateGraph graph = new NativeStateGraph(counts);
+		NativeStateGraph graph = sharedGraph != null ? sharedGraph
+			: new NativeStateGraph(properties.stream().mapToInt(p -> p.getPossibleValues().size()).toArray());
 		for (int state = 0; state < graph.stateCount; state++) {
 			Reference2ObjectArrayMap<Property<?>, Comparable<?>> values = new Reference2ObjectArrayMap<>(properties.size());
 			for (int property = 0; property < properties.size(); property++) {
@@ -136,6 +140,10 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 					}
 				}
 			}
+		}
+
+		StateDefinition<O, S> createWithGraph(Function<O, S> function, StateDefinition.Factory<O, S> factory, NativeStateGraph graph) {
+			return new StateDefinition<>(function, this.owner, factory, this.properties, graph);
 		}
 
 		public StateDefinition<O, S> create(Function<O, S> function, StateDefinition.Factory<O, S> factory) {

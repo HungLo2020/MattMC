@@ -61,7 +61,9 @@ public class ButtonBlock extends FaceAttachedHorizontalDirectionalBlock {
 	public ButtonBlock(BlockSetType blockSetType, int i, BlockBehaviour.Properties properties) {
 		super(properties.sound(blockSetType.soundType()));
 		this.type = blockSetType;
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(FACE, AttachFace.WALL));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(FACE, AttachFace.WALL));
+		}
 		this.ticksToStayPressed = i;
 		this.shapes = this.makeShapes();
 	}

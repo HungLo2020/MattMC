@@ -27,7 +27,9 @@ public class MangroveRootsBlock extends Block implements SimpleWaterloggedBlock 
 
 	public MangroveRootsBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

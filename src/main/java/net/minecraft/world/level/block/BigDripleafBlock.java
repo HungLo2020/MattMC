@@ -79,7 +79,9 @@ public class BigDripleafBlock extends HorizontalDirectionalBlock implements Bone
 
 	public BigDripleafBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false).setValue(FACING, Direction.NORTH).setValue(TILT, Tilt.NONE));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false).setValue(FACING, Direction.NORTH).setValue(TILT, Tilt.NONE));
+		}
 		this.shapes = this.makeShapes();
 	}
 

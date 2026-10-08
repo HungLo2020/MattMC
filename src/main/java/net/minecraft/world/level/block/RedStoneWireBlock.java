@@ -74,15 +74,17 @@ public class RedStoneWireBlock extends Block {
 
 	public RedStoneWireBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(NORTH, RedstoneSide.NONE)
-				.setValue(EAST, RedstoneSide.NONE)
-				.setValue(SOUTH, RedstoneSide.NONE)
-				.setValue(WEST, RedstoneSide.NONE)
-				.setValue(POWER, 0)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(NORTH, RedstoneSide.NONE)
+					.setValue(EAST, RedstoneSide.NONE)
+					.setValue(SOUTH, RedstoneSide.NONE)
+					.setValue(WEST, RedstoneSide.NONE)
+					.setValue(POWER, 0)
+			);
+		}
 		this.shapes = this.makeShapes();
 		this.crossState = this.defaultBlockState()
 			.setValue(NORTH, RedstoneSide.SIDE)

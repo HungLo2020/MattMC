@@ -35,7 +35,9 @@ public class LanternBlock extends Block implements SimpleWaterloggedBlock {
 
 	public LanternBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(HANGING, false).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(HANGING, false).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Nullable

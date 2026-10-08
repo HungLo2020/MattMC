@@ -29,7 +29,9 @@ public class CalibratedSculkSensorBlock extends SculkSensorBlock {
 
 	public CalibratedSculkSensorBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Nullable

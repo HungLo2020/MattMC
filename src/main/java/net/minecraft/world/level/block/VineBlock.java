@@ -45,9 +45,11 @@ public class VineBlock extends Block {
 
 	public VineBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition.any().setValue(UP, false).setValue(NORTH, false).setValue(EAST, false).setValue(SOUTH, false).setValue(WEST, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition.any().setValue(UP, false).setValue(NORTH, false).setValue(EAST, false).setValue(SOUTH, false).setValue(WEST, false)
+			);
+		}
 		this.shapes = this.makeShapes();
 	}
 

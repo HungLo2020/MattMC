@@ -51,7 +51,9 @@ public class LayeredCauldronBlock extends AbstractCauldronBlock {
 	public LayeredCauldronBlock(Biome.Precipitation precipitation, CauldronInteraction.InteractionMap interactionMap, BlockBehaviour.Properties properties) {
 		super(properties, interactionMap);
 		this.precipitationType = precipitation;
-		this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 1));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 1));
+		}
 	}
 
 	@Override

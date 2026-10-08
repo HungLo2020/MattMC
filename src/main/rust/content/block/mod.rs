@@ -6,6 +6,7 @@
 //! registries, see `NativeBlockRegistry`) and never changes. Subsystems derive
 //! their own lookup tables from it instead of receiving copies from Java.
 pub(crate) mod export;
+pub mod definitions;
 pub(crate) mod ffi;
 #[cfg(test)]
 mod tests;

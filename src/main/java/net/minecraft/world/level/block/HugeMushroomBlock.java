@@ -32,9 +32,11 @@ public class HugeMushroomBlock extends Block {
 
 	public HugeMushroomBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition.any().setValue(NORTH, true).setValue(EAST, true).setValue(SOUTH, true).setValue(WEST, true).setValue(UP, true).setValue(DOWN, true)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition.any().setValue(NORTH, true).setValue(EAST, true).setValue(SOUTH, true).setValue(WEST, true).setValue(UP, true).setValue(DOWN, true)
+			);
+		}
 	}
 
 	@Override

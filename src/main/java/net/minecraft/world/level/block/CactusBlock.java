@@ -40,7 +40,9 @@ public class CactusBlock extends Block {
 
 	public CactusBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		}
 	}
 
 	@Override

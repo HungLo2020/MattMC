@@ -18,7 +18,9 @@ public class HayBlock extends RotatedPillarBlock {
 
 	public HayBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.Y));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.Y));
+		}
 	}
 
 	@Override

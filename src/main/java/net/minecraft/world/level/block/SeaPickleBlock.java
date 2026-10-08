@@ -41,7 +41,9 @@ public class SeaPickleBlock extends VegetationBlock implements BonemealableBlock
 
 	public SeaPickleBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(PICKLES, 1).setValue(WATERLOGGED, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(PICKLES, 1).setValue(WATERLOGGED, true));
+		}
 	}
 
 	@Nullable

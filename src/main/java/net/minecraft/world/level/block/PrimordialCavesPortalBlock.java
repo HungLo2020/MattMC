@@ -58,7 +58,9 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 
 	public PrimordialCavesPortalBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.X));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.X));
+		}
 	}
 
 	@Override

@@ -24,7 +24,9 @@ public class RedstoneRandomizerBlock extends DiodeBlock {
 
 	public RedstoneRandomizerBlock(Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(OUTPUT_SIDE, OutputSide.LEFT).setValue(POWERED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(OUTPUT_SIDE, OutputSide.LEFT).setValue(POWERED, false));
+		}
 	}
 
 	@Override

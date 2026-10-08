@@ -20,7 +20,9 @@ public class RotatedPillarBlock extends Block {
 
 	public RotatedPillarBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(AXIS, Direction.Axis.Y));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(AXIS, Direction.Axis.Y));
+		}
 	}
 
 	@Override

@@ -38,7 +38,9 @@ public class DaylightDetectorBlock extends BaseEntityBlock {
 
 	public DaylightDetectorBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(POWER, 0).setValue(INVERTED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(POWER, 0).setValue(INVERTED, false));
+		}
 	}
 
 	@Override

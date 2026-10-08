@@ -36,7 +36,9 @@ public class SkullBlock extends AbstractSkullBlock {
 
 	public SkullBlock(SkullBlock.Type type, BlockBehaviour.Properties properties) {
 		super(type, properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(ROTATION, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(ROTATION, 0));
+		}
 	}
 
 	@Override

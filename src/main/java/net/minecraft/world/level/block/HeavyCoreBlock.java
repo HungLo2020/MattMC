@@ -26,7 +26,9 @@ public class HeavyCoreBlock extends Block implements SimpleWaterloggedBlock {
 
 	public HeavyCoreBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

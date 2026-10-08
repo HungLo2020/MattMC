@@ -57,15 +57,17 @@ public class TrapDoorBlock extends HorizontalDirectionalBlock implements SimpleW
 	public TrapDoorBlock(BlockSetType blockSetType, BlockBehaviour.Properties properties) {
 		super(properties.sound(blockSetType.soundType()));
 		this.type = blockSetType;
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(FACING, Direction.NORTH)
-				.setValue(OPEN, false)
-				.setValue(HALF, Half.BOTTOM)
-				.setValue(POWERED, false)
-				.setValue(WATERLOGGED, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(FACING, Direction.NORTH)
+					.setValue(OPEN, false)
+					.setValue(HALF, Half.BOTTOM)
+					.setValue(POWERED, false)
+					.setValue(WATERLOGGED, false)
+			);
+		}
 	}
 
 	@Override

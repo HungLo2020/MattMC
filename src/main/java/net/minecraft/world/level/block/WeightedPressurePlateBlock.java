@@ -33,7 +33,9 @@ public class WeightedPressurePlateBlock extends BasePressurePlateBlock {
 
 	public WeightedPressurePlateBlock(int i, BlockSetType blockSetType, BlockBehaviour.Properties properties) {
 		super(properties, blockSetType);
-		this.registerDefaultState(this.stateDefinition.any().setValue(POWER, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(POWER, 0));
+		}
 		this.maxWeight = i;
 	}
 

@@ -46,7 +46,9 @@ public class MultifaceBlock extends Block implements SimpleWaterloggedBlock {
 
 	public MultifaceBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(getDefaultMultifaceState(this.stateDefinition));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(getDefaultMultifaceState(this.stateDefinition));
+		}
 		this.shapes = this.makeShapes();
 		this.canRotate = Direction.Plane.HORIZONTAL.stream().allMatch(this::isFaceSupported);
 		this.canMirrorX = Direction.Plane.HORIZONTAL.stream().filter(Direction.Axis.X).filter(this::isFaceSupported).count() % 2L == 0L;

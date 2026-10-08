@@ -8,13 +8,9 @@ use super::{export, installed, BlockRegistry, DIRECTIONS};
 /// # Safety
 /// Each pointer addresses its stated count of values for this call.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_block_registry_install(ints: *const i32, int_len: i32, chars: *const u16, char_len: i32,
-    bytes: *const u8, byte_len: i32) -> i32 {
-    if ints.is_null() || bytes.is_null() || int_len <= 0 || char_len < 0 || byte_len < 0 || (chars.is_null() && char_len > 0) {
-        return 0;
-    }
-    let chars = if char_len == 0 { &[][..] } else { std::slice::from_raw_parts(chars, char_len as usize) };
-    let registry = match export::decode(std::slice::from_raw_parts(ints, int_len as usize), chars,
+pub unsafe extern "C" fn mattmc_block_registry_install(ints: *const i32, int_len: i32, bytes: *const u8, byte_len: i32) -> i32 {
+    if ints.is_null() || bytes.is_null() || int_len <= 0 || byte_len < 0 { return 0; }
+    let registry = match export::decode(std::slice::from_raw_parts(ints, int_len as usize),
         std::slice::from_raw_parts(bytes, byte_len as usize)) {
         Ok(registry) => registry,
         Err(_) => return 0,

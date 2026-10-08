@@ -27,7 +27,9 @@ public class PressurePlateBlock extends BasePressurePlateBlock {
 
 	public PressurePlateBlock(BlockSetType blockSetType, BlockBehaviour.Properties properties) {
 		super(properties, blockSetType);
-		this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false));
+		}
 	}
 
 	@Override

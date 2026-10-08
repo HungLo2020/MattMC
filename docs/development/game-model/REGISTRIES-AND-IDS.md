@@ -7,9 +7,10 @@
 
 The [Rust block registry](RUST-BLOCK-REGISTRY.md) holds every block, property
 and block state with typed IDs (`BlockId`, `StateId(u16)`, `PropertyId`,
-`FaceId`) and per-state columns. Java still defines the blocks and exports
-them once, lazily on the first `NativeBlockRegistry.ready()` call after the
-Java registries are frozen. Lighting, heightmaps, worldgen and chunk saving
+`FaceId`) and per-state columns. [Native definitions](BLOCK-DEFINITIONS.md)
+own names, order, domains and defaults. Java exports remaining state facts
+once, lazily on the first `NativeBlockRegistry.ready()` call after its
+compatibility registries are frozen. Lighting, heightmaps, worldgen and chunk saving
 derive their tables from it; terrain meshing combines its facts with
 render-owned columns when registering each meshing state.
 

@@ -1,7 +1,7 @@
 # Shared property definitions
 
 > Current implementation: Rust owns all 134 property
-> declarations: 123 shared and 11 for integrated content. Block definitions,
+> declarations: 123 shared and 11 for integrated content. Physical block settings,
 > Java enum behavior and general gameplay have not migrated yet.
 
 ## Ownership
@@ -21,11 +21,11 @@ definition or enum binding fails startup instead of substituting a Java domain.
 Generic factories remain for synthetic/test definitions. All properties used
 by the registered blocks have native declarations.
 
-The block export sends each property's native declaration ID. Rust
-shares the schema by `Arc`, avoiding a native-to-Java-to-native copy of names
-and values. The export protocol also accepts explicit schemas for synthetic/custom
-definitions; production blocks use native references. Declaration IDs
-are bridge-local; saved block/state IDs and first-use `PropertyId`s are unchanged.
+The [native block definition registry](BLOCK-DEFINITIONS.md) references schemas
+by `Builtin` ID and the installed registry shares them by `Arc`. Neither
+schemas nor block property lists return through Java. Declaration IDs are
+bridge-local; saved block/state IDs and first-use `PropertyId`s are unchanged.
+Generic Rust builders still accept explicit schemas for synthetic definitions.
 
 ## Changing or adding a property
 
@@ -61,6 +61,9 @@ state/codec. Bootstrap time/allocation are separate measurements; these checks
 do not establish full-client FPS or gameplay parity. Use the
 [render verification workflows](../rendering/RENDER-VERIFICATION.md) for that
 scope and retain open performance gaps while continuing native migration.
+
+The following results cover published property/fluid milestone `df6c6dc77`,
+before the [block-definition follow-up](BLOCK-DEFINITIONS.md).
 
 Five fresh-JVM pairs on 2026-10-08 match untouched Frozen for all 134
 properties, 31,846 states and 491,395 transitions, with unchanged fluid/graph

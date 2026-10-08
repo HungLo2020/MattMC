@@ -52,7 +52,9 @@ public class EnderChestBlock extends AbstractChestBlock<EnderChestBlockEntity> i
 
 	public EnderChestBlock(BlockBehaviour.Properties properties) {
 		super(properties, () -> BlockEntityType.ENDER_CHEST);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

@@ -27,7 +27,9 @@ public class CaveVinesBlock extends GrowingPlantHeadBlock implements CaveVines {
 
 	public CaveVinesBlock(BlockBehaviour.Properties properties) {
 		super(properties, Direction.DOWN, SHAPE, false, 0.1);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0).setValue(BERRIES, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0).setValue(BERRIES, false));
+		}
 	}
 
 	@Override

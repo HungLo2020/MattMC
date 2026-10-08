@@ -36,9 +36,11 @@ public class FenceBlock extends CrossCollisionBlock {
 
 	public FenceBlock(BlockBehaviour.Properties properties) {
 		super(4.0F, 16.0F, 4.0F, 16.0F, 24.0F, properties);
-		this.registerDefaultState(
-			this.stateDefinition.any().setValue(NORTH, false).setValue(EAST, false).setValue(SOUTH, false).setValue(WEST, false).setValue(WATERLOGGED, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition.any().setValue(NORTH, false).setValue(EAST, false).setValue(SOUTH, false).setValue(WEST, false).setValue(WATERLOGGED, false)
+			);
+		}
 		this.occlusionShapes = this.makeShapes(4.0F, 16.0F, 2.0F, 6.0F, 15.0F);
 	}
 

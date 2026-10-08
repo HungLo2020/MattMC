@@ -10,6 +10,8 @@ import java.util.Comparator;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.StateHolder;
@@ -18,6 +20,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.lighting.LightEngine;
 
 /** Same public-API observer on Current and Frozen; no Frozen source edits.
  * Hashes every value, default and single-property transition in every graph. */
@@ -91,11 +94,45 @@ public final class StateGraphReference {
                 propertyDefinitions++;
             }
         }
+        MessageDigest blockDigest = MessageDigest.getInstance("SHA-256");
+        int blockStates = 0;
+        List<BlockPos> offsetPositions = List.of(BlockPos.ZERO, new BlockPos(23, 7, -13));
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), blockDigest))) {
+            for (var block : BuiltInRegistries.BLOCK) {
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    out.writeInt(Block.getId(state)); out.writeInt(BuiltInRegistries.BLOCK.getId(block));
+                    out.writeBoolean(state.isAir()); out.writeBoolean(state.blocksMotion());
+                    out.writeBoolean(state.isRandomlyTicking()); out.writeBoolean(state.canOcclude());
+                    out.writeBoolean(state.useShapeForLightOcclusion()); out.writeBoolean(state.isSolidRender());
+                    out.writeBoolean(state.hasBlockEntity()); out.writeInt(state.getLightBlock());
+                    out.writeInt(state.getLightEmission());
+                    out.writeInt(Fluid.FLUID_STATE_REGISTRY.getId(state.getFluidState()));
+                    out.writeBoolean(state.hasOffsetFunction());
+                    for (var position : offsetPositions) {
+                        var offset = state.getOffset(position);
+                        out.writeLong(Double.doubleToRawLongBits(offset.x));
+                        out.writeLong(Double.doubleToRawLongBits(offset.y));
+                        out.writeLong(Double.doubleToRawLongBits(offset.z));
+                    }
+                    for (Direction direction : Direction.values()) {
+                        var boxes = LightEngine.getOcclusionShape(state, direction).toAabbs();
+                        out.writeInt(boxes.size());
+                        for (var box : boxes) {
+                            out.writeLong(Double.doubleToRawLongBits(box.minX)); out.writeLong(Double.doubleToRawLongBits(box.minY));
+                            out.writeLong(Double.doubleToRawLongBits(box.minZ)); out.writeLong(Double.doubleToRawLongBits(box.maxX));
+                            out.writeLong(Double.doubleToRawLongBits(box.maxY)); out.writeLong(Double.doubleToRawLongBits(box.maxZ));
+                        }
+                    }
+                    blockStates++;
+                }
+            }
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
             + " fluid_states=" + fluidStates + " fluid_sha256=" + HexFormat.of().formatHex(fluidDigest.digest())
             + " property_definitions=" + propertyDefinitions + " property_sha256=" + HexFormat.of().formatHex(propertyDigest.digest())
+            + " block_states=" + blockStates + " block_sha256=" + HexFormat.of().formatHex(blockDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
     }
 

@@ -72,7 +72,9 @@ public class LiquidBlock extends Block implements BucketPickup {
 		}
 
 		this.stateCache.add(flowingFluid.getFlowing(8, true));
-		this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 0));
+		}
 	}
 
 	@Override

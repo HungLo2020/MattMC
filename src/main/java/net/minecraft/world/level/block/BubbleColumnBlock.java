@@ -44,7 +44,9 @@ public class BubbleColumnBlock extends Block implements BucketPickup {
 
 	public BubbleColumnBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(DRAG_DOWN, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(DRAG_DOWN, true));
+		}
 	}
 
 	@Override

@@ -27,7 +27,9 @@ public class CopperBulbBlock extends Block {
 
 	public CopperBulbBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(LIT, false).setValue(POWERED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(LIT, false).setValue(POWERED, false));
+		}
 	}
 
 	@Override

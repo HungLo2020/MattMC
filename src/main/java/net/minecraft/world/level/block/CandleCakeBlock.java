@@ -50,7 +50,9 @@ public class CandleCakeBlock extends AbstractCandleBlock {
 
 	public CandleCakeBlock(Block block, BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(LIT, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LIT, false));
+		}
 		if (block instanceof CandleBlock candleBlock) {
 			BY_CANDLE.put(candleBlock, this);
 			this.candleBlock = candleBlock;

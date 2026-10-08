@@ -7,18 +7,17 @@
 Rust owns one registry of every block, property and block state:
 [`content/block/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/mod.rs).
 Rust subsystems derive their per-state lookup tables from it. They no longer
-receive a private table from their own Java bridge. Java still defines the
-blocks:
+receive a private table from their own Java bridge. The
+[native definition registry](BLOCK-DEFINITIONS.md) declares block names, order,
+property sets and defaults. Java supplies behavior factories and remaining
+physical/world-dependent facts.
 [`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
-exports the frozen registries once and Rust installs them. The export is lazy:
-the first `NativeBlockRegistry.ready()` call initializes `Holder.READY` and
-caches success or failure. The current wire format is **4**. Java exports a native fluid-state ID per
-block state, plus the remaining block/offset facts. Rust resolves fluid facts
-from the [native fluid registry](FLUID-DEFINITIONS.md). Shared
-[property declarations](PROPERTY-DEFINITIONS.md) are sent as native IDs, with
-no name/domain export; Rust shares their immutable schemas. Synthetic/custom
-schemas may still use the explicit encoding after a `-1` marker; every
-registered block property uses a native reference.
+exports those remaining facts once, lazily on the first `ready()` call.
+The current wire format is **5**: block/state/face counts, offset bounds,
+per-state face IDs/flags/fluid associations, light values, offset types and the
+face truth table. Names, schemas, defaults and value indices are not exported.
+Rust shares [property schemas](PROPERTY-DEFINITIONS.md) directly and resolves
+fluid facts from the [fluid registry](FLUID-DEFINITIONS.md).
 
 ## What it holds
 
@@ -110,7 +109,7 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
 - **Property identities stay distinct.** Native declaration IDs identify schemas;
   block-registry `PropertyId`s still follow first use of each Java object.
   Equal names do not merge different domains. Native schemas are shared by
-  `Arc`; malformed declaration IDs reject installation.
+  `Arc`; their identities come from the native block declarations.
 - **Fluid facts have one owner.** `StateFacts` accepts a `FluidStateId`, not a
   kind/height copy. Supplying HAS_FLUID or FLUID_FALLING in its input flags is
   rejected; the builder derives them from the fluid definition/state. Unknown
@@ -123,7 +122,8 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
   - every block's states are contiguous, in block order
   - every state is a distinct object at its own ID
   - the state count is between 1 and 65,535, leaving `0xffff` reserved
-  - Rust's arithmetic reproduces every exported value index
+  - block/state counts agree with the native definitions
+  - the remaining per-state facts and face table satisfy their bounds
 - **Custom `BlockState` subclasses** are flagged `CUSTOM`. Lighting,
   skylight, heightmap and meshing views decline those states; the chunk-section
   vocabulary declines the whole registry if one exists. Noise flags and the

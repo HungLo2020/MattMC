@@ -40,13 +40,17 @@ public abstract class DinosaurEggBlock extends Block {
 
     protected DinosaurEggBlock(Properties properties, VoxelShape voxelShape) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        }
         this.voxelShape = voxelShape;
     }
 
     protected DinosaurEggBlock(Properties properties, int widthPx, int heightPx) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        }
         int px = (16 - widthPx) / 2;
         this.voxelShape = Block.box(px, 0, px, 16 - px, heightPx, 16 - px);
     }

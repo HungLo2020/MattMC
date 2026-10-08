@@ -20,6 +20,19 @@ public final class NativePropertyDefinitions {
     private static final MethodHandle BUFFER = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_property_definitions_buffer",
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final Map<String, Definition> DEFINITIONS = load();
+    private static final Property<?>[] VIEWS = new Property<?>[DEFINITIONS.size()];
+
+    public static synchronized Property<?> view(int id) {
+        if (id < 0 || id >= VIEWS.length || VIEWS[id] == null) throw new IllegalStateException("Native property view not initialized: " + id);
+        return VIEWS[id];
+    }
+
+    private static synchronized <P extends Property<?>> P remember(P property) {
+        int id = property.nativeDefinitionId();
+        if (VIEWS[id] != null) throw new IllegalStateException("Native property projected twice: " + id);
+        VIEWS[id] = property;
+        return property;
+    }
 
     record Definition(int id, String name, int kind, List<String> values) {}
 
@@ -32,13 +45,13 @@ public final class NativePropertyDefinitions {
     public static BooleanProperty booleanProperty(String key) {
         Definition d = require(key, 0);
         if (!d.values().equals(List.of("true", "false"))) throw new IllegalStateException("Invalid native boolean domain: " + key);
-        return new BooleanProperty(d.name(), d.id());
+        return remember(new BooleanProperty(d.name(), d.id()));
     }
 
     public static IntegerProperty integerProperty(String key) {
         Definition d = require(key, 1);
         int[] values = d.values().stream().mapToInt(Integer::parseInt).toArray();
-        return new IntegerProperty(d.name(), values, d.id());
+        return remember(new IntegerProperty(d.name(), values, d.id()));
     }
 
     public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> enumProperty(String key, Class<T> type) {
@@ -53,7 +66,7 @@ public final class NativePropertyDefinitions {
             if (value == null) throw new IllegalStateException("Missing enum binding: " + key + "/" + name);
             values.add(value);
         }
-        return new EnumProperty<>(d.name(), type, values, d.id());
+        return remember(new EnumProperty<>(d.name(), type, values, d.id()));
     }
 
     private static MemorySegment buffer(int kind, int expected, int elementBytes, Arena inputs) throws Throwable {

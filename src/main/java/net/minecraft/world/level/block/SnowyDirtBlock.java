@@ -25,7 +25,9 @@ public class SnowyDirtBlock extends Block {
 
 	public SnowyDirtBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(SNOWY, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(SNOWY, false));
+		}
 	}
 
 	@Override

@@ -48,7 +48,9 @@ public class NoteBlock extends Block {
 
 	public NoteBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(INSTRUMENT, NoteBlockInstrument.HARP).setValue(NOTE, 0).setValue(POWERED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(INSTRUMENT, NoteBlockInstrument.HARP).setValue(NOTE, 0).setValue(POWERED, false));
+		}
 	}
 
 	private BlockState setInstrument(LevelReader levelReader, BlockPos blockPos, BlockState blockState) {

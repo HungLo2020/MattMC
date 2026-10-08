@@ -38,7 +38,9 @@ public class BigDripleafStemBlock extends HorizontalDirectionalBlock implements 
 
 	public BigDripleafStemBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false).setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false).setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Override

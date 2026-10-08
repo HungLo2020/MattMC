@@ -62,14 +62,16 @@ public class ShelfBlock extends BaseEntityBlock implements SelectableSlotContain
 
 	public ShelfBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(FACING, Direction.NORTH)
-				.setValue(POWERED, false)
-				.setValue(SIDE_CHAIN_PART, SideChainPart.UNCONNECTED)
-				.setValue(WATERLOGGED, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(FACING, Direction.NORTH)
+					.setValue(POWERED, false)
+					.setValue(SIDE_CHAIN_PART, SideChainPart.UNCONNECTED)
+					.setValue(WATERLOGGED, false)
+			);
+		}
 	}
 
 	@Override

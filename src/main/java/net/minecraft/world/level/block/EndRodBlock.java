@@ -21,7 +21,9 @@ public class EndRodBlock extends RodBlock {
 
 	public EndRodBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.UP));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.UP));
+		}
 	}
 
 	@Override

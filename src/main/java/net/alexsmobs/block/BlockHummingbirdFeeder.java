@@ -17,7 +17,9 @@ public class BlockHummingbirdFeeder extends Block {
     
     public BlockHummingbirdFeeder(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.stateDefinition.any().setValue(CONTENTS, 0));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.stateDefinition.any().setValue(CONTENTS, 0));
+        }
     }
     
     @Override

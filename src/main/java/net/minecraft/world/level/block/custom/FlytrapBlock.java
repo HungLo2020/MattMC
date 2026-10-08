@@ -40,7 +40,9 @@ public class FlytrapBlock extends BushBlock implements BonemealableBlock {
 
     public FlytrapBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(OPEN, Boolean.valueOf(true)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(OPEN, Boolean.valueOf(true)));
+        }
     }
 
     public VoxelShape getShape(BlockState state, BlockGetter getter, BlockPos pos, CollisionContext context) {

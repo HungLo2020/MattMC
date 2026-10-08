@@ -41,7 +41,9 @@ public class FarmBlock extends Block {
 
 	public FarmBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(MOISTURE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(MOISTURE, 0));
+		}
 	}
 
 	@Override

@@ -190,7 +190,9 @@ public class ComposterBlock extends Block implements WorldlyContainerHolder {
 
 	public ComposterBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LEVEL, 0));
+		}
 	}
 
 	public static void handleFill(Level level, BlockPos blockPos, boolean bl) {

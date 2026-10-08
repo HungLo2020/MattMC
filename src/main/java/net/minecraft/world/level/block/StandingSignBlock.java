@@ -31,7 +31,9 @@ public class StandingSignBlock extends SignBlock {
 
 	public StandingSignBlock(WoodType woodType, BlockBehaviour.Properties properties) {
 		super(woodType, properties.sound(woodType.soundType()));
-		this.registerDefaultState(this.stateDefinition.any().setValue(ROTATION, 0).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(ROTATION, 0).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

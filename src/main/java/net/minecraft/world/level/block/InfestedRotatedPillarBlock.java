@@ -22,7 +22,9 @@ public class InfestedRotatedPillarBlock extends InfestedBlock {
 
 	public InfestedRotatedPillarBlock(Block block, BlockBehaviour.Properties properties) {
 		super(block, properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.Y));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.Y));
+		}
 	}
 
 	@Override

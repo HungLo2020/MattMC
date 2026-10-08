@@ -27,7 +27,9 @@ public class WaterloggedTransparentBlock extends TransparentBlock implements Sim
 
 	public WaterloggedTransparentBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Nullable

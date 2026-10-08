@@ -47,7 +47,9 @@ public class FissurePrimalMagmaBlock extends Block {
 
     public FissurePrimalMagmaBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(REGEN_HEIGHT, 0));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(REGEN_HEIGHT, 0));
+        }
     }
 
     public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {

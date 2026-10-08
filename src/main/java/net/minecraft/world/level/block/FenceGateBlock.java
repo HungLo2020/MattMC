@@ -67,7 +67,9 @@ public class FenceGateBlock extends HorizontalDirectionalBlock {
 	public FenceGateBlock(WoodType woodType, BlockBehaviour.Properties properties) {
 		super(properties.sound(woodType.soundType()));
 		this.type = woodType;
-		this.registerDefaultState(this.stateDefinition.any().setValue(OPEN, false).setValue(POWERED, false).setValue(IN_WALL, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(OPEN, false).setValue(POWERED, false).setValue(IN_WALL, false));
+		}
 	}
 
 	@Override

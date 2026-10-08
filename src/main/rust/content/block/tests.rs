@@ -117,72 +117,55 @@ fn the_state_ceiling_is_enforced() {
     assert_eq!(b.block("x", &[p, q], 0, vec![]), Err(Error::Invalid("state count")));
 }
 
-/// Encodes a registry the way `NativeBlockRegistry` exports Java's.
-fn export(r: &BlockRegistry) -> (Vec<i32>, Vec<u16>, Vec<u8>) {
-    let (mut ints, mut chars, mut bytes) = (vec![FORMAT, r.properties().len() as i32, r.blocks().len() as i32, r.state_count() as i32,
-        r.face_count() as i32], Vec::new(), Vec::new());
-    let mut put = |s: &str, ints: &mut Vec<i32>| {
-        let units: Vec<u16> = s.encode_utf16().collect();
-        ints.push(units.len() as i32);
-        chars.extend(units);
-    };
-    for p in r.properties() {
-        ints.push(-1);
-        put(p.name(), &mut ints);
-        ints.push(p.values().len() as i32);
-        for v in p.values() {
-            put(v, &mut ints);
-        }
-    }
-    for b in r.blocks() {
-        put(b.name(), &mut ints);
-        ints.push((b.default_state().0 - b.state_range().start as u16) as i32);
-        ints.push(b.max_horizontal_offset().to_bits() as i32);
-        ints.push(b.max_vertical_offset().to_bits() as i32);
-        ints.push(b.properties().len() as i32);
-        ints.extend(b.properties().map(|p| p.0 as i32));
-    }
-    for b in r.blocks() {
-        for s in b.states() {
-            ints.extend(b.properties().map(|p| r.value(s, p).unwrap() as i32));
-        }
-    }
-    for s in 0..r.state_count() {
-        let s = StateId(s as u16);
-        ints.extend((0..DIRECTIONS).map(|d| r.light_face(s, d).0 as i32));
-        ints.push((r.flags(s).0 & !(StateFlags::HAS_FLUID.0 | StateFlags::FLUID_FALLING.0)) as i32);
-        ints.push(r.fluid_state(s).0 as i32);
-        bytes.extend([r.light_block(s), r.emission(s), r.offset(s) as u8]);
-    }
-    bytes.extend_from_slice(r.face_matrix());
-    (ints, chars, bytes)
+/// Remaining state facts for the entire native declaration table, with no
+/// layout/default/name input. This fixture deliberately uses empty fluid facts.
+fn native_fact_packet() -> (Vec<i32>, Vec<u8>) {
+    let mut ints = vec![FORMAT, 1235, 31809, 1];
+    ints.extend(std::iter::repeat_n(0, 1235 * 2 + 31809 * (DIRECTIONS + 2)));
+    (ints, vec![0; 31809 * 3 + 1])
 }
 
 #[test]
-fn export_round_trips() {
-    let r = sample();
-    let (ints, chars, bytes) = export(&r);
-    assert_eq!(decode(&ints, &chars, &bytes), Ok(r));
+fn native_fact_install_uses_declared_layouts_and_shared_schemas() {
+    use crate::content::property::Builtin;
+    let (ints, bytes) = native_fact_packet();
+    let r = decode(&ints, &bytes).unwrap();
+    assert_eq!(r.state_count(), 31809);
+    assert_eq!(r.blocks().len(), 1235);
+    assert_eq!(r.air(), Some(BlockId(0)));
+    assert_eq!(r.by_name("minecraft:stone"), Some(BlockId(1)));
+    assert_eq!(r.block(BlockId(1)).default_state(), StateId(1));
+    let leaves = r.by_name("minecraft:oak_leaves").unwrap();
+    let default = r.block(leaves).default_state();
+    for p in r.block(leaves).properties() {
+        let property = r.property(p);
+        let value = &property.values()[r.value(default, p).unwrap() as usize];
+        assert_eq!(value, match property.name() { "distance" => "7", "persistent" | "waterlogged" => "false", _ => panic!("unexpected leaf property") });
+    }
+    assert!(r.properties().iter().any(|p| Arc::ptr_eq(p, &Builtin::Lit.definition().schema)));
 }
 
 #[test]
-fn export_rejects_damage() {
-    let (ints, chars, bytes) = export(&sample());
-    assert!(decode(&ints[..ints.len() - 1], &chars, &bytes).is_err());
-    assert!(decode(&ints, &chars[..chars.len() - 1], &bytes).is_err());
-    assert!(decode(&ints, &chars, &bytes[..bytes.len() - 1]).is_err());
-    let mut more = ints.clone();
-    more.push(0);
-    assert!(decode(&more, &chars, &bytes).is_err());
-    let mut format = ints.clone();
-    format[0] = FORMAT + 1;
-    assert!(decode(&format, &chars, &bytes).is_err());
-    // A value index that is not the arithmetic layout (two stair states swapped).
-    let mut swapped = ints.clone();
-    let values_at = ints.len() - 22 * (DIRECTIONS + 2) - (16 * 3 + 4);
-    let first_stairs = values_at + 4;
-    swapped.swap(first_stairs + 2, first_stairs + 5);
-    assert_eq!(decode(&swapped, &chars, &bytes), Err(Error::Invalid("export state layout")));
+fn native_fact_export_rejects_damage() {
+    let (ints, bytes) = native_fact_packet();
+    assert!(decode(&ints[..ints.len() - 1], &bytes).is_err());
+    assert!(decode(&ints, &bytes[..bytes.len() - 1]).is_err());
+    let mut extra = ints.clone(); extra.push(0);
+    assert!(decode(&extra, &bytes).is_err());
+    for (at, value) in [(0, FORMAT - 1), (1, 1234), (2, 31808), (3, -1)] {
+        let mut damaged = ints.clone(); damaged[at] = value;
+        assert!(decode(&damaged, &bytes).is_err());
+    }
+    for invalid in [-1, 37, 65535, 65536] {
+        let mut damaged = ints.clone();
+        *damaged.last_mut().unwrap() = invalid;
+        assert!(decode(&damaged, &bytes).is_err());
+    }
+    for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING] {
+        let mut damaged = ints.clone();
+        let at = damaged.len() - 2; damaged[at] = flag.0 as i32;
+        assert!(decode(&damaged, &bytes).is_err());
+    }
 }
 
 #[test]
@@ -205,13 +188,7 @@ fn all_fluid_associations_derive_facts_without_a_java_round_trip() {
         assert_eq!(r.flags(state).contains(StateFlags::HAS_FLUID), id != 0);
         assert_eq!(r.flags(state).contains(StateFlags::FLUID_FALLING), falling);
     }
-    let (ints, chars, bytes) = export(&r);
-    assert_eq!(decode(&ints, &chars, &bytes), Ok(r));
-    for invalid in [-1, 37, 65535, 65536] {
-        let mut damaged = ints.clone();
-        *damaged.last_mut().unwrap() = invalid;
-        assert!(decode(&damaged, &chars, &bytes).is_err());
-    }
+
 }
 
 #[test]
@@ -220,25 +197,5 @@ fn block_definitions_cannot_override_native_fluid_flags() {
         let mut b = Builder::new();
         b.block("fixture:contradiction", &[], 0, vec![facts(flag.0, 0)]).unwrap();
         assert_eq!(b.finish(1, vec![0]), Err(Error::Invalid("state facts")));
-    }
-}
-
-#[test]
-fn exported_native_properties_share_the_owner_and_keep_local_identity() {
-    use crate::content::property::Builtin;
-    let mut b = Builder::new();
-    let lit = b.property_shared(Builtin::Lit.definition().schema.clone()).unwrap();
-    b.block("fixture:lit", &[lit], 0, vec![StateFacts::default(); 2]).unwrap();
-    let r = b.finish(1, vec![0]).unwrap();
-    let (mut ints, mut chars, bytes) = export(&r);
-    // Replace the custom-property export with the single native declaration ID.
-    ints.splice(5..10, [Builtin::Lit as i32]);
-    chars.drain(.."littruefalse".len());
-    let imported = decode(&ints, &chars, &bytes).unwrap();
-    assert_eq!(imported, r);
-    assert!(Arc::ptr_eq(&imported.properties()[0], &Builtin::Lit.definition().schema));
-    for invalid in [-2, 134, 65536] {
-        ints[5] = invalid;
-        assert_eq!(decode(&ints, &chars, &bytes), Err(Error::Invalid("native property id")));
     }
 }

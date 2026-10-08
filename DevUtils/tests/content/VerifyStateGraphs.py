@@ -22,10 +22,10 @@ OBSERVER = Path(__file__).with_name("StateGraphReference.java")
 # Bootstrap wraps stdout in Minecraft's logger; allow its prefix, but require
 # one complete, unambiguous receipt with no trailing fields.
 ROW = re.compile(r"\bSTATE_GRAPH_REFERENCE blocks=(\d+) fluids=(\d+) states=(\d+) "
-                 r"transitions=(\d+) sha256=([0-9a-f]{64}) fluid_states=(\d+) fluid_sha256=([0-9a-f]{64}) property_definitions=(\d+) property_sha256=([0-9a-f]{64}) bootstrap_ns=(\d+) "
+                 r"transitions=(\d+) sha256=([0-9a-f]{64}) fluid_states=(\d+) fluid_sha256=([0-9a-f]{64}) property_definitions=(\d+) property_sha256=([0-9a-f]{64}) block_states=(\d+) block_sha256=([0-9a-f]{64}) bootstrap_ns=(\d+) "
                  r"bootstrap_thread_bytes=(\d+)$", re.MULTILINE)
-FIELDS = ("blocks", "fluids", "states", "transitions", "sha256", "fluid_states", "fluid_sha256", "property_definitions", "property_sha256", "bootstrap_ns", "bootstrap_thread_bytes")
-HASH_FIELDS = ("sha256", "fluid_sha256", "property_sha256")
+FIELDS = ("blocks", "fluids", "states", "transitions", "sha256", "fluid_states", "fluid_sha256", "property_definitions", "property_sha256", "block_states", "block_sha256", "bootstrap_ns", "bootstrap_thread_bytes")
+HASH_FIELDS = ("sha256", "fluid_sha256", "property_sha256", "block_sha256")
 
 
 def sha(path: Path) -> str:
@@ -91,9 +91,9 @@ def main() -> None:
            "CARGO_PROFILE_RELEASE_DEBUG": "line-tables-only"}
     # No profiler, concurrent build, or game workload runs during these timings.
     out.mkdir(parents=True)
-    report = {"schema": "mattmc-state-graph-verification-v3", "passed": False,
+    report = {"schema": "mattmc-state-graph-verification-v4", "passed": False,
               "scope": "All block/fluid domains, ordered states, defaults and transitions; all fluid IDs, intrinsic traits, "
-                       "legacy block IDs and codec outputs/round trips; shared and integrated-content property definitions/codecs; fresh-JVM bootstrap only. "
+                       "legacy block IDs and codec outputs/round trips; shared and integrated-content property definitions/codecs; all block state flags, lights, fluid associations, offsets and light-occlusion boxes; fresh-JVM bootstrap only. "
                        "Does not establish gameplay, save lifecycle or full-client FPS parity.",
               "current": identity(ROOT), "frozen": identity(frozen), "pairs": [],
               "observer_sha256": sha(OBSERVER), "driver_sha256": sha(Path(__file__)),

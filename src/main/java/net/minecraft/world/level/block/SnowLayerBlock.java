@@ -35,7 +35,9 @@ public class SnowLayerBlock extends Block {
 
 	public SnowLayerBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(LAYERS, 1));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(LAYERS, 1));
+		}
 	}
 
 	@Override

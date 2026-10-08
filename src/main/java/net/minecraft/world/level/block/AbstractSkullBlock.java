@@ -24,7 +24,9 @@ public abstract class AbstractSkullBlock extends BaseEntityBlock {
 	public AbstractSkullBlock(SkullBlock.Type type, BlockBehaviour.Properties properties) {
 		super(properties);
 		this.type = type;
-		this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false));
+		}
 	}
 
 	@Override

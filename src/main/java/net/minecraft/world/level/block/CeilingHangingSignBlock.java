@@ -60,7 +60,9 @@ public class CeilingHangingSignBlock extends SignBlock {
 
 	public CeilingHangingSignBlock(WoodType woodType, BlockBehaviour.Properties properties) {
 		super(woodType, properties.sound(woodType.hangingSignSoundType()));
-		this.registerDefaultState(this.stateDefinition.any().setValue(ROTATION, 0).setValue(ATTACHED, false).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(ROTATION, 0).setValue(ATTACHED, false).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

@@ -54,7 +54,9 @@ public class PewenBranchBlock extends Block implements SimpleWaterloggedBlock {
 
     public PewenBranchBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(ROTATION, Integer.valueOf(0)).setValue(PINES, true));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(ROTATION, Integer.valueOf(0)).setValue(PINES, true));
+        }
     }
 
     public SoundType getSoundType(BlockState state) {

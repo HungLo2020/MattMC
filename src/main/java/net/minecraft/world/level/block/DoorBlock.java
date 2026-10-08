@@ -60,15 +60,17 @@ public class DoorBlock extends Block {
 	public DoorBlock(BlockSetType blockSetType, BlockBehaviour.Properties properties) {
 		super(properties.sound(blockSetType.soundType()));
 		this.type = blockSetType;
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(FACING, Direction.NORTH)
-				.setValue(OPEN, false)
-				.setValue(HINGE, DoorHingeSide.LEFT)
-				.setValue(POWERED, false)
-				.setValue(HALF, DoubleBlockHalf.LOWER)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(FACING, Direction.NORTH)
+					.setValue(OPEN, false)
+					.setValue(HINGE, DoorHingeSide.LEFT)
+					.setValue(POWERED, false)
+					.setValue(HALF, DoubleBlockHalf.LOWER)
+			);
+		}
 	}
 
 	public BlockSetType type() {

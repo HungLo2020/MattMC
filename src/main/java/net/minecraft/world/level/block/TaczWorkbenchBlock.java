@@ -35,7 +35,9 @@ public abstract class TaczWorkbenchBlock extends Block {
 	protected TaczWorkbenchBlock(Component title, BlockBehaviour.Properties properties) {
 		super(properties);
 		this.title = title;
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Override

@@ -29,7 +29,9 @@ public abstract class AbstractFurnaceBlock extends BaseEntityBlock {
 
 	protected AbstractFurnaceBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LIT, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LIT, false));
+		}
 	}
 
 	@Override

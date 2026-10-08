@@ -36,7 +36,9 @@ public class BannerBlock extends AbstractBannerBlock {
 
 	public BannerBlock(DyeColor dyeColor, BlockBehaviour.Properties properties) {
 		super(dyeColor, properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(ROTATION, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(ROTATION, 0));
+		}
 		BY_COLOR.put(dyeColor, this);
 	}
 

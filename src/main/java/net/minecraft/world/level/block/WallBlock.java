@@ -53,16 +53,18 @@ public class WallBlock extends Block implements SimpleWaterloggedBlock {
 
 	public WallBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(UP, true)
-				.setValue(NORTH, WallSide.NONE)
-				.setValue(EAST, WallSide.NONE)
-				.setValue(SOUTH, WallSide.NONE)
-				.setValue(WEST, WallSide.NONE)
-				.setValue(WATERLOGGED, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(UP, true)
+					.setValue(NORTH, WallSide.NONE)
+					.setValue(EAST, WallSide.NONE)
+					.setValue(SOUTH, WallSide.NONE)
+					.setValue(WEST, WallSide.NONE)
+					.setValue(WATERLOGGED, false)
+			);
+		}
 		this.shapes = this.makeShapes(16.0F, 14.0F);
 		this.collisionShapes = this.makeShapes(24.0F, 24.0F);
 	}

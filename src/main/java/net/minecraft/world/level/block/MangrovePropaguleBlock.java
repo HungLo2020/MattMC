@@ -43,7 +43,9 @@ public class MangrovePropaguleBlock extends SaplingBlock implements SimpleWaterl
 
 	public MangrovePropaguleBlock(TreeGrower treeGrower, BlockBehaviour.Properties properties) {
 		super(treeGrower, properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(STAGE, 0).setValue(AGE, 0).setValue(WATERLOGGED, false).setValue(HANGING, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(STAGE, 0).setValue(AGE, 0).setValue(WATERLOGGED, false).setValue(HANGING, false));
+		}
 	}
 
 	@Override

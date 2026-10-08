@@ -42,7 +42,9 @@ public class PrimalMagmaBlock extends Block {
     
     public PrimalMagmaBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(ACTIVE, Boolean.valueOf(false)).setValue(PERMANENT, Boolean.valueOf(false)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(ACTIVE, Boolean.valueOf(false)).setValue(PERMANENT, Boolean.valueOf(false)));
+        }
     }
 
     public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {

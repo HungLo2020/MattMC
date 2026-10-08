@@ -24,7 +24,9 @@ public class RedstoneLampBlock extends Block {
 
 	public RedstoneLampBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(LIT, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(LIT, false));
+		}
 	}
 
 	@Nullable

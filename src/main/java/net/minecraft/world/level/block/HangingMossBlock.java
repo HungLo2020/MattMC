@@ -33,7 +33,9 @@ public class HangingMossBlock extends Block implements BonemealableBlock {
 
 	public HangingMossBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(TIP, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(TIP, true));
+		}
 	}
 
 	@Override

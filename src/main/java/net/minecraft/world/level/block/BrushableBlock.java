@@ -51,7 +51,9 @@ public class BrushableBlock extends BaseEntityBlock implements Fallable {
 		this.turnsInto = block;
 		this.brushSound = soundEvent;
 		this.brushCompletedSound = soundEvent2;
-		this.registerDefaultState(this.stateDefinition.any().setValue(DUSTED, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(DUSTED, 0));
+		}
 	}
 
 	@Override

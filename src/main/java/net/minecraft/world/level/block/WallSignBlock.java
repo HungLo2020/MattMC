@@ -37,7 +37,9 @@ public class WallSignBlock extends SignBlock {
 
 	public WallSignBlock(WoodType woodType, BlockBehaviour.Properties properties) {
 		super(woodType, properties.sound(woodType.soundType()));
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override
