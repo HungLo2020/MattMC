@@ -32,10 +32,11 @@ presence does not prove an isolated timing gain. Java still generates/culls DH
 candidates, provenance modes keep additional work, and native publication still
 decodes/copies payloads. Compare equivalent diagnostic settings and rebuilds.
 
-The author identifies approximately 430 per-column DH draws/descriptor-set
-binds as the remaining vanilla+DH worker cost. Shared vertex pages and multi-draw
-indirect are a proposed follow-up at this revision; confirm that bottleneck in
-new profiles before changing batching. The ledger's soft retention targets and
+Approximately 430 per-column DH draws/descriptor-set binds were identified as
+the remaining vanilla+DH worker cost. Shared vertex pages with one geometry set
+per page are now implemented; multi-draw indirect is still a proposed follow-up.
+Confirm the remaining bind/draw cost in new profiles
+(`resource_set_binds`, `draw_indexed_ops`) before changing batching further. The ledger's soft retention targets and
 the generic registry's box/group caps do not establish long-run CPU/GPU bounds.
 Use the [new fixture and runtime checks](RENDER-VERIFICATION.md#october-7-evening-staging-and-dh-checks)
 for correctness alongside any optimization.

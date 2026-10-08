@@ -204,9 +204,11 @@ Frozen even where medians are close, and the shader+DH range straddles its
 Frozen mean. The fresh evening Frozen values replace earlier sessions as the
 reported comparison, without making old controls interchangeable.
 
-The author attributes the remaining vanilla+DH cost to roughly 430 per-column
-DH draws and descriptor-set binds. Shared vertex pages plus multi-draw indirect
-are proposed next work, not an implemented result at this checkpoint. See
+The remaining vanilla+DH cost was attributed to roughly 430 per-column DH
+draws and descriptor-set binds. DH column geometry now lives in shared device
+pages with one geometry set per page
+([architecture](RENDER-ARCHITECTURE.md)); multi-draw indirect is still
+proposed. See
 [profiling controls](SHADER-TERRAIN-PROFILING.md#october-7-comparison-controls).
 Scoped image passes, lifecycle reports and timing ranges establish different
 things; none closes the [remaining work](#remaining-work).
