@@ -3390,6 +3390,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * responsible for admitting the copied assets before the Rust LOD material
 	 * and pass path consumes them.
 	 */
+	/**
+	 * Publishes the DH collector's pending update straight from its Rust
+	 * ledger (no Java packing). {@code outcome} receives [kind, columns, bytes,
+	 * retirements, select nanos, apply nanos]; kind 0 means nothing was
+	 * pending, 2 that Java must publish this update (it carries material
+	 * provenance) and 3 a ledger error (its code second). Only kind 1 returns
+	 * a status.
+	 */
+	public Status flushWorldLodCollector(int collectorConfig, long[] outcome) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment nativeOutcome = arena.allocate(ValueLayout.JAVA_LONG, 6);
+			MemorySegment status = Struct.STATUS.allocate(arena);
+			int nativeResult = Native.worldLodCollectorFlush(contextId, collectorConfig, nativeOutcome, status);
+			MemorySegment.copy(nativeOutcome, ValueLayout.JAVA_LONG, 0, outcome, 0, 6);
+			checkStatus(nativeResult, "world LOD collector flush");
+			if (outcome[0] != 1L) return null;
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
 	public Status updateWorldLodAssets(
 		long generation,
 		List<WorldLodColumnAssetRecord> assets,
@@ -7579,6 +7599,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle WORLD_MESH_UPDATE_ASSETS_QUEUED = downcall("mattmc_vulkanic_gal_world_mesh_update_assets_queued", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WHOLE_FRAME_SUBMIT_QUEUED = downcall("mattmc_vulkanic_gal_whole_frame_submit_queued", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
 		private static final MethodHandle WHOLE_FRAME_JOIN_QUEUED = downcall("mattmc_vulkanic_gal_whole_frame_join_queued", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WORLD_LOD_COLLECTOR_FLUSH = downcall("mattmc_vulkanic_gal_world_lod_collector_flush", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_LOD_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_lod_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle SHADER_PACK_UPDATE_SOURCES = downcall("mattmc_vulkanic_gal_shader_pack_update_sources", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle SHADER_PACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_shader_pack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -7915,6 +7936,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) WORLD_MESH_UPDATE_ASSETS.invokeExact(contextId, request, result);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to update Rust VulkanicGAL world mesh assets", throwable);
+			}
+		}
+
+		static int worldLodCollectorFlush(long contextId, int collectorConfig, MemorySegment outcome, MemorySegment result) {
+			try {
+				return (int) WORLD_LOD_COLLECTOR_FLUSH.invokeExact(contextId, collectorConfig, outcome, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to flush the Rust DH collector", throwable);
 			}
 		}
 
