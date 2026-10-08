@@ -13,6 +13,7 @@ import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import com.seibel.distanthorizons.core.pos.DhLodPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.pos.Pos2D;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.RenderParams;
 import com.seibel.distanthorizons.core.util.objects.SortedArraySet;
@@ -26,11 +27,10 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.world.DistantHorizonsSemanticCollector;
 
+import java.util.Arrays;
 import java.util.Iterator;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * This object tells the {@link LodRenderer} what buffers to render
@@ -47,14 +47,10 @@ public class RenderBufferHandler implements AutoCloseable
 	public final LodQuadTree lodQuadTree;
 	
 	private final SortedArraySet<LodBufferContainer> loadedNearToFarBuffers;
-	private final List<Long> semanticColumnPositionsNearToFar = new ArrayList<>();
-	/**
-	 * The Rust preflight consumes the semantic visibility list synchronously on
-	 * the render thread. Keep one read-only wrapper around the reusable backing
-	 * list instead of allocating a new array and wrapper on every frame.
-	 */
-	private final List<Long> semanticColumnPositionsView =
-		Collections.unmodifiableList(this.semanticColumnPositionsNearToFar);
+	/** The walk's semantic candidate columns, reused across frames. */
+	private long[] semanticCandidates = new long[256];
+	/** The last walk's semantic render list (see {@link DistantHorizonsSemanticCollector#collectVisibleFrame}). */
+	private DistantHorizonsSemanticCollector.VisibleFrame semanticVisibleFrame = DistantHorizonsSemanticCollector.VisibleFrame.EMPTY;
 	
 	private int visibleBufferCount;
 	private int culledBufferCount;
@@ -111,7 +107,7 @@ public class RenderBufferHandler implements AutoCloseable
 	{
 		// clear the old list so we can start fresh
 		this.loadedNearToFarBuffers.clear();
-		this.semanticColumnPositionsNearToFar.clear();
+		this.semanticVisibleFrame = DistantHorizonsSemanticCollector.VisibleFrame.EMPTY;
 		
 		
 		
@@ -179,7 +175,6 @@ public class RenderBufferHandler implements AutoCloseable
 		int disabledSectionCount = 0;
 		int addedBufferCount = 0;
 		int semanticCandidateCount = 0;
-		int semanticUnpublishedCount = 0;
 		Iterator<QuadNode<LodRenderSection>> nodeIterator = this.lodQuadTree.nodeIteratorWithStoppingFilter((QuadNode<LodRenderSection> node) ->
 		{
 			if (node == null)
@@ -277,8 +272,6 @@ public class RenderBufferHandler implements AutoCloseable
 						&& bufferContainer.rustSemanticBuildHasNoDrawableGeometry()) {
 						continue;
 					}
-					semanticCandidateCount++;
-					this.semanticColumnPositionsNearToFar.add(renderSection.pos);
 					// A semantic DH build may retain the Java container as a CPU-side
 					// lifecycle object after its copied payload has been handed to Rust.
 					// Keep every frustum-visible identity in the semantic list, including
@@ -286,14 +279,13 @@ public class RenderBufferHandler implements AutoCloseable
 					// reject the frame coherently. Never re-admit an unpublished section to
 					// the legacy VBO list: the whole-frame route owns this boundary.
 					// An already-enabled DH node can survive a generation retirement
-					// without re-entering LodRenderSection#canRender. Reassert visible
-					// publication demand here, immediately before the coordinator's
-					// bounded visible-only asset flush, so that stale enabled state
-					// cannot leave a real non-empty candidate unpublished forever.
-					if (!net.vulkanic.world.DistantHorizonsSemanticCollector.hasPublishedColumn(renderSection.pos)
-						&& !net.vulkanic.world.DistantHorizonsSemanticCollector.requestColumnPublication(renderSection.pos)) {
-						semanticUnpublishedCount++;
+					// without re-entering LodRenderSection#canRender, so the collector
+					// reasserts publication demand for every unpublished candidate,
+					// immediately before the coordinator's bounded visible-only flush.
+					if (semanticCandidateCount == this.semanticCandidates.length) {
+						this.semanticCandidates = Arrays.copyOf(this.semanticCandidates, semanticCandidateCount * 2);
 					}
+					this.semanticCandidates[semanticCandidateCount++] = renderSection.pos;
 					continue;
 				}
 				if (bufferContainer == null)
@@ -319,11 +311,15 @@ public class RenderBufferHandler implements AutoCloseable
 		{
 			this.visibleBufferCount = this.loadedNearToFarBuffers.size();
 		}
-		this.semanticColumnPositionsNearToFar.sort(this::sortSemanticColumnPositionsNearToFar);
-		if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()) {
-			net.vulkanic.world.DistantHorizonsSemanticCollector.recordRenderListVisibilityStats(
-				semanticCandidateCount, semanticUnpublishedCount, this.semanticColumnPositionsView
-			);
+		if (DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()) {
+			DhBlockPos2D center = this.lodQuadTree.getCenterBlockPos();
+			this.semanticVisibleFrame = DistantHorizonsSemanticCollector.collectVisibleFrame(
+				this.semanticCandidates, semanticCandidateCount, center.x, center.z);
+			if (this.semanticVisibleFrame.requestFailures() > 0)
+			{
+				LOGGER.error("Error requesting publication of [" + this.semanticVisibleFrame.requestFailures()
+					+ "] visible DH columns, first: [" + this.semanticVisibleFrame.requestFailure() + "].");
+			}
 		}
 	}
 	
@@ -335,17 +331,10 @@ public class RenderBufferHandler implements AutoCloseable
 	
 	public SortedArraySet<LodBufferContainer> getColumnRenderBuffers() { return this.loadedNearToFarBuffers; }
 
-	/** Real DH quadtree/frustum visibility, expressed only as copied CPU column
-	 * identities for the Rust whole-frame route. */
-	public List<Long> getSemanticColumnRenderPositions() { return this.semanticColumnPositionsView; }
-
-	private int sortSemanticColumnPositionsNearToFar(long columnA, long columnB)
-	{
-		Pos2D aPos = DhSectionPos.getCenterBlockPos(columnA).toPos2D();
-		Pos2D bPos = DhSectionPos.getCenterBlockPos(columnB).toPos2D();
-		Pos2D centerPos = this.lodQuadTree.getCenterBlockPos().toPos2D();
-		return aPos.manhattanDist(centerPos) - bPos.manhattanDist(centerPos);
-	}
+	/** Real DH quadtree/frustum visibility for the Rust whole-frame route:
+	 * the copied CPU column identities near to far, and what the collector
+	 * admitted from them. */
+	public DistantHorizonsSemanticCollector.VisibleFrame getSemanticVisibleFrame() { return this.semanticVisibleFrame; }
 	
 	
 	

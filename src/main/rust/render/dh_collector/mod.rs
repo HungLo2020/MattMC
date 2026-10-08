@@ -12,6 +12,7 @@
 //! order of the column LRU.
 pub(crate) mod order;
 mod payload;
+mod visibility;
 #[cfg(test)]
 mod tests;
 

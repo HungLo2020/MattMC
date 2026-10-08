@@ -372,6 +372,31 @@ pub unsafe extern "C" fn mattmc_dh_collector_visible_column(key: i64, append: i3
     .unwrap_or(ERR_POISONED)
 }
 
+/// DH's per-frame render list (`Ledger::collect_visible_frame`): `keys`
+/// are the quadtree walk's candidate columns; flags bit 1 is `enabled()`,
+/// bit 2 admits the visible segments. Stores [unpublished, request failures,
+/// first failed key, its error code, opaque, side, up, water, then the keys
+/// near to far] as output and returns its length, or an admission error code.
+/// # Safety
+/// `keys` addresses `count` longs.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_collector_visible_frame(keys: *const i64, count: i32, center_x: i32, center_z: i32, flags: i32) -> i32 {
+    let keys = if count <= 0 { &[][..] } else { std::slice::from_raw_parts(keys, count as usize) };
+    let frame = with(|l| l.collect_visible_frame(keys, [center_x, center_z], flags & 1 != 0, flags & 2 != 0));
+    match frame {
+        None => ERR_POISONED,
+        Some(Err(failure)) => code(failure),
+        Some(Ok(frame)) => {
+            let (failed_key, failed_code) = frame.first_request_failure.map_or((0, 0), |(key, failure)| (key, code(failure) as i64));
+            let c = frame.counts;
+            let mut out = vec![frame.unpublished as i64, frame.request_failures as i64, failed_key, failed_code];
+            out.extend([c.opaque, c.side, c.up, c.water].map(i64::from));
+            out.extend(frame.sorted);
+            store_output(out)
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn mattmc_dh_collector_append_visible_column(key: i64, generation: i64, opaque: i32, side: i32, up: i32, water: i32) -> i32 {
     with(|l| l.append_visible_column(key, generation, Counts { opaque, side, up, water }).map_or_else(code, |_| 0))

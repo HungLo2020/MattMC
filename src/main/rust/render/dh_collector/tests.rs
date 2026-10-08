@@ -308,3 +308,41 @@ fn the_rust_flush_leaves_provenance_updates_to_java_and_acknowledges_what_it_sen
     l.begin_frame(Some(0), "", "finite", "detail");
     assert_eq!(l.visible_column(8).unwrap(), Visible::Admit { generation: 2, counts: Counts { opaque: 2, side: 0, up: 1, water: 0 } });
 }
+
+/// `DhSectionPos.encode`.
+fn section(detail: i64, x: i64, z: i64) -> i64 {
+    detail | ((x & 0x0FFF_FFFF) << 8) | ((z & 0x0FFF_FFFF) << 36)
+}
+
+#[test]
+fn section_centers_follow_dh_section_pos() {
+    use super::visibility::section_center;
+    assert_eq!(section_center(section(6, 3, 0)), [224, 32]);
+    assert_eq!(section_center(section(6, -4, 5)), [-224, 352]);
+    assert_eq!(section_center(section(7, 0, -1)), [64, -64]);
+    assert_eq!(section_center(section(1, -3, 2)), [-6, 4]);
+    assert_eq!(section_center(section(0, -7, 9)), [-7, 9]);
+}
+
+#[test]
+fn the_visible_frame_sorts_stably_and_requests_unpublished_columns_in_walk_order() {
+    let mut l = Ledger::new();
+    let c = config();
+    let mut e = Vec::new();
+    // Equal distance from the origin: walk order decides.
+    let (a, b, near) = (section(6, 1, 0), section(6, 0, 1), section(6, 0, 0));
+    for (generation, key) in [(1, a), (2, b), (3, near)] {
+        l.record_built(c, key, built(generation, generation as u8), &mut e).unwrap();
+    }
+    publish_all(&mut l, c);
+    l.record_built(c, a, built(4, 4), &mut e).unwrap();
+    let missing = section(6, 5, 5);
+    l.begin_frame(Some(0), "", "finite", "detail");
+    let frame = l.collect_visible_frame(&[b, missing, a, near], [0, 0], true, true).unwrap();
+    assert_eq!(frame.sorted, vec![near, b, a, missing]);
+    assert_eq!(frame.unpublished, 1, "only the column with no snapshot stays unpublished");
+    assert_eq!(frame.counts, Counts { opaque: 3, ..Counts::default() });
+    assert_eq!(l.route.candidate_columns, 4);
+    let disabled = l.collect_visible_frame(&[missing], [0, 0], false, true).unwrap();
+    assert_eq!((disabled.unpublished, disabled.counts), (1, Counts::default()));
+}

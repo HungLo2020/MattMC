@@ -101,33 +101,38 @@ public class LodRenderer
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.render-list");
 			buffers.buildRenderList(renderParams);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.render-list");
-			List<Long> semanticColumns = buffers.getSemanticColumnRenderPositions();
-			if (semanticColumns.isEmpty())
+			DistantHorizonsSemanticCollector.VisibleFrame visibleFrame = buffers.getSemanticVisibleFrame();
+			long[] semanticColumns = visibleFrame.nearToFar();
+			if (semanticColumns.length == 0)
 			{
 				DistantHorizonsSemanticCollector.recordRenderListObservation(0);
 				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("no-visible-columns", 0, 0, 0);
 				return false;
 			}
-			int opaqueSegments = 0;
-			int transparentSegments = 0;
-			int waterSegments = 0;
-			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.visible-segments");
-			for (long columnKey : semanticColumns)
+			int opaqueSegments = visibleFrame.segments().opaqueSegments();
+			int transparentSegments = visibleFrame.segments().transparentSegments();
+			int waterSegments = visibleFrame.segments().waterSegments();
+			if (!visibleFrame.admitted())
 			{
-				DistantHorizonsSemanticCollector.VisibleColumnSegments segments =
-					DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey);
-				opaqueSegments += segments.opaqueSegments();
-				transparentSegments += segments.transparentSegments();
-				waterSegments += segments.waterSegments();
+				// Exact-atlas coverage accounts each column in Java.
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.visible-segments");
+				for (long columnKey : semanticColumns)
+				{
+					DistantHorizonsSemanticCollector.VisibleColumnSegments segments =
+						DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey);
+					opaqueSegments += segments.opaqueSegments();
+					transparentSegments += segments.transparentSegments();
+					waterSegments += segments.waterSegments();
+				}
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.visible-segments");
 			}
-			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.visible-segments");
 			// The traversal above is the first point at which pending asset demand is
 			// known to be visible. Publish that bounded demand before freezing route
 			// semantics; the draw itself still waits for the next coherent frame.
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.asset-preflight");
 			net.vulkanic.gui.RustGalFrameCoordinator.flushPendingWorldLodAssetsForSemanticPreflight();
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.asset-preflight");
-			DistantHorizonsSemanticCollector.recordRenderListObservation(semanticColumns.size());
+			DistantHorizonsSemanticCollector.recordRenderListObservation(semanticColumns.length);
 			if (opaqueSegments + transparentSegments + waterSegments == 0)
 			{
 				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
