@@ -8,8 +8,10 @@
 The [Rust block registry](RUST-BLOCK-REGISTRY.md) holds every block, property
 and block state with typed IDs (`BlockId`, `StateId(u16)`, `PropertyId`,
 `FaceId`) and per-state columns. Java still defines the blocks and exports
-them once at startup. Lighting, heightmaps, worldgen and chunk saving derive
-their tables from it.
+them once, lazily on the first `NativeBlockRegistry.ready()` call after the
+Java registries are frozen. Lighting, heightmaps, worldgen and chunk saving
+derive their tables from it; terrain meshing combines its facts with
+render-owned columns when registering each meshing state.
 
 Still separate:
 - items, entity types, tags and biomes: no Rust registry yet
@@ -23,20 +25,27 @@ Still separate:
 **Typed, dense IDs** in `content/`:
 
 ```rust
-#[repr(transparent)] pub struct BlockId(u16);      // 1,211 today
-#[repr(transparent)] pub struct StateId(u16);      // 31,809 today
-#[repr(transparent)] pub struct ItemId(u16);       // 1,687
-#[repr(transparent)] pub struct EntityTypeId(u16); // 239
+#[repr(transparent)] pub struct BlockId(u16);      // implemented
+#[repr(transparent)] pub struct StateId(u16);      // implemented
+#[repr(transparent)] pub struct ItemId(u16);       // proposed
+#[repr(transparent)] pub struct EntityTypeId(u16); // proposed
 #[repr(transparent)] pub struct BiomeId(u16);      // per server: data-driven
 ```
+
+The 2026-10-07 source inventory contains 1,235 registered blocks: 1,211
+individual declarations plus 24 registrations from three eight-member
+`WeatheringCopperBlocks` groups. The [registry verification record](BLOCK-REGISTRY-VERIFICATION.md)
+reports 31,809 states; that runtime counter was not rerun for this documentation
+review. The [item inventory](ITEMS.md#today) contains 1,897 registrations, not
+the 1,687 individual `Item` fields alone.
 
 ### Why `StateId` is 16 bits
 
 Java's state ID is an `int`, but Java code mostly holds 4-byte references to
 `BlockState` objects instead. Chunk sections store packed palette indices of
 a few bits each. Sections that fall back to the global palette store IDs at
-`ceillog2(state count)` bits, 15 today. The network uses the same computed
-width, and saves store names.
+`ceillog2(state count)` bits, 15 for the reported 31,809-state registry. The
+network uses the same computed width, and saves store names.
 
 So the Rust type does not affect saves, the network or packed chunk storage.
 It sets the size of every *unpacked* state ID:
@@ -44,10 +53,13 @@ It sets the size of every *unpacked* state ID:
 - block-update and tick queues
 - anything that remembers a block, such as `BlockAnchor` or a falling block
 
-At 16 bits those are half the size of Java's. The cost is a ceiling of 65,536
-states, about twice today's count. A startup check fails loudly if
-registration exceeds it. Widening means changing `StateId` and fixing what the
-compiler reports. (Decided 2026-10-07.)
+At 16 bits those are half the size of Java's. The implemented ceiling is
+65,535 states: `u16::MAX` (`0xffff`) is reserved for “no state.” Java refuses
+an export above that limit, and Rust validates the same bound. Installation
+failure makes `NativeBlockRegistry.ready()` false, retaining the applicable
+Java compatibility routes; it is not a guaranteed loud startup failure.
+Widening requires updating the ID and export/consumer contracts. The 16-bit
+choice was made on 2026-10-07.
 
 **Registries are frozen tables**, built once in a fixed order:
 
@@ -89,6 +101,10 @@ is gone also keeps the network protocol and any recorded reference data valid.
   content, uses the `minecraft` namespace, so existing worlds keep loading.
 
 ## One source of truth
+
+The installed `BlockRegistry` is immutable for the process lifetime. Reinstalling
+an equal registry succeeds; a different registry is rejected. This does not
+implement reloadable content registries or generation-based publication.
 
 Every per-state fact a subsystem needs becomes a column of the state table
 (see [block states](BLOCK-STATES.md)) or a column owned by that subsystem but

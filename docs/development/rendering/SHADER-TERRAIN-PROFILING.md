@@ -12,13 +12,34 @@ these rows is a substitute for rerunning the same workload on a new revision.
 
 ## October 7 comparison controls
 
+Use the [later October 7 report](GOAL-5-STATUS.md#october-7-midday-and-later-performance-reports)
+for the native-rig/graph/GUI/DH interval. Its same-session shader+DH mean is
+232 FPS on each renderer but p99 remains 10.3 versus 8.0 ms. The earlier
+vanilla+DH Frozen 415 FPS does not reproduce in that later session (271 FPS),
+so do not carry it forward as a matched control. Long vanilla uses 60,000
+profiled Rust frames against an earlier-session 30,000-frame Frozen row; those
+rows do not establish a fresh equal-condition parity result. Latest assembly
+commit timings (shaders 332, vanilla 882 FPS) have no fresh paired Frozen row
+in that statement. All are author reports, not reruns here.
+
+The [progress log](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/PROGRESS.md) retracts the apparent graph gain at
+676 FPS because identical-build controls span 545–676 FPS. It attributes local
+CPU changes to earlier C2 compilation, shared persistent GUI decode arrays,
+node-bit/stamp graph bookkeeping, rig glint/admission/upload proof, ranked page
+keys and cheaper DH staging/shared draw-key identity. Component percentages,
+frame medians, whole-run means and tail changes are separate measures; gains
+from successive workloads cannot be added. The rig route was initially neutral
+at that benchmark's entity count. None of these observations removes the
+required visual, lifecycle and resource-bound checks.
+
 Keep short vanilla (240 warm-up + 1,800 measured frames), settled vanilla
 (6,000 + 1,800) and long vanilla (6,000 + 30,000) separate. The
 [author's progress log](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/PROGRESS.md#L13) withdraws the earlier
 unequal-warm-up parity comparison; even its equal-warm-up long run remains
 1334 versus Frozen 1462 FPS. Near-matching shader or vanilla+DH means do not
 establish all-mode parity or matching tails: the reported shaders+DH p99 is
-about 14 ms against 9.3 ms. This documentation review did not rerun these runs.
+about 14 ms against 9.3 ms at that earlier checkpoint. The later rows above
+have a different session/window. This documentation review did not rerun these runs.
 
 Use ordinary release timing with per-item phases off, then a separate attribution
 run with `-Dmattmc.dev.benchmark.detailedPhases=true`. Per-frame aggregate phases

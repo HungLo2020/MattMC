@@ -1,14 +1,17 @@
 # Block registry verification
 
-> Evidence for [the Rust block registry](RUST-BLOCK-REGISTRY.md) (Phase 1),
-> recorded on 2026-10-07 on a laptop (Intel i7-10750H, Linux x86_64,
+> Author-recorded evidence for [the Rust block registry](RUST-BLOCK-REGISTRY.md)
+> (Phase 1), recorded on 2026-10-07 on a laptop (Intel i7-10750H, Linux x86_64,
 > OpenJDK 25, `powersave` governor with turbo). It compares against commit
-> `5457b41ae`, the last commit before the registry.
+> `5457b41ae`, the last commit before the registry. The results below predate
+> the final format-2 meshing view at `7a6009f8`; they are not a fresh acceptance
+> run of that head.
 
 ## Parity
 
 [`VerifyRustBlockRegistry.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/VerifyRustBlockRegistry.py)
-ran 65 Java tests and 48 Rust tests with no failures. Key counters:
+was reported by the implementation author to have run 65 Java tests and
+48 Rust tests with no failures. Key counters from that run:
 
 - `NativeBlockRegistryTest`: 1,235 blocks and 31,809 states. Each state's
   block, flags, light block, emission and six faces match Java. All 491,067
@@ -85,4 +88,31 @@ python3 DevUtils/tests/content/VerifyRustBlockRegistry.py --case none  # parity 
 
 - Noise fill, proto chunk, surface and carvers. Their per-call path only lost
   a table pointer argument.
-- Rendering, whose tables are unchanged.
+- Rendering was outside the recorded comparison. Its meshing block facts were
+  subsequently switched to the registry in `7a6009f8`; no rendering performance
+  or reload result follows from the measurements above.
+
+## Current source and verification scope
+
+Static review at
+[`7a6009f8`](https://github.com/HungLo2020/MattMC/commit/7a6009f84d966263293f864933f4da06b1823dfa)
+confirms format 2 exports fluid/offset facts and that the meshing view derives
+block facts from the installed registry. The current
+[`NativeMeshingStateViewTest`](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/test/java/net/sodium/client/render/chunk/compile/pipeline/NativeMeshingStateViewTest.java)
+compares 17 integer fields and 18 raw float-bit fields per state in each of two
+fluid modes. For the author's reported 31,809 states, that would be 63,618
+records; this is a calculation of fixture scope, not a newly observed pass.
+`NativeBlockRegistryTest` also now checks fluid kinds, heights and offsets.
+
+The aggregate driver's `PARITY` list does not select the meshing fixture, so
+its earlier 65-Java/48-Rust report must not be treated as covering that change.
+Run the separate command on the [registry page](RUST-BLOCK-REGISTRY.md#testing)
+when validating meshing changes. The fixture compares explicit and derived
+records; it does not exercise a live rendered world or resource/world reloads.
+
+The driver records `faster_5pct` and `no_regression` booleans but does not fail
+solely because either is false. Its full multi-fork hot-path comparison was
+not completed in the reported session. A report file or successful command
+exit alone therefore does not establish full Phase 1 performance acceptance.
+This documentation review ran no Java/Rust tests, mutation tests, benchmarks
+or live worlds, and did not independently reproduce the runtime counters.

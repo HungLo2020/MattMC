@@ -54,6 +54,19 @@ cargo doc --no-deps --open    # then open mattmc_rust::render::vulkanic
    [lifecycle gate](RENDER-VERIFICATION.md#lifecycle-gate) fails on a logged
    dependency violation.
 
+Dependency retirement and submission retirement are separate. At
+[`7f256b53`](https://github.com/HungLo2020/MattMC/commit/7f256b5354033eff7553f51a10539fac5a68a0bd),
+[`retire`](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/vulkanic/gal/lifetime.rs#L33-L52)
+marks a referenced resource without destroying it; releasing its last dependent
+re-enters ordinary destruction, which still defers backend release through the
+last incomplete submission. A retained dependent can therefore keep a retired
+resource live indefinitely; this is not a memory bound or a completion fence.
+The [new fixture](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/vulkanic/tests/handles.rs#L50-L80)
+covers two views of one texture and an unreferenced texture, not the full
+consumer-cache/recording/submission matrix. This documentation review inspected
+the definition only. Preserve the author's bounded lifecycle report separately
+from broad leak or native-crash acceptance.
+
 Presentation follows its own cycle: `configure_frame_surface`, then per frame
 `acquire_frame`, `create_frame_target` for the acquired image, render, submit,
 and `present_frame` (or `cancel_frame`). Check `AcquiredFrame::status`:

@@ -54,6 +54,9 @@ installs modified sections, both heightmaps and the stage's post-processing
 marks once. `NativeProtoChunk.create` returns null, keeping `setBlockState`
 writes, unless:
 
+- the [block registry](../../game-model/RUST-BLOCK-REGISTRY.md) is installed;
+  Rust derives air, motion, fluid and tick flags from it through the shared
+  noise-fill view, instead of receiving a private Java flag table;
 - the chunk is a plain `ProtoChunk` whose persisted status is before
   `INITIALIZE_LIGHT` (no light updates) and whose heightmaps to update are
   exactly the primed world-generation pair;

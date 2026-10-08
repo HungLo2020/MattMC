@@ -119,9 +119,9 @@ so exit success alone is not performance acceptance.
 ## Status
 
 The results below are historical: they measured the original slice, when Java
-built the light types. The move to the block registry was checked against the
-slice's previous code by
-[block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
+built the light types. The [block registry verification record](../../game-model/BLOCK-REGISTRY-VERIFICATION.md)
+separately reports the author's later parity comparison against the slice's
+previous code; its full multi-fork hot-path comparison was not completed.
 
 The implementation author recorded release acceptance on 2026-10-06:
 Ryzen 5 5600G, Linux x86_64, OpenJDK 25. The author reported eight Java tests

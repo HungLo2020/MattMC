@@ -1,13 +1,18 @@
 # Block states (proposal)
 
-> Proposal; not implemented. See the [game model index](index.md).
+> Partly implemented: IDs, property arithmetic and the subset of columns in
+> [the Rust block registry](RUST-BLOCK-REGISTRY.md) are current. Typed property
+> constants, the complete table below and general shape interning remain
+> proposals. See the [game model index](index.md).
 
 ## Block vs state
 
 These stay two separate things, as in Java:
-- A **block** (`BlockId`, 1,211 today) is a kind of block, such as `furnace`.
+- A **block** (`BlockId`, 1,235 registrations in the source inventory) is a
+  kind of block, such as `furnace`.
   It owns the definition: properties, behavior, item, sound and strength.
-- A **state** (`StateId`, 31,809 today) is one combination of that block's
+- A **state** (`StateId`, 31,809 in the [author's parity record](BLOCK-REGISTRY-VERIFICATION.md))
+  is one combination of that block's
   property values, such as `furnace[facing=north,lit=true]`. Each block's
   states are a contiguous range, and each state's `block` column names its
   block.
@@ -26,7 +31,9 @@ state = block.first_state + Σ value_index(p) × stride(p)
 ```
 
 Each block keeps its property layout (property IDs, value counts, strides),
-so reading or changing a property is arithmetic:
+so reading or changing a property is arithmetic. The current registry exposes
+`value`, `with_value` and `state(block, values)` with property IDs and
+value indices. The following typed convenience API is still proposed:
 
 ```rust
 let age = state.get(AGE);                 // (id - first) / stride % count
@@ -46,7 +53,9 @@ let facing = state.get(FACING);           // returns Direction, typed
 
 Java's `BlockStateBase` caches about 30 facts per state in its constructor
 and `initCache()`. Rust keeps the same facts as **struct-of-arrays columns**
-indexed by `StateId`, built once:
+indexed by `StateId`, built once. This table is the proposed full layout;
+[current columns](RUST-BLOCK-REGISTRY.md#what-it-holds) include block ownership,
+flags, lighting faces, fluid facts and offsets, but not all entries below:
 
 | Column | Type | Used by |
 |---|---|---|
@@ -67,11 +76,13 @@ columns, so no function is ever called per lookup. Dynamic-shape blocks
 
 ## Shapes are interned
 
-Voxel shapes are deduplicated into a `ShapeId` table, along with derived data:
+The proposal deduplicates voxel shapes into a `ShapeId` table, along with derived data:
 face projections as `FaceId`, a face-occlusion truth table, and box lists.
-Light propagation already relies on exactly this, and
-`world/phys/shapes` already has the Rust kernels for joins, raycasts and
-closest points. They would take `ShapeId`s instead of raw shape buffers.
+The current registry interns light-occlusion face identities and receives
+Java's exact face-occlusion truth table; it does not provide a general
+`ShapeId` registry. `world/phys/shapes` already has the Rust kernels for joins,
+raycasts and closest points. Taking `ShapeId`s instead of raw shape buffers
+would be future work.
 
 ## Why columns
 

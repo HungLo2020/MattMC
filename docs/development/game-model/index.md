@@ -3,8 +3,10 @@
 > **Status: proposal; Phase 1 implemented.** These pages describe how blocks,
 > block states, items, block entities and entities should be represented in
 > Rust. Phase 1, the [Rust block registry](RUST-BLOCK-REGISTRY.md), is current
-> behavior; everything else is a proposal. The surveys behind the proposal are
-> dated 2026-10-07.
+> behavior; later definitions, behavior and component systems remain proposals.
+> “Implemented” describes source ownership, not completion of every acceptance
+> check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
+> The surveys behind the proposal are dated 2026-10-07.
 
 ## End state
 
@@ -41,18 +43,30 @@ for the bridge.
 | Integrated mods | Alex's Caves, Alex's Mobs and TaCZ content stays in the `minecraft` namespace as first-class content, not a separate layer. |
 | Threading | Follow Java's model as it is. |
 | Client and server | Like vanilla: an integrated server in single-player, with separate client and server worlds sharing the same definitions. |
-| State ID width | 16 bits (`StateId(u16)`), with a startup check against the 65,536 ceiling. |
+| State ID width | 16 bits (`StateId(u16)`), with a startup check against the 65,536 ceiling in the original proposal. See the implemented limit below. |
 | Dependencies | No off-the-shelf ECS. New crates need the user's approval; the component store is written in-house. |
 | Rendering | The rendering agent keeps working. Once this plan is final, it is reconciled with that agent's work before Phase 1 touches render tables. |
 | Scope now | Blocks, block states and items in detail. Entities stay high-level. |
+
+The original 16-bit decision described the theoretical 65,536-value space.
+The [implemented registry](RUST-BLOCK-REGISTRY.md#constraints) reserves
+`0xffff` for “no state,” so it permits at most **65,535 registered states**.
+Exceeding that limit makes installation decline; it does not implement the
+proposal's suggested loud startup failure.
+
+Rendering reconciliation has since reached terrain meshing: block facts come
+from the shared registry, while rendering keeps models, materials, passes,
+shader-pack IDs, tint and sprites, with a separate cache lifecycle. This updates
+the implementation status without changing the recorded coordination decision.
 
 ## Core idea in one paragraph
 
 Content is **data in registries**: blocks, states, items and entity types are
 dense IDs into frozen tables, built once at startup. Hot code reads the
 tables. Rare and complex **behavior** (ticks, interaction, placement) lives in
-small trait implementations, one per behavior family, so 1,211 blocks need
-roughly a hundred behaviors rather than 327 classes. **Per-instance data**
+small trait implementations, one per behavior family. The proposed reuse is
+roughly a hundred behaviors for the 1,235 registered blocks; the original
+Java class survey is described in [block behavior](BLOCK-BEHAVIOR.md). **Per-instance data**
 (a chest's items, a mob's health, a sign's text) lives in **components**. Mobs,
 items on the ground, minecarts *and* block entities are all entities in the
 same component store. A block entity is simply an entity with a `BlockAnchor`
@@ -82,8 +96,8 @@ one set of systems.
 ## Where it lives in the crate
 
 `content/` (registries and definitions) and `gameplay/` (behavior and systems)
-are reserved for this in the
-[project architecture](../PROJECT-ARCHITECTURE.md). `content/block/` holds the
-block registry; `gameplay/` has no block behavior yet. `world/` and `storage/`
-read their block tables from `content/`; `render/` will once its tables are
-reconciled.
+are the owners in the [project architecture](../PROJECT-ARCHITECTURE.md).
+`content/block/` holds the implemented block registry. `gameplay/tacz/` already
+contains the TaCZ function-modifier kernel; the proposed block-behavior and
+component systems are not implemented. `world/`, `storage/` and terrain meshing
+read shared block facts from `content/`, while each consumer owns its view.

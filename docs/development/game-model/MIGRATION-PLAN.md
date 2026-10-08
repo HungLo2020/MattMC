@@ -1,7 +1,10 @@
 # Migration plan (proposal)
 
 > Phase 1 is implemented ([Rust block registry](RUST-BLOCK-REGISTRY.md)).
-> Later phases are proposals. See the [game model index](index.md).
+> Later phases are proposals. Implementation here means the block-registry
+> source and its consumers exist; it does not certify all acceptance work.
+> See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md) and
+> [game model index](index.md).
 
 Each phase is a normal migration slice: parity tests against Java, a
 production-path benchmark, and docs.
@@ -9,7 +12,7 @@ production-path benchmark, and docs.
 ## Phase 1: one block registry from Java (implemented)
 
 - Rust's [`content::block`](RUST-BLOCK-REGISTRY.md) is built from **one Java
-  export** at startup:
+  export**, initialized lazily from the frozen Java registries:
   - blocks, properties and every state's columns
   - the light occlusion faces, interned, with Java's truth table
 - These per-slice tables were replaced by views of it, and each Java bridge
@@ -31,9 +34,10 @@ production-path benchmark, and docs.
   shader-pack IDs, tint and sprites.
 
 Not done in Phase 1, by design:
-- Items with default components, entity types, tags and biomes have no Rust
-  consumer yet. Each joins the registry with its first consumer; items
-  arrive with Phase 2's definitions. Adding them earlier would be unused code.
+- The shared registry does not yet own items with default components, entity
+  types, tags or biomes. Existing native systems can still consume separate
+  Java-supplied data, such as [biome-search inputs](../world/biome/RUST-BIOME-SEARCH.md).
+  General shared registries remain future work; this phase covers block facts.
 
 ## Phase 2: Rust defines the registries
 
@@ -72,8 +76,10 @@ Rendering already keys its meshing-state table by state ID and has its own
 tint, model-selector and shader-pack material tables. In this plan:
 - **Rendering keeps ownership** of render-specific columns: model selectors,
   render types and pack material IDs.
-- **Those columns are keyed by the shared `StateId`**, built from
-  `content::Registries` instead of raw integers and text snapshots.
+- **The proposed destination is shared typed IDs for all content.** Current
+  terrain meshing passes integer state IDs across FFM and validates them
+  against `content::block::BlockRegistry`; the generic `content::Registries`
+  design is not implemented.
 - Done for terrain meshing states: their block facts come from the registry,
   and rendering sends only its own columns (see the
   [registry's consumers](RUST-BLOCK-REGISTRY.md#consumers)). The shader-pack
@@ -92,8 +98,8 @@ See the [decisions table](index.md#decisions-2026-10-07). For this plan:
   definitions, as in vanilla. Client-only components (animation state) exist
   only in the client world.
 
-- **`StateId` width:** 16 bits, with a startup check against the 65,536
-  ceiling. See [why 16 bits](REGISTRIES-AND-IDS.md#why-stateid-is-16-bits).
+- **`StateId` width:** 16 bits; current installation allows 65,535 states,
+  reserving `0xffff` as a sentinel. See [why 16 bits](REGISTRIES-AND-IDS.md#why-stateid-is-16-bits).
 
 ## Open decisions
 

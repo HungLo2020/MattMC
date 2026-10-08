@@ -83,8 +83,9 @@ remain unchanged.
 
 The results below are historical: they measured the original slice, when Java
 built the global label table. Global palettes now pass no table (each state
-ID is its own label); that change was checked against the slice's previous
-code by [block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
+ID is its own label). The [block registry verification record](../../game-model/BLOCK-REGISTRY-VERIFICATION.md)
+contains the author's later parity and spot-check measurements against the
+slice's previous code; it does not rerun the full original acceptance gate.
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,
 OpenJDK 25.0.4.1. Eleven Java tests and three Rust tests passed with zero

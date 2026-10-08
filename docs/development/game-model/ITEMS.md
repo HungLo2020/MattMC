@@ -4,11 +4,23 @@
 
 ## Today
 
-Java has 1,687 items and only 83 `Item` subclasses. Since 1.20.5 almost all
-item behavior and data lives in **data components** (97 types): food, tools,
-durability, enchantments, equippable, and so on. `Item.Properties` mostly just
-sets components. An `ItemStack` is an item, a count, and a patch of component
-changes over the item's default components.
+The 2026-10-07 source inventory contains **1,897 item registrations**:
+
+- 1,687 individual `Item` fields in
+  [`Items.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/item/Items.java),
+  minus five aliases of already registered TaCZ items
+- 191 TaCZ registrations from the definition lists: 63 guns, 29 ammo items and
+  99 attachments
+- 24 registrations from three eight-member `WeatheringCopperItems` groups
+
+These are registration-site counts, not a new runtime dump. The original
+proposal's 83 `Item` subclasses is a historical source-survey figure.
+[`DataComponents.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/core/component/DataComponents.java)
+declares 97 `DataComponentType` fields for food, tools, durability,
+enchantments, equippable data and other properties. Since 1.20.5 much item data
+and behavior is component-driven, while specialized hooks still live in item
+classes. `Item.Properties` mostly sets components. An `ItemStack` is an item,
+a count, and a patch of component changes over the item's default components.
 
 ## Proposal
 

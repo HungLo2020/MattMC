@@ -94,9 +94,13 @@ flagged `0x4000_0000`, with `mesh_key` = rig id and `mesh_generation - 1` = its
 first pose. Rust composes the hierarchy like `ModelPart.visitRenderable` and
 expands one ordinary instance per drawn part before validation
 ([`model_rigs.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/model_rigs.rs)).
-Java retires a rig when its topology is evicted or a part generation changes,
-and releases it three frames later, so a pipelined frame never names a released
-rig. A rig instance may carry standard item foil: enchanted armor and trident
+Java retires a rig when its topology is evicted or a part generation changes.
+Release uses a [three-semantic-frame delay](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L12578-L12621)
+and a three-slot pose ring; that delay is not a GPU-completion fence or per-rig
+completion receipt. Queued submission decodes/copies on the caller before
+return, while the optional single in-flight route decodes later on its worker
+and retains the request arena until join. Preserve these separate contracts
+when changing queue depth or lifetime. A rig instance may carry standard item foil: enchanted armor and trident
 glint passes are rigs over the same parts with the glint texture and material,
 so they no longer bake a new posed mesh asset each frame. First-person frames,
 uncacheable dynamic textures and per-part mesh diagnostics keep Java-posed part
@@ -104,12 +108,28 @@ instances; `-Dmattmc.dev.modelRigs=false`
 forces that path for A/B checks. `ModelRigTransformParityTest` compares Rust's
 part transforms with Java's on vanilla models under random poses.
 
+Java still extracts local-space cubes and selects textures/materials. Rig
+registration validates nonzero identities, parent-before-child order and known
+flags, with 1–1,024 nodes and at most 4,096 registered rigs. Expansion validates
+pose spans, skips hidden subtrees, keeps children of `skipDraw` nodes and clears
+the transport flag before ordinary instance validation. [Rig implementation](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/rust/render/bridge/world/model_rigs.rs).
+[Admission and upload proof](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L12623-L12745)
+observe a topology once per semantic frame and reuse proof until withdrawal,
+readmission or registration invalidates it; changed part generations replace
+the registration. These mechanisms do not supply geometry for Citadel's empty
+proxy root: both structural extraction and the posed fallback remain empty
+([#803](https://github.com/HungLo2020/MattMC/issues/803)).
+
 Typed orb placements name a boundary in the collected mesh stream. When the
 shadow-only CPU capture removes foil or outline meshes, map those boundaries
 through its kept-mesh prefix before the later source-admission mapping.
 Preserve equal-boundary order, camera placements, culling facts and shadow roles;
 appearance residency and published immutable records must remain unchanged.
 See [the semantic collector](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/ExperienceOrbSemanticCollector.java).
+That existing filtering/admission remap does not cover subsequent native rig
+expansion: an input rig is one mesh row but may emit zero or many. The unchanged
+orb boundary can split the expanded parts or exceed the resulting stream
+([#819](https://github.com/HungLo2020/MattMC/issues/819), source-predicted).
 
 ## Standalone query handles
 
@@ -127,8 +147,9 @@ state with a pipelined frame, so asking never joins it. They use standalone poin
   (no policy, unresolved hooks) means Java keeps every candidate. The bridge
   owns the handle and destroys it before its context.
 - **Section graph** (Frozen's camera terrain search and ordinary compact terrain
-  selection): Java mirrors readiness/build facts and published solid/cutout/
-  translucent mesh rows. After camera search, `select_terrain` returns graph-owned
+  selection): Rust owns readiness/build/urgent/in-flight/stale bookkeeping;
+  Java reports column/build events and published solid/cutout/translucent mesh
+  rows. After camera search, `select_terrain` returns graph-owned
   buffers for camera layers, optional off-camera shadow candidates and animated
   section positions, plus producer counters. Camera/caster buffers use the same
   ABI 70/69 layouts as the whole-frame request. Their views are valid only until
@@ -139,6 +160,20 @@ state with a pipelined frame, so asking never joins it. They use standalone poin
   [selection and lifetime](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustSectionGraph.java#L215-L282),
   [packed frame storage](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L511-L591)
   and [selection scope](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+
+### Terrain layer intake
+
+At `4740f8fa`, the standalone `mattmc_terrain_assemble_layer` call replaces
+the earlier decode-only export. The [bridge export](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/bridge/world/terrain_intake.rs)
+keeps wire layout handling outside `worldrender`; native intake/assembly returns
+vertices, indices, ranges, identities and accounting receipts. Invalid arguments
+or capacity return `-2`; a rejected mesh returns `-3` with a bounded error string.
+Java [allocates encoded vertex storage and copies index/range outputs](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/java/net/vulkanic/world/RustTerrainIntake.java)
+before the confined scratch arena closes. It retains build/sort/atlas inputs,
+worker dispatch and asset publication. Native assembly now performs water
+classification and vertex rewrites previously done through Java's writable
+encoded view; keeping encoded vertices through publication is not an end-to-end
+zero-copy or worker-ownership claim.
 
 ## Rules the boundary tests enforce
 
@@ -209,12 +244,17 @@ also share persistent instance arrays. This was the default at the earlier
   addresses, both counts and that generation instead of re-decoding it.
   Never rewrite persistent GUI geometry in place. The Java store admits at most
   4,096 topologies; the separate thread-local Rust decode cache clears at 1,024
-  entries before inserting another. Cache hits still return owned geometry
-  copies, check each batch's metadata and skip per-vertex validation only after
+  entries before inserting another. Cache hits share Rust-owned vertex/index
+  arrays through `SharedVec` (`Arc<Vec<T>>`), check each batch's metadata and
+  skip per-vertex validation only after
   a successful check under the same block-raster-presence state.
   [Decoder](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/gui/mesh.rs#L11-L30)
   · [Validation](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/gui/mesh.rs#L254-L270)
-  The generation belongs to each Java bridge instance and advances on its close;
+  [Shared arrays](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/rust/render/guirender/mesh/model.rs#L178-L235)
+  remove repeated deep clones on cache hits. Misses copy Java input; mutable
+  access uses copy-on-write, consuming a still-shared vector clones it, and draw
+  preparation can create transformed vertices and copy indices. This is not a
+  zero-copy path. The generation belongs to each Java bridge instance and advances on its close;
   the native thread-local key contains no new-context identity. Same-thread
   context recreation with address reuse is an unverified lifecycle case, not
   a demonstrated defect or a guarantee supplied by the generation field.

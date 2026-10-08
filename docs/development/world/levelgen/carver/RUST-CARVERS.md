@@ -100,6 +100,11 @@ fixture result to retrogen, custom generators or complete-world acceptance.
 
 ## Measurements
 
+The historical results below predate the shared block registry. Carvers now
+read state-to-block ownership from that registry; the [registry verification
+record](../../../game-model/BLOCK-REGISTRY-VERIFICATION.md) reports the author's
+later parity checks, but no new carver hot-path timing for that change.
+
 The implementation author recorded release runs on 2026-10-05 on an i7-10750H
 laptop (CPU 5 measured, CPUs 0/1 for JVM workers). The driver ran three
 alternating JVM pairs per setting, at least 15 s of warmup and 30 samples per

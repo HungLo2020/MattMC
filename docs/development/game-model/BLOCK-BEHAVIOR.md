@@ -4,6 +4,10 @@
 
 ## What Java's 327 subclasses actually vary by
 
+The original 2026-10-07 proposal reported this source survey. Its class and
+hook counts are historical survey figures, not runtime registry totals or a
+new subclass audit at the current implementation snapshot.
+
 | Hooks overridden | Block classes |
 |---|---|
 | 0 (codec or constructor only) | 32 |
@@ -37,8 +41,8 @@ pub trait BlockBehavior: Send + Sync + 'static {
 - **One implementation per family, configured by fields**:
   `Crop { max_age: u8, seed: ItemId }`, `Slab`, `Stairs { base: StateId }`,
   `Door { set: BlockSetType }`, `Pillar`. The block registry stores a
-  `&'static dyn BlockBehavior` per `BlockId`. 1,211 blocks then share roughly
-  a hundred behaviors.
+  `&'static dyn BlockBehavior` per `BlockId`. The 1,235 registered blocks would
+  then share roughly a hundred behaviors; that is a design estimate.
 - **Shared mix-ins are helper functions, not base classes.** Waterlogging,
   horizontal facing, attachment checks and "falls like sand" become small
   functions that behaviors call. They are not levels of inheritance.

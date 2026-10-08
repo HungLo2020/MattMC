@@ -17,6 +17,7 @@ src/main/rust/
 │   └── block/
 ├── core/
 ├── gameplay/
+│   └── tacz/
 ├── network/
 │   └── codec/
 │       └── long_array/
@@ -168,11 +169,15 @@ box list. Java retains public ray prechecks and immediate inside-hit behavior.
 
 ### `gameplay/`
 
-Gameplay systems belong here. This is the intended home for native implementations of player, entity, item, combat, block interaction, and rule-driven behavior as those systems migrate from Java.
+Gameplay systems belong here. `gameplay/tacz/function_modifier.rs` already
+contains the TaCZ function-modifier kernel. Native player, entity, item,
+combat, block-interaction and component systems migrate here by ownership;
+the proposed general [game model](game-model/index.md) is not yet implemented
+beyond its block registry.
 
 ### `content/`
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, from which world and storage subsystems derive their tables. `content` must not depend on its consumers.
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, populated once by a lazy export from Java's frozen registries. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns content definitions, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
 
 ### `render/`
 
@@ -207,9 +212,10 @@ buffer ownership, length prefixes, cursor updates and compatibility behavior.
 Persistent encodings and region storage belong here. The
 [chunk-section serializer](world/chunk/RUST-CHUNK-SECTIONS.md) uses `storage/chunk/`
 to encode eligible section palettes, packed values, light layers and section Y
-straight into NBT tape. Java still snapshots live chunks, supplies registry
-vocabulary and biome names, builds the remaining root compound and owns save
-scheduling. Pending writes retain tape and create Java tags lazily when read;
+straight into NBT tape. Rust derives the block-state save vocabulary and
+palette storage bits from the shared block registry. Java still snapshots live
+chunks, supplies per-chunk biome names, builds the remaining root compound
+and owns save scheduling. Pending writes retain tape and create Java tags lazily when read;
 unsupported section inputs keep the Java encoding route. Eligible current-version
 loads also decode section tape natively; Java reconstructs containers and the
 remaining chunk state, with non-current/noncanonical input retaining upgrade

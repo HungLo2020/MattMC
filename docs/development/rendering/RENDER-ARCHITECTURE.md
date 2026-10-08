@@ -147,11 +147,17 @@ second copy of the instance records. Source resource sets (`TerrainSourceOwnedRe
 are immutable and `Arc`-shared: per-draw material preparation clones and compares
 them, so keep them cheap to clone and do not add mutable state.
 
-Entity models are model rigs: Java registers each cached model's part tree once
-and per frame copies only the raw part pose fields after `setupAnim`; Rust
-composes the hierarchy and expands the part instances (see
-[JAVA-BRIDGE](JAVA-BRIDGE.md), ABI 71). Animation (`setupAnim`) still runs in
-Java; it is the next piece to port per entity type.
+Cacheable entity models use ABI 71 rigs: Java supplies local-space part assets
+and raw poses after `setupAnim`; Rust composes the hierarchy and expands ordinary
+part instances. Java retains animation, texture/material choice and foil clocks.
+Armor/trident glint reuses rig parts; per-topology admission and cached upload
+proof reduce repeated checks. First-person, uncacheable dynamic textures and
+specified diagnostics retain Java-posed geometry for the same native renderer.
+See [Java Bridge](JAVA-BRIDGE.md) for the three-semantic-frame retirement delay,
+which is not a completion fence, and the separate queued/pipelined lifetimes.
+The empty Citadel proxy remains unsupported ([#803](https://github.com/HungLo2020/MattMC/issues/803));
+[#819](https://github.com/HungLo2020/MattMC/issues/819) tracks the source-predicted
+orb-boundary error when a rig changes the mesh stream length.
 
 The shared mesh instance stream is bound into every mesh resource set, so
 growing it rebuilds them all. It grows to at least twice its previous capacity;
@@ -179,22 +185,26 @@ edits, dispatched and finished builds, and accepted build flags through a
 standalone handle
 ([`RustSectionGraph`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustSectionGraph.java)),
 which is outside any bridge context so selecting never joins a pipelined frame.
-Java keeps only what Rust cannot hold: the meshing workers, and the
-`BlockEntity` and sprite objects that Rust's lists name by section key or id.
+Java retains meshing worker dispatch, build/sort/atlas inputs, mesh publication,
+and the `BlockEntity` and sprite objects named by Rust's section keys or IDs.
+The graph's needs-build/urgent marks are node bits; visible slots use visit
+stamps and animated-sprite lists are interned. These bookkeeping changes do not
+move world/entity semantics or resource-reload publication into the graph.
 
 - Visible sections are visited sections that are built with geometry.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
   Java mirrors each section's published layer meshes into the graph, and Rust
-  emits the compact camera layers (near-to-far visit order, translucent back
+  emits the compact camera layers (graph BFS visit order, translucent back
   to front), shader shadow casters and the frame's animated sprite ids (each
   once) in the frame records' native layout. Java copies these records without
   rebuilding each section's record and does not read the visits. The layer
   fingerprint receipt is computed only when terrain diagnostics are active.
   Diagnostic, fault, reload, explicit per-record and readiness-receipt frames
   keep the Java producer, which asks the search to copy its visits. The
-  implementation author reports byte-identical records over 1,800 frames per
-  mode; this review did not rerun that comparison.
+  implementation author's earlier `313e7a8a` report compares byte-identical
+  records over 1,800 frames per mode; it predates later ordering/bookkeeping
+  changes and was not rerun by this review.
   [Selection eligibility and handoff](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java#L4921-L4979)
 - A finished build's layers are decoded and assembled in Rust by one call
   ([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs),
@@ -210,12 +220,19 @@ Java keeps only what Rust cannot hold: the meshing workers, and the
     material type set, and ranges are split by material/texture.
   - **Identity:** the atlas-scoped `mesh_key` and the content hash
     `mesh_generation` (an identical rebuild keeps it).
-  - **Verification:** both steps matched Java's former code bit for bit
-    (decode on 1,500+ layers in vanilla and shaders; assembly on 1,500+ layers
-    with shaders, 0 mismatches). `cargo test --lib terrain::` pins the
-    contracts, including the former Java translucent cases.
-  - Java receives the vertices, index bytes, ranges and a receipt, and still
-    publishes the asset (residency, upload acknowledgement, reload staging).
+  - **Verification:** the author reports bit-for-bit comparisons against the
+    former Java code: decoding on 1,500+ layers in vanilla/shaders and assembly
+    on 1,500+ shader layers with no mismatches. The temporary comparison was
+    removed with the Java assembly. Thirteen checked-in assembly fixtures
+    include ported Java translucent contracts; `cargo test --lib terrain::`
+    targets the native definitions. This source review did not run those tests
+    or inspect the unbundled comparisons.
+  - Java receives encoded vertices, copied index bytes/range records and a
+    receipt, and still publishes the asset (residency, upload acknowledgement,
+    reload staging). It supplies sorter output, atlas identity and water sprite
+    rectangles; native assembly performs the water/material classification and
+    rewrites. This supersedes the `7a6009f8` Java water/index assembly boundary.
+    It does not eliminate all copies. [Intake handoff](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/java/net/vulkanic/world/RustTerrainIntake.java).
 - Rust lists the build requests in visit order, block-edit rebuilds first and
   sections already in flight skipped. Java dispatches them while in-flight
   builds stay below twice the worker count, and asks Rust whether each
@@ -310,12 +327,29 @@ a replacement can change opaque, transparent and water stream topology. See
 and
 [`RustGalFrameCoordinator`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java).
 
+Persistent GUI decode-cache hits now share owned vertex/index arrays through
+[`SharedVec`](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/rust/render/guirender/mesh/model.rs#L178-L235).
+Cache misses still copy caller input, shared mutation/consumption can clone,
+and preparation can transform/copy geometry. Decode sharing, prepared-geometry
+reuse and accepted GPU-range reuse retain separate bounds and lifetimes.
+
 Release descriptor sets and cached pass bindings before their textures,
 samplers or residency buffers. Cache eviction must account for prepared
 commands as well as submitted work. GUI stream reservations remain owned
 through command preparation and submission; frame-local reservations must be
 released when preparation fails. Shader reloads retire bindings and pipelines
 only after the replacement source generation is accepted.
+
+At `26d6beaa`, queued DH material-route receipts gained the collector lifecycle
+captured at consumption; mismatched receipts are dropped and counted after a
+reset. The same change drops parked fullscreen plans before runtime inputs.
+`7f256b53` broadens consumer-cache release for teardown/runtime replacement and
+adds [GAL retirement](VULKANIC-GAL.md): a still-referenced resource waits for its
+last dependent, then normal submission retirement protects in-flight use.
+This does not bound a cache that never releases its dependents. The
+[seven-scenario lifecycle gate](RENDER-VERIFICATION.md#lifecycle-gate) and
+[author's report](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/PROGRESS.md) provide scoped transition evidence;
+they do not resolve every prior native crash or prove long-run resource bounds.
 
 Item and armor foil extraction reuse bounded immutable CPU texture copies in
 [`StandardFoilTextureCache`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/StandardFoilTextureCache.java).

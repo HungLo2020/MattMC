@@ -86,6 +86,9 @@ All must hold; otherwise the Java loop runs:
 - The [block registry](../../game-model/RUST-BLOCK-REGISTRY.md) is installed.
   Rust derives each state's flags from it (air, blocks motion, fluid, random
   ticks, the AIR block), as do the proto-chunk storage and the surface stage.
+  The [registry verification record](../../game-model/BLOCK-REGISTRY-VERIFICATION.md)
+  reports the author's all-state flag and consumer parity checks; it does not
+  provide a new noise-fill hot-path measurement for that table migration.
 - No `DEBUG_ORE_VEINS`, `DEBUG_AQUIFERS`, `DEBUG_DISABLE_FLUID_GENERATION` or void-terrain debugging.
 - A plain `NoiseChunk`, empty `Blender`, 16-block cell rows, and either a
   [native chunk-noise template](RUST-CHUNK-NOISE.md) or the wrapped finalDensity

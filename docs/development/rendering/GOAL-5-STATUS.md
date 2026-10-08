@@ -1,22 +1,25 @@
 # Goal 5 rendering checkpoint
 
-**Goal 5 remains incomplete.** The current review covers retained-scene,
-queued-frame, compact-terrain, visibility and rendering-cost work through
-[`20e157ca`](https://github.com/HungLo2020/MattMC/commit/20e157cab7962140b30b83f40374cdeb1e6a8b19),
-including persistent GUI geometry, graph-visit terrain order, vanilla block-entity
-selection and DH transport/batching. It adds native ownership and author-recorded workload improvements;
-it does not establish broad visual/temporal parity, full scene migration,
-long-run resource bounds or resolution of the earlier independent native crash.
+**Goal 5 remains incomplete.** The current source review reaches
+[`4740f8fa`](https://github.com/HungLo2020/MattMC/commit/4740f8fabffd878286850083e2d86ff733c9121e):
+native section-graph bookkeeping, ABI 71 model rigs, shared GUI decode storage,
+terrain layer decoding/assembly and lifecycle retirement. This adds native
+ownership and bounded author-recorded checks; it does not establish broad
+visual/temporal parity, full scene migration, long-run resource bounds or
+resolution of the earlier independent native crash.
 
-Java still supplies world/entity semantics, graph updates and build scheduling.
-Rust now performs camera section-graph search, ordinary compact terrain/caster
-selection and an off-camera entity-shadow prefilter, alongside native frame
-execution and GPU resource ownership. Java still reads visits for pending build
-work and lazy entity-culling checks, marks animated sprites and retains the
-ineligible-frame terrain producer. The final target remains one Rust
-executable supporting client and server, at most one separately loaded Rust
+Rust owns the graph's readiness/build bookkeeping and ordinary terrain selection,
+rig hierarchy composition, terrain layer assembly and GPU execution/resources.
+Java still supplies world/entity semantics and animation, graph events, meshing
+worker dispatch, atlas/sprite inputs and asset publication. Diagnostic and other
+ineligible frames retain the Java terrain producer. The final target remains one
+Rust executable supporting client and server, at most one separately loaded Rust
 library, and no Java. See [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
+
+The current [Goal 5 tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6049236504)
+and [rendering ownership checkpoint](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6049217250)
+retain those bounded scopes; issue status is not runtime acceptance.
 
 The earlier [October 4 tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5982772544)
 and [October 3 checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5972378509)
@@ -30,9 +33,36 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ### October 7 source review
 
+#### Native rigs, terrain assembly and lifecycle follow-up
+
+The review through `4740f8fa` supersedes older current-ownership descriptions:
+
+- **Section graph:** Rust owns ready/build/urgent/in-flight/stale state, loading readiness, block-entity section lists, interned animated-sprite IDs and entity-culling visit stamps. Java reports events, dispatches workers, marks the selected sprite objects and publishes meshes. Graph order is BFS visit order, not strict distance order. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **ABI 71 rigs:** cached models send one flagged instance plus raw poses after Java `setupAnim`; Rust expands their hierarchy. Armor/trident glint reuses rig parts, with Java-supplied foil semantics. Per-topology admission runs once per semantic frame and upload proof is cached per registration. The three-semantic-frame retirement delay is not a completion fence. [Bridge](JAVA-BRIDGE.md)
+- **GUI reuse:** persistent decode-cache hits share Rust-owned `SharedVec` arrays; misses copy input, and mutation, consumption or draw preparation can copy again. This is not a zero-copy GUI or removal of Java GUI ownership. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **Terrain intake:** `4740f8fa` extends native decoding to complete layer assembly, including sorter-index normalization, unsupported-fluid omission, water/material classification, ranges and mesh identity. It removes the prior Java assembly and standalone decode export. Java supplies build/sort/atlas inputs and publishes the result; encoded vertices and copied index/range outputs do not establish zero-copy transport. [Retained scene](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route)
+- **Lifecycle:** queued DH receipts carry a collector lifecycle and stale receipts are dropped/countable. Teardown clears cached fullscreen consumers, while GAL retirement waits for dependency release and then honors submission retirement. The new seven-scenario lifecycle gate adds transition evidence, with explicit limits below. [Verification](RENDER-VERIFICATION.md#lifecycle-gate) · [GAL](VULKANIC-GAL.md)
+
+The Citadel empty proxy root still yields no geometry through either structural
+traversal or the posed fallback, so [#803](https://github.com/HungLo2020/MattMC/issues/803)
+remains open. [#819](https://github.com/HungLo2020/MattMC/issues/819) separately
+tracks raw orb mesh boundaries that are not remapped after a rig expands into
+zero or many meshes. This is a source-predicted ordering/rejection defect, not
+an independently observed gameplay crash or pixel failure.
+
+This documentation review inspected source and test definitions only. The
+[author's lifecycle commit](https://github.com/HungLo2020/MattMC/commit/7f256b5354033eff7553f51a10539fac5a68a0bd)
+reports all seven transition scenarios clean, 2,304 Rust and 481 Java tests;
+[the assembly commit](https://github.com/HungLo2020/MattMC/commit/4740f8fabffd878286850083e2d86ff733c9121e)
+reports 2,317 Rust and 448 Java tests, scoped Iris+DH/vanilla parity and clean
+world-unload/resource-reload repeats. Its temporary 1,500+ shader-layer assembly
+comparison is author-reported and not retained as a checked-in dual-path test.
+None of these runtime results or unbundled artifacts was rerun or independently
+inspected here. See [bounded checks](RENDER-VERIFICATION.md#october-7-rig-and-terrain-assembly-checks).
+
 #### GUI residency and mode-cost follow-up
 
-The `20e157ca` source checkpoint extends the earlier review below:
+The [`20e157ca` source checkpoint](https://github.com/HungLo2020/MattMC/commit/20e157cab7962140b30b83f40374cdeb1e6a8b19) extends the earlier review below:
 
 - **GUI reuse:** flat and standard-foil items keep topology/raster identities; foil pixels remain animated through a per-draw UV transform. Cached TACZ captures can use persistent bridge storage. Native decode, prepared-geometry and accepted GPU-range reuse avoid repeated work, with separate bounds and lifetimes. Geometry idle age counts mesh transactions, not every displayed frame. Same-thread context recreation/address reuse remains a verification gap, not a demonstrated failure. [Bridge](JAVA-BRIDGE.md) · [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 - **Terrain and block entities:** solid/cutout compact selection preserves graph visit order; translucent selection stays back to front. This is not a strict Euclidean near-to-far sort. Shader-disabled block-entity extraction consumes visited built sections plus global block entities when a current search exists; shader frames and unavailable-search cases keep the range-scan path. Java still owns the semantic extraction. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
@@ -112,6 +142,30 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 7 midday and later performance reports
+
+The [midday summary](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/SUMMARY.md) retains these author-recorded
+moving-camera rows; the source identifies earlier-session controls explicitly:
+
+| Reported workload | Rust/Vulkan FPS / median frame | Frozen Java/OpenGL FPS / median frame |
+| --- | --- | --- |
+| Shaders, 1,800 frames | 314–316 / 2.98–3.00 ms | 307–309 / 2.99 ms, earlier session |
+| Shaders + DH, 1,800 frames | 232 / 4.06 ms; p99 10.3 ms | 232 / 4.11 ms; p99 8.0 ms |
+| Vanilla + DH, 1,800 frames | 342–346 / 2.00–2.05 ms | 271 / 2.99 ms; earlier 415 no longer reproduces |
+| Vanilla, 1,800 frames | 707–808 / 0.80–0.95 ms | 1000 / 0.84 ms |
+| Vanilla, 1,800 after 6,000 warm-up | 1018 / 0.81 ms | 1395 / 0.66 ms, earlier session |
+| Long vanilla with profiler | 1590–1630 / 0.51–0.53 ms, 60,000 frames | 1462 / 0.52 ms, 30,000 frames, earlier session |
+
+Equal shader+DH mean FPS still leaves a p99 gap. Long vanilla rows differ in
+frame count/session and do not reverse the earlier unequal-warm-up retraction.
+The [progress log](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/PROGRESS.md) also retracts attribution of an early
+676 FPS graph result: same-build controls spanned 545–676 FPS. Lower C2 thresholds
+and later graph/decode/glint/page-sort/DH changes have local attribution reports;
+these are not additive gains or a fresh four-mode acceptance matrix. The latest
+assembly commit reports shaders 332 and vanilla 882 FPS without fresh paired
+Frozen controls in that statement. Preserve the older tables below as dated
+evidence, not current equivalent-baseline claims. No benchmark was rerun here.
 
 #### October 7 mode summary
 
@@ -223,6 +277,7 @@ frame-outcome or cancellation semantics. Follow the current
 
 ## Remaining work
 
+- Citadel model extraction [#803](https://github.com/HungLo2020/MattMC/issues/803) and source-predicted orb-boundary remapping after rig expansion [#819](https://github.com/HungLo2020/MattMC/issues/819)
 - Broad vanilla, DH, Iris and Iris+DH visual and temporal parity, including water, foliage, day/night/weather, entities/layers, hands, GUI and resource packs
 - General terrain flicker investigation across all four routes, cold terrain/water readiness and the failed original-pack underground comparison; clean bounded videos do not establish acceptance
 - The independent disconnect SIGSEGV, repeated entry/exit and broad native stability; the closed-pipe fix does not close these cases

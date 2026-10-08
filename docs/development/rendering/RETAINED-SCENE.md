@@ -105,12 +105,15 @@ Java copies the native records into its frame/request storage. At the
 [`20e157ca` checkpoint](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection.rs),
 solid/cutout layers preserve graph visit order while translucent layers remain
 back to front; this supersedes the earlier key-order equality report. The section
-graph owns readiness and build bookkeeping and the frame's animated sprites,
-and Rust decodes every compact section vertex
-([`terrain/intake.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs)).
-Java still dispatches the meshing workers, publishes the decoded meshes
-(keys, generations, translucent order and residency) and runs the
-ineligible-frame producer. Native record selection and retained GPU scene drawing
+graph owns readiness/build bookkeeping, visible-slot stamps and selected animated
+sprite IDs; Java marks the corresponding sprite objects. At `4740f8fa`, native
+[intake](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs) also assembles section layers: sorter-order normalization, unsupported-fluid
+omission, water/material classification, range splitting and mesh identity
+([`terrain/assembly.rs`](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/worldrender/terrain/assembly.rs)).
+Java supplies build/sort/atlas inputs, dispatches meshing workers, publishes the
+returned assets and runs the ineligible-frame producer. The prior Java water/index
+assembly boundary is historical; encoded vertex storage and copied output records
+do not make the handoff zero-copy. Native record selection and retained GPU scene drawing
 are separate steps. When the shader route is armed, admission
 (`frame/static_terrain.rs`) keeps them compact: `take_scene_terrain` turns
 described sections and casters into scene entries and expands only the rest
@@ -140,9 +143,9 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
    *Status:* the search runs in Rust (`chunk/section_graph.rs`), and ordinary
    frames also select compact camera layers, shadow candidates and animated
    sections in `chunk/terrain_selection.rs`. Java skips its visible-list and
-   per-section record construction on that route. It still consumes visits
-   when scheduling needed builds or lazily checking entity visibility, mirrors
-   published mesh rows and marks selected animated sprites. Shader-disabled
+   per-section record construction on that route. Rust now owns build request
+   bookkeeping and entity-culling visit stamps; Java dispatches the listed
+   requests, mirrors published meshes and marks selected sprites. Shader-disabled
    frames also extract block entities from visited built sections plus global
    entries when a current search exists; Java still performs their semantic
    extraction, so this is not the retained-entity phase. Diagnostic/fault/
@@ -153,7 +156,13 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
    and the camera a per-frame uniform, so nothing per-section is written while
    only the camera moves.
 5. **Retained entities and block entities**: persistent model instances, with
-   per-frame transform and pose data only.
+   per-frame transform and pose data only. ABI 71 rigs are partial progress:
+   cacheable models reuse local-space assets and send raw poses, but Rust still
+   expands ordinary per-frame instances and Java retains animation/semantic
+   extraction. First-person and other ineligible models retain Java posing.
+   [#803](https://github.com/HungLo2020/MattMC/issues/803) and
+   [#819](https://github.com/HungLo2020/MattMC/issues/819) remain bounded gaps;
+   this is not completion of the retained-entity phase.
 6. **Beyond Frozen:** GPU-driven culling into indirect-count buffers, and
    parallel command recording per pass.
 

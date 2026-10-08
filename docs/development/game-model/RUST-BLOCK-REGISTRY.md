@@ -7,9 +7,12 @@ Rust owns one registry of every block, property and block state:
 [`content/block/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/mod.rs).
 Rust subsystems derive their per-state lookup tables from it. They no longer
 receive a private table from their own Java bridge. Java still defines the
-blocks: at startup,
+blocks:
 [`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
-exports the frozen registries once and Rust installs them.
+exports the frozen registries once and Rust installs them. The export is lazy:
+the first `NativeBlockRegistry.ready()` call initializes `Holder.READY` and
+caches success or failure. The current wire format is **2**, including fluid
+and offset facts used by the meshing view.
 
 ## What it holds
 
@@ -35,13 +38,16 @@ exports the frozen registries once and Rust installs them.
   by exact box list, with face 0 empty. The face table holds
   `Shapes.faceShapeOccludes` for every pair; Java computes it at export.
 
-Items, entity types, tags and biomes are not in it yet. Each is added when a
-Rust consumer needs it (see the [migration plan](MIGRATION-PLAN.md)).
+Items, entity types, tags and biomes are not in this shared registry yet.
+Existing native consumers may still use separately supplied Java metadata;
+the shared model remains future work (see the [migration plan](MIGRATION-PLAN.md)).
 
 ## Consumers
 
-Each consumer builds its view once, on first use, with a `OnceLock` next to
-its code, and Java passes state IDs:
+World and storage consumers cache immutable derived views beside their code,
+using `OnceLock` after the registry is installed. Terrain meshing derives its
+view per state registration and keeps its separate reloadable cache. Java
+passes state IDs at the consumer boundary:
 
 | Consumer | View | Java passes |
 |---|---|---|
@@ -64,9 +70,15 @@ whether the native producer supports the state's fluid.
 fills in the rest from the registry: air, solid render, occlusion, block
 entity, motion, emission, fluid type, height and falling, and offsets. The
 explicit `registerState` remains for corpus replays, benchmarks, and states
-Rust declines (custom subclasses, or no registry).
-`NativeMeshingStateViewTest` checks that both give the same record for
-every state.
+Rust declines (including custom subclasses, unknown states or an unsupported
+native-fluid request), and when the registry is unavailable. A failed downcall
+throws; view rejection does not promise fallback after every exception. Java still
+computes fallback block facts before trying the view, so this is a shared
+source of transmitted facts, not proof that all Java preparation disappeared.
+`NativeMeshingStateViewTest` compares the explicit and derived records for
+every state in both fluid modes, field for field. This is a low-level record
+fixture, not an end-to-end render or reload test; its execution is not covered
+by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIFICATION.md).
 
 ## Adding a column or a consumer
 
@@ -79,22 +91,26 @@ every state.
 3. In the consumer, derive the view from `&BlockRegistry` in a plain function
    with a Rust unit test, and cache it with `OnceLock` behind
    `content::block::installed()`.
-4. Gate the Java route on `NativeBlockRegistry.ready()`. When it is false,
-   or Rust declines a view, the Java path runs as before.
+4. Gate the registry-backed route on `NativeBlockRegistry.ready()`. When it
+   is false or Rust declines a view, retain that consumer's existing fallback
+   (the explicit native record registration for meshing).
 
 ## Constraints
 
-- **Installation is all or nothing.** The export is refused, and every
-  consumer keeps its Java path, if any of these fails:
+- **Installation is all or nothing.** The export is refused and registry-backed
+  views are unavailable if any of these fails:
   - every block's states are contiguous, in block order
   - every state is a distinct object at its own ID
-  - the state count fits in 16 bits
+  - the state count is between 1 and 65,535, leaving `0xffff` reserved
   - Rust's arithmetic reproduces every exported value index
-- **Custom `BlockState` subclasses** are flagged `CUSTOM`. Consumers decline
-  them as their old bridges did. The chunk-section vocabulary declines the
-  whole registry if one exists.
+- **Custom `BlockState` subclasses** are flagged `CUSTOM`. Lighting,
+  skylight, heightmap and meshing views decline those states; the chunk-section
+  vocabulary declines the whole registry if one exists. Noise flags and the
+  carvers' block lookup still use the exported facts under their own existing
+  eligibility rules. There is no universal custom-state rejection.
 - **The registry is process-wide and immutable.** Installing an equal registry
-  again succeeds; a different one is rejected.
+  again succeeds; a different one is rejected. This is not a content-reload or
+  generation-publication mechanism; the rendering cache has its own lifecycle.
 - **Views stay in their subsystem.** `content` must not depend on consumers.
   The standalone [`src/test/rust/worldgen.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/test/rust/worldgen.rs)
   harness includes `content` for that reason.
@@ -102,11 +118,20 @@ every state.
 ## Testing
 
 ```sh
-# Every state against Java, plus the consumer parity tests
+# Registry columns and property arithmetic against Java
 ./gradlew test -x testRustNative --tests 'net.minecraft.world.level.block.NativeBlockRegistryTest'
-# Rust units for the registry and each view
-(cd src/main/rust && cargo test --lib -- content:: lighting heightmap noise_fill storage::chunk)
-# Parity, old-against-new benchmarks and an acceptance report
+# Meshing view record parity (not selected by the aggregate driver below)
+./gradlew test -x testRustNative --tests 'net.sodium.client.render.chunk.compile.pipeline.NativeMeshingStateViewTest'
+# Rust units for the registry and its world/storage views
+(
+  cd src/main/rust || exit
+  for filter in content:: world::level::lighting world::level::levelgen::heightmap \
+    world::level::levelgen::noise_fill world::level::levelgen::proto_chunk \
+    world::level::levelgen::carver storage::chunk; do
+    cargo test --lib -- "$filter" || exit
+  done
+)
+# Selected consumer parity, old-against-new benchmarks and a results report
 python3 DevUtils/tests/content/VerifyRustBlockRegistry.py
 ```
 
@@ -117,13 +142,17 @@ It then compares, in fresh JVMs:
 - each consumer's native benchmark, whose outputs must match between trees
 
 Results are in [Block registry verification](BLOCK-REGISTRY-VERIFICATION.md).
+The driver reports performance booleans in `results.json`; a successful exit
+does not require those booleans to pass. Inspect the per-case evidence before
+claiming a performance gate or full Phase 1 acceptance.
 
 ## Troubleshooting
 
 - **A consumer suddenly takes its Java path everywhere:** check
   `NativeBlockRegistry.ready()`. A registry change that breaks one of the
   installation checks (for example, a block registered with states out of
-  order) disables every consumer at once.
+  order) disables the registry-backed routes. Meshing retains its explicit
+  registration fallback; other consumers retain their own compatibility paths.
 - **A `NativeBlockRegistryTest` column mismatch** after changing block code
   means the exported fact no longer matches Java's answer. Fix the export,
   not the test.

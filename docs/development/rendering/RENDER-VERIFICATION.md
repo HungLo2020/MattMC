@@ -36,8 +36,10 @@ Run from the repository root; the subshell preserves the Rust directory configur
 The architecture boundary tests run with the Rust tests; see
 [Render Architecture](RENDER-ARCHITECTURE.md). The Java test task sets
 `net.bytebuddy.experimental` so Mockito 5.8's bundled Byte Buddy can mock
-game classes on JDK 25; "Mockito cannot mock this class" now means a real
-setup problem, not the JDK.
+game classes on JDK 25. The author reports the former 11 mocking failures
+resolved and two stale atlas/shield expectations corrected at `7f256b53`.
+Do not classify a new mocking failure as an accepted baseline automatically;
+check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### Lifecycle gate
 
@@ -53,14 +55,51 @@ python3 DevUtils/tests/rendering/RunLifecycleGate.py --label <label>
 
 It runs each transition scenario on the current client with Iris + DH
 (`--no-shaders`, `--no-dh`, `--scenario <name>` narrow it) and fails a
-scenario on a crashed audit row, any client exception, Rust panic or GAL
-`DependencyViolation`. The GAL logs every validation failure
+scenario on a crashed audit row or a recognized exception, Rust panic or GAL
+`DependencyViolation` in matching client logs. The GAL logs every validation failure
 (`rust_gal_validation_failure`, rate-limited), including teardown errors that
-callers discard, so a still-bound resource fails the gate; other validation
-failures are reported, not failed. Results go to
+callers discard. A logged dependency violation fails the gate; other
+validation failures are reported, not failed. Results go to
 `artifacts/graphics-captures/lifecycle-gate/<label>/summary.json`. Run it with
 a relative script path: the capture harness stops processes whose command line
 names the repository.
+
+The [gate source](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/DevUtils/tests/rendering/RunLifecycleGate.py)
+defaults to seven scenarios: same-world unload/reload, different-world reload,
+resource reload, resize, swapchain recreation, and view-distance decrease and
+increase. It requires a successful capture command and audit rows marked
+`crash_free`, and scans the selected client-log paths for `Exception`,
+`panicked at` and `DependencyViolation`. Generic GAL validation markers are
+reported without automatically failing the gate. Inspect retained logs and the
+underlying scenario receipts as well as `summary.json`: the driver does not
+require each row's `passed` field or prove that a matching client log exists.
+Use a fresh unique label, because existing directories are reused and client
+logs are scanned recursively. This is a bounded transition/log gate, not an
+image-parity, leak-bound or all-error certificate.
+
+The author reports all seven scenarios clean at `7f256b53`; `4740f8fa` reports
+clean world-unload/reload and resource-reload repeats after native assembly.
+The latter also guards VoxelMap's neighbor query when the player disappears
+during unload. This documentation review ran neither the gate nor the runtime
+checks and did not inspect their unbundled artifacts. The old independent
+SIGSEGV remains separate unless its specific cause and regression are established.
+
+### October 7 rig and terrain assembly checks
+
+Source reviewed through `4740f8fa`; these are verification targets, not runs
+performed by this documentation review:
+
+```sh
+(cd src/main/rust && cargo test --release model_rigs)
+(cd src/main/rust && cargo test --release terrain::)
+(cd src/main/rust && cargo test --release retire_defers_a_referenced_resource_until_its_last_dependent_goes)
+./gradlew test --tests net.vulkanic.world.ModelRigTransformParityTest
+```
+
+- **Rigs:** the [Java parity fixture](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/test/java/net/vulkanic/world/ModelRigTransformParityTest.java) compares cow, wolf and humanoid transforms over 20 seeded pose/visibility/skipDraw trials each; Rust fixtures cover hierarchy, bounds, flags and registration validation. They do not cover Citadel extraction, glint pixels, whole-frame orb ordering or upload/withdrawal races. Keep [#803](https://github.com/HungLo2020/MattMC/issues/803) open and add a real decode-path regression for [#819](https://github.com/HungLo2020/MattMC/issues/819), including zero/many-part expansion, consecutive orbs and shadow-only streams.
+- **Terrain:** [thirteen assembly fixtures](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/worldrender/terrain/assembly/tests.rs) cover opaque ranges, identity, sorted translucent ranges, facing-local rebasing, water atlas/separate-sheet behavior, generic and unsupported fluids, empty omission and malformed references. Native decoding has separate fixtures. The temporary 1,500+ layer comparison is author-reported, not a retained dual-path regression or independent run. Follow with normal sorting, water, reload and publication checks.
+- **GUI sharing:** cache fixtures were adapted to `SharedVec`; this interval adds no dedicated sharing/copy-on-write regression. Check cache hits/misses, shared mutation, preparation, context recreation and address reuse separately from GPU residency.
+- **Retirement:** the [new GAL fixture](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/vulkanic/tests/handles.rs#L50-L80) checks one texture with two dependent views plus immediate unreferenced retirement. It does not exercise a full set/view/texture cascade, recording/submission interleavings or all consumer-cache teardown routes. Keep those cases distinct from a passing unit fixture or the rig's three-frame delay.
 
 ### October 7 residency and selection checks
 
@@ -821,13 +860,16 @@ recording retirement; standalone GAL submit counters have a narrower scope.
 Compare creation/destruction alongside deferred destroys when diagnosing churn.
 Older submit-only artifacts may report zero despite per-frame preparation.
 
-Short runs measure warm-up. The camera turns 0.35° per frame, so 1,800 frames
-see the same views as 60,000, yet early frames cost several times more: Java
+Short and long runs revisit the same rotating view path (0.35° per frame),
+but differ in warm-up, sample weighting and streaming state. The author reports
+early frames costing several times more in the measured vanilla workload: Java
 phases sum to the whole frame interval and each runs 3–4× slower than in steady
 state, because once-per-frame methods need thousands of calls before C2
 compiles them. The client therefore lowers HotSpot's tier thresholds
 (`clientJvmArgs` in `build.gradle`, mirrored in `packaging/run-mattmc.*`):
-1,800-frame vanilla 588→679–749 FPS, shaders unchanged (GPU-bound). Same-build
+the author reports 1,800-frame vanilla 588→679–749 FPS, with shader timing
+unchanged in that GPU-bound workload. This was not independently reproduced.
+Same-build
 short vanilla runs still vary by roughly ±10% (545–676 FPS seen), with every
 phase moving together; compare phase means, repeat runs, or use a long run
 (`--measure-frames 60000`) before crediting a change with a few percent.

@@ -70,9 +70,10 @@ Results measure this reconstruction slice, not full lighting or chunk generation
 ## Status
 
 The results below are historical: they measured the original slice, when Java
-built the descriptor table. The move to the block registry was checked against
-the slice's previous code by
-[block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
+built the descriptor table. The [block registry verification record](../../game-model/BLOCK-REGISTRY-VERIFICATION.md)
+separately reports the author's later comparison against the slice's previous
+code, with its own measurement limits; these original acceptance results were
+not rerun for this documentation review.
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,
 OpenJDK 25.0.4.1. Ten Java tests and three Rust tests passed with zero differences.

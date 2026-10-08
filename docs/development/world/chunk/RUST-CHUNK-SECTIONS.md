@@ -195,8 +195,9 @@ success alone is not performance acceptance.
 ## Status
 
 These results are historical: the vocabulary was then built in Java. Its move
-to the block registry was checked by
-[block registry verification](../../game-model/BLOCK-REGISTRY-VERIFICATION.md).
+to the block registry has a separate
+[author-recorded comparison](../../game-model/BLOCK-REGISTRY-VERIFICATION.md),
+not a new run of these original acceptance results.
 
 The implementation author recorded the following release acceptance on
 2026-10-06, before the later `8db0fd82` recovery changes: Ryzen 5
