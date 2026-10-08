@@ -1,8 +1,9 @@
-# Rust vs Frozen Java speed (2026-10-07 evening, same desktop and session, moving camera; FPS / median frame)
+# Rust vs Frozen Java speed (2026-10-07 20:32, same desktop and session, moving camera, 6,000 frames; FPS / median frame)
 | Mode | Rust/Vulkan (current) | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 813–882 / 0.84–0.89 ms (1,800 frames) | 900 / 0.87 ms |
-| Vanilla + DH | 6,000 frames: 683 / 1.31 ms; 1,800 frames: 440–549 / 1.53–1.75 ms | 6,000: 774 / 1.07 ms; 1,800: 671 / 1.28 ms |
-| Shaders | 311–349 / 2.60–2.93 ms (GPU-bound) | 304 / 3.04 ms |
-| Shaders + DH | 223–241 / 3.99–4.10 ms (GPU-bound) | 226 / 4.20 ms |
-Gap: vanilla + DH (worker-bound on ~430 per-column DH draws, each with its own descriptor-set bind). Next fix: shared vertex pages + multi-draw indirect.
+| Vanilla | 1,100 / 0.67 ms | 1,151 / 0.73 ms |
+| Vanilla + DH | 617 / 1.31 ms | 736 / 1.14 ms |
+| Shaders | 341 / 2.83 ms (GPU-bound) | 318 / 3.02 ms |
+| Shaders + DH | 253 / 3.87 ms (GPU-bound) | 229 / 4.23 ms |
+Single runs; this desktop shows about ±25% run-to-run noise in vanilla + DH. All runs clean (0 VUIDs, 0 exceptions).
+Gap: vanilla + DH (worker-bound on per-column DH draws). DH geometry now uses shared pages with one set per page; next: multi-draw indirect.

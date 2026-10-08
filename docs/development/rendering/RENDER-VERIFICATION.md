@@ -99,6 +99,25 @@ during unload. This documentation review ran neither the gate nor the runtime
 checks and did not inspect their unbundled artifacts. The old independent
 SIGSEGV remains separate unless its specific cause and regression are established.
 
+### October 7 integration batch checks
+
+Run on the desktop (RTX 2070, Frozen `JavaPerfTesting` @ `7a4d18171`) against
+the integrated batch: DH render-list lifecycle in the ledger call, terrain
+publication rows in Rust, resource-reload payload release, lease-only DH
+container retirement, and DH geometry in shared device pages.
+
+- Tests: `cargo test --lib` 2344 pass (3 ignored); Java `net.vulkanic.*`,
+  `net.sodium.*`, `com.seibel.*`, `net.minecraft.client.dev.*` pass; wiki check
+  passes.
+- Lifecycle gate: all seven scenarios pass, with 0 exceptions, panics,
+  dependency violations and GAL validation failures.
+- Frozen parity with `MATTMC_CAPTURE_DH_GENERIC=true`: Iris+DH mean RGB
+  3.646/4.160/3.849 and DH extension pass; vanilla 0.257/0.452/0.530 pass;
+  0 VUIDs. The side-by-side images were inspected (water, DH, sky, clouds).
+- FPS, same session, moving camera, 6,000 frames, single runs (Rust vs
+  Frozen): vanilla 1,100 vs 1,151; vanilla+DH 617 vs 736; shaders 341 vs 318;
+  shaders+DH 253 vs 229. All clean. Vanilla+DH is still the gap.
+
 ### October 7 evening staging and DH checks
 
 Source reviewed at `f13239e1`; the following tests are verification targets,
