@@ -1,8 +1,8 @@
-# Rust vs Frozen Java speed (2026-10-07 evening, moving camera, FPS / median frame; Frozen from the midday same-day session)
-| Scenario | Rust/Vulkan | Frozen Java/OpenGL |
+# Rust vs Frozen Java speed (2026-10-07 evening, same desktop and session, moving camera; FPS / median frame)
+| Mode | Rust/Vulkan (current) | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Shaders, 1,800 frames | 311–349 / 2.60–2.93 ms (GPU-bound) | 307–309 / 2.99 ms (earlier session) |
-| Shaders + DH, 1,800 / 6,000 frames | 223 / 4.10 ms, p99 10.3; 241 / 3.99 ms, p99 8.4 | 232 / 4.11 ms, p99 8.0 |
-| Vanilla + DH, 1,800 frames | 472 / 1.70 ms | 271 / 2.99 ms |
-| Vanilla, 1,800 frames | 813–882 / 0.84–0.89 ms (short runs: warm-up spikes) | 1000 / 0.84 ms |
-| Vanilla, 60,000 frames (profiler attached) | 1590–1630 / 0.51–0.53 ms (midday) | 1462 / 0.52 ms (30,000, earlier session) |
+| Vanilla | 813–882 / 0.84–0.89 ms (1,800 frames) | 900 / 0.87 ms |
+| Vanilla + DH | 631 / 1.50 ms (6,000 frames); 440–549 / 1.53–1.75 ms (1,800) | 671 / 1.28 ms |
+| Shaders | 311–349 / 2.60–2.93 ms (GPU-bound) | 304 / 3.04 ms |
+| Shaders + DH | 223–241 / 3.99–4.10 ms (GPU-bound) | 226 / 4.20 ms |
+Gap: vanilla + DH (worker-bound on ~430 per-column DH draws, each with its own descriptor-set bind). Next fix: shared vertex pages + multi-draw indirect.
