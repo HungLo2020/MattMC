@@ -751,11 +751,14 @@ impl WorldPrimitiveFrontend {
         }
         if !deferred {
             self.lod_forward_opaque_pass_resources.begin_frame();
+            self.lod_forward_opaque_pass_resources.prune_idle_page_sets(gal);
         }
         // Transparent/water owners serve both routes and may pack per-frame
         // uniforms in either; reset their per-frame slots every frame.
         self.lod_transparent_pass_resources.begin_frame();
         self.lod_water_pass_resources.begin_frame();
+        self.lod_transparent_pass_resources.prune_idle_page_sets(gal);
+        self.lod_water_pass_resources.prune_idle_page_sets(gal);
         // Deferred DH alpha still lands in the graph's one-color translucent
         // attachment. Keep its exact-atlas owners on that attachment format;
         // the acquired target format is only valid for the direct forward
