@@ -1,5 +1,6 @@
 //! Expanded and textured LOD vertices, segments, columns and GPU column records.
 
+use crate::render::worldrender::geometry::arenas::SourceGeometryRange;
 use crate::render::worldrender::lod::*;
 
 /// DH emits one direction code for every generated quad. Retaining it as a
@@ -277,35 +278,25 @@ pub(crate) struct WorldLodGpuColumnAsset {
     pub segments: Vec<WorldLodGpuSegment>,
 }
 
+/// One segment's place in the shared DH geometry pages: the vertex page
+/// with the segment's first vertex, and its byte offset in the index page.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct WorldLodGpuSegmentResources {
     pub vertex_buffer: Handle,
-    pub(in crate::render::worldrender::lod) vertex_upload_buffer: Option<Handle>,
     pub vertex_base: u32,
     pub index_offset: u64,
 }
 
-impl WorldLodGpuSegmentResources {
-    pub(super) fn retire_uploads(&mut self, gal: &mut VulkanicGal) {
-        if let Some(buffer) = self.vertex_upload_buffer.take() {
-            let _ = gal.retire(buffer);
-        }
-    }
-
-    pub(super) fn destroy(mut self, gal: &mut VulkanicGal) {
-        self.retire_uploads(gal);
-        let _ = gal.retire(self.vertex_buffer);
-    }
-}
-
-#[derive(Clone, Debug)]
+/// A column's ranges in the shared DH geometry pages
+/// ([`WorldLodGpuResidency::pages`]). Columns no longer own buffers: their
+/// ranges return to the pages once no submission can read them.
+#[derive(Debug)]
 pub(crate) struct WorldLodGpuColumnResources {
     pub column_generation: u64,
     pub segments: Vec<WorldLodGpuSegmentResources>,
-    pub(in crate::render::worldrender::lod) shared_vertex_buffer: Option<Handle>,
-    pub(in crate::render::worldrender::lod) shared_vertex_upload_buffer: Option<Handle>,
     pub index_buffer: Handle,
-    pub(in crate::render::worldrender::lod) index_upload_buffer: Option<Handle>,
+    pub(in crate::render::worldrender::lod) vertex_range: SourceGeometryRange,
+    pub(in crate::render::worldrender::lod) index_range: SourceGeometryRange,
 }
 
 /// One generation-checked LOD draw range ready for a later Rust-owned
@@ -333,24 +324,3 @@ pub(crate) struct WorldLodGpuDraw {
     pub index_count: u32,
 }
 
-impl WorldLodGpuColumnResources {
-    pub(super) fn destroy(mut self, gal: &mut VulkanicGal) {
-        if let Some(buffer) = self.shared_vertex_upload_buffer.take() {
-            let _ = gal.retire(buffer);
-        }
-        if let Some(buffer) = self.index_upload_buffer.take() {
-            let _ = gal.retire(buffer);
-        }
-        let _ = gal.retire(self.index_buffer);
-        if let Some(buffer) = self.shared_vertex_buffer {
-            for segment in &mut self.segments {
-                segment.retire_uploads(gal);
-            }
-            let _ = gal.retire(buffer);
-        } else {
-            for segment in self.segments.into_iter().rev() {
-                segment.destroy(gal);
-            }
-        }
-    }
-}
