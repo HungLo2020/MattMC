@@ -1,5 +1,7 @@
 //! GPU residency of LOD columns (plain and textured) with prefetch uploads.
 
+use crate::render::vulkanic::SubmissionId;
+use crate::render::worldrender::geometry::arenas::SourceTerrainGeometryPages;
 use crate::render::worldrender::lod::*;
 
 /// Private residency for immutable LOD geometry. It deliberately exposes no
@@ -18,6 +20,14 @@ pub(crate) struct WorldLodGpuResidency {
     /// cannot reuse a stale draw list. This cache owns only copied Rust
     /// metadata and private GAL handles; it never retains Java or DH objects.
     pub(in crate::render::worldrender::lod) visible_draw_cache: Option<(Vec<WorldLodColumnInstanceRequest>, Vec<WorldLodGpuDraw>)>,
+    /// Shared device pages holding every resident column's vertices and
+    /// indices (vertex pages bind as storage, index pages as index buffers).
+    pub(in crate::render::worldrender::lod) pages: SourceTerrainGeometryPages,
+    /// Pages written by a confirmed submission: later uploads transition
+    /// them from their read state instead of from `Undefined`.
+    pub(in crate::render::worldrender::lod) initialized_pages: BTreeSet<Handle>,
+    /// The pending transaction's staging buffer and the pages it writes.
+    pub(in crate::render::worldrender::lod) pending_staging: Option<(Handle, Vec<Handle>)>,
 }
 
 impl WorldLodGpuResidency {
@@ -88,33 +98,43 @@ impl WorldLodGpuResidency {
             requested.insert(*column_key);
         }
 
-        let mut created = BTreeMap::new();
-        let mut staged_ops = Vec::new();
-        let result =
-            (|| -> GalResult<()> {
-                for column_key in requested {
-                    let asset = assets
-                        .get(&column_key)
-                        .expect("requested columns are validated against the asset map");
-                    if self.active.get(&column_key).is_some_and(|resources| {
-                        resources.column_generation == asset.column_generation
-                    }) {
-                        continue;
-                    }
-                    let resources = create_column_resources(gal, asset)?;
-                    staged_ops.extend(upload_ops(asset, &resources));
-                    created.insert(column_key, resources);
-                }
-                Ok(())
-            })();
-        if let Err(error) = result {
-            for (_, resources) in created {
-                resources.destroy(gal);
-            }
-            return Err(error);
+        // Pages emptied by completed releases go back to the GAL (destroyed
+        // once the pass sets that bind them are gone).
+        for page in self.pages.reclaim(gal) {
+            self.initialized_pages.remove(&page);
+            let _ = gal.retire(page);
         }
+        let mut created = BTreeMap::new();
+        let mut upload = WorldLodUploadTransaction::default();
+        let result = (|| -> GalResult<()> {
+            for column_key in requested {
+                let asset = assets
+                    .get(&column_key)
+                    .expect("requested columns are validated against the asset map");
+                if self.active.get(&column_key).is_some_and(|resources| {
+                    resources.column_generation == asset.column_generation
+                }) {
+                    continue;
+                }
+                let resources = create_column_resources(gal, &mut self.pages, asset, &mut upload)?;
+                created.insert(column_key, resources);
+            }
+            Ok(())
+        })();
+        let staged = result.and_then(|()| upload.finish(gal, &self.initialized_pages));
+        let (staging, mut staged_ops) = match staged {
+            Ok(staged) => staged,
+            Err(error) => {
+                for (_, resources) in created {
+                    self.pages.release_now(resources.vertex_range);
+                    self.pages.release_now(resources.index_range);
+                }
+                return Err(error);
+            }
+        };
         if !created.is_empty() {
             ops.append(&mut staged_ops);
+            self.pending_staging = staging.map(|buffer| (buffer, upload.written_pages()));
             self.pending = Some(created);
             // A replacement generation may use the same column key. Do not
             // let a cached draw list retain the previous generation's handles
@@ -269,34 +289,41 @@ impl WorldLodGpuResidency {
         let Some(created) = self.pending.take() else {
             return Ok(());
         };
-        for (column_key, mut resources) in created {
-            // The successful combined submission recorded the staging copies.
-            // GAL defers these destroys until that submission completes.
-            if let Some(buffer) = resources.shared_vertex_upload_buffer.take() {
-                let _ = gal.retire(buffer);
-            }
-            if let Some(buffer) = resources.index_upload_buffer.take() {
-                let _ = gal.retire(buffer);
-            }
-            for segment in &mut resources.segments {
-                segment.retire_uploads(gal);
-            }
+        // The accepted submission recorded the staging copies; the GAL defers
+        // the staging buffer's destruction until it completes.
+        if let Some((staging, written)) = self.pending_staging.take() {
+            let _ = gal.retire(staging);
+            self.initialized_pages.extend(written);
+        }
+        let after = gal.next_submission_id();
+        for (column_key, resources) in created {
             if let Some(previous) = self.active.insert(column_key, resources) {
-                previous.destroy(gal);
+                self.release_after(after, previous);
             }
         }
         Ok(())
     }
 
     pub(crate) fn discard_submission(&mut self, gal: &mut VulkanicGal) {
+        if let Some((staging, _)) = self.pending_staging.take() {
+            let _ = gal.retire(staging);
+        }
         if let Some(created) = self.pending.take() {
+            // No submitted work references ranges of a rejected transaction.
             for (_, resources) in created {
-                resources.destroy(gal);
+                self.pages.release_now(resources.vertex_range);
+                self.pages.release_now(resources.index_range);
             }
         }
         // Pending resources may be referenced by a resolved draw list. A
         // failed submission must retire both together.
         self.visible_draw_cache = None;
+    }
+
+    /// Returns a column's ranges once submissions up to `after` complete.
+    fn release_after(&mut self, after: SubmissionId, resources: WorldLodGpuColumnResources) {
+        self.pages.release_after(after, resources.vertex_range);
+        self.pages.release_after(after, resources.index_range);
     }
 
     pub(crate) fn reconcile_assets(
@@ -316,9 +343,10 @@ impl WorldLodGpuResidency {
                     .then_some(column_key)
             })
             .collect::<Vec<_>>();
+        let after = gal.next_submission_id();
         for column_key in stale {
             if let Some(resources) = self.active.remove(&column_key) {
-                resources.destroy(gal);
+                self.release_after(after, resources);
             }
         }
     }
@@ -326,9 +354,11 @@ impl WorldLodGpuResidency {
     pub(crate) fn destroy(&mut self, gal: &mut VulkanicGal) {
         self.discard_submission(gal);
         self.visible_draw_cache = None;
-        for (_, resources) in std::mem::take(&mut self.active) {
-            resources.destroy(gal);
-        }
+        self.active.clear();
+        // Retired pages are destroyed once their in-flight submissions and
+        // the pass sets that bind them are gone.
+        self.pages.destroy_all(gal);
+        self.initialized_pages.clear();
     }
 
     pub(crate) fn active_generation(&self, column_key: u64) -> Option<u64> {
@@ -697,282 +727,165 @@ impl WorldLodTexturedGpuResidency {
     }
 }
 
+/// One residency upload transaction: every new column's bytes go into a
+/// single staging buffer and are copied into the shared pages with one
+/// barrier per written page on each side.
+#[derive(Default)]
+pub(super) struct WorldLodUploadTransaction {
+    payload: Vec<u8>,
+    /// (staging offset, page, page offset, bytes, index page?)
+    copies: Vec<(u64, Handle, u64, u64, bool)>,
+}
+
+impl WorldLodUploadTransaction {
+    fn push(&mut self, page: Handle, page_offset: u64, bytes: &[u8], index: bool) {
+        let staging_offset = self.payload.len() as u64;
+        self.payload.extend_from_slice(bytes);
+        // Keep each staged block four-byte aligned for the copy offsets.
+        self.payload.resize(self.payload.len().next_multiple_of(4), 0);
+        self.copies.push((staging_offset, page, page_offset, bytes.len() as u64, index));
+    }
+
+    fn written_pages(&self) -> Vec<Handle> {
+        let mut pages: Vec<Handle> = self.copies.iter().map(|copy| copy.1).collect();
+        pages.sort_unstable();
+        pages.dedup();
+        pages
+    }
+
+    /// Creates the staging buffer and the copy ops. A page already written by
+    /// a confirmed submission transitions from its read state; a new page
+    /// from `Undefined`. Ranges being written are never read by pending work.
+    fn finish(
+        &self,
+        gal: &mut VulkanicGal,
+        initialized: &BTreeSet<Handle>,
+    ) -> GalResult<(Option<Handle>, Vec<CommandOp>)> {
+        if self.copies.is_empty() {
+            return Ok((None, Vec::new()));
+        }
+        let staging = gal.create_buffer(BufferDesc {
+            label: "world-lod-upload-staging".to_owned(),
+            size: self.payload.len() as u64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+        })?;
+        let mut ops = Vec::with_capacity(self.copies.len() + 8);
+        ops.push(CommandOp::HostWriteBuffer { buffer: staging, offset: 0, data: self.payload.clone() });
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            staging,
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        )));
+        let mut pages: Vec<(Handle, bool)> = self.copies.iter().map(|copy| (copy.1, copy.4)).collect();
+        pages.sort_unstable();
+        pages.dedup();
+        let read_state = |index: bool| if index { TextureUsageState::IndexRead } else { TextureUsageState::ShaderRead };
+        for &(page, index) in &pages {
+            let before = if initialized.contains(&page) { read_state(index) } else { TextureUsageState::Undefined };
+            ops.push(CommandOp::Barrier(buffer_barrier(page, before, TextureUsageState::TransferDst)));
+        }
+        for &(src_offset, dst, dst_offset, size, _) in &self.copies {
+            ops.push(CommandOp::CopyBufferRegion { src: staging, src_offset, dst, dst_offset, size });
+        }
+        for &(page, index) in &pages {
+            ops.push(CommandOp::Barrier(buffer_barrier(page, TextureUsageState::TransferDst, read_state(index))));
+        }
+        Ok((Some(staging), ops))
+    }
+}
+
+/// Allocates a column's vertex and index ranges in the shared pages and
+/// stages its bytes into `upload`.
 pub(super) fn create_column_resources(
     gal: &mut VulkanicGal,
+    pages: &mut SourceTerrainGeometryPages,
     asset: &WorldLodGpuColumnAsset,
+    upload: &mut WorldLodUploadTransaction,
 ) -> GalResult<WorldLodGpuColumnResources> {
-    let mut segments = Vec::with_capacity(asset.segments.len());
-    let mut index_bytes = 0u64;
     let vertex_bytes = asset.segments.iter().try_fold(0u64, |total, segment| {
         total
             .checked_add(segment.vertex_bytes.len() as u64)
             .ok_or_else(|| GalError::invalid_argument("world LOD vertex stream overflow"))
     })?;
-    // A single private storage stream removes per-segment GPU allocations and
-    // transfer copies. Oversized columns retain the original segment path;
-    // no admitted asset can exceed the backend's buffer limit merely because
-    // its independent segments are combined here.
-    let pack_vertices = vertex_bytes > 0
-        && vertex_bytes <= gal.capabilities().limits.max_buffer_size.min(MAX_SHARED_LOD_VERTEX_BYTES);
-    let mut shared_vertex_upload_buffer = None;
-    let mut shared_vertex_buffer = None;
-    let result = (|| -> GalResult<(Handle, Handle)> {
-        if pack_vertices {
-            let label = format!(
-                "world-lod-column{}-gen{}.vertices",
+    if vertex_bytes == 0 || vertex_bytes > gal.capabilities().limits.max_buffer_size.min(MAX_SHARED_LOD_VERTEX_BYTES) {
+        return Err(GalError::unsupported_feature(format!(
+            "world LOD column {} vertex stream of {vertex_bytes} bytes does not fit a geometry page",
+            asset.column_key
+        )));
+    }
+    // All segments share one index range; a four-byte boundary keeps both
+    // U16 and U32 index offsets valid.
+    let mut index_bytes = 0u64;
+    let mut local_index_offsets = Vec::with_capacity(asset.segments.len());
+    for (segment_index, segment) in asset.segments.iter().enumerate() {
+        if !segment.upload_payload_is_present() {
+            return Err(GalError::invalid_argument(format!(
+                "world LOD column {} generation {} segment {segment_index} upload payload was released before GPU residency",
                 asset.column_key, asset.column_generation
-            );
-            let upload = gal.create_buffer(BufferDesc {
-                label: format!("{label}-upload"),
-                size: vertex_bytes,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
-            })?;
-            shared_vertex_upload_buffer = Some(upload);
-            shared_vertex_buffer = Some(gal.create_buffer(BufferDesc {
-                label,
-                size: vertex_bytes,
-                memory: MemoryDomain::DeviceLocal,
-                usages: vec![BufferUsage::Vertex, BufferUsage::Storage, BufferUsage::TransferDst],
-            })?);
+            )));
         }
-        let mut vertex_base = 0u32;
-        for (segment_index, segment) in asset.segments.iter().enumerate() {
-            if !segment.upload_payload_is_present() {
-                return Err(GalError::invalid_argument(format!(
-                    "world LOD column {} generation {} segment {segment_index} upload payload was released before GPU residency",
-                    asset.column_key, asset.column_generation
-                )));
-            }
-            let label = format!(
-                "world-lod-column{}-gen{}-segment{segment_index}",
-                asset.column_key, asset.column_generation
-            );
-            // All segments in a column share one immutable index stream. A
-            // four-byte boundary keeps both U16 and U32 index offsets valid.
-            let index_offset = index_bytes
-                .checked_add(3)
-                .map(|value| value & !3)
-                .ok_or_else(|| GalError::invalid_argument("world LOD index offset overflow"))?;
-            index_bytes = index_offset
-                .checked_add(segment.index_bytes.len() as u64)
-                .ok_or_else(|| GalError::invalid_argument("world LOD index stream overflow"))?;
-            let segment_vertex_base = if pack_vertices { vertex_base } else { 0 };
-            if pack_vertices {
-                vertex_base = vertex_base
-                    .checked_add(segment.vertex_count)
-                    .ok_or_else(|| GalError::invalid_argument("world LOD vertex base overflow"))?;
-            }
-            if let Some(vertex_buffer) = shared_vertex_buffer {
-                segments.push(WorldLodGpuSegmentResources {
-                    vertex_buffer,
-                    vertex_upload_buffer: None,
-                    vertex_base: segment_vertex_base,
-                    index_offset,
-                });
-                continue;
-            }
-            // Oversized columns keep the original device-local segment path.
-            let created_segment = (|| -> GalResult<WorldLodGpuSegmentResources> {
-                let vertex_upload_buffer = gal.create_buffer(BufferDesc {
-                    label: format!("{label}.vertices-upload"),
-                    size: segment.vertex_bytes.len() as u64,
-                    memory: MemoryDomain::Upload,
-                    usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
-                })?;
-                let vertex_buffer = match gal.create_buffer(BufferDesc {
-                    label: format!("{label}.vertices"),
-                    size: segment.vertex_bytes.len() as u64,
-                    memory: MemoryDomain::DeviceLocal,
-                    usages: vec![
-                        BufferUsage::Vertex,
-                        BufferUsage::Storage,
-                        BufferUsage::TransferDst,
-                    ],
-                }) {
-                    Ok(buffer) => buffer,
-                    Err(error) => {
-                        let _ = gal.retire(vertex_upload_buffer);
-                        return Err(error);
-                    }
-                };
-                Ok(WorldLodGpuSegmentResources {
-                    vertex_buffer,
-                    vertex_upload_buffer: Some(vertex_upload_buffer),
-                    vertex_base: 0,
-                    index_offset,
-                })
-            })();
-            match created_segment {
-                Ok(resources) => segments.push(resources),
-                Err(error) => return Err(error),
-            }
-        }
-        if index_bytes == 0 {
-            return Err(GalError::invalid_argument(
-                "world LOD column has no index payload",
-            ));
-        }
-        let label = format!(
-            "world-lod-column{}-gen{}.indices",
-            asset.column_key, asset.column_generation
-        );
-        let index_upload_buffer = gal.create_buffer(BufferDesc {
-            label: format!("{label}-upload"),
-            size: index_bytes,
-            memory: MemoryDomain::Upload,
-            usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
-        })?;
-        let index_buffer = match gal.create_buffer(BufferDesc {
-            label,
-            size: index_bytes,
-            memory: MemoryDomain::DeviceLocal,
-            usages: vec![BufferUsage::Index, BufferUsage::TransferDst],
-        }) {
-            Ok(buffer) => buffer,
-            Err(error) => {
-                let _ = gal.retire(index_upload_buffer);
-                return Err(error);
-            }
-        };
-        Ok((index_upload_buffer, index_buffer))
-    })();
-    let (index_upload_buffer, index_buffer) = match result {
-        Ok(handles) => handles,
+        let offset = index_bytes
+            .checked_add(3)
+            .map(|value| value & !3)
+            .ok_or_else(|| GalError::invalid_argument("world LOD index offset overflow"))?;
+        index_bytes = offset
+            .checked_add(segment.index_bytes.len() as u64)
+            .ok_or_else(|| GalError::invalid_argument("world LOD index stream overflow"))?;
+        local_index_offsets.push(offset);
+    }
+    if index_bytes == 0 {
+        return Err(GalError::invalid_argument("world LOD column has no index payload"));
+    }
+    let vertex_range = SourceTerrainGeometryPages::allocate(
+        gal,
+        &mut pages.vertex_pages,
+        vertex_bytes,
+        &[BufferUsage::Vertex, BufferUsage::Storage],
+        "world-lod.vertices",
+        true,
+    )?;
+    let index_range = match SourceTerrainGeometryPages::allocate(
+        gal,
+        &mut pages.index_pages,
+        index_bytes,
+        &[BufferUsage::Index],
+        "world-lod.indices",
+        true,
+    ) {
+        Ok(range) => range,
         Err(error) => {
-            for segment in segments.into_iter().rev() {
-                if shared_vertex_buffer.is_none() {
-                    segment.destroy(gal);
-                }
-            }
-            if let Some(buffer) = shared_vertex_buffer {
-                let _ = gal.retire(buffer);
-            }
-            if let Some(buffer) = shared_vertex_upload_buffer {
-                let _ = gal.retire(buffer);
-            }
+            pages.release_now(vertex_range);
             return Err(error);
         }
     };
+    let page_vertex_base = vertex_range.offset / WORLD_LOD_GPU_VERTEX_BYTES as u64;
+    let mut vertex_payload = Vec::with_capacity(vertex_bytes as usize);
+    let mut index_payload = Vec::with_capacity(index_bytes as usize);
+    let mut segments = Vec::with_capacity(asset.segments.len());
+    let mut vertex_base = page_vertex_base;
+    for (segment, local_index_offset) in asset.segments.iter().zip(local_index_offsets) {
+        // The vertex base reaches shaders as an f32 lane: keep it exact.
+        debug_assert!(vertex_base < 1 << 24);
+        segments.push(WorldLodGpuSegmentResources {
+            vertex_buffer: vertex_range.buffer,
+            vertex_base: vertex_base as u32,
+            index_offset: index_range.offset + local_index_offset,
+        });
+        vertex_base += segment.vertex_count as u64;
+        vertex_payload.extend_from_slice(&segment.vertex_bytes);
+        index_payload.resize(local_index_offset as usize, 0);
+        index_payload.extend_from_slice(&segment.index_bytes);
+    }
+    upload.push(vertex_range.buffer, vertex_range.offset, &vertex_payload, false);
+    upload.push(index_range.buffer, index_range.offset, &index_payload, true);
     Ok(WorldLodGpuColumnResources {
         column_generation: asset.column_generation,
         segments,
-        shared_vertex_buffer,
-        shared_vertex_upload_buffer,
-        index_buffer,
-        index_upload_buffer: Some(index_upload_buffer),
+        index_buffer: index_range.buffer,
+        vertex_range,
+        index_range,
     })
-}
-
-pub(super) fn upload_ops(
-    asset: &WorldLodGpuColumnAsset,
-    resources: &WorldLodGpuColumnResources,
-) -> Vec<CommandOp> {
-    debug_assert_eq!(asset.segments.len(), resources.segments.len());
-    let mut ops = Vec::with_capacity(asset.segments.len() * 5 + 5);
-    let mut index_payload = Vec::new();
-    if let (Some(vertex_buffer), Some(vertex_upload_buffer)) = (
-        resources.shared_vertex_buffer,
-        resources.shared_vertex_upload_buffer,
-    ) {
-        let mut vertex_payload = Vec::with_capacity(
-            usize::try_from(asset.segments.iter().map(|segment| segment.vertex_bytes.len() as u64).sum::<u64>())
-                .expect("validated LOD vertex stream fits host address space"),
-        );
-        for segment in &asset.segments {
-            vertex_payload.extend_from_slice(&segment.vertex_bytes);
-        }
-        let size = vertex_payload.len() as u64;
-        ops.push(CommandOp::HostWriteBuffer {
-            buffer: vertex_upload_buffer,
-            offset: 0,
-            data: vertex_payload,
-        });
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            vertex_upload_buffer,
-            TextureUsageState::TransferDst,
-            TextureUsageState::TransferSrc,
-        )));
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            vertex_buffer,
-            TextureUsageState::Undefined,
-            TextureUsageState::TransferDst,
-        )));
-        ops.push(CommandOp::CopyBuffer {
-            src: vertex_upload_buffer,
-            dst: vertex_buffer,
-            size,
-        });
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            vertex_buffer,
-            TextureUsageState::TransferDst,
-            TextureUsageState::ShaderRead,
-        )));
-    }
-    for (segment, resources) in asset.segments.iter().zip(&resources.segments) {
-        if let Some(vertex_upload_buffer) = resources.vertex_upload_buffer {
-            ops.push(CommandOp::HostWriteBuffer {
-                buffer: vertex_upload_buffer,
-                offset: 0,
-                data: segment.vertex_bytes.clone(),
-            });
-            ops.push(CommandOp::Barrier(buffer_barrier(
-                vertex_upload_buffer,
-                TextureUsageState::TransferDst,
-                TextureUsageState::TransferSrc,
-            )));
-            ops.push(CommandOp::Barrier(buffer_barrier(
-                resources.vertex_buffer,
-                TextureUsageState::Undefined,
-                TextureUsageState::TransferDst,
-            )));
-            ops.push(CommandOp::CopyBuffer {
-                src: vertex_upload_buffer,
-                dst: resources.vertex_buffer,
-                size: segment.vertex_bytes.len() as u64,
-            });
-            ops.push(CommandOp::Barrier(buffer_barrier(
-                resources.vertex_buffer,
-                TextureUsageState::TransferDst,
-                TextureUsageState::ShaderRead,
-            )));
-        }
-        let index_offset = usize::try_from(resources.index_offset)
-            .expect("validated LOD index stream fits host address space");
-        debug_assert!(index_payload.len() <= index_offset);
-        index_payload.resize(index_offset, 0);
-        index_payload.extend_from_slice(&segment.index_bytes);
-    }
-    let index_upload_buffer = resources
-        .index_upload_buffer
-        .expect("new LOD column retains index staging until submission");
-    let index_payload_bytes = index_payload.len() as u64;
-    ops.push(CommandOp::HostWriteBuffer {
-        buffer: index_upload_buffer,
-        offset: 0,
-        data: index_payload,
-    });
-    ops.push(CommandOp::Barrier(buffer_barrier(
-        index_upload_buffer,
-        TextureUsageState::TransferDst,
-        TextureUsageState::TransferSrc,
-    )));
-    ops.push(CommandOp::Barrier(buffer_barrier(
-        resources.index_buffer,
-        TextureUsageState::Undefined,
-        TextureUsageState::TransferDst,
-    )));
-    ops.push(CommandOp::CopyBuffer {
-        src: index_upload_buffer,
-        dst: resources.index_buffer,
-        size: index_payload_bytes,
-    });
-    ops.push(CommandOp::Barrier(buffer_barrier(
-        resources.index_buffer,
-        TextureUsageState::TransferDst,
-        TextureUsageState::IndexRead,
-    )));
-    ops
 }
 
 pub(super) fn create_textured_column_resources(

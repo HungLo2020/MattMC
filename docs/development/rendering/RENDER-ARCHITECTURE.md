@@ -488,6 +488,21 @@ shaders+DH 193→215 FPS after replacing about 200 single-draw translucent passe
 The changed LOD regression exercises the existing opaque identical-draw case,
 not a new late-translucent-order assertion.
 
+DH column geometry lives in shared device pages
+([`lod/residency.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/lod/residency.rs),
+using the completion-gated page allocator in `geometry/arenas.rs`):
+- **Layout:** a column takes one vertex range and one index range; segments
+  address them by `vertex_base` and byte `index_offset`.
+- **Uploads:** each frame's uploads go through one staging buffer and
+  `CopyBufferRegion`, with one barrier per written page. A page first written
+  by an unconfirmed transaction transitions from `Undefined`.
+- **Releases:** replaced or reconciled columns release their ranges after the
+  next submission. A discarded transaction releases them immediately. Emptied
+  pages go to `gal.retire`.
+- **Limits:** a column must fit a page and keep `vertex_base` below 2^24, since
+  it reaches shaders as an f32. Paging prepares DH multi-draw; draw recording
+  is unchanged.
+
 Generic boxes group by four `(SSAO, translucency)` key classes and pack fixed
 uniform blocks; Java uses the [packed-buffer transport](JAVA-BRIDGE.md).
 DH generic groups (clouds, beacons, API objects) are retained in Rust

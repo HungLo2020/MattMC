@@ -112,7 +112,7 @@ impl SourceTerrainGeometryPages {
         gal: &mut VulkanicGal,
         pages: &mut Vec<SourceGeometryPage>,
         bytes: u64,
-        usage: BufferUsage,
+        usages: &[BufferUsage],
         kind: &str,
         device_local: bool,
     ) -> GalResult<SourceGeometryRange> {
@@ -130,21 +130,22 @@ impl SourceTerrainGeometryPages {
         }
         let capacity = SOURCE_TERRAIN_GEOMETRY_PAGE_BYTES.max(bytes);
         let buffer = gal.create_buffer(BufferDesc {
-            label: format!("source-terrain-geometry-page.{kind}.{}", pages.len()),
+            label: format!("{kind}-geometry-page.{}", pages.len()),
             size: capacity,
             memory: if device_local {
                 MemoryDomain::DeviceLocal
             } else {
                 MemoryDomain::Upload
             },
-            usages: vec![
-                usage,
-                if device_local {
+            usages: usages
+                .iter()
+                .copied()
+                .chain([if device_local {
                     BufferUsage::TransferDst
                 } else {
                     BufferUsage::HostWrite
-                },
-            ],
+                }])
+                .collect(),
         })?;
         let mut free_ranges = Vec::new();
         if capacity > bytes {
@@ -160,7 +161,7 @@ impl SourceTerrainGeometryPages {
         bytes: u64,
         device_local: bool,
     ) -> GalResult<SourceGeometryRange> {
-        Self::allocate(gal, &mut self.vertex_pages, bytes, BufferUsage::Storage, "vertices", device_local)
+        Self::allocate(gal, &mut self.vertex_pages, bytes, &[BufferUsage::Storage], "source-terrain.vertices", device_local)
     }
 
     pub(in crate::render::worldrender) fn allocate_index(
@@ -169,7 +170,7 @@ impl SourceTerrainGeometryPages {
         bytes: u64,
         device_local: bool,
     ) -> GalResult<SourceGeometryRange> {
-        Self::allocate(gal, &mut self.index_pages, bytes, BufferUsage::Index, "indices", device_local)
+        Self::allocate(gal, &mut self.index_pages, bytes, &[BufferUsage::Index], "source-terrain.indices", device_local)
     }
 
     pub(in crate::render::worldrender) fn release_now(&mut self, range: SourceGeometryRange) {

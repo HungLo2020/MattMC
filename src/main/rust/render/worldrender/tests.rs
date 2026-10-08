@@ -16570,9 +16570,11 @@ fn world_lod_gpu_residency_uploads_once_commits_with_submission_and_retires_by_g
             &mut operations,
         )
         .unwrap();
-    assert_eq!(10, operations.len());
+    // One staging write and barrier, then barrier, copy and barrier back for
+    // the vertex page and the index page.
+    assert_eq!(8, operations.len());
     assert_eq!(
-        2,
+        1,
         operations
             .iter()
             .filter(|operation| matches!(operation, CommandOp::HostWriteBuffer { .. }))
@@ -16638,7 +16640,7 @@ fn world_lod_gpu_residency_uploads_once_commits_with_submission_and_retires_by_g
             &mut replacement,
         )
         .unwrap();
-    assert_eq!(10, replacement.len());
+    assert_eq!(8, replacement.len());
     frontend.lod_gpu_residency.discard_submission(&mut gal);
 
     gal.retire_through(token.submission).unwrap();

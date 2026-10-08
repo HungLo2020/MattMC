@@ -1255,52 +1255,38 @@ fn column_index_stream_preserves_each_segments_index_range() {
         [IndexType::U16, IndexType::U32],
         [draws[0].index_type, draws[1].index_type]
     );
-    let index_upload = residency.pending.as_ref().unwrap()[&7]
-        .index_upload_buffer
-        .unwrap();
-    let vertex_upload = residency.pending.as_ref().unwrap()[&7]
-        .shared_vertex_upload_buffer
-        .unwrap();
-    assert_eq!(
-        1,
-        ops.iter()
-            .filter(|op| matches!(op, CommandOp::HostWriteBuffer { buffer, .. } if *buffer == vertex_upload))
-            .count()
-    );
+    // One staging write per transaction: the column's vertices, then its
+    // index range (segments four-byte aligned), copied into the pages.
     let writes = ops
         .iter()
         .filter_map(|op| match op {
-            CommandOp::HostWriteBuffer { buffer, data, .. } if *buffer == index_upload => {
-                Some(data.as_slice())
-            }
+            CommandOp::HostWriteBuffer { data, .. } => Some(data.as_slice()),
             _ => None,
         })
         .collect::<Vec<_>>();
     assert_eq!(1, writes.len());
-    assert_eq!(&first_indices[..], &writes[0][..first_indices.len()]);
-    assert_eq!(&[0, 0], &writes[0][first_indices.len()..8]);
-    assert_eq!(&second_indices[..], &writes[0][8..]);
+    let index_copy = ops
+        .iter()
+        .find_map(|op| match op {
+            CommandOp::CopyBufferRegion { src_offset, dst, size, .. } if *dst == draws[0].index_buffer => {
+                Some((*src_offset as usize, *size as usize))
+            }
+            _ => None,
+        })
+        .expect("index range copy");
+    let staged_indices = &writes[0][index_copy.0..index_copy.0 + index_copy.1];
+    assert_eq!(&first_indices[..], &staged_indices[..first_indices.len()]);
+    assert_eq!(&[0, 0], &staged_indices[first_indices.len()..8]);
+    assert_eq!(&second_indices[..], &staged_indices[8..]);
     residency.discard_submission(&mut gal);
 
+    // A column whose vertices exceed the device's buffer size is rejected.
     let mut small_limit = presentation_capabilities(vulkan_capabilities());
     small_limit.limits.max_buffer_size = 4 * WORLD_LOD_GPU_VERTEX_BYTES as u64;
-    let mut fallback_gal = crate::render::vulkanic::test_support::mock_gal_with_capabilities(small_limit);
-    let mut fallback = WorldLodGpuResidency::default();
-    let mut fallback_ops = Vec::new();
-    fallback
-        .stage_visible_uploads(&mut fallback_gal, &assets, &instances, &mut fallback_ops)
-        .unwrap();
-    let fallback_draws = fallback.resolve_visible_draws(&assets, &instances).unwrap();
-    assert_ne!(fallback_draws[0].vertex_buffer, fallback_draws[1].vertex_buffer);
-    assert_eq!([0, 0], [fallback_draws[0].vertex_base, fallback_draws[1].vertex_base]);
-    assert_eq!(
-        3,
-        fallback_ops
-            .iter()
-            .filter(|op| matches!(op, CommandOp::CopyBuffer { .. }))
-            .count()
-    );
-    fallback.discard_submission(&mut fallback_gal);
+    let mut small_gal = crate::render::vulkanic::test_support::mock_gal_with_capabilities(small_limit);
+    let mut small = WorldLodGpuResidency::default();
+    assert!(small.stage_visible_uploads(&mut small_gal, &assets, &instances, &mut Vec::new()).is_err());
+    assert!(small.pending.is_none());
 }
 
 #[test]
@@ -1326,19 +1312,23 @@ fn immutable_lod_upload_copies_to_device_local_and_retires_staging_after_submiss
     let staged_column = &residency.pending.as_ref().unwrap()[&7];
     let staged = staged_column.segments[0];
     let staged_index_buffer = staged_column.index_buffer;
-    let vertex_upload = staged_column.shared_vertex_upload_buffer.unwrap();
-    assert_eq!(Some(staged.vertex_buffer), staged_column.shared_vertex_buffer);
-    assert_eq!(None, staged.vertex_upload_buffer);
-    let index_upload = staged_column.index_upload_buffer.unwrap();
+    let staging = ops
+        .iter()
+        .find_map(|op| match op {
+            CommandOp::HostWriteBuffer { buffer, .. } => Some(*buffer),
+            _ => None,
+        })
+        .expect("staging write");
     assert!(ops.iter().any(|op| matches!(
         op,
-        CommandOp::CopyBuffer { src, dst, size }
-            if *src == vertex_upload && *dst == staged.vertex_buffer && *size == 4 * WORLD_LOD_GPU_VERTEX_BYTES as u64
+        CommandOp::CopyBufferRegion { src, dst, dst_offset, size, .. }
+            if *src == staging && *dst == staged.vertex_buffer && *dst_offset == staged_column.vertex_range.offset
+                && *size == 4 * WORLD_LOD_GPU_VERTEX_BYTES as u64
     )));
     assert!(ops.iter().any(|op| matches!(
         op,
-        CommandOp::CopyBuffer { src, dst, size }
-            if *src == index_upload && *dst == staged_index_buffer && *size == 6 * std::mem::size_of::<u16>() as u64
+        CommandOp::CopyBufferRegion { src, dst, size, .. }
+            if *src == staging && *dst == staged_index_buffer && *size == 6 * std::mem::size_of::<u16>() as u64
     )));
     gal.submit(SubmissionBatch {
         label: "world-lod.device-local-upload".to_string(),
@@ -1353,9 +1343,8 @@ fn immutable_lod_upload_copies_to_device_local_and_retires_staging_after_submiss
     let active = active_column.segments[0];
     assert_eq!(staged.vertex_buffer, active.vertex_buffer);
     assert_eq!(staged_index_buffer, active_column.index_buffer);
-    assert_eq!(None, active.vertex_upload_buffer);
-    assert_eq!(None, active_column.shared_vertex_upload_buffer);
-    assert_eq!(None, active_column.index_upload_buffer);
+    assert!(residency.pending_staging.is_none(), "staging retires with the accepted submission");
+    assert!(residency.initialized_pages.contains(&active.vertex_buffer));
     assert_eq!(
         active.vertex_buffer,
         residency
@@ -1363,6 +1352,77 @@ fn immutable_lod_upload_copies_to_device_local_and_retires_staging_after_submiss
             .unwrap()[0]
             .vertex_buffer
     );
+    residency.destroy(&mut gal);
+}
+
+#[test]
+fn columns_share_geometry_pages_and_replaced_ranges_return_after_completion() {
+    let expanded = expand_world_lod_column_asset(&asset()).unwrap();
+    let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
+    let mut second = packed.clone();
+    second.column_key = 8;
+    let assets = BTreeMap::from([(7, packed.clone()), (8, second)]);
+    let instance = |column_key| WorldLodColumnInstanceRequest {
+        column_key,
+        column_generation: 3,
+        layer: WORLD_LOD_LAYER_OPAQUE,
+        segment_index: 0,
+        order: 0,
+    };
+    let mut gal = crate::render::vulkanic::test_support::mock_gal_with_capabilities(presentation_capabilities(
+        vulkan_capabilities(),
+    ));
+    let mut residency = WorldLodGpuResidency::default();
+    let mut ops = Vec::new();
+    residency.stage_visible_uploads(&mut gal, &assets, &[instance(7), instance(8)], &mut ops).unwrap();
+    let draws = residency.resolve_visible_draws(&assets, &[instance(7), instance(8)]).unwrap();
+    assert_eq!(draws[0].vertex_buffer, draws[1].vertex_buffer, "columns share one vertex page");
+    assert_eq!(draws[0].index_buffer, draws[1].index_buffer, "and one index page");
+    assert_ne!(draws[0].vertex_base, draws[1].vertex_base);
+    assert_eq!(1, ops.iter().filter(|op| matches!(op, CommandOp::HostWriteBuffer { .. })).count());
+    gal.submit(SubmissionBatch {
+        label: "world-lod.pages".to_string(),
+        command_lists: vec![CommandList::from(CommandListDesc {
+            label: "world-lod.pages.commands".to_string(),
+            operations: ops,
+        })],
+    })
+    .unwrap();
+    residency.confirm_submission(&mut gal).unwrap();
+    let old_range = residency.active[&7].vertex_range;
+
+    // A new generation of column 7 takes a new range; the old one returns to
+    // the page only after the replacing submission completes.
+    let mut replaced = packed;
+    replaced.column_generation = 4;
+    let assets = BTreeMap::from([(7, replaced), (8, assets[&8].clone())]);
+    let mut ops = Vec::new();
+    let next = WorldLodColumnInstanceRequest { column_generation: 4, ..instance(7) };
+    residency.stage_visible_uploads(&mut gal, &assets, &[next, instance(8)], &mut ops).unwrap();
+    assert_ne!(old_range.offset, residency.pending.as_ref().unwrap()[&7].vertex_range.offset);
+    gal.submit(SubmissionBatch {
+        label: "world-lod.pages.replace".to_string(),
+        command_lists: vec![CommandList::from(CommandListDesc {
+            label: "world-lod.pages.replace.commands".to_string(),
+            operations: ops,
+        })],
+    })
+    .unwrap();
+    residency.confirm_submission(&mut gal).unwrap();
+    assert_eq!(2, residency.pages.pending_releases.len(), "old vertex and index ranges wait for completion");
+    // Released after the next submission (conservative: it may still be
+    // recorded against the replaced range when the frame is pipelined).
+    gal.submit(SubmissionBatch {
+        label: "world-lod.pages.after".to_string(),
+        command_lists: vec![CommandList::from(CommandListDesc {
+            label: "world-lod.pages.after.commands".to_string(),
+            operations: Vec::new(),
+        })],
+    })
+    .unwrap();
+    gal.retire_through(gal.latest_submission_id()).unwrap();
+    residency.stage_visible_uploads(&mut gal, &assets, &[next, instance(8)], &mut Vec::new()).unwrap();
+    assert!(residency.pages.pending_releases.is_empty());
     residency.destroy(&mut gal);
 }
 
