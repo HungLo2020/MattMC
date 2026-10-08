@@ -83,6 +83,7 @@ public class EnchantTableRenderer implements BlockEntityRenderer<EnchantingTable
 			0,
 			enchantTableRenderState.breakProgress
 		);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeEnchantingTableBookEmission(enchantTableRenderState, state);
 		poseStack.popPose();
 	}
 }

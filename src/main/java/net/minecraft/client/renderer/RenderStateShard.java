@@ -103,6 +103,10 @@ public abstract class RenderStateShard {
 
 	private static void setupGlintTexturing(float f) {
 		long l = (long)(Util.getMillis() * Minecraft.getInstance().options.glintSpeed().get() * 8.0);
+		net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeScaledTicks(l, f);
+		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.observeScaledTicks(l, f);
+		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.observeScaledTicks(l, f);
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.observeScaledTicks(l, f);
 		float g = (float)(l % 110000L) / 110000.0F;
 		float h = (float)(l % 30000L) / 30000.0F;
 		Matrix4f matrix4f = new Matrix4f().translation(-g, h, 0.0F);

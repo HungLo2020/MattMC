@@ -1237,6 +1237,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void close() {
+		net.vulkanic.backends.opengl.GraphicsAuditFrozenTerrainUv.close();
 		// VoxelMap: Call client stopping event
 		try {
 			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.invoker().onClientStopping(this);

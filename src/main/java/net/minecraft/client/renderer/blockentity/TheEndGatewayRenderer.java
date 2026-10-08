@@ -68,6 +68,7 @@ public class TheEndGatewayRenderer extends AbstractEndPortalRenderer<TheEndGatew
 		}
 
 		super.submit(endGatewayRenderState, poseStack, submitNodeCollector, cameraRenderState);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeEndGatewayEmission(endGatewayRenderState);
 	}
 
 	@Override

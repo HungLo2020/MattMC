@@ -45,6 +45,7 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 		submitNodeCollector.submitCustomGeometry(
 			poseStack, this.renderType(), (pose, vertexConsumer) -> this.renderCube(endPortalRenderState.facesToShow, pose.pose(), vertexConsumer)
 		);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeEndPortalEmission(endPortalRenderState);
 	}
 
 	private void renderCube(EnumSet<Direction> enumSet, Matrix4f matrix4f, VertexConsumer vertexConsumer) {

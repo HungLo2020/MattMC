@@ -129,6 +129,7 @@ public class BedRenderer implements BlockEntityRenderer<BedBlockEntity, BedRende
 			bedRenderState.breakProgress,
 			0
 		);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeBedEmission(bedRenderState);
 	}
 
 	public void submitSpecial(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, Material material, int k) {

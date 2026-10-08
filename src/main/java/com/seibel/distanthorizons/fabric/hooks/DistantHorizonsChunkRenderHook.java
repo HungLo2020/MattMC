@@ -15,16 +15,17 @@ import net.minecraft.hooks.ChunkRenderLayerHooks;
 public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
     private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 
-    @Override
-    public void onBeforeRenderLayer(ChunkSectionLayerGroup layerGroup) {
+	    @Override
+	    public void onBeforeRenderLayer(ChunkSectionLayerGroup layerGroup) {
         ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(
             ClientApi.RENDER_STATE.clientLevelWrapper,
             Minecraft.getInstance().levelRenderer.level
         );
 
-        if (layerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
-            try {
-                net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.translucent-fade");
+	        if (layerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
+	            try {
+	                net.minecraft.client.dev.GraphicsAuditDhFade.recordTransparentHook();
+	                net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.translucent-fade");
                 ClientApi.INSTANCE.renderFadeTransparent();
                 ClientApi.INSTANCE.renderDeferredLodsForShaders();
             } catch (Exception e) {
@@ -32,9 +33,10 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
             } finally {
                 net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("distant-horizons.translucent-fade");
             }
-        } else if (layerGroup == ChunkSectionLayerGroup.TRIPWIRE) {
-            try {
-                net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.opaque-fade");
+	        } else if (layerGroup == ChunkSectionLayerGroup.TRIPWIRE) {
+	            try {
+	                net.minecraft.client.dev.GraphicsAuditDhFade.recordOpaqueHook();
+	                net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.opaque-fade");
                 ClientApi.INSTANCE.renderFadeOpaque();
             } catch (Exception e) {
                 LOGGER.error("[DH-RENDER-LAYER] Error rendering tripwire: " + e.getMessage(), e);

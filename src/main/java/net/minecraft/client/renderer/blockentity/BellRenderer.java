@@ -57,5 +57,6 @@ public class BellRenderer implements BlockEntityRenderer<BellBlockEntity, BellRe
 			0,
 			bellRenderState.breakProgress
 		);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeBellEmission(bellRenderState);
 	}
 }

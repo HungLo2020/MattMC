@@ -34,6 +34,7 @@ public class FogShader extends AbstractShaderRenderer
 	private int activeColorTextureId = -1;
 	
 	private Mat4f inverseMvmProjMatrix; 
+	private boolean codexFogAuditLogged = false;
 	
 	
 	
@@ -143,6 +144,18 @@ public class FogShader extends AbstractShaderRenderer
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		int lodDrawDistance = Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get() * LodUtil.CHUNK_WIDTH;
+		if (Boolean.getBoolean("mattmc.graphicsAudit") && !this.codexFogAuditLogged)
+		{
+			this.codexFogAuditLogged = true;
+			System.err.println("[CODEX-DH-FOG] FogShader radius="
+				+ Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get()
+				+ " drawDistance=" + lodDrawDistance
+				+ " enableDhFog=" + Config.Client.Advanced.Graphics.Fog.enableDhFog.get()
+				+ " farStart=" + Config.Client.Advanced.Graphics.Fog.farFogStart.get()
+				+ " farEnd=" + Config.Client.Advanced.Graphics.Fog.farFogEnd.get()
+				+ " farDensity=" + Config.Client.Advanced.Graphics.Fog.farFogDensity.get()
+				+ " mix=" + Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogMixMode.get());
+		}
 		
 		
 		

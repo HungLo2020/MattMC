@@ -1178,7 +1178,8 @@ public class Gui {
 				guiGraphics.pose().translate(-(i + 8), -(j + 12));
 			}
 
-			guiGraphics.renderItem(player, itemStack, i, j, k);
+			if (!net.minecraft.client.dev.GraphicsAuditGuiItemPlacementFixture.render(guiGraphics, player, itemStack, i, j, k))
+				guiGraphics.renderItem(player, itemStack, i, j, k);
 			if (f > 0.0F) {
 				guiGraphics.pose().popMatrix();
 			}

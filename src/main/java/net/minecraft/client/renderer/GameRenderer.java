@@ -589,6 +589,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (!this.panoramicMode) {
 			this.featureRenderDispatcher.renderAllFeatures();
 			this.renderBuffers.bufferSource().endBatch();
+			net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginHand();
 			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			PoseStack poseStack = new PoseStack();
 			boolean taczHandPath = this.useTaczHandModelViewPath();
@@ -661,6 +662,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
+		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginFrame();
+		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginFrame();
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beginFrame();
 		// Iris: From MixinGameRenderer - set real tick delta and begin frame timers
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(deltaTracker.getGameTimeDeltaPartialTick(true));
 		net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
@@ -990,11 +994,18 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		GpuBufferSlice gpuBufferSlice = this.fogRenderer.getBuffer(FogRenderer.FogMode.WORLD);
 		profilerFiller.popPush("level");
 		net.minecraft.client.dev.DeterministicCameraCapture.recordFrozenSkyMatrices(matrix4f2, matrix4f);
+		net.minecraft.client.dev.GraphicsAuditFlowingWaterFixture.observeWorldView(this.minecraft, matrix4f, matrix4f2, this.mainCamera.getPosition());
+		net.minecraft.client.dev.GraphicsAuditMixedFluidFixture.observeWorldView(this.minecraft, matrix4f, matrix4f2, this.mainCamera.getPosition());
+		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginWorld();
+		try {
 		this.minecraft
 			.levelRenderer
 			.renderLevel(
 				this.resourcePool, deltaTracker, bl, this.mainCamera, matrix4f2, matrix4f, this.getProjectionMatrixForCulling(h), gpuBufferSlice, vector4f, !bl2
 			);
+		} finally {
+			net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.endWorld();
+		}
 		profilerFiller.popPush("hand");
 		boolean bl3 = this.minecraft.getCameraEntity() instanceof LivingEntity && ((LivingEntity)this.minecraft.getCameraEntity()).isSleeping();
 		float itemFov = this.getFov(this.mainCamera, f, false);
@@ -1015,6 +1026,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.screenEffectRenderer.renderScreenEffect(bl3, f, this.submitNodeStorage);
 		this.featureRenderDispatcher.renderAllFeatures();
 		bufferSource.endBatch();
+		if (!this.panoramicMode) net.minecraft.client.dev.GraphicsAuditHandFoilTiming.endHand();
 		profilerFiller.pop();
 		VulkanicAPI.setShaderFog(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
 		if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)

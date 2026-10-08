@@ -126,6 +126,10 @@ public final class StaticTerrainParityDiagnostics {
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxTransformTraceEvents", 8)
     );
     private static final long APPEARANCE_TRACE_SECTION = parseAppearanceTraceSection();
+    private static final int APPEARANCE_MAX_SAMPLES = appearanceSampleLimit(Integer.getInteger(
+            "mattmc.dev.staticTerrainParityDiagnostics.appearanceMaxSamples", MAX_SAMPLES));
+    private static final AtomicInteger CAPTURE_APPEARANCE_TRACE_EVENTS = new AtomicInteger();
+    static int appearanceSampleLimit(int requested) { return Math.max(0, Math.min(4096, requested)); }
     private static final int[] APPEARANCE_TRACE_BLOCK = parseAppearanceTraceBlock();
     /**
      * Optional bounded receipt for particular compact ABGR values in one
@@ -284,6 +288,10 @@ public final class StaticTerrainParityDiagnostics {
 		recordSourceVisibility(output);
         recordSourceMesh(output, DefaultTerrainRenderPasses.SOLID, "solid");
         recordSourceMesh(output, DefaultTerrainRenderPasses.CUTOUT, "cutout");
+        // Only the explicitly selected section gains a translucent CPU receipt.
+        if (output.render.getPosition().asLong() == APPEARANCE_TRACE_SECTION) {
+            recordSourceMesh(output, DefaultTerrainRenderPasses.TRANSLUCENT, "translucent");
+        }
     }
 
 	/** Records immutable build visibility only when explicitly selected. */
@@ -516,7 +524,12 @@ public final class StaticTerrainParityDiagnostics {
         Minecraft minecraft = Minecraft.getInstance();
         long gameTime = minecraft.level == null ? -1L : minecraft.level.getGameTime();
         long hash = mix(mix(0xcbf29ce484222325L, setXor), setSum);
-        if ("solid".equals(layer) && sectionCount > 0) {
+        // For shader-enabled Frozen captures Iris can invoke the ordinary draw
+        // hook with a pass-specific list (or cancel it) after setup finalized
+        // the real visible domain. Readiness must track only that finalized
+        // main-pass snapshot; otherwise a secondary list continually resets
+        // the stable-frame counter even though the world is settled.
+        if ("solid".equals(layer) && sectionCount > 0 && "java-opengl-setup".equals(stage)) {
             if (latestSolidSectionCount == sectionCount && latestSolidHash == hash) {
                 stableSolidFrames++;
             } else {
@@ -837,6 +850,26 @@ public final class StaticTerrainParityDiagnostics {
 
     /** Observes semantic source attributes only at the normal, non-shadow terrain pass. */
     public static void recordAppearanceSourceProbe(String stage, String layer) {
+        recordAppearanceSourceProbe(stage, layer, false);
+    }
+
+    /** Capture-bound observation of the latest completed CPU mesh, not GPU state. */
+    public static void recordAppearanceSourceAtCapture() {
+        String layer = appearanceCaptureLayer(System.getProperty(
+            "mattmc.dev.staticTerrainParityDiagnostics.appearanceCaptureLayer", "translucent"));
+        if (layer != null) recordAppearanceSourceProbe("capture-observed-source", layer, true);
+    }
+
+    /** Observation selection only; invalid diagnostic input never changes rendering. */
+    static String appearanceCaptureLayer(String requested) {
+        if (requested == null) return null;
+        return switch (requested) {
+            case "solid", "cutout", "translucent" -> requested;
+            default -> null;
+        };
+    }
+
+    private static void recordAppearanceSourceProbe(String stage, String layer, boolean capture) {
         if (!ENABLED || APPEARANCE_TRACE_SECTION == Long.MIN_VALUE) {
             return;
         }
@@ -846,14 +879,17 @@ public final class StaticTerrainParityDiagnostics {
         if (source == null || coverage == null) {
             return;
         }
-        int eventIndex = APPEARANCE_TRACE_EVENTS.incrementAndGet();
-        if (eventIndex > 8) {
+        int eventIndex = (capture ? CAPTURE_APPEARANCE_TRACE_EVENTS : APPEARANCE_TRACE_EVENTS).incrementAndGet();
+        if (eventIndex > (capture ? 5 : 8)) {
             return;
         }
         try {
             StringBuilder json = new StringBuilder(8192);
             json.append("{");
             appendField(json, "schema", "mattmc-static-terrain-appearance-source-v1").append(", ");
+            if (capture) json.append("\"gpuTerrainUv\":").append(
+                net.vulkanic.backends.opengl.GraphicsAuditFrozenTerrainUv.capture()).append(", ");
+            json.append("\"cpuTerrainInputs\":").append(net.minecraft.client.dev.GraphicsAuditTerrainInputs.json()).append(", ");
             appendField(json, "eventIndex", eventIndex).append(", ");
             appendField(json, "backend", backendName()).append(", ");
             appendField(json, "stage", stage).append(", ");
@@ -864,6 +900,8 @@ public final class StaticTerrainParityDiagnostics {
             appendField(json, "meshGeneration", coverage.meshGeneration()).append(", ");
             appendField(json, "gameTime", Minecraft.getInstance().level == null ? -1L : Minecraft.getInstance().level.getGameTime()).append(", ");
             appendField(json, "vertexStride", source.vertexStride()).append(", ");
+            appendField(json, "vertexCount", coverage.vertexCount()).append(", ");
+            appendField(json, "samplesComplete", source.samples().length == coverage.vertexCount()).append(", ");
             appendField(json, "separateAo", source.separateAo() ? 1 : 0).append(", ");
             appendField(json, "materialIdentity", coverage.materialIdentity()).append(", ");
             appendField(json, "textureIdentity", coverage.textureIdentity()).append(", ");
@@ -1619,7 +1657,7 @@ public final class StaticTerrainParityDiagnostics {
         // Retain a bounded, representative prefix solely so the post-draw
         // observer can select an in-viewport primitive without touching the
         // renderer's vertex stream or traversal.
-        int limit = Math.min(Math.min(vertices, vertexCapacity), MAX_SAMPLES);
+        int limit = Math.min(Math.min(vertices, vertexCapacity), APPEARANCE_MAX_SAMPLES);
         AppearanceSample[] samples = new AppearanceSample[limit];
         boolean separateAo = usesSeparateAo();
         int segment = 0;
@@ -1645,7 +1683,8 @@ public final class StaticTerrainParityDiagnostics {
                     (lightMaterial & 0xff) >>> 4, ((lightMaterial >>> 8) & 0xff) >>> 4,
                     (lightMaterial >>> 16) & 0xff,
                     wordAt(buffer, offset, stride, 20), wordAt(buffer, offset, stride, 24),
-                    wordAt(buffer, offset, stride, 28), wordAt(buffer, offset, stride, 32), wordAt(buffer, offset, stride, 36)
+                    wordAt(buffer, offset, stride, 28), wordAt(buffer, offset, stride, 32), wordAt(buffer, offset, stride, 36),
+                    buffer.getInt(offset), buffer.getInt(offset + 4), texture
             );
         }
         return new AppearanceSource(layer, stride, separateAo, samples);
@@ -1927,6 +1966,9 @@ public final class StaticTerrainParityDiagnostics {
             AppearanceSample sample = samples[i];
             json.append("{");
             appendField(json, "vertexIndex", sample.vertexIndex()).append(", ");
+            appendField(json, "compactPositionHi", String.format(Locale.ROOT, "%08x", sample.compactPositionHi())).append(", ");
+            appendField(json, "compactPositionLo", String.format(Locale.ROOT, "%08x", sample.compactPositionLo())).append(", ");
+            appendField(json, "compactTexture", String.format(Locale.ROOT, "%08x", sample.compactTexture())).append(", ");
             appendField(json, "primitiveIndex", sample.primitiveIndex()).append(", ");
             appendField(json, "faceCode", sample.faceCode()).append(", ");
             appendField(json, "worldPosition", vector3(sample.worldX(), sample.worldY(), sample.worldZ())).append(", ");
@@ -2351,7 +2393,8 @@ public final class StaticTerrainParityDiagnostics {
             float worldX, float worldY, float worldZ, float u, float v,
             int red, int green, int blue, int alphaOrAo, float ao,
             int blockLight, int skyLight, int materialBits,
-            int extensionWord20, int extensionWord24, int extensionWord28, int extensionWord32, int extensionWord36
+            int extensionWord20, int extensionWord24, int extensionWord28, int extensionWord32, int extensionWord36,
+            int compactPositionHi, int compactPositionLo, int compactTexture
     ) {
     }
 

@@ -43,6 +43,7 @@ public class SnowGolemHeadLayer extends RenderLayer<SnowGolemRenderState, SnowGo
 					? RenderType.outline(TextureAtlas.LOCATION_BLOCKS)
 					: ItemBlockRenderTypes.getRenderType(blockState);
 				submitNodeCollector.submitBlockModel(poseStack, renderType, blockStateModel, 0.0F, 0.0F, 0.0F, i, j, snowGolemRenderState.outlineColor);
+				net.minecraft.client.dev.DeterministicCameraCapture.observeSnowGolemPumpkinEmission(snowGolemRenderState, blockState);
 				poseStack.popPose();
 			}
 		}

@@ -359,6 +359,7 @@ public class ClientApi
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
 	public void renderLods() 
 	{ 
+		net.minecraft.client.dev.GraphicsAuditDhFade.recordRenderLods();
 		//LOGGER.debug("[DH-RENDER] renderLods() called");
 		this.renderLodLayer(false); 
 		//LOGGER.debug("[DH-RENDER] renderLods() completed");
@@ -372,6 +373,7 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
+		net.minecraft.client.dev.GraphicsAuditDhFade.recordRenderLayer();
 		//LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER START ==========");
 		//LOGGER.debug("[DH-RENDER-LAYER] renderingDeferredLayer: " + renderingDeferredLayer);
 		//LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
@@ -513,12 +515,19 @@ public class ClientApi
 			
 			if (!renderingDeferredLayer)
 			{
-				if (Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEFAULT)
+				boolean defaultRendererMode = Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEFAULT;
+				net.minecraft.client.dev.GraphicsAuditDhFade.recordRendererMode(defaultRendererMode);
+				if (defaultRendererMode)
 				{
 					boolean renderingCancelledForThisFrame = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderEvent.class, renderParams);
+					if (renderingCancelledForThisFrame)
+					{
+						net.minecraft.client.dev.GraphicsAuditDhFade.recordRenderEventCancelled(false);
+					}
 					if (!renderingCancelledForThisFrame)
 					{
 						//LOGGER.debug("[DH-RENDER-LAYER] Calling LodRenderer.INSTANCE.render()");
+						net.minecraft.client.dev.GraphicsAuditDhFade.recordLodRendererRender();
 						LodRenderer.INSTANCE.render(renderParams, profiler);
 						//LOGGER.debug("[DH-RENDER-LAYER] LodRenderer.INSTANCE.render() completed");
 					}
@@ -538,6 +547,10 @@ public class ClientApi
 			else
 			{
 				boolean renderingCancelled = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeDeferredRenderEvent.class, renderParams);
+				if (renderingCancelled)
+				{
+					net.minecraft.client.dev.GraphicsAuditDhFade.recordRenderEventCancelled(true);
+				}
 				if (!renderingCancelled)
 				{
 					LodRenderer.INSTANCE.renderDeferred(renderParams, profiler);
@@ -588,11 +601,12 @@ public class ClientApi
 				// only fade when requested
 				Config.Client.Advanced.Graphics.Quality.vanillaFadeMode.get() == EDhApiMcRenderingFadeMode.DOUBLE_PASS
 				// or if LOD-only mode is enabled (fading is used to remove the MC render pass)
-				|| Config.Client.Advanced.Debugging.lodOnlyMode.get()
+			|| Config.Client.Advanced.Debugging.lodOnlyMode.get()
 			)
 			// don't fade when Iris shaders are active, otherwise the rendering can get weird
 			&& !DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
 		{
+			net.minecraft.client.dev.GraphicsAuditDhFade.recordOpaqueRender();
 			VanillaFadeRenderer.INSTANCE.render(RENDER_STATE.mcModelViewMatrix, RENDER_STATE.mcProjectionMatrix, RENDER_STATE.frameTime, RENDER_STATE.clientLevelWrapper);
 		}
 	}
@@ -617,6 +631,7 @@ public class ClientApi
 				&& !DhApiRenderProxy.INSTANCE.getDeferTransparentRendering();
 			if (renderFade)
 			{
+				net.minecraft.client.dev.GraphicsAuditDhFade.recordTransparentRender();
 				VanillaFadeRenderer.INSTANCE.render(RENDER_STATE.mcModelViewMatrix, RENDER_STATE.mcProjectionMatrix, RENDER_STATE.frameTime, RENDER_STATE.clientLevelWrapper);
 			}
 		}

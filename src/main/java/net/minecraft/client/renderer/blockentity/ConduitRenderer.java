@@ -173,5 +173,6 @@ public class ConduitRenderer implements BlockEntityRenderer<ConduitBlockEntity, 
 			);
 			poseStack.popPose();
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.observeConduitEmission(condiutRenderState);
 	}
 }

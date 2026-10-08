@@ -45,7 +45,8 @@ public class ShaderLoader {
                 throw new RuntimeException("Shader not found: " + path);
             }
 
-            return IOUtils.toString(in, StandardCharsets.UTF_8);
+            return net.vulkanic.backends.opengl.GraphicsAuditFrozenTerrainUv.source(name,
+                    IOUtils.toString(in, StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new RuntimeException("Failed to read shader source for " + path, e);
         }

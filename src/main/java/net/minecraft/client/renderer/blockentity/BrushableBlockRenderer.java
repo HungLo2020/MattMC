@@ -68,6 +68,7 @@ public class BrushableBlockRenderer implements BlockEntityRenderer<BrushableBloc
 			brushableBlockRenderState.itemState.submit(poseStack, submitNodeCollector, brushableBlockRenderState.lightCoords, OverlayTexture.NO_OVERLAY, 0);
 			poseStack.popPose();
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.observeBrushableItemEmission(brushableBlockRenderState);
 	}
 
 	private float[] translations(Direction direction, int i) {

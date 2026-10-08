@@ -119,6 +119,8 @@ public class GuiRenderer implements AutoCloseable {
 	@Nullable
 	private GpuTextureView itemsAtlasDepthView;
 	private int itemAtlasX;
+	private int guiItemRasterDiagnosticCount;
+	private boolean guiItemRasterPixelsObserved;
 	private int itemAtlasY;
 	private int cachedGuiScale;
 	private int frameNumber;
@@ -206,6 +208,7 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void prepare() {
+		net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.beginFrame();
 		this.bufferSource.endBatch();
 		this.preparePictureInPicture();
 		this.prepareItemElements();
@@ -379,6 +382,8 @@ public class GuiRenderer implements AutoCloseable {
 								mutableBoolean2.setTrue();
 							} else {
 								TrackingItemStackRenderState trackingItemStackRenderState = guiItemRenderState.itemStackRenderState();
+								// Observe this frame's selected immutable sources, including atlas reuse.
+								trackingItemStackRenderState.recordGuiFoilSourcesForDiagnostics();
 								GuiRenderer.AtlasPosition atlasPosition = (GuiRenderer.AtlasPosition)this.atlasPositions.get(trackingItemStackRenderState.getModelIdentity());
 								if (atlasPosition == null || trackingItemStackRenderState.isAnimated() && atlasPosition.lastAnimatedOnFrame != this.frameNumber) {
 									if (this.itemAtlasX + j > k) {
@@ -399,8 +404,14 @@ public class GuiRenderer implements AutoCloseable {
 											VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
 										}
 
-										this.renderItemToAtlas(trackingItemStackRenderState, poseStack, kx, l, j);
+										net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.beginItem(guiItemRenderState.x(), guiItemRenderState.y());
+										try {
+											this.renderItemToAtlas(trackingItemStackRenderState, poseStack, kx, l, j);
+										} finally {
+											net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.endItem();
+										}
 										float f = (float)kx / k;
+										net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeAtlasWrite(guiItemRenderState.x(), guiItemRenderState.y(), kx, l);
 										float g = (float)(k - l) / k;
 										this.submitBlitFromItemAtlas(guiItemRenderState, f, g, j, k);
 										if (bl) {
@@ -416,6 +427,7 @@ public class GuiRenderer implements AutoCloseable {
 									}
 								} else {
 									this.submitBlitFromItemAtlas(guiItemRenderState, atlasPosition.u, atlasPosition.v, j, k);
+									net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeAtlasReuse(guiItemRenderState.x(), guiItemRenderState.y(), atlasPosition.x, atlasPosition.y);
 								}
 							}
 						}
@@ -430,6 +442,10 @@ public class GuiRenderer implements AutoCloseable {
 				}
 			}
 
+			if (!this.guiItemRasterPixelsObserved && Boolean.getBoolean("mattmc.dev.guiItemRasterTrace")) {
+				this.guiItemRasterPixelsObserved = net.minecraft.client.dev.GuiItemRasterDiagnostics.observe(
+					this.itemsAtlas, j, this.atlasPositions.size());
+			}
 			if (mutableBoolean2.getValue()) {
 				this.renderState
 					.forEachItem(
@@ -485,6 +501,12 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void renderItemToAtlas(TrackingItemStackRenderState trackingItemStackRenderState, PoseStack poseStack, int i, int j, int k) {
+		if (Boolean.getBoolean("mattmc.dev.guiItemRasterTrace") && this.guiItemRasterDiagnosticCount < 32) {
+			this.guiItemRasterDiagnosticCount++;
+			LOGGER.info("gui.item.raster-source slot={},{},{} atlas={}x{} source={}",
+				i, j, k, this.itemsAtlas.getWidth(0), this.itemsAtlas.getHeight(0),
+				trackingItemStackRenderState.describeGuiRasterSourceForDiagnostics());
+		}
 		poseStack.pushPose();
 		poseStack.translate(i + k / 2.0F, j + k / 2.0F, 0.0F);
 		poseStack.scale(k, -k, k);

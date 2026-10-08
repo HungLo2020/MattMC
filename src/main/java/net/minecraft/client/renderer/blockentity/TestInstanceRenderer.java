@@ -68,6 +68,7 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 		for (ErrorMarker errorMarker : testInstanceRenderState.errorMarkers) {
 			this.submitErrorMarker(poseStack, submitNodeCollector, errorMarker, cameraRenderState);
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.observeTestInstanceCompositionEmission(testInstanceRenderState);
 	}
 
 	private void submitErrorMarker(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ErrorMarker errorMarker, CameraRenderState cameraRenderState) {

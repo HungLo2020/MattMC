@@ -264,6 +264,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		this.lightUpdateQueue.add(runnable);
 	}
 
+	/** Observation-only readiness for shared capture fixtures. */
+	public boolean hasPendingLightUpdates() {
+		return !this.lightUpdateQueue.isEmpty();
+	}
+
 	public void pollLightUpdates() {
 		int i = this.lightUpdateQueue.size();
 		int j = i < 1000 ? Math.max(10, i / 10) : i;

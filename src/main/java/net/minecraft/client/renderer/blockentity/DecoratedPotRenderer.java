@@ -168,6 +168,7 @@ public class DecoratedPotRenderer implements BlockEntityRenderer<DecoratedPotBlo
 
 		this.submit(poseStack, submitNodeCollector, decoratedPotRenderState.lightCoords, OverlayTexture.NO_OVERLAY, decoratedPotRenderState.decorations, 0);
 		poseStack.popPose();
+		net.minecraft.client.dev.DeterministicCameraCapture.observeDecoratedPotEmission(decoratedPotRenderState);
 	}
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, PotDecorations potDecorations, int k) {

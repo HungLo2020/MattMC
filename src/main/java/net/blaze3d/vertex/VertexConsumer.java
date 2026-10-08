@@ -99,6 +99,9 @@ public interface VertexConsumer {
 				float u = byteBuffer.getFloat(16);
 				float aa = byteBuffer.getFloat(20);
 				Vector3f vector3f2 = matrix4f.transformPosition(p, q, r, new Vector3f());
+				net.minecraft.client.dev.GraphicsAuditGuiLeafVertices.record(bakedQuad, o, vector3f2, u, aa);
+				net.minecraft.client.dev.GraphicsAuditGuiLeafVertices.recordNormal(bakedQuad, o,
+					vector3f.x(), vector3f.y(), vector3f.z(), "vertex-consumer-before-pack");
 				this.addVertex(vector3f2.x(), vector3f2.y(), vector3f2.z(), y, u, aa, j, z, vector3f.x(), vector3f.y(), vector3f.z());
 			}
 		}

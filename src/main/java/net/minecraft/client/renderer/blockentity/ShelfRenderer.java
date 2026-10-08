@@ -64,6 +64,7 @@ public class ShelfRenderer implements BlockEntityRenderer<ShelfBlockEntity, Shel
 				this.submitItem(shelfRenderState, itemStackRenderState, poseStack, submitNodeCollector, i, f);
 			}
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.observeShelfItemEmission(shelfRenderState);
 	}
 
 	private void submitItem(

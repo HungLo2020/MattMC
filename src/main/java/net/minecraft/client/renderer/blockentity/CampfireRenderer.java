@@ -75,5 +75,6 @@ public class CampfireRenderer implements BlockEntityRenderer<CampfireBlockEntity
 				poseStack.popPose();
 			}
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.observeCampfireItemEmission(campfireRenderState);
 	}
 }

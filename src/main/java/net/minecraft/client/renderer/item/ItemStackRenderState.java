@@ -92,6 +92,41 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		return this.activeLayerCount == 0;
 	}
 
+	/** Opt-in bounded source diagnostics only; never mutates item/render state. */
+	public String describeGuiRasterSourceForDiagnostics() {
+		if (!Boolean.getBoolean("mattmc.dev.guiItemRasterTrace")) return "disabled";
+		StringBuilder result = new StringBuilder();
+		int remaining = 8;
+		for (int layerIndex = 0; layerIndex < this.activeLayerCount && remaining > 0; layerIndex++) {
+			var layer = this.layers[layerIndex];
+			for (var quad : layer.quads) {
+				if (quad.direction().getAxis() != net.minecraft.core.Direction.Axis.Z) continue;
+				if (remaining-- <= 0) break;
+				var sprite = quad.sprite();
+				result.append(" layer=").append(layerIndex).append(" face=").append(quad.direction())
+					.append(" sprite=").append(sprite.contents().name()).append(" region=")
+					.append(sprite.getX()).append(',').append(sprite.getY()).append(',')
+					.append(sprite.contents().width()).append(',').append(sprite.contents().height());
+				for (int vertex = 0; vertex < 4; vertex++) {
+					result.append(" vertex=").append(vertex).append(':')
+						.append(Float.toHexString(quad.getX(vertex))).append(',')
+						.append(Float.toHexString(quad.getY(vertex))).append(',')
+						.append(Float.toHexString(quad.getZ(vertex))).append(',')
+						.append(Float.toHexString(quad.getTexU(vertex))).append(',')
+						.append(Float.toHexString(quad.getTexV(vertex)));
+				}
+			}
+		}
+		return result.toString();
+	}
+
+	public void recordGuiFoilSourcesForDiagnostics() {
+		if (!Boolean.getBoolean("mattmc.dev.guiItemRasterTrace")) return;
+		for (int i = 0; i < this.activeLayerCount; i++) {
+			for (var quad : this.layers[i].quads) net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(quad);
+		}
+	}
+
 	public boolean usesBlockLight() {
 		return this.firstLayer().usesBlockLight;
 	}

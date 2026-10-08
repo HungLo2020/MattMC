@@ -13,6 +13,7 @@ import net.minecraft.client.model.SkullModelBase;
 import net.minecraft.client.model.dragon.DragonHeadModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -111,6 +112,7 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 			0,
 			skullBlockRenderState.breakProgress
 		);
+		DeterministicCameraCapture.observeSkullEmission(skullBlockRenderState);
 	}
 
 	public static void submitSkull(

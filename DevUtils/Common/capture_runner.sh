@@ -421,23 +421,30 @@ capture_x11_window() {
     local target_window="$1"
     local screenshot_file="$2"
     local raw_capture="${screenshot_file}.xwd"
+    local capture_error="${screenshot_file}.capture-error.log"
 
     # ImageMagick's `import -window` can succeed yet capture unrelated desktop
     # pixels under this X11 setup. xwd reads the requested drawable by id and
     # fails when it cannot; conversion happens only after that direct read.
     command -v xwd >/dev/null 2>&1 || return 1
-    command -v magick >/dev/null 2>&1 || return 1
-    xwd -silent -id "$target_window" -out "$raw_capture" >/dev/null 2>&1 || {
-        rm -f "$raw_capture"
+    command -v python3 >/dev/null 2>&1 || return 1
+    [[ -f "${MATTMC_CAPTURE_XWD_HELPER:-}" ]] || return 1
+    xwd -silent -id "$target_window" -out "$raw_capture" >/dev/null 2>"$capture_error" || {
+        xwininfo -id "$target_window" >>"$capture_error" 2>&1 || true
         return 1
     }
     [[ -s "$raw_capture" ]] || {
         rm -f "$raw_capture"
         return 1
     }
-    magick "$raw_capture" "$screenshot_file" >/dev/null 2>&1
-    local status=$?
-    rm -f "$raw_capture"
+    local status=0
+    python3 "$MATTMC_CAPTURE_XWD_HELPER" "$raw_capture" "$screenshot_file" >/dev/null 2>>"$capture_error" || status=$?
+    if [[ $status -ne 0 ]]; then
+        xwininfo -id "$target_window" >>"$capture_error" 2>&1 || true
+    fi
+    if [[ $status -eq 0 && "${MATTMC_CAPTURE_RETAIN_XWD:-false}" != "true" ]]; then
+        rm -f "$raw_capture"
+    fi
     [[ $status -eq 0 && -f "$screenshot_file" ]]
 }
 
@@ -1035,7 +1042,7 @@ fi
 if [[ -n "$GUI_RESOURCE_PACK_SCENARIO" && "$GUI_RESOURCE_PACK_SCENARIO" != "vanilla" && -n "${MATTMC_GUI_PACK_GENERATOR_ROOT:-}" ]]; then
     # Capture-only parity setup. Reuse the shared Python pack specification so
     # Frozen and Current consume byte-equivalent synthetic resource packs.
-    python3 - "$MATTMC_GUI_PACK_GENERATOR_ROOT" "$RUN_DIR" "$GUI_RESOURCE_PACK_SCENARIO" <<'PY'
+    python3 - "$MATTMC_GUI_PACK_GENERATOR_ROOT" "$RUN_DIR" "$GUI_RESOURCE_PACK_SCENARIO" "$META_LOG" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -1045,7 +1052,7 @@ run_dir = Path(sys.argv[2])
 scenario = sys.argv[3]
 sys.path.insert(0, str(root))
 sys.path.insert(0, str(root / "DevUtils" / "Common"))
-from DevUtils.Common.capture_runner import gui_resource_pack_specs, write_gui_resource_pack
+from DevUtils.Common.capture_runner import gui_resource_pack_specs, write_gui_resource_pack, directory_digest
 
 pack_root = run_dir / "resourcepacks"
 pack_root.mkdir(parents=True, exist_ok=True)
@@ -1053,6 +1060,8 @@ selected = []
 for spec in gui_resource_pack_specs(scenario):
     pack_dir = pack_root / str(spec["name"])
     write_gui_resource_pack(pack_dir, spec)
+    with Path(sys.argv[4]).open("a", encoding="utf-8") as metadata:
+        metadata.write(f"gui_resource_pack_{spec['name']}_sha256={directory_digest(pack_dir)}\n")
     selected.append(f"file/{spec['name']}")
 options = run_dir / "options.txt"
 lines = options.read_text(encoding="utf-8").splitlines() if options.is_file() else []
@@ -1085,6 +1094,11 @@ if [[ "${MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE:-false}" == "true" && -f 
     # enableRendering is the debug-wireframe switch, not the LOD renderer.
     upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" rendererMode '"DISABLED"'
     upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableRendering false
+    # The fixture's vanilla fade setting is part of the composition contract.
+    # Disable DH's independent fade hook as well, otherwise Frozen can still
+    # repaint the vanilla terrain after its renderer is nominally disabled.
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" vanillaFadeMode '"NONE"'
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" lodOnlyMode false
     # DH can retain this option even after rendering is disabled. It changes
     # vanilla settings such as clouds, so an ordinary Frozen OpenGL baseline
     # must turn it off in the copied harness run just as Current does.
@@ -1104,8 +1118,67 @@ if [[ "${MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE:-false}" == "true" && -f 
     upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" lodChunkRenderDistanceRadius 2
     echo "forced_dh_enableRendering=false reason=ordinary-selected-source" >> "$META_LOG"
     echo "forced_dh_rendererMode=DISABLED reason=ordinary-selected-source" >> "$META_LOG"
+    echo "forced_dh_vanillaFadeMode=NONE reason=ordinary-selected-source" >> "$META_LOG"
+    echo "forced_dh_lodOnlyMode=false reason=ordinary-selected-source" >> "$META_LOG"
     echo "forced_dh_overrideVanillaGraphicsSettings=false reason=ordinary-selected-source" >> "$META_LOG"
     echo "forced_dh_enableDistantGeneration=false reason=ordinary-selected-source" >> "$META_LOG"
+fi
+
+# Dedicated DH parity rows may request a bounded no-fog/dither isolation. The
+# Current Rust capture_runner applies these settings to its copied config; the
+# Frozen shell runner must apply the same capture-only inputs or the paired
+# image would compare Rust's private no-fog target against Java's fogged LOD.
+if [[ -f "$RUN_DIR/config/DistantHorizons.toml" ]]; then
+    upsert_toml_value() {
+        local file_path="$1" key="$2" value="$3"
+        sed -i -E "s|^([[:space:]]*)${key}[[:space:]]*=.*|\\1${key} = ${value}|" "$file_path"
+    }
+    if [[ "${MATTMC_CAPTURE_DH_DISABLE_FOG:-false}" == "true" ]]; then
+        upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableDhFog false
+        echo "forced_dh_disable_fog_enableDhFog=false" >> "$META_LOG"
+    fi
+    if [[ "${MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY:-false}" == "true" ]]; then
+        upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" transparency '"DISABLED"'
+        echo 'forced_dh_opaque_transparency="DISABLED"' >> "$META_LOG"
+    fi
+    # Keep the Frozen baseline on the same bounded DH composition inputs as
+    # Current's semantic route.  The OpenGL baseline still owns its Java draw
+    # submission; these values only make the paired fixture's visible LOD
+    # radius, fade policy, and fog contract equivalent.
+    if [[ "${MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY:-false}" == "true" ||
+          "${MATTMC_CAPTURE_DH_RUST_NON_WATER:-false}" == "true" ||
+          "${MATTMC_CAPTURE_DH_RUST_WATER:-false}" == "true" ]]; then
+        dh_pair_radius="${MATTMC_CAPTURE_DH_RADIUS_OVERRIDE:-4}"
+        upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" lodChunkRenderDistanceRadius "$dh_pair_radius"
+        echo "forced_dh_pair_lodChunkRenderDistanceRadius=$dh_pair_radius" >> "$META_LOG"
+        dh_pair_fade="${MATTMC_CAPTURE_DH_VANILLA_FADE_MODE:-NONE}"
+        case "${dh_pair_fade^^}" in
+            NONE|SINGLE_PASS|DOUBLE_PASS)
+                upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" vanillaFadeMode "\"${dh_pair_fade^^}\""
+                echo "forced_dh_pair_vanillaFadeMode=${dh_pair_fade^^}" >> "$META_LOG"
+                ;;
+            *)
+                echo "MATTMC_CAPTURE_DH_VANILLA_FADE_MODE must be NONE, SINGLE_PASS, or DOUBLE_PASS" >&2
+                exit 2
+                ;;
+        esac
+        if [[ "${MATTMC_CAPTURE_DH_KEEP_FOG:-false}" == "true" ]]; then
+            upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableDhFog true
+            echo "forced_dh_pair_enableDhFog=true" >> "$META_LOG"
+        fi
+    fi
+    if [[ -n "${MATTMC_CAPTURE_DH_DITHER:-}" ]]; then
+        case "${MATTMC_CAPTURE_DH_DITHER,,}" in
+            true|false)
+                upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" ditherDhFade "${MATTMC_CAPTURE_DH_DITHER,,}"
+                echo "forced_dh_dither=${MATTMC_CAPTURE_DH_DITHER,,}" >> "$META_LOG"
+                ;;
+            *)
+                echo "MATTMC_CAPTURE_DH_DITHER must be true or false" >&2
+                exit 2
+                ;;
+        esac
+    fi
 fi
 
 {

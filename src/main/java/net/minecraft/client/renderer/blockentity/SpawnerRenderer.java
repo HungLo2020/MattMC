@@ -48,6 +48,7 @@ public class SpawnerRenderer implements BlockEntityRenderer<SpawnerBlockEntity, 
 			submitEntityInSpawner(
 				poseStack, submitNodeCollector, spawnerRenderState.displayEntity, this.entityRenderer, spawnerRenderState.spin, spawnerRenderState.scale, cameraRenderState
 			);
+			net.minecraft.client.dev.DeterministicCameraCapture.observeSpawnerEntityEmission(spawnerRenderState);
 		}
 	}
 

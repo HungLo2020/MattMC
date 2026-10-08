@@ -292,8 +292,15 @@ public final class GraphicsFrameBenchmark {
 		player.setShiftKeyDown(false);
 		player.setDeltaMovement(Vec3.ZERO);
 		player.setPos(initialPosition);
-		double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
-		float yaw = initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * YAW_DELTA;
+		float yaw;
+		if ("moving-camera".equals(cameraPathType())) {
+			// Match Current's linear path after the fixed producer-settling view.
+			long pathFrame = settledFrameIndex < 0L ? 0L : frameIndex - settledFrameIndex;
+			yaw = initialYaw + pathFrame * YAW_DELTA;
+		} else {
+			double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
+			yaw = initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * YAW_DELTA;
+		}
 		player.setYRot(yaw);
 		player.setXRot(initialPitch);
 		player.yRotO = yaw;

@@ -69,7 +69,11 @@ public class ParticleEngine {
 
 	/** Installs one capture fixture while simulation ticks are frozen; never called by gameplay. */
 	void installGraphicsAuditParticle(Particle particle) {
-		if (!GraphicsAuditTerrainParticleFixture.requested() || particle.getParticleLimit().isPresent()) {
+		if ((!GraphicsAuditTerrainParticleFixture.requested() && !GraphicsAuditAtlasParticleFixture.requested()
+			&& !GraphicsAuditBlockMarkerFixture.requested()
+			&& !GraphicsAuditShriekParticleFixture.requested()
+			&& !GraphicsAuditVibrationParticleFixture.requested())
+			|| particle.getParticleLimit().isPresent()) {
 			throw new IllegalStateException("Unrequested or limited graphics audit particle");
 		}
 		this.particles.computeIfAbsent(particle.getGroup(), this::createParticleGroup).add(particle);
@@ -136,12 +140,16 @@ public class ParticleEngine {
 	}
 
 	public void extract(ParticlesRenderState particlesRenderState, Frustum frustum, Camera camera, float f) {
+		net.minecraft.client.dev.GraphicsAuditLavaFixture.beginParticles();
 		for (ParticleRenderType particleRenderType : RENDER_ORDER) {
 			ParticleGroup<?> particleGroup = (ParticleGroup<?>)this.particles.get(particleRenderType);
 			if (particleGroup != null && !particleGroup.isEmpty()) {
+				if (!(particleGroup instanceof QuadParticleGroup) && !(particleGroup instanceof NoRenderParticleGroup))
+					net.minecraft.client.dev.GraphicsAuditLavaFixture.unknownParticleGroup();
 				particlesRenderState.add(particleGroup.extractRenderState(frustum, camera, f));
 			}
 		}
+		net.minecraft.client.dev.GraphicsAuditLavaFixture.endParticles();
 	}
 
 	public void setLevel(@Nullable ClientLevel clientLevel) {

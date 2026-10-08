@@ -83,6 +83,7 @@ public class ShulkerBoxRenderer implements BlockEntityRenderer<ShulkerBoxBlockEn
 			material,
 			0
 		);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeShulkerBoxEmission(shulkerBoxRenderState);
 	}
 
 	public void submit(

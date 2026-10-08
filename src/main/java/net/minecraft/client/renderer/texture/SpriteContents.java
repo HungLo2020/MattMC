@@ -175,11 +175,19 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	}
 
 	private String graphicsAuditUploadedRgbaFnv64;
+	private String graphicsAuditUploadedMipRgbaFnv64 = "[]";
+	public String graphicsAuditUploadedMipRgbaFnv64() { return this.graphicsAuditUploadedMipRgbaFnv64; }
 
 	public String graphicsAuditUploadedRgbaFnv64() { return this.graphicsAuditUploadedRgbaFnv64; }
 
+	static boolean graphicsAuditFrameHashSupported(int width, int height) {
+		// Diagnostic work remains bounded to one selected sprite, at most
+		// 256 KiB at level zero. Includes the ordinary high-resolution lava pack.
+		return width > 0 && height > 0 && width <= 256 && height <= 256;
+	}
+
 	public String graphicsAuditFirstFrameRgbaFnv64() {
-		if (this.animatedTexture == null || this.width > 64 || this.height > 64) return null;
+		if (this.animatedTexture == null || !graphicsAuditFrameHashSupported(this.width, this.height)) return null;
 		int frame = this.animatedTexture.frames.getFirst().index();
 		int x = this.animatedTexture.getFrameX(frame) * this.width;
 		int y = this.animatedTexture.getFrameY(frame) * this.height;
@@ -202,16 +210,22 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		// Capture-only observation of pixels actually supplied to the unchanged
 		// upload above. Never select a frame or perform another GPU operation.
 		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
-			&& this.name.toString().equals("minecraft:block/magma") && this.width <= 64 && this.height <= 64) {
-			long hash = 0xcbf29ce484222325L;
-			long pointer = NativeImageHelper.getPointerRGBA(nativeImages[0]);
-			for (int y = 0; y < this.height; y++) {
-				long row = pointer + ((long)(l + y) * nativeImages[0].getWidth() + k) * 4;
-				for (int x = 0; x < this.width * 4; x++) {
-					hash = (hash ^ (org.lwjgl.system.MemoryUtil.memGetByte(row + x) & 255L)) * 0x100000001b3L;
+			&& net.minecraft.client.dev.GraphicsAuditBlockDisplayFixture.observesSprite(this.name)
+			&& graphicsAuditFrameHashSupported(this.width, this.height)) {
+			var hashes = new java.util.ArrayList<String>(this.byMipLevel.length);
+			for (int mip = 0; mip < this.byMipLevel.length; mip++) {
+				long hash = 0xcbf29ce484222325L;
+				long pointer = NativeImageHelper.getPointerRGBA(nativeImages[mip]);
+				for (int y = 0; y < (this.height >> mip); y++) {
+					long row = pointer + ((long)((l >> mip) + y) * nativeImages[mip].getWidth() + (k >> mip)) * 4;
+					for (int x = 0; x < (this.width >> mip) * 4; x++) {
+						hash = (hash ^ (org.lwjgl.system.MemoryUtil.memGetByte(row + x) & 255L)) * 0x100000001b3L;
+					}
 				}
+				hashes.add(String.format(java.util.Locale.ROOT, "%016x", hash));
 			}
-			this.graphicsAuditUploadedRgbaFnv64 = String.format(java.util.Locale.ROOT, "%016x", hash);
+			this.graphicsAuditUploadedRgbaFnv64 = hashes.getFirst();
+			this.graphicsAuditUploadedMipRgbaFnv64 = "[\"" + String.join("\",\"", hashes) + "\"]";
 		}
 	}
 

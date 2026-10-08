@@ -19,6 +19,9 @@ public class TerrainParticle extends SingleQuadParticle {
 	private final float vo;
 	// Iris: Track whether particle is opaque (from MixinTerrainParticle)
 	private boolean isOpaque;
+	// Diagnostic observation only; never used to choose a renderer or pipeline.
+	private boolean graphicsAuditAlphaTested;
+	boolean graphicsAuditAlphaTested() { return this.graphicsAuditAlphaTested; }
 
 	public TerrainParticle(ClientLevel clientLevel, double d, double e, double f, double g, double h, double i, BlockState blockState) {
 		this(clientLevel, d, e, f, g, h, i, blockState, BlockPos.containing(d, e, f));
@@ -45,6 +48,8 @@ public class TerrainParticle extends SingleQuadParticle {
 		
 		// Iris: Resolve translucency (from MixinTerrainParticle)
 		net.minecraft.client.renderer.chunk.ChunkSectionLayer type = net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState);
+		this.graphicsAuditAlphaTested = type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT
+			|| type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED;
 		if (type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID || 
 		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT || 
 		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED) {

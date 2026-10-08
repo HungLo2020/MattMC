@@ -137,6 +137,7 @@ public class ChestRenderer<T extends BlockEntity & LidBlockEntity> implements Bl
 		}
 
 		poseStack.popPose();
+		net.minecraft.client.dev.DeterministicCameraCapture.observeChestEmission(chestRenderState);
 	}
 
 	private ChestRenderState.ChestMaterialType getChestMaterial(BlockEntity blockEntity, boolean bl) {

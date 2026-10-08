@@ -519,7 +519,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			String name = entry.getKey();
 			Uniform uniform = entry.getValue();
 			if (uniform instanceof Uniform.Utb(int location, int samplerIndex, TextureFormat format, int textureId)) {
-				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(samplerIndex);
+				VulkanicAPI.setActiveTextureUnitIndex(ctx, samplerIndex);
 				VulkanicAPI.bindTextureBuffer(ctx, textureId);
 
 				GpuBufferSlice slice = glRenderPass.uniforms.get(name);
@@ -1534,6 +1534,8 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	protected void executeDraw(GlRenderPass glRenderPass, int i, int j, int k, @Nullable VertexFormat.IndexType indexType, int l) {
 		if (this.trySetup(glRenderPass, Collections.emptyList())) {
+			observeTransparencySamplers(glRenderPass);
+			observeCloudProgram(glRenderPass);
 			if (GlRenderPass.VALIDATION) {
 				if (indexType != null) {
 					if (glRenderPass.indexBuffer == null) {
@@ -1564,6 +1566,113 @@ public class GlCommandEncoder implements CommandEncoder {
 			}
 
 			this.drawFromBuffers(glRenderPass, i, j, k, indexType, glRenderPass.pipeline, l);
+		}
+	}
+
+	private static int transparencySamplerObservations;
+	private static int cloudProgramObservations;
+
+	private void observeCloudProgram(GlRenderPass pass) {
+		if (!Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.transparencySamplers")
+			|| !Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
+			|| !commandContext().isImmediate() || pass.pipeline == null
+			|| !pass.pipeline.info().getLocation().getPath().equals("pipeline/clouds")
+			|| cloudProgramObservations >= 3) return;
+		int observation = ++cloudProgramObservations;
+		int actual = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL20.GL_CURRENT_PROGRAM);
+		int activeTexture = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE);
+		LOGGER.info("FrozenCloudActiveUnit observation={} actualUnit={} cachedIrisUnit={} boundBufferTexture={}", observation,
+			activeTexture - org.lwjgl.opengl.GL13.GL_TEXTURE0,
+			net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex(),
+			org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL31.GL_TEXTURE_BINDING_BUFFER));
+		try {
+			for (var entry : pass.pipeline.program().getUniforms().entrySet()) {
+				if (entry.getValue() instanceof Uniform.Utb(int location, int expectedUnit, TextureFormat format, int expectedTexture)) {
+					int actualUnit = org.lwjgl.opengl.GL20.glGetUniformi(actual, location);
+					org.lwjgl.opengl.GL13.glActiveTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0 + actualUnit);
+					int actualTexture = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL31.GL_TEXTURE_BINDING_BUFFER);
+					org.lwjgl.opengl.GL13.glActiveTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0 + expectedUnit);
+					int expectedUnitTexture = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL31.GL_TEXTURE_BINDING_BUFFER);
+					LOGGER.info("FrozenCloudBuffer observation={} name={} expectedUnit={} actualUnit={} expectedTexture={} actualTexture={} expectedUnitTexture={} activeTexture={}",
+						observation, entry.getKey(), expectedUnit, actualUnit, expectedTexture, actualTexture, expectedUnitTexture, activeTexture);
+				}
+			}
+		} finally {
+			org.lwjgl.opengl.GL13.glActiveTexture(activeTexture);
+		}
+		LOGGER.info("FrozenCloudProgram observation={} expected={} actual={} blend={} srcRgb={} dstRgb={} srcAlpha={} dstAlpha={}",
+			observation, pass.pipeline.program().getProgramId(), actual,
+			org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_BLEND),
+			org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL14.GL_BLEND_SRC_RGB),
+			org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL14.GL_BLEND_DST_RGB),
+			org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL14.GL_BLEND_SRC_ALPHA),
+			org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL14.GL_BLEND_DST_ALPHA));
+		if (observation == 1) {
+			int count = org.lwjgl.opengl.GL20.glGetProgrami(actual, org.lwjgl.opengl.GL20.GL_ATTACHED_SHADERS);
+			var shaders = org.lwjgl.BufferUtils.createIntBuffer(count);
+			org.lwjgl.opengl.GL20.glGetAttachedShaders(actual, null, shaders);
+			for (int n = 0; n < count; n++) {
+				String source = org.lwjgl.opengl.GL20.glGetShaderSource(shaders.get(n));
+				LOGGER.info("FrozenCloudShader program={} shader={} source={}", actual, shaders.get(n), source);
+			}
+		}
+	}
+
+	/** Opt-in read-only driver-state audit. Raw active-unit changes are restored;
+	 * no texture binding, uniform, draw state, or backend cache is changed. */
+	private void observeTransparencySamplers(GlRenderPass pass) {
+		if (!Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.transparencySamplers")
+			|| !Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
+			|| !commandContext().isImmediate() || pass.pipeline == null
+			|| !pass.pipeline.info().getLocation().getPath().contains("transparency")
+			|| transparencySamplerObservations >= 12) return;
+		int observation = ++transparencySamplerObservations;
+		int program = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL20.GL_CURRENT_PROGRAM);
+		int active = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE);
+		try {
+			for (var entry : pass.samplers.entrySet()) {
+				int location = org.lwjgl.opengl.GL20.glGetUniformLocation(program, entry.getKey());
+				if (location < 0) continue;
+				int unit = org.lwjgl.opengl.GL20.glGetUniformi(program, location);
+				org.lwjgl.opengl.GL13.glActiveTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0 + unit);
+				int actual = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL11.GL_TEXTURE_BINDING_2D);
+				LOGGER.info("FrozenTransparencySampler observation={} pipeline={} program={} sampler={} unit={} expected={} actual={} label={}",
+					observation, pass.pipeline.info().getLocation(), program, entry.getKey(), unit,
+					VulkanicCoreAPI.textureId(entry.getValue().texture()), actual, entry.getValue().texture().getLabel());
+				observeTransparencyInputPixel(observation, entry.getKey(), entry.getValue());
+			}
+		} finally {
+			org.lwjgl.opengl.GL13.glActiveTexture(active);
+		}
+	}
+
+	private static void observeTransparencyInputPixel(int observation, String sampler, GpuTextureView view) {
+		if (org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER_BINDING) != 0
+			|| org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL11.GL_PACK_SKIP_PIXELS) != 0
+			|| org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL11.GL_PACK_SKIP_ROWS) != 0
+			|| org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL12.GL_PACK_SKIP_IMAGES) != 0) return;
+		int previous = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER_BINDING);
+		int previousBuffer = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL11.GL_READ_BUFFER);
+		int framebuffer = org.lwjgl.opengl.GL30.glGenFramebuffers();
+		boolean depth = sampler.contains("Depth");
+		try {
+			org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, framebuffer);
+			org.lwjgl.opengl.GL30.glFramebufferTexture2D(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER,
+				depth ? org.lwjgl.opengl.GL30.GL_DEPTH_ATTACHMENT : org.lwjgl.opengl.GL30.GL_COLOR_ATTACHMENT0,
+				org.lwjgl.opengl.GL11.GL_TEXTURE_2D, VulkanicCoreAPI.textureId(view.texture()), view.baseMipLevel());
+			org.lwjgl.opengl.GL11.glReadBuffer(depth ? org.lwjgl.opengl.GL11.GL_NONE : org.lwjgl.opengl.GL30.GL_COLOR_ATTACHMENT0);
+			if (org.lwjgl.opengl.GL30.glCheckFramebufferStatus(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER)
+				!= org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_COMPLETE) return;
+			var pixel = org.lwjgl.BufferUtils.createFloatBuffer(4);
+			org.lwjgl.opengl.GL11.glReadPixels(view.getWidth(0) / 2, view.getHeight(0) / 2 - 1, 1, 1,
+				depth ? org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT : org.lwjgl.opengl.GL11.GL_RGBA,
+				org.lwjgl.opengl.GL11.GL_FLOAT, pixel);
+			LOGGER.info("FrozenTransparencyInput observation={} sampler={} center=({},{},{},{})",
+				observation, sampler, pixel.get(0), pixel.get(1), pixel.get(2), pixel.get(3));
+		} finally {
+			org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, previous);
+			org.lwjgl.opengl.GL11.glReadBuffer(previousBuffer);
+			org.lwjgl.opengl.GL30.glDeleteFramebuffers(framebuffer);
 		}
 	}
 
@@ -2132,7 +2241,9 @@ public class GlCommandEncoder implements CommandEncoder {
 					if (!immediateSeamHasCompleteCoverage && (bl || bl2)) {
 						VulkanicAPI.setUniform1i(ctx, var41, var42);
 					}
-					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var42);
+					// Resource submission can change the backend unit independently of
+					// Iris's cache. Select the unit explicitly before the texel binding.
+					VulkanicAPI.setActiveTextureUnitIndex(ctx, var42);
 					VulkanicAPI.bindTextureBuffer(ctx, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
@@ -2166,6 +2277,10 @@ public class GlCommandEncoder implements CommandEncoder {
 					VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView2x.baseMipLevel());
 					VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
 					texture.flushModeChanges(textureTarget);
+					if (ctx.isImmediate() && renderPipeline.getLocation().getPath().equals("pipeline/glint")) {
+						String foilSampling = net.vulkanic.backends.opengl.OpenGLBackend.describeGuiFoilSamplingForAudit(texture, var46);
+						if (foilSampling != null) LOGGER.info("gui.leaf.sampling {}", foilSampling);
+					}
 					break;
 				default:
 					throw new MatchException(null, null);

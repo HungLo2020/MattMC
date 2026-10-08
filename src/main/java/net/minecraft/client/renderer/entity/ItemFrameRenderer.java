@@ -87,14 +87,12 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 				OverlayTexture.NO_OVERLAY,
 				itemFrameRenderState.outlineColor
 			);
+			net.minecraft.client.dev.DeterministicCameraCapture.observeItemFrameBackingEmission(itemFrameRenderState);
 			poseStack.popPose();
 		}
 
-		if (itemFrameRenderState.isInvisible) {
-			poseStack.translate(0.0F, 0.0F, 0.5F);
-		} else {
-			poseStack.translate(0.0F, 0.0F, 0.4375F);
-		}
+		float contentOffset = itemFrameRenderState.isInvisible ? 0.5F : 0.4375F;
+		poseStack.translate(0.0F, 0.0F, contentOffset);
 
 		if (itemFrameRenderState.mapId != null) {
 			int i = itemFrameRenderState.rotation % 4 * 2;
@@ -106,11 +104,13 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			poseStack.translate(0.0F, 0.0F, -1.0F);
 			int j = this.getLightCoords(itemFrameRenderState.isGlowFrame, 15728850, itemFrameRenderState.lightCoords);
 			this.mapRenderer.render(itemFrameRenderState.mapRenderState, poseStack, submitNodeCollector, true, j);
+			net.minecraft.client.dev.DeterministicCameraCapture.observeItemFrameMapEmission(itemFrameRenderState, j, contentOffset);
 		} else if (!itemFrameRenderState.item.isEmpty()) {
 			poseStack.mulPose(Axis.ZP.rotationDegrees(itemFrameRenderState.rotation * 360.0F / 8.0F));
 			int i = this.getLightCoords(itemFrameRenderState.isGlowFrame, 15728880, itemFrameRenderState.lightCoords);
 			poseStack.scale(0.5F, 0.5F, 0.5F);
 			itemFrameRenderState.item.submit(poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, itemFrameRenderState.outlineColor);
+			net.minecraft.client.dev.DeterministicCameraCapture.observeItemFrameItemEmission(itemFrameRenderState, i, contentOffset);
 		}
 
 		poseStack.popPose();

@@ -104,8 +104,11 @@ public class ModelFeatureRenderer {
 		Model<? super S> model = modelSubmit.model();
 		VertexConsumer vertexConsumer2 = modelSubmit.sprite() == null ? vertexConsumer : modelSubmit.sprite().wrap(vertexConsumer);
 		model.setupAnim(modelSubmit.state());
+		net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observe(model, modelSubmit.state(), renderType,
+			modelSubmit.tintedColor(), modelSubmit.lightCoords(), modelSubmit.overlayCoords(), this.poseStack.last());
 		model.renderToBuffer(this.poseStack, vertexConsumer2, modelSubmit.lightCoords(), modelSubmit.overlayCoords(), modelSubmit.tintedColor());
-		net.minecraft.client.dev.DeterministicCameraCapture.observeModelEmission(model, modelSubmit.state());
+		net.minecraft.client.dev.DeterministicCameraCapture.observeModelEmission(model, modelSubmit.state(), renderType);
+		net.minecraft.client.dev.GraphicsAuditCowOutlineFixture.observeModel(model, modelSubmit.state(), modelSubmit.pose().pose());
 		if (modelSubmit.outlineColor() != 0 && (renderType.outline().isPresent() || renderType.isOutline())) {
 			outlineBufferSource.setColor(modelSubmit.outlineColor());
 			VertexConsumer vertexConsumer3 = outlineBufferSource.getBuffer(renderType);

@@ -47,6 +47,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		((QuadParticleRenderState.Storage)this.particles.computeIfAbsent(layer, layerx -> new QuadParticleRenderState.Storage()))
 			.add(f, g, h, i, j, k, l, m, n, o, p, q, r, s);
 		this.particleCount++;
+		net.minecraft.client.dev.GraphicsAuditLavaFixture.observeParticle(f, g, h, i, j, k, l, m, r);
 	}
 
 	@Override

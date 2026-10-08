@@ -78,6 +78,8 @@ public abstract class AbstractSignRenderer implements BlockEntityRenderer<SignBl
 		this.submitSign(poseStack, signRenderState.lightCoords, woodType, simple, crumblingOverlay, submitNodeCollector);
 		this.submitSignText(signRenderState, poseStack, submitNodeCollector, true);
 		this.submitSignText(signRenderState, poseStack, submitNodeCollector, false);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeOakSignEmission(signRenderState, woodType);
+		net.minecraft.client.dev.DeterministicCameraCapture.observeHangingSignEmission(signRenderState, woodType);
 		poseStack.popPose();
 	}
 

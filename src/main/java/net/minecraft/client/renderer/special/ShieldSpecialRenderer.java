@@ -92,6 +92,31 @@ public class ShieldSpecialRenderer implements SpecialModelRenderer<DataComponent
 		this.model.root().getExtentsForGui(poseStack, set);
 	}
 
+	@Override
+	public boolean isAnimated(@Nullable DataComponentMap components) {
+		BannerPatternLayers patterns = components != null
+			? components.getOrDefault(DataComponents.BANNER_PATTERNS, BannerPatternLayers.EMPTY)
+			: BannerPatternLayers.EMPTY;
+		boolean patterned = !patterns.layers().isEmpty()
+			|| components != null && components.get(DataComponents.BASE_COLOR) != null;
+		if (this.materials.get(patterned ? ModelBakery.SHIELD_BASE : ModelBakery.NO_PATTERN_SHIELD).contents().isAnimated()) {
+			return true;
+		}
+		if (patterned) {
+			if (this.materials.get(net.minecraft.client.renderer.Sheets.SHIELD_BASE).contents().isAnimated()) {
+				return true;
+			}
+			// Match the renderer's layer limit; unused pack sprites must not invalidate the icon.
+			for (int index = 0; index < Math.min(16, patterns.layers().size()); index++) {
+				if (this.materials.get(net.minecraft.client.renderer.Sheets.getShieldMaterial(
+					patterns.layers().get(index).pattern())).contents().isAnimated()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	@Environment(EnvType.CLIENT)
 	public record Unbaked() implements SpecialModelRenderer.Unbaked {
 		public static final ShieldSpecialRenderer.Unbaked INSTANCE = new ShieldSpecialRenderer.Unbaked();

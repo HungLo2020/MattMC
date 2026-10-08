@@ -57,5 +57,6 @@ public class VaultRenderer implements BlockEntityRenderer<VaultBlockEntity, Vaul
 			ItemEntityRenderer.renderMultipleFromCount(poseStack, submitNodeCollector, vaultRenderState.lightCoords, vaultRenderState.displayItem, this.random);
 			poseStack.popPose();
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.observeVaultItemEmission(vaultRenderState);
 	}
 }

@@ -10,6 +10,7 @@ import net.minecraft.client.model.BannerModel;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -116,6 +117,7 @@ public class BannerRenderer implements BlockEntityRenderer<BannerBlockEntity, Ba
 			bannerRenderState.breakProgress,
 			0
 		);
+		DeterministicCameraCapture.observeBannerEmission(bannerRenderState);
 	}
 
 	public void submitSpecial(

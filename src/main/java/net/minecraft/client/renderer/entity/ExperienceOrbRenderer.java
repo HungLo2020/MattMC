@@ -32,6 +32,7 @@ public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, Experie
 	public void submit(
 		ExperienceOrbRenderState experienceOrbRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
 	) {
+		net.minecraft.client.dev.GraphicsAuditExperienceOrbFixture.observeSubmit(experienceOrbRenderState, poseStack.last().pose());
 		poseStack.pushPose();
 		int i = experienceOrbRenderState.icon;
 		float f = (i % 4 * 16 + 0) / 64.0F;
@@ -51,6 +52,7 @@ public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, Experie
 		float s = 0.3F;
 		poseStack.scale(0.3F, 0.3F, 0.3F);
 		submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
+			net.minecraft.client.dev.GraphicsAuditExperienceOrbFixture.observeCallback(experienceOrbRenderState, pose.pose());
 			vertex(vertexConsumer, pose, -0.5F, -0.25F, p, 255, r, f, j, experienceOrbRenderState.lightCoords);
 			vertex(vertexConsumer, pose, 0.5F, -0.25F, p, 255, r, g, j, experienceOrbRenderState.lightCoords);
 			vertex(vertexConsumer, pose, 0.5F, 0.75F, p, 255, r, g, h, experienceOrbRenderState.lightCoords);
@@ -76,5 +78,6 @@ public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, Experie
 	public void extractRenderState(ExperienceOrb experienceOrb, ExperienceOrbRenderState experienceOrbRenderState, float f) {
 		super.extractRenderState(experienceOrb, experienceOrbRenderState, f);
 		experienceOrbRenderState.icon = experienceOrb.getIcon();
+		net.minecraft.client.dev.GraphicsAuditExperienceOrbFixture.configureRenderState(experienceOrb, experienceOrbRenderState);
 	}
 }

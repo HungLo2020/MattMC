@@ -91,6 +91,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		this.scale(livingEntityRenderState, poseStack);
 		poseStack.translate(0.0F, -1.501F, 0.0F);
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.observeEntityTransform(livingEntityRenderState, poseStack.last());
+        net.minecraft.client.dev.GraphicsAuditWolfInputs.observeTransform(livingEntityRenderState, poseStack.last());
 		boolean bl = this.isBodyVisible(livingEntityRenderState);
 		boolean bl2 = !bl && !livingEntityRenderState.isInvisibleToPlayer;
 		RenderType renderType = this.getRenderType(livingEntityRenderState, bl, bl2, livingEntityRenderState.appearsGlowing());

@@ -58,6 +58,8 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
 	@SuppressWarnings("null")
     @Override // the shader interface should not modify pipeline state
     public void setupState(TerrainRenderPass pass, FogParameters parameters) {
+        net.vulkanic.backends.opengl.GraphicsAuditFrozenTerrainUv.beforePass(
+            pass == net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses.SOLID);
         this.bindTexture(ChunkShaderTextureSlot.BLOCK, pass.getAtlas());
         this.bindTexture(ChunkShaderTextureSlot.LIGHT, Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 
@@ -75,6 +77,9 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
         );
 
         this.fogShader.setup(parameters);
+        net.minecraft.client.dev.GraphicsAuditTerrainInputs.shrink(
+                (float) (subTexelOffset - (((1.0D / textureAtlas.width) / subTexelPrecision))),
+                (float) (subTexelOffset - (((1.0D / textureAtlas.height) / subTexelPrecision))));
     }
 
     @SuppressWarnings("null")
@@ -106,11 +111,13 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
     @Override
     public void setProjectionMatrix(Matrix4fc matrix) {
         this.uniformProjectionMatrix.set(matrix);
+        net.minecraft.client.dev.GraphicsAuditTerrainInputs.matrix("projection", matrix);
     }
 
     @Override
     public void setModelViewMatrix(Matrix4fc matrix) {
         this.uniformModelViewMatrix.set(matrix);
+        net.minecraft.client.dev.GraphicsAuditTerrainInputs.matrix("view", matrix);
     }
 
     @Override

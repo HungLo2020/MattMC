@@ -47,6 +47,10 @@ import java.util.function.BiFunction;
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
+    /** Optional readback diagnostics use the same backend-only extraction seam. */
+    static int diagnosticTextureName(net.blaze3d.opengl.GlTexture texture) {
+        return texture.getGlHandle();
+    }
 
     private static final int TEXTURE_UNIT_COUNT = 128;
     private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
@@ -247,7 +251,66 @@ public class OpenGLBackend implements GraphicsBackend {
                 "GlDevice has not been registered with OpenGLBackend. "
                     + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
         }
-        return device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+        GpuTexture texture = device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+        if ("UI items atlas depth".equals(label)) {
+            String diagnostic = describeGuiDepthForAudit(texture);
+            if (diagnostic != null) net.logging.LogUtils.getLogger().info("gui.item.depth-format {}", diagnostic);
+        }
+        return texture;
+    }
+
+    /** Opt-in reference query: no binding changes, writes, or runtime handle export. */
+    public static String describeGuiDepthForAudit(GpuTexture texture) {
+        if (!Boolean.getBoolean("mattmc.dev.guiItemRasterTrace")) return null;
+        if (!(texture instanceof net.blaze3d.opengl.GlTexture gl)) return "status=not-opengl";
+        if (!org.lwjgl.opengl.GL.getCapabilities().OpenGL45
+            && !org.lwjgl.opengl.GL.getCapabilities().GL_ARB_direct_state_access) return "status=direct-query-unavailable";
+        int id = gl.getGlHandle();
+        return "status=observed internalFormat="
+            + org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureLevelParameteri(id, 0, GL11.GL_TEXTURE_INTERNAL_FORMAT)
+            + " depthBits=" + org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureLevelParameteri(id, 0, org.lwjgl.opengl.GL14.GL_TEXTURE_DEPTH_SIZE)
+            + " depthType=" + org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureLevelParameteri(id, 0, org.lwjgl.opengl.GL30.GL_TEXTURE_DEPTH_TYPE);
+    }
+
+    private static int guiFoilSamplingObservations;
+
+    /** Read-only, bounded reference diagnostic. No names/handles leave this backend. */
+    public static String describeGuiFoilSamplingForAudit(GpuTexture texture, int unit) {
+        if (!Boolean.getBoolean("mattmc.dev.guiLeafSamplingTrace")) return null;
+        int[] item = net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.activeItemForDiagnostics();
+        if (item == null || item[0] != 292 || item[1] != 341 || guiFoilSamplingObservations >= 16) return null;
+        if (!(texture instanceof net.blaze3d.opengl.GlTexture gl)) return "status=not-opengl";
+        // The caller identifies the glint pipeline. Legacy texture wrappers
+        // may replace the resource label; never infer identity from that label.
+        if (texture.getWidth(0) != 16 || texture.getHeight(0) != 16) return null;
+        var caps = GL.getCapabilities();
+        if (!caps.OpenGL45 && !caps.GL_ARB_direct_state_access) return "status=direct-query-unavailable";
+        int id = gl.getGlHandle();
+        int sampler = GL30.glGetIntegeri(GL33.GL_SAMPLER_BINDING, unit);
+        java.util.function.IntUnaryOperator parameter = name -> sampler == 0
+            ? ARBDirectStateAccess.glGetTextureParameteri(id, name) : GL33.glGetSamplerParameteri(sampler, name);
+        java.util.function.IntToDoubleFunction floatingParameter = name -> sampler == 0
+            ? ARBDirectStateAccess.glGetTextureParameterf(id, name) : GL33.glGetSamplerParameterf(sampler, name);
+        float[] textureMatrix = new float[16];
+        float[] modelView = new float[16];
+        VulkanicAPI.getTextureMatrix().get(textureMatrix);
+        VulkanicAPI.getModelViewMatrix().get(modelView);
+        guiFoilSamplingObservations++;
+        return "status=observed item=292,341 samplerBound=" + (sampler != 0)
+            + " min=" + parameter.applyAsInt(GL11.GL_TEXTURE_MIN_FILTER)
+            + " mag=" + parameter.applyAsInt(GL11.GL_TEXTURE_MAG_FILTER)
+            + " wrapS=" + parameter.applyAsInt(GL11.GL_TEXTURE_WRAP_S)
+            + " wrapT=" + parameter.applyAsInt(GL11.GL_TEXTURE_WRAP_T)
+            + " minLod=" + floatingParameter.applyAsDouble(GL12.GL_TEXTURE_MIN_LOD)
+            + " maxLod=" + floatingParameter.applyAsDouble(GL12.GL_TEXTURE_MAX_LOD)
+            + " lodBias=" + floatingParameter.applyAsDouble(GL14.GL_TEXTURE_LOD_BIAS)
+            + " anisotropy=" + (caps.GL_EXT_texture_filter_anisotropic
+                ? floatingParameter.applyAsDouble(EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT) : 1.0)
+            + " baseMip=" + ARBDirectStateAccess.glGetTextureParameteri(id, GL12.GL_TEXTURE_BASE_LEVEL)
+            + " maxMip=" + ARBDirectStateAccess.glGetTextureParameteri(id, GL12.GL_TEXTURE_MAX_LEVEL)
+            + " internalFormat=" + ARBDirectStateAccess.glGetTextureLevelParameteri(id, 0, GL11.GL_TEXTURE_INTERNAL_FORMAT)
+            + " textureMatrix=" + java.util.Arrays.toString(textureMatrix)
+            + " modelView=" + java.util.Arrays.toString(modelView);
     }
 
     @Override
@@ -1221,6 +1284,12 @@ public class OpenGLBackend implements GraphicsBackend {
                 GL11.GL_COLOR_BUFFER_BIT,
                 GL11.GL_NEAREST
             );
+            // Opt-in read-only parity observation, after the ordinary blit.
+            // The diagnostic restores READ_FRAMEBUFFER/READ_BUFFER and never
+            // changes this present operation or its DRAW_FRAMEBUFFER state.
+            if (Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.itemBackgroundPixels")) {
+                net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("window-after-blit");
+            }
         } finally {
             GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
             GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);

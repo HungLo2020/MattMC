@@ -277,6 +277,24 @@ public class SodiumWorldRenderer {
         
         this.renderSectionManager.finalizeRenderLists(viewport);
 
+        // Iris may own the later terrain draw pass and cancel Sodium's normal
+        // draw callback. Keep the parity readiness observation attached to the
+        // finalized, renderer-neutral visible list as well, so shader-enabled
+        // Frozen captures can prove a settled terrain domain without changing
+        // the OpenGL draw route or retaining renderer state.
+        if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            StaticTerrainParityDiagnostics.recordVisibleLists(
+                    "java-opengl-setup",
+                    "solid",
+                    this.renderSectionManager.getRenderLists(),
+                    pos.x,
+                    pos.y,
+                    pos.z,
+                    this.client.getWindow().getWidth(),
+                    this.client.getWindow().getHeight()
+            );
+        }
+
         profiler.popPush("chunk_render_tick");
 
         this.renderSectionManager.tickVisibleRenders();

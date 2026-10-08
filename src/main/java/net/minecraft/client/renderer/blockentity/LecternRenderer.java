@@ -53,7 +53,7 @@ public class LecternRenderer implements BlockEntityRenderer<LecternBlockEntity, 
 			poseStack.mulPose(Axis.YP.rotationDegrees(-lecternRenderState.yRot));
 			poseStack.mulPose(Axis.ZP.rotationDegrees(67.5F));
 			poseStack.translate(0.0F, -0.125F, 0.0F);
-			submitNodeCollector.submitModel(
+				submitNodeCollector.submitModel(
 				this.bookModel,
 				this.bookState,
 				poseStack,
@@ -63,9 +63,10 @@ public class LecternRenderer implements BlockEntityRenderer<LecternBlockEntity, 
 				-1,
 				this.materials.get(EnchantTableRenderer.BOOK_LOCATION),
 				0,
-				lecternRenderState.breakProgress
-			);
-			poseStack.popPose();
+					lecternRenderState.breakProgress
+				);
+				net.minecraft.client.dev.DeterministicCameraCapture.observeLecternBookEmission(lecternRenderState, this.bookState);
+				poseStack.popPose();
 		}
 	}
 }

@@ -70,6 +70,7 @@ public class CopperGolemStatueBlockRenderer implements BlockEntityRenderer<Coppe
 				0,
 				copperGolemStatueRenderState.breakProgress
 			);
+			net.minecraft.client.dev.DeterministicCameraCapture.observeCopperGolemStatueEmission(copperGolemStatueRenderState);
 			poseStack.popPose();
 		}
 	}

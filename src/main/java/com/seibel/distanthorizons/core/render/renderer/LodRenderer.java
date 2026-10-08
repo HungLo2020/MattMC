@@ -129,6 +129,7 @@ public class LodRenderer
 	
 	private void renderLodPass(RenderParams renderParams, IProfilerWrapper profiler, boolean runningDeferredPass)
 	{
+		net.minecraft.client.dev.GraphicsAuditDhFade.recordLodRenderPassAttempt();
 		//====================//
 		// validate rendering //
 		//====================//
@@ -144,6 +145,7 @@ public class LodRenderer
 		// RenderParams parameter validation should be done before this
 		if (!renderParams.validationRun)
 		{
+			net.minecraft.client.dev.GraphicsAuditDhFade.recordLodRenderPassValidationFailure();
 			throw new IllegalArgumentException("Render parameters validation");
 		}
 		
@@ -165,6 +167,7 @@ public class LodRenderer
 			boolean setupSuccess = this.createRenderObjects();
 			if (!setupSuccess)
 			{
+				net.minecraft.client.dev.GraphicsAuditDhFade.recordLodRenderObjectSetupFailure();
 				// shouldn't normally happen, but just in case
 				return;
 			}
@@ -664,6 +667,7 @@ public class LodRenderer
 
 		if (!this.isCurrentDrawFramebufferComplete(ctx, opaquePass))
 		{
+			net.minecraft.client.dev.GraphicsAuditDhFade.recordLodFramebufferIncomplete();
 			renderPlan.cleanupState().applyIfPresent(ctx);
 			if (renderWireframe)
 			{
@@ -675,6 +679,9 @@ public class LodRenderer
 		
 		
 		SortedArraySet<LodBufferContainer> lodBufferContainers = lodBufferHandler.getColumnRenderBuffers();
+		net.minecraft.client.dev.GraphicsAuditDhFade.recordLodPass(
+			opaquePass,
+			lodBufferContainers == null ? 0 : lodBufferContainers.size());
 		if (lodBufferContainers != null)
 		{
 			try

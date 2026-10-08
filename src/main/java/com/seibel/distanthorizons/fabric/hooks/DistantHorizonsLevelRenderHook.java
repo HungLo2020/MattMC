@@ -41,6 +41,7 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforePrepareChunkRenders(Matrix4fc modelViewMatrix, double camX, double camY, double camZ) {
+        net.minecraft.client.dev.GraphicsAuditDhFade.recordLevelHook();
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
         
         LevelRenderer levelRenderer = Minecraft.getInstance().levelRenderer;
@@ -61,7 +62,9 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
 	        try {
 	            net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.lod-render");
-	            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(DHCompatInternal.shouldUseShaderOverrides());
+	            boolean deferTransparentRendering = DHCompatInternal.shouldUseShaderOverrides();
+	            net.minecraft.client.dev.GraphicsAuditDhFade.recordDeferTransparent(deferTransparentRendering);
+	            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(deferTransparentRendering);
 	            ClientApi.INSTANCE.renderLods();
 	        } catch (Exception ex) {
             LOGGER.error("[DH-RENDER-HOOK] renderLods() failed: " + ex.getMessage(), ex);

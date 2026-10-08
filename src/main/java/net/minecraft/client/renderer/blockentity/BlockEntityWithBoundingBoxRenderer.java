@@ -128,6 +128,10 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 						)
 					);
 					this.submitInvisibleBlocks(blockEntityWithBoundingBoxRenderState, blockPos, vec3i, submitNodeCollector, poseStack);
+					if (blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.STRUCTURE_BLOCK)) {
+						net.minecraft.client.dev.DeterministicCameraCapture.observeStructureBlockBoxEmission(
+							blockEntityWithBoundingBoxRenderState);
+					}
 				}
 			}
 		}

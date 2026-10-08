@@ -48,6 +48,9 @@ public class BakedModelEncoder {
 
                 // The packed transformed normal vector
                 int normal = MatrixHelper.transformNormal(matNormal, matrices.trustedNormals, quad.getAccurateNormal(i));
+                net.minecraft.client.dev.GraphicsAuditGuiLeafVertices.recordNormal(quad, i,
+                    (byte)normal / 127.0F, (byte)(normal >>> 8) / 127.0F,
+                    (byte)(normal >>> 16) / 127.0F, "baked-encoder-after-pack");
 
                 // The transformed position vector
                 float xt = MatrixHelper.transformPositionX(matPosition, x, y, z);

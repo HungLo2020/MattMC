@@ -15,5 +15,7 @@ public abstract class AbstractZombieModel<S extends ZombieRenderState> extends H
 		super.setupAnim(zombieRenderState);
 		float f = zombieRenderState.attackTime;
 		AnimationUtils.animateZombieArms(this.leftArm, this.rightArm, zombieRenderState.isAggressive, f, zombieRenderState.ageInTicks);
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.observeZombieModelPose(
+			zombieRenderState.ageInTicks, f, zombieRenderState.isAggressive, this);
 	}
 }
