@@ -333,14 +333,29 @@ indices (the bridge's sorted-index list is always empty). Atlas recovery replays
 order; rejected uploads must not advance animation clocks or lose pending work.
 
 DH asset preflight runs after the real quadtree selects visible generations.
-Keep those selected assets resident through submission and presentation. The CPU
-collector excludes their keys from replacement updates while the pending visible
-list exists; the coordinator flushes again after presentation. Unrelated columns
-still use the bounded publication budget, and repeated rebuilds retain only the
-latest pending snapshot. Changing a generation on old segment indices is unsafe:
-a replacement can change opaque, transparent and water stream topology. See
+Keep those selected assets resident through submission and presentation. The DH
+column ledger excludes their keys from replacement updates while the pending
+visible list exists; the coordinator flushes again after presentation. Unrelated
+columns still use the bounded publication budget, and repeated rebuilds retain
+only the latest pending snapshot. Changing a generation on old segment indices
+is unsafe: a replacement can change opaque, transparent and water stream
+topology.
+
+The ledger
+([`render/dh_collector`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/dh_collector))
+owns every column decision:
+- current, pending, in-flight, published and retiring generations
+- owner leases
+- lifecycle resets
+- the visible segments of the frame being prepared
+- route receipts
+
 [`DistantHorizonsSemanticCollector`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java)
-and
+keeps the copied payloads, the frame's render parameters and the capture
+diagnostics. It applies each ledger call's effects to its payload maps. The
+ledger reproduces Java's `LinkedHashMap` orders, including the column LRU's
+access order, because publication, retirement lists and eviction depend on
+them. See also
 [`RustGalFrameCoordinator`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java).
 
 Persistent GUI decode-cache hits now share owned vertex/index arrays through

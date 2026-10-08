@@ -32,6 +32,7 @@ src/main/rust/
 │   │   ├── render_data.rs
 │   │   ├── render_list.rs
 │   │   └── translucent.rs
+│   ├── dh_collector/
 │   ├── scene/
 │   ├── shared/
 │   ├── shaderpack/
@@ -189,6 +190,7 @@ Important current subdirectories:
 - `render/chunk/meshing/`: native chunk mesher implementation, including section scanning, static models, fluids, lighting/AO, tinting, culling, packing, assembly, FFI records, and diagnostics.
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
+- `render/dh_collector/`: the Distant Horizons column ledger: generations, publication, retirement, owner leases, the prepared frame's visible segments and route receipts ([rendering architecture](rendering/RENDER-ARCHITECTURE.md)). Its Java exports are `render/bridge/dh_collector.rs`.
 - `render/scene/`: wire and data vocabulary shared by Java and the renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).
 - `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
 - `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).
