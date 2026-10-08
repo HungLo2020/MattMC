@@ -227,13 +227,25 @@ move world/entity semantics or resource-reload publication into the graph.
     include ported Java translucent contracts; `cargo test --lib terrain::`
     targets the native definitions. This source review did not run those tests
     or inspect the unbundled comparisons.
-  - Java receives encoded vertices, copied index bytes/range records and a
-    receipt, and still publishes the asset (residency, upload acknowledgement,
-    reload staging), then drops the payload once Rust acknowledges the upload
-    (translucent included). It supplies sorter output, atlas identity and water sprite
+  - **Vertex staging:** Rust keeps the vertices
+    ([`terrain/staging.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/staging.rs)),
+    and Java's asset record holds only their count
+    (`VulkanicGalBridge.StagedWorldMeshVertices`). The asset update flags the
+    record (`reserved0` bit 0) and Rust copies the staged vertices of that key
+    and generation, so a rejected update can retry. Java discards the staged
+    entry once the upload is acknowledged, or when the layer is removed or
+    rolled back.
+    - Diagnostics that read vertices in Java get a copy instead: faults,
+      texture probes, the parity appearance trace and detailed terrain
+      diagnostics. `-Dmattmc.dev.forceTerrainVertexStaging=true` lets captures
+      stage anyway.
+  - Java receives copied index bytes/range records and a receipt, and still
+    publishes the asset (residency, upload acknowledgement, reload staging),
+    then drops the payload once Rust acknowledges the upload (translucent
+    included). It supplies sorter output, atlas identity and water sprite
     rectangles; native assembly performs the water/material classification and
     rewrites. This supersedes the `7a6009f8` Java water/index assembly boundary.
-    It does not eliminate all copies. [Intake handoff](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/java/net/vulkanic/world/RustTerrainIntake.java).
+    [Intake handoff](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/java/net/vulkanic/world/RustTerrainIntake.java).
 - Rust lists the build requests in visit order, block-edit rebuilds first and
   sections already in flight skipped. Java dispatches them while in-flight
   builds stay below twice the worker count, and asks Rust whether each

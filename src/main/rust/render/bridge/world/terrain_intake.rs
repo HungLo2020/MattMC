@@ -5,6 +5,7 @@
 use crate::render::bridge::abi::{FfiWorldMeshSectionRecord, FfiWorldMeshVertex};
 use crate::render::scene::mesh::WorldMeshVertex;
 use crate::render::worldrender::terrain::assembly::{assemble_layer, FfiWaterSprite, LayerAssemblyParams};
+use crate::render::worldrender::terrain::staging;
 use crate::render::worldrender::terrain::intake::{
     decode_compact_terrain_vertices, FfiCompactTerrainDecodeParams, FfiCompactTerrainDecodeStats,
 };
@@ -40,7 +41,9 @@ pub struct FfiTerrainLayerAssemblyParams {
     pub water_block_atlas: u32,
     /// Non-zero: `water` holds the still, flow and overlay sprites.
     pub water_present: u32,
-    pub reserved: u32,
+    /// [`ASSEMBLY_STAGE_VERTICES`]: keep the vertices in Rust (see
+    /// `worldrender/terrain/staging.rs`) instead of writing them out.
+    pub flags: u32,
     pub water: [FfiWaterSprite; 3],
     pub reserved_tail: u32,
 }
@@ -78,10 +81,16 @@ pub struct FfiTerrainLayerAssemblyReceipt {
     pub water_overlay: u32,
     pub water_texture_switches: u32,
     pub sample_count: u32,
+    /// Non-zero when the vertices were staged in Rust (not written out).
+    pub staged: u32,
+    pub reserved: u32,
 }
 
 const _: () = assert!(std::mem::size_of::<FfiTerrainLayerAssemblyParams>() == 96);
-const _: () = assert!(std::mem::size_of::<FfiTerrainLayerAssemblyReceipt>() == 136);
+const _: () = assert!(std::mem::size_of::<FfiTerrainLayerAssemblyReceipt>() == 144);
+
+/// Assembly flag: stage the vertices in Rust for the asset update.
+pub const ASSEMBLY_STAGE_VERTICES: u32 = 1;
 
 /// Ints per primitive sample: id, kind, retained, material, texture, retained index start.
 pub const PRIMITIVE_SAMPLE_INTS: usize = 6;
@@ -182,14 +191,23 @@ pub unsafe extern "C" fn mattmc_terrain_assemble_layer(
             Err(error) => return reject(&error),
         };
         let accounting = assembled.translucent.clone().unwrap_or_default();
-        if vertices.len() > output.vertex_capacity as usize
+        let vertex_count = vertices.len();
+        let stage = assembly.flags & ASSEMBLY_STAGE_VERTICES != 0;
+        if (!stage && vertex_count > output.vertex_capacity as usize)
             || assembled.index_bytes.len() as u64 > output.index_capacity
             || assembled.sections.len() > output.section_capacity as usize
         {
             return -2;
         }
-        for (index, vertex) in vertices.iter().enumerate() {
-            output.vertices.add(index).write(abi_vertex(vertex));
+        let staged = stage
+            && staging::stage(assembled.mesh_key, assembled.mesh_generation, std::mem::take(&mut *vertices));
+        if !staged {
+            if vertex_count > output.vertex_capacity as usize {
+                return -2;
+            }
+            for (index, vertex) in vertices.iter().enumerate() {
+                output.vertices.add(index).write(abi_vertex(vertex));
+            }
         }
         std::ptr::copy_nonoverlapping(assembled.index_bytes.as_ptr(), output.indices, assembled.index_bytes.len());
         for (index, section) in assembled.sections.iter().enumerate() {
@@ -250,7 +268,16 @@ pub unsafe extern "C" fn mattmc_terrain_assemble_layer(
             water_overlay: accounting.water_overlay,
             water_texture_switches: accounting.water_texture_switches,
             sample_count: samples as u32,
+            staged: staged as u32,
+            reserved: 0,
         });
-        vertices.len() as i32
+        vertex_count as i32
     })
+}
+
+/// Drops a layer's staged vertices that will not be published (identical
+/// rebuild, removal before upload). `mesh_generation` 0 drops any generation.
+#[no_mangle]
+pub extern "C" fn mattmc_terrain_discard_staged(mesh_key: u64, mesh_generation: u64) {
+    staging::discard(mesh_key, mesh_generation);
 }

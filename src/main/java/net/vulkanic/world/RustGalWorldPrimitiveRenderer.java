@@ -4208,7 +4208,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MODEL_PART_MESH_KEYS.rollbackTo(checkpoint.modelPartMeshKeys);
 			// Remove exactly the keys absent at the checkpoint and present now.
 			for (Long key : WORLD_MESH_ASSETS.keysAddedSince(checkpoint.meshAssets)) {
-				if (WORLD_MESH_ASSETS.remove(key) == null) continue;
+				VulkanicGalBridge.WorldMeshAssetRecord rolledBack = WORLD_MESH_ASSETS.remove(key);
+				if (rolledBack == null) continue;
+				if (rolledBack.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
+					RustTerrainIntake.discardStaged(key, rolledBack.meshGeneration());
+				}
 				DIRTY_WORLD_MESH_ASSETS.remove(key);
 			}
 			for (Integer key : WORLD_MESH_TEXTURES.keysAddedSince(checkpoint.textureAssets)) {
@@ -10467,6 +10471,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				+ " indexBytes=" + indexBytes + " sections=" + asset.sections().size());
 		}
 		int indexCount = indexBytes / indexStride;
+		// Staged terrain vertices are decoded from integer fields in Rust and
+		// cannot be non-finite; only their count is in Java.
+		if (!(asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices))
 		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : asset.vertices()) {
 			if (vertex == null || !Float.isFinite(vertex.x()) || !Float.isFinite(vertex.y()) || !Float.isFinite(vertex.z())
 				|| !Float.isFinite(vertex.u()) || !Float.isFinite(vertex.v())
@@ -10703,6 +10710,13 @@ public final class RustGalWorldPrimitiveRenderer {
 			));
 			PENDING_WORLD_MESH_RETIREMENTS.remove(asset.meshKey());
 			if (sameMeshPayload) {
+				Long uploaded = UPLOADED_WORLD_MESH_GENERATIONS.get(asset.meshKey());
+				if (asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices
+					&& !DIRTY_WORLD_MESH_ASSETS.contains(asset.meshKey())
+					&& uploaded != null && uploaded.longValue() == asset.meshGeneration()) {
+					// Already published: this identical rebuild's staging is never read.
+					RustTerrainIntake.discardStaged(asset.meshKey(), asset.meshGeneration());
+				}
 				if (changed) {
 					markWorldMeshAssetsChangedLocked();
 				}
@@ -10711,7 +10725,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				WORLD_MESH_ASSETS.put(asset.meshKey(), asset);
 				DIRTY_WORLD_MESH_ASSETS.add(asset.meshKey());
 			markWorldMeshAssetsChangedLocked();
-			String sourceSemantics = selectedSourceDiagnosticsEnabled()
+			// Only computed when the audit line is printed: it walks every vertex.
+			String sourceSemantics = Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+				&& selectedSourceDiagnosticsEnabled()
+				&& !(asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices)
 				? " source_semantics=" + staticTerrainSourceSemanticSummary(asset)
 				: "";
 			auditMessage(
@@ -10732,8 +10749,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.WorldMeshAssetRecord left,
 		VulkanicGalBridge.WorldMeshAssetRecord right
 	) {
+		boolean leftStaged = left.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices;
+		boolean rightStaged = right.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices;
 		return left.vertexLayoutVersion() == right.vertexLayoutVersion()
 			&& left.indexType() == right.indexType()
+			// Staged vertices compare by key and content generation; a staged
+			// and a copied list are treated as different payloads.
+			&& leftStaged == rightStaged
 			&& left.vertices().equals(right.vertices())
 			&& left.hasSameIndexPayload(right)
 			&& left.sections().equals(right.sections())
@@ -10885,6 +10907,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				DYNAMIC_WORLD_MESH_LIFETIME.forget(meshKey);
 				VulkanicGalBridge.WorldMeshAssetRecord removedAsset = WORLD_MESH_ASSETS.remove(meshKey);
 				StaticTerrainMeshResidency removedResidency = STATIC_TERRAIN_MESH_RESIDENCY.remove(meshKey);
+				if (removedAsset != null && removedAsset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
+					RustTerrainIntake.discardStaged(meshKey, 0L);
+				}
 				ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.remove(meshKey);
 				if (removedAsset == null && removedResidency == null) {
 					return;
@@ -19058,6 +19083,10 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
 		if (asset != null && asset.meshGeneration() == meshGeneration) {
 			WORLD_MESH_ASSETS.remove(meshKey);
+			if (asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
+				// Rust now owns the uploaded vertices; drop the staged copy.
+				RustTerrainIntake.discardStaged(meshKey, meshGeneration);
+			}
 			}
 		RustGalTerrainRenderer.releaseUploadedStaticTerrainPayload(meshKey, meshGeneration);
 	}

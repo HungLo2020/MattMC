@@ -12,6 +12,7 @@ pub mod mesh_cache;
 pub mod placement;
 pub mod resources;
 pub mod section;
+pub mod staging;
 pub mod submission;
 pub mod visibility;
 

@@ -1469,6 +1469,11 @@ public final class StaticTerrainParityDiagnostics {
     }
 
     /** Records the copied Current payload before it crosses FFI. */
+    /** Whether the appearance trace reads a section's copied vertices. */
+    public static boolean appearanceTraceActive() {
+        return ENABLED && APPEARANCE_TRACE_SECTION != Long.MIN_VALUE;
+    }
+
     public static void recordRustStaticTerrainAppearanceCopy(
             ChunkBuildOutput output,
             String layer,

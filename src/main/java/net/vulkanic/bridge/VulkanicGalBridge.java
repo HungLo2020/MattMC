@@ -3295,11 +3295,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_ASSET_RECORD.offset(0), Struct.WORLD_MESH_ASSET_RECORD.byteSize());
 				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 1, mesh.vertexLayoutVersion());
 				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 2, mesh.indexType());
-				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 3, 0);
+				boolean stagedVertices = mesh.vertices() instanceof StagedWorldMeshVertices;
+				// Bit 0: the vertices are staged in Rust (bridge/world/mesh_assets.rs).
+				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 3, stagedVertices ? 1 : 0);
 				Struct.WORLD_MESH_ASSET_RECORD.setLong(item, 4, mesh.meshKey());
 				Struct.WORLD_MESH_ASSET_RECORD.setLong(item, 5, mesh.meshGeneration());
-				MemorySegment vertexArray = Struct.WORLD_MESH_VERTEX.array(updateArena, mesh.vertices().size());
-				if (mesh.vertices() instanceof EncodedWorldMeshVertices encoded) {
+				int sentVertices = stagedVertices ? 0 : mesh.vertices().size();
+				MemorySegment vertexArray = Struct.WORLD_MESH_VERTEX.array(updateArena, sentVertices);
+				if (stagedVertices) {
+					// Nothing to copy.
+				} else if (mesh.vertices() instanceof EncodedWorldMeshVertices encoded) {
 					MemorySegment.copy(encoded.bytes(), 0, vertexArray, 0,
 						(long) encoded.size() * Struct.WORLD_MESH_VERTEX.byteSize());
 				} else for (int vertexIndex = 0; vertexIndex < mesh.vertices().size(); vertexIndex++) {
@@ -3321,7 +3326,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.terrainMaterialBits());
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 14, vertex.midBlockPacked());
 				}
-				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 6, vertexArray, mesh.vertices().size());
+				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 6, vertexArray, sentVertices);
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 7, mesh.indexBytes);
 				MemorySegment sectionArray = Struct.WORLD_MESH_SECTION_RECORD.array(updateArena, mesh.sections().size());
 				for (int sectionIndex = 0; sectionIndex < mesh.sections().size(); sectionIndex++) {
@@ -4392,6 +4397,46 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * only for consumers that read single vertices, and {@link #set} writes
 	 * back into the bytes (intake rewrites water quads before publication).
 	 */
+	/**
+	 * Vertices of a static-terrain layer staged in Rust by assembly
+	 * ({@code worldrender/terrain/staging.rs}): only the count crosses into
+	 * Java. The asset update sends no vertex bytes for it; Rust reads the
+	 * staged vertices of this key and generation. Element access is a bug.
+	 */
+	public static final class StagedWorldMeshVertices extends java.util.AbstractList<WorldMeshVertexRecord> {
+		private final int count;
+		private final long meshKey;
+		private final long meshGeneration;
+
+		public StagedWorldMeshVertices(int count, long meshKey, long meshGeneration) {
+			this.count = count;
+			this.meshKey = meshKey;
+			this.meshGeneration = meshGeneration;
+		}
+
+		@Override
+		public WorldMeshVertexRecord get(int index) {
+			throw new IllegalStateException("static terrain vertices of mesh " + meshKey + " are staged in Rust");
+		}
+
+		@Override
+		public int size() {
+			return count;
+		}
+
+		/** Same staged layer: the generation is a content hash of the vertices. */
+		@Override
+		public boolean equals(Object other) {
+			return other instanceof StagedWorldMeshVertices staged && staged.count == count
+				&& staged.meshKey == meshKey && staged.meshGeneration == meshGeneration;
+		}
+
+		@Override
+		public int hashCode() {
+			return Long.hashCode(meshKey) * 31 + Long.hashCode(meshGeneration);
+		}
+	}
+
 	public static final class EncodedWorldMeshVertices extends java.util.AbstractList<WorldMeshVertexRecord>
 			implements java.util.RandomAccess {
 		private final MemorySegment bytes;
@@ -4524,7 +4569,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Objects.requireNonNull(entityIdentity, "entityIdentity");
 			// Natively encoded vertices are kept as they are: copying would
 			// materialize a record per vertex.
-			vertices = vertices instanceof EncodedWorldMeshVertices ? vertices : List.copyOf(vertices);
+			vertices = vertices instanceof EncodedWorldMeshVertices || vertices instanceof StagedWorldMeshVertices
+				? vertices : List.copyOf(vertices);
 			indexBytes = indexBytes.clone();
 			sections = List.copyOf(sections);
 		}

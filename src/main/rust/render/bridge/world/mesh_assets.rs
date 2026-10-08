@@ -12,6 +12,10 @@ use crate::render::worldrender::WORLD_MAX_MESH_VERTICES;
 use crate::render::worldrender::WORLD_MESH_ASSET_RESIDENCY;
 use crate::render::worldrender::WORLD_MESH_TEXTURE_RESIDENCY;
 
+/// `FfiWorldMeshAssetRecord::reserved0` bit: the vertices were staged by
+/// terrain assembly (`worldrender/terrain/staging.rs`), not sent.
+pub(crate) const WORLD_MESH_ASSET_STAGED_TERRAIN_VERTICES: u32 = 1;
+
 const MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL: usize = WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
 const MAX_WORLD_MATERIAL_ASSET_COUNT: usize = WORLD_MAX_MESH_TEXTURE_ASSETS;
 
@@ -309,32 +313,54 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             ));
         }
         let index_type = ffi_index_type(mesh.index_type)?;
-        let raw_vertices = read_limited_slice(mesh.vertices, false, "world mesh vertices")?;
-        if raw_vertices.len() > WORLD_MAX_MESH_VERTICES {
-            return Err(GalError::ffi(
-                StatusCode::LengthOverflow,
-                format!(
-                    "world mesh vertex count {} exceeds bounded limit {WORLD_MAX_MESH_VERTICES}",
-                    raw_vertices.len()
-                ),
-            ));
-        }
-        let mut vertices = Vec::with_capacity(raw_vertices.len());
-        for vertex in raw_vertices {
-            validate_item_size::<FfiWorldMeshVertex>(vertex.byte_size, "world mesh vertex")?;
-            vertices.push(WorldMeshVertex {
-                position: [vertex.x, vertex.y, vertex.z],
-                uv: [vertex.u, vertex.v],
-                shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
-                shader_block_id: vertex.shader_block_id,
-                shader_material_type: vertex.shader_material_type,
-                terrain_material_bits: vertex.terrain_material_bits,
-                mid_block_packed: vertex.mid_block_packed,
-                color_argb: vertex.color_argb,
-                normal_packed: vertex.normal_packed,
-                light: vertex.light,
-            });
-        }
+        let vertices = if mesh.reserved0 & WORLD_MESH_ASSET_STAGED_TERRAIN_VERTICES != 0 {
+            // Static terrain: assembly staged the vertices in Rust. Copied, not
+            // taken: a rejected update is retried; Java discards the staged
+            // entry once this generation's upload is acknowledged.
+            if mesh.vertices.count != 0 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    "a staged terrain mesh must not also carry vertices",
+                ));
+            }
+            crate::render::worldrender::terrain::staging::get(mesh.mesh_key, mesh.mesh_generation).ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "staged terrain vertices for mesh {} generation {} are missing",
+                        mesh.mesh_key, mesh.mesh_generation
+                    ),
+                )
+            })?
+        } else {
+            let raw_vertices = read_limited_slice(mesh.vertices, false, "world mesh vertices")?;
+            if raw_vertices.len() > WORLD_MAX_MESH_VERTICES {
+                return Err(GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    format!(
+                        "world mesh vertex count {} exceeds bounded limit {WORLD_MAX_MESH_VERTICES}",
+                        raw_vertices.len()
+                    ),
+                ));
+            }
+            let mut vertices = Vec::with_capacity(raw_vertices.len());
+            for vertex in raw_vertices {
+                validate_item_size::<FfiWorldMeshVertex>(vertex.byte_size, "world mesh vertex")?;
+                vertices.push(WorldMeshVertex {
+                    position: [vertex.x, vertex.y, vertex.z],
+                    uv: [vertex.u, vertex.v],
+                    shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
+                    shader_block_id: vertex.shader_block_id,
+                    shader_material_type: vertex.shader_material_type,
+                    terrain_material_bits: vertex.terrain_material_bits,
+                    mid_block_packed: vertex.mid_block_packed,
+                    color_argb: vertex.color_argb,
+                    normal_packed: vertex.normal_packed,
+                    light: vertex.light,
+                });
+            }
+            vertices
+        };
         let index_bytes = read_bounded_bytes(
             mesh.index_bytes,
             false,

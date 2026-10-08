@@ -54,7 +54,8 @@ REPORT_PATTERNS = {
 }
 
 
-def capture_command(artifact_root: Path, scenario: str, shaders: bool, dh: bool) -> list[str]:
+def capture_command(artifact_root: Path, scenario: str, shaders: bool, dh: bool,
+                    jvm_args: list[str]) -> list[str]:
     command = [
         sys.executable, "DevUtils/Audit/Capture.py", "--profile", "extended",
         "--mode", "current-rust-vulkan-shaders-on" if shaders else "current-rust-vulkan-shaders-off",
@@ -66,6 +67,7 @@ def capture_command(artifact_root: Path, scenario: str, shaders: bool, dh: bool)
         "--validation", "standard", "--diagnostic", "--rust-full-gameplay-attachments",
         "--world-static-terrain-scenario", scenario,
     ]
+    command += [f"--jvm-arg={arg}" for arg in jvm_args]
     if dh:
         command += [
             "--world-distant-horizons-real-world", "--world-distant-horizons-water",
@@ -107,6 +109,8 @@ def main() -> int:
                         help="run only these scenarios (repeatable); default all")
     parser.add_argument("--no-shaders", action="store_true", help="vanilla instead of the Iris pack")
     parser.add_argument("--no-dh", action="store_true", help="without Distant Horizons")
+    parser.add_argument("--jvm-arg", action="append", default=[],
+                        help="extra client JVM option (repeatable), e.g. -Dmattmc.dev.forceTerrainVertexStaging=true")
     parser.add_argument("--run-source", help="MATTMC_CAPTURE_RUN_SOURCE override")
     parser.add_argument("--shader-pack", help="MATTMC_CAPTURE_SHADER_PACK_SOURCE override")
     parser.add_argument("--dh-radius", default=None,
@@ -131,7 +135,7 @@ def main() -> int:
         root = out / scenario
         root.mkdir(parents=True, exist_ok=True)
         with (root / "driver.log").open("w") as log:
-            code = subprocess.call(capture_command(root / "run", scenario, not args.no_shaders, not args.no_dh),
+            code = subprocess.call(capture_command(root / "run", scenario, not args.no_shaders, not args.no_dh, args.jvm_arg),
                                    cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT)
         counts = scan_logs(root)
         status = audit_status(root)

@@ -33,7 +33,11 @@ final class RustTerrainIntake {
 			ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
 			ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 	private static final long ASSEMBLY_PARAMS_BYTES = 96;
-	private static final long RECEIPT_BYTES = 136;
+	private static final long RECEIPT_BYTES = 144;
+	private static final int ASSEMBLY_STAGE_VERTICES = 1;
+	private static boolean stagingAnnounced;
+	private static final MethodHandle DISCARD_STAGED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_terrain_discard_staged", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
 	private static final long OUTPUT_BYTES = 80;
 	private static final int SECTION_RECORD_BYTES = 36;
 	private static final int SAMPLE_INTS = 6;
@@ -68,10 +72,43 @@ final class RustTerrainIntake {
 	static AssembledLayer assemble(ByteBuffer vertexData, int vertexStride, boolean separateAo, int atlasWidth,
 			int atlasHeight, int midBlockOffset, int faultBits, int[] segments, int[] metadata, int metadataStride,
 			int vertexCount, ByteBuffer sortedIndices, long sectionPos, int layerOrdinal, long atlasGeneration,
-			boolean waterBlockAtlas, WaterSprite[] water) {
-		MemorySegment buffer = MemorySegment.ofBuffer(vertexData);
+			boolean waterBlockAtlas, WaterSprite[] water, boolean stageVertices) {
+		if (stageVertices) {
+			AssembledLayer staged = assembleOnce(vertexData, vertexStride, separateAo, atlasWidth, atlasHeight,
+				midBlockOffset, faultBits, segments, metadata, metadataStride, vertexCount, sortedIndices, sectionPos,
+				layerOrdinal, atlasGeneration, waterBlockAtlas, water, true);
+			if (staged != null) {
+				if (!stagingAnnounced) {
+					stagingAnnounced = true;
+					System.out.println("[MattMC terrain] vertex staging active: section vertices stay in Rust");
+				}
+				return staged;
+			}
+			// The staging bound was reached: copy the vertices out instead.
+		}
+		return assembleOnce(vertexData, vertexStride, separateAo, atlasWidth, atlasHeight, midBlockOffset, faultBits,
+			segments, metadata, metadataStride, vertexCount, sortedIndices, sectionPos, layerOrdinal, atlasGeneration,
+			waterBlockAtlas, water, false);
+	}
+
+	/** Drops a layer's staged vertices that will not be (or were already) published. */
+	static void discardStaged(long meshKey, long meshGeneration) {
+		try {
+			DISCARD_STAGED.invokeExact(meshKey, meshGeneration);
+		} catch (Throwable throwable) {
+			throw new IllegalStateException("Rust terrain staging discard failed", throwable);
+		}
+	}
+
+	/** One assembly call; null when staging was requested but not possible. */
+	private static AssembledLayer assembleOnce(ByteBuffer vertexData, int vertexStride, boolean separateAo,
+			int atlasWidth, int atlasHeight, int midBlockOffset, int faultBits, int[] segments, int[] metadata,
+			int metadataStride, int vertexCount, ByteBuffer sortedIndices, long sectionPos, int layerOrdinal,
+			long atlasGeneration, boolean waterBlockAtlas, WaterSprite[] water, boolean stageVertices) {
+		MemorySegment buffer = MemorySegment.ofBuffer(vertexData.duplicate());
 		VulkanicGalBridge.Struct layout = VulkanicGalBridge.Struct.WORLD_MESH_VERTEX;
-		MemorySegment vertices = Arena.ofAuto().allocate(Math.max(1L, vertexCount * layout.byteSize()), 8);
+		MemorySegment vertices = stageVertices
+			? MemorySegment.NULL : Arena.ofAuto().allocate(Math.max(1L, vertexCount * layout.byteSize()), 8);
 		int primitiveCount = vertexCount / 4;
 		long indexCapacity = Math.max(4L, (long) primitiveCount * 6L * Integer.BYTES);
 		int sectionCapacity = Math.max(1, Math.max(segments.length / 2, primitiveCount));
@@ -91,6 +128,7 @@ final class RustTerrainIntake {
 			assembly.set(ValueLayout.JAVA_INT, 16, layerOrdinal);
 			assembly.set(ValueLayout.JAVA_INT, 20, waterBlockAtlas ? 1 : 0);
 			assembly.set(ValueLayout.JAVA_INT, 24, water != null ? 1 : 0);
+			assembly.set(ValueLayout.JAVA_INT, 28, stageVertices ? ASSEMBLY_STAGE_VERTICES : 0);
 			if (water != null) {
 				for (int index = 0; index < 3; index++) {
 					long base = 32 + index * 20L;
@@ -109,7 +147,7 @@ final class RustTerrainIntake {
 			MemorySegment receipt = arena.allocate(RECEIPT_BYTES, 8);
 			MemorySegment output = arena.allocate(OUTPUT_BYTES, 8);
 			output.set(ValueLayout.ADDRESS, 0, vertices);
-			output.set(ValueLayout.JAVA_INT, 8, vertexCount);
+			output.set(ValueLayout.JAVA_INT, 8, stageVertices ? 0 : vertexCount);
 			output.set(ValueLayout.JAVA_INT, 12, sectionCapacity);
 			output.set(ValueLayout.ADDRESS, 16, indices);
 			output.set(ValueLayout.JAVA_LONG, 24, indexCapacity);
@@ -121,7 +159,7 @@ final class RustTerrainIntake {
 			output.set(ValueLayout.ADDRESS, 64, stats);
 			output.set(ValueLayout.ADDRESS, 72, receipt);
 			MemorySegment sorted = sortedIndices == null || !sortedIndices.hasRemaining()
-				? MemorySegment.NULL : MemorySegment.ofBuffer(sortedIndices);
+				? MemorySegment.NULL : MemorySegment.ofBuffer(sortedIndices.duplicate());
 			long sortedLength = sorted.equals(MemorySegment.NULL) ? 0L : sortedIndices.remaining();
 			int decoded;
 			try {
@@ -135,11 +173,16 @@ final class RustTerrainIntake {
 			if (decoded == -3) {
 				throw new IllegalArgumentException(error.getString(0));
 			}
+			boolean staged = receipt.get(ValueLayout.JAVA_INT, 136) != 0;
+			if (stageVertices && decoded == -2) {
+				return null;
+			}
 			if (decoded != vertexCount) {
 				throw new IllegalArgumentException("Rust terrain layer assembly rejected the section mesh (" + decoded
 					+ " of " + vertexCount + " vertices)");
 			}
-			DecodedVertices decodedVertices = new DecodedVertices(vertices, vertexCount,
+			DecodedVertices decodedVertices = new DecodedVertices(staged ? null : vertices, vertexCount,
+				staged ? receipt.get(ValueLayout.JAVA_LONG, 0) : 0L, staged ? receipt.get(ValueLayout.JAVA_LONG, 8) : 0L,
 				stats.get(ValueLayout.JAVA_FLOAT, 0), stats.get(ValueLayout.JAVA_FLOAT, 4),
 				stats.get(ValueLayout.JAVA_FLOAT, 8), stats.get(ValueLayout.JAVA_FLOAT, 12),
 				stats.get(ValueLayout.JAVA_FLOAT, 16), stats.get(ValueLayout.JAVA_FLOAT, 20),
@@ -179,14 +222,23 @@ final class RustTerrainIntake {
 	}
 
 	/** Decoded vertices in the {@code FfiWorldMeshVertex} layout, and their receipts. */
-	record DecodedVertices(MemorySegment vertices, int count, float minX, float minY, float minZ, float maxX,
+	record DecodedVertices(MemorySegment vertices, int count, long stagedMeshKey, long stagedMeshGeneration, float minX, float minY, float minZ, float maxX,
 			float maxY, float maxZ, float minU, float minV, float maxU, float maxV, float minAo, float maxAo,
 			int separateAoVertices, boolean aoContractValid) {
 		private static final VulkanicGalBridge.Struct LAYOUT = VulkanicGalBridge.Struct.WORLD_MESH_VERTEX;
 
-		/** The vertices as a list over the encoded bytes (writes go to the bytes). */
-		VulkanicGalBridge.EncodedWorldMeshVertices encoded() {
-			return new VulkanicGalBridge.EncodedWorldMeshVertices(this.vertices, this.count);
+		/**
+		 * The vertices: a list over the encoded bytes (writes go to the bytes),
+		 * or only their count when they are staged in Rust.
+		 */
+		List<VulkanicGalBridge.WorldMeshVertexRecord> encoded() {
+			return this.vertices == null
+				? new VulkanicGalBridge.StagedWorldMeshVertices(this.count, this.stagedMeshKey, this.stagedMeshGeneration)
+				: new VulkanicGalBridge.EncodedWorldMeshVertices(this.vertices, this.count);
+		}
+
+		boolean staged() {
+			return this.vertices == null;
 		}
 
 

@@ -2090,7 +2090,8 @@ public final class RustGalTerrainRenderer {
 					layer.name(),
 					asset.meshKey(),
 					asset.meshGeneration(),
-					asset.asset().vertices()
+					asset.asset().vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices
+						? null : asset.asset().vertices()
 				);
 				if (layer == ChunkSectionLayer.TRANSLUCENT && asset.unsupportedPrimitiveCount() > 0) {
 					unsupportedFluidRejectedSections.incrementAndGet();
@@ -2228,7 +2229,7 @@ public final class RustGalTerrainRenderer {
 			metadataStride, vertexCount, layer == ChunkSectionLayer.TRANSLUCENT ? sorterIndexBuffer(output.getSorter()) : null,
 			sectionPos, layer.ordinal(), atlasGeneration,
 			waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute()) == WaterTextureBinding.BLOCK_ATLAS,
-			waterSprites());
+			waterSprites(), !vertexCopyRequired(fault));
 		RustTerrainIntake.DecodedVertices decoded = assembled.decoded();
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = decoded.encoded();
 		float minX = decoded.minX();
@@ -2414,6 +2415,22 @@ public final class RustGalTerrainRenderer {
 			new byte[] { 3 }, 1
 		);
 	}
+
+	/**
+	 * Diagnostics that read a layer's vertices in Java after assembly. Without
+	 * them the vertices stay staged in Rust and only their count reaches Java.
+	 */
+	private static boolean vertexCopyRequired(String fault) {
+		boolean vertexReaders = !fault.isEmpty() || !activeTextureProbes.isEmpty()
+			|| net.sodium.client.render.StaticTerrainParityDiagnostics.appearanceTraceActive();
+		// Captures run with detailed diagnostics; this lets them verify staging.
+		if (FORCE_VERTEX_STAGING) {
+			return vertexReaders;
+		}
+		return vertexReaders || detailedTerrainDiagnosticsEnabled(fault);
+	}
+
+	private static final boolean FORCE_VERTEX_STAGING = Boolean.getBoolean("mattmc.dev.forceTerrainVertexStaging");
 
 	/** The build sorter's u32 quad order, read in place (null when there is none). */
 	private static ByteBuffer sorterIndexBuffer(Sorter sorter) {
