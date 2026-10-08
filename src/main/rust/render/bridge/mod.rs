@@ -22,6 +22,7 @@ pub(crate) mod accounting;
 pub(crate) mod canonical;
 pub(crate) mod capabilities;
 pub(crate) mod context;
+pub(crate) mod dh_collector;
 pub(crate) mod frame;
 pub(crate) mod gui;
 pub(crate) mod layout;

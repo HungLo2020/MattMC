@@ -141,6 +141,7 @@ regressions before a normal-overlap gameplay pair:
 ```sh
 ./gradlew -PmattmcRustProfile=release test -x testRustNative -x buildRustNative \
   --tests net.vulkanic.world.DistantHorizonsSemanticCollectorTest
+(cd src/main/rust && cargo test --lib dh_collector)   # the Rust column ledger
 ```
 
 Rebuild the native release library first if Rust changed. Keep the gameplay
