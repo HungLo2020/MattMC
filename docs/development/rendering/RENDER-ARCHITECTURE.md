@@ -343,17 +343,28 @@ topology.
 
 The ledger
 ([`render/dh_collector`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/dh_collector))
-owns every column decision:
+owns every column decision and the column payloads:
 - current, pending, in-flight, published and retiring generations
+- each generation's packed vertices, copied once from Java when it is recorded
 - owner leases
 - lifecycle resets
 - the visible segments of the frame being prepared
 - route receipts
 
+The coordinator's flush calls `mattmc_vulkanic_gal_world_lod_collector_flush`
+([`render/bridge/dh_collector.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/dh_collector.rs)).
+It selects the update, builds the frontend assets from the ledger's payloads,
+and applies them; Java then acknowledges the update under its collector lock.
+A failed apply releases the selection. Updates that carry exact material
+provenance (exact-atlas and source-execution diagnostics) still go through
+Java's packed `updateWorldLodAssets`, because the provenance needs Java's
+model resolution.
+
 [`DistantHorizonsSemanticCollector`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java)
-keeps the copied payloads, the frame's render parameters and the capture
-diagnostics. It applies each ledger call's effects to its payload maps. The
-ledger reproduces Java's `LinkedHashMap` orders, including the column LRU's
+keeps the material provenance, the frame's render parameters and the capture
+diagnostics. It applies each ledger call's effects to its provenance maps.
+Diagnostics and probes read payload copies fetched from the ledger on demand.
+The ledger reproduces Java's `LinkedHashMap` orders, including the column LRU's
 access order, because publication, retirement lists and eviction depend on
 them. See also
 [`RustGalFrameCoordinator`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java).

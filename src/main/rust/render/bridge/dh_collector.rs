@@ -4,15 +4,28 @@
 //! segment lists, text) wait in this thread's buffers until it takes them.
 use crate::render::dh_collector::{
     allocate_generation, ledger, peek_next_generation, Acknowledged, Built, Column, Config, Counts, Effect, Failure, Instance,
-    Ledger, Visible,
+    Flush, Ledger, Payload, PendingUpdate, Segment, Visible,
 };
+use super::{
+    set_last_error, status_error, status_ok, status_result_from_error, with_registry_mut, write_status_out, FfiStatusResult,
+    GalError, StatusCode,
+};
+use crate::render::vulkanic::metrics::elapsed_nanos_u64;
+use crate::render::worldrender::frame::limits::WORLD_LOD_MAX_COLUMNS;
+use crate::render::worldrender::{WorldLodColumnAsset, WorldLodColumnRetirement};
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::ffi::{c_char, CStr};
+use std::time::Instant;
 
 thread_local! {
     static EFFECTS: RefCell<Vec<Effect>> = const { RefCell::new(Vec::new()) };
     static OUTPUT: RefCell<Vec<i64>> = const { RefCell::new(Vec::new()) };
     static TEXT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    /// Payload bytes for `take_bytes`.
+    static BYTES: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    /// The column `stage_segment` is building for `record_built`.
+    static STAGED: RefCell<[Vec<Segment>; 4]> = const { RefCell::new([Vec::new(), Vec::new(), Vec::new(), Vec::new()]) };
 }
 
 const ERR_POISONED: i32 = -100;
@@ -152,7 +165,8 @@ pub extern "C" fn mattmc_dh_collector_allocate_generation() -> i64 {
 /// generation of `arg`, 8 retained published payload generation of `arg`,
 /// 9 touch `arg` (`COLUMNS.get`) and return its generation, 10 column count,
 /// 11 pending visible segments, 12 frame enabled, 13 frame flags, 14 next
-/// generation, 15 hasColumn(`arg`), 16 hasPublishedColumn(`arg`). 0 means
+/// generation, 15 hasColumn(`arg`), 16 hasPublishedColumn(`arg`), 17 current
+/// generation of `arg` (not an access). 0 means
 /// "none" for generations. Returns `i64::MIN` for an unknown kind.
 #[no_mangle]
 pub extern "C" fn mattmc_dh_collector_query(kind: i32, arg: i64) -> i64 {
@@ -174,6 +188,7 @@ pub extern "C" fn mattmc_dh_collector_query(kind: i32, arg: i64) -> i64 {
         14 => peek_next_generation(),
         15 => l.has_column(arg) as i64,
         16 => l.has_published_column(arg) as i64,
+        17 => l.current(arg).map_or(0, |c| c.generation),
         _ => i64::MIN,
     })
     .unwrap_or(i64::MIN)
@@ -190,49 +205,92 @@ pub extern "C" fn mattmc_dh_collector_request_publication(key: i64) -> i32 {
     with(|l| l.request_publication(key).map_or_else(code, |p| p as i32)).unwrap_or(ERR_POISONED)
 }
 
-/// `recordBuiltSnapshotLocked` and, with `retain_owner`, the owner lease.
-/// `difference` is Java's payload difference (null without a replaced
-/// column); `provenance_bytes` is -1 without provenance. Writes [generation,
-/// owner token] to `out`. Returns the effect count or an error code.
+/// Copies one packed segment into the column being staged for
+/// [`mattmc_dh_collector_record_built`]. `layer` is 0..4 (opaque, side, up,
+/// water); segments arrive in each layer's order.
 /// # Safety
-/// `difference` is null or NUL-terminated UTF-8; `out` addresses 2 longs.
+/// `bytes` addresses `length` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_collector_stage_segment(layer: i32, source_index: i32, bytes: *const u8, length: i32) {
+    let bytes: Box<[u8]> = if length <= 0 { Box::default() } else { std::slice::from_raw_parts(bytes, length as usize).into() };
+    STAGED.with(|s| s.borrow_mut()[layer as usize & 3].push(Segment { source_index, bytes }));
+}
+
+/// `recordBuiltSnapshotLocked` and, with `retain_owner`, the owner lease, for
+/// the staged segments (taken whether or not this succeeds).
+/// `provenance_bytes` is -1 without provenance; `same_provenance` is Java's
+/// provenance equality with the current column. Writes [generation, owner
+/// token] to `out`. Returns the effect count or an error code.
+/// # Safety
+/// `out` addresses 2 longs.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_collector_record_built(
     config_bits: i32,
     key: i64,
     generation: i64,
-    byte_size: i64,
-    counts: *const i32,
-    has_segments: i32,
+    origin_x: i32,
+    origin_y: i32,
+    origin_z: i32,
     provenance_bytes: i64,
-    same_payload: i32,
     same_provenance: i32,
-    difference: *const c_char,
     retain_owner: i32,
     out: *mut i64,
 ) -> i32 {
-    let counts = std::slice::from_raw_parts(counts, 4);
+    let layers = STAGED.with(|s| std::mem::take(&mut *s.borrow_mut()));
     let built = Built {
-        column: Column {
-            generation,
-            byte_size,
-            counts: Counts { opaque: counts[0], side: counts[1], up: counts[2], water: counts[3] },
-        },
-        has_segments: has_segments != 0,
+        column: Column::new(generation, Payload { origin: [origin_x, origin_y, origin_z], layers }),
         provenance_bytes: (provenance_bytes >= 0).then_some(provenance_bytes),
-        same_payload: same_payload != 0,
         same_provenance: same_provenance != 0,
     };
-    let difference = (!difference.is_null()).then(|| text(difference).to_owned());
     let config = config(config_bits);
     let out = std::slice::from_raw_parts_mut(out, 2);
     with_effects(|l, effects| {
-        let generation = l.record_built(config, key, built, difference, effects)?;
+        let generation = l.record_built(config, key, built, effects)?;
         let token = if retain_owner != 0 { l.acquire_owner(key, generation) } else { 0 };
         out[0] = generation;
         out[1] = token as i64;
         Ok(())
     })
+}
+
+/// Stores a copy of a column's payload for Java's diagnostics: `which` 0 is
+/// the current column, 1 the retained published one. The output is
+/// [generation, origin x, y, z, segments per layer ×4, then (source index,
+/// byte length) per segment]; the bytes, concatenated, wait for
+/// [`mattmc_dh_collector_take_bytes`]. Returns the output length, or 0 when
+/// there is no such payload.
+#[no_mangle]
+pub extern "C" fn mattmc_dh_collector_payload(key: i64, which: i32) -> i32 {
+    let found = with(|l| {
+        if which == 0 {
+            l.current(key).map(|c| (c.generation, c.payload.clone()))
+        } else {
+            l.published_payload_of(key).map(|(generation, payload)| (generation, payload.clone()))
+        }
+    })
+    .flatten();
+    let Some((generation, payload)) = found else { return 0 };
+    let mut out = vec![generation, payload.origin[0] as i64, payload.origin[1] as i64, payload.origin[2] as i64];
+    out.extend(payload.layers.iter().map(|layer| layer.len() as i64));
+    let mut bytes = Vec::with_capacity(payload.byte_size() as usize);
+    for segment in payload.layers.iter().flatten() {
+        out.extend([segment.source_index as i64, segment.bytes.len() as i64]);
+        bytes.extend_from_slice(&segment.bytes);
+    }
+    BYTES.with(|b| *b.borrow_mut() = bytes);
+    store_output(out)
+}
+
+/// Copies the stored payload bytes into `out` (`length` bytes).
+/// # Safety
+/// `out` addresses `length` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_collector_take_bytes(out: *mut u8, length: i32) {
+    BYTES.with(|b| {
+        let bytes = std::mem::take(&mut *b.borrow_mut());
+        let length = (length.max(0) as usize).min(bytes.len());
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), out, length);
+    });
 }
 
 #[no_mangle]
@@ -436,10 +494,11 @@ pub extern "C" fn mattmc_dh_collector_pending_update(config_bits: i32, visible_c
     }
 }
 
-/// `acknowledge(update)`: `assets` holds (key, generation, opaque, side, up,
-/// water) per asset, `retirements` (key, generation). Returns the effect count.
+/// `acknowledge(update)` for an update Java sent: `assets` holds (key,
+/// generation) per asset, `retirements` (key, generation). Returns the effect
+/// count.
 /// # Safety
-/// The pointers address `asset_count` × 6 and `retirement_count` × 2 longs.
+/// The pointers address `asset_count` × 2 and `retirement_count` × 2 longs.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_collector_acknowledge(
     config_bits: i32,
@@ -448,18 +507,19 @@ pub unsafe extern "C" fn mattmc_dh_collector_acknowledge(
     retirements: *const i64,
     retirement_count: i32,
 ) -> i32 {
-    let raw = if asset_count <= 0 { &[][..] } else { std::slice::from_raw_parts(assets, asset_count as usize * 6) };
-    let assets: Vec<Acknowledged> = raw
-        .chunks_exact(6)
-        .map(|a| Acknowledged {
-            column_key: a[0],
-            generation: a[1],
-            counts: Counts { opaque: a[2] as i32, side: a[3] as i32, up: a[4] as i32, water: a[5] as i32 },
-        })
-        .collect();
+    let raw = if asset_count <= 0 { &[][..] } else { std::slice::from_raw_parts(assets, asset_count as usize * 2) };
+    let assets: Vec<(i64, i64)> = raw.chunks_exact(2).map(|a| (a[0], a[1])).collect();
     let raw = if retirement_count <= 0 { &[][..] } else { std::slice::from_raw_parts(retirements, retirement_count as usize * 2) };
     let retirements: Vec<(i64, i64)> = raw.chunks_exact(2).map(|r| (r[0], r[1])).collect();
     with_effects(|l, effects| {
+        let assets: Vec<Acknowledged> = assets
+            .iter()
+            .map(|&(column_key, generation)| Acknowledged {
+                column_key,
+                generation,
+                payload: l.sent_payload(column_key, generation).unwrap_or_default(),
+            })
+            .collect();
         l.acknowledge(config(config_bits), &assets, &retirements, effects);
         Ok(())
     })
@@ -503,6 +563,12 @@ pub extern "C" fn mattmc_dh_collector_begin_test_frame(enabled: i32) {
 #[no_mangle]
 pub extern "C" fn mattmc_dh_collector_column_keys() -> i32 {
     store_output(with(|l| l.column_keys().collect()).unwrap_or_default())
+}
+
+/// Keys with a retained published payload, in insertion order.
+#[no_mangle]
+pub extern "C" fn mattmc_dh_collector_published_payload_keys() -> i32 {
+    store_output(with(|l| l.published_payload_keys().collect()).unwrap_or_default())
 }
 
 /// Stores a column's last payload difference as text; returns its length,
@@ -565,4 +631,130 @@ pub extern "C" fn mattmc_dh_collector_diagnostics() -> i32 {
     })
     .unwrap_or_default();
     store_output(numbers)
+}
+
+/// `flushPendingAssets` from the ledger's payloads: selects the
+/// visible-candidate update, marks it in flight and applies it to the world
+/// frontend with no Java packing. Java then acknowledges it from the output
+/// (`pending_update`'s layout), or the call already released it on failure.
+/// `outcome` receives [kind, columns, bytes, retirements, select nanos, apply
+/// nanos]: kind 0 means nothing is pending, 1 applied (the return code and
+/// `status_out` are the frontend's), 2 a selected column carries material
+/// provenance, so nothing was selected and Java publishes the update itself,
+/// and 3 the selection failed with the ledger error code in the second slot.
+/// # Safety
+/// `outcome` addresses 6 longs; `status_out` is a status record.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_lod_collector_flush(
+    context_id: u64,
+    config_bits: i32,
+    outcome: *mut i64,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    let outcome = std::slice::from_raw_parts_mut(outcome, 6);
+    outcome.fill(0);
+    let select_started = Instant::now();
+    let failed = |outcome: &mut [i64], code: i32| {
+        outcome[0] = 3;
+        outcome[1] = code as i64;
+        StatusCode::Ok as i32
+    };
+    let update = match with(|l| l.select_flush(config(config_bits))) {
+        None => return failed(outcome, ERR_POISONED),
+        Some(Err(failure)) => return failed(outcome, code(failure)),
+        Some(Ok(Flush::Nothing)) => return StatusCode::Ok as i32,
+        Some(Ok(Flush::NeedsJava)) => {
+            outcome[0] = 2;
+            return StatusCode::Ok as i32;
+        }
+        Some(Ok(Flush::Selected(update))) => update,
+    };
+    let mut out = vec![update.generation, update.assets.len() as i64, update.retirements.len() as i64];
+    out.extend(update.assets.iter().flat_map(|a| [a.column_key, a.generation]));
+    out.extend(update.retirements.iter().flat_map(|&(key, generation)| [key, generation]));
+    store_output(out);
+    outcome[0] = 1;
+    outcome[1] = update.assets.len() as i64;
+    outcome[2] = update.assets.iter().map(|a| a.payload.byte_size()).sum();
+    outcome[3] = update.retirements.len() as i64;
+    outcome[4] = elapsed_nanos_u64(select_started) as i64;
+    let apply_started = Instant::now();
+    let result = with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            write_status_out(status_out, status_result_from_error(&error));
+            return Err(error.code as i32);
+        };
+        context.ffi_calls += 1;
+        context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(size_of::<FfiStatusResult>() as u64);
+        let applied = assets(&update).and_then(|(assets, retirements)| {
+            context.world_primitive_frontend.apply_world_lod_column_asset_update_with_provenance(
+                &mut context.gal,
+                update.generation as u64,
+                assets,
+                retirements,
+                Vec::new(),
+            )
+        });
+        match applied {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                Ok(())
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                Err(error.code as i32)
+            }
+        }
+    });
+    outcome[5] = elapsed_nanos_u64(apply_started) as i64;
+    match result {
+        Ok(()) => StatusCode::Ok as i32,
+        Err(status) => {
+            let sent: Vec<(i64, i64)> = update.assets.iter().map(|a| (a.column_key, a.generation)).collect();
+            with(|l| l.release_in_flight(&sent));
+            status
+        }
+    }
+}
+
+/// The frontend's view of an update, checked as `decode_world_lod_asset_update`
+/// checks a Java request.
+fn assets(update: &PendingUpdate) -> Result<(Vec<WorldLodColumnAsset>, Vec<WorldLodColumnRetirement>), GalError> {
+    if update.generation == 0 {
+        return Err(GalError::ffi(StatusCode::InvalidArgument, "world LOD asset update generation must be non-zero"));
+    }
+    if update.assets.len() > WORLD_LOD_MAX_COLUMNS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("world LOD column asset count {} exceeds bounded limit {WORLD_LOD_MAX_COLUMNS}", update.assets.len()),
+        ));
+    }
+    if update.retirements.len() > WORLD_LOD_MAX_COLUMNS {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!("world LOD retirement count {} exceeds bounded limit {WORLD_LOD_MAX_COLUMNS}", update.retirements.len()),
+        ));
+    }
+    let assets = update.assets.iter().map(|a| a.payload.asset(a.column_key, a.generation)).collect::<Result<Vec<_>, _>>()?;
+    let asset_keys: HashSet<i64> = update.assets.iter().map(|a| a.column_key).collect();
+    let mut retirement_keys = HashSet::new();
+    let mut retirements = Vec::with_capacity(update.retirements.len());
+    for &(key, generation) in &update.retirements {
+        if generation == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world LOD retirement reserved field and generation must be valid",
+            ));
+        }
+        if !retirement_keys.insert(key) || asset_keys.contains(&key) {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("duplicate or conflicting world LOD retirement {}", key as u64),
+            ));
+        }
+        retirements.push(WorldLodColumnRetirement { column_key: key as u64, column_generation: generation as u64 });
+    }
+    Ok((assets, retirements))
 }

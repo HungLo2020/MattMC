@@ -92,21 +92,21 @@ public final class DistantHorizonsSemanticCollector {
 	/** Frozen's optional DH far-clip fade runs before the vanilla transition;
 	 * Rust consumes this as policy data and owns the actual composition pass. */
 	public static final int RENDER_FLAG_DH_FAR_CLIP_FADE = 1 << 7;
-	/** Guards the payload maps below together with the Rust ledger
-	 * ({@link DhCollectorLedger}), which owns every column decision: current,
+	/** Guards the provenance maps below together with the Rust ledger
+	 * ({@link DhCollectorLedger}), which owns every column decision (current,
 	 * pending, in-flight, published and retiring generations, owner leases,
 	 * lifecycle resets, the visible segments being prepared and the route
-	 * receipts. Each ledger call returns effects that keep these maps holding
-	 * exactly the snapshots it references. */
+	 * receipts) and every column payload. Each ledger call returns effects
+	 * that keep these maps holding exactly the provenance it references. */
 	private static final Object LOCK = new Object();
-	/** Current copied column payload per key (the ledger's current generation). */
-	private static final Map<Long, LodColumnSnapshot> CURRENT = new java.util.HashMap<>();
 	/** Exact material provenance retained beside, never inside, the legacy LOD ABI. */
 	private static final Map<Long, LodMaterialProvenanceSnapshot> MATERIAL_PROVENANCE = new java.util.HashMap<>();
-	/** Last acknowledged immutable asset per live column, retained only when an
-	 * explicit source/capture consumer needs its full CPU geometry. In the
-	 * ledger's insertion order, which capture probes iterate. */
-	private static final Map<Long, LodColumnSnapshot> PUBLISHED_COLUMNS = new LinkedHashMap<>();
+	/** Java copies of ledger payloads, made only when a diagnostic, probe or
+	 * the provenance publication path reads one ({@link #currentColumnLocked},
+	 * {@link #publishedColumnLocked}) and dropped by the effects that replace
+	 * them. */
+	private static final Map<Long, LodColumnSnapshot> CURRENT_COPIES = new java.util.HashMap<>();
+	private static final Map<Long, LodColumnSnapshot> PUBLISHED_COPIES = new java.util.HashMap<>();
 	/** Provenance paired with the acknowledged asset, never with a newer build. */
 	private static final Map<Long, LodMaterialProvenanceSnapshot> PUBLISHED_MATERIAL_PROVENANCE = new LinkedHashMap<>();
 	/** Exact-atlas coverage is derived solely from an immutable published column
@@ -219,15 +219,14 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	/**
-	 * Applies a ledger call's effects to the payload maps. {@code built} and
-	 * {@code builtProvenance} are the snapshot and provenance that call
-	 * recorded; {@code update} the update it acknowledged.
+	 * Applies a ledger call's effects to the provenance maps and payload
+	 * copies. {@code builtProvenance} is the provenance of the column that call
+	 * recorded; {@code updateProvenance} that of the update it acknowledged.
 	 */
 	private static void applyEffectsLocked(
 		int count,
-		LodColumnSnapshot built,
 		LodMaterialProvenanceSnapshot builtProvenance,
-		PendingAssetUpdate update
+		Map<Long, LodMaterialProvenanceSnapshot> updateProvenance
 	) {
 		long[] effects = DhCollectorLedger.takeEffects(count);
 		for (int at = 0; at < effects.length; at += 3) {
@@ -235,34 +234,33 @@ public final class DistantHorizonsSemanticCollector {
 			long detail = effects[at + 2];
 			switch ((int)effects[at]) {
 				case DhCollectorLedger.EFFECT_SET_CURRENT -> {
-					CURRENT.put(key, built);
+					CURRENT_COPIES.remove(key);
 					if (builtProvenance != null) MATERIAL_PROVENANCE.put(key, builtProvenance);
 					else MATERIAL_PROVENANCE.remove(key);
 				}
 				case DhCollectorLedger.EFFECT_DROP_CURRENT -> {
-					CURRENT.remove(key);
+					CURRENT_COPIES.remove(key);
 					MATERIAL_PROVENANCE.remove(key);
 				}
 				case DhCollectorLedger.EFFECT_PUBLISH_CURRENT -> {
-					PUBLISHED_COLUMNS.put(key, built);
+					PUBLISHED_COPIES.remove(key);
 					if (builtProvenance != null) PUBLISHED_MATERIAL_PROVENANCE.put(key, builtProvenance);
 					else if (detail != 0L) PUBLISHED_MATERIAL_PROVENANCE.remove(key);
 				}
 				case DhCollectorLedger.EFFECT_PUBLISH_UPDATE -> {
-					if ((detail & 1L) != 0L) PUBLISHED_COLUMNS.put(key, update.snapshots().get((int)(detail >>> 1)));
-					else PUBLISHED_COLUMNS.remove(key);
-					LodMaterialProvenanceSnapshot provenance = update.materialProvenanceByColumn().get(key);
+					PUBLISHED_COPIES.remove(key);
+					LodMaterialProvenanceSnapshot provenance = updateProvenance.get(key);
 					if (provenance == null) PUBLISHED_MATERIAL_PROVENANCE.remove(key);
 					else PUBLISHED_MATERIAL_PROVENANCE.put(key, provenance);
 				}
 				case DhCollectorLedger.EFFECT_DROP_PUBLISHED -> {
-					PUBLISHED_COLUMNS.remove(key);
+					PUBLISHED_COPIES.remove(key);
 					PUBLISHED_MATERIAL_PROVENANCE.remove(key);
 				}
 				case DhCollectorLedger.EFFECT_CLEAR -> {
-					CURRENT.clear();
+					CURRENT_COPIES.clear();
 					MATERIAL_PROVENANCE.clear();
-					PUBLISHED_COLUMNS.clear();
+					PUBLISHED_COPIES.clear();
 					PUBLISHED_MATERIAL_PROVENANCE.clear();
 				}
 				default -> throw new IllegalStateException("Unknown DH ledger effect " + effects[at]);
@@ -288,13 +286,6 @@ public final class DistantHorizonsSemanticCollector {
 	/** The prepared frame as the ledger has it: the copied parameters with its flags, or disabled. */
 	private static VulkanicGalBridge.WorldLodRenderFrameRecord frameRecord(boolean enabled, int flags) {
 		return enabled ? withFlags(PENDING_RENDER_FRAME, flags) : VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-	}
-
-	private static int[] emittedSegmentCounts(LodColumnSnapshot column) {
-		return new int[] {
-			emittedSegmentCount(column.opaque()), emittedSegmentCount(column.transparentSide()),
-			emittedSegmentCount(column.transparentUp()), emittedSegmentCount(column.transparentWaterUp())
-		};
 	}
 
 	private DistantHorizonsSemanticCollector() {
@@ -588,7 +579,7 @@ public final class DistantHorizonsSemanticCollector {
 				if (segment.layer() != 1) continue;
 				// COLUMNS.get: an access in the ledger's LRU, as it was in Java.
 				long current = DhCollectorLedger.query(DhCollectorLedger.QUERY_TOUCH, segment.columnKey());
-				LodColumnSnapshot column = current == 0L ? null : CURRENT.get(segment.columnKey());
+				LodColumnSnapshot column = current == 0L ? null : currentColumnLocked(segment.columnKey());
 				if (column == null || column.generation() != segment.columnGeneration()
 					|| segment.segmentIndex() < 0 || segment.segmentIndex() >= column.opaque().size()) continue;
 				List<LodVertex> vertices = column.opaque().get(segment.segmentIndex()).vertices();
@@ -651,7 +642,7 @@ public final class DistantHorizonsSemanticCollector {
 					continue;
 				}
 				cachedColumns++;
-				LodColumnSnapshot column = CURRENT.get(columnKey);
+				LodColumnSnapshot column = currentColumnLocked(columnKey);
 				boolean published = DhCollectorLedger.query(DhCollectorLedger.QUERY_PUBLISHED_GENERATION, columnKey) == column.generation();
 				if (published) {
 					publishedColumns++;
@@ -1179,8 +1170,7 @@ public final class DistantHorizonsSemanticCollector {
 
 	private static DistantHorizonsWaterProbeResult waterSourceProbeResultLocked(BlockPos probe) {
 		String firstWaterBounds = "";
-		for (Map.Entry<Long, LodColumnSnapshot> entry : PUBLISHED_COLUMNS.entrySet()) {
-			long columnKey = entry.getKey();
+		for (long columnKey : DhCollectorLedger.publishedPayloadKeys()) {
 			LodColumnSnapshot column = publishedColumnLocked(columnKey);
 			LodMaterialProvenanceSnapshot provenance = publishedMaterialProvenanceLocked(columnKey);
 			if (column == null || provenance == null) {
@@ -1243,11 +1233,11 @@ public final class DistantHorizonsSemanticCollector {
 
 	private static DistantHorizonsWaterProbeResult waterCachedProbeResultLocked(BlockPos probe) {
 		for (long columnKey : DhCollectorLedger.columnKeys()) {
-			LodColumnSnapshot column = CURRENT.get(columnKey);
 			LodMaterialProvenanceSnapshot provenance = MATERIAL_PROVENANCE.get(columnKey);
 			if (provenance == null) {
 				continue;
 			}
+			LodColumnSnapshot column = currentColumnLocked(columnKey);
 			int waterSegmentIndex = nonEmptySegmentCount(column.opaque())
 				+ nonEmptySegmentCount(column.transparentSide())
 				+ nonEmptySegmentCount(column.transparentUp());
@@ -1561,14 +1551,16 @@ public final class DistantHorizonsSemanticCollector {
 				this.closed = true;
 				if (this.ownerToken == 0L) return;
 				applyEffectsLocked(DhCollectorLedger.releaseOwner(ledgerConfig(), this.columnKey, this.generation, this.ownerToken),
-					null, null, null);
+					null, Map.of());
 			}
 		}
 	}
 
-	/** Installs one already immutable snapshot while holding {@link #LOCK}:
-	 * Java compares the payloads, the ledger decides. Writes [generation, owner
-	 * token] to {@code result} and returns the generation (0 for an empty build). */
+	/** Hands one validated snapshot's payload to the ledger while holding
+	 * {@link #LOCK}: Rust copies the packed segments, compares them with the
+	 * current column and decides; Java keeps only the provenance. Writes
+	 * [generation, owner token] to {@code result} and returns the generation
+	 * (0 for an empty build). */
 	private static long recordBuiltSnapshotLocked(
 		long columnKey,
 		LodColumnSnapshot snapshot,
@@ -1576,17 +1568,19 @@ public final class DistantHorizonsSemanticCollector {
 		boolean retainOwner,
 		long[] result
 	) {
-		boolean hasSegments = snapshot.hasSegments();
-		LodColumnSnapshot replaced = hasSegments ? CURRENT.get(columnKey) : null;
-		boolean samePayload = replaced != null && replaced.hasSamePayload(snapshot);
-		boolean sameProvenance = samePayload && Objects.equals(MATERIAL_PROVENANCE.get(columnKey), provenance);
-		String difference = replaced != null && !samePayload ? replaced.payloadDifference(snapshot) : null;
+		List<List<LodBufferSnapshot>> layers = List.of(
+			snapshot.opaque(), snapshot.transparentSide(), snapshot.transparentUp(), snapshot.transparentWaterUp());
+		for (int layer = 0; layer < layers.size(); layer++) {
+			for (LodBufferSnapshot segment : layers.get(layer)) {
+				DhCollectorLedger.stageSegment(layer, segment.sourceBufferIndex(), segment.packedVerticesForRust());
+			}
+		}
+		boolean sameProvenance = Objects.equals(MATERIAL_PROVENANCE.get(columnKey), provenance);
 		int effects = DhCollectorLedger.recordBuilt(
-			ledgerConfig(), columnKey, snapshot.generation(), hasSegments ? snapshot.byteSize() : 0L,
-			emittedSegmentCounts(snapshot), hasSegments, provenance == null ? -1L : provenance.byteSize(),
-			samePayload, sameProvenance, difference, retainOwner, result
+			ledgerConfig(), columnKey, snapshot.generation(), snapshot.originX(), snapshot.originY(), snapshot.originZ(),
+			provenance == null ? -1L : provenance.byteSize(), sameProvenance, retainOwner, result
 		);
-		applyEffectsLocked(effects, snapshot, provenance, null);
+		applyEffectsLocked(effects, provenance, Map.of());
 		return result[0];
 	}
 
@@ -1618,7 +1612,7 @@ public final class DistantHorizonsSemanticCollector {
 			return;
 		}
 		synchronized (LOCK) {
-			applyEffectsLocked(DhCollectorLedger.removeColumn(ledgerConfig(), columnKey, -1L), null, null, null);
+			applyEffectsLocked(DhCollectorLedger.removeColumn(ledgerConfig(), columnKey, -1L), null, Map.of());
 		}
 	}
 
@@ -1630,7 +1624,7 @@ public final class DistantHorizonsSemanticCollector {
 			return;
 		}
 		synchronized (LOCK) {
-			applyEffectsLocked(DhCollectorLedger.removeColumn(ledgerConfig(), columnKey, columnGeneration), null, null, null);
+			applyEffectsLocked(DhCollectorLedger.removeColumn(ledgerConfig(), columnKey, columnGeneration), null, Map.of());
 		}
 	}
 
@@ -2596,7 +2590,7 @@ public final class DistantHorizonsSemanticCollector {
 		synchronized (LOCK) {
 			// The ledger retires every published generation through the normal
 			// pending-update path and keeps the lifecycle receipts.
-			applyEffectsLocked(DhCollectorLedger.clear(reason), null, null, null);
+			applyEffectsLocked(DhCollectorLedger.clear(reason), null, Map.of());
 			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
 			EXACT_ATLAS_COVERAGE_CACHE.clear();
 			BRIDGE_FACE_MATERIAL_CACHE.clear();
@@ -2679,15 +2673,48 @@ public final class DistantHorizonsSemanticCollector {
 		};
 	}
 
-	/** The retained published snapshot, when it is the ledger's published generation. */
+	/** A copy of the retained published payload, when it is the ledger's published generation. */
 	private static LodColumnSnapshot publishedColumnLocked(long columnKey) {
-		LodColumnSnapshot column = PUBLISHED_COLUMNS.get(columnKey);
-		if (column == null) {
+		long generation = DhCollectorLedger.query(DhCollectorLedger.QUERY_PUBLISHED_PAYLOAD_GENERATION, columnKey);
+		return generation == 0L ? null
+			: payloadCopyLocked(PUBLISHED_COPIES, columnKey, generation, DhCollectorLedger.PAYLOAD_PUBLISHED);
+	}
+
+	/** A copy of the current payload, without counting as a column access. */
+	private static LodColumnSnapshot currentColumnLocked(long columnKey) {
+		long generation = DhCollectorLedger.query(DhCollectorLedger.QUERY_CURRENT_GENERATION, columnKey);
+		return generation == 0L ? null
+			: payloadCopyLocked(CURRENT_COPIES, columnKey, generation, DhCollectorLedger.PAYLOAD_CURRENT);
+	}
+
+	private static LodColumnSnapshot payloadCopyLocked(
+		Map<Long, LodColumnSnapshot> copies, long columnKey, long generation, int which
+	) {
+		LodColumnSnapshot copy = copies.get(columnKey);
+		if (copy != null && copy.generation() == generation) return copy;
+		DhCollectorLedger.PayloadCopy payload = DhCollectorLedger.payload(columnKey, which);
+		if (payload == null) {
+			copies.remove(columnKey);
 			return null;
 		}
-		return DhCollectorLedger.query(DhCollectorLedger.QUERY_PUBLISHED_GENERATION, columnKey) == column.generation()
-			? column
-			: null;
+		long[] header = payload.header();
+		List<List<LodBufferSnapshot>> layers = new ArrayList<>(4);
+		int segment = 8;
+		int offset = 0;
+		for (int layer = 0; layer < 4; layer++) {
+			List<LodBufferSnapshot> buffers = new ArrayList<>((int)header[4 + layer]);
+			for (int index = 0; index < header[4 + layer]; index++, segment += 2) {
+				int length = (int)header[segment + 1];
+				buffers.add(LodBufferSnapshot.fromPacked((int)header[segment],
+					Arrays.copyOfRange(payload.bytes(), offset, offset + length)));
+				offset += length;
+			}
+			layers.add(buffers);
+		}
+		copy = new LodColumnSnapshot(columnKey, header[0], (int)header[1], (int)header[2], (int)header[3],
+			layers.get(0), layers.get(1), layers.get(2), layers.get(3));
+		copies.put(columnKey, copy);
+		return copy;
 	}
 
 	private static LodMaterialProvenanceSnapshot publishedMaterialProvenanceLocked(long columnKey) {
@@ -2705,13 +2732,65 @@ public final class DistantHorizonsSemanticCollector {
 			return null;
 		}
 		boolean profileUpdate = Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.dhChurnCounters");
-		long selectStarted = profileUpdate ? System.nanoTime() : 0L;
-		PendingAssetUpdate update = pendingUpdate(true);
-		long selectEnded = profileUpdate ? System.nanoTime() : 0L;
+		long[] outcome = new long[6];
+		long flushStarted = System.nanoTime();
+		VulkanicGalBridge.Status status = bridge.flushWorldLodCollector(ledgerConfig(), outcome);
+		if (outcome[0] == 3L) {
+			DhCollectorLedger.check((int)outcome[1]);
+		}
+		if (outcome[0] == 2L) {
+			return flushPendingAssetsFromJava(bridge, profileUpdate);
+		}
 		if (profileUpdate) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
-				"world.distant-horizons.asset-select", selectEnded - selectStarted);
+				"world.distant-horizons.asset-select", outcome[0] == 1L ? outcome[4] : System.nanoTime() - flushStarted);
 		}
+		if (outcome[0] != 1L) {
+			return null;
+		}
+		long[] update = DhCollectorLedger.takeOutput(3 + 2 * (int)(outcome[1] + outcome[3]));
+		int assetsAt = 3;
+		int retirementsAt = assetsAt + (int)update[1] * 2;
+		long[] assets = Arrays.copyOfRange(update, assetsAt, retirementsAt);
+		long[] retirements = Arrays.copyOfRange(update, retirementsAt, update.length);
+		if (profileUpdate) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				"world.distant-horizons.asset-update-columns", outcome[1]);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				"world.distant-horizons.asset-update-bytes", outcome[2]);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-native-update", outcome[5]);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-bridge", outcome[5]);
+		}
+		if (System.getenv("MATTMC_TRACE_WHOLE_FRAME") != null) {
+			System.err.println("whole-frame.dh-assets.begin generation=" + update[0]
+				+ " columns=" + outcome[1]
+				+ " snapshots_bytes=" + outcome[2]
+				+ " retirements=" + outcome[3]);
+			System.err.println("whole-frame.dh-assets.end generation=" + update[0]
+				+ " elapsed_nanos=" + outcome[5]);
+		}
+		long acknowledgeStarted = profileUpdate ? System.nanoTime() : 0L;
+		try {
+			acknowledge(assets, retirements, Map.of());
+		} catch (RuntimeException error) {
+			synchronized (LOCK) {
+				DhCollectorLedger.releaseInFlight(assets);
+			}
+			throw error;
+		}
+		if (profileUpdate) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-acknowledge", System.nanoTime() - acknowledgeStarted);
+		}
+		return status;
+	}
+
+	/** Publishes an update carrying material provenance, which needs Java's
+	 * model resolution, through the Java-packed bridge call. */
+	private static VulkanicGalBridge.Status flushPendingAssetsFromJava(VulkanicGalBridge bridge, boolean profileUpdate) {
+		PendingAssetUpdate update = pendingUpdate(true);
 		if (update == null) {
 			return null;
 		}
@@ -2767,7 +2846,8 @@ public final class DistantHorizonsSemanticCollector {
 	/**
 	 * The ledger selects the bounded update (visible demand first, never a
 	 * column selected for the frame being prepared or already in flight) and
-	 * marks it in flight; Java builds the copied records from its payloads.
+	 * marks it in flight; Java builds the copied records from copies of its
+	 * payloads.
 	 */
 	private static PendingAssetUpdate pendingUpdate(boolean visibleCandidatesOnly) {
 		synchronized (LOCK) {
@@ -2784,7 +2864,7 @@ public final class DistantHorizonsSemanticCollector {
 			for (int index = 0; index < assetCount; index++) {
 				long columnKey = selected[3 + index * 2];
 				long generation = selected[4 + index * 2];
-				LodColumnSnapshot snapshot = CURRENT.get(columnKey);
+				LodColumnSnapshot snapshot = currentColumnLocked(columnKey);
 				if (snapshot == null || snapshot.generation() != generation) {
 					throw new IllegalStateException("Distant Horizons ledger selected column " + columnKey
 						+ " generation " + generation + " without its copied payload");
@@ -2812,21 +2892,23 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static void acknowledge(PendingAssetUpdate update) {
+		long[] assets = new long[update.assets().size() * 2];
+		for (int index = 0; index < update.assets().size(); index++) {
+			assets[index * 2] = update.assets().get(index).columnKey();
+			assets[index * 2 + 1] = update.assets().get(index).columnGeneration();
+		}
+		long[] retirements = new long[update.retirements().size() * 2];
+		for (int index = 0; index < update.retirements().size(); index++) {
+			retirements[index * 2] = update.retirements().get(index).columnKey();
+			retirements[index * 2 + 1] = update.retirements().get(index).columnGeneration();
+		}
+		acknowledge(assets, retirements, update.materialProvenanceByColumn());
+	}
+
+	/** {@code assets} and {@code retirements}: (key, generation) each. */
+	private static void acknowledge(long[] assets, long[] retirements, Map<Long, LodMaterialProvenanceSnapshot> provenance) {
 		synchronized (LOCK) {
-			long[] assets = new long[update.assets().size() * 6];
-			for (int index = 0; index < update.assets().size(); index++) {
-				VulkanicGalBridge.WorldLodColumnAssetRecord asset = update.assets().get(index);
-				int[] counts = emittedSegmentCounts(update.snapshots().get(index));
-				assets[index * 6] = asset.columnKey();
-				assets[index * 6 + 1] = asset.columnGeneration();
-				for (int layer = 0; layer < 4; layer++) assets[index * 6 + 2 + layer] = counts[layer];
-			}
-			long[] retirements = new long[update.retirements().size() * 2];
-			for (int index = 0; index < update.retirements().size(); index++) {
-				retirements[index * 2] = update.retirements().get(index).columnKey();
-				retirements[index * 2 + 1] = update.retirements().get(index).columnGeneration();
-			}
-			applyEffectsLocked(DhCollectorLedger.acknowledge(ledgerConfig(), assets, retirements), null, null, update);
+			applyEffectsLocked(DhCollectorLedger.acknowledge(ledgerConfig(), assets, retirements), null, provenance);
 		}
 	}
 
@@ -3373,71 +3455,6 @@ public final class DistantHorizonsSemanticCollector {
 		List<LodBufferSnapshot> transparentUp,
 		List<LodBufferSnapshot> transparentWaterUp
 	) {
-		boolean hasSamePayload(LodColumnSnapshot other) {
-			return this.columnKey == other.columnKey
-				&& this.originX == other.originX
-				&& this.originY == other.originY
-				&& this.originZ == other.originZ
-				&& this.opaque.equals(other.opaque)
-				&& this.transparentSide.equals(other.transparentSide)
-				&& this.transparentUp.equals(other.transparentUp)
-				&& this.transparentWaterUp.equals(other.transparentWaterUp);
-		}
-
-		String payloadDifference(LodColumnSnapshot other) {
-			if (this.originX != other.originX || this.originY != other.originY || this.originZ != other.originZ) {
-				return "origin";
-			}
-			String opaqueDifference = bufferDifference(this.opaque, other.opaque, "opaque");
-			if (opaqueDifference != null) return opaqueDifference;
-			String sideDifference = bufferDifference(this.transparentSide, other.transparentSide, "transparent-side");
-			if (sideDifference != null) return sideDifference;
-			String upDifference = bufferDifference(this.transparentUp, other.transparentUp, "transparent-up");
-			if (upDifference != null) return upDifference;
-			String waterDifference = bufferDifference(this.transparentWaterUp, other.transparentWaterUp, "transparent-water-up");
-			return waterDifference == null ? "unknown" : waterDifference;
-		}
-
-		private static String bufferDifference(List<LodBufferSnapshot> left, List<LodBufferSnapshot> right, String name) {
-			if (left.size() != right.size()) return name + "-segment-count";
-			for (int index = 0; index < left.size(); index++) {
-				LodBufferSnapshot leftBuffer = left.get(index);
-				LodBufferSnapshot rightBuffer = right.get(index);
-				if (leftBuffer.sourceBufferIndex() != rightBuffer.sourceBufferIndex()) return name + "-source-index";
-				if (leftBuffer.vertices().size() != rightBuffer.vertices().size()) return name + "-vertex-count";
-				for (int vertexIndex = 0; vertexIndex < leftBuffer.vertices().size(); vertexIndex++) {
-					String vertexDifference = vertexDifference(
-						leftBuffer.vertices().get(vertexIndex),
-						rightBuffer.vertices().get(vertexIndex)
-					);
-					if (vertexDifference != null) {
-						return name + "[" + index + "].vertex[" + vertexIndex + "]." + vertexDifference;
-					}
-				}
-			}
-			return null;
-		}
-
-		private static String vertexDifference(LodVertex left, LodVertex right) {
-			if (left.localX() != right.localX()) return valueDifference("local-x", left.localX(), right.localX());
-			if (left.localY() != right.localY()) return valueDifference("local-y", left.localY(), right.localY());
-			if (left.localZ() != right.localZ()) return valueDifference("local-z", left.localZ(), right.localZ());
-			if (left.packedLightAndMicroOffset() != right.packedLightAndMicroOffset()) {
-				return valueDifference("packed-light-micro", left.packedLightAndMicroOffset(), right.packedLightAndMicroOffset());
-			}
-			if (left.red() != right.red()) return valueDifference("red", left.red(), right.red());
-			if (left.green() != right.green()) return valueDifference("green", left.green(), right.green());
-			if (left.blue() != right.blue()) return valueDifference("blue", left.blue(), right.blue());
-			if (left.alpha() != right.alpha()) return valueDifference("alpha", left.alpha(), right.alpha());
-			if (left.materialId() != right.materialId()) return valueDifference("material-id", left.materialId(), right.materialId());
-			if (left.normalIndex() != right.normalIndex()) return valueDifference("normal-index", left.normalIndex(), right.normalIndex());
-			if (left.padding() != right.padding()) return valueDifference("padding", left.padding(), right.padding());
-			return null;
-		}
-
-		private static String valueDifference(String field, int left, int right) {
-			return field + "=" + left + "->" + right;
-		}
 		public LodColumnSnapshot {
 			if (generation <= 0L) {
 				throw new IllegalArgumentException("generation must be positive");
@@ -4367,7 +4384,7 @@ public final class DistantHorizonsSemanticCollector {
 	static void resetForTest() {
 		synchronized (LOCK) {
 			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
-			applyEffectsLocked(DhCollectorLedger.resetForTest(), null, null, null);
+			applyEffectsLocked(DhCollectorLedger.resetForTest(), null, Map.of());
 			EXACT_ATLAS_COVERAGE_CACHE.clear();
 			BRIDGE_FACE_MATERIAL_CACHE.clear();
 			BRIDGE_VARIANT_FACE_MATERIAL_CACHE.clear();
@@ -4388,13 +4405,13 @@ public final class DistantHorizonsSemanticCollector {
 	static LodColumnSnapshot snapshotForTest(long columnKey) {
 		synchronized (LOCK) {
 			// COLUMNS.get: an access in the ledger's LRU, as it was in Java.
-			return DhCollectorLedger.query(DhCollectorLedger.QUERY_TOUCH, columnKey) == 0L ? null : CURRENT.get(columnKey);
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_TOUCH, columnKey) == 0L ? null : currentColumnLocked(columnKey);
 		}
 	}
 
 	static void trimRetainedColumnsForTest(int maximumColumns, long maximumBytes) {
 		synchronized (LOCK) {
-			applyEffectsLocked(DhCollectorLedger.trim(maximumColumns, maximumBytes), null, null, null);
+			applyEffectsLocked(DhCollectorLedger.trim(maximumColumns, maximumBytes), null, Map.of());
 		}
 	}
 

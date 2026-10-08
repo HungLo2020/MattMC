@@ -3,17 +3,22 @@
 //! owner leases of DH buffer containers; lifecycle resets; the visible
 //! segments of the frame being prepared; and the route receipts.
 //!
-//! `DistantHorizonsSemanticCollector` keeps the column payloads (packed
-//! vertices and material provenance) and the capture diagnostics. It applies
-//! each call's [`Effect`]s to its payload maps, so they always hold exactly
-//! the snapshots this ledger references. Every Java map operation is
-//! reproduced in order, including the access order of the column LRU.
+//! The ledger also owns each generation's copied payload (packed vertices,
+//! [`Payload`]), so ordinary publication goes straight from here to the world
+//! frontend. `DistantHorizonsSemanticCollector` keeps material provenance
+//! (it needs Java's model resolution), the capture diagnostics and payload
+//! copies for them; it applies each call's [`Effect`]s to its provenance maps.
+//! Every Java map operation is reproduced in order, including the access
+//! order of the column LRU.
 pub(crate) mod order;
+mod payload;
 #[cfg(test)]
 mod tests;
 
 use order::{OrderedMap, OrderedSet};
+pub(crate) use payload::{Payload, Segment};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -77,12 +82,19 @@ pub(crate) struct Instance {
     pub order: i32,
 }
 
-/// A column snapshot as the ledger sees it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A column snapshot: its generation and payload.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Column {
     pub generation: i64,
     pub byte_size: i64,
     pub counts: Counts,
+    pub payload: Arc<Payload>,
+}
+
+impl Column {
+    pub(crate) fn new(generation: i64, payload: Payload) -> Self {
+        Self { generation, byte_size: payload.byte_size(), counts: payload.counts(), payload: Arc::new(payload) }
+    }
 }
 
 /// What Java must do to its payload maps, in order.
@@ -128,14 +140,11 @@ pub(crate) struct Frame {
 }
 
 /// A newly built column for [`Ledger::record_built`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Built {
     pub column: Column,
-    pub has_segments: bool,
     /// The provenance sidecar's byte size, when it has one.
     pub provenance_bytes: Option<i64>,
-    /// Java's `hasSamePayload` against the current snapshot.
-    pub same_payload: bool,
     /// Java's provenance equality against the current provenance.
     pub same_provenance: bool,
 }
@@ -148,25 +157,36 @@ pub(crate) enum Visible {
 }
 
 /// One selected asset of a pending update.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Selected {
     pub column_key: i64,
     pub generation: i64,
+    pub payload: Arc<Payload>,
+    /// The column has a material provenance sidecar (Java must publish it).
+    pub has_provenance: bool,
 }
 
+#[derive(Debug)]
 pub(crate) struct PendingUpdate {
     pub generation: i64,
     pub assets: Vec<Selected>,
     pub retirements: Vec<(i64, i64)>,
 }
 
-/// An acknowledged asset: its key and generation, and the emitted segment
-/// counts of the snapshot that was sent.
-#[derive(Clone, Copy, Debug)]
+/// [`Ledger::select_flush`]'s result.
+#[derive(Debug)]
+pub(crate) enum Flush {
+    Nothing,
+    NeedsJava,
+    Selected(PendingUpdate),
+}
+
+/// An acknowledged asset: its key and generation, and the payload sent.
+#[derive(Clone, Debug)]
 pub(crate) struct Acknowledged {
     pub column_key: i64,
     pub generation: i64,
-    pub counts: Counts,
+    pub payload: Arc<Payload>,
 }
 
 /// Route state reported by `routeDiagnosticsSnapshot`.
@@ -307,12 +327,15 @@ pub(crate) struct Ledger {
     provenance: OrderedMap<i64>,
     published_generations: OrderedMap<i64>,
     published_meta: OrderedMap<PublishedMeta>,
-    published_payload: OrderedMap<i64>,
+    published_payload: OrderedMap<(i64, Arc<Payload>)>,
     pending: OrderedMap<i64>,
     pending_visible_keys: OrderedSet,
     candidates: OrderedSet,
     in_flight: OrderedMap<i64>,
     invalidated_in_flight: OrderedMap<i64>,
+    /// The payload of each (key, generation) in flight, until it is
+    /// acknowledged or released (a lifecycle reset keeps it).
+    sent: HashMap<(i64, i64), Arc<Payload>>,
     pending_retirements: OrderedMap<i64>,
     last_lifecycle_retirements: OrderedMap<i64>,
     payload_differences: HashMap<i64, String>,
@@ -343,6 +366,7 @@ impl Ledger {
             candidates: OrderedSet::new(),
             in_flight: OrderedMap::new(),
             invalidated_in_flight: OrderedMap::new(),
+            sent: HashMap::new(),
             pending_retirements: OrderedMap::new(),
             last_lifecycle_retirements: OrderedMap::new(),
             payload_differences: HashMap::new(),
@@ -368,8 +392,18 @@ impl Ledger {
 
     /// `publishedColumnLocked`: the generation of a retained published payload.
     pub(crate) fn published_payload_generation(&self, key: i64) -> Option<i64> {
-        let generation = *self.published_payload.peek(key)?;
-        (self.published_generations.peek(key) == Some(&generation)).then_some(generation)
+        self.published_payload_of(key).map(|(generation, _)| generation)
+    }
+
+    /// The retained published payload, when it is the published generation.
+    pub(crate) fn published_payload_of(&self, key: i64) -> Option<(i64, &Arc<Payload>)> {
+        let (generation, payload) = self.published_payload.peek(key)?;
+        (self.published_generations.peek(key) == Some(generation)).then_some((*generation, payload))
+    }
+
+    /// The current column without counting as an access.
+    pub(crate) fn current(&self, key: i64) -> Option<&Column> {
+        self.columns.peek(key)
     }
 
     pub(crate) fn published_generation(&self, key: i64) -> Option<i64> {
@@ -499,21 +533,14 @@ impl Ledger {
     }
 
     /// `recordBuiltSnapshotLocked`. Returns the generation that represents
-    /// the column (0 for an empty build). `difference` is Java's
-    /// `payloadDifference` against the replaced snapshot, when there is one.
-    pub(crate) fn record_built(
-        &mut self,
-        config: Config,
-        key: i64,
-        built: Built,
-        difference: Option<String>,
-        effects: &mut Vec<Effect>,
-    ) -> Result<i64> {
-        if !built.has_segments {
+    /// the column (0 for an empty build).
+    pub(crate) fn record_built(&mut self, config: Config, key: i64, built: Built, effects: &mut Vec<Effect>) -> Result<i64> {
+        if !built.column.payload.has_segments() {
             return Ok(0);
         }
-        let replaced = self.columns.get_touch(key).copied();
-        if let Some(replaced) = replaced.filter(|_| built.same_payload) {
+        let replaced = self.columns.get_touch(key).cloned();
+        let same_payload = replaced.as_ref().is_some_and(|r| r.payload == built.column.payload);
+        if let Some(replaced) = replaced.as_ref().filter(|_| same_payload) {
             if built.same_provenance {
                 if config.rust_whole_frame && self.published_generations.peek(key) != Some(&replaced.generation) {
                     self.mark_pending_visible(key)?;
@@ -522,34 +549,35 @@ impl Ledger {
                 self.receipts.reused += 1;
                 return Ok(replaced.generation);
             }
-            self.columns.put(key, built.column);
+            let generation = built.column.generation;
+            self.columns.put(key, built.column.clone());
             effects.push(Effect::SetCurrent(key));
             self.replace_provenance(key, built.provenance_bytes);
             if config.legacy_observation {
-                self.published_generations.put(key, built.column.generation);
-                self.published_payload.put(key, built.column.generation);
+                self.published_generations.put(key, generation);
+                self.published_payload.put(key, (generation, built.column.payload.clone()));
                 effects.push(Effect::PublishCurrent { key, remove_absent_provenance: true });
                 self.pending.remove(key);
             } else {
-                self.pending.put(key, built.column.generation);
+                self.pending.put(key, generation);
                 if config.rust_whole_frame {
                     self.mark_pending_visible(key)?;
                 }
             }
             self.receipts.built += 1;
-            return Ok(built.column.generation);
+            return Ok(generation);
         }
-        if replaced.is_some() {
+        if let Some(replaced) = &replaced {
             self.receipts.replaced += 1;
             self.receipts.last_payload_change_route_frame = self.route.frame;
-            let difference = difference.unwrap_or_else(|| "unknown".into());
+            let difference = replaced.payload.difference(&built.column.payload);
             self.receipts.last_payload_difference = difference.clone();
             self.payload_differences.insert(key, difference);
         }
-        self.columns.put(key, built.column);
+        self.columns.put(key, built.column.clone());
         effects.push(Effect::SetCurrent(key));
         self.replace_provenance(key, built.provenance_bytes);
-        if let Some(replaced) = replaced {
+        if let Some(replaced) = &replaced {
             self.retained_bytes -= replaced.byte_size;
         }
         self.retained_bytes += built.column.byte_size;
@@ -561,7 +589,7 @@ impl Ledger {
         }
         if config.legacy_observation {
             self.published_generations.put(key, built.column.generation);
-            self.published_payload.put(key, built.column.generation);
+            self.published_payload.put(key, (built.column.generation, built.column.payload.clone()));
             effects.push(Effect::PublishCurrent { key, remove_absent_provenance: false });
             self.pending.remove(key);
         } else {
@@ -632,8 +660,8 @@ impl Ledger {
         if config.legacy_observation || generation <= 0 {
             return;
         }
-        let current = self.columns.get_touch(key).copied();
-        if current.is_some_and(|c| c.generation == generation) {
+        let current = self.columns.get_touch(key).map(|c| c.generation);
+        if current == Some(generation) {
             self.remove_column_locked(key, effects);
             return;
         }
@@ -697,10 +725,10 @@ impl Ledger {
 
     /// `requestColumnPublication` (Java checks `enabled()` first).
     pub(crate) fn request_publication(&mut self, key: i64) -> Result<bool> {
-        let current = self.columns.get_touch(key).copied();
+        let current = self.columns.get_touch(key).map(|c| c.generation);
         let published = self.published_generations.peek(key).copied();
         if let Some(current) = current {
-            if published != Some(current.generation) {
+            if published != Some(current) {
                 self.mark_pending_visible(key)?;
             }
         }
@@ -710,10 +738,18 @@ impl Ledger {
     /// `pendingUpdate(visibleCandidatesOnly)`. Marks the selected assets in
     /// flight.
     pub(crate) fn pending_update(&mut self, config: Config, visible_candidates_only: bool) -> Result<Option<PendingUpdate>> {
+        let Some(update) = self.peek_pending_update(visible_candidates_only)? else { return Ok(None) };
+        self.mark_in_flight(config, &update.assets);
+        Ok(Some(update))
+    }
+
+    /// The update [`Self::pending_update`] would select, without marking it
+    /// in flight.
+    pub(crate) fn peek_pending_update(&self, visible_candidates_only: bool) -> Result<Option<PendingUpdate>> {
         if self.pending.is_empty() && self.pending_retirements.is_empty() {
             return Ok(None);
         }
-        let assets = self.select_pending_assets(config, visible_candidates_only)?;
+        let assets = self.select_pending_assets(visible_candidates_only)?;
         if assets.is_empty() && self.pending_retirements.is_empty() {
             return Ok(None);
         }
@@ -724,7 +760,28 @@ impl Ledger {
         }))
     }
 
-    fn select_pending_assets(&mut self, config: Config, visible_candidates_only: bool) -> Result<Vec<Selected>> {
+    /// The Rust flush's selection: the visible-candidate update, marked in
+    /// flight, unless one of its columns carries material provenance (then
+    /// nothing is marked and Java publishes the update).
+    pub(crate) fn select_flush(&mut self, config: Config) -> Result<Flush> {
+        let Some(update) = self.peek_pending_update(true)? else { return Ok(Flush::Nothing) };
+        if update.assets.iter().any(|a| a.has_provenance) {
+            return Ok(Flush::NeedsJava);
+        }
+        self.mark_in_flight(config, &update.assets);
+        Ok(Flush::Selected(update))
+    }
+
+    /// Marks a selection in flight, as `selectPendingAssetSnapshotsLocked` did.
+    fn mark_in_flight(&mut self, config: Config, selected: &[Selected]) {
+        for asset in selected {
+            self.in_flight.put(asset.column_key, asset.generation);
+            self.sent.insert((asset.column_key, asset.generation), asset.payload.clone());
+        }
+        self.trace_selection(config, selected);
+    }
+
+    fn select_pending_assets(&self, visible_candidates_only: bool) -> Result<Vec<Selected>> {
         let mut ordered: Vec<i64> = self.pending_visible_keys.iter().filter(|&k| self.pending.contains_key(k)).collect();
         if self.pending_visible_keys.is_empty() && visible_candidates_only {
             ordered.extend(self.candidates.iter().filter(|&k| self.pending.contains_key(k)));
@@ -740,7 +797,7 @@ impl Ledger {
                 continue;
             }
             // A pending snapshot is always the current one (both maps change together).
-            let Some(&column) = self.columns.peek(key) else {
+            let Some(column) = self.columns.peek(key) else {
                 debug_assert!(false, "pending column {key} is not current");
                 continue;
             };
@@ -752,13 +809,14 @@ impl Ledger {
             if selected.len() == MAX_PENDING_ASSET_COLUMNS_PER_UPDATE || exceeds {
                 break;
             }
-            selected.push(Selected { column_key: key, generation: column.generation });
+            selected.push(Selected {
+                column_key: key,
+                generation: column.generation,
+                payload: column.payload.clone(),
+                has_provenance: self.provenance.contains_key(key),
+            });
             selected_bytes = selected_bytes.checked_add(bytes).ok_or(Failure::ByteOverflow)?;
         }
-        for asset in &selected {
-            self.in_flight.put(asset.column_key, asset.generation);
-        }
-        self.trace_selection(config, &selected);
         Ok(selected)
     }
 
@@ -798,6 +856,7 @@ impl Ledger {
         let mut advanced: Vec<(i64, i64)> = Vec::new();
         for (index, asset) in assets.iter().enumerate() {
             let (key, generation) = (asset.column_key, asset.generation);
+            self.sent.remove(&(key, generation));
             if self.in_flight.peek(key) == Some(&generation) {
                 self.in_flight.remove(key);
             }
@@ -812,40 +871,40 @@ impl Ledger {
             if self.published_generations.peek(key).is_some_and(|&p| p != generation) {
                 advanced.push((key, generation));
             }
-            let current = self.columns.get_touch(key).copied();
+            let current = self.columns.get_touch(key).map(|c| (c.generation, c.byte_size));
             match current {
                 None => {
                     self.drop_published(key, effects);
                     self.pending_retirements.put(key, generation);
                 }
-                Some(current) if current.generation != generation && invalidated => {
+                Some((current, _)) if current != generation && invalidated => {
                     self.pending_retirements.put(key, generation);
                 }
-                Some(current) => {
+                Some((current, current_bytes)) => {
                     self.published_generations.put(key, generation);
-                    self.published_meta.put(key, PublishedMeta { generation, counts: asset.counts });
+                    self.published_meta.put(key, PublishedMeta { generation, counts: asset.payload.counts() });
                     if config.execution_snapshots {
-                        self.published_payload.put(key, generation);
+                        self.published_payload.put(key, (generation, asset.payload.clone()));
                     } else {
                         self.published_payload.remove(key);
                     }
                     effects.push(Effect::PublishUpdate { key, index, retain_payload: config.execution_snapshots });
-                    if !config.execution_snapshots && current.generation == generation {
+                    if !config.execution_snapshots && current == generation {
                         // discardAcknowledgedPayloadLocked
                         self.columns.remove(key);
                         effects.push(Effect::DropCurrent(key));
-                        self.retained_bytes -= current.byte_size;
+                        self.retained_bytes -= current_bytes;
                         self.remove_provenance(key);
                     }
                 }
             }
-            if current.is_some_and(|c| c.generation == generation) {
+            if current.is_some_and(|(c, _)| c == generation) {
                 self.pending_visible_keys.remove(key);
             }
             if was_visible_demand {
                 let message = format!(
                     "ack key={key} published={generation} current={} retained_visible_demand={}",
-                    current.map_or("missing".to_string(), |c| c.generation.to_string()),
+                    current.map_or("missing".to_string(), |(c, _)| c.to_string()),
                     self.pending_visible_keys.contains(key)
                 );
                 self.trace(config, &message);
@@ -917,8 +976,19 @@ impl Ledger {
     }
 
     /// `releaseInFlightAssets(update)`.
+    /// The sent payload of an asset in flight, for its acknowledgement.
+    pub(crate) fn sent_payload(&self, key: i64, generation: i64) -> Option<Arc<Payload>> {
+        self.sent.get(&(key, generation)).cloned()
+    }
+
+    /// Published payload keys in Java's `PUBLISHED_COLUMNS` order.
+    pub(crate) fn published_payload_keys(&self) -> impl Iterator<Item = i64> + '_ {
+        self.published_payload.keys()
+    }
+
     pub(crate) fn release_in_flight(&mut self, assets: &[(i64, i64)]) {
         for &(key, generation) in assets {
+            self.sent.remove(&(key, generation));
             if self.in_flight.peek(key) == Some(&generation) {
                 self.in_flight.remove(key);
             }
@@ -984,7 +1054,7 @@ impl Ledger {
 
     /// `recordVisibleMaterialColumn`'s admission (Java checks `enabled()`).
     pub(crate) fn visible_column(&mut self, key: i64) -> Result<Visible> {
-        let current = self.columns.get_touch(key).copied();
+        let current = self.columns.get_touch(key).map(|c| c.generation);
         if current.is_none() && self.pending_retirements.contains_key(key) {
             return Ok(Visible::Empty);
         }
@@ -996,7 +1066,7 @@ impl Ledger {
             self.route.unpublished_visible_columns += 1;
             return Ok(Visible::Empty);
         };
-        if current.is_some_and(|c| c.generation != column.generation) {
+        if current.is_some_and(|c| c != column.generation) {
             self.mark_pending_visible(key)?;
         }
         Ok(Visible::Admit { generation: column.generation, counts: column.counts })

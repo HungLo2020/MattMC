@@ -44,6 +44,7 @@ final class DhCollectorLedger {
 	static final int QUERY_NEXT_GENERATION = 14;
 	static final int QUERY_HAS_COLUMN = 15;
 	static final int QUERY_HAS_PUBLISHED_COLUMN = 16;
+	static final int QUERY_CURRENT_GENERATION = 17;
 
 	static final int SEGMENTS_PENDING = 0;
 	static final int SEGMENTS_LAST_CONSUMED = 1;
@@ -61,10 +62,15 @@ final class DhCollectorLedger {
 	private static final MethodHandle HAS_COLUMN_GENERATION = bind("has_column_generation", false, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG);
 	private static final MethodHandle REQUEST_PUBLICATION = bind("request_publication", false, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG);
+	private static final MethodHandle STAGE_SEGMENT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_collector_stage_segment",
+		FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT), CRITICAL);
 	private static final MethodHandle RECORD_BUILT = bind("record_built", true, ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
-		ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
-		ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
+		ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
+	private static final MethodHandle PAYLOAD = bind("payload", false, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT);
+	private static final MethodHandle TAKE_BYTES = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_collector_take_bytes",
+		FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT), CRITICAL);
+	private static final MethodHandle PUBLISHED_PAYLOAD_KEYS = bind("published_payload_keys", false, ValueLayout.JAVA_INT);
 	private static final MethodHandle RELEASE_OWNER = bind("release_owner", false, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG);
 	private static final MethodHandle RECORD_BUILD_ATTEMPT = bindVoid("record_build_attempt", ValueLayout.JAVA_INT);
@@ -175,14 +181,23 @@ final class DhCollectorLedger {
 		}
 	}
 
-	/** Returns the effect count; writes [generation, owner token] to {@code result}. */
-	static int recordBuilt(int config, long key, long generation, long byteSize, int[] counts, boolean hasSegments,
-		long provenanceBytes, boolean samePayload, boolean sameProvenance, String difference, boolean retainOwner, long[] result) {
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment differenceText = difference == null ? MemorySegment.NULL : utf8(arena, difference);
-			return check((int)RECORD_BUILT.invokeExact(config, key, generation, byteSize, MemorySegment.ofArray(counts),
-				hasSegments ? 1 : 0, provenanceBytes, samePayload ? 1 : 0, sameProvenance ? 1 : 0, differenceText,
-				retainOwner ? 1 : 0, MemorySegment.ofArray(result)));
+	/** Copies one packed segment into the column {@link #recordBuilt} records
+	 * next; {@code layer} is 0..3 (opaque, side, up, water). */
+	static void stageSegment(int layer, int sourceIndex, byte[] packedVertices) {
+		try {
+			STAGE_SEGMENT.invokeExact(layer, sourceIndex, MemorySegment.ofArray(packedVertices), packedVertices.length);
+		} catch (Throwable error) {
+			throw failure("segment staging", error);
+		}
+	}
+
+	/** Records the staged segments as the column's payload. Returns the effect
+	 * count; writes [generation, owner token] to {@code result}. */
+	static int recordBuilt(int config, long key, long generation, int originX, int originY, int originZ,
+		long provenanceBytes, boolean sameProvenance, boolean retainOwner, long[] result) {
+		try {
+			return check((int)RECORD_BUILT.invokeExact(config, key, generation, originX, originY, originZ,
+				provenanceBytes, sameProvenance ? 1 : 0, retainOwner ? 1 : 0, MemorySegment.ofArray(result)));
 		} catch (RuntimeException error) {
 			throw error;
 		} catch (Throwable error) {
@@ -388,10 +403,10 @@ final class DhCollectorLedger {
 		}
 	}
 
-	/** {@code assets}: (key, generation, opaque, side, up, water) each; {@code retirements}: (key, generation). */
+	/** {@code assets} and {@code retirements}: (key, generation) each. */
 	static int acknowledge(int config, long[] assets, long[] retirements) {
 		try {
-			return check((int)ACKNOWLEDGE.invokeExact(config, MemorySegment.ofArray(assets), assets.length / 6,
+			return check((int)ACKNOWLEDGE.invokeExact(config, MemorySegment.ofArray(assets), assets.length / 2,
 				MemorySegment.ofArray(retirements), retirements.length / 2));
 		} catch (RuntimeException error) {
 			throw error;
@@ -444,6 +459,43 @@ final class DhCollectorLedger {
 			throw error;
 		} catch (Throwable error) {
 			throw failure("column keys", error);
+		}
+	}
+
+	static final int PAYLOAD_CURRENT = 0;
+	static final int PAYLOAD_PUBLISHED = 1;
+
+	/** A copy of a column payload: [generation, origin x, y, z, segments per
+	 * layer ×4, (source index, byte length) per segment] and the concatenated
+	 * packed vertices. */
+	record PayloadCopy(long[] header, byte[] bytes) {}
+
+	/** The current or retained published payload of a column, or null. */
+	static PayloadCopy payload(long key, int which) {
+		try {
+			int length = (int)PAYLOAD.invokeExact(key, which);
+			if (length <= 0) return null;
+			long[] header = takeOutput(length);
+			long byteCount = 0L;
+			for (int at = 9; at < header.length; at += 2) byteCount += header[at];
+			byte[] bytes = new byte[Math.toIntExact(byteCount)];
+			TAKE_BYTES.invokeExact(MemorySegment.ofArray(bytes), bytes.length);
+			return new PayloadCopy(header, bytes);
+		} catch (RuntimeException error) {
+			throw error;
+		} catch (Throwable error) {
+			throw failure("payload copy", error);
+		}
+	}
+
+	/** Keys with a retained published payload, in insertion order. */
+	static long[] publishedPayloadKeys() {
+		try {
+			return takeOutput((int)PUBLISHED_PAYLOAD_KEYS.invokeExact());
+		} catch (RuntimeException error) {
+			throw error;
+		} catch (Throwable error) {
+			throw failure("published payload keys", error);
 		}
 	}
 
