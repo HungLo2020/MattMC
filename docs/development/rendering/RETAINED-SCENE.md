@@ -3,9 +3,10 @@
 **Status: shader-route retained terrain and the Rust visibility search are
 implemented in part; the full scene target remains open (October 2026).**
 ABI 70 carries compact terrain, and ordinary frames now select those compact
-camera layers and shadow candidates in the Rust section graph. Native vertex
-staging and the DH ledger/ABI 72 generic groups also retain CPU input data, with
-the separate ownership limits below. Diagnostic and
+camera layers and shadow candidates in the Rust section graph. Native
+publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups, retain CPU input data.
+Reduced-color DH geometry also uses shared GPU pages, with the separate
+ownership limits below. Diagnostic and
 other routes retain their documented producer and expansion paths. The phase list separates remaining targets
 from the current implementation; it is not a declaration of parity completion.
 
@@ -89,8 +90,9 @@ Static chunk sections whose meshes are resident are drawn by
   the light-frustum casters become shadow-only runs. Translucent runs keep
   frame order and split on any state change.
 - Shadow candidates come from sections the camera traversal has built, with
-  no shadow-only builds. Ordinary frames select them from Rust's mirrored graph
-  meshes; diagnostic and other ineligible frames retain the Java producer.
+  no shadow-only builds. Ordinary frames select them from graph mesh rows
+  synchronized directly from Rust's publication registry; diagnostic and other
+  ineligible frames retain the Java producer.
   Every section, camera visible or not, casts only if it passes Sodium's
   shadow-tree leaf test (`source_shadow_origin_intersects`: centre ±8, no
   distance cylinder).
@@ -113,8 +115,11 @@ sprite IDs; Java marks the corresponding sprite objects. At `4740f8fa`, native
 omission, water/material classification, range splitting and mesh identity
 ([`terrain/assembly.rs`](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/worldrender/terrain/assembly.rs)).
 Java supplies build/sort/atlas inputs, dispatches meshing workers, publishes the
-returned assets and runs the ineligible-frame producer. The prior Java water/index
-assembly boundary is historical. Since `1d609f12`, ordinary assembly keeps
+returned assets and runs the ineligible-frame producer. The native
+[publication registry](JAVA-BRIDGE.md#terrain-publication-registry) now owns
+section-layer identities and their graph-sync queue; Java still registers those
+rows and coordinates upload acknowledgement and resource-reload swaps. The
+prior Java water/index assembly boundary is historical. Since `1d609f12`, ordinary assembly keeps
 vertices in a native staging map until asset acceptance or discard; Java gets
 identity/count metadata plus copied indices, ranges and receipts. Asset decode
 clones the exact staged generation for retry safety. Diagnostic vertex readers
@@ -137,8 +142,18 @@ retains immutable packed payloads and publication/lease/route state in Rust.
 Java still walks the quadtree, supplies provenance and render parameters, and
 copies selected records into the frame. Ordinary publication builds frontend
 assets from the ledger; exact-material provenance retains the Java publication
-path. Batched collection reduces per-column calls without moving the DH tree
+path. Batched collection checks each walked container's generation before
+publication/visibility admission. Container close retires only its lease, and
+a build finishing after section close releases its new container instead of
+installing it. These changes preserve CPU lifetime without moving the DH tree
 or all frame preparation into Rust.
+
+Reduced-color GPU columns now suballocate shared device vertex/index pages;
+packed-uniform pass owners also share geometry bindings per vertex page.
+Exact-atlas residency keeps separate buffers, and DH source draw recording
+still emits individual indexed draws. See [page upload and retirement](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+for submission-gated reuse and idle binding retention. Shared storage is
+implemented; DH multi-draw and all-route retained scene ownership remain targets.
 
 ABI 72 similarly retains DH generic-group boxes in a CPU registry, with one
 per-frame group instance carrying origin, light, shading and SSAO. Native decode
@@ -169,8 +184,8 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
    sections in `chunk/terrain_selection.rs`. Java skips its visible-list and
    per-section record construction on that route. Rust now owns build request
    bookkeeping and entity-culling visit stamps; Java dispatches the listed
-   requests, mirrors published meshes and marks selected sprites. Shader-disabled
-   frames also extract block entities from visited built sections plus global
+   requests, invokes native publication-to-graph sync and marks selected sprites.
+   Shader-disabled frames also extract block entities from visited built sections plus global
    entries when a current search exists; Java still performs their semantic
    extraction, so this is not the retained-entity phase. Diagnostic/fault/
    reload/readiness-receipt frames keep the Java producer. Render-list region

@@ -187,8 +187,10 @@ edits, dispatched and finished builds, and accepted build flags through a
 standalone handle
 ([`RustSectionGraph`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustSectionGraph.java)),
 which is outside any bridge context so selecting never joins a pipelined frame.
-Java retains meshing worker dispatch, build/sort/atlas inputs, mesh publication,
-and the `BlockEntity` and sprite objects named by Rust's section keys or IDs.
+Java retains meshing worker dispatch, build/sort/atlas inputs, asset publication
+and reload staging, and the `BlockEntity` and sprite objects named by Rust's
+section keys or IDs. Published layer identities and their graph-sync queue
+now live in the native terrain registry described below.
 The graph's needs-build/urgent marks are node bits; visible slots use visit
 stamps and animated-sprite lists are interned. These bookkeeping changes do not
 move world/entity semantics or resource-reload publication into the graph.
@@ -196,9 +198,9 @@ move world/entity semantics or resource-reload publication into the graph.
 - Visible sections are visited sections that are built with geometry.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
-  Java mirrors each section's published layer meshes into the graph, and Rust
-  emits the compact camera layers (graph BFS visit order, translucent back
-  to front), shader shadow casters and the frame's animated sprite ids (each
+  Java requests one sync from the Rust publication registry into the graph,
+  and Rust emits the compact camera layers (graph BFS visit order, translucent
+  back to front), shader shadow casters and the frame's animated sprite ids (each
   once) in the frame records' native layout. Java copies these records without
   rebuilding each section's record and does not read the visits. The layer
   fingerprint receipt is computed only when terrain diagnostics are active.
@@ -258,11 +260,15 @@ move world/entity semantics or resource-reload publication into the graph.
     - The camera section graph takes the rows that changed since its last
       selection in one call
       ([`bridge/world/terrain_publication.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/terrain_publication.rs)),
-      or every row after a reset, a reload swap or for a new graph.
+      or every row after a reset, a reload swap or for a new graph. The sync
+      holds the publication mutex while applying reset/rows. Its change queue
+      is shared; it is not an independent subscription for each graph.
     - Java's off-camera shadow candidates read their rows from the registry
       in one call per frame.
     - Java (`RustTerrainPublication`) still calls the registry when it
-      registers, removes or reload-swaps a layer.
+      registers, removes or reload-swaps a layer, and retains its asset objects
+      and acknowledgement bookkeeping. The registry stores identities, not
+      payloads or GPU-completion receipts. See the [standalone contract](JAVA-BRIDGE.md#terrain-publication-registry).
   - Java receives copied index bytes/range records and a receipt, and still
     publishes the asset (residency, upload acknowledgement, reload staging),
     then drops the payload once Rust acknowledges the upload (translucent
@@ -355,6 +361,10 @@ retiring old assets. Java drops every static-terrain vertex/index payload
 translucent geometry per frame from the build order, so Java sends no sorted
 indices (the bridge's sorted-index list is always empty). Atlas recovery replays accepted updates in
 order; rejected uploads must not advance animation clocks or lose pending work.
+At resource-reload commit, Java also drops the staged layers' CPU payloads after
+checking every staged generation was uploaded; earlier acknowledgements could
+only release published layers. This does not cover the omitted-layer staging
+case tracked by [#821](https://github.com/HungLo2020/MattMC/issues/821).
 
 DH asset preflight runs after the real quadtree selects visible generations.
 Keep those selected assets resident through submission and presentation. The DH
@@ -414,9 +424,10 @@ route selection, generic callbacks and render parameters remain separate.
 `consumeVisibleFrame` hands over segments only when the prepared frame is
 enabled and its Rust route is selected, then clears the pending segments and
 frame together. A lifecycle-tagged completion receipt is distinct from this
-handoff. The [ledger fixtures](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/dh_collector/tests.rs)
-cover selection, ordering and stale-state rules; they do not exercise the
-actual native flush export's apply-failure/retry path or prove visual parity.
+handoff. The [ledger fixtures](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/dh_collector/tests.rs)
+cover selection, ordering and stale generations in the batched walk; they do
+not exercise the actual native flush export's apply-failure/retry path or prove
+visual parity.
 Overflow/rejection recovery also needs separate checks that native effects and
 Java provenance sidecars stay coherent; source fixtures alone do not establish
 rollback for every failed mutation.
@@ -472,6 +483,12 @@ and parents still need readiness. Their working set follows the DH quadtree
 lifetime. Check memory during large-radius streaming and repeated transitions;
 the cache targets are not a hard cap on live geometry. These leases own CPU
 lifetime only; Rust and the GAL retain all native resource ownership.
+[`LodBufferContainer.close`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodBufferContainer.java)
+now retires only its lease: a never-published container cannot remove a newer
+column by position. [`LodRenderSection`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/java/com/seibel/distanthorizons/core/render/LodRenderSection.java)
+serializes close with finished-build installation; a late container is closed
+instead of adopted. The lifecycle fixtures cover builds arriving before and
+after close, not arbitrary concurrent scheduling or a long-run memory bound.
 
 DH quad layers follow reduced-color opacity. Fully opaque leaf colors stay in
 the opaque stream; water keeps its translucent layer even at packed alpha 255.
@@ -488,20 +505,38 @@ shaders+DH 193→215 FPS after replacing about 200 single-draw translucent passe
 The changed LOD regression exercises the existing opaque identical-draw case,
 not a new late-translucent-order assertion.
 
-DH column geometry lives in shared device pages
-([`lod/residency.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/lod/residency.rs),
+Reduced-color DH column geometry lives in shared device pages
+([`lod/residency.rs`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/lod/residency.rs),
 using the completion-gated page allocator in `geometry/arenas.rs`):
 - **Layout:** a column takes one vertex range and one index range; segments
-  address them by `vertex_base` and byte `index_offset`.
-- **Uploads:** each frame's uploads go through one staging buffer and
-  `CopyBufferRegion`, with one barrier per written page. A page first written
-  by an unconfirmed transaction transitions from `Undefined`.
-- **Releases:** replaced or reconciled columns release their ranges after the
-  next submission. A discarded transaction releases them immediately. Emptied
-  pages go to `gal.retire`.
-- **Limits:** a column must fit a page and keep `vertex_base` below 2^24, since
-  it reaches shaders as an f32. Paging prepares DH multi-draw; draw recording
-  is unchanged.
+  address them by `vertex_base` and byte `index_offset`. Exact-atlas residency
+  still owns separate per-segment upload buffers.
+- **Uploads:** each pending upload transaction uses one staging buffer and
+  `CopyBufferRegion`, with a barrier on each side of every written page.
+  Confirmed pages transition from their read state; unconfirmed pages use
+  `Undefined`. Segment vertices copy directly into the transaction payload,
+  which moves into `HostWriteBuffer`; indices still use an assembled payload.
+  This removes intermediate copies, not the staging/GPU copy.
+- **Releases:** replaced or reconciled columns queue ranges against
+  `gal.next_submission_id()`; reclamation waits until that submission id is
+  complete. A discarded transaction returns unsubmitted ranges immediately.
+  Reclaimed empty pages go to `gal.retire`, so dependent resource sets and
+  in-flight submissions can delay actual destruction.
+- **Bindings:** with packed uniforms, each built-in pass owner caches one
+  geometry/frame set per vertex page, using a dynamic uniform offset per draw.
+  Other modes retain per-draw keys. Page sets are pruned after more than 120
+  unused owner-pass frames; frames that skip that owner do not advance the
+  counter. This delay is not a memory bound or completion fence.
+- **Limits:** a column's vertex stream must fit the admitted buffer limit, and
+  its `vertex_base` must remain below 2^24 for exact f32 representation. The
+  allocator uses 128 MiB pages or larger single-allocation pages; paging does
+  not cap total live GPU memory.
+
+The [per-page binding path](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/lod/passes.rs)
+and [indirect first-instance enablement](VULKANIC-GAL.md#changing-the-gal)
+prepare further batching. DH source passes still record individual
+`DrawIndexed` commands in draw order; shared pages do not establish DH
+multi-draw, zero-copy publication or full retained-scene ownership.
 
 Generic boxes group by four `(SSAO, translucency)` key classes and pack fixed
 uniform blocks; Java uses the [packed-buffer transport](JAVA-BRIDGE.md).

@@ -164,8 +164,10 @@ state with a pipelined frame, so asking never joins it. They use standalone poin
   owns the handle and destroys it before its context.
 - **Section graph** (Frozen's camera terrain search and ordinary compact terrain
   selection): Rust owns readiness/build/urgent/in-flight/stale bookkeeping;
-  Java reports column/build events and published solid/cutout/translucent mesh
-  rows. After camera search, `select_terrain` returns graph-owned
+  Java reports column/build events and requests a native sync from the
+  [terrain publication registry](#terrain-publication-registry), replacing its
+  earlier per-section mesh-row packing. After camera search, `select_terrain`
+  returns graph-owned
   buffers for camera layers, optional off-camera shadow candidates and animated
   section positions, plus producer counters. Camera/caster buffers use the same
   ABI 70/69 layouts as the whole-frame request. Their views are valid only until
@@ -176,6 +178,31 @@ state with a pipelined frame, so asking never joins it. They use standalone poin
   [selection and lifetime](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustSectionGraph.java#L215-L282),
   [packed frame storage](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L511-L591)
   and [selection scope](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+
+### Terrain publication registry
+
+[`RustTerrainPublication`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/java/net/vulkanic/world/RustTerrainPublication.java)
+binds standalone `mattmc_terrain_*` calls for publishing/removing a layer,
+replacing/clearing all rows, synchronizing a section graph and copying rows for
+Java shadow candidates. These render-thread calls use primitive arguments and
+long arrays, outside the context request/layout-query protocol. Rebuild Java
+and native code together when changing them.
+
+The process-wide, mutex-protected
+[registry](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/terrain/publication.rs)
+stores each section's solid/cutout/translucent key and generation, plus the
+translucent camera-sort flag. Duplicate keys belonging to another section layer
+reject publication or replacement without changing the registry. A row changes
+when Java registers the layer, before upload acknowledgement. Graph sync drains
+changed rows directly in Rust; clear/reload replacement or an explicit new-graph
+republish sends a full reset under the same lock. This is one shared change
+queue, not an independent cursor per graph. Shadow-row reads copy six longs per
+requested section into Java storage, with zeros for missing layers.
+
+Java retains the asset objects, upload acknowledgement and reload staging. The
+native identity registry does not own vertex/index payloads or GPU completion;
+compact frame records still follow the copying contract above. See
+[ownership and retries](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
 
 ### Terrain layer intake
 
@@ -205,8 +232,11 @@ boundary. Native assembly still performs the water/material classification and
 rewrites. The staged route removes a vertex round trip, not all copying or Java
 ownership. After acceptance, Java drops static-terrain payloads including
 translucent layers; per-frame translucent ordering uses native resident geometry.
-The fully omitted translucent path has a cleanup gap when no prior layer asset
-exists: assembly may stage vertices before Java returns no asset, and removal
+The resource-reload commit now releases the Java CPU payloads of every staged
+layer after all staged generations are uploaded; their earlier acknowledgements
+could only find published layers. The fully omitted translucent path still has
+a separate cleanup gap when no prior layer asset exists: assembly may stage
+vertices before Java returns no asset, and removal
 has no asset identity to discard. [#821](https://github.com/HungLo2020/MattMC/issues/821)
 tracks that source-derived retention; ordinary acknowledgement cleanup does not
 cover it. No runtime growth or exhausted budget was observed by this review.
@@ -226,7 +256,12 @@ it selects and applies a ledger-owned update, then returns identities for
 Java's acknowledgement. An apply failure releases its in-flight selection;
 a provenance-bearing selection stays on Java's packed asset path. Neither
 selection nor asset acceptance is a presentation receipt. The batched visible
-query still returns keys/segment records through Java frame storage. See
+query receives `(column key, generation)` pairs and filters stale generations
+before requesting publication, sorting and admitting segments. Its count is the
+number of pairs, and the result's nine-long header includes a stale-container
+count before the sorted keys. This changed standalone buffer contract requires
+matching Java/native builds; it is separate from the whole-frame ABI version.
+Keys and segment records still cross through Java frame storage. See
 [ledger publication and selection](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 for route gating, protection, bounds and the remaining Java producers.
 

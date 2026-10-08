@@ -29,21 +29,23 @@ turning it off would remove the triggering write.
 
 Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.
 
-For a rendering batch, run the [validation driver](#one-command-validation)
-instead of the steps one by one. Individually:
+The [validation driver](#one-command-validation) combines the common rendering
+checks with the limits below. The individual test commands are:
 
 ```sh
-(cd src/main/rust && cargo test --lib -- --test-threads=4)          # Rust, including boundary tests
+(cd src/main/rust && cargo test --locked --lib -- --test-threads=4)          # Rust, including boundary tests
 ./gradlew -PmattmcRustProfile=release test -x testRustNative       # Java
 ```
 
 Plain `./gradlew test` first reruns the whole Rust suite serially
-(`testRustNative`, `--test-threads=1`, about 5½ minutes) in Gradle's own target
-directory. Skip it with `-x testRustNative` whenever the Rust suite has already
-run. `-PmattmcRustProfile=release` makes the Java tests load the release
+(`testRustNative`, `--test-threads=1`) in Gradle's own target directory.
+The implementation author reports about 5½ minutes for that serial test step.
+Use `-x testRustNative` after separately completing the intended Rust checks;
+the driver's `--lib` command is narrower than Gradle's unfiltered Cargo command. `-PmattmcRustProfile=release` makes the Java tests load the release
 library the clients use, instead of building a debug one. Parallel Rust runs
-can race on native driver state (OpenAL/EGL/Vulkan); re-run any failure
-serially before treating it as real.
+can race on native driver state (OpenAL/EGL/Vulkan); preserve the initial
+failure and investigate it with serial repeats. A serial pass is useful evidence
+but does not establish that the original failure was harmless.
 
 The architecture boundary tests run with the Rust tests; see
 [Render Architecture](RENDER-ARCHITECTURE.md). The Java test task sets
@@ -59,36 +61,75 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
 ```
 
-The [driver](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/RunValidation.py)
-runs every check a rendering batch needs, in an order that builds once and
-never shares the GPU between clients:
+The [driver at `697b0a3c`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/DevUtils/tests/rendering/RunValidation.py)
+orchestrates a bounded set of tests and workloads:
 
-1. Java rendering tests on the release library, without `testRustNative`.
-   This also builds the release library and classes, so no client's readiness
-   timer waits on a cold build.
-2. The Rust suite (4 threads, failures re-run serially and reported as flaky
-   or failed) and the wiki check run in the background while the
-   [lifecycle gate](#lifecycle-gate) and both Frozen parity pairs (Iris+DH
-   with DH generic rendering on, and vanilla) run on the GPU.
-3. FPS runs last, alone: one clean 1,800-frame run per mode by default.
-   `--perf` instead interleaves current and Frozen (ABAB, 6,000 frames) in
-   every mode. Use it only when a change claims a performance effect; this
-   desktop varies about ±25% between runs in vanilla+DH.
+1. Java tests in `net.vulkanic.*`, `net.sodium.*`, `com.seibel.*` and
+   `net.minecraft.client.dev.*` use `-PmattmcRustProfile=release` and skip
+   Gradle's serial `testRustNative` dependency. Repeat `--java-test <pattern>`
+   to change the filters; `--all-java-tests` removes those filters while keeping
+   the Gradle task's own exclusions. `--skip java-tests` still runs
+   `buildRustNative` and `classes` with the release profile.
+2. `cargo test --locked --lib` runs with four threads by default and
+   `ALSOFT_DRIVERS=null`; this is not a `--release` test command. Named failures
+   parsed from libtest output are rerun serially and rerun successes are labeled
+   flaky. The Rust checks, followed by the wiki check, run in a background
+   thread while the [lifecycle gate](#lifecycle-gate) and two settled Frozen
+   parity pairs run sequentially. Iris+DH enables generic DH rendering; the
+   other pair is vanilla. Native-driver tests can overlap those correctness
+   captures, so this is not a claim of exclusive GPU use.
+3. The driver joins its background thread before moving-camera FPS. By default
+   it requests one 1,800-frame current-client run in each of four modes.
+   `--perf` instead requests current/Frozen/current/Frozen (ABAB), two runs per
+   side and mode with 6,000 measured frames each. `--perf-repeats` changes the
+   repetitions. Both protocols request 360 settle and 240 warm-up frames.
+
+The Java native-library build and current-client capture/FPS commands request
+the release profile, with line-table debug information and stripping disabled
+in the environment. Preserve effective hashes and settings; these do not make
+the separately compiled Rust test binary a release binary. The four modes are vanilla, shaders, vanilla+DH and shaders+DH.
+`--skip` accepts `java-tests`, `rust-tests`, `wiki`, `gate`, `parity` or `fps`
+and can be repeated. A subset run verifies only its executed steps.
 
 Output goes to `artifacts/graphics-captures/validation/<label>/` (existing
-labels are refused): `summary.md`, `summary.json`, per-step logs and timings.
-It exits non-zero if any step fails. It does not judge images: open the
-side-by-side PNGs listed in `summary.md` (water, DH, sky, clouds). Inputs
-default to the usual capture fixtures (`--run-source`, `--vanilla-run-source`,
-`--shader-pack` override them); missing inputs or a running client stop it
-before anything starts. `--skip <step>` drops a step, `--all-java-tests` runs
-every Java test.
+labels are refused): `summary.md`, `summary.json`, step logs and timings.
+All four input paths must exist even when associated steps are skipped:
+`--run-source`, `--vanilla-run-source`, `--shader-pack`, and the fixed sibling
+Frozen checkout `../MattMC_JavaPerfTesting/MattMC`. The driver refuses existing
+matching client JVMs at startup. Its later cleanup sends `SIGKILL` to any
+`java` process whose command line contains `KnotClient` or `devlaunchinjector`,
+without tracking whether this driver launched it. Use an isolated session and
+do not start another matching client during the run.
 
-A default run takes about 14½ minutes on the desktop (RTX 2070): Java tests
-17 s, gate 7 min, parity 4½ min, FPS 2½ min. The Rust suite (about 3 min) and
-the wiki check finish behind the gate. Running the same steps by hand took
-about 35 minutes, mostly because `./gradlew test` rebuilt and serially reran
-the Rust suite (7 min instead of 17 s).
+Treat the summary as an index into evidence, not an all-checks certificate:
+
+- A recorded failing step makes the aggregate fail, but an exception in the
+  background thread can omit the requested Rust/wiki results and leave the
+  remaining steps reporting PASS. Verify every intended step is present and
+  completed, including its logs. The independently isolated seven Python
+  driver tests pass; a fully mocked orchestration check reproduces this false
+  PASS after a background `OSError`, without running clients, builds or cleanup.
+  [#822](https://github.com/HungLo2020/MattMC/issues/822) tracks this orchestration
+  defect; helper-test success does not establish aggregate completeness.
+- FPS health rejects recognized exceptions, nonzero reported terrain failures
+  and reported VUIDs. Missing matching logs, absent VUID counts and missing
+  terrain counters can still appear clean. It does not itself require the
+  expected measured-frame count or validate every exit/core receipt; inspect
+  the underlying Gameplay artifacts and retain the checks in
+  [performance A/B](#4-performance-ab).
+- The parity reader consumes the latest matching numeric report and current
+  VUID records; it does not visually inspect PNGs. Review the listed
+  side-by-side images (water, DH, sky and clouds), effective mode, frame
+  correlation and the requested DH extension. Gate limits remain below.
+
+The implementation author reports a default run taking 14m20 (about 14½
+minutes) on an RTX 2070 desktop: Java tests about 17 s, gate 7 min, parity
+4½ min, FPS 2½ min, with Rust (about 3 min) and wiki work overlapping the gate.
+The earlier manual workflow reportedly took about 35 minutes. These are dated
+workflow observations, not independently reproduced timings or guarantees.
+The Python fixtures inspect command generation, ABAB ordering, named-failure
+parsing and synthetic artifact readers; they do not execute the complete live
+validation workflow. See the [integration records](#october-7-integration-batch-checks).
 
 ### Lifecycle gate
 
@@ -110,12 +151,11 @@ scenario on a crashed audit row or a recognized exception, Rust panic or GAL
 callers discard. A logged dependency violation fails the gate; other
 validation failures are reported, not failed. Results go to
 `artifacts/graphics-captures/lifecycle-gate/<label>/summary.json`
-(`--artifact-root` overrides it). To stop leftover clients, match `java`
-processes only: a `pkill -f` pattern also matches, and kills, the shell
-command that contains it. The capture harness itself stops only its own Gradle
-process group and client.
+(`--artifact-root` overrides it). The combined validation driver's broader
+client cleanup is described [above](#one-command-validation); do not confuse
+it with ownership-scoped termination of one capture process group.
 
-The [gate source](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/DevUtils/tests/rendering/RunLifecycleGate.py)
+The [gate source](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/DevUtils/tests/rendering/RunLifecycleGate.py)
 defaults to seven scenarios: same-world unload/reload, different-world reload,
 resource reload, resize, swapchain recreation, and view-distance decrease and
 increase. It requires a successful capture command and audit rows marked
@@ -151,29 +191,55 @@ SIGSEGV remains separate unless its specific cause and regression are establishe
 
 ### October 7 integration batch checks
 
-Run on the desktop (RTX 2070, Frozen `JavaPerfTesting` @ `7a4d18171`) against
-the integrated batch: DH render-list lifecycle in the ledger call, terrain
-publication rows in Rust, resource-reload payload release, lease-only DH
-container retirement, and DH geometry in shared device pages.
+Source reviewed through `697b0a3c`; the following fixture definitions are
+separate from the author's runtime reports below:
 
-- Tests: `cargo test --lib` 2344 pass (3 ignored); Java `net.vulkanic.*`,
-  `net.sodium.*`, `com.seibel.*`, `net.minecraft.client.dev.*` pass; wiki check
-  passes.
-- Lifecycle gate: all seven scenarios pass, with 0 exceptions, panics,
-  dependency violations and GAL validation failures.
-- Frozen parity with `MATTMC_CAPTURE_DH_GENERIC=true`: Iris+DH mean RGB
-  3.646/4.160/3.849 and DH extension pass; vanilla 0.257/0.452/0.530 pass;
-  0 VUIDs. The side-by-side images were inspected (water, DH, sky, clouds).
-- FPS, same session, moving camera, 6,000 frames, single runs (Rust vs
-  Frozen): vanilla 1,100 vs 1,151; vanilla+DH 617 vs 736; shaders 341 vs 318;
-  shaders+DH 253 vs 229. All clean. Vanilla+DH is still the gap.
-- Validation driver at `72b8cea2e`: the default run passed every step in
-  14m20 (`validation/drv1`; parity 3.663/4.177/3.853 DH pass and
-  0.230/0.394/0.442, 7/7 gate, Rust 2344, Java 792 + 1 skipped). `--perf`
-  (`validation/drv1-perf`, ABAB, 6,000 frames) gave Rust vs Frozen per run:
-  vanilla 1,171/1,130 vs 1,226/1,123; vanilla+DH 757/770 vs 736/599; shaders
-  343/351 vs 318/316; shaders+DH 250/252 vs 228/227. The single-run vanilla+DH
-  gap above was within run-to-run noise.
+- **Publication rows:** six [registry fixtures](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/terrain/publication.rs) cover initial/reset/dirty rows, unique-key collisions, removal, transactional replacement, clear and coordinate packing. One [C-export fixture](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/bridge/world/terrain_publication.rs) actually applies rows to the section graph, checks bulk reads and rejects a null graph/invalid slot. These do not exercise Java's full reload/acknowledgement path or inject failures between Java and native mutations.
+- **DH lifecycle batching:** [native fixtures](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/dh_collector/tests.rs) cover stale-generation rejection, stable ties, walk-ordered publication demand and LRU touches. Updated [Java comparisons](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/test/java/net/vulkanic/world/DistantHorizonsSemanticCollectorTest.java) compare per-column and bulk calls into the same migrated ledger in ordinary and exact-atlas modes; they are not old-Java versus new-Rust runtime parity.
+- **Lease and late-build repairs:** the collector fixture closes an unbuilt container without erasing another generation at the same position. Two [section lifecycle fixtures](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/test/java/com/seibel/distanthorizons/core/render/LodRenderSectionLifecycleTest.java) exercise completion before and after close, replacement and lease release. They drive those orderings explicitly; no exhaustive concurrent interleaving or live unload stability result follows from their definitions.
+- **Shared DH pages:** the [LOD fixture](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/lod/tests.rs) checks two columns sharing vertex/index buffers at different offsets, one staging host write, generation replacement and range release after a later completed mock submission. Existing upload/rejection/range fixtures are adapted, and packed transparent bindings assert shared page sets. These are mock-GAL assertions, not cross-device Vulkan or long-run page-retention measurements. Test unpacked/deferred and exact-atlas paths separately.
+- **Reload cleanup:** the new commit releases Java CPU payloads of uploaded reload replacements. It adds no dedicated reload-payload regression in this interval and does not repair the [#821](https://github.com/HungLo2020/MattMC/issues/821) fully omitted-layer native staging gap. Verify both paths separately.
+- **Vulkan feature negotiation:** `drawIndirectFirstInstance` is enabled if supported; the device diff adds no dedicated feature-disabled regression. Check that configuration independently before claiming cross-device coverage or DH multi-draw acceptance.
+
+The [integration report at `72b8cea2`](https://github.com/HungLo2020/MattMC/commit/72b8cea2e63a7186830e6c647a657745aa771969)
+attributes these desktop results to the implementation author (RTX 2070,
+Frozen `JavaPerfTesting` at `7a4d18171`):
+
+- Tests: `cargo test --lib` 2,344 passed, three ignored; Java rendering suites
+  `net.vulkanic.*`, `net.sodium.*`, `com.seibel.*`, `net.minecraft.client.dev.*`
+  and the wiki check passed
+- Lifecycle gate: seven scenarios passed, with zero reported exceptions,
+  panics, dependency violations and GAL validation failures
+- Frozen parity with `MATTMC_CAPTURE_DH_GENERIC=true`: Iris+DH RGB MAE
+  3.646/4.160/3.849 with DH extension pass; vanilla 0.257/0.452/0.530;
+  zero VUIDs, with side-by-side water/DH/sky/cloud images inspected by the author
+- 20:32 moving-camera single runs, 6,000 frames: Rust/Frozen FPS vanilla
+  1,100/1,151; vanilla+DH 617/736; shaders 341/318; shaders+DH 253/229.
+  Corresponding median frames were 0.67/0.73, 1.31/1.14, 2.83/3.02 and
+  3.87/4.23 ms. The author recorded all clean and about ±25% vanilla+DH noise
+
+The [later driver report](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/docs/development/rendering/RENDER-VERIFICATION.md)
+records a default run against `72b8cea2e` in 14m20 (`validation/drv1`):
+Rust 2,344, Java 792 passed plus one skipped, seven gate scenarios and parity
+Iris+DH 3.663/4.177/3.853 with DH pass, vanilla 0.230/0.394/0.442. Its separate
+`validation/drv1-perf` ABAB protocol used two 6,000-frame runs per side/mode:
+
+| Mode | Rust FPS, run 1 / run 2 | Frozen FPS, run 1 / run 2 |
+| --- | --- | --- |
+| Vanilla | 1,171 / 1,130 | 1,226 / 1,123 |
+| Vanilla + DH | 757 / 770 | 736 / 599 |
+| Shaders | 343 / 351 | 318 / 316 |
+| Shaders + DH | 250 / 252 | 228 / 227 |
+
+The [22:36 summary](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/SUMMARY.md) reports all runs clean and up to ±20%
+noise. It describes the earlier single-run vanilla+DH deficit as within that
+variability. Preserve both results; neither isolates the gain of one change,
+establishes tails or proves lasting all-mode parity. The standalone and driver
+captures are settled-pose evidence, distinct from moving performance workloads.
+This documentation reconciliation did not rerun Java/Rust runtime suites,
+the lifecycle gate, captures or benchmarks and did not inspect the unbundled
+artifacts. The isolated Python tool checks [above](#one-command-validation)
+have a narrower, independently reproduced scope.
 
 ### October 7 evening staging and DH checks
 

@@ -6,13 +6,46 @@ correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
 The [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary)
-and [October 7 evening summary](GOAL-5-STATUS.md#october-7-evening-same-session-summary)
+and [October 7 late-evening summary](GOAL-5-STATUS.md#october-7-late-evening-interleaved-summary)
 separate their dated reported timings from the historical profiles below; none of
 these rows is a substitute for rerunning the same workload on a new revision.
 
 ## October 7 comparison controls
 
-The latest [evening summary at `f13239e1`](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/SUMMARY.md)
+The latest [22:36 summary at `697b0a3c`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/SUMMARY.md) reports two
+6,000-frame runs per side and mode, interleaved current/Frozen/current/Frozen
+on the RTX 2070 desktop. Rust/Frozen per-run FPS is vanilla 1,171/1,130 versus
+1,226/1,123; vanilla+DH 757/770 versus 736/599; shaders 343/351 versus 318/316;
+shaders+DH 250/252 versus 228/227. Each slash separates runs, not FPS/median.
+The driver requests 360 settle and 240 warm-up frames. The author reports
+zero VUIDs/exceptions and up to ±20% run-to-run noise. These are scoped
+observations, not an isolated page-sharing gain or broad performance acceptance;
+per-run tails and long-run bounds are absent from that summary.
+
+The [20:32 integration summary](https://github.com/HungLo2020/MattMC/blob/72b8cea2e63a7186830e6c647a657745aa771969/SUMMARY.md)
+used one 6,000-frame run per side and reported vanilla+DH 617 versus 736 FPS,
+with about ±25% noise. Preserve that single-run result alongside the later
+ABAB reversal; do not average it into the newer session. No benchmark or
+artifact replay was performed by this documentation review.
+
+To request the driver's bounded four-mode comparison after separate correctness
+checks, use a fresh label:
+
+```sh
+python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --perf \
+  --skip java-tests --skip rust-tests --skip wiki --skip gate --skip parity
+```
+
+Skipping Java tests still prebuilds the release library and classes. All fixture
+and Frozen-checkout paths are still required; retain effective inputs, hashes,
+settings, logs and complete measured-frame receipts. The driver waits for its
+background checks before FPS, but its summary is not an independent check of
+all external load or missing health evidence. See
+[validation scope](RENDER-VERIFICATION.md#one-command-validation).
+
+The following `f13239e1` record predates both equal-window integration reports.
+
+The earlier [evening summary at `f13239e1`](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/SUMMARY.md)
 reports same-desktop/session Frozen values of vanilla 900, vanilla+DH 671,
 shaders 304 and shaders+DH 226 FPS. Rust ranges are vanilla 813–882,
 vanilla+DH 440–549 over 1,800 frames (631 over 6,000), shaders 311–349 and
@@ -32,14 +65,26 @@ presence does not prove an isolated timing gain. Java still generates/culls DH
 candidates, provenance modes keep additional work, and native publication still
 decodes/copies payloads. Compare equivalent diagnostic settings and rebuilds.
 
-Approximately 430 per-column DH draws/descriptor-set binds were identified as
-the remaining vanilla+DH worker cost. Shared vertex pages with one geometry set
-per page are now implemented; multi-draw indirect is still a proposed follow-up.
-Confirm the remaining bind/draw cost in new profiles
-(`resource_set_binds`, `draw_indexed_ops`) before changing batching further. The ledger's soft retention targets and
-the generic registry's box/group caps do not establish long-run CPU/GPU bounds.
-Use the [new fixture and runtime checks](RENDER-VERIFICATION.md#october-7-evening-staging-and-dh-checks)
-for correctness alongside any optimization.
+Approximately 430 per-column DH draws/descriptor-set binds were identified at
+that earlier checkpoint. Ordinary DH column vertices and indices now share
+device-local pages. Packed non-deferred passes use one geometry set per vertex
+page within each pass; unpacked/deferred bindings and exact-atlas geometry keep
+their separate paths. A transaction combines upload bytes and moves its staging
+payload into the host-write operation, avoiding one clone while retaining copies
+into staging/device storage. Replaced ranges wait for submission completion, and
+page sets idle for more than 120 pass frames can be pruned. These implementation
+bounds do not establish long-run memory limits. [Residency source](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/lod/residency.rs)
+· [Pass bindings](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/lod/passes.rs)
+
+DH multi-draw indirect remains proposed. Enabling Vulkan's supported
+`drawIndirectFirstInstance` feature is a prerequisite for nonzero indirect
+first-instance values, not a measured DH batching result. Reprofile
+`resource_set_binds` and `draw_indexed_ops` after page sharing before carrying
+forward the old bind/draw attribution. The ledger's soft retention targets and
+the generic registry's box/group caps also do not establish total-memory bounds.
+Use the [integration fixture and runtime checks](RENDER-VERIFICATION.md#october-7-integration-batch-checks)
+alongside any optimization; the later ABAB rows measure a batch, not individual
+publication, lifecycle, payload or page changes.
 
 The following paragraphs preserve earlier October 7 sessions and controls.
 

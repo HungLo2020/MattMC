@@ -192,6 +192,15 @@ self-contained and preserve earlier-use ordering; this is a command-list
 transformation, not a batch-wide move across lists. See
 [`host_write_hoist.rs`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/rust/render/vulkanic/gal/host_write_hoist.rs).
 
+Vulkan device creation enables `drawIndirectFirstInstance` when the physical
+device reports it, alongside the separately queried `multiDrawIndirect`
+([`device.rs`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/vulkanic/backends/vulkan/device.rs)).
+Nonzero indirect `firstInstance` values require that enabled feature; do not
+infer it from multi-draw support alone. This device setup change supports the
+terrain instance addressing described in [Render Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+DH's new shared pages and per-page bindings still use individual indexed draws;
+feature enablement does not implement DH multi-draw.
+
 GLSL modules compile through Shaderc at 50–80 ms each, so the Vulkan backend
 keeps compiled SPIR-V on disk (`backends/vulkan/spirv_disk_cache.rs`), keyed by
 a schema/Shaderc tag, build profile, stage, entry point and full source, and
