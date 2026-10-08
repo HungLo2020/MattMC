@@ -671,25 +671,28 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final DynamicWorldMeshLifetime DYNAMIC_WORLD_MESH_LIFETIME = new DynamicWorldMeshLifetime();
 	private static final ExperienceOrbSemanticCollector ORB_SEMANTICS = new ExperienceOrbSemanticCollector();
 	private static long orbTextureResourceGeneration = -1;
-	private static final Set<Long> DIRTY_WORLD_MESH_ASSETS = new LinkedHashSet<>();
 	/**
-	 * Static terrain becomes Rust-owned once its explicit upload has completed.
-	 * Keep only the tiny identity/texture dependency here after that point; the
-	 * vertex and index payload must not remain in the Java registry for every
-	 * visible chunk for the rest of a stationary camera session.
+	 * Java's world meshes waiting for upload, each with its place in the
+	 * world-mesh upload order. Static terrain waits in Rust's terrain residency
+	 * ({@link RustTerrainResidency}), numbered from the same counter, and the
+	 * batch merges both queues by it. A dirty mesh keeps its number until it is
+	 * uploaded or removed.
 	 */
-	// Primitive-keyed: these residency maps are only probed by key (never
-	// iterated), several times per terrain instance per frame.
-	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<StaticTerrainMeshResidency> STATIC_TERRAIN_MESH_RESIDENCY =
-		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
-	/**
-	 * Exact static-terrain dependency snapshot owned by the generation Rust has
-	 * accepted. Registration may already contain a newer pending generation;
-	 * keep this separate so that replacement cannot invalidate the last drawable
-	 * generation before the combined asset transaction succeeds.
-	 */
-	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<StaticTerrainMeshResidency> ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY =
-		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+	private static final Map<Long, Long> DIRTY_WORLD_MESH_ASSETS = new LinkedHashMap<>();
+	private static long worldMeshDirtySequence;
+
+	private static void markWorldMeshAssetDirtyLocked(long meshKey) {
+		if (!DIRTY_WORLD_MESH_ASSETS.containsKey(meshKey)) {
+			DIRTY_WORLD_MESH_ASSETS.put(meshKey, ++worldMeshDirtySequence);
+		}
+	}
+
+	/** Static-terrain meshes Rust holds: registered residencies plus assets waiting for upload. */
+	private static long terrainMeshResidencyLocked() {
+		long[] counts = RustTerrainResidency.counts();
+		return counts[RustTerrainResidency.COUNT_RESIDENCIES] + counts[RustTerrainResidency.COUNT_WAITING];
+	}
+
 	/** Explicit Rust resource retirements awaiting the next immutable mesh update. */
 	private static final Map<Long, Long> PENDING_WORLD_MESH_RETIREMENTS = new LinkedHashMap<>();
 	private static final MembershipJournaledMap<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES =
@@ -991,7 +994,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	public static void resendRetainedWorldMeshAssets() {
 		synchronized (LOCK) {
-			DIRTY_WORLD_MESH_ASSETS.addAll(WORLD_MESH_ASSETS.keySet());
+			// Static terrain is not here: Java holds no acknowledged terrain asset.
+			for (long meshKey : WORLD_MESH_ASSETS.keySet()) markWorldMeshAssetDirtyLocked(meshKey);
 		}
 	}
 
@@ -1551,7 +1555,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				// resource-pack replacement is prepared. Mark every retained payload
 				// dirty so the next upload atomically replaces it; an intermediate
 				// empty registry would turn a valid reload into a blank frame.
-				DIRTY_WORLD_MESH_ASSETS.addAll(WORLD_MESH_ASSETS.keySet());
+				// Static terrain is not here: its waiting assets are already dirty in
+				// Rust, and Rust re-uploads no acknowledged terrain asset (Java held none).
+				for (long meshKey : WORLD_MESH_ASSETS.keySet()) markWorldMeshAssetDirtyLocked(meshKey);
 				ORB_SEMANTICS.invalidatePublications();
 				ORB_SEMANTICS.clearFrame();
 				orbTextureResourceGeneration = -1;
@@ -1788,7 +1794,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			if (bridge == null || (ORB_SEMANTICS.dirtyAssets().isEmpty() && DIRTY_WORLD_MESH_ASSETS.isEmpty()
 				&& DIRTY_WORLD_MESH_TEXTURES.isEmpty()
-				&& PENDING_WORLD_MESH_RETIREMENTS.isEmpty())) {
+				&& PENDING_WORLD_MESH_RETIREMENTS.isEmpty()
+				&& RustTerrainResidency.counts()[RustTerrainResidency.COUNT_DIRTY] == 0L)) {
 				return null;
 			}
 			Map<Long, Long> protectedGenerations = protectedGenerationsSource.get();
@@ -1824,14 +1831,28 @@ public final class RustGalWorldPrimitiveRenderer {
 					uploadedWorldMeshAssetGeneration = uploadGeneration;
 					ORB_SEMANTICS.accepted(dirtyOrbs);
 					for (var orb : dirtyOrbs) UPLOADED_WORLD_MESH_GENERATIONS.put(orb.meshKey(), Long.valueOf(orb.meshGeneration()));
+					long[] terrainUploaded = new long[dirtyMeshes.size() * 2];
+					int terrainUploads = 0;
 					for (VulkanicGalBridge.WorldMeshAssetRecord mesh : dirtyMeshes) {
-						UPLOADED_WORLD_MESH_GENERATIONS.put(mesh.meshKey(), Long.valueOf(mesh.meshGeneration()));
-						StaticTerrainMeshResidency terrainResidency = STATIC_TERRAIN_MESH_RESIDENCY.get(mesh.meshKey());
-						if (terrainResidency != null && terrainResidency.meshGeneration() == mesh.meshGeneration()) {
-							ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.put(mesh.meshKey(), terrainResidency.copy());
+						if (mesh.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
+							terrainUploaded[terrainUploads * 2] = mesh.meshKey();
+							terrainUploaded[terrainUploads * 2 + 1] = mesh.meshGeneration();
+							terrainUploads++;
+							continue;
 						}
+						UPLOADED_WORLD_MESH_GENERATIONS.put(mesh.meshKey(), Long.valueOf(mesh.meshGeneration()));
 						DIRTY_WORLD_MESH_ASSETS.remove(mesh.meshKey());
-						releaseUploadedStaticTerrainPayloadLocked(mesh.meshKey(), mesh.meshGeneration());
+					}
+					if (terrainUploads > 0) {
+						// Rust drops each uploaded terrain asset; Java releases its own
+						// copy where the uploaded generation is the registered one.
+						boolean[] released = RustTerrainResidency.acknowledge(terrainUploaded, terrainUploads);
+						for (int index = 0; index < terrainUploads; index++) {
+							if (released[index]) {
+								RustGalTerrainRenderer.releaseUploadedStaticTerrainPayload(
+									terrainUploaded[index * 2], terrainUploaded[index * 2 + 1]);
+							}
+						}
 					}
 					for (VulkanicGalBridge.WorldMeshAssetRetirementRecord retirement : retirements) {
 						PENDING_WORLD_MESH_RETIREMENTS.remove(retirement.meshKey(), retirement.meshGeneration());
@@ -1846,7 +1867,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				auditMessage(
 					"Rust VulkanicGAL world mesh asset update accepted"
 						+ " generation=" + uploadGeneration
-							+ " meshes=" + WORLD_MESH_ASSETS.size()
+							+ " meshes=" + (WORLD_MESH_ASSETS.size() + RustTerrainResidency.counts()[RustTerrainResidency.COUNT_WAITING])
 							+ " dirty_meshes=" + dirtyMeshes.size()
 						+ " dirty_sorted_indices=" + dirtySortedIndices.size()
 							+ " textures=" + WORLD_MESH_TEXTURES.size()
@@ -1856,7 +1877,7 @@ public final class RustGalWorldPrimitiveRenderer {
 						+ " pending_retirements=" + PENDING_WORLD_MESH_RETIREMENTS.size()
 						+ " payload_bytes=" + lastWorldMeshAssetPayloadBytes
 						+ " uploaded_generation=" + uploadedWorldMeshAssetGeneration
-						+ " pending_meshes=" + DIRTY_WORLD_MESH_ASSETS.size()
+						+ " pending_meshes=" + (DIRTY_WORLD_MESH_ASSETS.size() + RustTerrainResidency.counts()[RustTerrainResidency.COUNT_DIRTY])
 				);
 				return status;
 			} catch (RuntimeException error) {
@@ -1926,18 +1947,20 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	public static WorldMeshAssetMetrics worldMeshAssetMetrics() {
 		synchronized (LOCK) {
+			// Static terrain's share comes from Rust's terrain residency.
+			long[] terrain = RustTerrainResidency.counts();
 			return new WorldMeshAssetMetrics(
 				worldMeshAssetGeneration,
 				uploadedWorldMeshAssetGeneration,
 				lastWorldMeshAssetPayloadCount,
 				lastWorldMeshAssetPayloadBytes,
 				worldMeshAssetUpdateFailures,
-				WORLD_MESH_ASSETS.size(),
+				WORLD_MESH_ASSETS.size() + (int)terrain[RustTerrainResidency.COUNT_WAITING],
 				WORLD_MESH_TEXTURES.size(),
-				DIRTY_WORLD_MESH_ASSETS.size(),
+				DIRTY_WORLD_MESH_ASSETS.size() + (int)terrain[RustTerrainResidency.COUNT_DIRTY],
 				DIRTY_WORLD_MESH_TEXTURES.size(),
 				PENDING_MESH_INSTANCES.size(),
-				UPLOADED_WORLD_MESH_GENERATIONS.size(),
+				UPLOADED_WORLD_MESH_GENERATIONS.size() + (int)terrain[RustTerrainResidency.COUNT_UPLOADED],
 				UPLOADED_WORLD_MESH_TEXTURES.size()
 			);
 		}
@@ -3821,7 +3844,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		org.joml.Quaternionf cameraOrientation, int red, int blue) {
 		synchronized (LOCK) {
 			ensureBoundedWorldPrimitiveViewportLocked("native orb requires a seeded frame");
-			if (WORLD_MESH_ASSETS.size() + STATIC_TERRAIN_MESH_RESIDENCY.size() + ORB_SEMANTICS.projectedResidentCount() > MAX_WORLD_MESH_ASSET_RESIDENCY)
+			if (WORLD_MESH_ASSETS.size() + terrainMeshResidencyLocked() + ORB_SEMANTICS.projectedResidentCount() > MAX_WORLD_MESH_ASSET_RESIDENCY)
 				throw new IllegalStateException("combined mesh/orb residency bound exceeded");
 			if (orbTextureResourceGeneration != worldMaterialAssetGeneration) {
 				var resource = Minecraft.getInstance().getResourceManager().getResource(EXPERIENCE_ORB_TEXTURE_LOCATION)
@@ -3838,7 +3861,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				new float[] {cameraOrientation.x, cameraOrientation.y, cameraOrientation.z, cameraOrientation.w},
 				state.entityId, PENDING_MESH_INSTANCES.size(),
                 VulkanicGalBridge.activeSemanticEntityCulling(),shadowCasterCaptureInstanceMark >= 0);
-			if (WORLD_MESH_ASSETS.containsKey(instance.meshKey()) || STATIC_TERRAIN_MESH_RESIDENCY.containsKey(instance.meshKey()))
+			if (WORLD_MESH_ASSETS.containsKey(instance.meshKey()) || RustTerrainResidency.contains(instance.meshKey()))
 				throw new IllegalStateException("native orb resource identity collision");
 			if (!instance.shadowOnly()) DeterministicCameraCapture.recordSubmittedWorkIdentity("experience-orb", "rust-vulkan-whole-frame:typed-orb");
 			if (!instance.shadowOnly() && Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
@@ -4213,9 +4236,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			for (Long key : WORLD_MESH_ASSETS.keysAddedSince(checkpoint.meshAssets)) {
 				VulkanicGalBridge.WorldMeshAssetRecord rolledBack = WORLD_MESH_ASSETS.remove(key);
 				if (rolledBack == null) continue;
-				if (rolledBack.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
-					RustTerrainIntake.discardStaged(key, rolledBack.meshGeneration());
-				}
 				DIRTY_WORLD_MESH_ASSETS.remove(key);
 			}
 			for (Integer key : WORLD_MESH_TEXTURES.keysAddedSince(checkpoint.textureAssets)) {
@@ -10345,7 +10365,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (registry == WORLD_MESH_ASSETS && key instanceof Long meshKey) {
 			if (ExperienceOrbSemanticCollector.ownsKey(meshKey))
 				throw new IllegalStateException("generic mesh uses reserved semantic orb identity");
-			if (!registry.containsKey(key) && registry.size() + STATIC_TERRAIN_MESH_RESIDENCY.size()
+			if (!registry.containsKey(key) && registry.size() + terrainMeshResidencyLocked()
 				+ ORB_SEMANTICS.residentCount() >= maximum)
 				throw new IllegalStateException("combined mesh/orb residency bound exceeded");
 		}
@@ -10590,7 +10610,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		if (previousAsset == null) {
 			WORLD_MESH_ASSETS.put(extraction.meshKey(), extraction.asset());
-			DIRTY_WORLD_MESH_ASSETS.add(extraction.meshKey());
+			markWorldMeshAssetDirtyLocked(extraction.meshKey());
 			changed = true;
 		}
 		VulkanicGalBridge.WorldMeshAssetRecord retainedAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
@@ -10631,7 +10651,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		boolean changed = false;
 		for (DynamicWorldMeshLifetime.Retirement retirement
 			: DYNAMIC_WORLD_MESH_LIFETIME.retireBeforeFrame(semanticFrameSequence)) {
-			if (STATIC_TERRAIN_MESH_RESIDENCY.containsKey(retirement.meshKey())) {
+			if (RustTerrainResidency.contains(retirement.meshKey())) {
 				continue;
 			}
 			VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(retirement.meshKey());
@@ -10653,11 +10673,14 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	/**
-	 * Registers a copied static-terrain asset. Java's vertex/index payload is
-	 * released as soon as Rust acknowledges its upload.
+	 * Registers a static-terrain asset. Its geometry stays in Rust: assembly
+	 * staged it under {@code stagedMeshKey} and this generation, and Rust's
+	 * terrain residency holds it until its upload is acknowledged. Java checks
+	 * the record's counts and sections and registers the textures.
 	 */
 	public static void registerStaticTerrainMeshAsset(
 		VulkanicGalBridge.WorldMeshAssetRecord asset,
+		long stagedMeshKey,
 		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures
 	) {
 		 synchronized (LOCK) {
@@ -10665,11 +10688,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			// Preflight the complete batch before publishing any texture. A static
 			// terrain asset is one semantic transaction; if its residency budget is
 			// exceeded, reject the batch without leaving a partially registered Rust
-			// texture set behind.
-			VulkanicGalBridge.WorldMeshAssetRecord previous = WORLD_MESH_ASSETS.get(asset.meshKey());
-			boolean sameMeshPayload = previous != null && sameStaticTerrainPayload(previous, asset);
+			// texture set behind. The generation hashes the vertices, indices and
+			// sections, so an equal waiting generation is an identical rebuild.
+			long waitingGeneration = RustTerrainResidency.pendingGeneration(asset.meshKey());
+			boolean sameMeshPayload = waitingGeneration == asset.meshGeneration();
 			if (!sameMeshPayload) validateWorldMeshAsset(asset, "static terrain");
-			if (previous == null) {
+			if (waitingGeneration == 0L) {
 				ensureWorldMeshRegistryCapacityLocked(WORLD_MESH_ASSETS, asset.meshKey(),
 					MAX_WORLD_MESH_ASSET_RESIDENCY, "mesh");
 			}
@@ -10705,30 +10729,22 @@ public final class RustGalWorldPrimitiveRenderer {
 				changed |= registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture);
 			}
 			DYNAMIC_WORLD_MESH_LIFETIME.forget(asset.meshKey());
-			STATIC_TERRAIN_MESH_RESIDENCY.put(asset.meshKey(), new StaticTerrainMeshResidency(
-				// sameMeshPayload caches sameStaticTerrainPayload(previous, asset),
-				// including its potentially large vertex and index comparison.
-				sameMeshPayload ? previous.meshGeneration() : asset.meshGeneration(),
-				textureIds(asset)
-			));
+			// An identical rebuild only re-registers; Rust drops its staged copy.
+			RustTerrainResidency.register(asset.meshKey(), asset.meshGeneration(), stagedMeshKey, textureIds(asset),
+				worldMeshDirtySequence + 1);
 			PENDING_WORLD_MESH_RETIREMENTS.remove(asset.meshKey());
 			if (sameMeshPayload) {
-				Long uploaded = UPLOADED_WORLD_MESH_GENERATIONS.get(asset.meshKey());
-				if (asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices
-					&& !DIRTY_WORLD_MESH_ASSETS.contains(asset.meshKey())
-					&& uploaded != null && uploaded.longValue() == asset.meshGeneration()) {
-					// Already published: this identical rebuild's staging is never read.
-					RustTerrainIntake.discardStaged(asset.meshKey(), asset.meshGeneration());
-				}
 				if (changed) {
 					markWorldMeshAssetsChangedLocked();
 				}
 				return;
-				}
-				WORLD_MESH_ASSETS.put(asset.meshKey(), asset);
-				DIRTY_WORLD_MESH_ASSETS.add(asset.meshKey());
+			}
+			// The sequence is used only when the mesh was not dirty yet; numbers
+			// may be skipped, never reused.
+			worldMeshDirtySequence++;
 			markWorldMeshAssetsChangedLocked();
-			// Only computed when the audit line is printed: it walks every vertex.
+			// Only computed when the audit line is printed, and only for
+			// vertices a diagnostic copied into Java: it walks every vertex.
 			String sourceSemantics = Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
 				&& selectedSourceDiagnosticsEnabled()
 				&& !(asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices)
@@ -10746,23 +10762,6 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ " route=rust-vulkan-whole-frame"
 			);
 		}
-	}
-
-	private static boolean sameStaticTerrainPayload(
-		VulkanicGalBridge.WorldMeshAssetRecord left,
-		VulkanicGalBridge.WorldMeshAssetRecord right
-	) {
-		boolean leftStaged = left.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices;
-		boolean rightStaged = right.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices;
-		return left.vertexLayoutVersion() == right.vertexLayoutVersion()
-			&& left.indexType() == right.indexType()
-			// Staged vertices compare by key and content generation; a staged
-			// and a copied list are treated as different payloads.
-			&& leftStaged == rightStaged
-			&& left.vertices().equals(right.vertices())
-			&& left.hasSameIndexPayload(right)
-			&& left.sections().equals(right.sections())
-			&& left.entityIdentity().equals(right.entityIdentity());
 	}
 
 	/**
@@ -10908,22 +10907,14 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static void removeStaticTerrainMeshAsset(long meshKey) {
 		synchronized (LOCK) {
 				DYNAMIC_WORLD_MESH_LIFETIME.forget(meshKey);
-				VulkanicGalBridge.WorldMeshAssetRecord removedAsset = WORLD_MESH_ASSETS.remove(meshKey);
-				StaticTerrainMeshResidency removedResidency = STATIC_TERRAIN_MESH_RESIDENCY.remove(meshKey);
-				if (removedAsset != null && removedAsset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
-					RustTerrainIntake.discardStaged(meshKey, 0L);
-				}
-				ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.remove(meshKey);
-				if (removedAsset == null && removedResidency == null) {
+				// Rust withdraws the residency and any waiting asset (and its
+				// geometry); the retirement carries its uploaded generation, else the
+				// waiting or registered one.
+				long removedGeneration = RustTerrainResidency.remove(meshKey);
+				if (removedGeneration == 0L) {
 					return;
 				}
-				Long acceptedGeneration = UPLOADED_WORLD_MESH_GENERATIONS.get(meshKey);
-				long removedGeneration = acceptedGeneration != null
-					? acceptedGeneration.longValue()
-					: removedAsset != null ? removedAsset.meshGeneration() : removedResidency.meshGeneration();
 				PENDING_WORLD_MESH_RETIREMENTS.put(meshKey, removedGeneration);
-				DIRTY_WORLD_MESH_ASSETS.remove(meshKey);
-				UPLOADED_WORLD_MESH_GENERATIONS.remove(meshKey);
 				worldMeshUploadWithdrawals++;
 				for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
 					if (PENDING_MESH_INSTANCES.get(index).meshKey() == meshKey) {
@@ -11225,17 +11216,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			throw new IllegalArgumentException("Rust static terrain cull policy is not an explicit semantic enum");
 		}
 		synchronized (LOCK) {
-			VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
-			StaticTerrainMeshResidency residency = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
-			// Once the combined Rust upload is acknowledged, the CPU mesh payload
-			// may be released while its explicit residency record remains.  That
-			// retained record is the valid backend-owned admission state for later
-			// semantic visibility submissions; requiring the CPU asset here would
-			// misclassify an uploaded mesh as stale/unregistered.
-			boolean generationMatches = asset != null
-				? asset.meshGeneration() == meshGeneration
-				: residency != null && residency.meshGeneration() == meshGeneration;
-			if (!generationMatches) {
+			// The waiting asset's generation, or once it is uploaded (and its
+			// geometry dropped) the registered one: that residency is the valid
+			// backend-owned admission state for later semantic submissions.
+			if (!RustTerrainResidency.generationMatches(meshKey, meshGeneration)) {
 				return false;
 			}
 			if (viewportWidth <= 0 || viewportHeight <= 0
@@ -11304,9 +11288,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static void markWorldMeshAssetsChangedLocked() {
 		worldMeshAssetGeneration++;
 		attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
-		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + DIRTY_WORLD_MESH_TEXTURES.size();
-		lastWorldMeshAssetPayloadBytes = 0L;
-		for (long meshKey : DIRTY_WORLD_MESH_ASSETS) {
+		long[] terrain = RustTerrainResidency.counts();
+		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + (int)terrain[RustTerrainResidency.COUNT_DIRTY]
+			+ DIRTY_WORLD_MESH_TEXTURES.size();
+		lastWorldMeshAssetPayloadBytes = terrain[RustTerrainResidency.COUNT_DIRTY_BYTES];
+		for (long meshKey : DIRTY_WORLD_MESH_ASSETS.keySet()) {
 			VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(meshKey);
 			if (mesh == null) {
 				continue;
@@ -11328,10 +11314,30 @@ public final class RustGalWorldPrimitiveRenderer {
 		long byteBudget,
 		Map<Long, Long> protectedGenerations
 	) {
-		if (DIRTY_WORLD_MESH_ASSETS.isEmpty()) {
+		// Static terrain waits in Rust: its candidates are the frame's per-record
+		// terrain instances' dirty assets, then its queue by dirty sequence.
+		long[] terrainInstances = new long[PENDING_MESH_INSTANCES.size() * 2];
+		int terrainInstanceCount = 0;
+		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
+			if (instance.stratum() == STRATUM_WORLD_TERRAIN) {
+				terrainInstances[terrainInstanceCount * 2] = instance.meshKey();
+				terrainInstances[terrainInstanceCount * 2 + 1] = instance.meshGeneration();
+				terrainInstanceCount++;
+			}
+		}
+		long[] protectedPairs = new long[protectedGenerations.size() * 2];
+		int protectedCount = 0;
+		for (Map.Entry<Long, Long> entry : protectedGenerations.entrySet()) {
+			protectedPairs[protectedCount * 2] = entry.getKey();
+			protectedPairs[protectedCount * 2 + 1] = entry.getValue();
+			protectedCount++;
+		}
+		long[] terrain = RustTerrainResidency.candidates(terrainInstances, terrainInstanceCount, protectedPairs,
+			protectedCount, limit);
+		if (DIRTY_WORLD_MESH_ASSETS.isEmpty() && terrain.length == 0) {
 			return List.of();
 		}
-		List<VulkanicGalBridge.WorldMeshAssetRecord> meshes = new ArrayList<>(Math.min(DIRTY_WORLD_MESH_ASSETS.size(), limit));
+		List<VulkanicGalBridge.WorldMeshAssetRecord> meshes = new ArrayList<>(limit);
 		long bytes = 0L;
 		// Current-frame semantic work has to cross before background ingestion.
 		// A transient visible mesh must also precede persistent terrain entries:
@@ -11349,7 +11355,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			// A rig instance stands for each of its part meshes.
 			forEachInstanceMeshLocked(instance, (meshKey, meshGeneration) -> {
-				if (full[0] || !DIRTY_WORLD_MESH_ASSETS.contains(meshKey)) {
+				if (full[0] || !DIRTY_WORLD_MESH_ASSETS.containsKey(meshKey)) {
 					return 0L;
 				}
 				VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(meshKey);
@@ -11368,20 +11374,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			});
 		}
 		bytes = frameBytes[0];
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
-			if (instance.stratum() != STRATUM_WORLD_TERRAIN) {
-				continue;
-			}
-			if (!DIRTY_WORLD_MESH_ASSETS.contains(instance.meshKey())) {
-				continue;
-			}
-			VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(instance.meshKey());
-			if (mesh == null || mesh.meshGeneration() != instance.meshGeneration()) {
-				continue;
-			}
-			if (!StaticTerrainVisibilitySet.mayPublishGeneration(protectedGenerations, mesh.meshKey(), mesh.meshGeneration())) {
-				continue;
-			}
+		// Per-record terrain instances' assets, in instance order (Rust checked
+		// that each is dirty, of this generation and publishable).
+		int terrainAt = 0;
+		for (; terrainAt < terrain.length && terrain[terrainAt] < 0L; terrainAt += 4) {
+			VulkanicGalBridge.WorldMeshAssetRecord mesh = residentTerrainRecord(terrain, terrainAt);
 			if (containsWorldMeshAsset(meshes, mesh.meshKey())) {
 				continue;
 			}
@@ -11391,16 +11388,33 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			bytes += meshBytes;
 		}
-		for (long meshKey : DIRTY_WORLD_MESH_ASSETS) {
-			if (containsWorldMeshAsset(meshes, meshKey)) {
-				continue;
-			}
-			VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(meshKey);
-			if (mesh == null) {
-				continue;
-			}
-			if (!StaticTerrainVisibilitySet.mayPublishGeneration(protectedGenerations, mesh.meshKey(), mesh.meshGeneration())) {
-				continue;
+		while (terrainAt < terrain.length && terrain[terrainAt] < 0L) {
+			terrainAt += 4;
+		}
+		// Then one queue: Java's dirty meshes and Rust's dirty terrain, by sequence.
+		var javaQueue = DIRTY_WORLD_MESH_ASSETS.entrySet().iterator();
+		Map.Entry<Long, Long> javaNext = javaQueue.hasNext() ? javaQueue.next() : null;
+		while (javaNext != null || terrainAt < terrain.length) {
+			VulkanicGalBridge.WorldMeshAssetRecord mesh;
+			if (terrainAt < terrain.length && (javaNext == null || terrain[terrainAt] < javaNext.getValue())) {
+				mesh = residentTerrainRecord(terrain, terrainAt);
+				terrainAt += 4;
+				if (containsWorldMeshAsset(meshes, mesh.meshKey())) {
+					continue;
+				}
+			} else {
+				long meshKey = javaNext.getKey();
+				javaNext = javaQueue.hasNext() ? javaQueue.next() : null;
+				if (containsWorldMeshAsset(meshes, meshKey)) {
+					continue;
+				}
+				mesh = WORLD_MESH_ASSETS.get(meshKey);
+				if (mesh == null) {
+					continue;
+				}
+				if (!StaticTerrainVisibilitySet.mayPublishGeneration(protectedGenerations, mesh.meshKey(), mesh.meshGeneration())) {
+					continue;
+				}
 			}
 			long meshBytes = worldMeshAssetPayloadBytes(mesh);
 			if (!appendWorldMeshAssetWithinBudget(meshes, mesh, bytes, limit, byteBudget)) {
@@ -11409,6 +11423,17 @@ public final class RustGalWorldPrimitiveRenderer {
 			bytes += meshBytes;
 		}
 		return meshes;
+	}
+
+	/** An update record for a resident terrain asset from a candidate at
+	 * {@code at} ([sequence, key, generation, payload bytes]): no geometry,
+	 * which Rust takes from its terrain residency. */
+	private static VulkanicGalBridge.WorldMeshAssetRecord residentTerrainRecord(long[] candidates, int at) {
+		long meshKey = candidates[at + 1];
+		long meshGeneration = candidates[at + 2];
+		return new VulkanicGalBridge.WorldMeshAssetRecord(meshKey, meshGeneration, MESH_VERTEX_LAYOUT_V3,
+			VulkanicGalBridge.INDEX_U16, new VulkanicGalBridge.StagedWorldMeshVertices(0, meshKey, meshGeneration, candidates[at + 3]),
+			new byte[0], List.of());
 	}
 
 	private static boolean appendWorldMeshAssetWithinBudget(
@@ -11436,6 +11461,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static long worldMeshAssetPayloadBytes(VulkanicGalBridge.WorldMeshAssetRecord mesh) {
+		if (mesh.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices resident && resident.payloadBytes() >= 0L) {
+			return resident.payloadBytes();
+		}
 		return mesh.indexByteLength() + (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
 	}
 
@@ -18981,25 +19009,18 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private static boolean isWorldMeshGenerationAndTexturesUploadedLocked(long meshKey, long meshGeneration) {
 		Long uploadedGeneration = UPLOADED_WORLD_MESH_GENERATIONS.get(meshKey);
-		StaticTerrainMeshResidency registeredTerrain = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
-		StaticTerrainMeshResidency acknowledgedTerrain = ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.get(meshKey);
-		if (registeredTerrain != null || acknowledgedTerrain != null) {
-			// StaticTerrainVisibilitySet.isAcceptedGeneration, evaluated on the
-			// primitive generations: this runs for every instance every frame.
-			boolean generationAccepted = uploadedGeneration != null && uploadedGeneration.longValue() == meshGeneration
-				&& ((acknowledgedTerrain != null && acknowledgedTerrain.meshGeneration() == meshGeneration)
-					|| (registeredTerrain != null && registeredTerrain.meshGeneration() == meshGeneration));
-			if (!generationAccepted) {
-				return false;
-			}
-			StaticTerrainMeshResidency accepted = acknowledgedTerrain != null
-					&& acknowledgedTerrain.meshGeneration() == meshGeneration
-				? acknowledgedTerrain
-				: registeredTerrain;
-			if (accepted == null || accepted.meshGeneration() != meshGeneration) {
-				return false;
-			}
-			for (int textureId : accepted.textureIds()) {
+		if (uploadedGeneration != null || WORLD_MESH_ASSETS.containsKey(meshKey)) {
+			return isJavaWorldMeshGenerationAndTexturesUploadedLocked(meshKey, meshGeneration, uploadedGeneration);
+		}
+		// Static terrain (Java records no terrain upload): Rust's terrain
+		// residency knows whether this generation was uploaded (it may still be
+		// the acknowledged one while a newer one waits) and its textures.
+		int[] terrainTextures = RustTerrainResidency.accepted(meshKey, meshGeneration);
+		if (terrainTextures == RustTerrainResidency.REJECTED_RESULT) {
+			return false;
+		}
+		if (terrainTextures != RustTerrainResidency.NOT_TERRAIN_RESULT) {
+			for (int textureId : terrainTextures) {
 				// Registration can already contain a newer texture payload. The
 				// acknowledged terrain generation continues using Rust's last accepted
 				// incarnation until the replacement transaction succeeds.
@@ -19009,6 +19030,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			return true;
 		}
+		return false;
+	}
+
+	private static boolean isJavaWorldMeshGenerationAndTexturesUploadedLocked(
+		long meshKey, long meshGeneration, Long uploadedGeneration
+	) {
 		if (uploadedGeneration == null || uploadedGeneration.longValue() != meshGeneration) {
 			return false;
 		}
@@ -19078,32 +19105,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	/** Called only after native acceptance while LOCK is held. */
-	private static void releaseUploadedStaticTerrainPayloadLocked(long meshKey, long meshGeneration) {
-		StaticTerrainMeshResidency residency = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
-		if (residency == null || residency.meshGeneration() != meshGeneration) {
-			return;
-		}
-		VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
-		if (asset != null && asset.meshGeneration() == meshGeneration) {
-			WORLD_MESH_ASSETS.remove(meshKey);
-			if (asset.vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices) {
-				// Rust now owns the uploaded vertices; drop the staged copy.
-				RustTerrainIntake.discardStaged(meshKey, meshGeneration);
-			}
-			}
-		RustGalTerrainRenderer.releaseUploadedStaticTerrainPayload(meshKey, meshGeneration);
-	}
-
 	private record ModelMeshSemanticIdentity(String modelClass, ResourceLocation textureIdentity) {}
-
-	private record StaticTerrainMeshResidency(
-		long meshGeneration,
-		int[] textureIds
-	) {
-		private StaticTerrainMeshResidency copy() {
-			return new StaticTerrainMeshResidency(meshGeneration, textureIds.clone());
-		}
-	}
 
 	public record EnergySwirlExecutionDiagnostic(
 		long deterministicFrameIndex,

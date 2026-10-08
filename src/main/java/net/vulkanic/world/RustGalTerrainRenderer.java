@@ -2114,7 +2114,7 @@ public final class RustGalTerrainRenderer {
 				long atlasGenerationForRegistration = atlasGeneration;
 				boolean stagingReload = resourceReloadStaging;
 				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(
-					asset.asset(), stagingReload ? List.of()
+					asset.asset(), asset.stagedMeshKey(), stagingReload ? List.of()
 						: atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute()))
 				);
 				if (stagingReload) {
@@ -2271,6 +2271,8 @@ public final class RustGalTerrainRenderer {
 		OrderedTranslucentMesh orderedTranslucentMesh = null;
 		if (layer == ChunkSectionLayer.TRANSLUCENT) {
 			if (sections.isEmpty()) {
+				// Nothing to register: drop what assembly staged.
+				RustTerrainIntake.discardStaged(assembled.meshKey(), assembled.meshGeneration());
 				return null;
 			}
 			orderedTranslucentMesh = orderedTranslucentReceipt(assembled);
@@ -2368,7 +2370,8 @@ public final class RustGalTerrainRenderer {
 				vertices,
 				indexBytes,
 				sections
-			)
+			),
+			assembled.meshKey()
 		);
 	}
 
@@ -4529,7 +4532,10 @@ public final class RustGalTerrainRenderer {
 		int[] translucentSourceSegmentQuadCounts,
 		int translucentIndexBytes,
 		long translucentIndexHash,
-			VulkanicGalBridge.WorldMeshAssetRecord asset
+			VulkanicGalBridge.WorldMeshAssetRecord asset,
+			// The key assembly staged the geometry under (differs from meshKey
+			// only under the mesh-key-collision fault).
+			long stagedMeshKey
 		) {
 		TerrainSectionAsset releaseCpuPayload() {
 			return new TerrainSectionAsset(
@@ -4544,7 +4550,7 @@ public final class RustGalTerrainRenderer {
 				negativeYNormalSections, horizontalNormalSections, sectionOriginX,
 				sectionOriginY, sectionOriginZ, translucentSortType, translucentPrimitiveAccountingReason,
 				unsupportedPrimitiveCount, translucentSourceSegmentQuadCounts, translucentIndexBytes,
-				translucentIndexHash, null
+				translucentIndexHash, null, stagedMeshKey
 			);
 		}
 	}

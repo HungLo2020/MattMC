@@ -12,9 +12,10 @@ use crate::render::worldrender::WORLD_MAX_MESH_VERTICES;
 use crate::render::worldrender::WORLD_MESH_ASSET_RESIDENCY;
 use crate::render::worldrender::WORLD_MESH_TEXTURE_RESIDENCY;
 
-/// `FfiWorldMeshAssetRecord::reserved0` bit: the vertices were staged by
-/// terrain assembly (`worldrender/terrain/staging.rs`), not sent.
-pub(crate) const WORLD_MESH_ASSET_STAGED_TERRAIN_VERTICES: u32 = 1;
+/// `FfiWorldMeshAssetRecord::reserved0` bit: a static-terrain asset whose
+/// vertices, index bytes and sections Rust's terrain residency holds
+/// (`worldrender/terrain/residency.rs`); the record carries none of them.
+pub(crate) const WORLD_MESH_ASSET_TERRAIN_RESIDENT: u32 = 2;
 
 const MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL: usize = WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
 const MAX_WORLD_MATERIAL_ASSET_COUNT: usize = WORLD_MAX_MESH_TEXTURE_ASSETS;
@@ -313,25 +314,41 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             ));
         }
         let index_type = ffi_index_type(mesh.index_type)?;
-        let vertices = if mesh.reserved0 & WORLD_MESH_ASSET_STAGED_TERRAIN_VERTICES != 0 {
-            // Static terrain: assembly staged the vertices in Rust. Copied, not
-            // taken: a rejected update is retried; Java discards the staged
-            // entry once this generation's upload is acknowledged.
-            if mesh.vertices.count != 0 {
+        // Read again below for a resident terrain asset, from its own index type.
+        if mesh.reserved0 & !WORLD_MESH_ASSET_TERRAIN_RESIDENT != 0 {
+            return Err(GalError::ffi(StatusCode::InvalidArgument, "unknown world mesh asset reserved bits"));
+        }
+        let resident = if mesh.reserved0 & WORLD_MESH_ASSET_TERRAIN_RESIDENT != 0 {
+            // Copied, not taken: a rejected update is retried. The asset leaves
+            // residency when Java acknowledges this generation's upload.
+            if mesh.vertices.count != 0 || mesh.index_bytes.len != 0 || mesh.sections.count != 0 {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
-                    "a staged terrain mesh must not also carry vertices",
+                    "a resident terrain mesh must not also carry vertices, indices or sections",
                 ));
             }
-            crate::render::worldrender::terrain::staging::get(mesh.mesh_key, mesh.mesh_generation).ok_or_else(|| {
+            let residency = crate::render::worldrender::terrain::residency::residency();
+            let asset = residency.pending_asset(mesh.mesh_key, mesh.mesh_generation).ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::InvalidArgument,
                     format!(
-                        "staged terrain vertices for mesh {} generation {} are missing",
+                        "resident terrain mesh {} generation {} is not waiting for upload",
                         mesh.mesh_key, mesh.mesh_generation
                     ),
                 )
-            })?
+            })?;
+            if asset.index_bytes.len() > WORLD_MAX_MESH_INDEX_BYTES || asset.sections.len() > WORLD_MAX_MESH_SECTIONS {
+                return Err(GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    format!("resident terrain mesh {} exceeds the index or section bound", mesh.mesh_key),
+                ));
+            }
+            Some(asset.clone())
+        } else {
+            None
+        };
+        let vertices = if let Some(asset) = &resident {
+            asset.vertices.clone()
         } else {
             let raw_vertices = read_limited_slice(mesh.vertices, false, "world mesh vertices")?;
             if raw_vertices.len() > WORLD_MAX_MESH_VERTICES {
@@ -361,52 +378,17 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             }
             vertices
         };
-        let index_bytes = read_bounded_bytes(
-            mesh.index_bytes,
-            false,
-            WORLD_MAX_MESH_INDEX_BYTES,
-            "world mesh index bytes",
-        )?;
-        let raw_sections = read_limited_slice(mesh.sections, false, "world mesh sections")?;
-        if raw_sections.len() > WORLD_MAX_MESH_SECTIONS {
-            return Err(GalError::ffi(
-                StatusCode::LengthOverflow,
-                format!(
-                    "world mesh section count {} exceeds bounded limit {WORLD_MAX_MESH_SECTIONS}",
-                    raw_sections.len()
-                ),
-            ));
-        }
-        let mut sections = Vec::with_capacity(raw_sections.len());
-        for section in raw_sections {
-            validate_item_size::<FfiWorldMeshSectionRecord>(
-                section.byte_size,
-                "world mesh section",
-            )?;
-            let material_id = world_material_semantics::canonical_material_id(section.material_id)
-                .ok_or_else(|| {
-                    GalError::ffi(
-                        StatusCode::UnknownEnum,
-                        format!("unknown world mesh material id {}", section.material_id),
-                    )
-                })?;
-            if section.source_facing > 6 {
-                return Err(GalError::ffi(
-                    StatusCode::UnknownEnum,
-                    format!("unknown world mesh source facing {}", section.source_facing),
-                ));
-            }
-            sections.push(WorldMeshSection {
-                material_id,
-                texture_id: section.texture_id,
-                material_mode: section.material_mode,
-                cull_policy: section.cull_policy,
-                winding: section.winding,
-                index_offset: section.index_offset,
-                index_count: section.index_count,
-                source_facing: section.source_facing,
-            });
-        }
+        let index_type = match &resident {
+            Some(asset) => ffi_index_type(asset.index_type)?,
+            None => index_type,
+        };
+        let (index_bytes, sections) = match resident {
+            Some(asset) => (asset.index_bytes, asset.sections),
+            None => (
+                read_bounded_bytes(mesh.index_bytes, false, WORLD_MAX_MESH_INDEX_BYTES, "world mesh index bytes")?,
+                decode_world_mesh_sections(mesh.sections)?,
+            ),
+        };
         let entity_identity = read_label(
             mesh.entity_identity_utf8,
             "world mesh asset entity identity",
@@ -695,4 +677,50 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets_queued(
             error.code as i32
         }
     }
+}
+
+/// # Safety
+/// `raw` addresses its stated record count.
+unsafe fn decode_world_mesh_sections(raw: FfiSlice<FfiWorldMeshSectionRecord>) -> GalResult<Vec<WorldMeshSection>> {
+    let raw_sections = read_limited_slice(raw, false, "world mesh sections")?;
+    if raw_sections.len() > WORLD_MAX_MESH_SECTIONS {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "world mesh section count {} exceeds bounded limit {WORLD_MAX_MESH_SECTIONS}",
+                raw_sections.len()
+            ),
+        ));
+    }
+    let mut sections = Vec::with_capacity(raw_sections.len());
+    for section in raw_sections {
+        validate_item_size::<FfiWorldMeshSectionRecord>(
+            section.byte_size,
+            "world mesh section",
+        )?;
+        let material_id = world_material_semantics::canonical_material_id(section.material_id)
+            .ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh material id {}", section.material_id),
+                )
+            })?;
+        if section.source_facing > 6 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world mesh source facing {}", section.source_facing),
+            ));
+        }
+        sections.push(WorldMeshSection {
+            material_id,
+            texture_id: section.texture_id,
+            material_mode: section.material_mode,
+            cull_policy: section.cull_policy,
+            winding: section.winding,
+            index_offset: section.index_offset,
+            index_count: section.index_count,
+            source_facing: section.source_facing,
+        });
+    }
+    Ok(sections)
 }

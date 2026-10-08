@@ -3299,8 +3299,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 1, mesh.vertexLayoutVersion());
 				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 2, mesh.indexType());
 				boolean stagedVertices = mesh.vertices() instanceof StagedWorldMeshVertices;
-				// Bit 0: the vertices are staged in Rust (bridge/world/mesh_assets.rs).
-				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 3, stagedVertices ? 1 : 0);
+				// Bit 1: a terrain asset Rust's terrain residency holds; the record
+				// carries no vertices, indices or sections (bridge/world/mesh_assets.rs).
+				if (stagedVertices && (mesh.indexByteLength() != 0 || !mesh.sections().isEmpty())) {
+					throw new IllegalArgumentException("a resident terrain mesh record must carry no indices or sections");
+				}
+				Struct.WORLD_MESH_ASSET_RECORD.setInt(item, 3, stagedVertices ? 2 : 0);
 				Struct.WORLD_MESH_ASSET_RECORD.setLong(item, 4, mesh.meshKey());
 				Struct.WORLD_MESH_ASSET_RECORD.setLong(item, 5, mesh.meshGeneration());
 				int sentVertices = stagedVertices ? 0 : mesh.vertices().size();
@@ -4526,20 +4530,29 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * back into the bytes (intake rewrites water quads before publication).
 	 */
 	/**
-	 * Vertices of a static-terrain layer staged in Rust by assembly
-	 * ({@code worldrender/terrain/staging.rs}): only the count crosses into
-	 * Java. The asset update sends no vertex bytes for it; Rust reads the
-	 * staged vertices of this key and generation. Element access is a bug.
+	 * Static-terrain vertices that stay in Rust: assembly stages the layer
+	 * ({@code worldrender/terrain/staging.rs}) and its registration moves it
+	 * into terrain residency ({@code worldrender/terrain/residency.rs}). Only
+	 * the count crosses into Java. An asset update record built with these
+	 * carries no geometry; Rust uploads the resident asset of its key and
+	 * generation, whose upload size is {@link #payloadBytes}. Element access is
+	 * a bug.
 	 */
 	public static final class StagedWorldMeshVertices extends java.util.AbstractList<WorldMeshVertexRecord> {
 		private final int count;
 		private final long meshKey;
 		private final long meshGeneration;
+		private final long payloadBytes;
 
 		public StagedWorldMeshVertices(int count, long meshKey, long meshGeneration) {
+			this(count, meshKey, meshGeneration, -1L);
+		}
+
+		public StagedWorldMeshVertices(int count, long meshKey, long meshGeneration, long payloadBytes) {
 			this.count = count;
 			this.meshKey = meshKey;
 			this.meshGeneration = meshGeneration;
+			this.payloadBytes = payloadBytes;
 		}
 
 		@Override
@@ -4550,6 +4563,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override
 		public int size() {
 			return count;
+		}
+
+		/** The resident asset's upload bytes (vertices and indices), or -1 if unknown. */
+		public long payloadBytes() {
+			return payloadBytes;
 		}
 
 		/** Same staged layer: the generation is a content hash of the vertices. */

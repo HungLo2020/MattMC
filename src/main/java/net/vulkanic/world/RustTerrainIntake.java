@@ -91,7 +91,7 @@ final class RustTerrainIntake {
 			waterBlockAtlas, water, false);
 	}
 
-	/** Drops a layer's staged vertices that will not be (or were already) published. */
+	/** Drops a layer assembly staged that will not be registered. */
 	static void discardStaged(long meshKey, long meshGeneration) {
 		try {
 			DISCARD_STAGED.invokeExact(meshKey, meshGeneration);

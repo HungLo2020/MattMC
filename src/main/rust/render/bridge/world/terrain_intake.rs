@@ -3,7 +3,9 @@
 //! world-mesh vertex ABI, index bytes, draw ranges and a receipt.
 
 use crate::render::bridge::abi::{FfiWorldMeshSectionRecord, FfiWorldMeshVertex};
-use crate::render::scene::mesh::WorldMeshVertex;
+use crate::render::scene::mesh::{WorldMeshSection, WorldMeshVertex};
+use crate::render::worldrender::frame::material_quads::canonical_material_id;
+use crate::render::worldrender::terrain::staging::StagedAsset;
 use crate::render::worldrender::terrain::assembly::{assemble_layer, FfiWaterSprite, LayerAssemblyParams};
 use crate::render::worldrender::terrain::staging;
 use crate::render::worldrender::terrain::intake::{
@@ -41,8 +43,8 @@ pub struct FfiTerrainLayerAssemblyParams {
     pub water_block_atlas: u32,
     /// Non-zero: `water` holds the still, flow and overlay sprites.
     pub water_present: u32,
-    /// [`ASSEMBLY_STAGE_VERTICES`]: keep the vertices in Rust (see
-    /// `worldrender/terrain/staging.rs`) instead of writing them out.
+    /// [`ASSEMBLY_STAGE_VERTICES`]: do not also write the vertices out (the
+    /// layer is always staged in Rust, see `worldrender/terrain/staging.rs`).
     pub flags: u32,
     pub water: [FfiWaterSprite; 3],
     pub reserved_tail: u32,
@@ -81,7 +83,7 @@ pub struct FfiTerrainLayerAssemblyReceipt {
     pub water_overlay: u32,
     pub water_texture_switches: u32,
     pub sample_count: u32,
-    /// Non-zero when the vertices were staged in Rust (not written out).
+    /// Non-zero when the vertices were not written out (only staged).
     pub staged: u32,
     pub reserved: u32,
 }
@@ -89,7 +91,8 @@ pub struct FfiTerrainLayerAssemblyReceipt {
 const _: () = assert!(std::mem::size_of::<FfiTerrainLayerAssemblyParams>() == 96);
 const _: () = assert!(std::mem::size_of::<FfiTerrainLayerAssemblyReceipt>() == 144);
 
-/// Assembly flag: stage the vertices in Rust for the asset update.
+/// Assembly flag: leave the vertices only in Rust's staging (no copy for
+/// Java diagnostics).
 pub const ASSEMBLY_STAGE_VERTICES: u32 = 1;
 
 /// Ints per primitive sample: id, kind, retained, material, texture, retained index start.
@@ -199,9 +202,7 @@ pub unsafe extern "C" fn mattmc_terrain_assemble_layer(
         {
             return -2;
         }
-        let staged = stage
-            && staging::stage(assembled.mesh_key, assembled.mesh_generation, std::mem::take(&mut *vertices));
-        if !staged {
+        if !stage {
             if vertex_count > output.vertex_capacity as usize {
                 return -2;
             }
@@ -209,6 +210,29 @@ pub unsafe extern "C" fn mattmc_terrain_assemble_layer(
                 output.vertices.add(index).write(abi_vertex(vertex));
             }
         }
+        // The update takes the layer from terrain residency, which takes it
+        // from staging at registration; the frontend's section form is
+        // checked here, once.
+        let mut sections = Vec::with_capacity(assembled.sections.len());
+        for section in &assembled.sections {
+            let Some(material_id) = canonical_material_id(section.material_id) else {
+                return reject(&format!("unknown world mesh material id {}", section.material_id));
+            };
+            if section.source_facing > 6 {
+                return reject(&format!("unknown world mesh source facing {}", section.source_facing));
+            }
+            sections.push(WorldMeshSection { material_id, ..*section });
+        }
+        let asset = StagedAsset {
+            index_type: assembled.index_type,
+            vertices: std::mem::take(&mut *vertices),
+            index_bytes: assembled.index_bytes.clone(),
+            sections,
+        };
+        if !staging::stage(assembled.mesh_key, assembled.mesh_generation, asset) {
+            return reject("Rust terrain staging bound reached");
+        }
+        let staged = stage;
         std::ptr::copy_nonoverlapping(assembled.index_bytes.as_ptr(), output.indices, assembled.index_bytes.len());
         for (index, section) in assembled.sections.iter().enumerate() {
             output.sections.add(index).write_unaligned(FfiWorldMeshSectionRecord {

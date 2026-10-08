@@ -11,6 +11,7 @@ pub mod materials;
 pub mod mesh_cache;
 pub mod placement;
 pub mod publication;
+pub mod residency;
 pub mod resources;
 pub mod section;
 pub mod staging;
