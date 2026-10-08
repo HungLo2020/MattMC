@@ -361,9 +361,10 @@ Java's packed `updateWorldLodAssets`, because the provenance needs Java's
 model resolution.
 
 Each frame, DH's quadtree walk (`RenderBufferHandler.buildRenderList`)
-collects candidate column keys and makes one ledger call,
-`collectVisibleFrame`. That call:
-1. requests publication of the unpublished columns, in walk order;
+collects the key and generation of each drawable container it reaches, and
+makes one ledger call, `collectVisibleFrame`. That call:
+1. drops containers whose generation is no longer current, then requests
+   publication of the unpublished columns, in walk order;
 2. sorts the keys near to far, keeping walk order for equal distances;
 3. records the frame's visibility;
 4. admits the visible segments.

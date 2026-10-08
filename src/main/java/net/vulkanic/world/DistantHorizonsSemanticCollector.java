@@ -2434,21 +2434,23 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	/**
-	 * DH's per-frame render list in one ledger call. For the walk's first
-	 * {@code count} candidate columns, in walk order, this requests publication
-	 * of each unpublished column, then sorts them near to far around the
-	 * quadtree's center, records them as this frame's visibility, and admits
-	 * their visible segments. Exact-atlas coverage needs Java's per-column
-	 * accounting, so then the caller admits each column through
-	 * {@link #recordVisibleMaterialColumn}.
+	 * DH's per-frame render list in one ledger call. {@code walked} holds the
+	 * first {@code count} drawable containers the quadtree walk reached, as
+	 * (key, generation) pairs. In walk order this drops containers whose
+	 * generation is no longer current ({@link #hasColumn}) and requests
+	 * publication of each unpublished column; it then sorts the candidates near
+	 * to far around the quadtree's center, records them as this frame's
+	 * visibility, and admits their visible segments. Exact-atlas coverage needs
+	 * Java's per-column accounting, so then the caller admits each column
+	 * through {@link #recordVisibleMaterialColumn}.
 	 */
-	public static VisibleFrame collectVisibleFrame(long[] candidateKeys, int count, int centerX, int centerZ) {
+	public static VisibleFrame collectVisibleFrame(long[] walked, int count, int centerX, int centerZ) {
 		boolean enabled = enabled();
 		boolean admit = enabled && !exactAtlasCoverageRequested();
 		int flags = (enabled ? DhCollectorLedger.VISIBLE_FRAME_ENABLED : 0) | (admit ? DhCollectorLedger.VISIBLE_FRAME_ADMIT : 0);
 		long[] frame;
 		synchronized (LOCK) {
-			frame = DhCollectorLedger.visibleFrame(candidateKeys, count, centerX, centerZ, flags);
+			frame = DhCollectorLedger.visibleFrame(walked, count, centerX, centerZ, flags);
 		}
 		String requestFailure = null;
 		if (frame[1] > 0L) {
@@ -2460,7 +2462,7 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		VisibleColumnSegments segments = new VisibleColumnSegments(
 			(int)frame[4], (int)(frame[5] + frame[6]), (int)frame[7]);
-		return new VisibleFrame(Arrays.copyOfRange(frame, 8, frame.length), (int)frame[0], admit, segments,
+		return new VisibleFrame(Arrays.copyOfRange(frame, 9, frame.length), (int)frame[0], admit, segments,
 			(int)frame[1], requestFailure);
 	}
 

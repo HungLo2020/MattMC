@@ -141,6 +141,15 @@ public class LodBufferContainer implements AutoCloseable
 		return this.rustSemanticBuffersPublished && this.rustSemanticColumnGeneration == 0L;
 	}
 
+	/** For the render walk: -1 before a Rust build is published (or after
+	 * close), otherwise the generation built, 0 for no drawable geometry. The
+	 * walk asks the collector whether it is still current
+	 * ({@link #rustSemanticBuildLifecycleCurrent}), batched for the frame. */
+	public long rustSemanticWalkGeneration()
+	{
+		return this.rustSemanticBuffersPublished ? this.rustSemanticColumnGeneration : -1L;
+	}
+
 	/** True while this container still owns the collector generation it built. */
 	public boolean rustSemanticBuildLifecycleCurrent()
 	{
