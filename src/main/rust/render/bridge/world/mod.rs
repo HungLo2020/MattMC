@@ -15,6 +15,7 @@ mod mesh_assets;
 mod entity_shadow_query;
 mod model_rigs;
 mod terrain_intake;
+mod terrain_publication;
 
 pub(crate) use self::whole_frame::*;
 pub(crate) use self::meshes::*;

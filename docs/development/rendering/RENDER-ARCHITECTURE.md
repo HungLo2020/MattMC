@@ -248,6 +248,21 @@ move world/entity semantics or resource-reload publication into the graph.
       diagnostics. `-Dmattmc.dev.forceTerrainVertexStaging=true` bypasses only
       the detailed-diagnostics condition; faults, active probes and the appearance
       trace still require copied vertices.
+  - **Publication rows:** Rust's registry
+    ([`terrain/publication.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/publication.rs))
+    holds each section's published solid, cutout and translucent mesh (key and
+    generation, and whether the translucent layer is camera-sorted). It also
+    rejects a mesh key that another section layer already publishes.
+    - A row switches when Java registers the layer, not when its upload is
+      acknowledged; Frozen parity records that timing.
+    - The camera section graph takes the rows that changed since its last
+      selection in one call
+      ([`bridge/world/terrain_publication.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/terrain_publication.rs)),
+      or every row after a reset, a reload swap or for a new graph.
+    - Java's off-camera shadow candidates read their rows from the registry
+      in one call per frame.
+    - Java (`RustTerrainPublication`) still calls the registry when it
+      registers, removes or reload-swaps a layer.
   - Java receives copied index bytes/range records and a receipt, and still
     publishes the asset (residency, upload acknowledgement, reload staging),
     then drops the payload once Rust acknowledges the upload (translucent
