@@ -452,6 +452,106 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(2L, DistantHorizonsSemanticCollector.snapshotForTest(columnKey).generation());
 	}
 
+	/** The per-frame render list in one ledger call matches the per-column
+	 * calls it replaced: publication requests in walk order, visibility in
+	 * near-to-far order (stable for equal distances), and segment admission. */
+	@Test
+	void visibleFrameMatchesThePerColumnRenderListCalls() {
+		assertVisibleFrameParity(false);
+	}
+
+	/** Exact-atlas coverage keeps Java's per-column admission after the call. */
+	@Test
+	void exactAtlasVisibleFrameMatchesThePerColumnRenderListCalls() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		assertVisibleFrameParity(true);
+	}
+
+	private static void assertVisibleFrameParity(boolean exactAtlas) {
+		int centerX = 96;
+		int centerZ = -40;
+		// Walk order differs from distance order; two pairs tie on distance.
+		long[] walk = {
+			DhSectionPos.encode((byte) 6, 3, 0), DhSectionPos.encode((byte) 6, 1, -1),
+			DhSectionPos.encode((byte) 7, 0, 0), DhSectionPos.encode((byte) 6, 1, 0),
+			DhSectionPos.encode((byte) 6, 2, -1), DhSectionPos.encode((byte) 6, -4, 5),
+			DhSectionPos.encode((byte) 6, 1, -2)
+		};
+		java.util.function.Supplier<Object> perColumn = () -> {
+			buildRenderListFixture(walk);
+			DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+			int unpublished = 0;
+			for (long key : walk) {
+				if (!DistantHorizonsSemanticCollector.hasPublishedColumn(key)
+					&& !DistantHorizonsSemanticCollector.requestColumnPublication(key)) {
+					unpublished++;
+				}
+			}
+			List<Long> sorted = new java.util.ArrayList<>(java.util.Arrays.stream(walk).boxed().toList());
+			sorted.sort(java.util.Comparator.comparingInt(key ->
+				Math.abs(DhSectionPos.getCenterBlockPosX(key) - centerX) + Math.abs(DhSectionPos.getCenterBlockPosZ(key) - centerZ)));
+			DistantHorizonsSemanticCollector.recordRenderListVisibilityStats(walk.length, unpublished, sorted);
+			int[] counts = new int[3];
+			for (long key : sorted) {
+				var segments = DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(key);
+				counts[0] += segments.opaqueSegments();
+				counts[1] += segments.transparentSegments();
+				counts[2] += segments.waterSegments();
+			}
+			return renderListOutcome(sorted.stream().mapToLong(Long::longValue).toArray(), unpublished, counts);
+		};
+		java.util.function.Supplier<Object> oneCall = () -> {
+			buildRenderListFixture(walk);
+			DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+			long[] candidates = java.util.Arrays.copyOf(walk, walk.length + 3);
+			var frame = DistantHorizonsSemanticCollector.collectVisibleFrame(candidates, walk.length, centerX, centerZ);
+			assertEquals(!exactAtlas, frame.admitted());
+			assertEquals(0, frame.requestFailures());
+			var segments = frame.segments();
+			int[] counts = { segments.opaqueSegments(), segments.transparentSegments(), segments.waterSegments() };
+			if (!frame.admitted()) {
+				for (long key : frame.nearToFar()) {
+					var admitted = DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(key);
+					counts[0] += admitted.opaqueSegments();
+					counts[1] += admitted.transparentSegments();
+					counts[2] += admitted.waterSegments();
+				}
+			}
+			return renderListOutcome(frame.nearToFar(), frame.unpublished(), counts);
+		};
+		String expected = perColumn.get().toString();
+		DistantHorizonsSemanticCollector.resetForTest();
+		assertEquals(expected, oneCall.get().toString());
+		assertTrue(expected.contains("unpublished=2"), expected);
+		assertFalse(expected.contains("counts=[0, 0, 0]"), expected);
+		assertFalse(expected.startsWith("order=" + java.util.Arrays.toString(walk)), "the fixture must reorder: " + expected);
+	}
+
+	/** Publishes the first five walk columns, then rebuilds one (pending
+	 * replacement) and builds one more (never published); the last key has no
+	 * column. Run against a fresh collector so generations repeat. */
+	private static void buildRenderListFixture(long[] walk) {
+		for (int index = 0; index < 5; index++) {
+			buildSemanticContainer(walk[index], 0xff557733 + index);
+		}
+		publishPendingForTest();
+		buildSemanticContainer(walk[1], 0xff000001);
+		buildSemanticContainer(walk[5], 0xff000002);
+	}
+
+	private static String renderListOutcome(long[] nearToFar, int unpublished, int[] counts) {
+		var route = DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
+		var frame = DistantHorizonsSemanticCollector.consumeRenderFrame();
+		var visible = DistantHorizonsSemanticCollector.consumeVisibleSegments();
+		var update = DistantHorizonsSemanticCollector.pendingVisibleUpdateForTest();
+		return "order=" + java.util.Arrays.toString(nearToFar) + " unpublished=" + unpublished
+			+ " counts=" + java.util.Arrays.toString(counts) + " route=" + route
+			+ " enabled=" + frame.enabled() + " visible=" + visible
+			+ " update=" + (update == null ? "none" : update.assets().stream()
+				.map(asset -> asset.columnKey() + ":" + asset.columnGeneration()).toList());
+	}
+
 	@AfterEach
 	void resetCollector() {
 		System.clearProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY);

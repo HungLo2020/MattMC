@@ -360,6 +360,17 @@ provenance (exact-atlas and source-execution diagnostics) still go through
 Java's packed `updateWorldLodAssets`, because the provenance needs Java's
 model resolution.
 
+Each frame, DH's quadtree walk (`RenderBufferHandler.buildRenderList`)
+collects candidate column keys and makes one ledger call,
+`collectVisibleFrame`. That call:
+1. requests publication of the unpublished columns, in walk order;
+2. sorts the keys near to far, keeping walk order for equal distances;
+3. records the frame's visibility;
+4. admits the visible segments.
+
+The order matches the per-column calls it replaced. With exact-atlas coverage,
+`LodRenderer` still admits each column through `recordVisibleMaterialColumn`.
+
 [`DistantHorizonsSemanticCollector`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java)
 keeps the material provenance, the frame's render parameters and the capture
 diagnostics. It applies each ledger call's effects to its provenance maps.

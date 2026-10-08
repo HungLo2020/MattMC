@@ -97,6 +97,8 @@ final class DhCollectorLedger {
 	private static final MethodHandle OBSERVE_RENDER_LIST = bindVoid("observe_render_list", ValueLayout.JAVA_INT);
 	private static final MethodHandle RECORD_VISIBILITY = bindVoid("record_visibility", ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
+	private static final MethodHandle VISIBLE_FRAME = bind("visible_frame", true, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
+		ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
 	private static final MethodHandle PENDING_UPDATE = bind("pending_update", false, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_INT);
 	private static final MethodHandle ACKNOWLEDGE = bind("acknowledge", true, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
@@ -389,6 +391,22 @@ final class DhCollectorLedger {
 			RECORD_VISIBILITY.invokeExact(candidates, unpublished, arena.allocateFrom(ValueLayout.JAVA_LONG, values), values.length);
 		} catch (Throwable error) {
 			throw failure("visibility", error);
+		}
+	}
+
+	static final int VISIBLE_FRAME_ENABLED = 1;
+	static final int VISIBLE_FRAME_ADMIT = 2;
+
+	/** One frame's render list from the walk's first {@code count} candidate
+	 * keys: [unpublished, request failures, first failed key, its error code,
+	 * opaque, side, up, water, then the keys near to far]. */
+	static long[] visibleFrame(long[] keys, int count, int centerX, int centerZ, int flags) {
+		try {
+			return takeOutput(check((int)VISIBLE_FRAME.invokeExact(MemorySegment.ofArray(keys), count, centerX, centerZ, flags)));
+		} catch (RuntimeException error) {
+			throw error;
+		} catch (Throwable error) {
+			throw failure("visible frame", error);
 		}
 	}
 
