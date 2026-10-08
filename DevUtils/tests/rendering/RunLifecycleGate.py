@@ -113,6 +113,8 @@ def main() -> int:
                         help="extra client JVM option (repeatable), e.g. -Dmattmc.dev.forceTerrainVertexStaging=true")
     parser.add_argument("--run-source", help="MATTMC_CAPTURE_RUN_SOURCE override")
     parser.add_argument("--shader-pack", help="MATTMC_CAPTURE_SHADER_PACK_SOURCE override")
+    parser.add_argument("--artifact-root", type=Path,
+                        help="output directory (default artifacts/graphics-captures/lifecycle-gate/<label>)")
     parser.add_argument("--dh-radius", default=None,
                         help="MATTMC_CAPTURE_DH_RADIUS_OVERRIDE (default: the world's own radius; the "
                              "resize/swapchain DH residency checks assume it)")
@@ -129,7 +131,7 @@ def main() -> int:
         env.pop("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE", None)
     env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
 
-    out = REPO / "artifacts" / "graphics-captures" / "lifecycle-gate" / args.label
+    out = args.artifact_root or REPO / "artifacts" / "graphics-captures" / "lifecycle-gate" / args.label
     results = []
     for scenario in args.scenario or SCENARIOS:
         root = out / scenario

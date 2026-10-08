@@ -29,10 +29,21 @@ turning it off would remove the triggering write.
 
 Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.
 
+For a rendering batch, run the [validation driver](#one-command-validation)
+instead of the steps one by one. Individually:
+
 ```sh
-(cd src/main/rust && cargo test --release)   # Rust, including boundary tests
-./gradlew test                               # Java
+(cd src/main/rust && cargo test --lib -- --test-threads=4)          # Rust, including boundary tests
+./gradlew -PmattmcRustProfile=release test -x testRustNative       # Java
 ```
+
+Plain `./gradlew test` first reruns the whole Rust suite serially
+(`testRustNative`, `--test-threads=1`, about 5½ minutes) in Gradle's own target
+directory. Skip it with `-x testRustNative` whenever the Rust suite has already
+run. `-PmattmcRustProfile=release` makes the Java tests load the release
+library the clients use, instead of building a debug one. Parallel Rust runs
+can race on native driver state (OpenAL/EGL/Vulkan); re-run any failure
+serially before treating it as real.
 
 The architecture boundary tests run with the Rust tests; see
 [Render Architecture](RENDER-ARCHITECTURE.md). The Java test task sets
@@ -41,6 +52,43 @@ game classes on JDK 25. The author reports the former 11 mocking failures
 resolved and two stale atlas/shield expectations corrected at `7f256b53`.
 Do not classify a new mocking failure as an accepted baseline automatically;
 check the effective JVM, Byte Buddy configuration and actual failure.
+
+### One-command validation
+
+```sh
+python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
+```
+
+The [driver](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/RunValidation.py)
+runs every check a rendering batch needs, in an order that builds once and
+never shares the GPU between clients:
+
+1. Java rendering tests on the release library, without `testRustNative`.
+   This also builds the release library and classes, so no client's readiness
+   timer waits on a cold build.
+2. The Rust suite (4 threads, failures re-run serially and reported as flaky
+   or failed) and the wiki check run in the background while the
+   [lifecycle gate](#lifecycle-gate) and both Frozen parity pairs (Iris+DH
+   with DH generic rendering on, and vanilla) run on the GPU.
+3. FPS runs last, alone: one clean 1,800-frame run per mode by default.
+   `--perf` instead interleaves current and Frozen (ABAB, 6,000 frames) in
+   every mode. Use it only when a change claims a performance effect; this
+   desktop varies about ±25% between runs in vanilla+DH.
+
+Output goes to `artifacts/graphics-captures/validation/<label>/` (existing
+labels are refused): `summary.md`, `summary.json`, per-step logs and timings.
+It exits non-zero if any step fails. It does not judge images: open the
+side-by-side PNGs listed in `summary.md` (water, DH, sky, clouds). Inputs
+default to the usual capture fixtures (`--run-source`, `--vanilla-run-source`,
+`--shader-pack` override them); missing inputs or a running client stop it
+before anything starts. `--skip <step>` drops a step, `--all-java-tests` runs
+every Java test.
+
+A default run takes about 14½ minutes on the desktop (RTX 2070): Java tests
+17 s, gate 7 min, parity 4½ min, FPS 2½ min. The Rust suite (about 3 min) and
+the wiki check finish behind the gate. Running the same steps by hand took
+about 35 minutes, mostly because `./gradlew test` rebuilt and serially reran
+the Rust suite (7 min instead of 17 s).
 
 ### Lifecycle gate
 
@@ -61,9 +109,11 @@ scenario on a crashed audit row or a recognized exception, Rust panic or GAL
 (`rust_gal_validation_failure`, rate-limited), including teardown errors that
 callers discard. A logged dependency violation fails the gate; other
 validation failures are reported, not failed. Results go to
-`artifacts/graphics-captures/lifecycle-gate/<label>/summary.json`. Run it with
-a relative script path: the capture harness stops processes whose command line
-names the repository.
+`artifacts/graphics-captures/lifecycle-gate/<label>/summary.json`
+(`--artifact-root` overrides it). To stop leftover clients, match `java`
+processes only: a `pkill -f` pattern also matches, and kills, the shell
+command that contains it. The capture harness itself stops only its own Gradle
+process group and client.
 
 The [gate source](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/DevUtils/tests/rendering/RunLifecycleGate.py)
 defaults to seven scenarios: same-world unload/reload, different-world reload,
@@ -117,6 +167,13 @@ container retirement, and DH geometry in shared device pages.
 - FPS, same session, moving camera, 6,000 frames, single runs (Rust vs
   Frozen): vanilla 1,100 vs 1,151; vanilla+DH 617 vs 736; shaders 341 vs 318;
   shaders+DH 253 vs 229. All clean. Vanilla+DH is still the gap.
+- Validation driver at `72b8cea2e`: the default run passed every step in
+  14m20 (`validation/drv1`; parity 3.663/4.177/3.853 DH pass and
+  0.230/0.394/0.442, 7/7 gate, Rust 2344, Java 792 + 1 skipped). `--perf`
+  (`validation/drv1-perf`, ABAB, 6,000 frames) gave Rust vs Frozen per run:
+  vanilla 1,171/1,130 vs 1,226/1,123; vanilla+DH 757/770 vs 736/599; shaders
+  343/351 vs 318/316; shaders+DH 250/252 vs 228/227. The single-run vanilla+DH
+  gap above was within run-to-run noise.
 
 ### October 7 evening staging and DH checks
 

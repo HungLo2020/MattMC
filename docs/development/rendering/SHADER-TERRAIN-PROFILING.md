@@ -174,8 +174,10 @@ CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
 asprof -e itimer -i 1ms --cstack dwarf -t -d 20 -o collapsed -f window.collapsed <pid>
 ```
 
-Keep the profiler binary and its output outside the repository path: the
-capture harness terminates processes whose command line names the repository.
+Keeping the profiler binary and its output outside the repository path is
+harmless, but the capture harness only stops its own Gradle process group and
+client. Commands that were stopped mid-run earlier matched their own
+`pkill -f` cleanup pattern; match `java` processes when stopping clients.
 Never copy a library over `build/rust/native/`; a running client maps it.
 
 The moving benchmark rotates yaw 0.35° per frame, and each readiness restart
