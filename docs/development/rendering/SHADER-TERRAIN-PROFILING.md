@@ -6,11 +6,41 @@ correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
 The [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary)
-and [October 7 mode summary](GOAL-5-STATUS.md#october-7-mode-summary)
+and [October 7 evening summary](GOAL-5-STATUS.md#october-7-evening-same-session-summary)
 separate their dated reported timings from the historical profiles below; none of
 these rows is a substitute for rerunning the same workload on a new revision.
 
 ## October 7 comparison controls
+
+The latest [evening summary at `f13239e1`](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/SUMMARY.md)
+reports same-desktop/session Frozen values of vanilla 900, vanilla+DH 671,
+shaders 304 and shaders+DH 226 FPS. Rust ranges are vanilla 813–882,
+vanilla+DH 440–549 over 1,800 frames (631 over 6,000), shaders 311–349 and
+shaders+DH 223–241 FPS. Keep the two vanilla+DH windows separate. The brief
+summary does not give every Frozen duration, warm-up or tail, so retrieve the
+original receipts before claiming matched-window parity or a change in spikes.
+Close medians and some overlapping FPS ranges do not establish all-mode parity.
+These are author records; this review ran no benchmark or artifact replay.
+
+The [staging and generic-group progress record](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/PROGRESS.md)
+reports shaders 349 FPS after terrain staging and vanilla+DH generic semantics
+0.121 → 0.028 ms after retaining groups, with median frame 1.53 ms versus
+1.70–1.75 ms before. Treat the component and frame measurements separately.
+The later native DH ledger/payload/visibility changes remove Java publication
+packing and repeated per-column downcalls on ordinary paths, but their source
+presence does not prove an isolated timing gain. Java still generates/culls DH
+candidates, provenance modes keep additional work, and native publication still
+decodes/copies payloads. Compare equivalent diagnostic settings and rebuilds.
+
+The author identifies approximately 430 per-column DH draws/descriptor-set
+binds as the remaining vanilla+DH worker cost. Shared vertex pages and multi-draw
+indirect are a proposed follow-up at this revision; confirm that bottleneck in
+new profiles before changing batching. The ledger's soft retention targets and
+the generic registry's box/group caps do not establish long-run CPU/GPU bounds.
+Use the [new fixture and runtime checks](RENDER-VERIFICATION.md#october-7-evening-staging-and-dh-checks)
+for correctness alongside any optimization.
+
+The following paragraphs preserve earlier October 7 sessions and controls.
 
 Use the [later October 7 report](GOAL-5-STATUS.md#october-7-midday-and-later-performance-reports)
 for the native-rig/graph/GUI/DH interval. Its same-session shader+DH mean is

@@ -15,6 +15,7 @@ render/
 ├── shaderpack/   shader-pack parsing, planning and runtime
 ├── shared/       helpers used by both renderers
 ├── scene/        wire and data vocabulary (constants, data types)
+├── dh_collector/ DH column state, copied payloads, publication and frame admission
 ├── vulkanic/     VulkanicGAL: the graphics abstraction layer and its backends
 └── chunk/        native chunk meshing, render lists and sorting used by Java's chunk renderer
 ```
@@ -62,6 +63,7 @@ or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe ch
 | GUI drawing, item rendering or a GUI post effect | `guirender/` |
 | A wire constant or data type shared with Java | `scene/` |
 | Shader-pack parsing or pass planning | `shaderpack/` |
+| DH column generations, leases or publication/visibility bookkeeping | `dh_collector/`; keep Java wire handling in `bridge/dh_collector.rs` |
 | A new Java entry point or wire record | `bridge/` (see [Java Bridge](JAVA-BRIDGE.md)) |
 | A new GPU capability, resource type or command | `vulkanic/` (see [VulkanicGAL](VULKANIC-GAL.md)) |
 
@@ -234,11 +236,18 @@ move world/entity semantics or resource-reload publication into the graph.
     record (`reserved0` bit 0) and Rust copies the staged vertices of that key
     and generation, so a rejected update can retry. Java discards the staged
     entry once the upload is acknowledged, or when the layer is removed or
-    rolled back.
+    rolled back. The map holds one generation per mesh key, capped at 32,768
+    keys; it has no separate byte cap. If a new key cannot be staged, Java
+    retries assembly with copied vertex output. A missing or superseded
+    generation rejects the asset update; it must not silently use another
+    generation's vertices. The fully omitted translucent result can leave a staged entry
+    when no prior asset exists to remove; [#821](https://github.com/HungLo2020/MattMC/issues/821)
+    tracks that source-derived cleanup gap, without an observed runtime leak claim.
     - Diagnostics that read vertices in Java get a copy instead: faults,
       texture probes, the parity appearance trace and detailed terrain
-      diagnostics. `-Dmattmc.dev.forceTerrainVertexStaging=true` lets captures
-      stage anyway.
+      diagnostics. `-Dmattmc.dev.forceTerrainVertexStaging=true` bypasses only
+      the detailed-diagnostics condition; faults, active probes and the appearance
+      trace still require copied vertices.
   - Java receives copied index bytes/range records and a receipt, and still
     publishes the asset (residency, upload acknowledgement, reload staging),
     then drops the payload once Rust acknowledges the upload (translucent
@@ -343,7 +352,7 @@ topology.
 
 The ledger
 ([`render/dh_collector`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/dh_collector))
-owns every column decision and the column payloads:
+owns column state transitions and packed payload storage:
 - current, pending, in-flight, published and retiring generations
 - each generation's packed vertices, copied once from Java when it is recorded
 - owner leases
@@ -358,18 +367,42 @@ and applies them; Java then acknowledges the update under its collector lock.
 A failed apply releases the selection. Updates that carry exact material
 provenance (exact-atlas and source-execution diagnostics) still go through
 Java's packed `updateWorldLodAssets`, because the provenance needs Java's
-model resolution.
+model resolution. Native publication shares immutable payloads through `Arc`
+while selecting/in-flight tracking, but decodes packed bytes into owned frontend
+vertex vectors; diagnostic payload fetches also copy. It removes the ordinary
+Java repacking round trip without making publication zero-copy.
+
+Retention targets remain 512 columns and 64 MiB including tracked provenance.
+Trimming stops when only protected columns remain, so these are soft targets,
+not a bound on live DH geometry. Publication selects at most 16 columns and a
+16 MiB target per update; the first oversized column can exceed that byte target.
+Pending visible-key and segment lists each have a 16,384-entry bound. Keep these
+limits separate from frontend admission and GPU-resource retirement. See
+[ledger selection and trimming](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/dh_collector/mod.rs).
 
 Each frame, DH's quadtree walk (`RenderBufferHandler.buildRenderList`)
-collects candidate column keys and makes one ledger call,
-`collectVisibleFrame`. That call:
+collects candidate column keys and batches their publication/visibility work in
+`collectVisibleFrame`. This replaces per-column round trips, not every ledger
+call in a frame. That call:
 1. requests publication of the unpublished columns, in walk order;
 2. sorts the keys near to far, keeping walk order for equal distances;
 3. records the frame's visibility;
 4. admits the visible segments.
 
-The order matches the per-column calls it replaced. With exact-atlas coverage,
-`LodRenderer` still admits each column through `recordVisibleMaterialColumn`.
+The native sort preserves walk order at equal Manhattan distance from the
+quadtree center, including Java integer arithmetic. Java still owns the quadtree
+walk and frustum decisions. With exact-atlas coverage, `LodRenderer` still
+admits each column through `recordVisibleMaterialColumn`; begin/consume,
+route selection, generic callbacks and render parameters remain separate.
+`consumeVisibleFrame` hands over segments only when the prepared frame is
+enabled and its Rust route is selected, then clears the pending segments and
+frame together. A lifecycle-tagged completion receipt is distinct from this
+handoff. The [ledger fixtures](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/dh_collector/tests.rs)
+cover selection, ordering and stale-state rules; they do not exercise the
+actual native flush export's apply-failure/retry path or prove visual parity.
+Overflow/rejection recovery also needs separate checks that native effects and
+Java provenance sidecars stay coherent; source fixtures alone do not establish
+rollback for every failed mutation.
 
 [`DistantHorizonsSemanticCollector`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java)
 keeps the material provenance, the frame's render parameters and the capture
@@ -450,7 +483,26 @@ DH generic groups (clouds, beacons, API objects) are retained in Rust
   boxes as `(box + origin) - camera` in f64. Clouds, which only move their
   origin, no longer resend about 2,600 boxes per frame.
 - An instance whose group generation Rust lacks is skipped and raises a resend
-  flag. Java then re-registers every group on the next frame.
+  flag. Java then re-registers every group on the next collection. Removed
+  groups are released during collection, and clearing the Java renderer releases
+  its registered groups.
+- The process-wide CPU registry admits at most 4,096 groups and 65,536 retained
+  boxes, separately from Java's 10,000-box per-frame producer limit. Registration
+  requires nonzero id/generation and valid finite bounds/materials. It copies
+  boxes; each frame still allocates/expands camera-relative requests and passes
+  ordinary frame validation. The registry is not a per-submission snapshot or a
+  GPU completion fence. Preserve registration/release ordering relative to
+  decode, especially on the optional worker-decode route.
+- The source group allocator starts at zero, which current retained registration
+  rejects. [#820](https://github.com/HungLo2020/MattMC/issues/820) applies when
+  that first group reaches active collection; inactive or cancelled groups need not
+  trigger it. This source mismatch was not reproduced in a client run.
+
+Java retains API callbacks, active/cancelled-group selection, dirty notifications,
+origins, light and shading. Same-count geometry edits must trigger the existing
+change notification. These retained DH boxes do not implement retained entities
+or block entities in the [scene plan](RETAINED-SCENE.md#phases).
+
 [Ordinary DH source pack sets](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/lod/source.rs#L741-L761)
 retire only when their recorded resource generations bind a released role.
 Their draw sets, pipelines and frame rings stay intact. The [shared teardown](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/worldrender/source/programs/teardown.rs#L186-L217)

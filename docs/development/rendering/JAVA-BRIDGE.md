@@ -120,6 +120,22 @@ the registration. These mechanisms do not supply geometry for Citadel's empty
 proxy root: both structural extraction and the posed fallback remain empty
 ([#803](https://github.com/HungLo2020/MattMC/issues/803)).
 
+ABI 72 appends retained DH generic-group instances as whole-frame field 51 and
+the double camera origin as field 52. Group boxes use struct 116 (56 bytes:
+double min/max bounds, color and material); instances use struct 117 (72 bytes:
+group id/generation, double origin, packed light, SSAO flag and six shading
+multipliers). Java registers changed boxes through `setDhGenericGroup`; Rust
+copies them into its CPU registry, then expands each frame's instances into
+ordinary camera-relative boxes in draw order. This is retained input data,
+not a retained GPU scene or a borrowed Java array. Both id and generation must
+be nonzero. Rebuild Java and native code together; see
+[registration and expansion](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/bridge/world/dh_generic_groups.rs)
+and [group lifetime and bounds](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+The Java group allocator can supply id 0 to this nonzero-only path;
+[#820](https://github.com/HungLo2020/MattMC/issues/820) tracks that admission
+mismatch when the first allocated group reaches active rendering. It is not
+a claim that every default world fails.
+
 Typed orb placements name a boundary in the collected mesh stream. When the
 shadow-only CPU capture removes foil or outline meshes, map those boundaries
 through its kept-mesh prefix before the later source-admission mapping.
@@ -168,12 +184,51 @@ the earlier decode-only export. The [bridge export](https://github.com/HungLo202
 keeps wire layout handling outside `worldrender`; native intake/assembly returns
 vertices, indices, ranges, identities and accounting receipts. Invalid arguments
 or capacity return `-2`; a rejected mesh returns `-3` with a bounded error string.
-Java [allocates encoded vertex storage and copies index/range outputs](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/java/net/vulkanic/world/RustTerrainIntake.java)
-before the confined scratch arena closes. It retains build/sort/atlas inputs,
-worker dispatch and asset publication. Native assembly now performs water
-classification and vertex rewrites previously done through Java's writable
-encoded view; keeping encoded vertices through publication is not an end-to-end
-zero-copy or worker-ownership claim.
+That checkpoint's encoded-vertex copy is now the fallback. Since `1d609f12`,
+ordinary intake leaves assembled vertices in Rust's
+[staging map](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/worldrender/terrain/staging.rs),
+with one generation per mesh key and at most 32,768 keys. Java receives the
+vertex count/key/generation, copied index bytes, draw ranges and receipts.
+`StagedWorldMeshVertices` cannot be read as a Java vertex list. Asset records
+set `reserved0` bit 0 and carry an empty vertex slice; the native decoder
+requires the exact staged generation and clones it, preserving retry data until
+Java discards it after acceptance, removal or rollback.
+
+If staging cannot admit a new key, [Java intake](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/java/net/vulkanic/world/RustTerrainIntake.java)
+repeats assembly with copied vertex output. Fault injection, active texture
+probes and the appearance trace always require vertex copies. Detailed terrain
+diagnostics also copy unless `-Dmattmc.dev.forceTerrainVertexStaging=true` is
+set; that switch does not override the other vertex readers. The map's limit
+counts layers, not bytes. Java retains build/sort/atlas inputs, worker
+dispatch and asset-publication bookkeeping; indices and ranges still cross the
+boundary. Native assembly still performs the water/material classification and
+rewrites. The staged route removes a vertex round trip, not all copying or Java
+ownership. After acceptance, Java drops static-terrain payloads including
+translucent layers; per-frame translucent ordering uses native resident geometry.
+The fully omitted translucent path has a cleanup gap when no prior layer asset
+exists: assembly may stage vertices before Java returns no asset, and removal
+has no asset identity to discard. [#821](https://github.com/HungLo2020/MattMC/issues/821)
+tracks that source-derived retention; ordinary acknowledgement cleanup does not
+cover it. No runtime growth or exhausted budget was observed by this review.
+
+### DH collector ledger
+
+[`DhCollectorLedger.java`](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/java/net/vulkanic/world/DhCollectorLedger.java)
+binds the standalone `mattmc_dh_collector_*` exports. These calls use the
+collector's Java lock and Rust's ledger mutex; variable-length effects, text,
+segment and payload results live in thread-local native buffers and must be
+taken immediately on the calling thread. They are copied results, not a
+persistent native view. Keep segment staging and `record_built` together; the
+latter takes the staged payload even when recording fails.
+
+`mattmc_vulkanic_gal_world_lod_collector_flush` also enters the context registry:
+it selects and applies a ledger-owned update, then returns identities for
+Java's acknowledgement. An apply failure releases its in-flight selection;
+a provenance-bearing selection stays on Java's packed asset path. Neither
+selection nor asset acceptance is a presentation receipt. The batched visible
+query still returns keys/segment records through Java frame storage. See
+[ledger publication and selection](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+for route gating, protection, bounds and the remaining Java producers.
 
 ## Rules the boundary tests enforce
 
@@ -258,19 +313,20 @@ also share persistent instance arrays. This was the default at the earlier
   the native thread-local key contains no new-context identity. Same-thread
   context recreation with address reuse is an unverified lifecycle case, not
   a demonstrated defect or a guarantee supplied by the generation field.
-- Generic DH boxes (up to 10,000 per frame, mostly clouds) travel as
-  `PackedDhGenericBoxes` primitive arrays rather than a record per box. The
-  pending buffer rotates through a ring of three; a consumed frame takes the
-  buffer itself, and the encoder writes its arrays into native layout. Reuse
-  relies on the coordinator draining queued work down to one prior frame and
-  queued submission copying on the caller before return; preserve both when
-  changing queue depth. The new packed-box tests assert ABI equality and value
-  validation, not ring-wraparound or queue-lifetime behavior.
-  Since ABI 72 the same object also carries the frame's retained-group
-  instances and camera (`addGroupInstance`, `setCamera`; fields 51 and 52 of
-  the whole-frame request). The group boxes themselves are registered once,
-  through `VulkanicGalBridge.setDhGenericGroup`, and placed by Rust. See
-  [Render Architecture](RENDER-ARCHITECTURE.md).
+- `PackedDhGenericBoxes` carries ABI 72 retained-group instances and camera
+  data for the ordinary DH generic producer (up to 10,000 boxes per frame).
+  Its primitive per-box arrays remain available for direct box input; unchanged
+  groups no longer resend those arrays every frame. The pending buffer rotates
+  through a ring of three; a consumed frame takes the buffer itself, and the
+  encoder copies its arrays into native layout. Reuse relies on the coordinator
+  draining queued work down to one prior frame and queued submission decoding
+  on the caller before return; preserve both when changing queue depth.
+  Registration copies group-local boxes separately, and whole-frame decode
+  expands the matching registry generation into owned frame boxes. The optional
+  worker-decode route therefore resolves groups later; registration/release and
+  request-arena lifetime are separate concerns. Existing packed-box tests assert
+  ABI equality and value validation, not ring-wraparound or queue-lifetime
+  behavior. See [Render Architecture](RENDER-ARCHITECTURE.md).
   [Pending ring](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L467-L483)
   · [Queue drain](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java#L745-L761)
 - Non-queued context-registry entry points join pending work first (`with_registry*`),

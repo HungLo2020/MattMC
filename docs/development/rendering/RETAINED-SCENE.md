@@ -3,7 +3,9 @@
 **Status: shader-route retained terrain and the Rust visibility search are
 implemented in part; the full scene target remains open (October 2026).**
 ABI 70 carries compact terrain, and ordinary frames now select those compact
-camera layers and shadow candidates in the Rust section graph. Diagnostic and
+camera layers and shadow candidates in the Rust section graph. Native vertex
+staging and the DH ledger/ABI 72 generic groups also retain CPU input data, with
+the separate ownership limits below. Diagnostic and
 other routes retain their documented producer and expansion paths. The phase list separates remaining targets
 from the current implementation; it is not a declaration of parity completion.
 
@@ -112,8 +114,13 @@ omission, water/material classification, range splitting and mesh identity
 ([`terrain/assembly.rs`](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/worldrender/terrain/assembly.rs)).
 Java supplies build/sort/atlas inputs, dispatches meshing workers, publishes the
 returned assets and runs the ineligible-frame producer. The prior Java water/index
-assembly boundary is historical; encoded vertex storage and copied output records
-do not make the handoff zero-copy. Native record selection and retained GPU scene drawing
+assembly boundary is historical. Since `1d609f12`, ordinary assembly keeps
+vertices in a native staging map until asset acceptance or discard; Java gets
+identity/count metadata plus copied indices, ranges and receipts. Asset decode
+clones the exact staged generation for retry safety. Diagnostic vertex readers
+and staging-capacity misses use copied vertex output. See
+[terrain intake](JAVA-BRIDGE.md#terrain-layer-intake) for bounds and fallback.
+Native record selection and retained GPU scene drawing
 are separate steps. When the shader route is armed, admission
 (`frame/static_terrain.rs`) keeps them compact: `take_scene_terrain` turns
 described sections and casters into scene entries and expands only the rest
@@ -122,6 +129,23 @@ calls `expand_static_terrain` first, so they still see ordinary instances.
 Coverage validation and voxel occupancy read the compact and scene terrain
 directly. A retained record is dropped whenever its key acknowledges another
 generation, so a record's presence proves it is current.
+
+## Current: retained DH inputs
+
+The [DH column ledger](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+retains immutable packed payloads and publication/lease/route state in Rust.
+Java still walks the quadtree, supplies provenance and render parameters, and
+copies selected records into the frame. Ordinary publication builds frontend
+assets from the ledger; exact-material provenance retains the Java publication
+path. Batched collection reduces per-column calls without moving the DH tree
+or all frame preparation into Rust.
+
+ABI 72 similarly retains DH generic-group boxes in a CPU registry, with one
+per-frame group instance carrying origin, light, shading and SSAO. Native decode
+still expands these into ordinary camera-relative box requests. Java owns the
+callbacks and change notifications; missing generations request resending. This
+is separate from retained GPU terrain and phase 5's entity/block-entity target.
+Neither change establishes all-route scene ownership or Frozen parity.
 
 ## Phases
 

@@ -5,7 +5,8 @@ Java reference checkout, is the correctness baseline: compare against it,
 don't change it.
 
 Large historical capture inputs may be stored as lossless `.gz` archives.
-Restore the original file before running tools that require its plain path;
+The lifecycle gate reads matching plain and gzip client logs directly; restore
+the original file before running other tools that require its plain path;
 see [capture storage and recovery](ARTIFACT-STORAGE.md).
 
 Serialize experiments that share native/class outputs. Native builds now publish
@@ -64,12 +65,13 @@ validation failures are reported, not failed. Results go to
 a relative script path: the capture harness stops processes whose command line
 names the repository.
 
-The [gate source](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/DevUtils/tests/rendering/RunLifecycleGate.py)
+The [gate source](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/DevUtils/tests/rendering/RunLifecycleGate.py)
 defaults to seven scenarios: same-world unload/reload, different-world reload,
 resource reload, resize, swapchain recreation, and view-distance decrease and
 increase. It requires a successful capture command and audit rows marked
-`crash_free`, and scans the selected client-log paths for `Exception`,
-`panicked at` and `DependencyViolation`. Generic GAL validation markers are
+`crash_free`, and scans the selected `.log` and `.log.gz` client paths for `Exception`,
+`panicked at` and `DependencyViolation`. Other suffixes are ignored; a retained
+plain/gzip duplicate is scanned twice. Generic GAL validation markers are
 reported without automatically failing the gate. Inspect retained logs and the
 underlying scenario receipts as well as `summary.json`: the driver does not
 require each row's `passed` field or prove that a matching client log exists.
@@ -77,12 +79,61 @@ Use a fresh unique label, because existing directories are reused and client
 logs are scanned recursively. This is a bounded transition/log gate, not an
 image-parity, leak-bound or all-error certificate.
 
+Extra client options are repeatable and forwarded as `--jvm-arg=<option>`.
+To exercise native terrain staging in detailed capture scenarios:
+
+```sh
+python3 DevUtils/tests/rendering/RunLifecycleGate.py --label <unique-label> \
+  --jvm-arg=-Dmattmc.dev.forceTerrainVertexStaging=true
+```
+
+This overrides the detailed-diagnostics copy preference; faults, texture probes
+and the appearance trace still require copied vertices. Verify the staging
+announcement and retained receipts. The flag is not a guarantee that every
+layer used staging, especially when its count cap triggers copied fallback.
+
 The author reports all seven scenarios clean at `7f256b53`; `4740f8fa` reports
 clean world-unload/reload and resource-reload repeats after native assembly.
 The latter also guards VoxelMap's neighbor query when the player disappears
 during unload. This documentation review ran neither the gate nor the runtime
 checks and did not inspect their unbundled artifacts. The old independent
 SIGSEGV remains separate unless its specific cause and regression are established.
+
+### October 7 evening staging and DH checks
+
+Source reviewed at `f13239e1`; the following tests are verification targets,
+not runs performed by this documentation review. Rebuild Java and the native
+library together for ABI 72 before runtime checks:
+
+```sh
+(cd src/main/rust && cargo test --release staged_vertices_serve_only_their_generation_until_discarded)
+(cd src/main/rust && cargo test --release dh_collector)
+(cd src/main/rust && cargo test --release dh_generic_groups)
+./gradlew -PmattmcRustProfile=release test --tests net.vulkanic.world.DistantHorizonsSemanticCollectorTest
+```
+
+- **Terrain staging:** the [generation fixture](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/worldrender/terrain/staging.rs) checks replacement, repeated reads and generation-specific/wildcard discard. It does not exercise the 32,768-layer fallback, the actual mesh-update rejection/retry, Java acknowledgement/removal/rollback wiring or concurrent publication. Inspect those separately; the staged upload clones vertices inside Rust and still copies index/range inputs.
+- **DH ledger:** [ledger fixtures](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/dh_collector/tests.rs) cover identical rebuild/owner leases, late acknowledgement after reset, protected eviction and access order, selected-route segment handover, stale execution receipts, payload differences and bridge-like asset validation. The `the_rust_flush_leaves_provenance_updates_to_java_and_acknowledges_what_it_sent` fixture calls ledger selection/acknowledgement; it does not execute the native flush export's context lookup, frontend apply, failure release or retry. Retention targets can remain exceeded by protected columns and are not a total-memory bound.
+- **Bulk visibility:** two [Java comparisons](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/test/java/net/vulkanic/world/DistantHorizonsSemanticCollectorTest.java) compare per-column and bulk call sequences against the same migrated ledger on matching fixtures, in ordinary and exact-atlas modes. They are not a pre-migration Java-versus-Rust implementation comparison. They check tied-distance order, unpublished columns, counts, route receipts, handed-over segments and publication order. Rust fixtures also cover section centers and stable sorting. These do not independently rerun the live quadtree/frustum walk or prove temporal parity.
+- **Generic groups:** two [native fixtures](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/bridge/world/dh_generic_groups.rs) check representative camera-relative expansion, preserved instance ordinals, stale-generation skipping/resend and inverted bounds. ABI layout assertions cover the appended frame fields and 56/72-byte records. The fixtures do not prove the complete Java dirty-group/re-registration lifecycle, queued-frame overlap, registry capacity behavior or visual continuity during resend.
+
+Add integration regressions for the source-qualified boundaries in
+[#820](https://github.com/HungLo2020/MattMC/issues/820) and
+[#821](https://github.com/HungLo2020/MattMC/issues/821): use the actual first
+allocated group through active collection, and stage a fully omitted translucent
+layer with no previous asset, verifying exact-generation cleanup. Hand-picked
+nonzero group IDs and assembly-only empty-result fixtures miss those handoffs.
+The issues report source inspection, not runtime reproductions.
+
+Follow with moving vanilla/DH and Iris+DH, visible generic objects, translucent
+terrain sorting, upload rejection/retry and real unload/reload/resource-reload
+checks. Preserve material-provenance coverage beside the ordinary native flush
+route. The author reports scoped tests/captures at the staging and generic-group
+commits in the [checkpoint](GOAL-5-STATUS.md#evening-terrain-staging-and-dh-ownership-follow-up);
+those reports are not fresh verification of the later ledger/payload/visibility
+commits. The gzip/log and JVM-argument changes add no new checked-in lifecycle
+driver regression in this interval. Runtime suites and unbundled artifacts were
+not rerun or inspected by this review.
 
 ### October 7 rig and terrain assembly checks
 

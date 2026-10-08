@@ -1,25 +1,34 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`4740f8fa`](https://github.com/HungLo2020/MattMC/commit/4740f8fabffd878286850083e2d86ff733c9121e):
-native section-graph bookkeeping, ABI 71 model rigs, shared GUI decode storage,
-terrain layer decoding/assembly and lifecycle retirement. This adds native
-ownership and bounded author-recorded checks; it does not establish broad
-visual/temporal parity, full scene migration, long-run resource bounds or
-resolution of the earlier independent native crash.
+[`f13239e1`](https://github.com/HungLo2020/MattMC/commit/f13239e10d0f66d244c4311c091d0d60819fb391):
+native terrain vertex staging, the DH column ledger and payload publication,
+bulk DH visible-segment admission, and ABI 72 retained generic groups. These
+extend the earlier graph, rig and terrain-assembly work. Source inspection and
+author-recorded checks do not establish broad visual/temporal parity, complete
+scene migration, long-run resource bounds or resolution of the independent
+native crash.
 
-Rust owns the graph's readiness/build bookkeeping and ordinary terrain selection,
-rig hierarchy composition, terrain layer assembly and GPU execution/resources.
-Java still supplies world/entity semantics and animation, graph events, meshing
-worker dispatch, atlas/sprite inputs and asset publication. Diagnostic and other
-ineligible frames retain the Java terrain producer. The final target remains one
-Rust executable supporting client and server, at most one separately loaded Rust
-library, and no Java. See [Project Architecture](../PROJECT-ARCHITECTURE.md),
+Rust owns terrain graph bookkeeping, ordinary terrain selection and assembly,
+rig hierarchy composition, the DH ledger and ordinary payload publication,
+and GPU execution/resources. Java still supplies world/entity semantics and
+animation, meshing dispatch and inputs, DH quadtree/frustum candidates, frame
+parameters and material-provenance diagnostics. Terrain staging and DH native
+publication retain copied/diagnostic paths; neither is a zero-copy contract.
+The final target remains one Rust executable supporting client and server,
+at most one separately loaded Rust library, and no Java. See
+[Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [Goal 5 tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6049236504)
+The current [terrain staging](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6051134159),
+[DH ledger](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6051203728),
+[retained groups](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6051205144)
+and [measurement](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6051135359)
+checkpoints credit these bounded changes while keeping acceptance work open.
+
+The prior [Goal 5 tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6049236504)
 and [rendering ownership checkpoint](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6049217250)
-retain those bounded scopes; issue status is not runtime acceptance.
+retain their dated scopes; issue status is not runtime acceptance.
 
 The earlier [October 4 tracker checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5982772544)
 and [October 3 checkpoint](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5972378509)
@@ -33,9 +42,40 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ### October 7 source review
 
+#### Evening terrain staging and DH ownership follow-up
+
+The `f75eea5b` → `f13239e1` interval adds these current boundaries:
+
+- **Terrain vertices:** ordinary assembly stages decoded vertices by mesh key/generation in Rust; Java carries a count, and the mesh update clones the exact staged generation so rejection can retry. Java requests discard after acknowledgement, removal, rollback or an identical already-published rebuild. The 32,768-layer cap falls back to copied output; it is a layer-count bound, not a byte or GPU-memory bound. Faults, texture probes and appearance traces still require Java-readable vertices. Translucent Java payloads now release after upload too; the unused Java sorted-index channel is removed while Rust retains per-frame ordering. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **DH ledger and payloads:** Rust owns current/pending/in-flight/published/retiring generations, owner leases, lifecycle receipts and column payloads copied at build recording. Ordinary asset publication constructs frontend assets in Rust; Java acknowledges under its lock. Material-provenance updates and on-demand diagnostic payload copies keep Java paths. The collector's 512-column/64 MiB retention targets can remain exceeded when entries are protected; the 16-column/16 MiB publication slice permits a first oversized column. These are not total-memory guarantees. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+- **DH visibility:** Java still walks/culls the quadtree. One ledger call requests publication in that walk's order, performs stable near-to-far Manhattan ordering around the quadtree center, records visibility and admits ordinary visible segments. Exact-atlas coverage retains Java per-column admission. Only a selected route hands consumed segments to the frame. This does not move the quadtree or all DH semantics into Rust. [Verification](RENDER-VERIFICATION.md#october-7-evening-staging-and-dh-checks)
+- **ABI 72 generic groups:** Java registers boxes when a group is changed or its count changes, then sends group instances/origins per frame. Rust retains local boxes and expands `(box + origin) - camera` in double precision before converting to floats. Missing/stale generations skip that instance and request resend; this is recovery behavior, not proof of gap-free presentation. Rebuild Java and native code together. [Bridge](JAVA-BRIDGE.md)
+- **Lifecycle driver:** matching plain or gzip client logs now feed the same failure patterns, and repeatable `--jvm-arg` options can force the staged terrain path in captures. Missing logs, image parity and memory bounds remain outside the gate's asserted contract. [Lifecycle gate](RENDER-VERIFICATION.md#lifecycle-gate)
+
+Two bounded source findings remain open: [#820](https://github.com/HungLo2020/MattMC/issues/820)
+reconciles the first allocated DH group ID zero with nonzero retained admission;
+[#821](https://github.com/HungLo2020/MattMC/issues/821) covers staged vertices
+left behind by a fully omitted translucent layer with no prior published asset.
+These are conditional active-path findings, not observed route failures, leaks
+or claims about every world. Existing [#803](https://github.com/HungLo2020/MattMC/issues/803)
+and [#819](https://github.com/HungLo2020/MattMC/issues/819) remain separate.
+
+The implementation author reports 2,318 Rust/527 Java tests, scoped Iris+DH
+and vanilla parity, zero VUIDs and all seven lifecycle scenarios with staging
+forced at [`1d609f12`](https://github.com/HungLo2020/MattMC/commit/1d609f121447e42c47b4ff97adc7daa65484bfca).
+The [`63584f3a` generic-group report](https://github.com/HungLo2020/MattMC/commit/63584f3a0354fc2c9ac1d9769202f0080e59483b)
+records 2,329 Rust/583 Java tests, scoped parity including 2,241 cloud boxes in
+nine groups, and three clean unload/reload/resource-reload scenarios. These
+results belong to those commits, not a rerun of all later ledger changes.
+This documentation review inspected source and test definitions only; it did
+not rerun runtime suites, captures or benchmarks, or inspect the unbundled
+artifacts. See [fixture limits](RENDER-VERIFICATION.md#october-7-evening-staging-and-dh-checks)
+and the [evening timing summary](#october-7-evening-same-session-summary).
+
 #### Native rigs, terrain assembly and lifecycle follow-up
 
-The review through `4740f8fa` supersedes older current-ownership descriptions:
+This earlier review through `4740f8fa` retains its original ownership scope;
+the evening staging and DH changes above supersede the affected details:
 
 - **Section graph:** Rust owns ready/build/urgent/in-flight/stale state, loading readiness, block-entity section lists, interned animated-sprite IDs and entity-culling visit stamps. Java reports events, dispatches workers, marks the selected sprite objects and publishes meshes. Graph order is BFS visit order, not strict distance order. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 - **ABI 71 rigs:** cached models send one flagged instance plus raw poses after Java `setupAnim`; Rust expands their hierarchy. Armor/trident glint reuses rig parts, with Java-supplied foil semantics. Per-topology admission runs once per semantic frame and upload proof is cached per registration. The three-semantic-frame retirement delay is not a completion fence. [Bridge](JAVA-BRIDGE.md)
@@ -142,6 +182,34 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 7 evening same-session summary
+
+The [summary at `f13239e1`](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/SUMMARY.md)
+reports moving-camera measurements on the same desktop and evening session:
+
+| Reported mode | Rust/Vulkan FPS / median frame | Frozen Java/OpenGL FPS / median frame |
+| --- | --- | --- |
+| Vanilla | 813–882 / 0.84–0.89 ms; 1,800 frames | 900 / 0.87 ms |
+| Vanilla + DH | 631 / 1.50 ms; 6,000 frames | 671 / 1.28 ms |
+| Vanilla + DH, shorter runs | 440–549 / 1.53–1.75 ms; 1,800 frames | Same reported Frozen row; duration unspecified |
+| Shaders | 311–349 / 2.60–2.93 ms | 304 / 3.04 ms |
+| Shaders + DH | 223–241 / 3.99–4.10 ms | 226 / 4.20 ms |
+
+These are author-recorded ranges, not independently rerun measurements. The
+brief summary does not state every row's measured duration, warm-up or tail
+statistics, and its two Rust vanilla+DH windows must stay separate. It does
+not establish equal-window performance parity: vanilla mean FPS remains below
+Frozen even where medians are close, and the shader+DH range straddles its
+Frozen mean. The fresh evening Frozen values replace earlier sessions as the
+reported comparison, without making old controls interchangeable.
+
+The author attributes the remaining vanilla+DH cost to roughly 430 per-column
+DH draws and descriptor-set binds. Shared vertex pages plus multi-draw indirect
+are proposed next work, not an implemented result at this checkpoint. See
+[profiling controls](SHADER-TERRAIN-PROFILING.md#october-7-comparison-controls).
+Scoped image passes, lifecycle reports and timing ranges establish different
+things; none closes the [remaining work](#remaining-work).
 
 #### October 7 midday and later performance reports
 
