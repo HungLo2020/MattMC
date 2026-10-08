@@ -179,9 +179,14 @@ regressions before a normal-overlap gameplay pair:
 
 ```sh
 ./gradlew -PmattmcRustProfile=release test -x testRustNative -x buildRustNative \
-  --tests net.vulkanic.world.DistantHorizonsSemanticCollectorTest
+  --tests net.vulkanic.world.DistantHorizonsSemanticCollectorTest \
+  --tests com.seibel.distanthorizons.core.render.LodRenderSectionLifecycleTest
 (cd src/main/rust && cargo test --lib dh_collector)   # the Rust column ledger
 ```
+
+Two lifetime rules these tests pin: a container retires only through its own
+lease (closing one that never recorded a column changes nothing), and a build
+that finishes after its `LodRenderSection` closed is closed, not installed.
 
 Rebuild the native release library first if Rust changed. Keep the gameplay
 readiness requirement intact; repeated DH builds in a stationary scene can
