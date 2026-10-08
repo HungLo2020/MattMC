@@ -31,7 +31,8 @@ pub unsafe extern "C" fn mattmc_block_registry_install(ints: *const i32, int_len
 /// (block property order), 6 `with_value` for each property and value index,
 /// 7 default state per block, 8 the face truth table, 9 fluid kind, 10 fluid
 /// height (`f32` bits), 11 offset type, 12 each block's maximum horizontal
-/// and vertical offsets (`f32` bits). Writes when `out_len` is large enough and
+/// and vertical offsets (`f32` bits), 13 native fluid-state ID.
+/// Writes when `out_len` is large enough and
 /// returns the value count; -1 when nothing is installed or `kind` is unknown.
 /// # Safety
 /// `out` addresses `out_len` values.
@@ -74,6 +75,7 @@ fn column(registry: &BlockRegistry, kind: i32) -> Option<Vec<i32>> {
             .iter()
             .flat_map(|b| [b.max_horizontal_offset().to_bits() as i32, b.max_vertical_offset().to_bits() as i32])
             .collect(),
+        13 => states().map(|s| registry.fluid_state(s).0 as i32).collect(),
         _ => return None,
     })
 }

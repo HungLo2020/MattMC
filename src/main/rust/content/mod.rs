@@ -3,4 +3,5 @@
 //! See docs/development/game-model/.
 pub mod block;
 pub mod fluid;
+pub mod property;
 pub mod state;

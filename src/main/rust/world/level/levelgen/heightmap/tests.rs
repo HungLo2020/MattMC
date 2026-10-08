@@ -139,7 +139,7 @@ fn validates_lengths_and_bad_ids_without_out_of_bounds_access() {
 #[test]
 fn masks_follow_each_heightmap_predicate() {
     use crate::content::block::{Builder, FaceId, StateFacts, StateFlags};
-    let state = |flags: u16| StateFacts { flags: StateFlags(flags), light_block: 0, emission: 0, light_faces: [FaceId(0); 6], ..StateFacts::default() };
+    let state = |flags: u16| StateFacts { fluid_state: crate::content::fluid::FluidStateId(if flags & StateFlags::HAS_FLUID.0 != 0 { 18 } else { 0 }), flags: StateFlags(flags & !StateFlags::HAS_FLUID.0), light_block: 0, emission: 0, light_faces: [FaceId(0); 6], ..StateFacts::default() };
     let (air, motion, fluid, leaves, custom) = (StateFlags::AIR.0, StateFlags::BLOCKS_MOTION.0, StateFlags::HAS_FLUID.0, StateFlags::LEAVES.0,
         StateFlags::CUSTOM.0);
     let mut b = Builder::new();

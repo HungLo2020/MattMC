@@ -18,6 +18,10 @@ property declarations, defaults and 37 intrinsic state rows use typed
 `FluidId`/`FluidStateId`. Java registers compatibility views in Rust order;
 world-dependent flow and ticks have not migrated.
 
+The [shared property owner](PROPERTY-DEFINITIONS.md) declares all 134 properties
+(123 shared and 11 for integrated content). The block registry shares their
+schemas directly, without importing definitions from Java.
+
 Still separate:
 - items, entity types, tags and biomes: no Rust registry yet
 - rendering's own meshing-state columns (models, materials, passes,

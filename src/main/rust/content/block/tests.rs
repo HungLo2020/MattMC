@@ -18,7 +18,7 @@ fn sample() -> BlockRegistry {
     b.max_offsets(wheat, 0.5, 0.125).unwrap();
     // Waterlogged ("true", the first value) stairs hold a still water source.
     b.block("minecraft:oak_stairs", &[facing, half, wet], 3, (0..16)
-        .map(|i| if i % 2 == 0 { StateFacts { fluid: FluidKind::Water, fluid_height_bits: (8.0f32 / 9.0).to_bits(), ..facts(2 | 4, 0) } } else { facts(2, 0) })
+        .map(|i| if i % 2 == 0 { StateFacts { fluid_state: FluidStateId(18), ..facts(2, 0) } } else { facts(2, 0) })
         .collect()).unwrap();
     b.finish(1, vec![0]).unwrap()
 }
@@ -127,6 +127,7 @@ fn export(r: &BlockRegistry) -> (Vec<i32>, Vec<u16>, Vec<u8>) {
         chars.extend(units);
     };
     for p in r.properties() {
+        ints.push(-1);
         put(p.name(), &mut ints);
         ints.push(p.values().len() as i32);
         for v in p.values() {
@@ -149,9 +150,9 @@ fn export(r: &BlockRegistry) -> (Vec<i32>, Vec<u16>, Vec<u8>) {
     for s in 0..r.state_count() {
         let s = StateId(s as u16);
         ints.extend((0..DIRECTIONS).map(|d| r.light_face(s, d).0 as i32));
-        ints.push(r.flags(s).0 as i32);
-        ints.push(r.fluid_height(s).to_bits() as i32);
-        bytes.extend([r.light_block(s), r.emission(s), r.fluid(s) as u8, r.offset(s) as u8]);
+        ints.push((r.flags(s).0 & !(StateFlags::HAS_FLUID.0 | StateFlags::FLUID_FALLING.0)) as i32);
+        ints.push(r.fluid_state(s).0 as i32);
+        bytes.extend([r.light_block(s), r.emission(s), r.offset(s) as u8]);
     }
     bytes.extend_from_slice(r.face_matrix());
     (ints, chars, bytes)
@@ -182,4 +183,62 @@ fn export_rejects_damage() {
     let first_stairs = values_at + 4;
     swapped.swap(first_stairs + 2, first_stairs + 5);
     assert_eq!(decode(&swapped, &chars, &bytes), Err(Error::Invalid("export state layout")));
+}
+
+#[test]
+fn all_fluid_associations_derive_facts_without_a_java_round_trip() {
+    let mut b = Builder::new();
+    for id in 0..37 {
+        b.block(&format!("fixture:fluid_{id}"), &[], 0, vec![StateFacts {
+            fluid_state: FluidStateId(id), ..StateFacts::default()
+        }]).unwrap();
+    }
+    let r = b.finish(1, vec![0]).unwrap();
+    for id in 0..37 {
+        let state = StateId(id);
+        let source = matches!(id, 17 | 18 | 35 | 36);
+        let amount = if id == 0 { 0 } else if source { 8 } else if id < 17 { (id - 1) % 8 + 1 } else { (id - 19) % 8 + 1 };
+        let falling = matches!(id, 1..=8 | 17 | 19..=26 | 35);
+        assert_eq!(r.fluid_state(state), FluidStateId(id));
+        assert_eq!(r.fluid(state), if id == 0 { FluidKind::None } else if id <= 18 { FluidKind::Water } else { FluidKind::Lava });
+        assert_eq!(r.fluid_height(state).to_bits(), (amount as f32 / 9.0).to_bits());
+        assert_eq!(r.flags(state).contains(StateFlags::HAS_FLUID), id != 0);
+        assert_eq!(r.flags(state).contains(StateFlags::FLUID_FALLING), falling);
+    }
+    let (ints, chars, bytes) = export(&r);
+    assert_eq!(decode(&ints, &chars, &bytes), Ok(r));
+    for invalid in [-1, 37, 65535, 65536] {
+        let mut damaged = ints.clone();
+        *damaged.last_mut().unwrap() = invalid;
+        assert!(decode(&damaged, &chars, &bytes).is_err());
+    }
+}
+
+#[test]
+fn block_definitions_cannot_override_native_fluid_flags() {
+    for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING] {
+        let mut b = Builder::new();
+        b.block("fixture:contradiction", &[], 0, vec![facts(flag.0, 0)]).unwrap();
+        assert_eq!(b.finish(1, vec![0]), Err(Error::Invalid("state facts")));
+    }
+}
+
+#[test]
+fn exported_native_properties_share_the_owner_and_keep_local_identity() {
+    use crate::content::property::Builtin;
+    let mut b = Builder::new();
+    let lit = b.property_shared(Builtin::Lit.definition().schema.clone()).unwrap();
+    b.block("fixture:lit", &[lit], 0, vec![StateFacts::default(); 2]).unwrap();
+    let r = b.finish(1, vec![0]).unwrap();
+    let (mut ints, mut chars, bytes) = export(&r);
+    // Replace the custom-property export with the single native declaration ID.
+    ints.splice(5..10, [Builtin::Lit as i32]);
+    chars.drain(.."littruefalse".len());
+    let imported = decode(&ints, &chars, &bytes).unwrap();
+    assert_eq!(imported, r);
+    assert!(Arc::ptr_eq(&imported.properties()[0], &Builtin::Lit.definition().schema));
+    for invalid in [-2, 134, 65536] {
+        ints[5] = invalid;
+        assert_eq!(decode(&ints, &chars, &bytes), Err(Error::Invalid("native property id")));
+    }
 }

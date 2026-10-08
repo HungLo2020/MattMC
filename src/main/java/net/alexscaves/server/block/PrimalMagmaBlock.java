@@ -1,5 +1,7 @@
 package net.alexscaves.server.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -34,8 +36,8 @@ import org.jetbrains.annotations.Nullable;
 
 public class PrimalMagmaBlock extends Block {
 
-    public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
-    public static final BooleanProperty PERMANENT = BooleanProperty.create("permanent");
+    public static final BooleanProperty ACTIVE = NativePropertyDefinitions.booleanProperty("PRIMALMAGMABLOCK_ACTIVE");
+    public static final BooleanProperty PERMANENT = NativePropertyDefinitions.booleanProperty("PRIMALMAGMABLOCK_PERMANENT");
     public static final VoxelShape SINK_SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 2.0D, 16.0D);
     
     public PrimalMagmaBlock(BlockBehaviour.Properties properties) {

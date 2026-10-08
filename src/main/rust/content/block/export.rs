@@ -2,17 +2,20 @@
 //! registries and checks that its state layout is the arithmetic one.
 //!
 //! `ints`: [FORMAT, property count, block count, state count, face count];
-//! per property: name length, value count, each value name's length; per
+//! per property: native declaration ID, or -1 followed by name length, value
+//! count and each value name's length for an unmigrated property; per
 //! block: name length, default state offset, maximum horizontal and vertical
 //! offsets (`f32` bits), property count, property IDs in name order; per
 //! state: its value index for each of its block's properties; per state:
-//! six face IDs, flags, fluid height (`f32` bits).
+//! six face IDs, block-only flags, native fluid-state ID.
 //! `chars`: the names, UTF-16, in the order their lengths appear.
-//! `bytes`: per state: light block, emission, fluid kind, offset type; then
+//! `bytes`: per state: light block, emission, offset type; then
 //! the face table.
-use super::{BlockRegistry, Builder, Error, FaceId, FluidKind, OffsetType, PropertyId, StateFacts, StateFlags, DIRECTIONS};
+use super::{BlockRegistry, Builder, Error, FaceId, OffsetType, PropertyId, StateFacts, StateFlags, DIRECTIONS};
 
-pub(crate) const FORMAT: i32 = 2;
+use crate::content::fluid::FluidStateId;
+
+pub(crate) const FORMAT: i32 = 4;
 /// Ints per state after the value indices.
 const STATE_INTS: usize = DIRECTIONS + 2;
 
@@ -64,6 +67,13 @@ pub(crate) fn decode(ints: &[i32], chars: &[u16], bytes: &[u8]) -> Result<BlockR
     let face_count = ints.count(u16::MAX as usize)?;
     let mut builder = Builder::new();
     for _ in 0..property_count {
+        let native = ints.next()?;
+        if native != -1 {
+            let id = u16::try_from(native).map_err(|_| Error::Invalid("native property id"))?;
+            let definition = crate::content::property::registry().get(id).ok_or(Error::Invalid("native property id"))?;
+            builder.property_shared(definition.schema.clone())?;
+            continue;
+        }
         let name_len = ints.count(chars.values.len())?;
         let value_count = ints.count(u16::MAX as usize)?;
         let lengths = ints.take(value_count)?;
@@ -98,7 +108,7 @@ pub(crate) fn decode(ints: &[i32], chars: &[u16], bytes: &[u8]) -> Result<BlockR
     let mut values = Vec::with_capacity(blocks.len());
     let mut states = 0usize;
     for block in &blocks {
-        let size: usize = block.properties.iter().map(|p| builder.properties[p.0 as usize].values.len()).product();
+        let size: usize = block.properties.iter().map(|p| builder.properties[p.0 as usize].values().len()).product();
         states = states.checked_add(size).filter(|&s| s <= state_count).ok_or(Error::Invalid("export state count"))?;
         values.push(ints.take(size * block.properties.len())?);
     }
@@ -106,10 +116,10 @@ pub(crate) fn decode(ints: &[i32], chars: &[u16], bytes: &[u8]) -> Result<BlockR
         return Err(Error::Invalid("export state count"));
     }
     let per_state = ints.take(state_count * STATE_INTS)?;
-    let facts = bytes.take(state_count * 4)?;
+    let facts = bytes.take(state_count * 3)?;
     let mut state = 0usize;
     for block in &blocks {
-        let size: usize = block.properties.iter().map(|p| builder.properties[p.0 as usize].values.len()).product();
+        let size: usize = block.properties.iter().map(|p| builder.properties[p.0 as usize].values().len()).product();
         let mut list = Vec::with_capacity(size);
         for s in state..state + size {
             let row = &per_state[s * STATE_INTS..(s + 1) * STATE_INTS];
@@ -118,15 +128,14 @@ pub(crate) fn decode(ints: &[i32], chars: &[u16], bytes: &[u8]) -> Result<BlockR
                 *face = FaceId(u16::try_from(id).map_err(|_| Error::Invalid("export face"))?);
             }
             let flags = StateFlags(u16::try_from(row[DIRECTIONS]).map_err(|_| Error::Invalid("export flags"))?);
-            let b = &facts[s * 4..s * 4 + 4];
+            let b = &facts[s * 3..s * 3 + 3];
             list.push(StateFacts {
                 flags,
                 light_block: b[0],
                 emission: b[1],
                 light_faces,
-                fluid: FluidKind::from_u8(b[2]).ok_or(Error::Invalid("export fluid"))?,
-                fluid_height_bits: row[DIRECTIONS + 1] as u32,
-                offset: OffsetType::from_u8(b[3]).ok_or(Error::Invalid("export offset"))?,
+                fluid_state: FluidStateId(u16::try_from(row[DIRECTIONS + 1]).map_err(|_| Error::Invalid("fluid state id"))?),
+                offset: OffsetType::from_u8(b[2]).ok_or(Error::Invalid("export offset"))?,
             });
         }
         let id = builder.block(&block.name, &block.properties, block.default, list)?;

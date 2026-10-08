@@ -1,5 +1,7 @@
 package net.alexscaves.server.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import net.alexscaves.server.entity.living.DinosaurEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -32,7 +34,7 @@ import java.util.List;
 
 public abstract class DinosaurEggBlock extends Block {
     public static final IntegerProperty HATCH = BlockStateProperties.HATCH;
-    public static final BooleanProperty NEEDS_PLAYER = BooleanProperty.create("needs_player");
+    public static final BooleanProperty NEEDS_PLAYER = NativePropertyDefinitions.booleanProperty("DINOSAUREGGBLOCK_NEEDS_PLAYER");
 
     private final VoxelShape voxelShape;
 

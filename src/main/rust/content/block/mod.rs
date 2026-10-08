@@ -12,8 +12,10 @@ mod tests;
 
 use std::collections::HashMap;
 use std::ops::Range;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
+pub use super::property::Schema as Property;
 use super::state::{StateLayout, StateSlot};
+use super::fluid::{self, FluidStateId};
 
 /// A block, by its `BuiltInRegistries.BLOCK` ID.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -97,18 +99,6 @@ pub enum FluidKind {
     Other = 3,
 }
 
-impl FluidKind {
-    pub(crate) fn from_u8(value: u8) -> Option<Self> {
-        Some(match value {
-            0 => Self::None,
-            1 => Self::Water,
-            2 => Self::Lava,
-            3 => Self::Other,
-            _ => return None,
-        })
-    }
-}
-
 /// `BlockBehaviour.OffsetType`: how a state's model is offset by position.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(u8)]
@@ -133,6 +123,7 @@ impl OffsetType {
 /// The facts recorded for one state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct StateFacts {
+    /// Block facts only. HAS_FLUID and FLUID_FALLING are derived at freeze.
     pub flags: StateFlags,
     /// `getLightBlock()`, 0..=15.
     pub light_block: u8,
@@ -140,27 +131,9 @@ pub struct StateFacts {
     pub emission: u8,
     /// `LightEngine.getOcclusionShape(state, direction)` per direction.
     pub light_faces: [FaceId; DIRECTIONS],
-    pub fluid: FluidKind,
-    /// `getFluidState().getOwnHeight()` as `f32` bits (0 without a fluid).
-    pub fluid_height_bits: u32,
+    /// Association only; all fluid facts come from the native fluid registry.
+    pub fluid_state: FluidStateId,
     pub offset: OffsetType,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Property {
-    name: String,
-    values: Vec<String>,
-}
-
-impl Property {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Serialized value names in `getPossibleValues()` order.
-    pub fn values(&self) -> &[String] {
-        &self.values
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -231,14 +204,13 @@ pub enum Error {
 pub struct BlockRegistry {
     blocks: Vec<Block>,
     by_name: HashMap<String, BlockId>,
-    properties: Vec<Property>,
+    properties: Vec<Arc<Property>>,
     block: Vec<BlockId>,
     flags: Vec<StateFlags>,
     light_block: Vec<u8>,
     emission: Vec<u8>,
     light_faces: Vec<[FaceId; DIRECTIONS]>,
-    fluid: Vec<FluidKind>,
-    fluid_height_bits: Vec<u32>,
+    fluid_state: Vec<FluidStateId>,
     offset: Vec<OffsetType>,
     face_count: usize,
     occludes: Vec<u8>,
@@ -262,7 +234,7 @@ impl BlockRegistry {
         self.by_name.get(name).copied()
     }
 
-    pub fn properties(&self) -> &[Property] {
+    pub fn properties(&self) -> &[Arc<Property>] {
         &self.properties
     }
 
@@ -295,13 +267,23 @@ impl BlockRegistry {
         self.light_faces[state.index()][direction]
     }
 
-    pub fn fluid(&self, state: StateId) -> FluidKind {
-        self.fluid[state.index()]
+    pub fn fluid_state(&self, state: StateId) -> FluidStateId {
+        self.fluid_state[state.index()]
     }
 
-    /// `getFluidState().getOwnHeight()`.
+    pub fn fluid(&self, state: StateId) -> FluidKind {
+        let fluids = fluid::registry();
+        let traits = fluids.state(self.fluid_state(state)).expect("validated fluid state");
+        match fluids.definition(traits.fluid).expect("built-in fluid owner").family {
+            fluid::Family::Empty => FluidKind::None,
+            fluid::Family::Water => FluidKind::Water,
+            fluid::Family::Lava => FluidKind::Lava,
+        }
+    }
+
+    /// `getFluidState().getOwnHeight()`, from its native owner.
     pub fn fluid_height(&self, state: StateId) -> f32 {
-        f32::from_bits(self.fluid_height_bits[state.index()])
+        fluid::registry().state(self.fluid_state(state)).expect("validated fluid state").own_height
     }
 
     pub fn offset(&self, state: StateId) -> OffsetType {
@@ -378,7 +360,7 @@ impl BlockRegistry {
 #[derive(Default)]
 pub struct Builder {
     blocks: Vec<Block>,
-    properties: Vec<Property>,
+    properties: Vec<Arc<Property>>,
     states: Vec<(BlockId, StateFacts)>,
 }
 
@@ -392,11 +374,13 @@ impl Builder {
     }
 
     pub(crate) fn property_owned(&mut self, name: String, values: Vec<String>) -> Result<PropertyId, Error> {
-        if values.is_empty() || values.len() > u16::MAX as usize {
-            return Err(Error::Invalid("property value count"));
-        }
+        let schema = Property::new(name, values).ok_or(Error::Invalid("property value count"))?;
+        self.property_shared(Arc::new(schema))
+    }
+
+    pub fn property_shared(&mut self, schema: Arc<Property>) -> Result<PropertyId, Error> {
         let id = u16::try_from(self.properties.len()).map_err(|_| Error::Invalid("property count"))?;
-        self.properties.push(Property { name, values });
+        self.properties.push(schema);
         Ok(PropertyId(id))
     }
 
@@ -407,7 +391,7 @@ impl Builder {
         let id = u16::try_from(self.blocks.len()).map_err(|_| Error::Invalid("block count"))?;
         let mut counts = Vec::with_capacity(properties.len());
         for (i, &property) in properties.iter().enumerate() {
-            let values = self.properties.get(property.0 as usize).ok_or(Error::Invalid("property id"))?.values.len();
+            let values = self.properties.get(property.0 as usize).ok_or(Error::Invalid("property id"))?.values().len();
             if properties[..i].contains(&property) {
                 return Err(Error::Invalid("repeated property"));
             }
@@ -469,25 +453,30 @@ impl Builder {
             light_block: Vec::with_capacity(n),
             emission: Vec::with_capacity(n),
             light_faces: Vec::with_capacity(n),
-            fluid: Vec::with_capacity(n),
-            fluid_height_bits: Vec::with_capacity(n),
+            fluid_state: Vec::with_capacity(n),
             offset: Vec::with_capacity(n),
             face_count,
             occludes,
         };
+        let fluids = fluid::registry();
+        let derived_flags = StateFlags::HAS_FLUID.0 | StateFlags::FLUID_FALLING.0;
         for (block, facts) in self.states {
-            if facts.flags.0 & !StateFlags::ALL != 0 || facts.light_block > 15 || facts.emission > 15
+            if facts.flags.0 & !(StateFlags::ALL & !derived_flags) != 0 || facts.light_block > 15 || facts.emission > 15
                 || facts.light_faces.iter().any(|f| f.0 as usize >= face_count)
             {
                 return Err(Error::Invalid("state facts"));
             }
+            let traits = fluids.state(facts.fluid_state).ok_or(Error::Invalid("fluid state id"))?;
+            let definition = fluids.definition(traits.fluid).expect("built-in fluid owner");
+            let mut flags = facts.flags;
+            if definition.family != fluid::Family::Empty { flags.0 |= StateFlags::HAS_FLUID.0; }
+            if traits.falling { flags.0 |= StateFlags::FLUID_FALLING.0; }
             registry.block.push(block);
-            registry.flags.push(facts.flags);
+            registry.flags.push(flags);
             registry.light_block.push(facts.light_block);
             registry.emission.push(facts.emission);
             registry.light_faces.push(facts.light_faces);
-            registry.fluid.push(facts.fluid);
-            registry.fluid_height_bits.push(facts.fluid_height_bits);
+            registry.fluid_state.push(facts.fluid_state);
             registry.offset.push(facts.offset);
         }
         Ok(registry)

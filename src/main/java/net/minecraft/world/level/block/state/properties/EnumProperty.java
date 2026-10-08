@@ -16,7 +16,11 @@ public final class EnumProperty<T extends Enum<T> & StringRepresentable> extends
 	private final int[] ordinalToIndex;
 
 	private EnumProperty(String string, Class<T> class_, List<T> list) {
-		super(string, class_);
+		this(string, class_, list, -1);
+	}
+
+	EnumProperty(String string, Class<T> class_, List<T> list, int nativeDefinitionId) {
+		super(string, class_, nativeDefinitionId);
 		if (list.isEmpty()) {
 			throw new IllegalArgumentException("Trying to make empty EnumProperty '" + string + "'");
 		} else {

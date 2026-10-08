@@ -20,7 +20,7 @@ final class NativeFluidDefinitions {
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final List<Definition> DEFINITIONS = load();
 
-    record Traits(int amount, boolean source, float ownHeight, int legacyLevel) {}
+    record Traits(int stateId, int amount, boolean source, float ownHeight, int legacyLevel) {}
     record Definition(int id, String name, int family, boolean source, List<Property<?>> properties,
                       int firstState, int defaultLocalState, float explosionResistance, List<Traits> states) {}
 
@@ -83,7 +83,7 @@ final class NativeFluidDefinitions {
                         || height < 0 || height > 1 || legacy < 0 || legacy > 15) {
                         throw new IllegalStateException("Invalid native fluid state: " + state);
                     }
-                    stateViews.add(new Traits(amount, isSource != 0, height, legacy));
+                    stateViews.add(new Traits(state, amount, isSource != 0, height, legacy));
                 }
                 String name = new String(names.asSlice(word(rows, base), word(rows, base + 1)).toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8);
                 result.add(new Definition(id, name, family, source != 0, List.copyOf(projected), firstState, initial,

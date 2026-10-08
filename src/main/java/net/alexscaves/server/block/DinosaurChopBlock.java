@@ -1,5 +1,7 @@
 package net.alexscaves.server.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -40,7 +42,7 @@ import java.util.Map;
 public class DinosaurChopBlock extends Block implements SimpleWaterloggedBlock {
 
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
-    public static final IntegerProperty BITES = IntegerProperty.create("bites", 0, 3);
+    public static final IntegerProperty BITES = NativePropertyDefinitions.integerProperty("DINOSAURCHOPBLOCK_BITES");
     public static final net.minecraft.world.level.block.state.properties.EnumProperty<Direction> FACING = BlockStateProperties.FACING;
     public final Map<BlockState, VoxelShape> shapeMap = new HashMap<>();
 

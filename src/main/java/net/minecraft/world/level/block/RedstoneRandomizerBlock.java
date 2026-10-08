@@ -1,5 +1,7 @@
 package net.minecraft.world.level.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -18,7 +20,7 @@ import net.minecraft.world.level.redstone.Orientation;
 
 public class RedstoneRandomizerBlock extends DiodeBlock {
 	public static final MapCodec<RedstoneRandomizerBlock> CODEC = simpleCodec(RedstoneRandomizerBlock::new);
-	public static final EnumProperty<OutputSide> OUTPUT_SIDE = EnumProperty.create("output", OutputSide.class);
+	public static final EnumProperty<OutputSide> OUTPUT_SIDE = NativePropertyDefinitions.enumProperty("REDSTONERANDOMIZERBLOCK_OUTPUT_SIDE", OutputSide.class);
 
 	public RedstoneRandomizerBlock(Properties properties) {
 		super(properties);

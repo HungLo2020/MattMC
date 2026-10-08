@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Comparator;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -13,6 +14,7 @@ import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
@@ -61,11 +63,50 @@ public final class StateGraphReference {
                 }
             }
         }
+        MessageDigest propertyDigest = MessageDigest.getInstance("SHA-256");
+        int propertyDefinitions = 0;
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), propertyDigest))) {
+            List<java.lang.reflect.Field> definitions = new java.util.ArrayList<>();
+            for (var field : BlockStateProperties.class.getFields()) {
+                if (Property.class.isAssignableFrom(field.getType())) definitions.add(field);
+            }
+            definitions.add(Class.forName("net.alexscaves.server.block.DinosaurEggBlock").getField("NEEDS_PLAYER"));
+            definitions.add(Class.forName("net.alexscaves.server.block.PrimalMagmaBlock").getField("ACTIVE"));
+            definitions.add(Class.forName("net.alexscaves.server.block.PrimalMagmaBlock").getField("PERMANENT"));
+            definitions.add(Class.forName("net.alexscaves.server.block.PewenBranchBlock").getField("PINES"));
+            definitions.add(Class.forName("net.alexscaves.server.block.PewenBranchBlock").getField("ROTATION"));
+            definitions.add(Class.forName("net.alexscaves.server.block.DinosaurChopBlock").getField("BITES"));
+            definitions.add(Class.forName("net.alexscaves.server.block.FissurePrimalMagmaBlock").getField("REGEN_HEIGHT"));
+            definitions.add(Class.forName("net.alexsmobs.block.BlockHummingbirdFeeder").getField("CONTENTS"));
+            definitions.add(Class.forName("net.minecraft.world.level.block.RedstoneRandomizerBlock").getField("OUTPUT_SIDE"));
+            definitions.add(Class.forName("net.minecraft.world.level.block.custom.FlytrapBlock").getField("OPEN"));
+            definitions.add(Class.forName("net.minecraft.world.level.block.custom.CycadBlock").getField("TOP"));
+            definitions.sort(Comparator.comparing(field -> field.getDeclaringClass().getName() + "." + field.getName()));
+            for (var field : definitions) {
+                Property<?> property = (Property<?>) field.get(null);
+                out.writeUTF(field.getDeclaringClass().getName() + "." + field.getName());
+                out.writeUTF(property.getName()); out.writeUTF(property.getValueClass().getName());
+                out.writeInt(property.getPossibleValues().size());
+                for (Object value : property.getPossibleValues()) propertyValue(out, property, value);
+                propertyDefinitions++;
+            }
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
             + " fluid_states=" + fluidStates + " fluid_sha256=" + HexFormat.of().formatHex(fluidDigest.digest())
+            + " property_definitions=" + propertyDefinitions + " property_sha256=" + HexFormat.of().formatHex(propertyDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void propertyValue(DataOutputStream out, Property property, Object value) throws Exception {
+        String name = valueName(property, value);
+        out.writeUTF(name); out.writeInt(property.getInternalIndex((Comparable) value));
+        if (!property.getValue(name).orElseThrow().equals(value)) throw new AssertionError("Property parse failed: " + property);
+        var encoded = property.codec().encodeStart(JsonOps.INSTANCE, value).getOrThrow();
+        out.writeUTF(encoded.toString());
+        if (!property.codec().parse(JsonOps.INSTANCE, encoded).getOrThrow().equals(value)) throw new AssertionError("Property codec failed: " + property);
     }
 
     private static void graph(DataOutputStream out, String name, StateDefinition<?, ?> definition, StateHolder<?, ?> initial) throws Exception {

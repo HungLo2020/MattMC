@@ -36,7 +36,7 @@ public class Fluids {
 			int next = fluid.nativeDefinition.firstState();
 			for (FluidState fluidState : fluid.getStateDefinition().getPossibleStates()) {
 				Fluid.FLUID_STATE_REGISTRY.add(fluidState);
-				if (Fluid.FLUID_STATE_REGISTRY.getId(fluidState) != next++) {
+				if (fluidState.nativeStateId() != next || Fluid.FLUID_STATE_REGISTRY.getId(fluidState) != next++) {
 					throw new IllegalStateException("Native fluid state IDs changed");
 				}
 			}

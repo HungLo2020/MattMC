@@ -1,5 +1,7 @@
 package net.alexscaves.server.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import com.google.common.collect.Maps;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
@@ -47,8 +49,8 @@ public class PewenBranchBlock extends Block implements SimpleWaterloggedBlock {
 
 
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
-    public static final BooleanProperty PINES = BooleanProperty.create("pines");
-    public static final IntegerProperty ROTATION = IntegerProperty.create("rotation", 0, 7);
+    public static final BooleanProperty PINES = NativePropertyDefinitions.booleanProperty("PEWENBRANCHBLOCK_PINES");
+    public static final IntegerProperty ROTATION = NativePropertyDefinitions.integerProperty("PEWENBRANCHBLOCK_ROTATION");
 
     public PewenBranchBlock(BlockBehaviour.Properties properties) {
         super(properties);

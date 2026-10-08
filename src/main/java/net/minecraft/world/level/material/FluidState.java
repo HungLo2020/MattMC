@@ -37,6 +37,11 @@ public final class FluidState extends StateHolder<Fluid, FluidState> {
 		this.nativeTraits = nativeTraits;
 	}
 
+	/** Stable ID supplied by the native fluid registry, independent of Java lookup maps. */
+	public int nativeStateId() {
+		return this.nativeTraits.stateId();
+	}
+
 	public Fluid getType() {
 		return this.owner;
 	}

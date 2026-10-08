@@ -27,11 +27,11 @@ final class NativeStateGraph {
     private final int width;
 
     NativeStateGraph(int[] counts) {
+        Arena lifetime = Arena.ofAuto();
         try (Arena inputs = Arena.ofConfined()) {
             MemorySegment header = inputs.allocate(5L * Integer.BYTES, Integer.BYTES);
             MemorySegment raw = (MemorySegment) CREATE.invokeExact(inputs.allocateFrom(ValueLayout.JAVA_INT, counts), counts.length, header);
             if (raw.address() == 0) throw new IllegalArgumentException("Invalid or oversized native state graph");
-            Arena lifetime = Arena.ofAuto();
             this.owner = raw.reinterpret(1, lifetime, NativeStateGraph::release);
             this.stateCount = header.getAtIndex(ValueLayout.JAVA_INT, 0);
             this.properties = header.getAtIndex(ValueLayout.JAVA_INT, 1);

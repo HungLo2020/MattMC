@@ -1,5 +1,7 @@
 package net.alexscaves.server.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -41,7 +43,7 @@ import java.util.List;
 
 public class FissurePrimalMagmaBlock extends Block {
 
-    public static final IntegerProperty REGEN_HEIGHT = IntegerProperty.create("regen_height", 0, 4);
+    public static final IntegerProperty REGEN_HEIGHT = NativePropertyDefinitions.integerProperty("FISSUREPRIMALMAGMABLOCK_REGEN_HEIGHT");
 
     public FissurePrimalMagmaBlock(BlockBehaviour.Properties properties) {
         super(properties);

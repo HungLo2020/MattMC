@@ -1,7 +1,8 @@
 # Rust block registry
 
 > **Current behavior** (Phase 1 of the [migration plan](MIGRATION-PLAN.md)).
-> The rest of the [game model](index.md) is still a proposal.
+> Native state graphs and fluid definitions are also implemented migration
+> slices; remaining definitions/gameplay in the [game model](index.md) are proposals.
 
 Rust owns one registry of every block, property and block state:
 [`content/block/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/mod.rs).
@@ -11,8 +12,13 @@ blocks:
 [`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
 exports the frozen registries once and Rust installs them. The export is lazy:
 the first `NativeBlockRegistry.ready()` call initializes `Holder.READY` and
-caches success or failure. The current wire format is **2**, including fluid
-and offset facts used by the meshing view.
+caches success or failure. The current wire format is **4**. Java exports a native fluid-state ID per
+block state, plus the remaining block/offset facts. Rust resolves fluid facts
+from the [native fluid registry](FLUID-DEFINITIONS.md). Shared
+[property declarations](PROPERTY-DEFINITIONS.md) are sent as native IDs, with
+no name/domain export; Rust shares their immutable schemas. Synthetic/custom
+schemas may still use the explicit encoding after a `-1` marker; every
+registered block property uses a native reference.
 
 ## What it holds
 
@@ -32,7 +38,8 @@ and offset facts used by the meshing view.
     block entity, and falling fluid
   - light block and emission
   - six light occlusion faces
-  - fluid kind (none, water, lava, other) and the fluid's own height
+  - typed fluid-state association; fluid kind and own height resolve from the
+    native fluid owner, while has-fluid/falling flags are derived at freeze
   - model offset type; each block also has its maximum horizontal and
     vertical offsets
 - **Faces:** the light occlusion faces (`LightEngine.getOcclusionShape`) interned
@@ -73,9 +80,9 @@ entity, motion, emission, fluid type, height and falling, and offsets. The
 explicit `registerState` remains for corpus replays, benchmarks, and states
 Rust declines (including custom subclasses, unknown states or an unsupported
 native-fluid request), and when the registry is unavailable. A failed downcall
-throws; view rejection does not promise fallback after every exception. Java still
-computes fallback block facts before trying the view, so this is a shared
-source of transmitted facts, not proof that all Java preparation disappeared.
+throws; view rejection does not promise fallback after every exception. Java prepares only render-owned columns before trying the view. Explicit
+block/fluid facts are computed only when the view declines; the normal route
+does not reconstruct native-owned metadata in Java.
 `NativeMeshingStateViewTest` compares the explicit and derived records for
 every state in both fluid modes, field for field. This is a low-level record
 fixture, not an end-to-end render or reload test; its execution is not covered
@@ -84,9 +91,11 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
 ## Adding a column or a consumer
 
 1. Add the fact to `StateFacts` and the column in `content/block/mod.rs`.
-   Export it in `NativeBlockRegistry.export()` and decode it in
+   For facts still owned by Java, export them in `NativeBlockRegistry.export()`
+   and decode them in
    [`export.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/export.rs).
-   Bump `FORMAT` on both sides.
+   Bump `FORMAT` on both sides. Facts already owned by native content should
+   be resolved from typed IDs, not exported back through Java.
 2. Check it for every state in `NativeBlockRegistryTest` against Java's live
    answer.
 3. In the consumer, derive the view from `&BlockRegistry` in a plain function
@@ -98,6 +107,17 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
 
 ## Constraints
 
+- **Property identities stay distinct.** Native declaration IDs identify schemas;
+  block-registry `PropertyId`s still follow first use of each Java object.
+  Equal names do not merge different domains. Native schemas are shared by
+  `Arc`; malformed declaration IDs reject installation.
+- **Fluid facts have one owner.** `StateFacts` accepts a `FluidStateId`, not a
+  kind/height copy. Supplying HAS_FLUID or FLUID_FALLING in its input flags is
+  rejected; the builder derives them from the fluid definition/state. Unknown
+  fluid IDs are rejected. The two-byte association replaces five bytes of
+  duplicated kind/height columns per block state. Native consumers also retain
+  exact source/flowing state identity, which those two columns alone cannot
+  represent.
 - **Installation is all or nothing.** The export is refused and registry-backed
   views are unavailable if any of these fails:
   - every block's states are contiguous, in block order

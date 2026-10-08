@@ -3,12 +3,13 @@
 //! adapters. Registry order and state IDs are part of the save/network contract.
 pub(crate) mod ffi;
 
-use crate::content::state::StateLayout;
+use crate::content::{state::StateLayout, property::Builtin};
 use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FluidId(pub u16);
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct FluidStateId(pub u16);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,10 +30,10 @@ pub enum Property {
 }
 
 impl Property {
-    fn count(self) -> u16 {
+    fn domain(self) -> crate::content::property::Domain {
         match self {
-            Self::Falling => 2,
-            Self::Level => 8,
+            Self::Falling => Builtin::Falling.domain(),
+            Self::Level => Builtin::LevelFlowing.domain(),
         }
     }
 }
@@ -60,6 +61,8 @@ impl Definition {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StateTraits {
+    pub fluid: FluidId,
+    pub falling: bool,
     pub amount: u8,
     pub source: bool,
     pub own_height: f32,
@@ -103,7 +106,7 @@ impl Registry {
         };
         for (name, family, source, properties) in declarations {
             let layout =
-                StateLayout::new(&properties.iter().map(|p| p.count()).collect::<Vec<_>>())
+                StateLayout::new(&properties.iter().map(|p| p.domain().count()).collect::<Vec<_>>())
                     .expect("bounded built-in fluid domains");
             let definition = Definition {
                 id: FluidId(registry.definitions.len() as u16),
@@ -118,15 +121,17 @@ impl Registry {
             };
             for state in 0..definition.state_count() {
                 let falling = properties.first() == Some(&Falling)
-                    && definition.layout.slots()[0].value(state as u16) == 0;
+                    && Falling.domain().boolean(definition.layout.slots()[0].value(state as u16)).expect("falling domain");
                 let amount = if family == Empty {
                     0
                 } else if source {
                     8
                 } else {
-                    definition.layout.slots()[1].value(state as u16) as u8 + 1
+                    Level.domain().integer(definition.layout.slots()[1].value(state as u16)).expect("flowing level domain") as u8
                 };
                 let traits = StateTraits {
+                    fluid: definition.id,
+                    falling,
                     amount,
                     source,
                     own_height: amount as f32 / 9.0,
@@ -227,6 +232,8 @@ mod tests {
             assert_eq!(
                 *registry.state(FluidStateId(id as u16)).unwrap(),
                 StateTraits {
+                    fluid: FluidId(if id == 0 { 0 } else if id <= 16 { 1 } else if id <= 18 { 2 } else if id <= 34 { 3 } else { 4 }),
+                    falling: (1..=8).contains(&id) || id == 17 || (19..=26).contains(&id) || id == 35,
                     amount,
                     source,
                     own_height: amount as f32 / 9.0,

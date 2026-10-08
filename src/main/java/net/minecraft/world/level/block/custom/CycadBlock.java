@@ -1,5 +1,7 @@
 package net.minecraft.world.level.block.custom;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -35,7 +37,7 @@ import java.util.stream.Stream;
  * CycadBlock - stackable plant that grows up to 4 blocks high
  */
 public class CycadBlock extends BushBlock implements BonemealableBlock {
-    public static final BooleanProperty TOP = BooleanProperty.create("top");
+    public static final BooleanProperty TOP = NativePropertyDefinitions.booleanProperty("CYCADBLOCK_TOP");
 
     public static final VoxelShape SHAPE = Block.box(4, 0, 4, 12, 16, 12);
     public static final VoxelShape SHAPE_TOP = buildShape(

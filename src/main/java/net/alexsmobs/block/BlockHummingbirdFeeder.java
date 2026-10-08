@@ -1,5 +1,7 @@
 package net.alexsmobs.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
@@ -11,7 +13,7 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
  * This is a simplified version that only includes what the Hummingbird entity needs
  */
 public class BlockHummingbirdFeeder extends Block {
-    public static final IntegerProperty CONTENTS = IntegerProperty.create("contents", 0, 3);
+    public static final IntegerProperty CONTENTS = NativePropertyDefinitions.integerProperty("BLOCKHUMMINGBIRDFEEDER_CONTENTS");
     
     public BlockHummingbirdFeeder(BlockBehaviour.Properties properties) {
         super(properties);

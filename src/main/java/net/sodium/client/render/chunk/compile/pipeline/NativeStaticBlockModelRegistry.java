@@ -254,14 +254,26 @@ public final class NativeStaticBlockModelRegistry {
         }
 
         int flags = fluidOverlayFlags(state);
-        if (state.isAir()) {
-            flags |= STATE_FLAG_AIR;
-        }
         if (selectorId >= 0) {
             flags |= STATE_FLAG_MODEL;
             if (modelHasOnlyCullFaceQuads(model)) {
                 flags |= STATE_FLAG_MODEL_FACE_CULLABLE;
             }
+        }
+        FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
+        int sameBlockSkipMask = sameBlockSkipMask(state);
+        // Rust owns block/fluid facts. Prepare only rendering columns on the
+        // normal path; explicit facts are computed only if the view declines.
+        if (NativeBlockRegistry.ready() && NativeStaticBlockModelCache.registerStateView(stateId, selectorId,
+                flags & RENDER_OWNED_FLAGS, material.bits(), modelPassId, 0, semanticBlockStateId(state),
+                fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup(state, sameBlockSkipMask), sameBlockSkipMask,
+                tintType, (FORCE_JAVA_FLUIDS ? NativeStaticBlockModelCache.CONTROL_JAVA_FLUIDS : 0)
+                    | (isNativeFluidSupported(fluidState) ? NativeStaticBlockModelCache.CONTROL_NATIVE_FLUID : 0),
+                fluidSprites.values(), fluidSprites.overlayValid ? 1 : 0)) {
+            return stateId;
+        }
+        if (state.isAir()) {
+            flags |= STATE_FLAG_AIR;
         }
         if (!FORCE_JAVA_FLUIDS && !fluidState.isEmpty()) {
             flags |= STATE_FLAG_FLUID;
@@ -285,18 +297,6 @@ public final class NativeStaticBlockModelRegistry {
 
         int fluidType = FORCE_JAVA_FLUIDS ? FLUID_NONE : fluidType(fluidState);
         BlockBehaviour.OffsetType offsetType = state.sodium$getOffsetType();
-        FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
-        int sameBlockSkipMask = sameBlockSkipMask(state);
-        // Rust takes the block facts from its block registry; Java sends what
-        // rendering owns. Explicit facts remain for states Rust declines.
-        if (NativeBlockRegistry.ready() && NativeStaticBlockModelCache.registerStateView(stateId, selectorId,
-                flags & RENDER_OWNED_FLAGS, material.bits(), modelPassId, 0, semanticBlockStateId(state),
-                fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup(state, sameBlockSkipMask), sameBlockSkipMask,
-                tintType, (FORCE_JAVA_FLUIDS ? NativeStaticBlockModelCache.CONTROL_JAVA_FLUIDS : 0)
-                    | (isNativeFluidSupported(fluidState) ? NativeStaticBlockModelCache.CONTROL_NATIVE_FLUID : 0),
-                fluidSprites.values(), fluidSprites.overlayValid ? 1 : 0)) {
-            return stateId;
-        }
         NativeStaticBlockModelCache.registerState(stateId, selectorId, flags, material.bits(), modelPassId,
 				state.getLightEmission(), 0, semanticBlockStateId(state), fluidMaterialBits, fluidPassId, fluidBlockId,
                 skipGroup(state, sameBlockSkipMask), sameBlockSkipMask, fluidType,

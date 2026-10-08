@@ -57,6 +57,7 @@ class NativeFluidDefinitionsTest {
     }
 
     private static void assertTraits(FluidState state, int amount, boolean source, boolean empty, int legacy) {
+        assertEquals(Fluid.FLUID_STATE_REGISTRY.getId(state), state.nativeStateId());
         assertEquals(amount, state.getAmount());
         assertEquals(source, state.isSource());
         assertEquals(empty, state.isEmpty());

@@ -24,7 +24,16 @@ registers compatibility objects in native order and checks every fluid/state
 ID. Its public constants are named views. Adapter selection binds remaining
 Java callbacks to a native family; adapters do not declare state properties or
 calculate intrinsic facts. `FluidState` reads immutable projected facts without
-FFM calls on its hot getters. Java still supplies property objects and codecs.
+FFM calls on its hot getters. Java retains property objects and codecs as
+compatibility views. Falling and flowing-level domains now come from the
+[shared native property owner](PROPERTY-DEFINITIONS.md); fluid construction
+uses its typed boolean/integer values, not duplicated domain arithmetic.
+
+The shared [block registry](RUST-BLOCK-REGISTRY.md) stores a typed fluid-state
+ID for each block state and derives fluid flags from this owner. Kind and
+height queries resolve the same canonical state rows; Java no longer exports
+those facts back to Rust. Java `FluidState` exposes its native ID directly,
+with registration checks against the temporary Java ID mapper.
 
 The versioned bridge borrows immutable CPU buffers from Rust's `OnceLock`.
 They live for the process and require no release. Java copies small metadata
@@ -53,8 +62,8 @@ the same public API on both sides, without modifying Frozen. Its graph digest
 covers all block/fluid domains, ordered states, defaults and transitions. A
 separate fluid digest covers all names/IDs, default IDs, intrinsic traits,
 legacy block IDs and encoded codec outputs; every codec round trip must return
-the canonical state. Version 2 receipts add that fluid digest while retaining
-the original graph digest. Use a new output directory for each run.
+the canonical state. Version 2 receipts added that fluid digest; version 3 additionally checks
+every shared property declaration and codec, retaining the earlier digests. Use a new output directory for each run.
 
 These checks establish definition/state/codec parity and fresh-JVM bootstrap
 measurements, not world-dependent fluid simulation or complete gameplay
@@ -64,7 +73,8 @@ each production slice and diagnose regressions.
 
 ## Current evidence (2026-10-08)
 
-The five fresh-JVM pairs in the original checkout's
+For the published definition milestone `6ccbfdf41` (before the block/fluid
+association follow-up), five fresh-JVM pairs in the original checkout's
 `build/fluid-definitions-master-verification-20261008/results.json` agree with
 Frozen: 1,235 blocks, five fluids, 31,846 states and 491,395 graph transitions.
 The unchanged graph digest is
@@ -90,3 +100,15 @@ four p99 comparisons failed; shader-only p99 was worse than earlier captures,
 without an established cause. The root `SUMMARY.md` retains both repeats;
 this is a verified ownership slice with an open performance gap, not full
 renderer or migration acceptance.
+
+The earlier association-only follow-up passed 14 native content tests, 28 affected
+world/storage consumer tests and 20 Java projection/meshing/save tests. Five
+fresh Frozen pairs retain both digests
+(`build/fluid-associations-master-verification-20261008/results.json`). Reviewed
+vanilla and shaders+DH coast pairs pass in
+`validation/native-fluid-associations-smoke-20261008/`; a separate shaders+DH
+resource reload passes in `lifecycle-gate/fluid-association-reload-20261008/`,
+both below graphics captures. These are scoped checks, not a new four-mode
+FPS result or a repeat of all seven lifecycle scenarios. The current FPS table now covers the combined association/property milestone;
+its [property verification record](PROPERTY-DEFINITIONS.md#verification) has
+the completed full workflow and remaining performance gap.

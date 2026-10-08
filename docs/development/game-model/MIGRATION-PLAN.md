@@ -46,8 +46,11 @@ state values and transition IDs for block/fluid definitions and shared
 block-registry slot arithmetic. [Fluid definitions](FLUID-DEFINITIONS.md) now
 come from Rust, including all five registry entries and their 37 intrinsic
 state rows. Java still supplies block declarations, factories, codecs,
-state-object views and world-dependent fluid simulation. The remaining
-registry-definition migration below is unfinished.
+state-object views and world-dependent fluid simulation. The
+[134 property declarations](PROPERTY-DEFINITIONS.md) also originate
+in Rust; block registries share their schemas and fluids use their typed
+domains. This includes all 11 additional properties for integrated content.
+The remaining registry-definition migration below is unfinished.
 
 - Rust builds the registries from its own definitions (the builders in
   [adding content](ADDING-CONTENT.md)) in Java's order.

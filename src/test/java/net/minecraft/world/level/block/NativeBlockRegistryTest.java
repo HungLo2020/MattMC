@@ -76,7 +76,7 @@ class NativeBlockRegistryTest {
     @Test
     void fluidsAndOffsetsMatchEveryState() {
         int[] kinds = NativeBlockRegistry.column(9), heights = NativeBlockRegistry.column(10), offsets = NativeBlockRegistry.column(11);
-        int[] maxOffsets = NativeBlockRegistry.column(12);
+        int[] maxOffsets = NativeBlockRegistry.column(12), fluidIds = NativeBlockRegistry.column(13);
         int water = 0, lava = 0, offset = 0;
         for (int id = 0; id < states; id++) {
             BlockState s = state(id);
@@ -84,6 +84,7 @@ class NativeBlockRegistryTest {
             int kind = fluid.isEmpty() ? 0 : fluid.is(net.minecraft.world.level.material.Fluids.WATER)
                 || fluid.is(net.minecraft.world.level.material.Fluids.FLOWING_WATER) ? 1
                 : fluid.is(net.minecraft.world.level.material.Fluids.LAVA) || fluid.is(net.minecraft.world.level.material.Fluids.FLOWING_LAVA) ? 2 : 3;
+            assertEquals(net.minecraft.world.level.material.Fluid.FLUID_STATE_REGISTRY.getId(fluid), fluidIds[id], "fluid state of " + s);
             assertEquals(kind, kinds[id], "fluid of " + s);
             assertEquals(Float.floatToRawIntBits(fluid.isEmpty() ? 0.0F : fluid.getOwnHeight()), heights[id], "fluid height of " + s);
             assertEquals(s.sodium$getOffsetType().ordinal(), offsets[id], "offset of " + s);

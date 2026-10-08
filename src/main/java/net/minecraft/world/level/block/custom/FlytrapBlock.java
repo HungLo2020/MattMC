@@ -1,5 +1,7 @@
 package net.minecraft.world.level.block.custom;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -28,7 +30,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public class FlytrapBlock extends BushBlock implements BonemealableBlock {
 
     public static final MapCodec<FlytrapBlock> CODEC = simpleCodec(FlytrapBlock::new);
-    public static final BooleanProperty OPEN = BooleanProperty.create("open");
+    public static final BooleanProperty OPEN = NativePropertyDefinitions.booleanProperty("FLYTRAPBLOCK_OPEN");
     public static final VoxelShape SHAPE = Block.box(3.5, 0, 3.5, 12.5, 21, 12.5);
 
     @Override

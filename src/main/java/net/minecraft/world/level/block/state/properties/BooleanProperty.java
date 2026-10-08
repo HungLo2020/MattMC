@@ -9,7 +9,11 @@ public final class BooleanProperty extends Property<Boolean> {
 	private static final int FALSE_INDEX = 1;
 
 	private BooleanProperty(String string) {
-		super(string, Boolean.class);
+		this(string, -1);
+	}
+
+	BooleanProperty(String name, int nativeDefinitionId) {
+		super(name, Boolean.class, nativeDefinitionId);
 	}
 
 	@Override

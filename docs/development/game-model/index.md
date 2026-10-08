@@ -3,7 +3,7 @@
 > **Status: proposal; Phase 1 implemented.** These pages describe how blocks,
 > block states, items, block entities and entities should be represented in
 > Rust. Phase 1, the [Rust block registry](RUST-BLOCK-REGISTRY.md), is current
-> behavior. Native state graphs and fluid definitions are current migration
+> behavior. Native state graphs, property declarations and fluid definitions are current migration
 > work; remaining definitions, behavior and component systems remain proposals.
 > “Implemented” describes source ownership, not completion of every acceptance
 > check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
@@ -93,6 +93,8 @@ one set of systems.
   how to add a column or consumer, constraints and tests.
 - [Native state graphs](STATE-GRAPHS.md) (current work): shared state construction,
   temporary Java projections, CPU buffer ownership and verification.
+- [Shared property definitions](PROPERTY-DEFINITIONS.md) (current work): native
+  names/domains, compatibility views and block/fluid schemas.
 - [Native fluid definitions](FLUID-DEFINITIONS.md) (current work): Rust-owned
   registry, intrinsic state facts, Java compatibility views and Frozen checks.
 - [Block registry verification](BLOCK-REGISTRY-VERIFICATION.md) (current):
@@ -103,7 +105,8 @@ one set of systems.
 `content/` (registries and definitions) and `gameplay/` (behavior and systems)
 are the owners in the [project architecture](../PROJECT-ARCHITECTURE.md).
 `content/block/` holds the implemented block registry; `content/fluid/` owns
-built-in fluid definitions and intrinsic state facts. `gameplay/tacz/` already
+built-in fluid definitions and intrinsic state facts. `content/property/` owns
+property declarations and immutable schemas. `gameplay/tacz/` already
 contains the TaCZ function-modifier kernel; the proposed block-behavior and
 component systems are not implemented. `world/`, `storage/` and terrain meshing
 read shared block facts from `content/`, while each consumer owns its view.
