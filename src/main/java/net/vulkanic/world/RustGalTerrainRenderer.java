@@ -3485,7 +3485,14 @@ public final class RustGalTerrainRenderer {
 				return false;
 			}
 		}
-		Map<LayerKey, TerrainSectionAsset> replacement = Map.copyOf(RESOURCE_RELOAD_SECTION_ASSETS);
+		// Every staged layer is uploaded, but its acknowledgement could not
+		// release the CPU payload while the layer was only staged (the release
+		// resolves published layers); release it with the commit.
+		Map<LayerKey, TerrainSectionAsset> replacement = new HashMap<>(RESOURCE_RELOAD_SECTION_ASSETS.size());
+		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : RESOURCE_RELOAD_SECTION_ASSETS.entrySet()) {
+			TerrainSectionAsset asset = entry.getValue();
+			replacement.put(entry.getKey(), asset.asset() == null ? asset : asset.releaseCpuPayload());
+		}
 		resourceReloadCommitInProgress = true;
 		try {
 			ensureTerrainAtlasAssetForWorldMesh();
