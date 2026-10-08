@@ -178,3 +178,31 @@ fn ordered_maps_follow_java_linked_hash_map_rules() {
     assert!(access.peek(3).is_some());
     assert_eq!(access.keys().next(), Some(3), "peek does not reorder");
 }
+
+#[test]
+fn only_a_selected_route_hands_over_its_segments() {
+    let mut l = Ledger::new();
+    let c = config();
+    let mut e = Vec::new();
+    l.record_built(c, 6, built(1, false), None, &mut e).unwrap();
+    publish_all(&mut l, c);
+    for select in [false, true] {
+        l.begin_frame(Some(0), "", "finite", "");
+        let Visible::Admit { generation, counts } = l.visible_column(6).unwrap() else { panic!() };
+        l.append_visible_column(6, generation, counts).unwrap();
+        if select {
+            l.select_route(true).unwrap();
+        }
+        let (visible, frame) = l.consume_frame();
+        assert_eq!(visible.len(), usize::from(select), "selected={select}");
+        assert!(frame.enabled);
+        assert!(l.pending_segments().is_empty());
+    }
+    // A rejected route hands over nothing either.
+    l.begin_frame(Some(0), "", "finite", "");
+    let Visible::Admit { generation, counts } = l.visible_column(6).unwrap() else { panic!() };
+    l.append_visible_column(6, generation, counts).unwrap();
+    l.select_route(true).unwrap();
+    l.reject_route("test", 1, 0, 0);
+    assert!(l.consume_frame().0.is_empty());
+}
