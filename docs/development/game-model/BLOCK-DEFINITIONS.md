@@ -1,7 +1,8 @@
 # Native block state definitions
 
-> Current implementation, focused correctness verification passed: Rust declares the
-> names, order, state domains and defaults of all 1,235 registered blocks.
+> Current implementation: Rust declares the names, order, state domains and
+> defaults of all 1,235 registered blocks. Focused correctness results below
+> are author-recorded milestone evidence.
 > Java still supplies behavior factories, shapes, predicates
 > and world-dependent gameplay. This is not complete block migration.
 
@@ -38,7 +39,8 @@ graphs. Dynamically constructed graphs still use automatic arenas; see
 The [block registry](RUST-BLOCK-REGISTRY.md) now imports only remaining state
 facts and face data. Its format 7 packet contains block/state/face counts,
 offset bounds, per-state face IDs/flags, blocked-light values and offset types.
-Emitted light and fluid associations now derive from native intrinsic rules. Names, property schemas, defaults and value indices no longer
+Emitted light and fluid associations now derive from native intrinsic rules.
+Names, property schemas, defaults and value indices no longer
 make a native-to-Java-to-native trip. Air and can-occlude flags derive directly
 from native physical definitions; incoming packets must not supply them.
 
@@ -50,7 +52,8 @@ from native physical definitions; incoming packets must not supply them.
   families move. Do not add a second Java declaration for registered state data.
 - Validate state IDs, defaults, transitions, codecs and physical facts against
   Frozen before accepting a declaration change. A changed template can affect
-  many blocks and all later global state IDs.
+  many blocks and all later global state IDs. Java live-view agreement alone
+  cannot independently verify a definition now shared by both sides.
 
 ```sh
 CARGO_TARGET_DIR="$PWD/build/rust/target-tests" cargo test \
@@ -71,10 +74,13 @@ checks every block’s physical settings and constructor caches; its follow-up
 verification is recorded in [physical settings](BLOCK-PHYSICS.md). Version 6
 also checks map colors and copied color/emission functions; see
 [intrinsic state rules](BLOCK-INTRINSICS.md) for current verification status.
+Read the [observer scope and integrity limits](STATE-GRAPHS.md#verification)
+before interpreting a passing receipt or its JVM main-thread allocation figures.
 
-The following results predate the physical-settings follow-up. The
-pre-integration control at published `df6c6dc77` matched Frozen in three
-pairs (`build/block-definitions-control-verification-20261008/results.json`).
+The following author-recorded results were not rerun and their local receipts
+were not independently inspected for this documentation review. They predate
+the physical-settings follow-up. The pre-integration control at published
+`df6c6dc77` matched Frozen in three pairs (`build/block-definitions-control-verification-20261008/results.json`).
 The native declaration draft also matched every ID/name/range/domain/default,
 and its standalone content tests and Java compilation passed. The integrated release build, 17 native content tests and 22 Java
 registry/graph/codec/save/meshing tests also pass. Five integrated Frozen pairs

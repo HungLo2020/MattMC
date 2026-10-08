@@ -1,27 +1,35 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`97e30922`](https://github.com/HungLo2020/MattMC/commit/97e3092269ed29854c8175a480a819fb1896c311):
-stricter verification, feature-parity fixtures, artifact retention and the
-whole-project migration plan. This tooling/documentation milestone changes no
-Java or Rust runtime code; the rendering ownership below retains its
-[`697b0a3c`](https://github.com/HungLo2020/MattMC/commit/697b0a3c6200151830a565c73aaee88d323eb484)
-implementation scope. Source inspection and author-recorded checks do not
-establish broad visual/temporal parity, complete scene migration, long-run
-resource bounds or resolution of the independent native crash.
+[`d0141162`](https://github.com/HungLo2020/MattMC/commit/d0141162d81eee184fa99f0b7a9411d401c306b4):
+native state graphs, fluid/property declarations, registered block definitions,
+physical settings and intrinsic state rules now supplement the earlier rendering
+ownership. The latest author-recorded intrinsic-state workflow **fails overall
+performance acceptance** despite passing tests, lifecycle cases and settled
+coast comparisons. See the [current measured workload](#october-8-native-block-intrinsics-summary).
+Source inspection and author reports do not establish broad visual/temporal
+parity, complete scene migration, long-run resource bounds or resolution of the
+independent native crash.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
 payload publication, and GPU execution/resources. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
 asset/reload bookkeeping, DH quadtree/frustum candidates, frame parameters and
-material-provenance diagnostics. Terrain staging and DH native publication
-retain copied/diagnostic paths; neither is a zero-copy contract.
+material-provenance diagnostics. Content definitions now have separate native
+owners; Java retains behavior factories, contextual callbacks and compatibility
+objects. Terrain staging and DH native publication retain copied/diagnostic
+paths; neither is a zero-copy contract.
 The final target remains one Rust executable supporting client and dedicated
 server, at most one separately loaded Rust library, and no Java/JVM. See the
 [whole-project migration plan](../RUST-MIGRATION.md),
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
+
+The current [content ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6070919773)
+and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6070924916)
+retain these source and acceptance boundaries. The resource/registry and
+performance goals remain open.
 
 The current [terrain publication](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6053377956),
 [DH lifecycle](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6053379365),
@@ -62,6 +70,21 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 8 native content ownership checkpoint
+
+The `97e30922` → `d0141162` interval includes runtime ownership changes, beyond
+the earlier verification-only milestone:
+
+- [State graphs](../game-model/STATE-GRAPHS.md), [fluid definitions](../game-model/FLUID-DEFINITIONS.md) and [shared properties](../game-model/PROPERTY-DEFINITIONS.md) now originate in Rust. Java projects compatibility views and retains world-dependent fluid simulation and gameplay
+- [Registered block definitions](../game-model/BLOCK-DEFINITIONS.md) own identities, ordered domains/defaults and shared transition graphs. [Physical settings](../game-model/BLOCK-PHYSICS.md) and [intrinsic state rules](../game-model/BLOCK-INTRINSICS.md) also originate in Rust, including map-color identity, emission and canonical fluid association. Export format 7 no longer imports emission or fluid IDs. Java retains shapes, blocked light and contextual behavior; sound/offset ownership remains an isolated draft at this checkpoint
+- Capture cleanup now finds parent ownership markers and the fixture pass checks that its source directory exists. These repairs do not protect every retained workspace from subsequent whole-invocation retirement: [#823](https://github.com/HungLo2020/MattMC/issues/823) records that separate gap. Follow the [pinning and storage limits](ARTIFACT-STORAGE.md#verification-driver-retention)
+
+The implementation author's [pinned working record](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/PROGRESS.md)
+reports the runtime checks and cleanup counts below. This documentation review
+inspected committed source and text records, not the original runtime receipts,
+clients, captures, Java/Rust suites or cleanup filesystem. The rejected dense
+mesh-slot cache was removed; it is not part of these landed ownership slices.
+
 ### October 8 verification and migration checkpoint
 
 The `1216f060` → `97e30922` interval changes acceptance tooling and its
@@ -70,11 +93,11 @@ planning/evidence records, not the runtime implementation:
 - **Verification:** requested background checks can no longer disappear into a passing aggregate. The combined driver also checks the complete lifecycle scenario set, stricter FPS/parity receipts and paired performance floors. These guards address specific evidence failures; they do not prove all workload equivalence or inspect images. [Canonical workflow](RENDER-VERIFICATION.md#one-command-validation)
 - **Feature parity:** `RunFeatureParity.py` adds block-entity, equipment, held-item and hand fixtures. Every requested scenario must pass Frozen; an unchanged historical failure is not absolute parity. The current working record reports chest/chest-shaders/sign/trident passes, but bed/banner/zombie/held-item coverage remains incomplete or failed. Prior shield/hand attempts stopped at disk preflight and zombie equipment-reference processing raised an exception; distinguish those harness failures from renderer defects. [Pinned working record](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/PROGRESS.md)
 - **Evidence storage:** completed generated fixtures and superseded marked invocations can retire automatically. Preserve current acceptance, unresolved diagnostics and required input sources using the [storage and pinning rules](ARTIFACT-STORAGE.md#verification-driver-retention); retired evidence is not replayable merely because its summary survives.
-- **Migration scope:** the [staged plan](../RUST-MIGRATION.md) extends through content, world ownership, gameplay, presentation/services and Rust application startup. Verification/storage is the current milestone; content definitions and state construction are the next planned ownership slice. Existing native rendering and bridge ownership do not complete the application migration.
+- **Migration scope:** the [staged plan](../RUST-MIGRATION.md) extends through content, world ownership, gameplay, presentation/services and Rust application startup. At this historical checkpoint, content definitions and state construction were the next planned ownership slice; the later native content checkpoint above records their landed scope. Existing native rendering and bridge ownership do not complete the application migration.
 
-The refreshed root records describe a separate `d7ee0335d` runtime candidate,
-not a new runtime result from this source commit. Its raw benchmark receipts
-are unavailable, so recorded health and FPS do not independently re-establish
+That checkpoint's root records describe a separate `d7ee0335d` runtime candidate,
+not a new runtime result from the verification-only source commit. Its raw
+benchmark receipts are unavailable, so recorded health and FPS do not independently re-establish
 acceptance. See the [October 8 candidate summary](#october-8-recorded-candidate-summary).
 This documentation review inspected source and retained text records, not live
 clients, captures, Java/Rust runtime suites or the unbundled benchmark artifacts.
@@ -246,6 +269,71 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 8 native block intrinsics summary
+
+The [summary at `d0141162`](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/SUMMARY.md)
+records native intrinsic state rules before the sound/offset draft: RTX 2070,
+moving camera, ABAB and 6,000 measured frames per run.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median average-FPS change | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- | --- |
+| Vanilla | 1,107.5 / 1,106.4 | 1,149.1 / 1,201.9 | −5.8% | 3.582 / 3.184 |
+| Vanilla + DH | 626.0 / 630.0 | 792.3 / 582.2 | −8.6% | 6.233 / 5.789 |
+| Shaders | 326.8 / 328.3 | 310.5 / 308.3 | +5.9% | 5.920 / 6.156 |
+| Shaders + DH | 245.0 / 244.1 | 221.8 / 221.0 | +10.5% | 7.674 / 8.325 |
+
+**Performance FAIL:** vanilla and vanilla+DH miss both average-FPS and p99
+floors; both shader modes pass those floors in this run. The author reports all
+16 runs clean with exact frame counts and zero VUIDs, Java/Rust suites passing
+1,704/2,359 tests with two skips/three ignores, all seven lifecycle cases passing
+and five Frozen observer pairs matching all six content digests. Reviewed
+vanilla/Iris+DH coast RGB errors are 0.312/0.515/0.600 and 3.763/4.359/3.997,
+with the DH subset passing. The receipt is
+`artifacts/graphics-captures/validation/native-block-intrinsics-master-20261008/summary.json`;
+25 generated fixture copies were reportedly retired. These runtime, image and
+cleanup claims are author records, not independently inspected artifacts or
+reruns by this documentation review. No isolated intrinsic-state speedup,
+broad parity or Rust-only application completion is established.
+
+#### October 8 native block physics summary
+
+The [summary at `1b183793`](https://github.com/HungLo2020/MattMC/blob/1b1837931a9b25fa12b655e440c6ff77cdd5887d/SUMMARY.md)
+records the historical native physical-settings milestone before intrinsic-state
+integration:
+RTX 2070, moving camera, ABAB and 6,000 measured frames per run.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median average-FPS change | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- | --- |
+| Vanilla | 1,004.7 / 1,054.4 | 1,111.5 / 1,124.9 | −7.9% | 3.627 / 3.752 |
+| Vanilla + DH | 495.7 / 703.1 | 705.4 / 598.2 | −8.0% | 7.310 / 5.991 |
+| Shaders | 322.9 / 325.7 | 303.2 / 306.3 | +6.4% | 11.447 / 7.323 |
+| Shaders + DH | 238.6 / 242.8 | 217.9 / 216.3 | +10.9% | 14.605 / 9.860 |
+
+**Performance FAIL:** vanilla and vanilla+DH miss the average-FPS floor; only
+vanilla passes p99, while the other three modes fail. The author reports all
+16 runs clean, exact frame counts and zero VUIDs. Reported Java/Rust suites pass
+1,701/2,357 tests with two Java skips/three Rust ignores; all seven lifecycle
+cases and five content digests pass. Reviewed vanilla/Iris+DH coast RGB errors
+are 0.210/0.355/0.390 and 3.726/4.268/3.871, with the DH subset passing.
+These successes do not turn the combined workflow into a pass or establish an
+isolated physics speedup, broad parity or Rust-only application completion.
+The original checkout's receipt is
+`artifacts/graphics-captures/validation/native-block-physics-master-20261008/summary.json`;
+25 generated fixture copies were reportedly retired. Those runtime and cleanup
+claims were not independently rerun or checked against the unbundled artifacts.
+
+Keep earlier ownership measurements separate. The
+[fluid report retained at `df6c6dc7`](https://github.com/HungLo2020/MattMC/blob/df6c6dc77d0e382b13fa8fcd62317f512ebf0b94/PROGRESS.md)
+records vanilla/DH FPS deficits of 6.0%/18.6% and four failing p99 comparisons.
+The [property summary at that checkpoint](https://github.com/HungLo2020/MattMC/blob/df6c6dc77d0e382b13fa8fcd62317f512ebf0b94/SUMMARY.md)
+records deficits of 6.3%/0.5%, with both shader modes passing their FPS and p99
+floors in that run. The
+[block-definition summary at `2f2158cc`](https://github.com/HungLo2020/MattMC/blob/2f2158cc46f99f7ba3263309e5daefea9874608a/SUMMARY.md)
+records vanilla −9.4%, DH +3.7%, shaders +8.8% and shaders+DH +11.5%, with all
+four p99 comparisons failing; it uses a separately repeated vanilla set after
+earlier attempts were excluded. Each workflow remains a historical performance
+FAIL. Differences between these sessions are not isolated migration gains.
 
 #### October 8 recorded candidate summary
 

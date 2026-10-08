@@ -1,12 +1,15 @@
 # Native intrinsic block-state rules
 
-> Implemented locally; focused correctness checks pass. Full client verification
-> passed; the overall performance target remains unmet.
+> Current implementation at
+> [`d0141162`](https://github.com/HungLo2020/MattMC/commit/d0141162d81eee184fa99f0b7a9411d401c306b4).
+> The author's focused/full-client correctness results below passed;
+> the overall performance target remains unmet.
 
 ## Ownership
 
-[`content/block/definitions/intrinsic.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/definitions/intrinsic.rs) evaluates emitted light, semantic map
-color and canonical fluid association once for every registered state. The
+The [intrinsic rule owner](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/src/main/rust/content/block/definitions/intrinsic.rs)
+evaluates emitted light, semantic map color and canonical fluid association
+once for every registered state. The
 catalog selects 205 shared rule sets in `intrinsic/declarations.rs`. Rules use
 typed native properties: lit lights, candle/pickle counts, log axes, bed parts,
 growth stages, spawner/vault states and waterlogging. These are executable
@@ -56,7 +59,14 @@ only its required properties, and check manually constructed fluid states.
 Version 6 of `DevUtils/tests/content/VerifyStateGraphs.py` adds cached/default
 map colors and copied color/emission functions to the retained graph, fluid,
 property, physical and block-state digests. Use a new output directory and
-run without competing builds, games or profilers.
+run without competing builds, games or profilers. The map-color probes use
+`EmptyBlockGetter` at `BlockPos.ZERO`; see the
+[observer scope and integrity limits](STATE-GRAPHS.md#verification). A matching
+receipt does not establish general contextual behavior or a performance gate.
+
+The following results are author-recorded. This documentation review did not
+rerun their suites or inspect the local receipts. They describe this milestone,
+before the sound/offset follow-up mentioned in the source summary.
 
 Before integration, the native evaluator matched all 31,809 Frozen state IDs,
 map colors, light levels and fluid IDs. Twenty standalone content tests and
@@ -66,13 +76,14 @@ The integrated release build, 20 native content tests and 27 Java ownership,
 registry, graph, meshing and save tests pass. Five v6 Frozen pairs match all
 six semantic digests, with sources/native hashes verified and Frozen unchanged:
 `build/block-intrinsics-master-verification-20261008/results.json`. Bootstrap
-medians were Current2.288/Frozen2.314 s; thread allocation956.74/1069.62 MB
+medians were Current 2.288/Frozen 2.314 s; JVM main-thread allocation
+956.74/1069.62 MB
 (−10.6% for the combined content migration). No isolated speedup is established.
 
 Full `validation/native-block-intrinsics-master-20261008/` verification passed
 1,704 Java tests (2 skipped), 2,359 Rust tests (3 ignored), all seven lifecycle
 scenarios and both reviewed static coast pairs. Vanilla RGB differences were
-0.312/0.515/0.600; Iris+DH3.763/4.359/3.997, with its DH subset passing. No
+0.312/0.515/0.600; Iris+DH 3.763/4.359/3.997, with its DH subset passing. No
 Vulkan validation errors or owned process orphans were found.
 
 All 16 paired 6,000-frame runs were clean. Vanilla/DH average FPS and p99

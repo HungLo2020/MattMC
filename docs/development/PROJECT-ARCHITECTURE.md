@@ -18,7 +18,11 @@ src/main/rust/
 ├── assets/
 ├── compat/
 ├── content/
-│   └── block/
+│   ├── block/
+│   │   └── definitions/
+│   ├── fluid/
+│   ├── property/
+│   └── state/
 ├── core/
 ├── gameplay/
 │   └── tacz/
@@ -177,8 +181,10 @@ box list. Java retains public ray prechecks and immediate inside-hit behavior.
 Gameplay systems belong here. `gameplay/tacz/function_modifier.rs` already
 contains the TaCZ function-modifier kernel. Native player, entity, item,
 combat, block-interaction and component systems migrate here by ownership;
-the proposed general [game model](game-model/index.md) is not yet implemented
-beyond its block registry.
+the general block-behavior and component systems in the
+[game model](game-model/index.md) remain proposals. Its registry, state-graph,
+property, fluid, registered block-definition, physical-setting and intrinsic
+state-rule owners already live in `content/`.
 
 ### `content/`
 

@@ -57,6 +57,11 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
+The latest [native intrinsics checkpoint](GOAL-5-STATUS.md#october-8-native-block-intrinsics-summary)
+reports passing tests, lifecycle cases and coast pairs but an overall
+performance FAIL. Keep that author report separate from the historical checks
+below; this documentation review did not rerun its clients or suites.
+
 ```sh
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
 ```
@@ -99,6 +104,13 @@ and can be repeated. A subset run verifies only its executed steps.
 
 Output goes to `artifacts/graphics-captures/validation/<label>/` (existing
 labels are refused): `summary.md`, `summary.json`, step logs and timings.
+The validation and feature-parity drivers also retire completed generated
+fixtures and superseded marked invocations. [#823](https://github.com/HungLo2020/MattMC/issues/823) demonstrates
+that a missing-source fixture retained by the workspace pass can later disappear
+with its older parent invocation. Pin an affected invocation root with `.keep`
+before further runs and retain required source saves outside managed outputs;
+see [the separate cleanup passes and pin limits](ARTIFACT-STORAGE.md#verification-driver-retention).
+
 All four input paths must exist even when associated steps are skipped. The
 defaults, relative to this checkout, are:
 

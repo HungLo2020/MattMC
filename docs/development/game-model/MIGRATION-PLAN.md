@@ -1,8 +1,10 @@
 # Migration plan (proposal)
 
-> Phase 1 is implemented ([Rust block registry](RUST-BLOCK-REGISTRY.md)).
-> Later phases are proposals. Implementation here means the block-registry
-> source and its consumers exist; it does not certify all acceptance work.
+> Phase 1 is implemented ([Rust block registry](RUST-BLOCK-REGISTRY.md));
+> Phase 2 now has native state graphs, properties, fluids, registered block
+> definitions, physical settings and intrinsic state rules. Remaining producers,
+> behavior and components are unfinished. Source ownership does not certify
+> all acceptance work.
 > See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md) and
 > [game model index](index.md).
 
@@ -11,10 +13,16 @@ production-path benchmark, and docs.
 
 ## Phase 1: one block registry from Java (implemented)
 
-- Rust's [`content::block`](RUST-BLOCK-REGISTRY.md) is built from **one Java
-  export**, initialized lazily from the frozen Java registries:
-  - blocks, properties and every state's columns
-  - the light occlusion faces, interned, with Java's truth table
+The original Phase 1 milestone established the shared registry:
+
+- Rust's [`content::block`](RUST-BLOCK-REGISTRY.md) was built from **one Java
+  export**, initialized lazily from frozen Java registries:
+  - block/property definitions and every state's columns
+  - interned light-occlusion face IDs and Java's truth table
+
+Current construction combines native declarations with a smaller format-7
+export of remaining Java state facts; see Phase 2 below.
+
 - These per-slice tables were replaced by views of it, and each Java bridge
   lost its private builder:
   - lighting types and faces
@@ -48,18 +56,25 @@ come from Rust, including all five registry entries and their 37 intrinsic
 state rows. [Block state definitions](BLOCK-DEFINITIONS.md) now supply the
 ordered catalog, property sets and defaults. [Physical settings](BLOCK-PHYSICS.md)
 and [intrinsic state rules](BLOCK-INTRINSICS.md) now also originate in Rust.
-The latter own map colors, emission and fluid associations. Java still supplies factories, shapes/predicates,
-codecs, state-object views and world-dependent gameplay. The
+The latter own map colors, emission and fluid associations. Java still supplies
+factories, shapes/predicates, blocked light, codecs, state-object views and
+world-dependent gameplay. The
 [134 property declarations](PROPERTY-DEFINITIONS.md) also originate
 in Rust; block registries share their schemas and fluids use their typed
 domains. This includes all 11 additional properties for integrated content.
 The remaining registry-definition migration below is unfinished.
 
-- Rust builds the registries from its own definitions (the builders in
-  [adding content](ADDING-CONTENT.md)) in Java's order.
-- Java *verifies* against Rust at startup, then later reads IDs from it.
-- Remaining per-state shape/predicate functions are ported by family with
-  parity checks; map-color and emitted-light rules are already native-owned.
+- Registered blocks now read native names, domains/defaults, physical
+  settings and intrinsic state traits. Java retains factories,
+  `Registry.register`, state objects, codecs and cache initialization;
+  startup checks keep native and Java IDs aligned.
+- Broader content registries and the builders proposed in
+  [adding content](ADDING-CONTENT.md) remain future work.
+- Remaining shape, blocked-light and contextual predicate producers still
+  need migration with independent parity checks. Format 7 imports face IDs/truth
+  tables, blocked light, offsets and the flags not directly derived from native
+  physical/fluid definitions. Map-color identities, emitted light and canonical
+  fluid-state associations now originate in native rules.
 
 ## Phase 3: behavior and components by family
 

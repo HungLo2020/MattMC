@@ -1,8 +1,10 @@
 # Shared property definitions
 
 > Current implementation: Rust owns all 134 property
-> declarations: 123 shared and 11 for integrated content. Physical block settings,
-> Java enum behavior and general gameplay have not migrated yet.
+> declarations: 123 shared and 11 for integrated content. Registered block
+> definitions, [physical settings](BLOCK-PHYSICS.md) and
+> [intrinsic state rules](BLOCK-INTRINSICS.md) are native too; Java enum objects,
+> codecs, behavior and world-dependent gameplay remain.
 
 ## Ownership
 
@@ -54,20 +56,22 @@ python3 DevUtils/tests/content/VerifyStateGraphs.py \
   --java-home /path/to/jdk-25 --output build/property-definitions-verification
 ```
 
-Version 3 observer receipts compare all 134 public property fields, serialized
-domains, internal indices, parsing and codecs with untouched Frozen classes.
-The existing digests still cover every block/fluid graph and fluid intrinsic
-state/codec. Bootstrap time/allocation are separate measurements; these checks
-do not establish full-client FPS or gameplay parity. Use the
+Version 3 added comparisons of all 134 public property fields, serialized
+domains, internal indices, parsing and codecs against Frozen's existing
+classes. Current version 6 retains these and the earlier graph/fluid checks;
+see [observer scope and integrity limits](STATE-GRAPHS.md#verification).
+Bootstrap time and JVM main-thread allocation are separate measurements;
+they do not establish full-client FPS or gameplay parity. Use the
 [render verification workflows](../rendering/RENDER-VERIFICATION.md) for that
 scope and retain open performance gaps while continuing native migration.
 
-The following results cover published property/fluid milestone `df6c6dc77`,
-before the [block-definition follow-up](BLOCK-DEFINITIONS.md).
+The following author-recorded results cover published property/fluid milestone
+`df6c6dc77`, before the [block-definition follow-up](BLOCK-DEFINITIONS.md).
+This documentation review did not rerun the suites or inspect the local receipts.
 
 Five fresh-JVM pairs on 2026-10-08 match untouched Frozen for all 134
-properties, 31,846 states and 491,395 transitions, with unchanged fluid/graph
-digests. Receipt: `build/property-definitions-master-verification-20261008/results.json`.
+properties, 31,846 combined block/fluid states and 491,395 transitions,
+with unchanged fluid/graph digests. Receipt: `build/property-definitions-master-verification-20261008/results.json`.
 The release build and 17 native content tests pass. Bootstrap medians were
 Current/Frozen 2.308/2.314 s; main-thread allocation 959.39/1068.05 MB. The
 allocation reduction includes earlier graph/fluid migrations; this does not

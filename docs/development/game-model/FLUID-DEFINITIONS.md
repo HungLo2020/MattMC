@@ -31,8 +31,10 @@ uses its typed boolean/integer values, not duplicated domain arithmetic.
 
 The shared [block registry](RUST-BLOCK-REGISTRY.md) stores a typed fluid-state
 ID for each block state and derives fluid flags from this owner. Kind and
-height queries resolve the same canonical state rows; Java no longer exports
-those facts back to Rust. Java `FluidState` exposes its native ID directly,
+height queries resolve the same canonical state rows. The block state's
+association now comes from [native intrinsic rules](BLOCK-INTRINSICS.md), so
+Java no longer exports that ID or its derived facts back to Rust. Java
+`FluidState` exposes its native ID directly,
 with registration checks against the temporary Java ID mapper.
 
 The versioned bridge borrows immutable CPU buffers from Rust's `OnceLock`.
@@ -62,8 +64,11 @@ the same public API on both sides, without modifying Frozen. Its graph digest
 covers all block/fluid domains, ordered states, defaults and transitions. A
 separate fluid digest covers all names/IDs, default IDs, intrinsic traits,
 legacy block IDs and encoded codec outputs; every codec round trip must return
-the canonical state. Version 2 receipts added that fluid digest; version 3 additionally checks
-every shared property declaration and codec, retaining the earlier digests. Use a new output directory for each run.
+the canonical state. Version 2 receipts added that fluid digest; version 3
+added every shared property declaration and codec. Current version 6 retains
+those checks and adds block/physical/intrinsic facts; see
+[observer scope and reference limits](STATE-GRAPHS.md#verification). Use a new
+output directory for each run.
 
 These checks establish definition/state/codec parity and fresh-JVM bootstrap
 measurements, not world-dependent fluid simulation or complete gameplay
@@ -73,10 +78,15 @@ each production slice and diagnose regressions.
 
 ## Current evidence (2026-10-08)
 
+These are author-recorded milestone results, not fresh verification of the
+current source. This documentation review did not rerun the suites or inspect
+the local receipts.
+
 For the published definition milestone `6ccbfdf41` (before the block/fluid
 association follow-up), five fresh-JVM pairs in the original checkout's
 `build/fluid-definitions-master-verification-20261008/results.json` agree with
-Frozen: 1,235 blocks, five fluids, 31,846 states and 491,395 graph transitions.
+Frozen: 1,235 blocks, five fluids, 31,846 combined block/fluid states
+(31,809 + 37) and 491,395 graph transitions.
 The unchanged graph digest is
 `989fd061714809653c436cae3e4931044af50fa0f4c4ade82c28b82140540e23`;
 the fluid/codec digest is
@@ -84,7 +94,7 @@ the fluid/codec digest is
 Source/native hashes matched and Frozen remained unchanged.
 
 Median bootstrap time was Current 2.267 s versus Frozen 2.233 s (+1.5%);
-main-thread allocation was 958.99 versus 1066.39 MB (−10.1%). This includes
+JVM main-thread allocation was 958.99 versus 1066.39 MB (−10.1%). This includes
 the earlier native state-graph migration, so it is not an isolated fluid
 speedup. Two native fluid tests and ten focused Java projection/registry/graph/
 meshing tests pass. The full workflow at
@@ -109,6 +119,10 @@ vanilla and shaders+DH coast pairs pass in
 `validation/native-fluid-associations-smoke-20261008/`; a separate shaders+DH
 resource reload passes in `lifecycle-gate/fluid-association-reload-20261008/`,
 both below graphics captures. These are scoped checks, not a new four-mode
-FPS result or a repeat of all seven lifecycle scenarios. The current FPS table now covers the combined association/property milestone;
-its [property verification record](PROPERTY-DEFINITIONS.md#verification) has
-the completed full workflow and remaining performance gap.
+FPS result or a repeat of all seven lifecycle scenarios. The next recorded
+FPS table covered the combined association/property milestone;
+its [property verification record](PROPERTY-DEFINITIONS.md#verification) records
+that workflow and its remaining performance gap. Later registered block and
+physical-setting results are recorded separately in
+[block definitions](BLOCK-DEFINITIONS.md), [physical settings](BLOCK-PHYSICS.md)
+and [intrinsic state rules](BLOCK-INTRINSICS.md).

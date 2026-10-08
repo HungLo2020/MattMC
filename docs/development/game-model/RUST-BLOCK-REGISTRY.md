@@ -1,8 +1,9 @@
 # Rust block registry
 
-> **Current behavior** (Phase 1 of the [migration plan](MIGRATION-PLAN.md)).
-> Native state graphs and fluid definitions are also implemented migration
-> slices; remaining definitions/gameplay in the [game model](index.md) are proposals.
+> **Current behavior:** the Phase 1 shared registry plus implemented Phase 2
+> state graphs, properties, fluids, registered block definitions, physical
+> settings and intrinsic rules. Remaining fact producers and gameplay in the
+> [game model](index.md) are unfinished; see the [migration plan](MIGRATION-PLAN.md).
 
 Rust owns one registry of every block, property and block state:
 [`content/block/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/mod.rs).
@@ -112,9 +113,10 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
 ## Constraints
 
 - **Property identities stay distinct.** Native declaration IDs identify schemas;
-  block-registry `PropertyId`s still follow first use of each Java object.
-  Equal names do not merge different domains. Native schemas are shared by
-  `Arc`; their identities come from the native block declarations.
+  registry `PropertyId`s are assigned at first use of each declaration while
+  traversing the native block catalog. This preserves the former Java identity
+  ordering without importing Java property objects. Equal names do not merge
+  different declarations/domains; immutable schemas are shared by `Arc`.
 - **Fluid facts have one owner.** `StateFacts` accepts a `FluidStateId`, not a
   kind/height copy. Supplying HAS_FLUID or FLUID_FALLING in its input flags is
   rejected; the builder derives them from the fluid definition/state. Unknown
@@ -129,6 +131,12 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
   - the state count is between 1 and 65,535, leaving `0xffff` reserved
   - block/state counts agree with the native definitions
   - the remaining per-state facts and face table satisfy their bounds
+- **Registered declarations are required.** Missing native names, invalid
+  declaration data or incompatible Java bindings fail block construction.
+  The synthetic/unregistered codec/test path may still choose Java domains,
+  defaults and physical settings; it does not rescue a missing registered
+  definition. A failed lazy remaining-fact installation is a separate boundary
+  and can leave consumer compatibility routes available.
 - **Custom `BlockState` subclasses** are flagged `CUSTOM`. Lighting,
   skylight, heightmap and meshing views decline those states; the chunk-section
   vocabulary declines the whole registry if one exists. Noise flags and the
@@ -179,6 +187,8 @@ claiming a performance gate or full Phase 1 acceptance.
   installation checks (for example, a block registered with states out of
   order) disables the registry-backed routes. Meshing retains its explicit
   registration fallback; other consumers retain their own compatibility paths.
-- **A `NativeBlockRegistryTest` column mismatch** after changing block code
-  means the exported fact no longer matches Java's answer. Fix the export,
-  not the test.
+- **A `NativeBlockRegistryTest` column mismatch:** first identify the producer.
+  Check native definitions/rules for air/can-occlude, emitted light and
+  fluid-derived facts; check the Java exporter for the remaining columns. Use
+  the independent Frozen observer when both live views share a changed native declaration, since
+  agreement between those views alone cannot verify the original semantics.

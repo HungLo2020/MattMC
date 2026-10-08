@@ -4,6 +4,8 @@ Graphics captures accumulate under `artifacts/graphics-captures/`,
 `logs/graphics-audit/`, and older `~/.cache/mattmc-*` test directories. Preserve
 unique runtime evidence and fixture inputs when reclaiming space. Treat copied
 worlds as saves, even when their parent directory is named `cache`.
+Cleanup histories below are implementation-author reports; this documentation
+review did not inspect their original files or rerun cleanup.
 
 ## Bulk retirement: 2026-10-08
 
@@ -24,8 +26,9 @@ checks, with protected save/settings and shader-pack hashes matching. This
 documentation review did not inspect that unbundled receipt or the source
 filesystem, reproduce the cleanup, or independently establish those figures.
 
-A follow-up reclaimed another 45.54 GiB, leaving about 348 GiB free. It removed
-41 unused build-output/cache directories and, after stopping the idle Gradle
+The author's [later cleanup record](https://github.com/HungLo2020/MattMC/blob/1b1837931a9b25fa12b655e440c6ff77cdd5887d/docs/development/rendering/ARTIFACT-STORAGE.md#bulk-retirement-2026-10-08)
+reports a follow-up reclaiming another 45.54 GiB, leaving about 348 GiB free.
+It removed 41 unused build-output/cache directories and, after stopping the idle Gradle
 daemon, its regenerable compiler analysis cache. The active checkout's main
 build and staged native library remain available; retired build trees require
 recompilation. Another 1,237 historical logs, measurement files and raw
@@ -35,17 +38,19 @@ feature comparison baselines, source fixtures and crash evidence were excluded
 from this additional compression. All 28 protected source/save/settings/pack
 hashes matched, and cleanup left the worktree status unchanged before this
 documentation update. Follow-up receipts are in `bulk-followup/` below the
-receipt directory named below.
+receipt directory named above.
 
-A final sweep reclaimed another 10.90 GiB: 2,065 byte-identical historical
-artifact files now share storage, five inactive generated fixtures outside the
+The author reports a final sweep reclaiming another 10.90 GiB: 2,065
+byte-identical historical artifact files now share storage, five inactive generated fixtures outside the
 main capture tree were retired, and unused Cargo profiles/incremental data were
 removed. The current release library and debug test outputs remain; rebuilding
 retired profiles recreates their caches. Free space measured 352.49 GiB after
 the recent builds and verification runs. Receipts in `final-dedup/` record
 duplicate hashes, original timestamps, removed paths and protected-file checks.
 Historical hardlinked artifacts are immutable: copy a file to a separate inode
-before editing it. Unique evidence and pinned investigations were retained.
+before editing it. Unique evidence and pinned investigations were reportedly
+retained. These follow-up figures, hash checks and preservation claims were not
+independently verified against the original filesystem or cleanup receipts.
 
 Retired videos/readbacks cannot be restored from this receipt; old generated
 workspaces require regeneration from their recorded inputs.
@@ -62,12 +67,21 @@ rows or while a client/build still uses it.
 
 ## Verification-driver retention
 
-The [retirement helpers at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/DevUtils/Common/artifact_retention.py#L410-L497)
+The [retirement helpers at `1b183793`](https://github.com/HungLo2020/MattMC/blob/1b1837931a9b25fa12b655e440c6ff77cdd5887d/DevUtils/Common/artifact_retention.py#L410-L498)
 perform two separate destructive operations. `RunValidation.py` retires workspace
 copies while finishing its summary; `RunFeatureParity.py` does so after each
 scenario's pair and again at the end. Both prune older completed invocations
 after writing their summary. Failed comparisons are eligible too. A driver
 exception before these calls can leave copies and no final retention receipt.
+
+**Known retention gap:** [#823](https://github.com/HungLo2020/MattMC/issues/823)
+tracks a canonical fixture whose recorded source directory is missing: the
+workspace pass retains the copy, but an older parent invocation can still be
+deleted after a newer completed invocation of the same schema and outcome.
+The parent-retirement pass does not honor `retained_workspaces`. Pin the affected
+invocation root with `.keep` before later runs and preserve required sources
+outside retirement-managed outputs. The root pin protects the parent only;
+it does not prevent ordinary eligible workspace retirement.
 
 For workspace retirement, only paths inside a marked invocation are candidates:
 
@@ -92,8 +106,11 @@ plus source-directory existence, not input hashes or recoverability. The drivers
 existence before creating a fresh output, and the capture harness requires a
 source world. The retirement helper does not compare recorded input hashes or independently
 protect sources placed inside disposable output trees.
-Isolated synthetic fixtures confirm those helper limits; they do not reproduce
-data loss in a normal fresh-driver run. A manifest by itself is not a backup.
+An exact-source synthetic check for #823 used a source that existed at fixture
+creation and was then relocated. With process discovery mocked inactive, the
+workspace survived its pass but was deleted with its old parent; the explicit
+root `.keep` control survived. This demonstrates the two-pass gap, not actual
+user-data loss or a live-driver run. A manifest by itself is not a backup.
 
 Workspace retirement ignores capture preservation and root `.keep` pins;
 those pins protect the **full invocation** in the next operation. Among sibling
@@ -115,13 +132,16 @@ per-scenario workspace passes are not accumulated in that final receipt.
 Retirement deletes files, without an archive or undo path. Keep the input sources
 and pin evidence needed to reproduce a comparison. The earlier documentation
 review independently ran four temporary-fixture tests with mocked process
-checks. Current verification passes nine retention tests, including a real
-child-process lifetime check, within 37 passing harness regressions. These
-bounded checks do not establish safe cleanup of every live filesystem state.
+checks. The [repair commit's author](https://github.com/HungLo2020/MattMC/commit/a0f5abeb27f122ace8a44265b0ed82320a39c0a7)
+reports nine retention tests, including a real child-process lifetime check,
+within 37 passing harness regressions. Those reported checks do not cover the
+later demonstrated #823 parent-retirement gap or establish safe cleanup of
+every live filesystem state.
 
 The capture runner also retires its isolated game directories after shutdown.
-Its ownership-marker search now reaches parent directories; the former early
-return silently skipped this cleanup. Live process references, symlinks,
+The [`a0f5abeb` repair](https://github.com/HungLo2020/MattMC/blob/a0f5abeb27f122ace8a44265b0ed82320a39c0a7/DevUtils/Common/artifact_retention.py#L158-L167)
+restores the parent ownership-marker search; the former early return silently
+skipped this cleanup. Live process references, symlinks,
 missing `/proc` process visibility and crash-containing copies remain. Canonical
 fixture retirement also requires that its recorded source directory still
 exists. Check these paths with:

@@ -1,7 +1,9 @@
 # Registries and IDs (proposal)
 
-> Partly implemented: the block registry exists (see below). The rest is a
-> proposal. See the [game model index](index.md).
+> Partly implemented: block/fluid registries, native properties, state graphs
+> and registered block definitions, physical settings and intrinsic rules exist.
+> The general registry container and remaining content registries below are proposals.
+> See the [game model index](index.md).
 
 ## Today
 
@@ -70,6 +72,8 @@ At 16 bits those are half the size of Java's. The implemented ceiling is
 an export above that limit, and Rust validates the same bound. Installation
 failure makes `NativeBlockRegistry.ready()` false, retaining the applicable
 Java compatibility routes; it is not a guaranteed loud startup failure.
+Native declaration/graph construction has separate bounds and fails invalid
+registered definitions before this optional remaining-fact installation.
 Widening requires updating the ID and export/consumer contracts. The 16-bit
 choice was made on 2026-10-07.
 
@@ -96,18 +100,21 @@ pub struct Registry<T> {
 
 ## Ordering is part of the contract
 
-Java assigns IDs by registration order. Block IDs follow the `Blocks.java`
-declaration order, and state IDs follow block order (each block's states are
-contiguous).
+The native block catalog fixes the registration order and contiguous state
+ranges. Java's `Blocks.register` binds behavior factories in that same order,
+checks the native block IDs and fills its state mapper from the projected
+native graphs. The ordering preserves the original Java IDs.
 
 Saved worlds store names (palettes hold block-state compounds), so numeric
 IDs never reach disk. They still must match between Java and Rust while both
 run, and between a MattMC client and server. Keeping Java's order after Java
 is gone also keeps the network protocol and any recorded reference data valid.
 
-- Rust registration is driven by an **explicit ordered list** that matches
-  Java's order exactly. A startup parity test compares every name, ID and
-  state against Java's registries while both run.
+- Rust registration uses an **explicit ordered list**. Production startup
+  checks registered names, block order and state ranges/IDs against Java's
+  compatibility views. Separate parity tests and the Frozen observer cover
+  domains, defaults, transitions and the documented facts; startup checks
+  alone are not full semantic verification.
 - New content is **appended**, so existing IDs never move.
 - All content, including the integrated Alex's Caves, Alex's Mobs and TaCZ
   content, uses the `minecraft` namespace, so existing worlds keep loading.
@@ -122,5 +129,6 @@ Every per-state fact a subsystem needs becomes a column of the state table
 (see [block states](BLOCK-STATES.md)) or a column owned by that subsystem but
 built from the registry. Examples of the latter are render model selectors
 and shader-pack material IDs. Subsystems stop receiving their own copies from
-Java. During migration the registry itself is first filled from one Java
-export, then built natively (see the [migration plan](MIGRATION-PLAN.md)).
+Java. The original Phase 1 imported definitions from Java. Current
+construction reads native definitions and imports only the remaining Java
+state facts (see the [migration plan](MIGRATION-PLAN.md)).

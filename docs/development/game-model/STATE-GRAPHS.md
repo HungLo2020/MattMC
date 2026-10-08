@@ -44,26 +44,44 @@ python3 DevUtils/tests/content/VerifyStateGraphs.py \
   --java-home /path/to/jdk-25 --output build/state-graph-verification
 ```
 
-The [driver](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/VerifyStateGraphs.py)
-requires an unused output directory. It builds Current, reads the existing
-Frozen main classpath, compiles the same observer against Frozen and alternates
-five fresh JVM pairs. Use `--frozen-repo` for a different reference location;
-build that checkout beforehand through its normal workflow. Both sides use
-identical JVM flags without a profiler. Receipts include every graph's combined
-semantic digest, bootstrap time/main-thread allocation, source/native hashes
-and reference identity. A mismatch, incomplete receipt, failed process or
-changed measured source rejects the result. Bootstrap measurements are scoped
-to registry startup; they are not gameplay FPS.
+The [driver at this review](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/DevUtils/tests/content/VerifyStateGraphs.py)
+requires a new directory under this checkout's `build/`. It builds Current,
+reads Frozen's existing main classpath, compiles one observer against Frozen
+and alternates five fresh JVM pairs by default (`--pairs` permits at least
+three). Use `--frozen-repo` for a separate reference checkout whose main
+classes were built beforehand. Both sides use identical JVM flags without a
+profiler.
 
-The [reference observer](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/StateGraphReference.java)
+Receipts record semantic digests, bootstrap time and JVM main-thread allocated
+bytes. Allocation excludes other threads and native memory; it is not total
+process memory. Semantic mismatch, incomplete/invalid receipts, failed
+processes or changed measured sources/native library reject the run. The
+driver reports timing/allocation ratios but enforces no speedup threshold.
+These measurements cover bootstrap, not gameplay FPS.
+
+Integrity checks hash Current's enumerated sources and native library, plus
+the observer source, driver and compiled observer class; Frozen is identified
+by its path, Git HEAD/status and existing classpath. The driver rechecks Frozen's
+Git identity, but does not individually hash its precompiled class bytes.
+Treat that reference-build provenance limit separately from semantic equality.
+
+The [reference observer](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/DevUtils/tests/content/StateGraphReference.java)
 uses identical public APIs on Current and Frozen. It hashes every definition,
 property domain, ordered state, default and single-property transition across
 blocks and fluids. Version 2 also emits an independent digest for fluid IDs,
 intrinsic facts, legacy block IDs and codec outputs/identity round trips.
 Version 3 adds all property declarations/codecs; version 4 adds block-state
-flags, lighting, fluid associations, sampled offsets and light-occlusion boxes.
-Matching hashes establish those semantics, not complete gameplay, rendering
-or save-lifecycle parity. Profiled bootstrap allocation
-samples are diagnostic; require repeated unprofiled measurements and the
-[full rendering workflow](../rendering/RENDER-VERIFICATION.md) before promoting
-runtime changes. Run work from `master` in the MattMC checkout.
+flags, lighting, fluid associations, two sampled offsets and light-occlusion
+boxes. Version 5 adds 18 physical settings, matching superclass caches where
+present, and seven cached physical facts per block state. Current version 6
+adds default/cached map-color IDs, copied color/emission functions and canonical
+fluid associations. The contextual probes use `EmptyBlockGetter` at
+`BlockPos.ZERO`; the separate offset probes use two fixed positions.
+
+The observer's graph count combines block and fluid states; the recorded
+31,846 total comprises 31,809 block states plus 37 fluid states. Matching
+digests cover the inspected semantics and samples, not all contextual
+collision/gameplay, rendering or save-lifecycle behavior. Use repeated
+unprofiled measurements and the
+[full rendering workflow](../rendering/RENDER-VERIFICATION.md) for runtime
+acceptance. No observer or runtime suite was rerun for this documentation review.

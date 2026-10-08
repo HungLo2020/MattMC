@@ -1,6 +1,9 @@
 # Adding content (proposal)
 
-> Proposal; not implemented. See the [game model index](index.md).
+> The single-file builder below is proposed. The current native/Java steps
+> are described first; see the [game model index](index.md).
+
+<a id="today-java"></a>
 
 ## Current transition
 

@@ -5,7 +5,11 @@ Java OpenGL. Static captures, validation, RenderDoc and temporary timers are
 correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
-The [October 8 candidate record](GOAL-5-STATUS.md#october-8-recorded-candidate-summary)
+The [latest native intrinsics summary](GOAL-5-STATUS.md#october-8-native-block-intrinsics-summary)
+reports an overall performance FAIL: vanilla/DH miss both FPS and p99 floors,
+while both shader modes pass those floors in that run. Its author-recorded
+runtime receipts were not independently inspected by this documentation review. The separate historical
+[October 8 candidate record](GOAL-5-STATUS.md#october-8-recorded-candidate-summary)
 has no raw benchmark receipts available. The
 [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary) and
 [October 7 late-evening summary](GOAL-5-STATUS.md#october-7-late-evening-interleaved-summary)
@@ -15,12 +19,14 @@ evidence on the runtime revision being evaluated.
 ## October 8 acceptance controls
 
 The [`97e30922` milestone](https://github.com/HungLo2020/MattMC/commit/97e3092269ed29854c8175a480a819fb1896c311)
-changes verification and documentation only; it adds no runtime performance
-claim. The refreshed root summary instead records a separate `d7ee0335d`
-candidate: median average FPS trails Frozen by 7.8% vanilla and 8.1% vanilla+DH,
-while shader modes lead by 10.1% and 9.3%. Raw benchmark receipts are unavailable,
-so neither run health nor performance acceptance can be re-established from
-that summary. See the [recorded values and provenance](GOAL-5-STATUS.md#october-8-recorded-candidate-summary).
+changed verification and documentation only. Later native content milestones
+through `d0141162` change runtime ownership and have separate author-recorded
+workflows. The latest intrinsic-state report gives median average-FPS changes
+of −5.8% vanilla, −8.6% vanilla+DH, +5.9% shaders and +10.5% shaders+DH;
+vanilla/DH also fail p99. Passing tests, lifecycle cases and settled coast images
+do not satisfy these performance floors. See the
+[latest table and distinct historical records](GOAL-5-STATUS.md#october-8-native-block-intrinsics-summary);
+the older `d7ee0335d` candidate's unavailable raw receipts are a separate limit.
 
 The current driver's `--perf` comparison requires at least two clean paired
 repeats per side in every mode. For each mode, the median of Current's per-run
@@ -52,9 +58,9 @@ so evidence needed for a later comparison remains available.
 
 ## October 8 native mesh lookup experiment (rejected)
 
-On master `97e309226` with uncommitted native state graphs, a derived
-slot-indexed mesh cache was compared with its previous implementation and
-Frozen OpenGL: control/candidate/Frozen/Frozen/candidate/control, 6,000 moving
+The author records this rejected experiment on master `97e309226` with then
+uncommitted native state graphs. A derived slot-indexed mesh cache was compared
+with its previous implementation and Frozen OpenGL: control/candidate/Frozen/Frozen/candidate/control, 6,000 moving
 frames each, 360 settle and 240 warm-up frames. All six runs completed cleanly
 with zero VUIDs. Current clients' mapped library paths and SHA-256 values were
 verified; two earlier launch-override probes failed this identity check and
@@ -69,13 +75,16 @@ time override, so the diagnostic set it immediately before JavaExec launched.
 
 Median native terrain semantic submission fell from 0.03750 to 0.03590 ms,
 but candidate median FPS was 1.96% lower and p99 12.04% higher than control.
-This did not demonstrate an overall win; the cache was removed. Publication,
-readiness, slot reuse and reload-clearing regressions remain. The previous
+This did not demonstrate an overall win; the cache was removed and did not
+ship with the later native content milestones. Publication, readiness, slot
+reuse and reload-clearing regressions remain. The previous
 lookup still trails Frozen; this vanilla-only diagnostic does not establish
 four-mode performance or visual acceptance. Compact receipts are under
 `artifacts/graphics-captures/goal5/dense-mesh-cache-measurement-v3/`; generated
 fixture copies retired after each run. Resume profiling from the retained
-whole-frame costs before implementing another optimization.
+whole-frame costs before implementing another optimization. These run-health,
+timing and fixture-retirement figures are the author's report, not independent
+runtime or cleanup verification by this documentation review.
 
 ## October 7 comparison controls
 

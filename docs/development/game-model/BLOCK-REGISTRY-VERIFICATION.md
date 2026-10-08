@@ -94,15 +94,36 @@ python3 DevUtils/tests/content/VerifyRustBlockRegistry.py --case none  # parity 
 
 ## Current source and verification scope
 
+The figures above remain the author's historical Phase 1 record. At the
+reviewed source
+[`d0141162`](https://github.com/HungLo2020/MattMC/commit/d0141162d81eee184fa99f0b7a9411d401c306b4),
+[registered definitions](BLOCK-DEFINITIONS.md), [physical profiles](BLOCK-PHYSICS.md),
+[intrinsic state rules](BLOCK-INTRINSICS.md), [properties](PROPERTY-DEFINITIONS.md),
+[fluids](FLUID-DEFINITIONS.md) and [state graphs](STATE-GRAPHS.md) have native
+owners. The
+[format-7 decoder](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/src/main/rust/content/block/export.rs)
+reads native names, layouts/defaults, emission and fluid-state associations,
+derives air/can-occlude and fluid flags natively, and still imports Java face
+IDs/truth tables, other state flags, blocked-light values and offsets. Later
+milestone results belong to their linked pages, not the Phase 1 totals above.
+
+The block registry's 31,809 states are distinct from the observer's 31,846
+combined block/fluid states: the latter includes 37 fluid states. Likewise,
+491,067 block-property transitions and 491,395 combined graph transitions
+describe different scopes. These counters are preserved from author-recorded
+results, not independently rerun here.
+
+The following format-2 paragraph is a **historical source checkpoint**.
 Static review at
 [`7a6009f8`](https://github.com/HungLo2020/MattMC/commit/7a6009f84d966263293f864933f4da06b1823dfa)
-confirms format 2 exports fluid/offset facts and that the meshing view derives
-block facts from the installed registry. The current
+confirmed format 2 exported fluid/offset facts and that the meshing view derived
+block facts from the installed registry. That revision's
 [`NativeMeshingStateViewTest`](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/test/java/net/sodium/client/render/chunk/compile/pipeline/NativeMeshingStateViewTest.java)
 compares 17 integer fields and 18 raw float-bit fields per state in each of two
 fluid modes. For the author's reported 31,809 states, that would be 63,618
 records; this is a calculation of fixture scope, not a newly observed pass.
-`NativeBlockRegistryTest` also now checks fluid kinds, heights and offsets.
+`NativeBlockRegistryTest` at that checkpoint also checked fluid kinds, heights
+and offsets.
 
 The aggregate driver's `PARITY` list does not select the meshing fixture, so
 its earlier 65-Java/48-Rust report must not be treated as covering that change.

@@ -1,10 +1,11 @@
 # Rust game model (proposal)
 
-> **Status: proposal; Phase 1 implemented.** These pages describe how blocks,
-> block states, items, block entities and entities should be represented in
-> Rust. Phase 1, the [Rust block registry](RUST-BLOCK-REGISTRY.md), is current
-> behavior. Native state graphs, property declarations, fluid definitions and
-> registered block state definitions, physical settings and intrinsic state rules are implemented ownership slices; remaining definitions, behavior and component systems remain proposals.
+> **Status: proposal with implemented ownership slices.** Phase 1's
+> [Rust block registry](RUST-BLOCK-REGISTRY.md) and Phase 2's native state
+> graphs, properties, fluids, registered block definitions, physical settings
+> and intrinsic state rules are current. Java still supplies block factories,
+> objects/codecs, shapes, blocked light, contextual predicates and world callbacks.
+> Remaining content registries, behavior and component systems are proposals.
 > “Implemented” describes source ownership, not completion of every acceptance
 > check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
 > The surveys behind the proposal are dated 2026-10-07.
@@ -52,8 +53,10 @@ for the bridge.
 The original 16-bit decision described the theoretical 65,536-value space.
 The [implemented registry](RUST-BLOCK-REGISTRY.md#constraints) reserves
 `0xffff` for “no state,” so it permits at most **65,535 registered states**.
-Exceeding that limit makes installation decline; it does not implement the
-proposal's suggested loud startup failure.
+The lazy remaining-fact registry installation can decline and preserve its
+consumers' compatibility routes. Native declaration/graph construction has
+separate bounds and fails invalid or oversized definitions; a missing
+registered declaration does not fall back to a Java definition.
 
 Rendering reconciliation has since reached terrain meshing: block facts come
 from the shared registry, while rendering keeps models, materials, passes,
@@ -104,7 +107,7 @@ one set of systems.
 - [Native fluid definitions](FLUID-DEFINITIONS.md) (current work): Rust-owned
   registry, intrinsic state facts, Java compatibility views and Frozen checks.
 - [Block registry verification](BLOCK-REGISTRY-VERIFICATION.md) (current):
-  Phase 1's parity and benchmark results.
+  historical Phase 1 parity/benchmarks and the current evidence boundary.
 
 ## Where it lives in the crate
 

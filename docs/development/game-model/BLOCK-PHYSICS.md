@@ -1,11 +1,12 @@
 # Native block physical settings
 
-> Current implementation; focused correctness checks passed. The full
-> performance target remains unmet.
+> Current implementation; the author's recorded focused correctness checks
+> passed. The full performance target remains unmet.
 
 ## Ownership and use
 
-Rust's `content/block/definitions/physics.rs` declares five physical floats
+Rust's [physical definition owner](https://github.com/HungLo2020/MattMC/blob/1b1837931a9b25fa12b655e440c6ff77cdd5887d/src/main/rust/content/block/definitions/physics.rs)
+declares five physical floats
 (hardness, resistance, friction, speed factor and jump factor), twelve flags
 and piston push reaction for every registered block. The ordered catalog
 selects one of 181 immutable configurations for each of its 1,235 entries.
@@ -16,7 +17,10 @@ Native consumers read `definitions::registry().definition(block_id).physics`.
 The data has process lifetime, no world references and no rendering resources.
 Hot consumers can read their existing compact state columns; air and occlusion
 flags now derive from native physical definitions when those columns freeze.
-Java's remaining-fact packet rejects attempts to supply either flag.
+Java's remaining-fact packet rejects attempts to supply either flag. Other
+state flags still pass through Java's per-state evaluation, including the
+random-tick result; owning a physical setting does not migrate every derived
+or overridden state query.
 
 `NativeBlockDefinitions` borrows bounded metadata buffers and creates one
 temporary Java view per configuration. `BlockBehaviour` applies the native
@@ -53,17 +57,26 @@ physical fields against untouched Frozen, including raw float bits,
 constructor-cached values and seven additional cached physical facts for every
 block state. It retains the graph, fluid, property and per-state
 fact digests. Run it with a new output directory and no competing workload;
-follow with real client lifecycle, image and performance verification.
+follow with real client lifecycle, image and performance verification. The
+[observer limits](STATE-GRAPHS.md#verification) distinguish semantic checks,
+JVM main-thread allocation, reference-build provenance and performance gates.
 
 ## Current verification
+
+These author-recorded results describe the physical-settings milestone present
+at milestone commit
+[`1b183793`](https://github.com/HungLo2020/MattMC/commit/1b1837931a9b25fa12b655e440c6ff77cdd5887d).
+This documentation review did not rerun the suites or inspect local receipts.
+They predate the [intrinsic state-rule milestone](BLOCK-INTRINSICS.md), whose
+separate results cover map colors, emitted light and fluid associations.
 
 The integrated release build, 18 native content tests and 24 Java
 ownership/registry/graph/codec/save/meshing tests pass. Five fresh-JVM pairs
 against untouched Frozen match all five semantic digests, including every
 physical setting and the cached state facts. Receipt:
 `build/block-physics-master-verification-20261008/results.json`.
-Bootstrap medians were Current2.279/Frozen2.263 s (+0.7%); thread allocation
-959.19/1066.06 MB (−10.0% for the combined content migration). This does not
+Bootstrap medians were Current 2.279/Frozen 2.263 s (+0.7%); JVM main-thread
+allocation 959.19/1066.06 MB (−10.0% for the combined content migration). This does not
 establish an isolated physics or gameplay speedup.
 
 Full `validation/native-block-physics-master-20261008/` verification passed
