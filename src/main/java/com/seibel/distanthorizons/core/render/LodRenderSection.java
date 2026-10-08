@@ -70,7 +70,9 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	
 	
 	private boolean renderingEnabled = false;
-	
+	/** Set by {@link #close()}; guarded by {@code this}. A late build must not install after it. */
+	private boolean closed = false;
+
 	/** this reference is necessary so we can determine what VBO to render */
 	public LodBufferContainer bufferContainer; 
 	
@@ -375,21 +377,42 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		this.bufferUploadFuture = ColumnRenderBufferBuilder.uploadBuffersAsync(this.level, this.pos, lodQuadBuilder);
 		this.bufferUploadFuture.thenAccept((buffer) ->
 		{
-			// needed to clean up the old data
-			LodBufferContainer previousContainer = this.bufferContainer;
-			
-			// upload complete
-			// The Rust whole-frame route owns no Java VBO, but its immutable CPU
-			// semantic publication still has the same DH section lifetime. Keep the
-			// container so close/reload retires that publication exactly once.
-			this.bufferContainer = buffer.renderDataReady() ? buffer : null;
+			this.installBuiltContainer(buffer);
 			this.getAndBuildRenderDataFuture = null;
-			
-			if (previousContainer != null)
-			{
-				previousContainer.close();
-			}
 		});
+	}
+
+	/**
+	 * Swaps in a finished build. The build completes on a DH worker and can
+	 * outlive {@link #close()}; a container arriving after close is closed here
+	 * instead of being installed, since nothing would ever close it later.
+	 */
+	void installBuiltContainer(LodBufferContainer buffer)
+	{
+		LodBufferContainer containerToClose;
+		synchronized (this)
+		{
+			if (this.closed)
+			{
+				containerToClose = buffer;
+			}
+			else
+			{
+				// needed to clean up the old data
+				containerToClose = this.bufferContainer;
+
+				// upload complete
+				// The Rust whole-frame route owns no Java VBO, but its immutable CPU
+				// semantic publication still has the same DH section lifetime. Keep the
+				// container so close/reload retires that publication exactly once.
+				this.bufferContainer = buffer.renderDataReady() ? buffer : null;
+			}
+		}
+
+		if (containerToClose != null)
+		{
+			containerToClose.close();
+		}
 	}
 	
 	//endregion render data uploading
@@ -714,10 +737,16 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		
 		
 		this.stopRenderingBeacons();
-		
-		if (this.bufferContainer != null)
+
+		LodBufferContainer container;
+		synchronized (this)
 		{
-			this.bufferContainer.close();
+			this.closed = true;
+			container = this.bufferContainer;
+		}
+		if (container != null)
+		{
+			container.close();
 		}
 		
 		// removes any in-progress futures since they aren't needed any more
@@ -747,7 +776,12 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		
 		// remove any active world gen requests that may be for this position
 		ThreadPoolExecutor executor = ThreadPoolUtil.getCleanupExecutor();
-		// while this should generally be a fast operation 
+		if (executor == null)
+		{
+			// thread pools are already shut down, nothing left to cancel
+			return;
+		}
+		// while this should generally be a fast operation
 		// this is run on a separate thread to prevent lag on the render thread
 		executor.execute(() -> this.fullDataSourceProvider.removeRetrievalRequestIf((genPos) -> DhSectionPos.contains(this.pos, genPos)));
 		
