@@ -381,10 +381,12 @@ limits separate from frontend admission and GPU-resource retirement. See
 [ledger selection and trimming](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/dh_collector/mod.rs).
 
 Each frame, DH's quadtree walk (`RenderBufferHandler.buildRenderList`)
-collects candidate column keys and batches their publication/visibility work in
+collects the key and generation of each drawable container it reaches, and
+batches their lifecycle, publication and visibility work in one ledger call,
 `collectVisibleFrame`. This replaces per-column round trips, not every ledger
 call in a frame. That call:
-1. requests publication of the unpublished columns, in walk order;
+1. drops containers whose generation is no longer current, then requests
+   publication of the unpublished columns, in walk order;
 2. sorts the keys near to far, keeping walk order for equal distances;
 3. records the frame's visibility;
 4. admits the visible segments.

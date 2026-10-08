@@ -372,17 +372,19 @@ pub unsafe extern "C" fn mattmc_dh_collector_visible_column(key: i64, append: i3
     .unwrap_or(ERR_POISONED)
 }
 
-/// DH's per-frame render list (`Ledger::collect_visible_frame`): `keys`
-/// are the quadtree walk's candidate columns; flags bit 1 is `enabled()`,
-/// bit 2 admits the visible segments. Stores [unpublished, request failures,
-/// first failed key, its error code, opaque, side, up, water, then the keys
-/// near to far] as output and returns its length, or an admission error code.
+/// DH's per-frame render list (`Ledger::collect_visible_frame`): `walked`
+/// holds (key, generation) for each drawable container the quadtree walk
+/// reached; flags bit 1 is `enabled()`, bit 2 admits the visible segments.
+/// Stores [unpublished, request failures, first failed key, its error code,
+/// opaque, side, up, water, stale containers, then the keys near to far] as
+/// output and returns its length, or an admission error code.
 /// # Safety
-/// `keys` addresses `count` longs.
+/// `walked` addresses `count` × 2 longs.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_collector_visible_frame(keys: *const i64, count: i32, center_x: i32, center_z: i32, flags: i32) -> i32 {
-    let keys = if count <= 0 { &[][..] } else { std::slice::from_raw_parts(keys, count as usize) };
-    let frame = with(|l| l.collect_visible_frame(keys, [center_x, center_z], flags & 1 != 0, flags & 2 != 0));
+pub unsafe extern "C" fn mattmc_dh_collector_visible_frame(walked: *const i64, count: i32, center_x: i32, center_z: i32, flags: i32) -> i32 {
+    let raw = if count <= 0 { &[][..] } else { std::slice::from_raw_parts(walked, count as usize * 2) };
+    let walked: Vec<(i64, i64)> = raw.chunks_exact(2).map(|w| (w[0], w[1])).collect();
+    let frame = with(|l| l.collect_visible_frame(&walked, [center_x, center_z], flags & 1 != 0, flags & 2 != 0));
     match frame {
         None => ERR_POISONED,
         Some(Err(failure)) => code(failure),
@@ -391,6 +393,7 @@ pub unsafe extern "C" fn mattmc_dh_collector_visible_frame(keys: *const i64, cou
             let c = frame.counts;
             let mut out = vec![frame.unpublished as i64, frame.request_failures as i64, failed_key, failed_code];
             out.extend([c.opaque, c.side, c.up, c.water].map(i64::from));
+            out.push(frame.stale as i64);
             out.extend(frame.sorted);
             store_output(out)
         }
