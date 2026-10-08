@@ -153,6 +153,21 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void closingAContainerThatNeverRecordedCannotRetireAnotherSectionsGeneration() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		// e.g. a section closed before its build ran, or a failed build
+		LodBufferContainer unbuilt = new LodBufferContainer(84L, new DhBlockPos(0, 64, 0));
+		LodBufferContainer live = buildSemanticContainer(84L, 0xff557733);
+		publishPendingForTest();
+		unbuilt.close();
+		assertTrue(live.rustSemanticBuildLifecycleCurrent(),
+			"a container without a lease owns no generation and must not retire the position by key");
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		live.close();
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(84L));
+	}
+
+	@Test
 	void quadtreeRenderabilityWaitsForAcknowledgedRustAssetPublication() throws Exception {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		DistantHorizonsSemanticCollector.resetForTest();

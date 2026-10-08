@@ -150,6 +150,9 @@ public class LodBufferContainer implements AutoCloseable
 		return this.rustSemanticBuffersPublished ? this.rustSemanticColumnGeneration : -1L;
 	}
 
+	/** The collector generation this container built; 0 for none or an empty build. */
+	public long rustSemanticColumnGeneration() { return this.rustSemanticColumnGeneration; }
+
 	/** True while this container still owns the collector generation it built. */
 	public boolean rustSemanticBuildLifecycleCurrent()
 	{
@@ -182,22 +185,16 @@ public class LodBufferContainer implements AutoCloseable
 	public synchronized void close()
 	{
 		this.buffersUploaded = false;
-		boolean ownedRustSemanticLifecycle = this.rustSemanticBuffersPublished;
 		this.rustSemanticBuffersPublished = false;
 		// Keep the copied semantic asset lifecycle aligned with the legacy LOD
 		// container. This touches no native renderer object or GL state.
+		// Only the lease retires anything: a container that never recorded a
+		// column owns no generation, so it must not retire the position by key
+		// (that would erase a newer section's generation at the same position).
 		if (this.rustSemanticColumnLease != null)
 		{
 			this.rustSemanticColumnLease.close();
 			this.rustSemanticColumnGeneration = 0L;
-		}
-		else if (!ownedRustSemanticLifecycle)
-		{
-			// Legacy observation snapshots do not retain their generation on this
-			// container and therefore still retire by identity. A Rust semantic
-			// empty build owns generation zero and must never erase a later non-empty generation
-			// when this old lifecycle marker closes asynchronously.
-			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
 		}
 	}
 	
