@@ -3,10 +3,11 @@
 > **Status: proposal with implemented ownership slices.** Phase 1's
 > [Rust block registry](RUST-BLOCK-REGISTRY.md) and Phase 2's native state
 > graphs, properties, fluids, registered block definitions, physical settings,
-> intrinsic state rules, sound/offset definitions and block-family configuration
-> are current. Java still
+> intrinsic state rules, sound-event/profile/instrument definitions, block
+> sound/offset settings and block-family configuration are current. Java still
 > supplies block factories, objects/codecs, shapes, blocked light, contextual
-> predicates and world callbacks. Remaining content registries, behavior and
+> predicates, sound policy/resource callbacks and world callbacks. Remaining
+> content registries, behavior and
 > component systems are proposals.
 > “Implemented” describes source ownership, not completion of every acceptance
 > check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
@@ -121,7 +122,9 @@ one set of systems.
 
 `content/` (registries and definitions) and `gameplay/` (behavior and systems)
 are the owners in the [project architecture](../PROJECT-ARCHITECTURE.md).
-`content/block/` holds the implemented block registry; `content/fluid/` owns
+`content/block/` holds the implemented block registry, definitions, offsets and
+shared `family/` configuration; `content/sound/` owns event/profile/instrument
+identities, separate from audio playback resources. `content/fluid/` owns
 built-in fluid definitions and intrinsic state facts. `content/property/` owns
 property declarations and immutable schemas. `gameplay/tacz/` already
 contains the TaCZ function-modifier kernel; the proposed block-behavior and

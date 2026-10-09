@@ -1,11 +1,14 @@
 # Block-family configuration
 
-> Implemented and verified for the recorded content/runtime scope.
-> The overall performance target remains unmet.
+> Current source ownership at
+> [`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422).
+> Runtime results below are author-recorded; the overall performance target
+> remains unmet.
 
 ## Ownership
 
-`content/block/family/` declares 17 block-set types and 12 wood types. These
+[`content/block/family/`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/rust/content/block/family/mod.rs)
+declares 17 block-set types and 12 wood types. These
 contain shared interaction flags, pressure-plate sensitivity, canonical sound
 references and sign/gate sound profiles. Rust's ordered block catalog binds
 141 blocks to typed family parameters: doors, trapdoors, buttons, pressure
@@ -29,11 +32,14 @@ retaining their codec and public alias identities. Raw metadata loading stays
 separate from constructing those views to avoid recursive initialization.
 Native event objects remain accessible before registry holders bind at freeze.
 
-Registered factories pass admitted `Properties` to native-only constructor
+[`NativeBlockFamilies`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/java/net/minecraft/world/level/block/state/properties/NativeBlockFamilies.java)
+validates bounded immutable tables and references. Registered factories pass
+admitted `Properties` to native-only constructor
 overloads. These select the exact family and parameters through immutable CPU
 views. Missing admission or a mismatched family fails before allocating the
 block's intrusive registry holder. Explicit legacy constructors and arbitrary
-unregistered record values remain available for codec/data paths.
+unregistered record values remain available for codec/data paths. They are not
+a fallback for missing or mismatched registered family bindings.
 
 Per-position/tick work does not make an FFM call to fetch configuration. Rust
 consumers read typed definitions directly; current Java behavior reads the
@@ -51,7 +57,15 @@ Run the native content tests, `NativeBlockFamiliesTest`, existing state/codec
 checks, and the v8 Frozen observer in [block definitions](BLOCK-DEFINITIONS.md).
 It checks definitions, public aliases, codec round trips and every registered
 family binding. Follow with realistic client/lifecycle/parity/performance
-verification. The standalone draft matches all Frozen definitions/bindings;
+verification.
+
+The results below are preserved from the
+[author’s milestone 1i record](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/PROGRESS.md#milestone-1i--block-family-configuration-verified-performance-target-unmet).
+This documentation review inspected source only: it did not rerun Java/native
+tests, client or performance checks, inspect the local receipts, or independently
+review the images.
+
+The standalone draft matches all Frozen definitions/bindings;
 27 standalone content/core tests pass. The integrated release build, 26 native
 content tests and 35 Java ownership/codec/meshing/save checks also pass. Five
 integrated v8 Frozen pairs match all eight digests, with sources/native unchanged
@@ -62,7 +76,9 @@ cases and both reviewed static coast images. RGB differences are
 0.304/0.542/0.642 and 3.664/4.182/3.826, with the DH subset passing and VUID0.
 All 16 paired 6,000-frame performance runs are clean; vanilla/DH average FPS
 and p99 remain below Frozen, while both shader modes pass this run. The
-vanilla+DH median gap is 28.9% and needs investigation; no isolated attribution
+vanilla+DH median gap is 28.9% and needs investigation. The pinned
+[`SUMMARY.md`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/SUMMARY.md)
+records **Performance FAIL**; no isolated attribution
 to family configuration is established. Root `SUMMARY.md` retains repeats and
 tails. Sources/native hashes match the observer, Frozen is unchanged and
 25 generated fixture copies retired. Evidence: `build/block-family-migration-draft/runtime-integrity.json`.

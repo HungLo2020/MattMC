@@ -1,12 +1,13 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`d0141162`](https://github.com/HungLo2020/MattMC/commit/d0141162d81eee184fa99f0b7a9411d401c306b4):
-native state graphs, fluid/property declarations, registered block definitions,
-physical settings and intrinsic state rules now supplement the earlier rendering
-ownership. The latest author-recorded intrinsic-state workflow **fails overall
-performance acceptance** despite passing tests, lifecycle cases and settled
-coast comparisons. See the [current measured workload](#october-8-native-block-intrinsics-summary).
+[`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422):
+native sound, block offsets and block-family configuration now extend the earlier
+content and rendering ownership. The latest author-recorded family workflow
+**fails overall performance acceptance** despite passing tests, lifecycle cases
+and settled coast comparisons. Vanilla+DH records a larger FPS and p99 gap that
+needs investigation; no isolated family regression is established. See the
+[current measured workload](#october-8-native-block-families-summary).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
@@ -26,10 +27,13 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [content ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6070919773)
-and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6070924916)
-retain these source and acceptance boundaries. The resource/registry and
-performance goals remain open.
+The October 9 [content ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6073238616)
+and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6073232463)
+retain these source and acceptance boundaries. Content/resource ownership and
+performance remain open; #823's bounded tooling closure does not close them.
+The earlier [intrinsics ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6070919773)
+and [intrinsics evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6070924916)
+retain their historical checkpoint scope.
 
 The current [terrain publication](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6053377956),
 [DH lifecycle](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6053379365),
@@ -70,6 +74,28 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 8 sound, offset and block-family checkpoint
+
+The `3e1b2a94` → `87046367` interval adds three source boundaries:
+
+- [Sound content](../game-model/SOUND-DEFINITIONS.md) and [block sound/offset policy](../game-model/BLOCK-SOUND-AND-OFFSETS.md) now originate in Rust. Java retains canonical registry/holder views, cached sound/instrument objects and immutable offset vectors; playback resources and contextual gameplay remain separate. Fact-export format 8 derives offset kinds and bounds from native definitions instead of Java-exported values
+- [Block-family configuration](../game-model/BLOCK-FAMILY-TYPES.md) now supplies block sets, wood types and typed per-block parameters to Java compatibility constructors. Button timing and weighted-plate limits are data; Java still owns interactions, tick scheduling, redstone and other world-dependent behavior
+- [#823 is closed after focused retention verification](https://github.com/HungLo2020/MattMC/issues/823#issuecomment-6073221178). Parent retirement now rechecks workspace eligibility and preserves an old invocation when any workspace must remain. This repairs the demonstrated two-pass defect, not every cleanup risk or runtime acceptance condition. [Storage contract](ARTIFACT-STORAGE.md#verification-driver-retention)
+
+The author reports five Frozen observer pairs matching all seven content
+digests after sound/offset integration, then all eight after family integration. The two full runtime workflows
+remain **performance FAIL**; their [separate workload records](#october-8-native-block-families-summary)
+retain test counts, image scope, repeats and receipt paths. This documentation
+review inspected committed source and author records, not the unbundled runtime
+receipts, clients or Java/Rust suites. The map-palette/image-processing work in
+[the pinned working record](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/PROGRESS.md)
+is staged only; it is not another landed runtime milestone.
+
+`RunDev.py` also gains a Frozen launcher. It skips Frozen's launch-blocking test
+task and uses that checkout's ordinary game directory. It does not select the
+reference backend or validate source identity; see [launch prerequisites and
+write behavior](../tooling/NATIVE-BUILDS.md#launch-current-or-frozen).
+
 ### October 8 native content ownership checkpoint
 
 The `97e30922` → `d0141162` interval includes runtime ownership changes, beyond
@@ -77,7 +103,7 @@ the earlier verification-only milestone:
 
 - [State graphs](../game-model/STATE-GRAPHS.md), [fluid definitions](../game-model/FLUID-DEFINITIONS.md) and [shared properties](../game-model/PROPERTY-DEFINITIONS.md) now originate in Rust. Java projects compatibility views and retains world-dependent fluid simulation and gameplay
 - [Registered block definitions](../game-model/BLOCK-DEFINITIONS.md) own identities, ordered domains/defaults and shared transition graphs. [Physical settings](../game-model/BLOCK-PHYSICS.md) and [intrinsic state rules](../game-model/BLOCK-INTRINSICS.md) also originate in Rust, including map-color identity, emission and canonical fluid association. Export format 7 no longer imports emission or fluid IDs. Java retains shapes, blocked light and contextual behavior; sound/offset ownership remains an isolated draft at this checkpoint
-- Capture cleanup now finds parent ownership markers and the fixture pass checks that its source directory exists. These repairs do not protect every retained workspace from subsequent whole-invocation retirement: [#823](https://github.com/HungLo2020/MattMC/issues/823) records that separate gap. Follow the [pinning and storage limits](ARTIFACT-STORAGE.md#verification-driver-retention)
+- Capture cleanup at this historical checkpoint finds parent ownership markers and the fixture pass checks that its source directory exists. That still left the two-pass gap recorded in [#823](https://github.com/HungLo2020/MattMC/issues/823); the later family checkpoint repairs it. Follow the current [pinning and storage limits](ARTIFACT-STORAGE.md#verification-driver-retention)
 
 The implementation author's [pinned working record](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/PROGRESS.md)
 reports the runtime checks and cleanup counts below. This documentation review
@@ -269,6 +295,67 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 8 native block families summary
+
+The [summary at `48a6e051`](https://github.com/HungLo2020/MattMC/blob/48a6e051ecd8bc322fb41118004edb3f13b41932/SUMMARY.md)
+records native block-family configuration on RTX 2070: moving camera, ABAB,
+two runs per side and mode, and 6,000 measured frames per run.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median average-FPS change | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- | --- |
+| Vanilla | 1,119.3 / 1,012.5 | 1,132.6 / 1,156.1 | −6.9% | 3.742 / 3.473 |
+| Vanilla + DH | 597.1 / 559.9 | 833.0 / 793.2 | −28.9% | 7.973 / 4.275 |
+| Shaders | 333.3 / 341.2 | 311.0 / 312.7 | +8.1% | 5.310 / 6.205 |
+| Shaders + DH | 247.1 / 240.6 | 223.7 / 223.0 | +9.2% | 7.735 / 8.257 |
+
+**Performance FAIL:** vanilla and vanilla+DH miss both average-FPS and p99
+floors; both shader modes pass those floors in this workload. The larger DH gap
+needs investigation with equivalent paired inputs and runtime identities;
+comparison with an earlier milestone alone does not isolate family overhead.
+The author reports all 16 runs clean with exact frame counts and zero VUIDs,
+Java/Rust suites passing 1,711/2,366 tests with two skips/three ignores, all seven
+lifecycle cases passing and five Frozen observer pairs matching all eight
+content digests. Reviewed vanilla/Iris+DH coast RGB errors are
+0.304/0.542/0.642 and 3.664/4.182/3.826, with the DH subset passing.
+
+The reported receipts are
+`artifacts/graphics-captures/validation/native-block-families-master-20261008/summary.json`
+and `build/block-families-master-verification-20261008/results.json`.
+Source/native integrity and unchanged Frozen are author-recorded checks;
+25 generated fixture copies were reportedly retired. This documentation review
+did not inspect those unbundled receipts or rerun runtime, image or cleanup
+work. These reports do not establish broad parity, a speedup attributable to
+family ownership or Rust-only application completion.
+
+#### October 8 native sound and offsets summary
+
+The [summary at `059c9562`](https://github.com/HungLo2020/MattMC/blob/059c9562134b2e0056b31dfec0982bafa4762abd/SUMMARY.md)
+records the preceding sound/offset milestone on RTX 2070 with the same stated
+moving-camera ABAB protocol and 6,000 measured frames per run.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median average-FPS change | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- | --- |
+| Vanilla | 1,152.5 / 1,124.0 | 1,170.6 / 1,175.3 | −3.0% | 3.559 / 3.007 |
+| Vanilla + DH | 613.2 / 624.7 | 669.9 / 617.4 | −3.8% | 6.987 / 6.581 |
+| Shaders | 348.0 / 345.9 | 320.4 / 318.3 | +8.6% | 5.678 / 5.860 |
+| Shaders + DH | 249.8 / 249.0 | 228.2 / 227.1 | +9.6% | 8.001 / 7.816 |
+
+**Performance FAIL:** vanilla and vanilla+DH miss both average-FPS and p99
+floors; shaders+DH also misses p99. The author reports all 16 runs clean,
+exact frame counts and zero VUIDs; Java/Rust suites pass 1,708/2,363 tests with
+two skips/three ignores. Seven lifecycle cases and five observer pairs matching
+all seven content digests pass, including 9,250 offset samples. Reviewed
+vanilla/Iris+DH coast RGB errors are 0.252/0.401/0.463 and
+3.695/4.222/3.867, with the DH subset passing.
+
+The reported receipts are
+`artifacts/graphics-captures/validation/native-block-materials-master-20261008/summary.json`
+and `build/block-materials-master-verification-20261008/results.json`.
+Source/native integrity and unchanged Frozen are author-recorded checks;
+25 generated fixture copies were reportedly retired. These runtime, image and
+cleanup claims were not independently rerun or checked against their original
+artifacts. No isolated sound/offset speedup or broad runtime acceptance follows.
 
 #### October 8 native block intrinsics summary
 

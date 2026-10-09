@@ -21,19 +21,43 @@ python3 DevUtils/RunDev.py          # Current, release native profile
 python3 DevUtils/RunDev.py --frozen # Frozen Java/OpenGL checkout
 ```
 
-`--frozen` resolves `java_perf_repo` from
-`DevUtils/Common/platform/directory/directories.json`. Use
-`--frozen-repo /path/to/Frozen` to launch another full clone. Frozen uses its own
-`run/` directory for settings and saves; its default backend is OpenGL. Keep
-that backend selected when using it as the performance reference.
+[The launcher at `87046367`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/DevUtils/RunDev.py)
+finds the Current root relative to its own script, then starts Gradle with the
+selected checkout as its working directory. `--frozen` resolves `java_perf_repo`
+through Current's `DevUtils/Common/platform/directory/directories.json` and the
+detected platform or `--platform` override. Linux and Windows have configured paths; macOS currently
+has none. `--frozen-repo /absolute/path/to/Frozen` selects an explicit checkout
+without also requiring `--frozen`; relative explicit paths resolve from the
+caller's working directory. Prefer an absolute path when launching elsewhere.
 
-Prepare a missing checkout with `python3 DevUtils/ProvisionFrozenBaseline.py`;
-see [Frozen preparation](../rendering/RENDER-VERIFICATION.md#2-frozen-image-comparison).
-The Frozen launcher runs `runClient -x test`, without `clean`. Frozen's old
-`DevUtils/RunDev.sh` runs `clean runClient`, which triggers its test dependency:
-its bundled Byte Buddy rejects Java 25 in Mockito tests and prevents launch.
-Skipping those tests allows ordinary play; it does not verify that suite or
-change Frozen's source. To launch directly inside Frozen:
+Frozen must be a separate directory with a `.git/` directory and a Gradle
+wrapper; a linked worktree's `.git` file is rejected. The launcher does not
+check branch, origin, cleanliness, exact reference commit, compiled outputs or
+input readiness. Prepare a missing checkout with
+`python3 DevUtils/ProvisionFrozenBaseline.py`; see the provisioner's distinct
+[preparation and mutation behavior](../rendering/RENDER-VERIFICATION.md#2-frozen-image-comparison).
+The launch still needs that checkout's build/JDK dependencies and a working
+graphics session. On Linux, the launcher aborts on a detected NVIDIA
+kernel/user-space driver mismatch before starting either client.
+
+The Frozen command is `runClient -x test`, without `clean` or Current's native
+release-profile flag. It inherits the caller's environment; it does not force
+OpenGL or rewrite source files itself. Current's launch defaults
+`MATTMC_RUST_VULKAN_GPU_TIMESTAMPS` to `true` only when unset; Frozen does not add
+that default. Frozen's [Gradle task at `7a4d1817`](https://github.com/HungLo2020/MattMC/blob/7a4d181717dc0c7da9086f1a17687dfd522ce417/build.gradle#L622-L679)
+builds/copies required outputs and defaults the game's working directory to its
+own `run/` (`mattmcRunGameDir` can override it). Normal launch/gameplay can write
+build caches, shader-pack copies, settings and saves. This is not a read-only
+Frozen invocation or a check that its source identity stayed unchanged.
+
+[The reviewed Frozen options at `7a4d1817`](https://github.com/HungLo2020/MattMC/blob/7a4d181717dc0c7da9086f1a17687dfd522ce417/src/main/java/net/minecraft/client/Options.java#L207-L215)
+default to OpenGL, but persisted settings can select another backend; verify
+OpenGL for the performance reference. Its older `DevUtils/RunDev.sh`
+requests `clean runClient`; Frozen's `runClient` depends on `test` even without
+`clean`. The implementation author reports Java 25/Byte Buddy mocking failures
+blocking that route. Skipping `test` avoids that dependency; it neither verifies
+the suite nor guarantees a successful launch. This documentation review
+inspected source without launching a client. To launch directly inside Frozen:
 
 ```sh
 ./gradlew runClient -x test

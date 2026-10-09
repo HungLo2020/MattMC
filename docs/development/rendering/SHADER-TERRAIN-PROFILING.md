@@ -5,10 +5,12 @@ Java OpenGL. Static captures, validation, RenderDoc and temporary timers are
 correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
-The [latest native intrinsics summary](GOAL-5-STATUS.md#october-8-native-block-intrinsics-summary)
+The [latest native family summary](GOAL-5-STATUS.md#october-8-native-block-families-summary)
 reports an overall performance FAIL: vanilla/DH miss both FPS and p99 floors,
-while both shader modes pass those floors in that run. Its author-recorded
-runtime receipts were not independently inspected by this documentation review. The separate historical
+while both shader modes pass those floors in that workload. The larger DH gap
+needs investigation; the milestone comparison does not isolate its cause. Its
+author-recorded runtime receipts were not independently inspected by this
+documentation review. The separate historical
 [October 8 candidate record](GOAL-5-STATUS.md#october-8-recorded-candidate-summary)
 has no raw benchmark receipts available. The
 [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary) and
@@ -20,13 +22,17 @@ evidence on the runtime revision being evaluated.
 
 The [`97e30922` milestone](https://github.com/HungLo2020/MattMC/commit/97e3092269ed29854c8175a480a819fb1896c311)
 changed verification and documentation only. Later native content milestones
-through `d0141162` change runtime ownership and have separate author-recorded
-workflows. The latest intrinsic-state report gives median average-FPS changes
-of −5.8% vanilla, −8.6% vanilla+DH, +5.9% shaders and +10.5% shaders+DH;
-vanilla/DH also fail p99. Passing tests, lifecycle cases and settled coast images
-do not satisfy these performance floors. See the
-[latest table and distinct historical records](GOAL-5-STATUS.md#october-8-native-block-intrinsics-summary);
+through `48a6e051` change runtime ownership and have separate author-recorded
+workflows. The latest family report gives median average-FPS changes of −6.9%
+vanilla, −28.9% vanilla+DH, +8.1% shaders and +9.2% shaders+DH; vanilla/DH also
+fail p99. The preceding sound/offset workflow has its own failure, including
+shaders+DH p99. Passing tests, lifecycle cases and settled coast images do not
+satisfy these performance floors. See the
+[latest table and distinct historical records](GOAL-5-STATUS.md#october-8-native-block-families-summary);
 the older `d7ee0335d` candidate's unavailable raw receipts are a separate limit.
+The [October 9 performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6073232463)
+keeps #709 open; repaired retention and passing documentation CI do not
+establish rendering acceptance.
 
 The current driver's `--perf` comparison requires at least two clean paired
 repeats per side in every mode. For each mode, the median of Current's per-run

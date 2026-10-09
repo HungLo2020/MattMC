@@ -12,7 +12,8 @@
 contains the ordered catalog and 131 shared property/default sets. Definitions
 also select immutable [physical settings](BLOCK-PHYSICS.md) and
 [intrinsic state rules](BLOCK-INTRINSICS.md), plus
-[sound/instrument/offset settings](BLOCK-SOUND-AND-OFFSETS.md). Their state templates
+[sound/instrument/offset settings](BLOCK-SOUND-AND-OFFSETS.md) and typed
+[family parameters](BLOCK-FAMILY-TYPES.md). Their state templates
 use typed [native properties](PROPERTY-DEFINITIONS.md) and serialized default
 values; Rust derives all 31,809 contiguous state IDs. Keep existing catalog
 order and append new entries to preserve IDs.
@@ -39,7 +40,8 @@ graphs. Dynamically constructed graphs still use automatic arenas; see
 
 The [block registry](RUST-BLOCK-REGISTRY.md) now imports only remaining state
 facts and face data. Its format 8 packet contains block/state/face counts,
-per-state face IDs/flags and blocked-light values. Offset kinds and limits
+per-state face IDs/flags, blocked-light values and the face-occlusion truth
+matrix. Offset kinds and limits
 now derive from native definitions. Emitted light and fluid associations derive
 from native intrinsic rules. Names, property schemas, defaults and value indices no longer
 make a native-to-Java-to-native trip. Air and can-occlude flags derive directly

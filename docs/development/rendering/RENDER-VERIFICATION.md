@@ -57,10 +57,14 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
-The latest [native intrinsics checkpoint](GOAL-5-STATUS.md#october-8-native-block-intrinsics-summary)
-reports passing tests, lifecycle cases and coast pairs but an overall
-performance FAIL. Keep that author report separate from the historical checks
-below; this documentation review did not rerun its clients or suites.
+The latest [native family checkpoint](GOAL-5-STATUS.md#october-8-native-block-families-summary)
+reports Java/Rust 1,711/2,366 tests passing, seven lifecycle cases and reviewed
+coast pairs, but an overall **performance FAIL**. Vanilla and vanilla+DH miss
+both FPS and p99 floors; the larger DH gap needs investigation. The preceding
+sound/offset workflow has its own [separate record](GOAL-5-STATUS.md#october-8-native-sound-and-offsets-summary).
+Keep author-recorded runtime checks separate from source inspection and focused
+Python tooling verification; this documentation review did not rerun those
+clients or Java/Rust suites or inspect their unbundled runtime artifacts.
 
 ```sh
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
@@ -105,11 +109,13 @@ and can be repeated. A subset run verifies only its executed steps.
 Output goes to `artifacts/graphics-captures/validation/<label>/` (existing
 labels are refused): `summary.md`, `summary.json`, step logs and timings.
 The validation and feature-parity drivers also retire completed generated
-fixtures and superseded marked invocations. [#823](https://github.com/HungLo2020/MattMC/issues/823) demonstrates
-that a missing-source fixture retained by the workspace pass can later disappear
-with its older parent invocation. Pin an affected invocation root with `.keep`
-before further runs and retain required source saves outside managed outputs;
-see [the separate cleanup passes and pin limits](ARTIFACT-STORAGE.md#verification-driver-retention).
+fixtures and superseded marked invocations. The repair for
+[#823 is closed after focused verification](https://github.com/HungLo2020/MattMC/issues/823#issuecomment-6073221178):
+parent retirement now rechecks workspace eligibility and preserves a parent
+with any retained workspace. This does not replace backups or establish live
+process race freedom. Keep required sources outside managed outputs, and pin
+acceptance evidence or unresolved investigations with a root `.keep`; see
+[the separate cleanup passes and pin limits](ARTIFACT-STORAGE.md#verification-driver-retention).
 
 All four input paths must exist even when associated steps are skipped. The
 defaults, relative to this checkout, are:
@@ -175,6 +181,28 @@ interrupted missing results, and skip combinations. These checks did not run
 Java/Rust suites, clients, live benchmarks or production cleanup. See the
 [integration records](#october-7-integration-batch-checks) for separate historical
 author reports.
+
+### Sound, offset and family evidence
+
+The [content observer at `48a6e051`](https://github.com/HungLo2020/MattMC/blob/48a6e051ecd8bc322fb41118004edb3f13b41932/DevUtils/tests/content/VerifyStateGraphs.py)
+uses schema v8 and compares eight semantic digests, adding sound/material and
+family declarations to its earlier graph, fluid, property, block, physical and
+intrinsic checks. It requires a separate Frozen checkout with compiled main
+classes and at least three alternating fresh-JVM pairs. Sound coverage includes
+event identities/ranges, profiles, instruments, state bindings and finite offset
+samples; family coverage includes block-set/wood definitions, aliases, codecs
+and per-block bindings. Source/native hashes, observer identity and Frozen Git
+identity are checked around the run. Frozen Git identity does not authenticate
+its prebuilt classes, and the bootstrap timing/allocation report has no
+performance acceptance threshold. Main-thread Java allocation is not total
+process or native memory.
+
+These are definition and fresh-JVM bootstrap checks. They do not establish
+sound playback, interactions or tick scheduling, save lifecycle, moving-frame
+parity or full-client FPS. The author's five-pair v7/v8 reports and full
+workflows are recorded separately in the [sound/offset](GOAL-5-STATUS.md#october-8-native-sound-and-offsets-summary)
+and [family](GOAL-5-STATUS.md#october-8-native-block-families-summary) summaries;
+matching digests do not turn their failed performance verdicts into passes.
 
 ### Feature fixture parity
 
@@ -797,6 +825,12 @@ fetch still happens with `--check --dry-run`. Plain `--dry-run` suppresses
 state-changing steps while platform/Git inspection still runs; it checks cached
 upstream refs, not fresh remote state. This review
 did not execute the provisioner.
+
+For ordinary interactive launch, `RunDev.py --frozen` selects the configured
+checkout and skips its `test` task. It does not prepare missing inputs, force
+OpenGL, check the reference branch or protect its game directory from normal
+settings/save writes. See [the launcher contract](../tooling/NATIVE-BUILDS.md#launch-current-or-frozen).
+An interactive launch is not a parity or integrity receipt.
 
 A shader-pack pair at a fixed pose:
 

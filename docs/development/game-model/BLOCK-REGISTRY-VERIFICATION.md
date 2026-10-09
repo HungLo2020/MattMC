@@ -96,16 +96,30 @@ python3 DevUtils/tests/content/VerifyRustBlockRegistry.py --case none  # parity 
 
 The figures above remain the author's historical Phase 1 record. At the
 reviewed source
-[`d0141162`](https://github.com/HungLo2020/MattMC/commit/d0141162d81eee184fa99f0b7a9411d401c306b4),
+[`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422),
 [registered definitions](BLOCK-DEFINITIONS.md), [physical profiles](BLOCK-PHYSICS.md),
 [intrinsic state rules](BLOCK-INTRINSICS.md), [properties](PROPERTY-DEFINITIONS.md),
-[fluids](FLUID-DEFINITIONS.md) and [state graphs](STATE-GRAPHS.md) have native
-owners. The
-[format-7 decoder](https://github.com/HungLo2020/MattMC/blob/d0141162d81eee184fa99f0b7a9411d401c306b4/src/main/rust/content/block/export.rs)
-reads native names, layouts/defaults, emission and fluid-state associations,
-derives air/can-occlude and fluid flags natively, and still imports Java face
-IDs/truth tables, other state flags, blocked-light values and offsets. Later
-milestone results belong to their linked pages, not the Phase 1 totals above.
+[fluids](FLUID-DEFINITIONS.md), [state graphs](STATE-GRAPHS.md),
+[sound definitions](SOUND-DEFINITIONS.md), [block sounds/offsets](BLOCK-SOUND-AND-OFFSETS.md)
+and [block-family configuration](BLOCK-FAMILY-TYPES.md) have native owners.
+The [format-8 decoder](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/rust/content/block/export.rs)
+reads native names, layouts/defaults, emission, fluid-state associations and
+offset kinds/limits. It derives air/can-occlude and fluid flags natively, while
+Java still exports face IDs/truth tables, remaining state flags and blocked
+light. Java also retains shapes, contextual predicates, cache initialization
+and world callbacks. Synthetic/unregistered compatibility objects do not
+provide fallback for missing registered definitions.
+
+The current [v8 observer](STATE-GRAPHS.md#verification) retains v7 sound/offset
+coverage and adds family definitions, aliases/codecs and registered bindings.
+Later milestone results belong to their linked pages, not the Phase 1 totals
+above. The author's [family summary](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/SUMMARY.md)
+reports 1,711 Java/2,366 Rust passes (two skips/three ignores), seven lifecycle
+cases, two reviewed static image pairs and eight matching content digests.
+It also explicitly records **Performance FAIL**: vanilla and vanilla+DH fail
+average FPS and p99, including a 28.9% vanilla+DH median FPS gap. Both shader
+modes pass that run. These are author-recorded results, not independently
+reproduced acceptance or an isolated family performance attribution.
 
 The block registry's 31,809 states are distinct from the observer's 31,846
 combined block/fluid states: the latter includes 37 fluid states. Likewise,

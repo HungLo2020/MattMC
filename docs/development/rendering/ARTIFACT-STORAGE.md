@@ -67,20 +67,29 @@ rows or while a client/build still uses it.
 
 ## Verification-driver retention
 
-The [retirement helpers at `1b183793`](https://github.com/HungLo2020/MattMC/blob/1b1837931a9b25fa12b655e440c6ff77cdd5887d/DevUtils/Common/artifact_retention.py#L410-L498)
+The [retirement helpers at `48a6e051`](https://github.com/HungLo2020/MattMC/blob/48a6e051ecd8bc322fb41118004edb3f13b41932/DevUtils/Common/artifact_retention.py#L410-L504)
 perform two separate destructive operations. `RunValidation.py` retires workspace
 copies while finishing its summary; `RunFeatureParity.py` does so after each
 scenario's pair and again at the end. Both prune older completed invocations
 after writing their summary. Failed comparisons are eligible too. A driver
 exception before these calls can leave copies and no final retention receipt.
 
-**Parent retirement:** the local repair for [#823](https://github.com/HungLo2020/MattMC/issues/823)
-rechecks fixture/workspace eligibility immediately before deleting an old
-invocation. Any retained workspace also retains its parent. This covers a
-missing recorded source even when an earlier summary reports no retained
-workspaces. Once an external source is available again, an otherwise eligible
-old invocation can retire normally. Eleven focused retention tests pass,
-including the two-phase missing-source regression and source-restoration case.
+**Parent retirement:** [#823 is closed after focused verification](https://github.com/HungLo2020/MattMC/issues/823#issuecomment-6073221178)
+of the repair in `48a6e051`. Before deleting an eligible old invocation, the
+helper reruns fixture/workspace retirement and retains the parent if any
+workspace must remain. It rechecks the filesystem rather than trusting the old
+summary's retained-workspace list. Once an external source returns, an otherwise
+eligible old invocation can retire normally.
+
+The author reports 11 focused retention tests. Separately, the linked tracker
+review independently executed eight exact-source Python cases: successive
+successful and failed `RunValidation.finish` calls retained a missing-source
+fixture across repeated passes and retired it after source restoration;
+unknown-fixture, root-pin, comparison-baseline, live-parent, crash-evidence and
+ordinary-retirement controls also passed. Those checks used synthetic temporary
+fixtures and mocked process discovery, without clients or Java/Rust runtime
+suites. The closure covers the demonstrated two-pass defect, not live-process
+race freedom or safe cleanup of every filesystem state.
 
 Keep required sources outside retirement-managed outputs. Source existence is
 still only a bounded eligibility check, not proof of recoverability or a backup.
@@ -139,9 +148,10 @@ review independently ran four temporary-fixture tests with mocked process
 checks. The [repair commit's author](https://github.com/HungLo2020/MattMC/commit/a0f5abeb27f122ace8a44265b0ed82320a39c0a7)
 reports nine retention tests, including a real child-process lifetime check,
 within 37 passing harness regressions. Those reported checks do not cover the
-later demonstrated #823 parent-retirement gap. The new focused checks above
-exercise that sequence; they do not establish safe cleanup of every live
-filesystem state.
+later demonstrated #823 parent-retirement gap. The newer author tests and
+independent synthetic acceptance cases above exercise the repaired sequence;
+their bounded scope does not establish safe cleanup of every live filesystem
+state.
 
 The capture runner also retires its isolated game directories after shutdown.
 The [`a0f5abeb` repair](https://github.com/HungLo2020/MattMC/blob/a0f5abeb27f122ace8a44265b0ed82320a39c0a7/DevUtils/Common/artifact_retention.py#L158-L167)

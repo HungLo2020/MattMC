@@ -2,8 +2,9 @@
 
 > Phase 1 is implemented ([Rust block registry](RUST-BLOCK-REGISTRY.md));
 > Phase 2 now has native state graphs, properties, fluids, registered block
-> definitions, physical settings and intrinsic state rules. Remaining producers,
-> behavior and components are unfinished. Source ownership does not certify
+> definitions, physical settings, intrinsic state rules, sound/offset definitions
+> and block-family configuration. Remaining producers, behavior and components
+> are unfinished. Source ownership does not certify
 > all acceptance work.
 > See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md) and
 > [game model index](index.md).
@@ -69,16 +70,19 @@ domains. This includes all 11 additional properties for integrated content.
 The remaining registry-definition migration below is unfinished.
 
 - Registered blocks now read native names, domains/defaults, physical
-  settings and intrinsic state traits. Java retains factories,
+  settings, intrinsic state traits, sound/instrument/offset settings and typed
+  family parameters. Java retains factories,
   `Registry.register`, state objects, codecs and cache initialization;
   startup checks keep native and Java IDs aligned.
 - Broader content registries and the builders proposed in
   [adding content](ADDING-CONTENT.md) remain future work.
 - Remaining shape, blocked-light and contextual predicate producers still
-  need migration with independent parity checks. Format 7 imports face IDs/truth
-  tables, blocked light, offsets and the flags not directly derived from native
-  physical/fluid definitions. Map-color identities, emitted light and canonical
-  fluid-state associations now originate in native rules.
+  need migration with independent parity checks. Format 8 imports face IDs/truth
+  tables, blocked light and the flags not directly derived from native
+  physical/fluid definitions. Map-color identities, emitted light, canonical
+  fluid-state associations and model offsets now originate in native rules.
+  Family configuration does not migrate world callbacks, ticking or entity
+  queries; sound definitions do not migrate Java sound policy or resource caches.
 
 ## Phase 3: behavior and components by family
 

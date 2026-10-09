@@ -16,12 +16,15 @@ src/main/rust/
 ├── lib.rs
 ├── app/
 ├── assets/
+├── audio/
 ├── compat/
 ├── content/
 │   ├── block/
-│   │   └── definitions/
+│   │   ├── definitions/
+│   │   └── family/
 │   ├── fluid/
 │   ├── property/
+│   ├── sound/
 │   └── state/
 ├── core/
 ├── gameplay/
@@ -198,8 +201,9 @@ compute semantic map colors, emitted light and canonical fluid associations.
 and note instruments; [block sound/offset definitions](game-model/BLOCK-SOUND-AND-OFFSETS.md)
 own state sound selection and model offsets. [Block-family configuration](game-model/BLOCK-FAMILY-TYPES.md)
 provides shared block sets, wood types and registered family parameters.
-Playback resources stay in `audio/`.
-General gameplay remains Java.
+Playback resources stay in `audio/`, with Java retaining sound policy and
+resource lookup/cache callbacks. Block-family configuration does not migrate
+world callbacks, scheduling or entity queries. General gameplay remains Java.
 
 [`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,
 registration order, property declarations, defaults and intrinsic state facts.
@@ -234,6 +238,18 @@ Important current subdirectories:
 ### `assets/`
 
 Asset loading, decoding, caching, and resource processing belong here. Future Rust-side texture, model, shader, language, and pack-resource work should live here when it is not exclusively part of a rendering backend.
+
+### `audio/`
+
+The [native audio backend](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/rust/audio/mod.rs)
+owns playback resources, device-local buffers and decoding. Sound-event,
+profile and instrument identities belong to `content/sound/`, independently
+of those resource lifetimes. Java
+[`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
+still resolves and schedules sounds, and
+[`SoundBufferLibrary`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/java/net/minecraft/client/sounds/SoundBufferLibrary.java)
+loads pack resources, keeps asset futures and handles generation/close callbacks
+on cache clear. Native sound definitions do not complete the audio migration.
 
 ### `network/`
 
