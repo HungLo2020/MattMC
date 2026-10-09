@@ -1,6 +1,7 @@
 # Rust live light layers
 
-The local migration gives canonical `DataLayer` objects a Rust owner. Lazy raw
+At [`4246f4e7`](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953),
+canonical `DataLayer` objects have a Rust owner. Lazy raw
 integer defaults and allocated 2,048-byte nibble generations live in
 [`lighting/layers/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/lighting/layers).
 Java reads a leased CPU view; mutations, independent copies and sky-layer
@@ -10,7 +11,8 @@ repetition run in Rust. This subsystem has no rendering or GPU dependencies.
 
 [`NativeLightBlocks`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeLightBlocks.java)
 passes a pinned CPU owner to propagation. Rust takes an independent snapshot
-without a Java byte-array projection. Results export ordered section keys and
+without a Java byte-array projection. This still copies native bytes into a
+pass-local snapshot; it is not zero-copy propagation. Results export ordered section keys and
 affected sections only. After Java performs the existing map copy-on-write,
 Rust installs each result directly into its target owner. Sky seeding and first
 row repetition also keep canonical light bytes native. Client packet application uses
@@ -21,6 +23,11 @@ constructor retains its existing alias contract.
 Java still owns light-engine orchestration, map publication and callbacks.
 Terrain slices currently read scalar light through the CPU view; direct bulk
 terrain-light preparation remains work. No whole-game speedup is established.
+Follow the [Java handoff](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L204-L259)
+and [native installation](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/world/level/lighting/propagation/ffi.rs#L230-L242)
+when changing publication: result-transfer errors throw and do not roll back
+sections already installed. Unsupported input/callback rejection replays Java
+before result installation, as described in [propagation](RUST-LIGHT-PROPAGATION.md#how-a-pass-works).
 
 ## Compatibility and lifetime
 
@@ -31,7 +38,8 @@ terrain-light preparation remains work. No whole-game speedup is established.
   the raw default to zero, matching the original byte-array constructor.
 - The public byte-array constructor preserves its caller's mutable alias.
   `getData()` explicitly transfers an owned layer into one persistent Java
-  array. Later writes use that array until a fill or independent copy adopts
+  array; it is an ownership escape, not a temporary read-only export.
+  Later writes use that array until a fill or independent copy adopts
   native ownership again. Subclasses retain their original Java callbacks.
 - CPU owner and view leases have separate automatic arenas. A view retains its
   generation after owner release. Synchronous callbacks pin their source until
@@ -40,6 +48,12 @@ terrain-light preparation remains work. No whole-game speedup is established.
   Atomic native cells do not replace the world publication transaction.
 
 ## Verification
+
+The commands below are the current focused checks. The results that follow are
+the implementation author's [committed live-light record](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/PROGRESS.md#L81-L87)
+and [release summary](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/SUMMARY.md),
+not independent runtime verification by this documentation review. Its
+release `31c8c8cc` measurements precede the ABI 78 GUI/harness changes.
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::lighting

@@ -65,13 +65,15 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
-The latest [generation-handoff checkpoint](GOAL-5-STATUS.md#october-9-native-generation-handoff-summary)
-reports Java/Rust 1,751/2,417 tests passing, seven lifecycle cases and reviewed
-coast pairs, but an overall **performance FAIL**. Vanilla and vanilla+DH miss
-both FPS and p99 floors; shader modes pass both in that workload. The preceding
-[family](GOAL-5-STATUS.md#october-8-native-block-families-summary) and
-[sound/offset](GOAL-5-STATUS.md#october-8-native-sound-and-offsets-summary)
-workflows retain their separate historical records.
+The latest complete [live-light matrix](GOAL-5-STATUS.md#october-9-live-light-and-ordinary-gameplay-summary)
+reports Java/Rust 1,800/2,436 tests passing, seven lifecycle cases and reviewed
+coast pairs, but an overall **performance FAIL**: vanilla misses FPS/p99 and DH
+misses p99. Both shader modes pass those floors in that workload. The later
+ABI 78 GUI/harness commit has no full replacement matrix; its short ordinary
+travel parity was not reproduced manually and visual captures timed out.
+Earlier [item-input](GOAL-5-STATUS.md#october-9-native-world-and-hand-input-summary)
+and [generation-handoff](GOAL-5-STATUS.md#october-9-native-generation-handoff-summary)
+workflows retain their own historical results.
 Keep author-recorded runtime checks separate from source inspection and focused
 Python tooling verification; this documentation review did not rerun those
 clients or Java/Rust suites or inspect their unbundled runtime artifacts.
@@ -1283,6 +1285,10 @@ the [ordinary gameplay comparison](GAMEPLAY-PERFORMANCE.md). Keep its continuous
 frame recording alongside the settled measurements below. The capture launcher
 hides the minimap in settled rows, and readiness resets can exclude publication
 stalls; those rows alone must not be reported as ordinary gameplay parity.
+`RunValidation.py` records this scope in its FPS receipt as
+`ordinary_gameplay_verified: false`. The ordinary driver is invoked separately;
+its `complete` status confirms protocol completion and health checks, without
+an automatic Current/Frozen performance-floor or pixel-parity verdict.
 
 For the current original-pack moving workload, batching probes and rejected
 optimization evidence, see [shader terrain profiling](SHADER-TERRAIN-PROFILING.md).

@@ -10,7 +10,7 @@ package, for palette data). Ordinary block palettes and packed words now come
 directly from their [Rust live owner](../chunk/RUST-LIVE-SECTIONS.md), without
 reconstructing a Java palette or word array for the light handoff. Java still owns
 the remaining light orchestration: section statuses,
-`checkNode`, queued and retained data, `markNewInconsistencies`,
+`checkNode`, queued/retained layer maps, `markNewInconsistencies` and
 `swapSectionMap`. Canonical live light bytes now have a
 [Rust owner](RUST-LIVE-LAYERS.md); public mutable arrays and subclasses retain
 compatibility ownership.
@@ -38,7 +38,8 @@ compatibility ownership.
    boundary around propagation writes, not a rollback of earlier `checkNode`
    work or callback side effects. Invalid ABI input (`-1`), downcall failures
    and result-transfer failures throw instead of replaying in Java; see the
-   [bridge status handling](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L274-L325).
+   [current bridge status handling](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L204-L259).
+   An installation error does not roll back sections already installed.
 
 Sky seeding runs one critical downcall per section. Canonical native owners
 retain lazy allocation until the loop writes; allocated layers update in place.
@@ -71,6 +72,11 @@ throws; it does not use the propagation pass's Java replay path.
 
 ## Verify a change
 
+Start with the [live-layer production tests and Frozen oracle](RUST-LIVE-LAYERS.md#verification)
+for current ownership changes. The older driver below also embeds a source-shape
+audit from before native live layers; keep its audit verdict separate from the
+runtime parity suites it invokes.
+
 ```sh
 python3 DevUtils/tests/lighting/VerifyRustLightPropagation.py --parity-only
 python3 DevUtils/tests/lighting/VerifyRustLightPropagation.py --forks 3
@@ -79,8 +85,8 @@ python3 DevUtils/tests/lighting/VerifyRustLightPropagation.py --forks 3
 The historical driver audits edits to `LightEngine`, `SkyLightEngine` and
 `DataLayer` against Git `54611cfc2`; that source-shape audit predates live light
 ownership. Do not interpret its rejection of the new storage shape as a
-semantic verdict. Use the live-layer Frozen oracle and production checks above
-for this local batch. The driver also runs `NativeLightPropagationTest` and the Rust
+semantic verdict. Use the linked live-layer Frozen oracle and production checks
+for current storage changes. The driver also runs `NativeLightPropagationTest` and the Rust
 lighting tests. The parity tests light worlds on both routes over the same
 chunks and compare all light storage after every pass:
 

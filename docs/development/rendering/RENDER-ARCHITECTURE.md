@@ -87,8 +87,11 @@ Current chunk CPU inputs have separate world owners: [live block sections](../wo
 own canonical storage/mutation, [section-local counters](../world/chunk/RUST-SECTION-COUNTERS.md)
 fuse eligible writes and recount directly, [immutable rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
-share resolver lattice samples within a capture. Java retains contextual light,
-biome blending, model admission and worker dispatch. Canonical
+share resolver lattice samples within a capture. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
+own canonical lazy defaults and allocated nibble generations, including native
+propagation handoffs. Java retains light-engine orchestration and map publication;
+terrain slices still read scalar light through leased CPU views. Biome blending,
+model admission and worker dispatch also remain Java-owned. Canonical
 [generation-stage transfers](../world/levelgen/RUST-STAGE-HANDOFF.md) copy/adopt
 inside Rust; stage and live formats remain separate. These CPU owners do not
 change GAL resources, completion or presentation.
@@ -97,6 +100,16 @@ change GAL resources, completion or presentation.
 Rust expands ordinary RGBA textures and owns native map material policy. The
 indexed GUI input arrived with ABI 73; the current whole-frame ABI is 78.
 Java retains map revisions, staging and contextual map production.
+
+Raw GUI images use a separate incremental publication contract at ABI 78:
+changed CPU payloads accompany the complete live identity manifest, while Rust
+retains unchanged pixels and GPU resources. Admission validates the combined
+resident bounds before changing the generation. Java retains the resident set
+and unaccepted changes for retry, and resends all resident payloads after native
+context recreation. VoxelMap consumes its dirty flag before copying and reuses
+clean immutable snapshots. See [raw-image generations](JAVA-BRIDGE.md#raw-gui-image-generations)
+and the [ordinary gameplay protocol](GAMEPLAY-PERFORMANCE.md); reducing this
+traffic does not establish end-to-end performance acceptance.
 
 Selected-source frames carry thousands of mesh instances (mostly off-camera
 shadow candidates), and several passes look each one up every frame. Keep
@@ -499,6 +512,11 @@ rollback for every failed mutation.
 keeps the material provenance, the frame's render parameters and the capture
 diagnostics. It applies each ledger call's effects to its provenance maps.
 Diagnostics and probes read payload copies fetched from the ledger on demand.
+Packed vertex admission checks restricted material/normal bytes directly;
+unsigned 16-bit position/light fields need no Java vertex reconstruction.
+Unpacked inputs retain their field checks. This changes validation allocation,
+not topology, material provenance or DH generation policy; see the
+[allocation constraints](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints).
 The ledger reproduces Java's `LinkedHashMap` orders, including the column LRU's
 access order, because publication, retirement lists and eviction depend on
 them. See also

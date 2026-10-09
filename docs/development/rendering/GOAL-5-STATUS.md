@@ -1,14 +1,15 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`64294324`](https://github.com/HungLo2020/MattMC/commit/642943247003d7d8d756a65180f0872b088c13f0):
-native section counters, DH cloud preparation and GUI/world/hand item poses
-extend the earlier ownership. The latest author-recorded item workflow passes
-all median average-FPS floors in its measured window but **fails overall
-performance acceptance on vanilla p99**. Large repeat variance prevents a
-robust or isolated speedup claim. Later reload/memory observer corrections have
-narrower fresh evidence; they were not followed by another full performance
-matrix. See the [current measured workload](#october-9-native-world-and-hand-input-summary).
+[`4246f4e7`](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953):
+canonical live light generations and propagation handoffs now have Rust owners;
+ABI 78 adds incremental raw GUI image updates, alongside packed DH admission
+and an ordinary-gameplay performance harness. The latest complete author-recorded
+matrix, release `31c8c8cc`, **fails performance acceptance on vanilla FPS/p99
+and DH p99**. It predates the GUI/harness commit and does not validate that newer
+source. The later short ordinary travel result was not reproduced in manual
+play, and its visual captures timed out. See the
+[current evidence summary](#october-9-live-light-and-ordinary-gameplay-summary).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
@@ -17,8 +18,11 @@ Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
 payload publication, retained visibility frames and built-in cloud preparation,
 native authored item poses and GPU execution/resources.
-Separate native world owners now supply canonical live/rebuild state and section
-color fields. Java still supplies
+Separate native world owners now supply canonical live/rebuild state, section
+color fields and live light generations. Java still orchestrates light storage
+maps and publication, with mutable-array and subclass compatibility paths.
+Raw GUI image publication retains unchanged native images while Java supplies
+semantic identities and changed CPU snapshots. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
 asset/reload bookkeeping, DH quadtree/frustum candidates, frame parameters and
 material-provenance diagnostics. Content definitions now have separate native
@@ -31,7 +35,14 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The [current performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6088997781)
+The [current performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6091091526),
+[GUI ownership review](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6091093270)
+and [live-light review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6091109625)
+retain those open boundaries. The separate tracker check passed four Python
+ordinary-harness fixtures and skipped the JDK 25 agent fixture; it did not run
+clients or reproduce parity.
+
+The [preceding item-input performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6088997781)
 keeps the failed tail-latency gate and measured/observer-only windows explicit.
 
 The preceding [generation-handoff source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6086170999)
@@ -86,6 +97,23 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 9 live light and incremental GUI images
+
+The `ba8d4a93` → `4246f4e7` interval adds two bounded source changes:
+
+- [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md) move canonical lazy defaults and 2,048-byte generations into Rust. Propagation snapshots and result installation, sky seeding/repetition and independent client packet imports use native CPU owners. Java retains orchestration, map copy-on-write and compatibility arrays/callbacks; terrain light preparation still reads scalar views
+- [Raw GUI images](JAVA-BRIDGE.md#raw-gui-image-generations) send changed payloads plus the complete live identity manifest at ABI 78. Java retains dirty publication and retry state; Rust validates the combined resident set before eviction or replacement. Clean VoxelMap frames reuse snapshots, packed DH admission avoids per-vertex Java decoding, and atlas replacement releases cached source-pack consumers before samplers
+
+The [ordinary gameplay harness](GAMEPLAY-PERFORMANCE.md) adds visible-minimap
+entry, stationary and actual-travel windows with continuous completed-frame
+timing. The settled validation receipt now explicitly sets
+`ordinary_gameplay_verified: false`; clean settled rows do not prove ordinary
+gameplay performance. The [recorded evidence](#october-9-live-light-and-ordinary-gameplay-summary)
+keeps the live-light matrix and later GUI/harness observations separate.
+This review inspected pinned source and committed author records; it did not
+run clients, Java/Rust suites, captures or profiles, or inspect unbundled runtime
+receipts.
+
 ### October 9 section counters, clouds and item inputs
 
 The `a908f78c` → `64294324` interval advances three bounded owners:
@@ -98,9 +126,10 @@ The intervening [readiness/cleanup fixes](https://github.com/HungLo2020/MattMC/c
 remove column sidecars by their index range, transform debug axes through the
 frame view, and preserve offscreen rebuild marks without resetting camera
 readiness. These changes do not waive benchmark producer checks or establish
-broad visual acceptance. Source-only light-owner draft results in the working
-record are not evidence that production light propagation/rebuild consumers
-have migrated.
+broad visual acceptance. Light ownership was still a source-only draft at
+that checkpoint. The later [live-light implementation](../world/lighting/RUST-LIVE-LAYERS.md)
+migrates canonical propagation handoffs; bulk terrain-light preparation remains
+unfinished.
 
 ### October 9 native frame and world-input checkpoint
 
@@ -340,6 +369,43 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 9 live light and ordinary gameplay summary
+
+The [summary retained at `4246f4e7`](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/SUMMARY.md)
+records the preceding live-light release `31c8c8cc` on RTX 3080 Ti: moving-camera
+ABAB, two runs per side and mode, with exactly 6,000 measured frames each.
+These are author-reported settled measurements, not an ordinary-gameplay result
+or a rerun by this documentation review.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- |
+| Vanilla | 1,059.3 / 1,132.7 | 1,152.4 / 1,153.9 | 3.781 / 3.439 |
+| Vanilla + DH | 685.2 / 720.5 | 608.0 / 730.7 | 5.524 / 5.519 |
+| Shaders | 352.9 / 351.6 | 316.9 / 316.1 | 5.370 / 6.693 |
+| Shaders + DH | 254.7 / 250.6 | 230.3 / 228.6 | 7.377 / 7.542 |
+
+**Performance FAIL:** vanilla misses FPS and p99; DH misses p99. Both shader
+modes pass both floors in this recorded workload. The author reports 2,436 Rust
+tests (three ignored), 1,800 Java tests (two skipped), all seven lifecycle cases,
+reviewed vanilla/Iris+DH coast pairs with DH coverage, and sixteen clean exact-frame
+rows. VUID/exception/orphan counts are zero; source/native/Frozen/protected-edit
+integrity passes and 25 generated copies were retired. Receipt:
+`validation/native-live-light-final-20261009/summary.json`.
+
+The [live-light guide](../world/lighting/RUST-LIVE-LAYERS.md#verification)
+preserves the 108-representation Frozen oracle and separate ordinary-flight
+profiles. Weighted allocation of 0.934 GB Current versus 2.186 GB Frozen in
+one eight-second window each is diagnostic; overlapping categories and a
+JIT-heavy Current CPU profile prevent isolated storage or throughput claims.
+
+The later [ABI 78 commit](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953)
+reports short shaders-off/DH-on ordinary travel parity that was not reproduced
+in manual play; visual parity captures still timed out. No performance pass
+is claimed. The prior live-light matrix cannot be carried forward to certify
+these GUI/DH changes. Use the [ordinary protocol](GAMEPLAY-PERFORMANCE.md)
+alongside settled and visual/lifecycle checks; source fixtures and a completed
+timing run do not establish full acceptance.
 
 #### October 9 native world and hand input summary
 

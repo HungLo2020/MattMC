@@ -51,15 +51,28 @@ exact measurement window and cleanup checks pass. Receipt:
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
 
-## Changing the ABI
+## Raw GUI image generations
 
 ABI 78 appends a retained asset-ID manifest to raw GUI image request 91. A
 nonempty manifest sends only changed pixel payloads and retains the other native
 images; omitted IDs are evicted. An empty manifest preserves full-replacement
 semantics, including clearing all images. Combined resident bounds and identity
 validation complete before mutation; rejected updates preserve the generation
-for retry. See [gameplay performance](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints)
-for Java dirty publication and context recreation.
+for retry. Every incoming payload must appear in the nonempty manifest;
+unchanged IDs need resident pixels, IDs must be nonzero and unique, and the
+combined resident set must fit the image-count and expanded-byte bounds.
+Only changed or evicted images lose their cached native resources.
+
+The [request layout](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/render/bridge/abi/gui.rs#L226-L236)
+appends `retained_asset_ids` as field 4 of struct 91. The
+[frontend admission](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/render/guirender/frontend/assets.rs#L93-L247)
+owns retention and replacement; the bridge copies/validates the wire input.
+Java clears pending changes only after acceptance and sends all resident pixels
+when `uploadedRawImageGeneration` is zero, including after context recreation.
+See [gameplay performance](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints)
+for dirty publication, focused checks and remaining runtime evidence limits.
+
+## Changing the ABI
 
 1. Add or extend the record in the right `bridge/abi/` family file. Append
    fields; reordering or removing fields breaks every Java writer.

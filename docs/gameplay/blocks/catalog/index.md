@@ -2,7 +2,7 @@
 
 Browse **1,235 block IDs** traced through the inspected built-in registration path, including direct fields and helper-created Copper forms. Separate wall, plant, moving-part and technical forms are included; this is not a count of obtainable inventory items. Categories are navigation choices, not game registry tags.
 
-A **related guide** can cover a whole family or only shared behavior. Its presence does not mean every variant has a complete article. **Article needed** means this catalog has no dedicated placed-block guide to offer yet. Item stubs are not substitutes.
+All listed IDs currently have a **related guide**, which may cover a whole family or only shared behavior. A link does not establish complete variant detail or runtime verification. Use placed-block guides for block behavior; an inventory item page alone does not cover it.
 
 | Browse | Registered forms | Includes |
 | --- | ---: | --- |

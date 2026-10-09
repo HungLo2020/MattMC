@@ -2,7 +2,7 @@
 
 Find the **1,235 source-inventoried built-in IDs** by name below, including MattMC additions, separately registered variants and helper-created Copper forms. Browse [block categories](catalog/index.md) for material or purpose.
 
-**Article coverage is incomplete.** A **related guide** can describe shared family behavior without covering every variant detail. **Article needed** marks a missing dedicated owner. The Copper Bars/Chain/Lantern forms now have their own reviewed family guide. See the [correction of the earlier direct-field-only count](catalog/index.md#registration-method-correction).
+**Every listed ID currently links to a related guide.** A family link does not certify every variant detail: acquisition, placement, state changes and drops may need further review. Article depth remains uneven, so navigation coverage is not full behavior coverage. See the [correction of the earlier direct-field-only count](catalog/index.md#registration-method-correction).
 
 Names use English localization where available. A † marks one of 25 readable registry-name labels without a separate English entry; the exact ID distinguishes those forms.
 

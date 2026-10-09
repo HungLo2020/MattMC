@@ -4,6 +4,10 @@ Use this alongside the settled renderer benchmark when comparing Current with
 Frozen. The settled benchmark hides VoxelMap and its optional camera motion
 rotates at a fixed point. Readiness losses can discard partial timing windows.
 Those results do not establish startup, streaming, or visible-minimap performance.
+The [driver at `4246f4e7`](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/DevUtils/tests/rendering/RunOrdinaryPerformance.py)
+records a separate `ordinary-gameplay-v1` protocol. A `complete` result means
+the requested observation finished and passed its state/health checks; the
+driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 
 ## Run the ordinary comparison
 
@@ -22,6 +26,12 @@ copies of this same source through the existing capture engines. A pair rejects
 DH cache formats Frozen cannot read; prepare a compatible copied source rather
 than editing the original world. Current may upgrade its own isolated cache.
 The original saves/configs and Frozen source stay untouched.
+
+`--seconds` sets the length of each of the three windows (30 seconds each by
+default), not the total session length. Use a new output directory for every
+invocation; the driver rejects an existing one and pins the output with `.keep`.
+Review and retire it through the [storage rules](ARTIFACT-STORAGE.md#verification-driver-retention)
+when it is no longer needed.
 
 The default runs Current then Frozen at fullscreen 1920×1080, render/simulation
 distance 12, an unlimited FPS slider, VSync off, and matched 8 GiB ZGC/JIT
@@ -100,7 +110,23 @@ Run the regular Java rendering suites and Rust suite, plus:
 python3 -m unittest discover -s DevUtils/tests/rendering -p test_ordinary_performance.py
 ```
 
-These checks cover dynamic snapshot reuse/replacement/reload, native patch
-retention and rejected-update retry, packed DH bounds/allocation, long-stall
-accounting, source compatibility and frame-agent return paths. Follow with
-ordinary visible-map gameplay and normal visual/lifecycle checks.
+The Java and Rust suites cover dynamic snapshot reuse/replacement/reload,
+native patch retention/rejected-update retry and packed DH bounds/allocation.
+The [Python fixtures](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/DevUtils/tests/rendering/test_ordinary_performance.py)
+cover output creation, long-stall accounting, gameplay/motion rejection and
+read-only source compatibility. Their frame-agent return-path/DH-call test
+requires a complete JDK 25 and otherwise skips; retain that skip explicitly.
+These fixtures do not replace ordinary visible-map gameplay and normal
+visual/lifecycle checks.
+
+## Recorded evidence and limits
+
+The [ABI 78 commit](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953)
+reports short shaders-off/DH-on travel runs near Frozen, but says that result
+was not reproduced in manual play and that visual parity captures still timed
+out. It claims no performance pass. The [live-light matrix](GOAL-5-STATUS.md#october-9-live-light-and-ordinary-gameplay-summary)
+in the retained summary predates this GUI/harness change and fails vanilla
+FPS/p99 and DH p99. Keep those separate workloads and source identities.
+This documentation review inspected source and committed author records; it
+did not run clients, Java/Rust suites or profiles, or inspect the original
+runtime receipts.
