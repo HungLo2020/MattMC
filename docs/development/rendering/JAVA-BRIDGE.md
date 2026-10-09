@@ -157,6 +157,18 @@ blended-cutout mode 7; both compact whole-frame decoding and ordinary quad
 validation must admit that mode. Rust resolves its depth/lightmap/fog/order
 policy; see [map colors](../game-model/MAP-COLORS.md). Rebuild both sides together.
 
+ABI 74 appends native DH CPU frame identity, lifecycle and count as whole-frame
+fields 53–55. The collector exports these with layer counts through
+`mattmc_dh_collector_consume_retained`; readback is explicit. Production Java
+sends no inline LOD stream for a native reference. Decode rejects mixed streams,
+missing/oversized metadata, stale identities/lifecycles or changed decisions,
+then owns the immutable list before queued execution. Queued input accounting
+still charges its declared segment count. This is a bounded semantic CPU
+transaction, not a GPU handle or presenter; see
+[native frame ownership](RETAINED-SCENE.md#native-dh-visibility-frame-ownership).
+Rebuild Java/native together. Capture observers may copy records, but the
+renderer consumes the retained native snapshot directly.
+
 ## Standalone query handles
 
 Some render-thread questions are answered by handles that share no context

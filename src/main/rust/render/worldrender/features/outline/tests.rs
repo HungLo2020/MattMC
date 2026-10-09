@@ -23,7 +23,7 @@ fn frame_with_instances(instances: Vec<WorldMeshInstanceRequest>) -> WorldPrimit
         dh_generic_boxes: Vec::new(),
         mesh_instances: instances,
         text_quads: Vec::new(),
-        lod_instances: Vec::new(),
+        lod_instances: Vec::new().into(),
         lod_render_frame: WorldLodRenderFrame::default(),
         static_terrain_shadow_casters: StaticTerrainShadowCasters::default(),
         static_terrain_sections: StaticTerrainSections::default(),

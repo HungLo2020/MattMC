@@ -1381,6 +1381,50 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void productionFrameKeepsSegmentsInRustAndReportsCountsWithoutDiagnosticRecords() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			92L, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
+			List.of(), List.of(), List.of());
+		publishPendingForTest();
+		System.clearProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY);
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(92L);
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
+		var consumed = DistantHorizonsSemanticCollector.consumeRetainedVisibleFrame();
+		assertTrue(consumed.visibleSegments().isEmpty(), "ordinary frames must not construct Java records");
+		assertTrue(consumed.nativeReference().id() > 0L);
+		assertEquals(consumed.lifecycle(), consumed.nativeReference().lifecycle());
+		assertEquals(1, consumed.nativeReference().instanceCount());
+		assertEquals(1, consumed.nativeReference().opaqueCount());
+		assertEquals(0, consumed.nativeReference().transparentCount());
+		assertEquals(0, consumed.nativeReference().waterCount());
+		var stale = DistantHorizonsSemanticCollector.consumeRetainedVisibleFrame();
+		assertEquals(0L, stale.nativeReference().id());
+		assertEquals(0, stale.nativeReference().instanceCount());
+	}
+
+	@Test
+	void nativeFrameReadbackPreservesCaptureRecordsAndReferenceIdentity() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			93L, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
+			List.of(), List.of(), List.of());
+		publishPendingForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(93L);
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
+		var consumed = DistantHorizonsSemanticCollector.consumeRetainedVisibleFrame();
+		assertEquals(1, consumed.visibleSegments().size());
+		assertEquals(93L, consumed.visibleSegments().getFirst().columnKey());
+		assertTrue(consumed.nativeReference().id() > 0L);
+		assertEquals(consumed.visibleSegments().size(), consumed.nativeReference().instanceCount());
+		assertThrows(UnsupportedOperationException.class, () -> consumed.visibleSegments().clear());
+	}
+
+	@Test
 	void pairedConsumptionCannotMixVisibleSegmentsWithAConsumedOrResetRenderFrame() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		DistantHorizonsSemanticCollector.recordBuiltColumn(

@@ -120,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 73;
+	public static final int ABI_VERSION = 74;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -1735,6 +1735,39 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			staticTerrainSections, modelRigPoses);
 	}
 
+	public WholeFrameSubmitResult submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
+		long generation, long frameId, long correlationId, long frameTarget,
+		int guiWidth, int guiHeight, int viewportWidth, int viewportHeight,
+		float[] viewMatrix, float[] projectionMatrix, WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments, List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads, List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame, List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame, WorldFeatureCoverageRecord worldFeatureCoverage,
+		List<GuiSpriteRecord> guiSprites, List<GuiAffineQuadRecord> guiAffineQuads,
+		List<GuiMeshBatchRecord> guiMeshBatches, List<WorldTextQuadRecord> worldTextQuads,
+		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		int guiBlurBeforeStratum, int guiBlurRadius, String postEffectId, GuiProjectionRecord guiProjection,
+		List<GuiTiledQuadRecord> guiTiledQuads, EngineGlobalsRecord engineGlobals,
+		List<WorldParticleQuadRecord> worldParticles, List<WorldExperienceOrbInstanceRecord> worldOrbs,
+		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
+		TerrainFrameCamera terrainFrameCamera,
+		StaticTerrainShadowCasters staticTerrainShadowCasters,
+		StaticTerrainSections staticTerrainSections,
+		ModelRigPoses modelRigPoses,
+		WorldLodFrameReference worldLodFrameReference
+	) {
+		return submitWorldFrame(generation, frameId, correlationId, frameTarget, guiWidth, guiHeight,
+			viewportWidth, viewportHeight, viewMatrix, projectionMatrix, worldBackground, worldSegments,
+			worldCrackQuads, worldBorderQuads, worldMaterialQuads, worldMeshInstances, voxelVolumeFrame,
+			shaderEnvironmentFrame, worldLodInstances, worldLodRenderFrame, worldFeatureCoverage,
+			guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads, firstPersonFrame,
+			firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId, true,
+			guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs,
+			worldDistantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters,
+			staticTerrainSections, modelRigPoses, worldLodFrameReference);
+	}
+
 	private WholeFrameSubmitResult submitWorldFrame(
 		long generation,
 		long frameId,
@@ -1905,6 +1938,53 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		StaticTerrainShadowCasters staticTerrainShadowCasters,
 		StaticTerrainSections staticTerrainSections,
 		ModelRigPoses modelRigPoses
+	) {
+		return submitWorldFrame(generation, frameId, correlationId, frameTarget, guiWidth, guiHeight, viewportWidth, viewportHeight, viewMatrix, projectionMatrix, worldBackground, worldSegments, worldCrackQuads, worldBorderQuads, worldMaterialQuads, worldMeshInstances, voxelVolumeFrame, shaderEnvironmentFrame, worldLodInstances, worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads, firstPersonFrame, firstPersonMeshInstances, guiBlurBeforeStratum, guiBlurRadius, postEffectId, wholeFrame, guiProjection, guiTiledQuads, engineGlobals, worldParticles, worldOrbs, worldDistantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters, staticTerrainSections, modelRigPoses, WorldLodFrameReference.EMPTY);
+	}
+
+	private WholeFrameSubmitResult submitWorldFrame(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame,
+		WorldFeatureCoverageRecord worldFeatureCoverage,
+		List<GuiSpriteRecord> guiSprites,
+		List<GuiAffineQuadRecord> guiAffineQuads,
+		List<GuiMeshBatchRecord> guiMeshBatches,
+		List<WorldTextQuadRecord> worldTextQuads,
+		WorldFirstPersonFrameRecord firstPersonFrame,
+		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		int guiBlurBeforeStratum,
+		int guiBlurRadius,
+		String postEffectId,
+		boolean wholeFrame,
+		GuiProjectionRecord guiProjection,
+		List<GuiTiledQuadRecord> guiTiledQuads,
+		EngineGlobalsRecord engineGlobals,
+		List<WorldParticleQuadRecord> worldParticles,
+		List<WorldExperienceOrbInstanceRecord> worldOrbs,
+		List<WorldDistantHorizonsGenericBoxRecord> worldDistantHorizonsGenericBoxes,
+		TerrainFrameCamera terrainFrameCamera,
+		StaticTerrainShadowCasters staticTerrainShadowCasters,
+		StaticTerrainSections staticTerrainSections,
+		ModelRigPoses modelRigPoses,
+		WorldLodFrameReference worldLodFrameReference
 	) {
 		if (pipelinedRequestArena != null) {
 			// The worker still decodes the previous request, which shares the
@@ -2193,7 +2273,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			MemorySegment.copy(uvs, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(12), 8);
 			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 13, quad.blockEntityId());
 		}
-		MemorySegment lodInstanceArray = encodeWorldLodInstances(worldLodInstances);
+		Objects.requireNonNull(worldLodFrameReference, "worldLodFrameReference");
+		boolean retainedLodFrame = worldLodFrameReference.id() != 0L;
+		MemorySegment lodInstanceArray = retainedLodFrame ? MemorySegment.NULL : encodeWorldLodInstances(worldLodInstances);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-text-and-lod");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-gui-streams");
 		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
@@ -2286,7 +2368,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WHOLE_FRAME_SUBMIT.offset(23),
 			Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize()
 		);
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 24, lodInstanceArray, worldLodInstances.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 24, lodInstanceArray, retainedLodFrame ? 0 : worldLodInstances.size());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 53, worldLodFrameReference.id());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 54, worldLodFrameReference.lifecycle());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 55, worldLodFrameReference.instanceCount());
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-lod-frame");
 		MemorySegment lodRenderFrame = request.asSlice(
 			Struct.WHOLE_FRAME_SUBMIT.offset(25),
@@ -4965,6 +5050,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	/** One visible semantic DH LOD segment in legacy render-list order. */
+	/** Immutable native CPU visibility transaction, not a GPU or memory handle. */
+	public record WorldLodFrameReference(long id, long lifecycle, int instanceCount,
+		int opaqueCount, int transparentCount, int waterCount) {
+		public static final WorldLodFrameReference EMPTY = new WorldLodFrameReference(0L, 0L, 0, 0, 0, 0);
+		public WorldLodFrameReference {
+			if (id < 0L || lifecycle < 0L || instanceCount < 0 || instanceCount > 16_384
+				|| opaqueCount < 0 || transparentCount < 0 || waterCount < 0
+				|| (long)opaqueCount + transparentCount + waterCount != instanceCount
+				|| (id == 0L ? lifecycle != 0L || instanceCount != 0 : instanceCount == 0)) {
+				throw new IllegalArgumentException("invalid native CPU LOD frame reference");
+			}
+		}
+	}
+
 	public record WorldLodColumnInstanceRecord(
 		long columnKey,
 		long columnGeneration,

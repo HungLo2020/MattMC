@@ -93,6 +93,11 @@ pub struct FfiWholeFrameSubmitRequest {
     /// see `bridge/world/dh_generic_groups.rs`), placed with `dh_generic_camera`.
     pub world_dh_generic_group_instances: FfiSlice<FfiDhGenericGroupInstance>,
     pub dh_generic_camera: [f64; 3],
+    /// ABI v74: opaque immutable CPU visibility snapshot; mutually exclusive
+    /// with inline LOD records. Decode owns it before queued execution.
+    pub world_lod_frame_id: u64,
+    pub world_lod_frame_lifecycle: i64,
+    pub world_lod_frame_count: u64,
 }
 
 #[repr(C)]

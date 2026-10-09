@@ -13,6 +13,9 @@
 pub(crate) mod order;
 mod payload;
 mod visibility;
+mod frames;
+pub(crate) use frames::RetainedVisibleFrame;
+use crate::render::scene::lod::WorldLodInstances;
 #[cfg(test)]
 mod tests;
 
@@ -60,6 +63,7 @@ pub(crate) enum Failure {
     SelectUnsupportedSegments,
     RetentionBounds,
     ByteOverflow,
+    FrameReferenceBounds,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Failure>;
@@ -73,15 +77,7 @@ pub(crate) struct Counts {
     pub water: i32,
 }
 
-/// One visible segment (`WorldLodColumnInstanceRecord`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Instance {
-    pub column_key: i64,
-    pub column_generation: i64,
-    pub layer: i32,
-    pub segment_index: i32,
-    pub order: i32,
-}
+pub(crate) use crate::render::scene::lod::WorldLodColumnInstance as Instance;
 
 /// A column snapshot: its generation and payload.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -342,7 +338,10 @@ pub(crate) struct Ledger {
     payload_differences: HashMap<i64, String>,
     pending_segments: Vec<Instance>,
     next_visible_order: i32,
-    last_consumed: Vec<Instance>,
+    last_consumed: WorldLodInstances,
+    last_consumed_signature: Option<i64>,
+    last_consumed_counts: [u32; 3],
+    consumed_frames: std::collections::VecDeque<RetainedVisibleFrame>,
     frame: Frame,
     next_update_generation: i64,
     retained_bytes: i64,
@@ -373,7 +372,10 @@ impl Ledger {
             payload_differences: HashMap::new(),
             pending_segments: Vec::new(),
             next_visible_order: 0,
-            last_consumed: Vec::new(),
+            last_consumed: WorldLodInstances::default(),
+            last_consumed_signature: None,
+            last_consumed_counts: [0; 3],
+            consumed_frames: std::collections::VecDeque::new(),
             frame: Frame::default(),
             next_update_generation: 1,
             retained_bytes: 0,
@@ -682,7 +684,7 @@ impl Ledger {
         self.pending.remove(key);
         self.pending_visible_keys.remove(key);
         let before = self.pending_segments.len();
-        self.pending_segments.retain(|i| i.column_key != key);
+        self.pending_segments.retain(|i| i.column_key != key as u64);
         if self.pending_segments.len() != before {
             self.recompute_route_counts();
             if self.pending_segments.is_empty() {
@@ -718,7 +720,7 @@ impl Ledger {
             !self.owners.contains_key(&key)
                 && !self.candidates.contains(key)
                 && !self.pending_visible_keys.contains(key)
-                && !self.last_consumed.iter().any(|i| i.column_key == key)
+                && !self.last_consumed.iter().any(|i| i.column_key == key as u64)
         })
     }
 
@@ -790,7 +792,7 @@ impl Ledger {
             ordered.extend(self.pending.keys());
         }
         let selected_keys: Option<std::collections::HashSet<i64>> =
-            (!self.pending_segments.is_empty()).then(|| self.pending_segments.iter().map(|i| i.column_key).collect());
+            (!self.pending_segments.is_empty()).then(|| self.pending_segments.iter().map(|i| i.column_key as i64).collect());
         let mut selected = Vec::with_capacity(MAX_PENDING_ASSET_COLUMNS_PER_UPDATE);
         let mut selected_bytes = 0i64;
         for key in ordered {
@@ -941,7 +943,7 @@ impl Ledger {
         }
         let before = self.pending_segments.len();
         self.pending_segments
-            .retain(|i| !advanced.iter().any(|&(key, generation)| key == i.column_key && generation != i.column_generation));
+            .retain(|i| !advanced.iter().any(|&(key, generation)| key as u64 == i.column_key && generation as u64 != i.column_generation));
         if self.pending_segments.len() == before {
             return;
         }
@@ -963,7 +965,7 @@ impl Ledger {
         }
         let before = self.pending_segments.len();
         self.pending_segments
-            .retain(|i| !retirements.iter().any(|&(key, generation)| key == i.column_key && generation == i.column_generation));
+            .retain(|i| !retirements.iter().any(|&(key, generation)| key as u64 == i.column_key && generation as u64 == i.column_generation));
         if self.pending_segments.len() == before {
             return;
         }
@@ -1091,7 +1093,7 @@ impl Ledger {
 
     /// `recordVisibleSegment`'s append of compacted segment indexes.
     pub(crate) fn append_segments(&mut self, key: i64, generation: i64, layer: i32, indexes: &[i32]) -> Result<()> {
-        if self.pending_segments.len() + indexes.len() > MAX_VISIBLE_SEGMENTS {
+        if self.pending_segments.len() + indexes.len() > MAX_VISIBLE_SEGMENTS || indexes.iter().any(|&index| index < 0) {
             return Err(Failure::VisibleSegmentCapture);
         }
         for &index in indexes {
@@ -1101,7 +1103,7 @@ impl Ledger {
     }
 
     fn push_instance(&mut self, column_key: i64, column_generation: i64, layer: i32, segment_index: i32) {
-        self.pending_segments.push(Instance { column_key, column_generation, layer, segment_index, order: self.next_visible_order });
+        self.pending_segments.push(Instance { column_key: column_key as u64, column_generation: column_generation as u64, layer: layer as u32, segment_index: segment_index as u32, order: self.next_visible_order as u32 });
         self.next_visible_order += 1;
     }
 
@@ -1115,8 +1117,8 @@ impl Ledger {
         }
         let mut hash = 0xcbf29ce484222325u64;
         for i in visible {
-            hash = update(hash, i.column_key);
-            hash = update(hash, i.column_generation);
+            hash = update(hash, i.column_key as i64);
+            hash = update(hash, i.column_generation as i64);
             hash = update(hash, i.layer as i64);
             hash = update(hash, i.segment_index as i64);
             hash = update(hash, i.order as i64);
@@ -1126,19 +1128,35 @@ impl Ledger {
 
     /// `consumeVisibleFrame` (Java checks `enabled()`): the selected visible
     /// segments and the frame they were prepared for.
-    pub(crate) fn consume_frame(&mut self) -> (Vec<Instance>, Frame) {
+    pub(crate) fn consume_frame(&mut self) -> (WorldLodInstances, Frame) {
         let frame = self.frame;
         let selected = self.route.selected && frame.enabled && frame.flags & ROUTE_SELECTED_FLAG != 0;
-        let result = if selected { self.pending_segments.clone() } else { Vec::new() };
-        let signature = Self::visible_set_signature(&result);
+        let result = self.take_selected_segments(selected);
+        let signature = *self.last_consumed_signature.get_or_insert_with(|| Self::visible_set_signature(&result));
         if signature != self.receipts.last_visible_set_signature {
             self.receipts.last_visible_set_signature = signature;
             self.receipts.last_visible_set_change_route_frame = self.route.frame;
         }
-        self.last_consumed = result.clone();
-        self.pending_segments.clear();
         self.frame = Frame::default();
         (result, frame)
+    }
+
+    fn take_selected_segments(&mut self, selected: bool) -> WorldLodInstances {
+        let visible = if selected { self.pending_segments.as_slice() } else { &[] };
+        if visible != &*self.last_consumed {
+            self.last_consumed = visible.to_vec().into();
+            self.last_consumed_signature = None;
+            self.last_consumed_counts = [0; 3];
+            for instance in &self.last_consumed {
+                // Compatibility appenders can run after route selection.
+                // Preserve their non-panicking counts; retained handoff
+                // rejects incomplete classification before exposing an ID.
+                let slot = match instance.layer { 1 => 0, 2 | 3 => 1, 4 => 2, _ => continue };
+                self.last_consumed_counts[slot] += 1;
+            }
+        }
+        self.pending_segments.clear();
+        self.last_consumed.clone()
     }
 
     /// `consumeRenderFrame`.
@@ -1147,11 +1165,8 @@ impl Ledger {
     }
 
     /// `consumeVisibleSegments`.
-    pub(crate) fn consume_segments(&mut self) -> Vec<Instance> {
-        let result = if self.route.selected { self.pending_segments.clone() } else { Vec::new() };
-        self.last_consumed = result.clone();
-        self.pending_segments.clear();
-        result
+    pub(crate) fn consume_segments(&mut self) -> WorldLodInstances {
+        self.take_selected_segments(self.route.selected)
     }
 
     /// `markRustNonWaterRouteSelected` (Java checks `enabled()`). Returns
@@ -1279,6 +1294,9 @@ impl Ledger {
         self.payload_differences.clear();
         self.pending_segments.clear();
         self.last_consumed.clear();
+        self.last_consumed_signature = None;
+        self.last_consumed_counts = [0; 3];
+        self.consumed_frames.clear();
         self.frame = Frame::default();
         self.next_visible_order = 0;
         let route = &mut self.route;

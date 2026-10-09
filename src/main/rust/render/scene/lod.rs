@@ -1,6 +1,55 @@
 //! Distant Horizons LOD wire vocabulary: frame flags, layers, material
 //! variants and the vertex layout version.
 
+use std::{ops::Deref, sync::Arc};
+
+/// One ordered reference to an immutable, published CPU column generation.
+/// The collector and renderer share this vocabulary without converting it at
+/// the frame boundary. These are semantic identities, never GPU handles.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WorldLodColumnInstance {
+    pub column_key: u64,
+    pub column_generation: u64,
+    pub layer: u32,
+    pub segment_index: u32,
+    pub order: u32,
+}
+
+/// Immutable selected LOD work. Derived passes and queued frames share its
+/// allocation; clearing a pass drops its reference without copying the list.
+/// Empty frames need no allocation.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WorldLodInstances(Option<Arc<Vec<WorldLodColumnInstance>>>);
+
+impl WorldLodInstances {
+    pub fn clear(&mut self) { self.0 = None; }
+
+    pub fn shares_storage(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (None, None) => true,
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+impl From<Vec<WorldLodColumnInstance>> for WorldLodInstances {
+    fn from(instances: Vec<WorldLodColumnInstance>) -> Self {
+        Self((!instances.is_empty()).then(|| Arc::new(instances)))
+    }
+}
+
+impl Deref for WorldLodInstances {
+    type Target = [WorldLodColumnInstance];
+    fn deref(&self) -> &Self::Target { self.0.as_ref().map(|instances| instances.as_slice()).unwrap_or(&[]) }
+}
+
+impl<'a> IntoIterator for &'a WorldLodInstances {
+    type Item = &'a WorldLodColumnInstance;
+    type IntoIter = std::slice::Iter<'a, WorldLodColumnInstance>;
+    fn into_iter(self) -> Self::IntoIter { self.iter() }
+}
+
 /// Stable semantic layout decoded from Distant Horizons' CPU LOD builder.
 /// This is intentionally separate from `WorldMeshVertex`: DH has vertex
 /// color/material/light semantics but no Minecraft atlas UV ownership.

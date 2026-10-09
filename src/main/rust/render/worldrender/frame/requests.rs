@@ -174,17 +174,7 @@ pub struct WorldLodColumnMaterialProvenance {
     pub face_materials: Vec<WorldLodFaceMaterial>,
 }
 
-/// Compact visible-column reference for the eventual combined world frame.
-/// Layer and ordering are explicit because transparent LOD streams cannot be
-/// merged into opaque terrain submission accidentally.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct WorldLodColumnInstanceRequest {
-    pub column_key: u64,
-    pub column_generation: u64,
-    pub layer: u32,
-    pub segment_index: u32,
-    pub order: u32,
-}
+pub use crate::render::scene::lod::{WorldLodColumnInstance as WorldLodColumnInstanceRequest, WorldLodInstances};
 
 /// Resolved, backend-neutral Distant Horizons terrain-program inputs for one
 /// frame. Java supplies scalar gameplay/configuration semantics only; Rust
@@ -620,7 +610,7 @@ pub struct WorldPrimitiveFrame {
     /// Visible DH LOD references are transport-only until a complete Rust LOD
     /// material/pass contract is admitted. Keeping them in the combined frame
     /// preserves the real producer ordering without borrowing legacy GL state.
-    pub lod_instances: Vec<WorldLodColumnInstanceRequest>,
+    pub lod_instances: WorldLodInstances,
     pub lod_render_frame: WorldLodRenderFrame,
     /// Off-camera terrain shadow casters. The frontend expands them into
     /// `mesh_instances` before validation; see `frame::shadow_casters`.
@@ -654,7 +644,7 @@ impl WorldPrimitiveFrame {
             dh_generic_boxes: Vec::new(),
             mesh_instances: Vec::new(),
             text_quads: Vec::new(),
-            lod_instances: Vec::new(),
+            lod_instances: WorldLodInstances::default(),
             lod_render_frame: self.lod_render_frame.clone(),
             static_terrain_shadow_casters: self.static_terrain_shadow_casters.clone(),
             static_terrain_sections: self.static_terrain_sections.clone(),

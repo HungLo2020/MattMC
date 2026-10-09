@@ -1285,7 +1285,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
         texture.field_offsets[15]
     );
-    assert_eq!(53, whole_frame.field_count);
+    assert_eq!(56, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
         whole_frame.field_offsets[45]
@@ -1325,6 +1325,11 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, dh_generic_camera) as u32,
         whole_frame.field_offsets[52]
     );
+    for (field, offset) in [
+        (53, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_id)),
+        (54, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_lifecycle)),
+        (55, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_count)),
+    ] { assert_eq!(offset as u32, whole_frame.field_offsets[field]); }
     assert_eq!(size_of::<FfiDhGenericGroupBox>(), 56);
     assert_eq!(size_of::<FfiDhGenericGroupInstance>(), 72);
     assert_eq!(
@@ -2273,6 +2278,9 @@ fn whole_frame_request(
             count: 0,
         },
         dh_generic_camera: [0.0; 3],
+        world_lod_frame_id: 0,
+        world_lod_frame_lifecycle: 0,
+        world_lod_frame_count: 0,
         world_model_rig_poses: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
@@ -6328,6 +6336,23 @@ fn world_lod_asset_ffi_accepts_the_bounded_packed_dh_vertex_stream() {
     );
     assert_eq!(7, owned[0].segments[0].vertices[0].material_id);
     assert_eq!(5, owned[0].segments[0].vertices[0].normal_index);
+}
+
+#[test]
+fn whole_frame_ffi_rejects_incomplete_oversized_and_mixed_native_lod_references() {
+    for (id, lifecycle, count, inline_count) in [
+        (0, 1, 0, 0), (0, 0, 1, 0), (1, 0, 0, 0),
+        (1, 0, crate::render::worldrender::WORLD_LOD_MAX_VISIBLE_SEGMENTS as u64 + 1, 0), (1, 0, 1, 1),
+    ] {
+        let mut request = whole_frame_request(&[], &[]);
+        request.world_lod_frame_id = id;
+        request.world_lod_frame_lifecycle = lifecycle;
+        request.world_lod_frame_count = count;
+        // Mixed references reject without dereferencing the inline pointer.
+        request.world_lod_instances.count = inline_count;
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap_err();
+        assert!(format!("{error}").contains("native DH frame"), "{error}");
+    }
 }
 
 #[test]

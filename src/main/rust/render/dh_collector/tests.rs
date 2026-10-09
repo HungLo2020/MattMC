@@ -133,7 +133,7 @@ fn visible_columns_use_global_segment_indexes_and_wait_for_publication() {
     l.acknowledge(c, &[Acknowledged { column_key: 9, generation: sent.generation, payload: sent.payload.clone() }], &[], &mut e);
     let Visible::Admit { generation, counts } = l.visible_column(9).unwrap() else { panic!() };
     l.append_visible_column(9, generation, counts).unwrap();
-    let layers: Vec<(i32, i32, i32)> = l.pending_segments().iter().map(|i| (i.layer, i.segment_index, i.order)).collect();
+    let layers: Vec<(u32, u32, u32)> = l.pending_segments().iter().map(|i| (i.layer, i.segment_index, i.order)).collect();
     assert_eq!(layers, vec![(1, 0, 0), (1, 1, 1), (2, 2, 2), (4, 3, 3)]);
     assert!(l.select_route(false).unwrap());
     assert_eq!(l.route.reason, "reduced-color-with-partial-exact-atlas");

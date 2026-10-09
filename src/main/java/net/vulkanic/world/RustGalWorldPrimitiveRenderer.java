@@ -18504,7 +18504,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				}
 			}
 			DistantHorizonsSemanticCollector.ConsumedVisibleFrame consumedDistantHorizons =
-				DistantHorizonsSemanticCollector.consumeVisibleFrame();
+				DistantHorizonsSemanticCollector.consumeRetainedVisibleFrame();
 			// Generic boxes are copied before DH decides whether the complete private
 			// route is admissible. Pair them with that exact consumed decision: a
 			// rejected/transitional frame has no private DH target or lightmap in
@@ -18560,7 +18560,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				shadowCasters,
 				terrainSections,
 				takeModelRigPosesLocked(),
-				consumedDistantHorizons.lifecycle()
+				consumedDistantHorizons.lifecycle(),
+				consumedDistantHorizons.nativeReference()
 			);
 			worldTextDiagnostic = worldTextDiagnostic.withConsumed(semanticFrameSequence, frame.textQuads().size());
 			ORB_SEMANTICS.clearFrame();
@@ -18809,7 +18810,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			frame.staticTerrainShadowCasters(),
 			frame.staticTerrainSections(),
 			frame.modelRigPoses(),
-			frame.distantHorizonsLifecycle()
+			frame.distantHorizonsLifecycle(),
+			frame.lodFrameReference()
 		);
 	}
 
@@ -18855,9 +18857,63 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.StaticTerrainSections staticTerrainSections,
 		VulkanicGalBridge.ModelRigPoses modelRigPoses,
 		/** DH collector lifecycle this frame's LOD semantics were consumed under. */
-		long distantHorizonsLifecycle
+		long distantHorizonsLifecycle,
+		/** Selected native CPU list; lodInstances contains diagnostic readback only when this is present. */
+		VulkanicGalBridge.WorldLodFrameReference lodFrameReference
 	) {
+		public PrimitiveFrame(
+			int viewportWidth,
+			int viewportHeight,
+			float[] viewMatrix,
+			float[] projectionMatrix,
+			VulkanicGalBridge.WorldBackgroundRecord background,
+			List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
+			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
+			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
+			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
+			List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+			List<String> meshProducerLabels,
+			VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+			VulkanicGalBridge.WorldFeatureCoverageRecord featureCoverage,
+			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> lodInstances,
+			VulkanicGalBridge.WorldLodRenderFrameRecord lodRenderFrame,
+			int entityFlameQuadCount,
+			VulkanicGalBridge.WorldFirstPersonFrameRecord firstPersonFrame,
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances,
+			List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads,
+			List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
+			List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes,
+			VulkanicGalBridge.TerrainFrameCamera terrainFrameCamera,
+			VulkanicGalBridge.StaticTerrainShadowCasters staticTerrainShadowCasters,
+			VulkanicGalBridge.StaticTerrainSections staticTerrainSections,
+			VulkanicGalBridge.ModelRigPoses modelRigPoses,
+			/** DH collector lifecycle this frame's LOD semantics were consumed under. */
+			long distantHorizonsLifecycle
+		) {
+			this(viewportWidth, viewportHeight, viewMatrix, projectionMatrix, background, segments, crackQuads, borderQuads, materialQuads, textQuads, meshInstances, meshProducerLabels, voxelVolumeFrame, shaderEnvironmentFrame, featureCoverage, lodInstances, lodRenderFrame, entityFlameQuadCount, firstPersonFrame, firstPersonMeshInstances, particleQuads, orbInstances, distantHorizonsGenericBoxes, terrainFrameCamera, staticTerrainShadowCasters, staticTerrainSections, modelRigPoses, distantHorizonsLifecycle, VulkanicGalBridge.WorldLodFrameReference.EMPTY);
+		}
+
+		public int lodInstanceCount() {
+			return lodFrameReference.id() != 0L ? lodFrameReference.instanceCount() : lodInstances.size();
+		}
+		public int lodOpaqueInstanceCount() { return lodLayerCount(1); }
+		public int lodTransparentInstanceCount() { return lodLayerCount(2); }
+		public int lodWaterInstanceCount() { return lodLayerCount(4); }
+		private int lodLayerCount(int kind) {
+			if (lodFrameReference.id() != 0L) {
+				return switch (kind) { case 1 -> lodFrameReference.opaqueCount(); case 2 -> lodFrameReference.transparentCount(); default -> lodFrameReference.waterCount(); };
+			}
+			int count = 0;
+			for (var instance : lodInstances) {
+				if (instance.layer() == kind || kind == 2 && instance.layer() == 3) count++;
+			}
+			return count;
+		}
+
 		public PrimitiveFrame {
+			if (lodFrameReference == null) lodFrameReference = VulkanicGalBridge.WorldLodFrameReference.EMPTY;
 			if (modelRigPoses == null) {
 				modelRigPoses = VulkanicGalBridge.ModelRigPoses.EMPTY;
 			}

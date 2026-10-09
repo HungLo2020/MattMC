@@ -88,6 +88,7 @@ final class DhCollectorLedger {
 		ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
 	private static final MethodHandle SEGMENTS = bind("segments", false, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
 	private static final MethodHandle CONSUME = bind("consume", true, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
+	private static final MethodHandle CONSUME_RETAINED = bind("consume_retained", true, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
 	private static final MethodHandle SELECT_ROUTE = bind("select_route", false, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
 	private static final MethodHandle REJECT_ROUTE = bindVoid("reject_route", ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
@@ -340,6 +341,18 @@ final class DhCollectorLedger {
 			throw error;
 		} catch (Throwable error) {
 			throw failure("consume", error);
+		}
+	}
+
+	/** Nine scalar longs; segment bytes are copied only for diagnostic readback. */
+	static long[] consumeRetained(boolean readback, long[] header) {
+		if (header.length != 9) throw new IllegalArgumentException("native DH frame header must contain nine longs");
+		try {
+			return takeOutput(check((int)CONSUME_RETAINED.invokeExact(readback ? 1 : 0, MemorySegment.ofArray(header))));
+		} catch (RuntimeException error) {
+			throw error;
+		} catch (Throwable error) {
+			throw failure("retained frame consume", error);
 		}
 	}
 

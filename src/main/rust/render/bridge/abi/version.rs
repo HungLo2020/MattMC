@@ -127,7 +127,8 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v72 appends retained DH generic group instances: group boxes are
 /// registered once and each frame sends only the groups' origins.
 /// v73 adds indexed map-color CPU image input, expanded only by the Rust frontend.
-pub const FFI_ABI_VERSION: u32 = 73;
+/// v74 appends a bounded native CPU DH visibility-frame reference.
+pub const FFI_ABI_VERSION: u32 = 74;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

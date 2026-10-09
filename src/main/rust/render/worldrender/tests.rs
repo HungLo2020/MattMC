@@ -2227,7 +2227,7 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
             layer: WORLD_LOD_LAYER_OPAQUE,
             segment_index: 0,
             order: 0,
-        }];
+        }].into();
         frame.lod_render_frame = WorldLodRenderFrame {
             enabled: true,
             flags: WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
@@ -3264,7 +3264,7 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         layer: WORLD_LOD_LAYER_OPAQUE,
         segment_index: 0,
         order: 0,
-    }];
+    }].into();
     // The DH fullscreen contract derives clip planes from an actual
     // perspective projection; identity is not a valid depth-space fixture.
     let dh_projection = [
@@ -4174,7 +4174,7 @@ pub(crate) fn frame(segments: Vec<WorldLineSegmentRequest>) -> WorldPrimitiveFra
         dh_generic_boxes: Vec::new(),
         mesh_instances: Vec::new(),
         text_quads: Vec::new(),
-        lod_instances: Vec::new(),
+        lod_instances: Vec::new().into(),
         lod_render_frame: WorldLodRenderFrame::default(),
         static_terrain_shadow_casters: StaticTerrainShadowCasters::default(),
         static_terrain_sections: StaticTerrainSections::default(),
@@ -4235,7 +4235,7 @@ fn selected_source_distant_horizons_admission_accepts_declared_reduced_color_mat
         micro_offset: 0.01,
         ..WorldLodRenderFrame::default()
     };
-    dh_frame.lod_instances = vec![instance];
+    dh_frame.lod_instances = vec![instance].into();
     frontend
         .validate_source_distant_horizons_for_frame(&dh_frame)
         .expect(
@@ -4301,7 +4301,7 @@ fn selected_source_distant_horizons_admission_uses_the_late_material_program_for
             order: 23,
             ..instance
         },
-    ];
+    ].into();
 
     frontend
         .validate_source_distant_horizons_for_frame(&dh_frame)
@@ -7614,13 +7614,13 @@ fn mixed_translucent_material_and_lod_work_stays_on_ordinary_graph() {
         WORLD_MATERIAL_MODE_TRANSLUCENT,
         WORLD_DEPTH_POLICY_TEST_NO_WRITE,
     ));
-    frame.lod_instances.push(WorldLodColumnInstanceRequest {
+    frame.lod_instances = vec![WorldLodColumnInstanceRequest {
         column_key: 1,
         column_generation: 1,
         layer: WORLD_LOD_LAYER_OPAQUE,
         segment_index: 0,
         order: 0,
-    });
+    }].into();
 
     assert!(!frontend.frame_has_fabulous_transparency_work(&frame));
     frame.lod_render_frame.enabled = true;
@@ -17194,7 +17194,7 @@ fn private_dh_material_passes_partition_partial_atlas_segments_without_duplicate
             order: 2,
             ..instance
         },
-    ];
+    ].into();
     frame.lod_render_frame = lod_frame;
     frame.shader_environment.enabled = true;
     frame.shader_environment.world_generation = 1;

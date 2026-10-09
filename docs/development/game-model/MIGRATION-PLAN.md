@@ -23,12 +23,26 @@ terrain and DH owners provide starting points; their remaining Java consumers
 and orchestration are still unfinished. Preserve world/save behavior and bounded
 generation/reload handling, and verify realistic workloads against Frozen.
 
-The first candidate is the [DH frame transaction](../rendering/RETAINED-SCENE.md#next-proposed-ownership-slice),
-which still reconstructs Rust-selected segments on both sides of the bridge.
+The first local implementation is the [DH frame transaction](../rendering/RETAINED-SCENE.md#native-dh-visibility-frame-ownership),
+which keeps Rust-selected segments in native immutable frame storage. All seven lifecycle cases and the reviewed vanilla/Iris+DH image pairs pass
+locally. Four-mode comparisons completed with sixteen clean runs but still fail vanilla/DH
+performance floors. The handoff is implemented. Final release image proof and paired diagnostic
+profiles pass; the targeted Java allocation/encoding cost is reduced, with no
+accepted isolated throughput gain. See the retained-scene evidence for bounds.
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java installs stage results and
 still owns normal chunk mutation/orchestration. Move hot consumers with storage
 so ordinary block reads do not become individual cross-language calls.
+
+A concrete remaining producer is terrain rebuild preparation:
+[`ClonedChunkSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/world/cloned/ClonedChunkSection.java)
+clones Java palettes, `LevelSlice` expands Java block arrays, and
+[`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java)
+repackages padded state/light grids and per-block tint inputs for Rust meshing.
+This is source-confirmed ownership/transfer work, not a measured hotspot or an
+implemented loaded-world migration. Profile rebuild/streaming workloads before
+choosing the slice; move authoritative section data and its bulk consumers
+together while preserving snapshot timing, contextual rules and reload handling.
 
 ## Phase 1: one block registry from Java (implemented)
 

@@ -140,7 +140,8 @@ generation, so a record's presence proves it is current.
 The [DH column ledger](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 retains immutable packed payloads and publication/lease/route state in Rust.
 Java still walks the quadtree, supplies provenance and render parameters, and
-copies selected records into the frame. Ordinary publication builds frontend
+hands the selected native CPU frame reference to the renderer. Selected records
+are copied back only for diagnostics/compatibility observers. Ordinary publication builds frontend
 assets from the ledger; exact-material provenance retains the Java publication
 path. Batched collection checks each walked container's generation before
 publication/visibility admission. Container close retires only its lease, and
@@ -162,17 +163,59 @@ callbacks and change notifications; missing generations request resending. This
 is separate from retained GPU terrain and phase 5's entity/block-entity target.
 Neither change establishes all-route scene ownership or Frozen parity.
 
-### Next proposed ownership slice
+### Native DH visibility frame ownership
 
-Remove the visible-segment round trip: Rust currently selects the list, exports
-it into Java records, and decodes those records back into another native list.
-The next candidate is a bounded native CPU frame transaction consumed directly
-by the renderer, with Java carrying its identity and scalar counts. Move the
-coordinator's layer counting and diagnostic-copy consumers with this boundary;
-otherwise they would recreate the same list every frame. Preserve exact order,
-column generations, lifecycle rejection, queued-frame ownership and capture
-readback. This slice is not implemented yet. Profile the moving DH workload
-against Frozen first, then verify real transitions and images alongside timing.
+Implemented; scoped verification on 2026-10-09. The first release passes all seven
+lifecycle cases and reviewed vanilla/Iris+DH images. Its sixteen clean ABAB
+runs still fail vanilla/DH FPS and p99 floors; neither static ownership changes
+nor earlier profiles establish an isolated throughput gain. After late-input hardening, the final release also passes a fresh reviewed
+Iris+DH pair and paired 60,000-frame diagnostic profiles; source/library/Frozen
+integrity and cleanup pass. See the evidence below for its performance limits.
+
+ABI 74 removes the ordinary visible-segment round trip. The collector and
+renderer share `scene::lod::WorldLodColumnInstance` and an immutable native list.
+Java carries the frame identity, lifecycle and scalar layer counts; the bridge
+resolves that identity directly. It does not repack diagnostic readback into
+render inputs. The coordinator also consumes native layer counts, and completion
+copies capture records only when diagnostics request them.
+
+The collector retains at most three CPU frame snapshots, each bounded to 16,384
+segments. Unchanged ordered sets share storage and reuse their stability hash.
+Decode verifies identity, lifecycle, count and the exact selected decision,
+then retains immutable ownership before queueing. Clearing/resetting the
+collector invalidates unresolved references; already decoded frames keep their
+CPU list. Old identifiers are never reused. Derived passes can clear their list
+without copying another frame's storage. Existing column-retention protection,
+publication/generation checks and GAL resource/completion ownership remain.
+Compatibility appenders can add work after route selection; unclassified layers
+reject retained handoff without panicking or poisoning the ledger. Counts already
+computed for the immutable set establish this check without another full scan.
+
+Legacy inline inputs and explicit capture readback remain supported. Java still
+walks the DH tree, prepares frame matrices/configuration and owns exact-material
+provenance. This slice does not migrate loaded-world storage or the entire DH
+producer. GPU resources and presentation continue through the existing GAL.
+
+The accepted before/after diagnostic profiles are
+`goal5/map-policy-dh-profile-v2-20261008/` and
+`goal5/native-dh-frame-profile-20261009/`. Both verify the sampling window,
+source/library/Frozen integrity and clean 60,000-frame completion. In their
+15-second allocation windows (1 MiB sampling), consumption falls from432.01 to
+33.55 MB; the former encoder falls from191.89 MB to no observed allocation or
+CPU samples. The two paths' share of render-thread CPU samples falls from~4.7%
+to~1.5%. These are sampled component costs, not exact per-frame allocation or an
+isolated throughput gain. Benchmark machinery is reported separately. The
+original early-attachment profile remains rejected.
+
+`validation/native-dh-frame-ownership-20261009/` retains all seven lifecycle
+cases, reviewed vanilla/Iris+DH pairs and sixteen clean ABAB/6,000-frame rows.
+Its overall result is **FAIL**: vanilla and vanilla+DH miss FPS/p99 floors;
+both shader modes pass. This full comparison used release SHA1ad43eea before
+late-input rejection was hardened. Final release SHA77998a11 has2,396 Rust
+passes/3 ignores, a fresh reviewed Iris+DH pair in
+`goal5/native-dh-frame-hardened-proof-v2-20261009/`, and the accepted paired
+profiles above. Java1,729 passes/2 skips precede the native-only hardening;
+Java source and ABI are unchanged. Broad parity and long-run memory remain open.
 
 ## Phases
 

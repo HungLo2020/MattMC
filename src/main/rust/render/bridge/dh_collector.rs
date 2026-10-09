@@ -38,6 +38,7 @@ fn code(failure: Failure) -> i32 {
         Failure::SelectUnsupportedSegments => -4,
         Failure::RetentionBounds => -5,
         Failure::ByteOverflow => -6,
+        Failure::FrameReferenceBounds => -7,
     }
 }
 
@@ -93,7 +94,7 @@ fn store_text(values: &[&str]) -> i32 {
 
 fn push_instances(out: &mut Vec<i64>, instances: &[Instance]) {
     for i in instances {
-        out.extend([i.column_key, i.column_generation, i.layer as i64, i.segment_index as i64, i.order as i64]);
+        out.extend([i.column_key as i64, i.column_generation as i64, i.layer as i64, i.segment_index as i64, i.order as i64]);
     }
 }
 
@@ -436,13 +437,36 @@ pub unsafe extern "C" fn mattmc_dh_collector_consume(mode: i32, header: *mut i64
     with(|l| {
         let (segments, frame) = match mode {
             0 => l.consume_frame(),
-            1 => (Vec::new(), l.consume_render_frame()),
+            1 => (Default::default(), l.consume_render_frame()),
             _ => (l.consume_segments(), l.frame()),
         };
         header.copy_from_slice(&[frame.enabled as i64, frame.flags as i64, l.lifecycle(), l.route.frame]);
         push_instances(&mut out, &segments);
     });
     store_output(out)
+}
+
+/// Consumes one immutable native CPU frame. Java receives only scalar
+/// [enabled, flags, lifecycle, route frame, id, count, opaque, transparent,
+/// water]. A segment readback is emitted only for explicit diagnostics.
+/// # Safety
+/// `header` addresses nine writable longs.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_collector_consume_retained(readback: i32, header: *mut i64) -> i32 {
+    if header.is_null() { return code(Failure::FrameReferenceBounds); }
+    match with(|ledger| ledger.consume_retained_frame()) {
+        Some(Ok(frame)) => {
+            std::slice::from_raw_parts_mut(header, 9).copy_from_slice(&[
+                frame.frame.enabled as i64, frame.frame.flags as i64, frame.lifecycle, frame.route_frame,
+                frame.id as i64, frame.instances.len() as i64,
+                frame.counts[0] as i64, frame.counts[1] as i64, frame.counts[2] as i64]);
+            let mut out = Vec::new();
+            if readback != 0 { push_instances(&mut out, &frame.instances); }
+            store_output(out)
+        }
+        Some(Err(failure)) => code(failure),
+        None => ERR_POISONED,
+    }
 }
 
 /// Returns 1 when the route became selected, 0 when it already was, or an

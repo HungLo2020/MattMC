@@ -235,6 +235,7 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
             request
                 .world_lod_instances
                 .count
+                .saturating_add(request.world_lod_frame_count)
                 .saturating_mul(size_of::<FfiWorldLodColumnInstanceRecord>() as u64),
         )
         .saturating_add(

@@ -1057,7 +1057,8 @@ public final class RustGalFrameCoordinator {
 							primitiveFrame.terrainFrameCamera(),
 							primitiveFrame.staticTerrainShadowCasters(),
 							primitiveFrame.staticTerrainSections(),
-							primitiveFrame.modelRigPoses()
+							primitiveFrame.modelRigPoses(),
+							primitiveFrame.lodFrameReference()
 						);
 						break;
 					} catch (IllegalStateException failure) {
@@ -1347,20 +1348,12 @@ public final class RustGalFrameCoordinator {
 				lastDhParityPhaseFrame = frameId;
 			}
 			METRICS.worldLodSelectedFrames++;
-			METRICS.worldLodInstancesSubmitted += primitiveFrame.lodInstances().size();
+			METRICS.worldLodInstancesSubmitted += primitiveFrame.lodInstanceCount();
 			METRICS.worldLodFramesExecuted++;
-			if (!primitiveFrame.lodInstances().isEmpty()) {
-				int opaqueInstances = 0;
-				int transparentInstances = 0;
-				int waterInstances = 0;
-				for (var instance : primitiveFrame.lodInstances()) {
-					switch (instance.layer()) {
-						case 1 -> opaqueInstances++;
-						case 2, 3 -> transparentInstances++;
-						case 4 -> waterInstances++;
-						default -> { }
-					}
-				}
+			if (primitiveFrame.lodInstanceCount() != 0) {
+				int opaqueInstances = primitiveFrame.lodOpaqueInstanceCount();
+				int transparentInstances = primitiveFrame.lodTransparentInstanceCount();
+				int waterInstances = primitiveFrame.lodWaterInstanceCount();
 				DistantHorizonsSemanticCollector.recordRustMaterialRouteExecution(
 					frameId,
 					submissionId,
@@ -1369,7 +1362,7 @@ public final class RustGalFrameCoordinator {
 					// identity shared by the Rust execution and screenshot receipt;
 					// do not invent a route-specific frame offset.
 					net.minecraft.client.dev.DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
-					primitiveFrame.lodInstances().size(),
+					primitiveFrame.lodInstanceCount(),
 					opaqueInstances,
 					transparentInstances,
 					waterInstances,
@@ -1713,7 +1706,7 @@ public final class RustGalFrameCoordinator {
 			+ "  \"world_mesh_instances\":" + result.worldMeshInstanceCount() + ",\n"
 			+ "  \"world_mesh_batches\":" + result.worldMeshBatchCount() + ",\n"
 			+ "  \"world_mesh_draws\":" + result.worldMeshDrawCount() + ",\n"
-			+ "  \"world_lod_instances\":" + primitiveFrame.lodInstances().size() + ",\n"
+			+ "  \"world_lod_instances\":" + primitiveFrame.lodInstanceCount() + ",\n"
 			+ "  \"world_lod_route_selected\":" + lodRouteSelected(primitiveFrame.lodRenderFrame()) + ",\n"
 			+ "  \"world_material_quads\":" + result.worldMaterialQuadCount() + ",\n"
 			+ "  \"world_crack_quads\":" + result.worldCrackQuadCount() + ",\n"
@@ -1902,7 +1895,7 @@ public final class RustGalFrameCoordinator {
 			+ " particle_quads=" + particleQuads
 			+ " particle_semantic_quads=" + frame.particleQuads().size()
 			+ " mesh_instances=" + frame.meshInstances().size()
-			+ " lod_instances=" + frame.lodInstances().size()
+			+ " lod_instances=" + frame.lodInstanceCount()
 			+ " lod_route_selected=" + lodRouteSelected(frame.lodRenderFrame())
 			+ " feature_models=" + coverage.modelSubmits()
 			+ " feature_model_parts=" + coverage.modelPartSubmits()

@@ -783,7 +783,10 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_static_terrain_sections,
                 world_model_rig_poses,
                 world_dh_generic_group_instances,
-                dh_generic_camera
+                dh_generic_camera,
+                world_lod_frame_id,
+                world_lod_frame_lifecycle,
+                world_lod_frame_count
             ]
         ),
         89 => layout!(

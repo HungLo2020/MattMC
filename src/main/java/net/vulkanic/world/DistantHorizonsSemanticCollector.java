@@ -137,6 +137,8 @@ public final class DistantHorizonsSemanticCollector {
 	 * last consumed set, as records). Diagnostic capture may inspect this
 	 * bounded copy, but it never feeds admission. */
 	private static List<VulkanicGalBridge.WorldLodColumnInstanceRecord> LAST_CONSUMED_VISIBLE_SEGMENTS = List.of();
+	/** Reused under LOCK; immutable scalar references are copied into the frame. */
+	private static final long[] CONSUMED_VISIBLE_FRAME_HEADER = new long[9];
 	/** Immutable source snapshots captured at the actual Java-to-Rust frame
 	 * handoff. DH is allowed to publish replacements after this point, but those
 	 * replacements must not rewrite capture provenance for the submitted frame. */
@@ -2012,8 +2014,14 @@ public final class DistantHorizonsSemanticCollector {
 	public record ConsumedVisibleFrame(
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments,
 		VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame,
-		long lifecycle
-	) {}
+		long lifecycle,
+		VulkanicGalBridge.WorldLodFrameReference nativeReference
+	) {
+		public ConsumedVisibleFrame(List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments,
+			VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame, long lifecycle) {
+			this(visibleSegments, renderFrame, lifecycle, VulkanicGalBridge.WorldLodFrameReference.EMPTY);
+		}
+	}
 
 	/** Completed-frame DH receipts dropped because their lifecycle had ended. */
 	public static long staleRouteExecutionReceipts() {
@@ -2022,7 +2030,17 @@ public final class DistantHorizonsSemanticCollector {
 		}
 	}
 
+	/** Compatibility/observation accessor: returns eager immutable records. */
 	public static ConsumedVisibleFrame consumeVisibleFrame() {
+		return consumeVisibleFrame(true);
+	}
+
+	/** Production handoff keeps the selected CPU list in Rust. */
+	public static ConsumedVisibleFrame consumeRetainedVisibleFrame() {
+		return consumeVisibleFrame(executionSnapshotsEnabled());
+	}
+
+	private static ConsumedVisibleFrame consumeVisibleFrame(boolean readback) {
 		if (!enabled()) {
 			synchronized (LOCK) {
 				return new ConsumedVisibleFrame(List.of(), VulkanicGalBridge.WorldLodRenderFrameRecord.disabled(),
@@ -2032,11 +2050,15 @@ public final class DistantHorizonsSemanticCollector {
 		synchronized (LOCK) {
 			// The ledger hands over the selected segments with the frame they were
 			// prepared for, clears both and tracks visible-set stability.
-			long[] header = new long[4];
+			long[] header = CONSUMED_VISIBLE_FRAME_HEADER;
 			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result =
-				records(DhCollectorLedger.consume(DhCollectorLedger.CONSUME_VISIBLE_FRAME, header));
+				records(DhCollectorLedger.consumeRetained(readback, header));
+			VulkanicGalBridge.WorldLodFrameReference nativeReference = header[4] == 0L
+				? VulkanicGalBridge.WorldLodFrameReference.EMPTY
+				: new VulkanicGalBridge.WorldLodFrameReference(header[4], header[2],
+					Math.toIntExact(header[5]), Math.toIntExact(header[6]), Math.toIntExact(header[7]), Math.toIntExact(header[8]));
 			VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame = frameRecord(header[0] != 0L, (int)header[1]);
-			if (!result.isEmpty()) {
+			if (header[5] != 0L) {
 				RustGalTerrainRenderer.ensureTerrainAtlasAssetForWorldMesh();
 			}
 			LAST_CONSUMED_VISIBLE_SEGMENTS = result;
@@ -2044,7 +2066,7 @@ public final class DistantHorizonsSemanticCollector {
 				? snapshotExecutedSegmentsLocked(result)
 				: List.of();
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-			ConsumedVisibleFrame consumed = new ConsumedVisibleFrame(result, renderFrame, header[2]);
+			ConsumedVisibleFrame consumed = new ConsumedVisibleFrame(result, renderFrame, header[2], nativeReference);
 			writeSemanticPayloadReceiptLocked(header[3], result);
 			return consumed;
 		}
@@ -2367,10 +2389,11 @@ public final class DistantHorizonsSemanticCollector {
 			net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame(
 				"distant-horizons", executionIdentity
 			);
+			if (!executionSnapshotsEnabled()) return;
 			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> executedSegments = submittedSegments == null
 				? LAST_CONSUMED_VISIBLE_SEGMENTS
 				: List.copyOf(submittedSegments);
-			if (executionSnapshotsEnabled() && executedSegments.size() == instances) {
+			if (executedSegments.size() == instances) {
 				List<ExecutedVisibleSegmentSnapshot> snapshots = executedSegments.equals(LAST_CONSUMED_VISIBLE_SEGMENTS)
 					? LAST_CONSUMED_VISIBLE_SEGMENT_SNAPSHOTS
 					: snapshotExecutedSegmentsLocked(executedSegments);

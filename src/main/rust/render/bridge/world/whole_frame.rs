@@ -1303,36 +1303,36 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             block_entity_id: quad.block_entity_id,
         });
     }
-    let raw_lod_instances = read_slice(
-        request.world_lod_instances,
-        true,
-        "world primitive LOD instances",
-    )?;
-    if raw_lod_instances.len() > WORLD_LOD_MAX_VISIBLE_SEGMENTS {
-        return Err(GalError::ffi(
-            StatusCode::InvalidArgument,
-            format!(
-                "world primitive LOD instance count {} exceeds max {}",
-                raw_lod_instances.len(),
-                WORLD_LOD_MAX_VISIBLE_SEGMENTS
-            ),
-        ));
-    }
-    let mut lod_instances = Vec::with_capacity(raw_lod_instances.len());
-    for instance in raw_lod_instances {
-        validate_item_size::<FfiWorldLodColumnInstanceRecord>(
-            instance.byte_size,
-            "world primitive LOD instance",
-        )?;
-        lod_instances.push(WorldLodColumnInstanceRequest {
-            column_key: instance.column_key,
-            column_generation: instance.column_generation,
-            layer: instance.layer,
-            segment_index: instance.segment_index,
-            order: instance.order,
-        });
-    }
     let lod_render_frame = decode_world_lod_render_frame(request.world_lod_render_frame)?;
+    let lod_instances = if request.world_lod_frame_id != 0 {
+        if request.world_lod_instances.count != 0 || request.world_lod_frame_count == 0
+            || request.world_lod_frame_count > WORLD_LOD_MAX_VISIBLE_SEGMENTS as u64 {
+            return Err(GalError::invalid_argument("invalid native DH frame reference or mixed inline LOD work"));
+        }
+        let ledger = crate::render::dh_collector::ledger().lock()
+            .map_err(|_| GalError::invalid_argument("DH frame ledger is poisoned"))?;
+        ledger.resolve_retained_frame(request.world_lod_frame_id, request.world_lod_frame_lifecycle,
+            request.world_lod_frame_count, lod_render_frame.enabled, lod_render_frame.flags)
+            .ok_or_else(|| GalError::invalid_argument("native DH frame identity, lifecycle, count or selection is stale"))?
+    } else {
+        if request.world_lod_frame_lifecycle != 0 || request.world_lod_frame_count != 0 {
+            return Err(GalError::invalid_argument("absent native DH frame has reference metadata"));
+        }
+        let raw_lod_instances = read_slice(request.world_lod_instances, true, "world primitive LOD instances")?;
+        if raw_lod_instances.len() > WORLD_LOD_MAX_VISIBLE_SEGMENTS {
+            return Err(GalError::ffi(StatusCode::InvalidArgument, format!(
+                "world primitive LOD instance count {} exceeds max {}",
+                raw_lod_instances.len(), WORLD_LOD_MAX_VISIBLE_SEGMENTS)));
+        }
+        let mut instances = Vec::with_capacity(raw_lod_instances.len());
+        for instance in raw_lod_instances {
+            validate_item_size::<FfiWorldLodColumnInstanceRecord>(instance.byte_size, "world primitive LOD instance")?;
+            instances.push(WorldLodColumnInstanceRequest { column_key: instance.column_key,
+                column_generation: instance.column_generation, layer: instance.layer,
+                segment_index: instance.segment_index, order: instance.order });
+        }
+        instances.into()
+    };
     // DH may publish generic-object callbacks during the transition before
     // its private route is selected for this exact world frame. The copied
     // records are validated above, but have no admitted destination yet.
