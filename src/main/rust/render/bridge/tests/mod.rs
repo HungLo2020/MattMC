@@ -14,6 +14,7 @@ use crate::render::scene::lod::WORLD_LOD_LAYER_OPAQUE;
 use crate::render::scene::lod::WORLD_LOD_VARIANT_EXACT;
 use crate::render::scene::lod::WORLD_LOD_VERTEX_LAYOUT_V1;
 use crate::render::scene::material::WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
+use crate::render::scene::material::{WORLD_MATERIAL_ID_MAP_TEXT, WORLD_MATERIAL_ID_ITEM_FRAME_MAP, WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP, WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT};
 use crate::render::scene::material::WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
 use crate::render::scene::material::WORLD_MATERIAL_SOURCE_CLOUDS;
 use crate::render::scene::material::WORLD_MATERIAL_SOURCE_ENTITY_MODEL;
@@ -4850,6 +4851,59 @@ fn compact_world_material_ffi_decodes_copies_and_deduplicates_table() {
 }
 
 #[test]
+fn compact_world_material_ffi_admits_map_text_and_rejects_mismatched_modes() {
+    let mut table = vec![material_table_record()];
+    table[0].material_id = WORLD_MATERIAL_ID_MAP_TEXT;
+    table[0].texture_id = 0xf000_1002;
+    table[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT;
+    table[0].depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
+    table[0].cull_policy = WORLD_CULL_NONE;
+    table[0].source_program = WORLD_MATERIAL_SOURCE_TEXTURED;
+    let compact = [compact_material_quad_request()];
+    for identity in [WORLD_MATERIAL_ID_MAP_TEXT, WORLD_MATERIAL_ID_ITEM_FRAME_MAP, WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP] {
+        table[0].material_id = identity;
+        let request = whole_frame_request_with_compact_materials(&table, &compact);
+        let (_, _, frame, _) = unsafe {
+            decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap()
+        };
+        let quad = &frame.material_quads[0];
+        assert_eq!(identity, quad.material_id);
+        assert_eq!(WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT, quad.material_mode);
+        assert_eq!(WORLD_MATERIAL_SOURCE_TEXTURED, quad.source_program);
+        assert_eq!(0xf000_1002, quad.texture_id);
+
+        // Vertex-modulated quads use the ordinary frame lane rather than the
+        // compact table. Both production decoders must admit this material.
+        let mut raw = material_quad_request();
+        raw.material_id = table[0].material_id;
+        raw.texture_id = table[0].texture_id;
+        raw.material_mode = table[0].material_mode;
+        raw.source_program = table[0].source_program;
+        raw.depth_policy = table[0].depth_policy;
+        raw.cull_policy = table[0].cull_policy;
+        raw.vertex0_color_argb = 0xff80_4020;
+        let raw = [raw];
+        let request = whole_frame_request_with_materials(&raw);
+        let (_, _, frame, _) = unsafe {
+            decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap()
+        };
+        assert_eq!(identity, frame.material_quads[0].material_id);
+        assert_eq!(0xff80_4020, frame.material_quads[0].vertex_color_argb[0]);
+
+    }
+    table[0].material_mode = WORLD_MATERIAL_MODE_OPAQUE;
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
+    assert_eq!(StatusCode::InvalidArgument, unsafe {
+        decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap_err()
+    }.code);
+    table[0].material_mode = 8;
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
+    assert_eq!(StatusCode::UnknownEnum, unsafe {
+        decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap_err()
+    }.code);
+}
+
+#[test]
 fn compact_world_material_ffi_preserves_private_dh_generic_stratum() {
     let mut table = vec![material_table_record()];
     table[0].stratum = WORLD_STRATUM_DH_GENERIC;
@@ -5283,7 +5337,7 @@ fn semantic_raw_gui_image_ffi_preserves_frozen_rgba8_metadata() {
         negotiated_feature_bits: 0,
     };
     let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
-    assert_eq!(GuiRawImageFormat::Rgba8, owned[0].format);
+    assert_eq!(GuiRawImageSourceFormat::Rgba8, owned[0].format);
     assert_eq!(pixels, owned[0].pixels.as_slice());
 }
 
@@ -6577,3 +6631,35 @@ fn shader_pack_asset_ffi_rejects_malformed_file_records() {
 }
 
 mod gal_abi;
+
+#[test]
+fn indexed_map_ffi_copies_indices_and_bounds_expanded_residency() {
+    let mut pixels: Vec<u8> = (0..=255).collect();
+    let mut asset = FfiGuiRawImageAssetPayload {
+        byte_size: size_of::<FfiGuiRawImageAssetPayload>() as u32, format: 3,
+        asset_id: 993, width: 256, height: 1,
+        pixels: FfiBytes { ptr: pixels.as_ptr(), len: pixels.len() as u64 },
+        sampling_filter: 0, sampling_address: 0,
+    };
+    let request = FfiGuiRawImageUpdateRequest {
+        header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiGuiRawImageUpdateRequest>() as u32 },
+        generation: 1, assets: FfiSlice { ptr: &asset, count: 1 }, negotiated_feature_bits: 0,
+    };
+    let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
+    pixels.fill(0);
+    assert_eq!(GuiRawImageSourceFormat::MapColor8, owned[0].format);
+    assert_eq!(255, owned[0].pixels[255]);
+
+    // Five compact 16 MiB inputs would expand to 320 MiB. Reject before the
+    // frontend can allocate those resident images, although wire bytes fit.
+    let large = vec![0; 4096 * 4096];
+    asset.width = 4096; asset.height = 4096;
+    asset.pixels = FfiBytes { ptr: large.as_ptr(), len: large.len() as u64 };
+    let assets: Vec<_> = (1..=5).map(|id| FfiGuiRawImageAssetPayload { asset_id: id, ..asset }).collect();
+    let excessive = FfiGuiRawImageUpdateRequest {
+        assets: FfiSlice { ptr: assets.as_ptr(), count: assets.len() as u64 }, ..request
+    };
+    let error = unsafe { decode_gui_raw_image_update(&excessive, test_capabilities()) }.unwrap_err();
+    assert_eq!(StatusCode::LengthOverflow, error.code);
+    assert!(error.message.contains("aggregate"));
+}

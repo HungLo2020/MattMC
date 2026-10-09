@@ -1057,12 +1057,12 @@ impl WorldPrimitiveFrontend {
             .shader_runtime
             .as_ref()
             .is_some_and(ShaderPackRuntimeExecutor::suppresses_vanilla_cloud_faces);
-        let source_textured_material_coverage = source_material_writer_coverage(
+        let source_textured_material_coverage = source_material_writer_coverage_for_draws(
             &textured_batches,
             plan.terrain
                 .textured_material
-                .as_ref()
-                .map(|material| material.draws.as_slice()),
+                .iter()
+                .flat_map(|material| material.draws.iter()),
         )?;
         let source_weather_coverage = source_material_writer_coverage(
             &weather_batches,

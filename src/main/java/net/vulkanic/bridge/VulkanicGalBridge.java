@@ -120,7 +120,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 72;
+	public static final int ABI_VERSION = 73;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -3645,13 +3645,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				|| (samplingFilter >= 1 && samplingFilter <= 2 && samplingAddress >= 1 && samplingAddress <= 2))) {
 				throw new IllegalArgumentException("invalid explicit raw GUI image sampling");
 			}
-			if (assetId == 0L || format < 1 || format > 2 || width <= 0 || height <= 0
+			if (assetId == 0L || format < 1 || format > 3 || width <= 0 || height <= 0
 				|| width > MAX_RAW_IMAGE_DIMENSION || height > MAX_RAW_IMAGE_DIMENSION) {
 				throw new IllegalArgumentException("invalid semantic GUI raw image asset");
 			}
 			Objects.requireNonNull(pixels, "pixels");
 			long pixelCount = (long) width * height;
-			int bytesPerPixel = format == 1 ? 1 : 4;
+			int bytesPerPixel = format == 2 ? 4 : 1;
 			long expectedBytes = pixelCount * bytesPerPixel;
 			if (pixelCount > MAX_RAW_IMAGE_PIXELS || expectedBytes > MAX_RAW_IMAGE_BYTES
 				|| pixels.length != expectedBytes) {
@@ -3674,6 +3674,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		 */
 		public int pixelByteLength() {
 			return this.pixels.length;
+		}
+		/** Counts post-decode residency for compact indexed map images. */
+		public long residentPixelByteLength() {
+			return format == 3 ? (long)width * height * 4L : pixels.length;
 		}
 
 		/** Compares immutable payloads without exposing or cloning either array. */

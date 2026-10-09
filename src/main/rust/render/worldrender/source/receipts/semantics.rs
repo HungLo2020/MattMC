@@ -376,6 +376,8 @@ impl WorldPrimitiveFrontend {
 /// modulation that the selected source ABI consumes without exposing asset,
 /// pipeline, or native resource identities. The fixed sample bound keeps a
 /// diagnostic capture from scaling with the world's visible mesh count.
+/// Samples prioritize model/moving producers over terrain so ordinary chunk
+/// counts cannot hide the identity a capture gate needs to correlate.
 pub(crate) fn source_mesh_instance_semantics_json(frame: &WorldPrimitiveFrame) -> String {
     let mut source_instances = 0u64;
     let mut non_white_color_instances = 0u64;
@@ -409,7 +411,14 @@ pub(crate) fn source_mesh_instance_semantics_json(frame: &WorldPrimitiveFrame) -
         if instance.depth_policy == WORLD_DEPTH_POLICY_TEST_NO_WRITE {
             translucent_instances = translucent_instances.saturating_add(1);
         }
-        if records.len() < 16 {
+    }
+    let source_instances_iter = || frame.mesh_instances.iter()
+        .filter(|instance| is_source_terrain_mesh_stratum(instance.stratum));
+    for instance in source_instances_iter()
+        .filter(|instance| instance.stratum != WORLD_STRATUM_TERRAIN)
+        .chain(source_instances_iter().filter(|instance| instance.stratum == WORLD_STRATUM_TERRAIN))
+        .take(16)
+    {
             let color = argb_to_rgba(instance.color_argb);
             records.push(format!(
                 concat!(
@@ -431,7 +440,6 @@ pub(crate) fn source_mesh_instance_semantics_json(frame: &WorldPrimitiveFrame) -
                 instance.cull_policy,
                 instance.winding,
             ));
-        }
     }
     format!(
         concat!(

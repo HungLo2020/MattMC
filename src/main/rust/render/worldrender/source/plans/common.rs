@@ -23,6 +23,17 @@ pub(crate) struct PreparedNamedSourceTexturedMaterialFramePlan {
     pub(in crate::render::worldrender) draws: Vec<TexturedMaterialSourceDraw>,
 }
 
+/// Adjacent material batches sharing one source writer and output schema.
+/// Groups retain source order; glyph and particle writers cannot share targets
+/// just because both consume the compact quad storage.
+pub(in crate::render::worldrender) struct SourceMaterialProgramGroup {
+    pub(in crate::render::worldrender) program: std::sync::Arc<LoweredTexturedMaterialSourceProgram>,
+    pub(in crate::render::worldrender) batches: Vec<SourceTexturedMaterialBatch>,
+    pub(in crate::render::worldrender) targets: TerrainSourceColorPassTargets,
+    pub(in crate::render::worldrender) resources: TerrainSourceOwnedResourceSet,
+    pub(in crate::render::worldrender) formats: Vec<ColorFormat>,
+}
+
 /// One ordered `gbuffers_weather` source writer. It shares the compact
 /// Rust-owned material stream with generic textured material, but retains a
 /// separately lowered source program, output contract, and alpha-over pass.

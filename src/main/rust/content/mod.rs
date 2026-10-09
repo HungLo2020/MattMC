@@ -6,3 +6,4 @@ pub mod fluid;
 pub mod property;
 pub mod state;
 pub mod sound;
+pub mod map_color;

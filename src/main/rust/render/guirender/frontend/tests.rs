@@ -513,6 +513,24 @@ fn vulkan_gui_sample_with_material(
     blur: Option<(i32, i32)>,
     material: crate::render::guirender::items::material::GuiAffineMaterial,
 ) -> Option<Vec<u8>> {
+    vulkan_gui_sample_with_source_format(stratum, pixels, u0, u1, tiles, height, invert, prewarm_alpha, atlas_region, mixed, blur, material, GuiRawImageSourceFormat::Rgba8)
+}
+
+fn vulkan_gui_sample_with_source_format(
+    stratum: u32,
+    pixels: Vec<u8>,
+    u0: f32,
+    u1: f32,
+    tiles: Option<crate::render::guirender::tiling::GuiTileGeometry>,
+    height: u32,
+    invert: bool,
+    prewarm_alpha: bool,
+    atlas_region: Option<[u32; 4]>,
+    mixed: bool,
+    blur: Option<(i32, i32)>,
+    material: crate::render::guirender::items::material::GuiAffineMaterial,
+    source_format: GuiRawImageSourceFormat,
+) -> Option<Vec<u8>> {
     let mut gal = match vulkan_gal("MattMC GUI vignette frontend conformance") {
         Ok(gal) => gal,
         Err(error) => {
@@ -640,8 +658,8 @@ fn vulkan_gui_sample_with_material(
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
-                    width: (pixels.len() / 4) as u32 / height,
+                    format: source_format,
+                    width: (pixels.len() / source_format.bytes_per_pixel()) as u32 / height,
                     height,
                     pixels,
                 }],
@@ -715,7 +733,7 @@ fn vulkan_gui_sample_with_material(
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 42,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![0, 0, 255, 128],
@@ -2820,7 +2838,7 @@ fn native_model_item_uses_registered_owned_image_without_borrowing_an_atlas() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![255; 16],
@@ -3116,7 +3134,7 @@ fn rotating_panorama_meshes_stay_within_the_bounded_rust_stream() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 6,
                 pixels: vec![255; 24],
@@ -3429,7 +3447,7 @@ fn cached_gui_items_survive_other_items_in_the_same_frame() {
     let target = frame_target(&mut gal);
     let mut frontend = GuiFrontend::default();
     frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
-        sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
+        sampling: None, asset_id: 7, format: GuiRawImageSourceFormat::Rgba8,
         width: 1, height: 1, pixels: vec![255; 4],
     }]).unwrap();
     for step in 0..3 {
@@ -3503,7 +3521,7 @@ fn vulkan_item_cache_retains_pixels_moves_composition_and_invalidates_identity_a
                         vec![GuiRawImageAssetPayload {
                             sampling: None,
                             asset_id: 7,
-                            format: GuiRawImageFormat::Rgba8,
+                            format: GuiRawImageSourceFormat::Rgba8,
                             width: 1,
                             height: 1,
                             pixels: if step == 0 {
@@ -3769,7 +3787,7 @@ fn vulkan_pending_mesh_preparations_match_separate_submissions() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 7,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![255; 4],
@@ -3957,7 +3975,7 @@ fn pending_mesh_stream_survives_interleaved_upload_completion() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255; 4],
@@ -4053,7 +4071,7 @@ fn accepted_mesh_geometry_stays_resident_across_frames_until_idle() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255; 4],
@@ -4114,7 +4132,7 @@ fn discarded_mesh_preparation_does_not_publish_attachment_layout() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255; 4],
@@ -4194,7 +4212,7 @@ fn owned_mesh_items_rasterize_layers_then_compose_once_into_the_gui_target() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255, 255, 255, 255],
@@ -4374,7 +4392,7 @@ fn entity_preview_submission_stats_prove_body_and_armor_raster_selection() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255, 255, 255, 255],
@@ -4457,7 +4475,7 @@ fn mesh_items_share_compositor_program_and_packed_uniform_stream() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 7,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![255, 255, 255, 255],
@@ -4465,7 +4483,7 @@ fn mesh_items_share_compositor_program_and_packed_uniform_stream() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 8,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![255, 255, 255, 255],
@@ -5087,7 +5105,7 @@ fn raw_image_assets_are_copied_validated_and_rendered_as_affine_quads() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Alpha8,
+                format: GuiRawImageSourceFormat::Alpha8,
                 width: 2,
                 height: 2,
                 pixels: pixels.clone(),
@@ -5150,7 +5168,7 @@ fn unchanged_raw_image_generation_retains_dynamic_gpu_resources() {
     let payload = GuiRawImageAssetPayload {
         sampling: None,
         asset_id: 41,
-        format: GuiRawImageFormat::Rgba8,
+        format: GuiRawImageSourceFormat::Rgba8,
         width: 1,
         height: 1,
         pixels: vec![1, 2, 3, 4],
@@ -5188,7 +5206,7 @@ fn gui_textures_share_one_immutable_pipeline_per_explicit_raster_contract() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Alpha8,
+                    format: GuiRawImageSourceFormat::Alpha8,
                     width: 2,
                     height: 2,
                     pixels: vec![255; 4],
@@ -5196,7 +5214,7 @@ fn gui_textures_share_one_immutable_pipeline_per_explicit_raster_contract() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 42,
-                    format: GuiRawImageFormat::Alpha8,
+                    format: GuiRawImageSourceFormat::Alpha8,
                     width: 2,
                     height: 2,
                     pixels: vec![127; 4],
@@ -5246,7 +5264,7 @@ fn dynamic_gui_blend_strata_share_one_explicit_texture_resource() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![1; 16],
@@ -5382,7 +5400,7 @@ fn gui_glint_sampler_is_explicit_shared_image_safe_and_failure_atomic() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 2,
                     height: 2,
                     pixels: vec![127; 16],
@@ -5446,7 +5464,7 @@ fn gui_glint_sampler_is_explicit_shared_image_safe_and_failure_atomic() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 2,
                     height: 2,
                     pixels: vec![255; 16],
@@ -5479,7 +5497,7 @@ fn gui_glint_resource_sampling_metadata_only_reload_rebinds_without_changing_sha
                     generation,
                     vec![GuiRawImageAssetPayload {
                         asset_id: 41,
-                        format: GuiRawImageFormat::Rgba8,
+                        format: GuiRawImageSourceFormat::Rgba8,
                         width: 2,
                         height: 2,
                         pixels: vec![127; 16],
@@ -5546,7 +5564,7 @@ fn vulkan_gui_shared_image_reload_retires_every_binding_and_upload_buffer() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 2,
                     height: 2,
                     pixels: vec![generation as u8; 16],
@@ -5617,7 +5635,7 @@ fn explicit_atlas_declarations_cannot_alias_copied_images_or_admit_fallback_samp
     let payload = || GuiRawImageAssetPayload {
         sampling: None,
         asset_id: 101,
-        format: GuiRawImageFormat::Rgba8,
+        format: GuiRawImageSourceFormat::Rgba8,
         width: 1,
         height: 1,
         pixels: vec![255; 4],
@@ -5658,7 +5676,7 @@ fn changed_dynamic_gui_image_retires_shared_texture_before_recreation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![1; 16],
@@ -5692,7 +5710,7 @@ fn changed_dynamic_gui_image_retires_shared_texture_before_recreation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![2; 16],
@@ -5800,7 +5818,7 @@ fn malformed_raw_image_update_rolls_back_without_destroying_valid_generation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![1, 2, 3, 4],
@@ -5814,7 +5832,7 @@ fn malformed_raw_image_update_rolls_back_without_destroying_valid_generation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 8,
-                format: GuiRawImageFormat::Alpha8,
+                format: GuiRawImageSourceFormat::Alpha8,
                 width: 2,
                 height: 2,
                 pixels: vec![1, 2, 3],
@@ -5838,7 +5856,7 @@ fn oversized_raw_image_pixel_count_is_rejected_before_payload_validation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 99,
-                format: GuiRawImageFormat::Alpha8,
+                format: GuiRawImageSourceFormat::Alpha8,
                 width: 8192,
                 height: 8192,
                 pixels: Vec::new(),
@@ -5937,4 +5955,36 @@ fn custom_post_effect_cleanup_orders_dependents_before_sampler_inputs() {
             HandleKind::Texture,
         ]
     );
+}
+
+#[test]
+fn indexed_map_image_admission_uses_frozen_rgba_and_keeps_gpu_format_explicit() {
+    let mut gal = mock_gal();
+    let mut frontend = GuiFrontend::default();
+    let payload = GuiRawImageAssetPayload {
+        sampling: None, asset_id: 991, format: GuiRawImageSourceFormat::MapColor8,
+        width: 256, height: 1, pixels: (0..=255).collect(),
+    };
+    frontend.apply_raw_image_update(&mut gal, 1, vec![payload.clone()]).unwrap();
+    let image = &frontend.raw_images[&991];
+    assert_eq!(GuiRawImageFormat::Rgba8, image.format);
+    assert_eq!(include_bytes!("../../../content/map_color/frozen-native-rgba.bin").as_slice(), image.pixels);
+    let mut malformed = payload;
+    malformed.pixels.pop();
+    assert!(frontend.apply_raw_image_update(&mut gal, 2, vec![malformed]).is_err());
+    assert_eq!(1, frontend.raw_image_generation);
+    assert_eq!(1024, frontend.raw_images[&991].pixels.len());
+    frontend.apply_raw_image_update(&mut gal, 3, vec![]).unwrap();
+    assert!(frontend.raw_images.is_empty());
+}
+
+#[test]
+fn vulkan_indexed_map_images_preserve_red_blue_channels_through_gal_upload_and_draw() {
+    let bytes = vulkan_gui_sample_with_source_format(
+        GUI_OPAQUE_BLIT_STRATUM, vec![18,50], 0.0,1.0,None,2,false,false,None,false,None,
+        crate::render::guirender::items::material::GuiAffineMaterial::Unlit,
+        GuiRawImageSourceFormat::MapColor8,
+    ).expect("Vulkan required for indexed map channel regression");
+    let frozen = include_bytes!("../../../content/map_color/frozen-native-rgba.bin");
+    assert_eq!([&frozen[18*4..19*4],&frozen[50*4..51*4]].concat(),bytes);
 }

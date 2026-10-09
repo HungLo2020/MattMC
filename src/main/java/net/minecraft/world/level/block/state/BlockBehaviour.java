@@ -451,6 +451,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		private BlockBehaviour.BlockStateBase.Cache cache;
 		private FluidState fluidState = Fluids.EMPTY.defaultFluidState();
         private final boolean nativeIntrinsicState;
+        private final int nativePolicy;
         private final SoundType nativeSound;
         private final NativeBlockMaterials.Offset nativeOffset;
 		private boolean isRandomlyTicking;
@@ -461,16 +462,17 @@ public abstract class BlockBehaviour implements FeatureElement {
 		private int lightBlock;
 
 		protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec) {
-            this(block, reference2ObjectArrayMap, mapCodec, -1, null, null);
+            this(block, reference2ObjectArrayMap, mapCodec, -1, null, null, -1);
         }
 
-        protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec, int nativeTraits, SoundType nativeSound, NativeBlockMaterials.Offset nativeOffset) {
+        protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec, int nativeTraits, SoundType nativeSound, NativeBlockMaterials.Offset nativeOffset, int nativePolicy) {
 			super(block, reference2ObjectArrayMap, mapCodec);
             this.nativeIntrinsicState = nativeTraits >= 0;
+            this.nativePolicy = nativePolicy;
             this.nativeSound = nativeSound; this.nativeOffset = nativeOffset;
 			BlockBehaviour.Properties properties = block.properties;
 			this.lightEmission = nativeTraits >= 0 ? (nativeTraits >>> 8) & 15 : properties.lightEmission.applyAsInt(this.asState());
-			this.useShapeForLightOcclusion = block.useShapeForLightOcclusion(this.asState());
+			this.useShapeForLightOcclusion = nativePolicy >= 0 ? (nativePolicy & 2) != 0 : block.useShapeForLightOcclusion(this.asState());
 			this.isAir = properties.isAir;
 			this.ignitedByLava = properties.ignitedByLava;
 			this.liquid = properties.liquid;
@@ -515,7 +517,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 
 		public void initCache() {
 			if (!this.nativeIntrinsicState) this.fluidState = this.owner.getFluidState(this.asState());
-			this.isRandomlyTicking = this.owner.isRandomlyTicking(this.asState());
+			this.isRandomlyTicking = this.nativePolicy >= 0 ? (this.nativePolicy & 1) != 0 : this.owner.isRandomlyTicking(this.asState());
 			if (!this.getBlock().hasDynamicShape()) {
 				this.cache = new BlockBehaviour.BlockStateBase.Cache(this.asState());
 			}
@@ -883,7 +885,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public boolean hasBlockEntity() {
-			return this.getBlock() instanceof EntityBlock;
+			return this.nativePolicy >= 0 ? (this.nativePolicy & 8) != 0 : this.getBlock() instanceof EntityBlock;
 		}
 
 		public boolean shouldChangedStateKeepBlockEntity(BlockState blockState) {

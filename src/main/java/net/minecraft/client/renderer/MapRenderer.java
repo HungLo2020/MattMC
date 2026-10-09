@@ -40,49 +40,50 @@ public class MapRenderer {
 				"Rust whole-frame map decoration bound exceeded " + MAX_RUST_MAP_DECORATIONS
 			);
 		}
-		float[] mapVertices = {0.0F, 128.0F, -0.01F, 128.0F, 128.0F, -0.01F, 128.0F, 0.0F, -0.01F, 0.0F, 0.0F, -0.01F};
-		float[] mapUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
-		boolean mapAccepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
-			poseStack, RenderType.text(mapRenderState.texture), mapRenderState.texture, mapVertices, mapUvs, -1, i
-		);
-		if (!mapAccepted) {
-			throw new IllegalStateException("Rust whole-frame map route rejected the copied map quad");
-		}
-		if (!mapAccepted) {
-			throw new IllegalStateException("Rust whole-frame map route is unavailable; Java map geometry is not a fallback");
+		// Text/coverage replay must preserve labels without re-enqueuing the
+		// image and decorations already submitted by the primary entity pass.
+		boolean submitGeometry = !submitNodeCollector.isSemanticCoverageOnly();
+		if (submitGeometry) {
+			float[] mapVertices = {0.0F, 128.0F, -0.01F, 128.0F, 128.0F, -0.01F, 128.0F, 0.0F, -0.01F, 0.0F, 0.0F, -0.01F};
+			float[] mapUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
+			boolean mapAccepted = submitNodeCollector.submitMapTexturedQuadSemantic(
+				poseStack, mapRenderState.texture, mapVertices, mapUvs, -1, i
+			);
+			if (!mapAccepted) {
+				throw new IllegalStateException("Rust whole-frame map route rejected the copied map quad");
+			}
 		}
 		int j = 0;
 
 		for (MapRenderState.MapDecorationRenderState mapDecorationRenderState : mapRenderState.decorations) {
 			if (!bl || mapDecorationRenderState.renderOnFrame) {
-				poseStack.pushPose();
-				poseStack.translate(mapDecorationRenderState.x / 2.0F + 64.0F, mapDecorationRenderState.y / 2.0F + 64.0F, -0.02F);
-				poseStack.mulPose(Axis.ZP.rotationDegrees(mapDecorationRenderState.rot * 360 / 16.0F));
-				poseStack.scale(4.0F, 4.0F, 3.0F);
-				poseStack.translate(-0.125F, 0.125F, 0.0F);
-				TextureAtlasSprite textureAtlasSprite = mapDecorationRenderState.atlasSprite;
-				if (textureAtlasSprite != null) {
-					float f = j * -0.001F;
-					float[] vertices = {-1.0F, 1.0F, f, 1.0F, 1.0F, f, 1.0F, -1.0F, f, -1.0F, -1.0F, f};
-					float[] uvs = {textureAtlasSprite.getU0(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV1(), textureAtlasSprite.getU0(), textureAtlasSprite.getV1()};
-					boolean framedDecoration = net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemFrameMapDecorationSubmission(
-						textureAtlasSprite.atlasLocation(), mapDecorationRenderState.decorationIdentity,
-						mapDecorationRenderState.x, mapDecorationRenderState.y, mapDecorationRenderState.rot);
-					boolean decorationAccepted;
-					try {
-						decorationAccepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
-							poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), textureAtlasSprite.atlasLocation(), vertices, uvs, -1, i
-						);
-					} finally {
-						if (framedDecoration) net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemFrameMapDecorationSubmission();
+				if (submitGeometry) {
+					poseStack.pushPose();
+					poseStack.translate(mapDecorationRenderState.x / 2.0F + 64.0F, mapDecorationRenderState.y / 2.0F + 64.0F, -0.02F);
+					poseStack.mulPose(Axis.ZP.rotationDegrees(mapDecorationRenderState.rot * 360 / 16.0F));
+					poseStack.scale(4.0F, 4.0F, 3.0F);
+					poseStack.translate(-0.125F, 0.125F, 0.0F);
+					TextureAtlasSprite textureAtlasSprite = mapDecorationRenderState.atlasSprite;
+					if (textureAtlasSprite != null) {
+						float f = j * -0.001F;
+						float[] vertices = {-1.0F, 1.0F, f, 1.0F, 1.0F, f, 1.0F, -1.0F, f, -1.0F, -1.0F, f};
+						float[] uvs = {textureAtlasSprite.getU0(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV1(), textureAtlasSprite.getU0(), textureAtlasSprite.getV1()};
+						boolean framedDecoration = net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemFrameMapDecorationSubmission(
+							textureAtlasSprite.atlasLocation(), mapDecorationRenderState.decorationIdentity,
+							mapDecorationRenderState.x, mapDecorationRenderState.y, mapDecorationRenderState.rot);
+						boolean decorationAccepted;
+						try {
+							decorationAccepted = submitNodeCollector.submitMapTexturedQuadSemantic(
+								poseStack, textureAtlasSprite.atlasLocation(), vertices, uvs, -1, i
+							);
+						} finally {
+							if (framedDecoration) net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemFrameMapDecorationSubmission();
+						}
+						if (!decorationAccepted) {
+							throw new IllegalStateException("Rust whole-frame map route rejected a copied decoration quad");
+						}
+						poseStack.popPose();
 					}
-					if (!decorationAccepted) {
-						throw new IllegalStateException("Rust whole-frame map route rejected a copied decoration quad");
-					}
-					if (!decorationAccepted) {
-						throw new IllegalStateException("Rust whole-frame map-decoration route is unavailable; Java map geometry is not a fallback");
-					}
-					poseStack.popPose();
 				}
 
 				if (mapDecorationRenderState.name != null) {

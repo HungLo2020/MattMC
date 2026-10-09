@@ -1,6 +1,7 @@
 //! Decoding a whole-frame submit: world primitives, meshes, GUI streams and frame-level records.
 
 use super::*;
+use crate::render::scene::material::WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT;
 
 /// `MATTMC_TRACE_PARTICLE_QUADS=N` logs the first N decoded particle quads of
 /// each frame (texture, surface, UV bounds, ARGB colour, packed light,
@@ -682,6 +683,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         if quad.material_mode != WORLD_MATERIAL_MODE_OPAQUE
             && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
             && quad.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
+            && quad.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
         {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -882,6 +884,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             if record.material_mode != WORLD_MATERIAL_MODE_OPAQUE
                 && record.material_mode != WORLD_MATERIAL_MODE_CUTOUT
                 && record.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
+                && record.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
             {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,

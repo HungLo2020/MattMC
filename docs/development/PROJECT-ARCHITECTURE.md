@@ -197,13 +197,17 @@ Java block/fluid views use it. [Block state definitions](game-model/BLOCK-DEFINI
 registered catalog and shared graphs; [physical definitions](game-model/BLOCK-PHYSICS.md)
 supply intrinsic block settings. [Intrinsic state rules](game-model/BLOCK-INTRINSICS.md)
 compute semantic map colors, emitted light and canonical fluid associations.
+[Map palette content](game-model/MAP-COLORS.md) owns palette identities, RGB and
+packed brightness tables; rendering owns image residency and GPU resources.
 [Sound content](game-model/SOUND-DEFINITIONS.md) owns event identities, profiles
 and note instruments; [block sound/offset definitions](game-model/BLOCK-SOUND-AND-OFFSETS.md)
 own state sound selection and model offsets. [Block-family configuration](game-model/BLOCK-FAMILY-TYPES.md)
 provides shared block sets, wood types and registered family parameters.
+[State policy](game-model/STATE-POLICY.md) computes tick/light-shape eligibility
+and leaf/entity markers into shared immutable columns.
 Playback resources stay in `audio/`, with Java retaining sound policy and
-resource lookup/cache callbacks. Block-family configuration does not migrate
-world callbacks, scheduling or entity queries. General gameplay remains Java.
+resource lookup/cache callbacks. Block-family configuration and state policy do
+not migrate world callbacks, scheduling or entity queries. General gameplay remains Java.
 
 [`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,
 registration order, property declarations, defaults and intrinsic state facts.
@@ -237,7 +241,9 @@ Important current subdirectories:
 
 ### `assets/`
 
-Asset loading, decoding, caching, and resource processing belong here. Future Rust-side texture, model, shader, language, and pack-resource work should live here when it is not exclusively part of a rendering backend.
+Asset loading, decoding, caching, and resource processing belong here.
+`assets/map_image.rs` performs bounded indexed-map PNG encoding for the
+transitional world asset transport; map palette data stays in `content/`. Future Rust-side texture, model, shader, language, and pack-resource work should live here when it is not exclusively part of a rendering backend.
 
 ### `audio/`
 

@@ -100,12 +100,25 @@ impl GuiRawImageFormat {
     }
 }
 
+/// CPU input encoding is distinct from the resident/GPU texture format.
+/// Indexed map colors are expanded by the frontend before resource admission.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GuiRawImageSourceFormat { Alpha8, Rgba8, MapColor8 }
+impl GuiRawImageSourceFormat {
+    pub(crate) fn bytes_per_pixel(self) -> usize {
+        match self { Self::Alpha8 | Self::MapColor8 => 1, Self::Rgba8 => 4 }
+    }
+    pub(crate) fn resident_format(self) -> GuiRawImageFormat {
+        match self { Self::Alpha8 => GuiRawImageFormat::Alpha8, Self::Rgba8 | Self::MapColor8 => GuiRawImageFormat::Rgba8 }
+    }
+}
+
 /// CPU-owned image data. The FFI boundary will carry this as one bounded asset
 /// update; it deliberately contains no atlas, renderer, or backend objects.
 #[derive(Clone, Debug)]
 pub struct GuiRawImageAssetPayload {
     pub asset_id: u64,
-    pub format: GuiRawImageFormat,
+    pub format: GuiRawImageSourceFormat,
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,

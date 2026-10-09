@@ -519,6 +519,11 @@ impl WorldPrimitiveFrontend {
             })?
             .stage_textured_material_source_color_resources(gal, program, color_targets)?;
         let merged = base.with_stage_color_resources(&color_resources)?;
+        let merged = if program.opaque_resource_bindings.bindings().iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialTexture)
+            && merged.availability().resource_for(TerrainSourceResourceRole::MaterialTexture).is_some() {
+            merged.excluding_roles([TerrainSourceResourceRole::MaterialTexture])?
+        } else { merged };
         // Let the candidate stage producer roles this writer declares even
         // when the dimension's terrain program does not (Nether/End writers
         // can declare a shadow map the terrain program never samples).
@@ -528,10 +533,22 @@ impl WorldPrimitiveFrontend {
                     .opaque_resource_bindings
                     .bindings()
                     .iter()
-                    .map(|binding| binding.role()),
+                    .map(|binding| binding.role())
+                    .filter(|role| *role != TerrainSourceResourceRole::MaterialTexture),
             );
         }
-        program.require_semantic_resources(merged.availability())?;
+        if program.opaque_resource_bindings.bindings().iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialTexture) {
+            for binding in program.opaque_resource_bindings.bindings() {
+                // The glyph's exact local texture is supplied per producer batch.
+                if binding.role() != TerrainSourceResourceRole::MaterialTexture
+                    && merged.availability().resource_for(binding.role()).is_none() {
+                    return Err(GalError::invalid_argument(format!("material source resource '{}' is unavailable before local texture binding", binding.resource_name())));
+                }
+            }
+        } else {
+            program.require_semantic_resources(merged.availability())?;
+        }
         Ok(merged)
     }
 

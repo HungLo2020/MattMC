@@ -337,18 +337,28 @@ impl WorldPrimitiveFrontend {
         Option<(u32, u64)>,
         Option<[i32; 2]>,
     )> {
+        let local_role = if program.opaque_resource_bindings.bindings().iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialTexture) {
+            TerrainSourceResourceRole::MaterialTexture
+        } else {
+            TerrainSourceResourceRole::MaterialAtlas
+        };
         match batch.source_uv_space {
             WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS => {
+                if local_role == TerrainSourceResourceRole::MaterialTexture {
+                    return Err(GalError::invalid_argument("world glyph local-texture writer cannot inherit the terrain atlas"));
+                }
                 Ok((base_resources.clone(), None, None))
             }
             WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE => {
                 let (resources, identity, extent) = self
-                    .source_resources_with_local_material_texture(
+                    .source_resources_with_local_material_texture_for_role(
                         gal,
                         program.shader_pack_generation,
                         base_resources,
                         batch.texture_id,
                         frame_id,
+                        local_role,
                     )?;
                 Ok((resources, Some(identity), Some(extent)))
             }
@@ -370,6 +380,19 @@ impl WorldPrimitiveFrontend {
         base_resources: &TerrainSourceOwnedResourceSet,
         texture_id: u32,
         frame_id: u64,
+    ) -> GalResult<(TerrainSourceOwnedResourceSet, (u32, u64), [i32; 2])> {
+        self.source_resources_with_local_material_texture_for_role(gal, shader_pack_generation,
+            base_resources, texture_id, frame_id, TerrainSourceResourceRole::MaterialAtlas)
+    }
+
+    fn source_resources_with_local_material_texture_for_role(
+        &mut self,
+        gal: &mut VulkanicGal,
+        shader_pack_generation: u64,
+        base_resources: &TerrainSourceOwnedResourceSet,
+        texture_id: u32,
+        frame_id: u64,
+        role: TerrainSourceResourceRole,
     ) -> GalResult<(TerrainSourceOwnedResourceSet, (u32, u64), [i32; 2])> {
         if shader_pack_generation == 0
             || shader_pack_generation != base_resources.availability().shader_pack_generation()
@@ -423,11 +446,20 @@ impl WorldPrimitiveFrontend {
                     "source material local sampler vanished after successful creation",
                 )
             })?;
-        let resources = base_resources.with_combined_sampler_override(
-            TerrainSourceResourceRole::MaterialAtlas,
-            combined_sampler,
-            key.texture_generation,
-        )?;
+        let resources = if role == TerrainSourceResourceRole::MaterialAtlas {
+            base_resources.with_combined_sampler_override(role, combined_sampler, key.texture_generation)?
+        } else {
+            let local = TerrainSourceOwnedResourceSet::new(
+                TerrainSourceResourceAvailabilitySet::new(shader_pack_generation, key.world_generation,
+                    [TerrainSourceResourceAvailability { role: role.clone(), shape: role.expected_sampled_resource_shape(),
+                        resource_generation: key.texture_generation }])?,
+                [TerrainSourceOwnedResource { role: role.clone(), combined_sampler }],
+            )?;
+            let base = if base_resources.availability().resource_for(role.clone()).is_some() {
+                base_resources.excluding_roles([role])?
+            } else { base_resources.clone() };
+            TerrainSourceOwnedResourceSet::merge([&base, &local])?
+        };
         let width = i32::try_from(width).map_err(|_| {
             GalError::invalid_argument("local source material width exceeds source ivec2")
         })?;
@@ -869,6 +901,7 @@ impl WorldPrimitiveFrontend {
                 WORLD_MATERIAL_MODE_OPAQUE,
                 WORLD_MATERIAL_MODE_CUTOUT,
                 WORLD_MATERIAL_MODE_TRANSLUCENT,
+                WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
                 WORLD_MATERIAL_MODE_GLINT,
             ],
             "textured material",
@@ -2170,6 +2203,7 @@ pub(in crate::render::worldrender) fn source_material_batches_for_program(
             .last()
             .is_some_and(|batch: &SourceTexturedMaterialBatch| {
                 batch.start + batch.count == index
+                    && batch.material_id == quad.material_id
                     && batch.texture_id == quad.texture_id
                     && batch.source_uv_space == quad.source_uv_space
                     && batch.material_mode == quad.material_mode
@@ -2185,6 +2219,7 @@ pub(in crate::render::worldrender) fn source_material_batches_for_program(
             batches.last_mut().expect("checked source batch").count += 1;
         } else {
             batches.push(SourceTexturedMaterialBatch {
+                material_id: quad.material_id,
                 start: index,
                 count: 1,
                 texture_id: quad.texture_id,
@@ -2210,6 +2245,7 @@ pub(in crate::render::worldrender) fn source_textured_material_batches(
             WORLD_MATERIAL_MODE_OPAQUE,
             WORLD_MATERIAL_MODE_CUTOUT,
             WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
         ],
     )
 }

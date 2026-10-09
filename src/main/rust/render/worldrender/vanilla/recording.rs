@@ -419,7 +419,7 @@ impl WorldPrimitiveFrontend {
             || !distant_horizons_box_batches.is_empty()
             || material_batches
                 .iter()
-                .any(|batch| material_uses_particle_shader(batch.key.source_program));
+                .any(|batch| material_uses_lightmap(batch.key));
         if builtin_terrain_lightmap_required {
             let Some(lightmap_frame) = frame.shader_environment.vanilla_lightmap else {
                 return Err(GalError::unsupported_feature(
@@ -1149,6 +1149,10 @@ impl WorldPrimitiveFrontend {
                         &mut late_particle_ops
                     } else if material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW {
                         &mut receiver_shadow_ops
+                    } else if is_map_material(material_id) {
+                        // Maps use the text pipeline after opaque entity/model meshes.
+                        // Drawing them earlier lets the frame erase their color.
+                        &mut deferred_entity_layer_ops
                     } else if material_id == WORLD_MATERIAL_ID_ENERGY_SWIRL {
                         // EnergySwirl is authored after its entity's base model.
                         // Its inflated shell writes depth, so drawing this material
@@ -1168,7 +1172,7 @@ impl WorldPrimitiveFrontend {
                     if requires_lightmap {
                         let lightmap = builtin_terrain_lightmap_resource_set.ok_or_else(|| {
                             GalError::backend(
-                                "weather material pipeline has no staged Rust lightmap binding",
+                                "lightmapped material pipeline has no staged Rust lightmap binding",
                             )
                         })?;
                         ops.push(CommandOp::BindResourceSet {

@@ -119,8 +119,9 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
             ));
         }
         let format = match asset.format {
-            1 => GuiRawImageFormat::Alpha8,
-            2 => GuiRawImageFormat::Rgba8,
+            1 => GuiRawImageSourceFormat::Alpha8,
+            2 => GuiRawImageSourceFormat::Rgba8,
+            3 => GuiRawImageSourceFormat::MapColor8,
             other => {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
@@ -162,10 +163,7 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
                 ),
             ));
         }
-        let bytes_per_pixel = match format {
-            GuiRawImageFormat::Alpha8 => 1usize,
-            GuiRawImageFormat::Rgba8 => 4usize,
-        };
+        let bytes_per_pixel = format.bytes_per_pixel();
         let expected_bytes = pixel_count.checked_mul(bytes_per_pixel).ok_or_else(|| {
             GalError::ffi(
                 StatusCode::LengthOverflow,
@@ -187,7 +185,12 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
                 ),
             ));
         }
-        total_pixels = total_pixels.checked_add(expected_bytes).ok_or_else(|| {
+        // Bound decoded residency too; indexed images expand in the frontend.
+        let resident_bytes = pixel_count.checked_mul(match format.resident_format() {
+            GuiRawImageFormat::Alpha8 => 1usize,
+            GuiRawImageFormat::Rgba8 => 4usize,
+        }).ok_or_else(|| GalError::ffi(StatusCode::LengthOverflow, "raw GUI resident image size overflows"))?;
+        total_pixels = total_pixels.checked_add(resident_bytes).ok_or_else(|| {
             GalError::ffi(
                 StatusCode::LengthOverflow,
                 "raw GUI image aggregate byte count overflows",

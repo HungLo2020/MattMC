@@ -41,6 +41,10 @@ SCENARIOS: dict[str, tuple[bool, list[str]]] = {
     "held-trident-foil": (False, ["--hotbar-item-fixture", "model-foil"]),
     "held-shield": (False, ["--hotbar-item-fixture", "shield"]),
     "held-shield-foil": (False, ["--hotbar-item-fixture", "shield-foil"]),
+    "framed-map": (False, ["--world-mesh-model-scenario", "item-frame-map"]),
+    "framed-map-rotated": (False, ["--world-mesh-model-scenario", "item-frame-map-rotated"]),
+    "framed-map-decorated": (False, ["--world-mesh-model-scenario", "item-frame-map-decorated"]),
+    "framed-map-shaders": (True, ["--world-mesh-model-scenario", "item-frame-map"]),
     "empty-hand": (False, ["--hotbar-item-fixture", "standard-3d", "--empty-selected-hand"]),
 }
 
@@ -174,6 +178,7 @@ def main() -> int:
                    "--repo-root", str(args.repo_root), "--frozen-repo", str(args.frozen_repo),
                    "--world", "Origin", "--artifact-dir", str(artifact_dir), "--artifact-preserve-current-run",
                    "--rust-profile", "release",
+                   *(["--rust-selected-source-execution"] if shaders else []),
                    *extra, *[f"--jvm-arg={arg}" for arg in args.jvm_arg]]
         print(f"{name} ...", flush=True)
         with (out / f"{name}.log").open("w") as log:

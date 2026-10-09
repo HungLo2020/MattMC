@@ -278,7 +278,7 @@ impl WorldPrimitiveFrontend {
         let fabulous_lightmap_required = fabulous_meshes_present
             || batches
                 .iter()
-                .any(|batch| material_uses_particle_shader(batch.key.source_program));
+                .any(|batch| material_uses_lightmap(batch.key));
         let builtin_terrain_lightmap_layout = if fabulous_lightmap_required {
             if frame.shader_environment.world_generation == 0
                 || frame.shader_environment.vanilla_lightmap.is_none()
@@ -587,7 +587,7 @@ impl WorldPrimitiveFrontend {
                 });
                 if resources.lightmap_resource_layout.is_some() {
                     let lightmap = builtin_terrain_lightmap_resource_set.ok_or_else(|| {
-                        GalError::backend("Fabulous weather material pipeline has no staged Rust lightmap binding")
+                        GalError::backend("Fabulous lightmapped material pipeline has no staged Rust lightmap binding")
                     })?;
                     operations.push(CommandOp::BindResourceSet {
                         pipeline_layout: resources.pipeline_layout,
@@ -1484,7 +1484,7 @@ impl WorldPrimitiveFrontend {
         let mut operations = Vec::with_capacity(batches.len() * 12);
         let external_particle_lightmap = if batches
             .iter()
-            .any(|batch| material_uses_particle_shader(batch.key.source_program))
+            .any(|batch| material_uses_lightmap(batch.key))
         {
             let lightmap = frame.shader_environment.vanilla_lightmap.ok_or_else(|| {
                 GalError::unsupported_feature(
@@ -1627,7 +1627,7 @@ impl WorldPrimitiveFrontend {
                 });
                 if resources.lightmap_resource_layout.is_some() {
                     let lightmap = external_particle_lightmap.ok_or_else(|| {
-                        GalError::backend("external weather material pipeline has no staged Rust lightmap binding")
+                        GalError::backend("external lightmapped material pipeline has no staged Rust lightmap binding")
                     })?;
                     operations.push(CommandOp::BindResourceSet {
                         pipeline_layout: resources.pipeline_layout,

@@ -435,6 +435,10 @@ impl WorldPrimitiveFrontend {
             WORLD_MATERIAL_MODE_OPAQUE => "MC_RENDER_STAGE_TERRAIN_SOLID",
             WORLD_MATERIAL_MODE_CUTOUT => "MC_RENDER_STAGE_TERRAIN_CUTOUT",
             WORLD_MATERIAL_MODE_TRANSLUCENT => "MC_RENDER_STAGE_TERRAIN_TRANSLUCENT",
+            // Map text is collected by ItemFrameRenderer during Iris's
+            // entity phase, even though its compact writer uses the local
+            // textured stream. Its alpha cutoff does not make it terrain.
+            WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT => "MC_RENDER_STAGE_ENTITIES",
             value => {
                 return Err(GalError::unsupported_feature(format!(
                     "source terrain render stage is unsupported for material mode {value}"

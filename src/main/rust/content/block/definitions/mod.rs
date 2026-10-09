@@ -6,6 +6,7 @@ mod templates;
 pub mod physics;
 pub mod intrinsic;
 pub mod material;
+pub mod policy;
 #[cfg(test)]
 mod tests;
 
@@ -27,6 +28,7 @@ pub struct Definition {
     pub physics: &'static physics::Physics,
     pub material: &'static material::Material,
     pub family: super::family::Family,
+    pub policy: &'static policy::Rules,
 }
 
 pub struct Registry {
@@ -46,6 +48,7 @@ pub struct Registry {
     offset_rows: Vec<i32>,
     offset_values: Vec<f64>,
     intrinsic_states: Vec<intrinsic::StateTraits>,
+    policies: Vec<policy::StatePolicy>,
     intrinsic_rows: Vec<i32>,
     rule_refs: Vec<i32>,
     rule_rows: Vec<i32>,
@@ -62,7 +65,7 @@ impl Registry {
             physics_rows: physics::PROFILES.iter().flat_map(physics::Physics::words).collect(),
             material_rows: material::PROFILES.iter().flat_map(|m| [m.base_sound as i32,m.instrument as i32,m.offset as i32]).collect(),
             state_sounds: Vec::new(),offset_rows: Vec::new(),offset_values: Vec::new(),
-            intrinsic_states: Vec::new(), intrinsic_rows: Vec::new(),
+            intrinsic_states: Vec::new(), intrinsic_rows: Vec::new(), policies: Vec::new(),
             rule_refs: Vec::new(), rule_rows: Vec::new(), rule_properties: Vec::new(), rule_values: Vec::new(),
         };
         for config in super::offset::PROFILES {
@@ -95,7 +98,7 @@ impl Registry {
             r.templates.push(Template { properties, default_local, graph });
         }
         let mut next_state = 0;
-        for &(name, template, physical, intrinsic, material, family) in catalog::BLOCKS {
+        for &(name, template, physical, intrinsic, material, family, policy) in catalog::BLOCKS {
             let id = BlockId(u16::try_from(r.definitions.len()).expect("bounded native block IDs"));
             let t = &r.templates[template as usize];
             let states = r.graph_headers[t.graph as usize][0] as usize;
@@ -103,13 +106,14 @@ impl Registry {
             assert!(r.by_name.insert(name, id).is_none(), "duplicate native block name");
             r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32, physical as i32, material as i32]);
             r.names.extend_from_slice(name.as_bytes());
-            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize], material: &material::PROFILES[material as usize], family });
+            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize], material: &material::PROFILES[material as usize], family, policy: &policy::PROFILES[policy as usize] });
             let values = r.graphs[t.graph as usize].buffer(0).expect("native graph values");
             let rules = &intrinsic::PROFILES[intrinsic as usize];
             for local in 0..states {
                 let width = t.properties.len();
                 let facts = rules.evaluate(&t.properties, &values[local * width..(local + 1) * width]);
                 r.state_sounds.push(material::PROFILES[material as usize].sound(&t.properties,&values[local * width..(local + 1) * width]));
+                r.policies.push(policy::PROFILES[policy as usize].evaluate(&t.properties, &values[local * width..(local + 1) * width], physics::PROFILES[physical as usize].flags, facts.fluid));
                 r.intrinsic_rows.push(facts.packed());
                 r.intrinsic_states.push(facts);
             }
@@ -149,13 +153,14 @@ impl Registry {
                 r.rule_refs.push(id as i32);
             }
         }
-        r.header = [4, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
+        r.header = [5, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
             r.properties.len() as i32, r.names.len() as i32, r.graphs.len() as i32, physics::PROFILES.len() as i32,
             (r.rule_rows.len() / 4) as i32, r.rule_properties.len() as i32, r.rule_values.len() as i32,
             crate::content::fluid::registry().definitions().iter().map(|d| d.state_count()).sum::<usize>() as i32,material::PROFILES.len() as i32,super::offset::PROFILES.len() as i32,r.offset_values.len() as i32];
         r
     }
 
+    pub fn state_policy(&self, id: StateId) -> Option<policy::StatePolicy> { self.policies.get(id.index()).copied() }
     pub fn state_sound(&self, id: StateId) -> Option<&crate::content::sound::SoundTypeDefinition> {
         self.state_sounds.get(id.0 as usize).map(|&sound| sound.definition())
     }

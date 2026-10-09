@@ -32,6 +32,7 @@ pub(in crate::render::worldrender) const WORLD_BORDER_UNIFORM_BYTES: u64 =
 
 pub(in crate::render::worldrender) const WORLD_MATERIAL_HEADER_BYTES: usize = 144;
 pub(in crate::render::worldrender) const WORLD_SKY_MATERIAL_HEADER_BYTES: usize = 160;
+pub(in crate::render::worldrender) const WORLD_MAP_MATERIAL_HEADER_BYTES: usize = 176;
 
 // Four copied lightmap coordinate pairs retain the source UV2 semantic for
 // material families such as weather.  Keeping this in the shared explicit
@@ -39,7 +40,7 @@ pub(in crate::render::worldrender) const WORLD_SKY_MATERIAL_HEADER_BYTES: usize 
 // material programs which declare a lightmap contract to consume it.
 pub(in crate::render::worldrender) const WORLD_MATERIAL_QUAD_BYTES: usize = 192;
 
-pub(in crate::render::worldrender) const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_SKY_MATERIAL_HEADER_BYTES
+pub(in crate::render::worldrender) const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MAP_MATERIAL_HEADER_BYTES
     + WORLD_MAX_MATERIAL_QUADS_PER_BATCH * WORLD_MATERIAL_QUAD_BYTES)
     as u64;
 
@@ -118,6 +119,7 @@ impl DistantHorizonsGenericBoxBatch {
 /// atlas object, texture unit, or backend handle in the semantic frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::render::worldrender) struct SourceTexturedMaterialBatch {
+    pub(in crate::render::worldrender) material_id: u32,
     pub(in crate::render::worldrender) start: usize,
     pub(in crate::render::worldrender) count: usize,
     pub(in crate::render::worldrender) texture_id: u32,
@@ -648,7 +650,8 @@ pub(in crate::render::worldrender) fn append_private_dh_draws(draws: &[TerrainMe
 }
 
 pub(in crate::render::worldrender) fn material_uses_lightmap(key: MaterialResourceKey) -> bool {
-    is_distant_horizons_generic_stratum(key.stratum)
+    is_map_material(key.material_id)
+        || is_distant_horizons_generic_stratum(key.stratum)
         || material_uses_particle_shader(key.source_program)
 }
 
@@ -855,7 +858,9 @@ pub(in crate::render::worldrender) fn material_depth_and_cull(quad: &WorldMateri
     // depth writing and back-face culling. The source-family contract belongs
     // in this Rust frontend, before explicit GAL state is constructed; it is
     // not inferred from blending or a transitional Java raster-state guess.
-    if quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES {
+    if is_map_material(quad.material_id) {
+        (WORLD_DEPTH_POLICY_TEST_WRITE, WORLD_CULL_NONE)
+    } else if quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES {
         (WORLD_DEPTH_POLICY_TEST_WRITE, WORLD_CULL_BACK)
     } else {
         (quad.depth_policy, quad.cull_policy)
@@ -2102,6 +2107,14 @@ pub(in crate::render::worldrender) fn packed_material_uniforms_for_batch(
     if batch.key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
         for value in frame.shader_environment.fog_parameter_color {
             push_f32(&mut out, value);
+        }
+    }
+    if is_map_material(batch.key.material_id) {
+        let e = &frame.shader_environment;
+        for value in e.fog_parameter_color { push_f32(&mut out, value); }
+        for value in [e.fog_environmental_start, e.fog_environmental_end,
+            e.fog_render_distance_start, e.fog_render_distance_end] {
+            push_f32(&mut out, if e.enabled { value } else { 1.0e12 });
         }
     }
     for index in &batch.indices {

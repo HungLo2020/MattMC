@@ -32,7 +32,8 @@ import org.lwjgl.system.MemoryUtil;
  */
 public final class RustGalGuiRawImageAssets {
 	/** Frozen uploads ordinary GUI PNGs as RGBA8, retaining stored channels. */
-	private static final int RAW_RGBA8 = 2;
+	public static final int RAW_RGBA8 = 2;
+	public static final int RAW_MAP_COLOR8 = 3;
 	private static final int MAX_ENCODED_BYTES = 32 * 1024 * 1024;
 	private static final int MAX_DECODED_PIXELS = 16 * 1024 * 1024;
 	private static final int MAX_SEMANTIC_IDENTITIES = 4096;
@@ -172,6 +173,13 @@ public final class RustGalGuiRawImageAssets {
 			Asset atlas = resolveAtlas(source);
 			if (atlas != null) return atlas;
 		}
+		// Explicit CPU images (notably map/<id>) own their exact semantic
+		// identity. They are not inferred textures/<identity>.png resources.
+		// Resource reload clears this cache; stitched atlases still resolve above.
+		synchronized (LOCK) {
+			Asset copied = CACHE.get(source);
+			if (copied != null) return copied;
+		}
 		for (ResourceLocation candidate : candidates(source)) {
 			synchronized (LOCK) {
 				Asset cached = CACHE.get(candidate);
@@ -268,7 +276,7 @@ public final class RustGalGuiRawImageAssets {
 			revision ^= value & 0xffL;
 			revision *= 0x100000001b3L;
 		}
-		return new SemanticRawImageSnapshot(asset.identity(), asset.width(), asset.height(), 1L, revision, asset.pixels());
+		return new SemanticRawImageSnapshot(asset.identity(), asset.width(), asset.height(), 1L, revision, asset.pixels(), asset.format());
 	}
 
 	/** Loads and caches an early vanilla-pack image without publishing it to Rust. */
@@ -338,7 +346,36 @@ public final class RustGalGuiRawImageAssets {
 		return true;
 	}
 
-	/** Retires an image staged by {@link #stageCpuRgba8}; Rust drops it on the next generation. */
+	/** Checks CPU image availability after reload/invalidation, without consulting GPU state. */
+	public static boolean hasCpuMapColor8(ResourceLocation source) {
+		synchronized (LOCK) {
+			Asset asset = CACHE.get(source);
+			return asset != null && asset.format() == RAW_MAP_COLOR8;
+		}
+	}
+
+	/** Stages indexed map colors; Rust expands them after bounded image admission. */
+	public static boolean stageCpuMapColor8(ResourceLocation source, byte[] colors) {
+		if (source == null || colors == null || colors.length != 128 * 128) return false;
+		Asset asset = new Asset(assetId(source.toString()), source.toString(), 128, 128, colors, 0, 0, RAW_MAP_COLOR8);
+		Asset previous;
+		synchronized (LOCK) {
+			previous = CACHE.get(source);
+			if (!cachePutLocked(CACHE, source, asset)) return false;
+		}
+		try { stage(asset); }
+		catch (RuntimeException error) {
+			synchronized (LOCK) {
+				if (CACHE.get(source) == asset) {
+					if (previous == null) CACHE.remove(source); else CACHE.put(source, previous);
+				}
+			}
+			throw error;
+		}
+		return true;
+	}
+
+	/** Retires a staged CPU image; Rust drops it on the next generation. */
 	public static void releaseCpuRgba8(ResourceLocation source) {
 		if (source == null) return;
 		Asset removed;
@@ -499,7 +536,7 @@ public final class RustGalGuiRawImageAssets {
 		// staged until its bounded pending-image transaction has succeeded, so a
 		// rejected update can be retried instead of being hidden by this fast path.
 		RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(
-			asset.assetId(), RAW_RGBA8, asset.width(), asset.height(), asset.pixels(), asset.samplingFilter(), asset.samplingAddress()
+			asset.assetId(), asset.format(), asset.width(), asset.height(), asset.pixels(), asset.samplingFilter(), asset.samplingAddress()
 		));
 		synchronized (LOCK) {
 			if (STAGED_ASSETS.size() >= MAX_SEMANTIC_IDENTITIES) {
@@ -514,6 +551,7 @@ public final class RustGalGuiRawImageAssets {
 	static boolean samePayload(Asset first, Asset second) {
 		return first != null && second != null
 			&& first.assetId == second.assetId
+			&& first.format == second.format
 			&& first.width == second.width
 			&& first.height == second.height
 			&& first.samplingFilter == second.samplingFilter
@@ -698,7 +736,10 @@ public final class RustGalGuiRawImageAssets {
 		}
 	}
 
-	record Asset(long assetId, String identity, int width, int height, byte[] pixels, int samplingFilter, int samplingAddress) {
+	record Asset(long assetId, String identity, int width, int height, byte[] pixels, int samplingFilter, int samplingAddress, int format) {
+		Asset(long assetId, String identity, int width, int height, byte[] pixels, int samplingFilter, int samplingAddress) {
+			this(assetId, identity, width, height, pixels, samplingFilter, samplingAddress, RAW_RGBA8);
+		}
 		Asset(long assetId, String identity, int width, int height, byte[] pixels) {
 			this(assetId, identity, width, height, pixels, 0, 0);
 		}
@@ -717,7 +758,10 @@ public final class RustGalGuiRawImageAssets {
 		}
 	}
 
-	public record SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels) {
+	public record SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels, int format) {
+		public SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels) {
+			this(identity, width, height, generation, revision, pixels, RAW_RGBA8);
+		}
 		public SemanticRawImageSnapshot {
 			pixels = pixels.clone();
 		}

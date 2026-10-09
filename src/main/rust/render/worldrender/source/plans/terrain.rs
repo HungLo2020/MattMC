@@ -20,7 +20,7 @@ pub(crate) struct PreparedNamedSourceTerrainFramePlan {
     pub(in crate::render::worldrender) entity_shadow_draws: Vec<EntitySourceDraw>,
     pub(in crate::render::worldrender) entities: Option<PreparedNamedSourceEntityFramePlan>,
     pub(in crate::render::worldrender) hands: Option<PreparedNamedSourceHandFramePlan>,
-    pub(in crate::render::worldrender) textured_material: Option<PreparedNamedSourceTexturedMaterialFramePlan>,
+    pub(in crate::render::worldrender) textured_material: Vec<PreparedNamedSourceTexturedMaterialFramePlan>,
     pub(in crate::render::worldrender) weather: Option<PreparedNamedSourceWeatherFramePlan>,
     pub(in crate::render::worldrender) clouds: Option<PreparedNamedSourceCloudFramePlan>,
     pub(in crate::render::worldrender) lines: Option<PreparedNamedSourceLineFramePlan>,
@@ -331,7 +331,7 @@ impl PreparedNamedSourceTerrainFramePlan {
                     }
                 }
                 VanillaPostTerrainSourceWriter::TexturedMaterial => {
-                    if let Some(textured_material) = self.textured_material.as_ref() {
+                    for textured_material in &self.textured_material {
                         runtime.append_textured_material_source_color_pass(
                             operations,
                             &textured_material.targets,
@@ -798,57 +798,32 @@ impl WorldPrimitiveFrontend {
             };
 
             let textured_material_batches = source_textured_material_batches(frame)?;
-            let (
-                textured_material_program,
-                textured_material_targets,
-                textured_material_resources,
-                textured_material_formats,
-            ) = if textured_material_batches.is_empty() {
-                (None, None, None, None)
-            } else {
-                let program = self
-                    .shader_runtime
-                    .as_ref()
-                    .expect("shader runtime remains installed while resolving gbuffers_textured")
-                    .prepared_lowered_textured_material_source_program()?
-                    .ok_or_else(|| {
-                        GalError::unsupported_feature(
-                            "selected source frame has textured material work but no lowered gbuffers_textured program",
-                        )
-                    })?;
-                if program.shader_pack_generation != shader_pack_generation {
-                    return Err(GalError::invalid_argument(
-                        "gbuffers_textured program generation does not match the named terrain target generation",
-                    ));
+            let mut material_groups: Vec<SourceMaterialProgramGroup> = Vec::new();
+            for batch in textured_material_batches {
+                if let Some(group) = material_groups.last_mut() {
+                    let first = group.batches[0].material_id;
+                    let glyph = |id| matches!(id, WORLD_MATERIAL_ID_ITEM_FRAME_MAP | WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP);
+                    if glyph(first) == glyph(batch.material_id) {
+                        group.batches.push(batch);
+                        continue;
+                    }
                 }
-                let targets = self
-                    .stage_textured_material_source_color_pass_targets(
-                        gal,
-                        world_generation,
-                        graph_generation,
-                        extent,
-                        &program,
-                        &color_targets,
-                        depth_texture,
-                        depth_view,
-                        clear_values,
-                    )?
-                    .clone();
-                let resources = self
-                    .stage_candidate_source_resources_for_textured_material_program(
-                        gal,
-                        world_generation,
-                        frame.frame_id,
-                        &program,
-                        &color_targets,
-                    )?;
-                let formats = targets
-                    .color_attachments
-                    .iter()
-                    .map(|attachment| attachment.format)
-                    .collect::<Vec<_>>();
-                (Some(program), Some(targets), Some(resources), Some(formats))
-            };
+                let program = self.source_program_for_material_batch(frame, batch)?;
+                if program.shader_pack_generation != shader_pack_generation {
+                    return Err(GalError::invalid_argument("material source generation does not match frame targets"));
+                }
+                let targets = self.stage_textured_material_source_color_pass_targets(
+                    gal, world_generation, graph_generation, extent, &program,
+                    &color_targets, depth_texture, depth_view, clear_values,
+                )?.clone();
+                let resources = self.stage_candidate_source_resources_for_textured_material_program(
+                    gal, world_generation, frame.frame_id, &program, &color_targets,
+                )?;
+                let formats = targets.color_attachments.iter().map(|a| a.format).collect();
+                material_groups.push(SourceMaterialProgramGroup {
+                    program, targets, resources, formats, batches: vec![batch],
+                });
+            }
 
             let weather_batches = source_weather_material_batches(frame)?;
             let (weather_program, weather_targets, weather_resources, weather_formats) =
@@ -1262,14 +1237,10 @@ impl WorldPrimitiveFrontend {
                     GalError::invalid_argument("shadow-only source stream reservation overflows")
                 })
             })?;
-            let textured_material_stream_bytes = match textured_material_program.as_ref() {
-                Some(program) => source_material_batch_stream_bytes(
-                    program,
-                    &textured_material_batches,
-                    "textured material",
-                )?,
-                None => 0,
-            };
+            let textured_material_stream_bytes = material_groups.iter().try_fold(0_u64, |total, group| {
+                let bytes = source_material_batch_stream_bytes(&group.program, &group.batches, "material")?;
+                total.checked_add(bytes).ok_or_else(|| GalError::invalid_argument("material source stream reservation overflows"))
+            })?;
             let weather_stream_bytes = match weather_program.as_ref() {
                 Some(program) => {
                     source_material_batch_stream_bytes(program, &weather_batches, "weather")?
@@ -1956,64 +1927,54 @@ impl WorldPrimitiveFrontend {
             }
             self.source_terrain_batch_scope = None;
             self.write_selected_source_terrain_transform_receipt(frame, &transform_probes);
-            let textured_material = match (
-                textured_material_program.as_ref(),
-                textured_material_targets,
-                textured_material_resources.as_ref(),
-                textured_material_formats.as_ref(),
-            ) {
-                (None, None, None, None) => None,
-                (Some(program), Some(targets), Some(resources), Some(formats)) => {
-                    let texture_transforms =
-                        self.source_texture_transforms_for_owned_resources()?;
-                    let mut material_draws = Vec::with_capacity(textured_material_batches.len());
-                    for batch in textured_material_batches {
-                        let (batch_resources, local_texture, local_texture_extent) = self
-                            .source_resources_for_textured_material_batch(
-                                gal,
-                                program,
-                                resources,
-                                batch,
-                                frame.frame_id,
-                            )?;
-                        let mut uniform_frame = base_uniform_frame.clone();
-                        uniform_frame.render_stage =
-                            Some(self.source_render_stage_for_material_mode(batch.material_mode)?);
-                        uniform_frame.block_entity_id = Some(batch.block_entity_id);
-                        if let Some(extent) = local_texture_extent {
-                            uniform_frame.material_atlas_size = Some(extent);
-                        }
-                        let prepared = self.prepare_textured_material_source_frame_for_indices(
-                            program,
-                            frame,
-                            batch.indices(),
-                            &texture_transforms,
-                            &uniform_frame,
-                        )?;
-                        material_draws.push(self.prepare_lowered_textured_material_source_draw(
+            let mut textured_material = Vec::with_capacity(material_groups.len());
+            for group in material_groups {
+                let program = group.program.as_ref();
+                let resources = &group.resources;
+                let formats = &group.formats;
+                let texture_transforms =
+                    self.source_texture_transforms_for_owned_resources()?;
+                let mut material_draws = Vec::with_capacity(group.batches.len());
+                for batch in group.batches {
+                    let (batch_resources, local_texture, local_texture_extent) = self
+                        .source_resources_for_textured_material_batch(
                             gal,
                             program,
-                            &prepared,
-                            &batch_resources,
-                            local_texture,
-                            batch.material_mode,
-                            batch.depth_policy,
-                            batch.cull_policy,
-                            batch.winding,
-                            formats.clone(),
-                        )?);
+                            resources,
+                            batch,
+                            frame.frame_id,
+                        )?;
+                    let mut uniform_frame = base_uniform_frame.clone();
+                    uniform_frame.render_stage =
+                        Some(self.source_render_stage_for_material_mode(batch.material_mode)?);
+                    self.apply_material_producer_source_uniforms(frame, batch, &mut uniform_frame)?;
+                    if let Some(extent) = local_texture_extent {
+                        uniform_frame.material_atlas_size = Some(extent);
                     }
-                    Some(PreparedNamedSourceTexturedMaterialFramePlan {
-                        targets,
-                        draws: material_draws,
-                    })
+                    let prepared = self.prepare_textured_material_source_frame_for_indices(
+                        program,
+                        frame,
+                        batch.indices(),
+                        &texture_transforms,
+                        &uniform_frame,
+                    )?;
+                    material_draws.push(self.prepare_lowered_textured_material_source_draw(
+                        gal,
+                        program,
+                        &prepared,
+                        &batch_resources,
+                        local_texture,
+                        batch.material_mode,
+                        batch.depth_policy,
+                        batch.cull_policy,
+                        batch.winding,
+                        formats.clone(),
+                    )?);
                 }
-                _ => {
-                    return Err(GalError::backend(
-                        "textured material source preparation retained an incomplete program/target/resource tuple",
-                    ));
-                }
-            };
+                textured_material.push(PreparedNamedSourceTexturedMaterialFramePlan {
+                    targets: group.targets, draws: material_draws,
+                });
+            }
             let weather = match (
                 weather_program.as_ref(),
                 weather_targets,

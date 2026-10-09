@@ -33,6 +33,10 @@ pub enum TexturedMaterialSourceInput {
     /// The compact stream's disabled entity attribute supplies (0, 0, 0, 1).
     /// This is a source semantic, independent of any live GL attribute state.
     GenericEntityAttribute,
+    /// World glyph producer identity resolved through the active pack source.
+    CanonicalEntityIdentity,
+    QuadMidTextureCoordinate,
+    QuadTangent,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -40,6 +44,7 @@ pub enum TexturedMaterialSourceOutput {
     LitColor,
     MaterialAuxiliary,
     TranslucencyAuxiliary,
+    ViewSpaceNormal,
 }
 
 impl TexturedMaterialSourceOutput {
@@ -51,6 +56,7 @@ impl TexturedMaterialSourceOutput {
             Self::LitColor => TerrainPassOutput::LitTerrainColor,
             Self::MaterialAuxiliary => TerrainPassOutput::MaterialAuxiliary,
             Self::TranslucencyAuxiliary => TerrainPassOutput::TranslucencyAuxiliary,
+            Self::ViewSpaceNormal => TerrainPassOutput::ViewSpaceNormal,
         }
     }
 }

@@ -21,7 +21,7 @@ fn shared_graph_buffers_are_local_and_never_caller_owned() {
         assert!(ffi::mattmc_block_definition_graph_buffer(0, 4, &mut length).is_null());
         assert_eq!(length, 0);
         assert!(ffi::mattmc_block_definition_graph_buffer(0, 0, std::ptr::null_mut()).is_null());
-        assert!(ffi::mattmc_block_definitions_buffer(15, &mut length).is_null());
+        assert!(ffi::mattmc_block_definitions_buffer(16, &mut length).is_null());
         assert_eq!(length, 0);
         assert!(ffi::mattmc_block_definitions_buffer(0, std::ptr::null_mut()).is_null());
     }
@@ -65,7 +65,7 @@ fn intrinsic_and_rule_buffers_are_bounded_process_lifetime_views() {
             assert_eq!(first, values.as_ptr().cast());
             assert_eq!(ffi::mattmc_block_definitions_buffer(kind, &mut length), first);
         }
-        assert!(ffi::mattmc_block_definitions_buffer(15, &mut length).is_null());
+        assert!(ffi::mattmc_block_definitions_buffer(16, &mut length).is_null());
         assert_eq!(length, 0);
     }
 }

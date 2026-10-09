@@ -13,6 +13,7 @@ mod horizon;
 mod shadow_batch_selection;
 mod shadow_facing;
 mod sky_dark_disc;
+mod map_material;
 use crate::render::vulkanic::test_support::{MockBackend, presentation_capabilities, vulkan_capabilities};
 use crate::render::vulkanic::commands::ClearColor;
 use crate::render::guirender::frontend::{GuiFrontend, GuiSpriteRequest};
@@ -5548,6 +5549,30 @@ fn source_material_receipt_reports_only_semantic_texture_and_uv_identity() {
 }
 
 #[test]
+fn source_mesh_receipt_keeps_model_and_moving_producers_when_terrain_fills_the_sample() {
+    let mut source_frame = frame(Vec::new());
+    for key in 1..=32 {
+        let mut terrain = mesh_instance(key, 1);
+        terrain.stratum = WORLD_STRATUM_TERRAIN;
+        source_frame.mesh_instances.push(terrain);
+    }
+    let mut backing = mesh_instance(90_001, 2);
+    backing.stratum = WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY;
+    let mut moving = mesh_instance(90_002, 3);
+    moving.stratum = WORLD_STRATUM_MOVING_MESH;
+    source_frame.mesh_instances.extend([backing, moving]);
+
+    let receipt = source_mesh_instance_semantics_json(&source_frame);
+    assert!(receipt.contains("\"source_instances\":34"));
+    assert!(receipt.contains("\"terrain_instances\":32"));
+    assert!(receipt.contains("\"opaque_geometry_instances\":1"));
+    assert!(receipt.contains("\"moving_mesh_instances\":1"));
+    assert!(receipt.contains("\"mesh_key\":90001,"), "backing must remain correlatable: {receipt}");
+    assert!(receipt.contains("\"mesh_key\":90002,"), "moving producer must remain correlatable: {receipt}");
+    assert_eq!(16, receipt.matches("\"mesh_key\":").count(), "diagnostic storage stays bounded");
+}
+
+#[test]
 fn source_mesh_instance_receipt_reports_semantic_color_without_backend_identity() {
     let mut source_frame = frame(Vec::new());
     let mut tinted = mesh_instance(0x51_414e44, 7);
@@ -8320,6 +8345,94 @@ fn source_entity_frames_merge_contiguous_same_state_sections_into_one_draw_range
 }
 
 #[test]
+fn source_map_material_pipeline_admits_translucent_cutout() {
+    let source = complete_bundled_pack_source_for_test();
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.enable_candidate_source_preparation_for_test();
+    frontend
+        .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+            pack_name: source.name().to_string(),
+            generation: source.generation(),
+            files: source.files(),
+        })
+        .unwrap();
+    frontend.ensure_shader_runtime(&mut gal, source.generation()).unwrap();
+    frontend.observe_shader_pack_source_candidate_for_scope(TerrainProgramScope::Overworld);
+    let program = frontend
+        .shader_runtime
+        .as_ref()
+        .unwrap()
+        .prepared_lowered_textured_material_source_program()
+        .unwrap()
+        .unwrap();
+    frontend
+        .ensure_lowered_textured_material_source_pipeline_resources(
+            &mut gal,
+            &program,
+            WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
+            WORLD_DEPTH_POLICY_TEST_WRITE,
+            WORLD_CULL_NONE,
+            WORLD_WINDING_CCW,
+            vec![TextureFormat::Rgba8Unorm],
+        )
+        .expect("admitted map work must also have an executable source pipeline");
+    frontend.destroy_resources(&mut gal);
+}
+
+#[test]
+fn source_framed_map_uses_glyph_writer_and_compiles_its_owned_quad_stream() {
+    let source = complete_bundled_pack_source_for_test();
+    let mut gal = crate::render::vulkanic::test_support::vulkan_gal("world-glyph-source-compilation").unwrap();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.apply_shader_pack_source_update(ShaderPackSourceUpdate {
+        pack_name: source.name().to_string(), generation: source.generation(), files: source.files(),
+    }).unwrap();
+    let glyph = frontend.world_glyph_source_program(TerrainProgramScope::Overworld).unwrap();
+    assert!(glyph.program.fragment.label.contains("gbuffers_entities"));
+    assert!(glyph.program.vertex.source.contains("vulkanic_glyph_face_normal"));
+    frontend.ensure_lowered_textured_material_source_pipeline_resources(
+        &mut gal, &glyph.program, WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
+        WORLD_DEPTH_POLICY_TEST_WRITE, WORLD_CULL_NONE, WORLD_WINDING_CCW,
+        vec![TextureFormat::Rgba8Unorm; glyph.program.named_output_color_slots().len()],
+    ).expect("world glyph metadata must compile through the owned compact stream");
+    frontend.destroy_resources(&mut gal);
+}
+
+#[test]
+fn source_map_material_uses_the_active_pack_entity_render_stage() {
+    let mut frontend = WorldPrimitiveFrontend::default();
+    for (generation, entity_stage) in [(17, 23), (18, 41)] {
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "source-map-render-stage-test".to_string(),
+                generation,
+                files: vec![ShaderSourceFile::new(
+                    RUNTIME_ENVIRONMENT_PATH,
+                    format!(
+                        "MC_RENDER_STAGE_ENTITIES={entity_stage}\nMC_RENDER_STAGE_TERRAIN_TRANSLUCENT=12\n"
+                    ),
+                )],
+            })
+            .unwrap();
+        assert_eq!(
+            entity_stage,
+            frontend
+                .source_render_stage_for_material_mode(WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT)
+                .unwrap(),
+            "map text is emitted during entity rendering; reloads must read the active pack define",
+        );
+        assert_eq!(
+            12,
+            frontend
+                .source_render_stage_for_material_mode(WORLD_MATERIAL_MODE_TRANSLUCENT)
+                .unwrap(),
+        );
+    }
+    assert!(frontend.source_render_stage_for_material_mode(8).is_err());
+}
+
+#[test]
 fn source_entity_frame_uses_the_active_pack_entity_render_stage_only_when_declared() {
     let source = ShaderPackSource::new(
         "source-entity-render-stage-test",
@@ -8816,6 +8929,7 @@ fn source_material_accepts_mesh_owned_local_texture_and_retires_replacements() {
     )
     .unwrap();
     let batch = SourceTexturedMaterialBatch {
+        material_id: WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
         start: 0,
         count: 1,
         texture_id,
@@ -15965,7 +16079,7 @@ fn prepared_source_terrain_named_color_submission_draws_into_pack_declared_targe
             draws: Vec::new(),
         }),
         hands: None,
-        textured_material: None,
+        textured_material: Vec::new(),
         weather: None,
         clouds: None,
         lines: None,
@@ -27564,4 +27678,14 @@ fn merged_static_and_sorted_batches_match_a_stable_sort_of_their_concatenation()
     // An unsorted part falls back to sorting.
     let reversed: Vec<_> = tail.iter().rev().cloned().collect();
     assert_eq!(expected(&head, &reversed), identity(&merge_sorted_mesh_batches(&head, reversed, &frame)));
+}
+
+#[test]
+fn native_indexed_map_png_uses_world_decoder_with_exact_frozen_channels() {
+    let codes: Vec<u8> = (0..128*128).map(|i| i as u8).collect();
+    let png = crate::assets::map_image::encode_png(&codes).unwrap();
+    let (rgba,width,height) = decode_png_rgba(&png,"native indexed map").unwrap();
+    assert_eq!((128,128),(width,height));
+    let frozen = include_bytes!("../../content/map_color/frozen-native-rgba.bin");
+    assert_eq!(frozen.repeat(64),rgba);
 }

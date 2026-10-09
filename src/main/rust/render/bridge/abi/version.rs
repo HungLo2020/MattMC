@@ -126,7 +126,8 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// and Rust expands the registered part hierarchy.
 /// v72 appends retained DH generic group instances: group boxes are
 /// registered once and each frame sends only the groups' origins.
-pub const FFI_ABI_VERSION: u32 = 72;
+/// v73 adds indexed map-color CPU image input, expanded only by the Rust frontend.
+pub const FFI_ABI_VERSION: u32 = 73;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

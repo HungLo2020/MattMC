@@ -107,7 +107,7 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			int j = this.getLightCoords(itemFrameRenderState.isGlowFrame, 15728850, itemFrameRenderState.lightCoords);
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemFrameMapSubmission(
 				itemFrameRenderState.entityId, itemFrameRenderState.mapId.id(), itemFrameRenderState.mapRenderState.texture,
-				itemFrameRenderState.rotation, itemFrameRenderState.isInvisible, contentOffset);
+				itemFrameRenderState.rotation, itemFrameRenderState.isInvisible, itemFrameRenderState.isGlowFrame, contentOffset);
 			try {
 				this.mapRenderer.render(itemFrameRenderState.mapRenderState, poseStack, submitNodeCollector, true, j);
 			} finally {

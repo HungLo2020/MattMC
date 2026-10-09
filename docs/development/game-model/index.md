@@ -103,6 +103,8 @@ one set of systems.
   intrinsic configurations, Java views and directly derived native flags.
 - [Native intrinsic state rules](BLOCK-INTRINSICS.md) (current work): map colors,
   emitted light, fluid associations and temporary compatibility projections.
+- [Native state policy](STATE-POLICY.md) (current work): tick/light-shape eligibility, leaf/entity markers and immutable compatibility views.
+- [Map colors and image processing](MAP-COLORS.md) (current work): palette/shading ownership, compact indexed inputs and bounded native image processing.
 - [Native sound definitions](SOUND-DEFINITIONS.md) (current work): event identities,
   block sound profiles and note instruments.
 - [Block sounds and model offsets](BLOCK-SOUND-AND-OFFSETS.md) (current work):

@@ -1,8 +1,7 @@
 //! State-only content rules, evaluated once into immutable native columns.
 //! Map colors are semantic palette identities, not render materials or tints.
 mod declarations;
-mod map_color;
-pub use map_color::MapColor;
+pub use crate::content::map_color::MapColor;
 pub(super) use declarations::{IntrinsicSet, PROFILES};
 
 use crate::content::{fluid::{self, Family, FluidStateId}, property::{Builtin, Domain}};

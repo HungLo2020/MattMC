@@ -405,6 +405,7 @@ pub(super) fn required_legacy_transform_uniforms(
                 | SourceTransformSemantics::Entity
                 | SourceTransformSemantics::Hand => "mat4 gbufferModelView;",
                 SourceTransformSemantics::TexturedMaterial
+                | SourceTransformSemantics::WorldGlyph
                 | SourceTransformSemantics::Weather
                 | SourceTransformSemantics::Cloud => "mat4 gbufferModelView;",
                 SourceTransformSemantics::Shadow => "mat4 shadowModelView;",
@@ -429,6 +430,7 @@ pub(super) fn required_legacy_transform_uniforms(
                 | SourceTransformSemantics::Entity
                 | SourceTransformSemantics::Hand => "mat4 gbufferProjection;",
                 SourceTransformSemantics::TexturedMaterial
+                | SourceTransformSemantics::WorldGlyph
                 | SourceTransformSemantics::Weather
                 | SourceTransformSemantics::Cloud => "mat4 gbufferProjection;",
                 SourceTransformSemantics::Shadow => "mat4 shadowProjection;",

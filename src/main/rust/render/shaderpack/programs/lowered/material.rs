@@ -137,7 +137,7 @@ impl LoweredTexturedMaterialSourceProgram {
             .opaque_resource_bindings
             .bindings()
             .iter()
-            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialAtlas)
+            .any(|binding| matches!(binding.role(), TerrainSourceResourceRole::MaterialAtlas | TerrainSourceResourceRole::MaterialTexture))
         {
             return Err(GalError::unsupported_feature(
                 "textured material source program has no declared base-color sampler",

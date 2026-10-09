@@ -406,9 +406,9 @@ public final class RustGalFrameCoordinator {
 			}
 			long projectedBytes = 0L;
 			for (VulkanicGalBridge.GuiRawImageAssetRecord candidate : pendingRawImages.values()) {
-				if (candidate != previous) projectedBytes = Math.addExact(projectedBytes, candidate.pixelByteLength());
+				if (candidate != previous) projectedBytes = Math.addExact(projectedBytes, candidate.residentPixelByteLength());
 			}
-			projectedBytes = Math.addExact(projectedBytes, asset.pixelByteLength());
+			projectedBytes = Math.addExact(projectedBytes, asset.residentPixelByteLength());
 			if (projectedBytes > MAX_PENDING_RAW_IMAGE_BYTES) {
 				throw new IllegalStateException(
 					"semantic GUI raw-image byte bound exceeded " + MAX_PENDING_RAW_IMAGE_BYTES

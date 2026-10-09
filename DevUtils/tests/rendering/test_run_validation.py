@@ -1,6 +1,7 @@
 """The validation driver's commands, ordering and artifact readers."""
 import json
 import copy
+import gzip
 from pathlib import Path
 import sys
 import tempfile
@@ -13,6 +14,45 @@ import RunValidation as validation
 
 
 class RunValidationTest(unittest.TestCase):
+    def test_only_exact_orderly_shutdown_disconnect_is_classified_separately(self):
+        stopping = "[23:08:08] [Render thread/INFO]: Stopping!\n"
+        disconnect = ("[23:08:08] [Server thread/INFO]: Player lost connection: "
+                      "Internal Exception: java.nio.channels.ClosedChannelException\n")
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary)
+            (run / "capture").mkdir()
+            path = run / "capture/runClient_1.log"
+            for suffix in (".log", ".log.gz"):
+                path = path.with_suffix(suffix)
+                data = (stopping + disconnect).encode()
+                path.write_bytes(gzip.compress(data) if suffix.endswith("gz") else data)
+                health = validation.read_client_health(run)
+                self.assertEqual(0, health["exceptions"])
+                self.assertEqual(2, health["raw_exception_mentions"])
+                self.assertEqual(1, health["shutdown_disconnects"])
+                path.unlink()
+
+    def test_runtime_disconnects_stack_traces_and_other_shutdown_errors_still_fail(self):
+        stopping = "[23:08:08] [Render thread/INFO]: Stopping!\n"
+        disconnect = ("[23:08:08] [Server thread/INFO]: Player lost connection: "
+                      "Internal Exception: java.nio.channels.ClosedChannelException\n")
+        cases = {
+            "before shutdown": disconnect + stopping,
+            "error level": stopping + disconnect.replace("thread/INFO", "thread/ERROR"),
+            "invalid marker": stopping.replace("thread/INFO", "thread/ERROR") + disconnect,
+            "different error": stopping + disconnect.replace("ClosedChannelException", "IOException"),
+            "stack trace": stopping + disconnect + "java.nio.channels.ClosedChannelException\n",
+            "runtime error": "java.lang.IllegalStateException\n" + stopping + disconnect,
+            "native panic": stopping + "panicked at render/frame.rs\n",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary)
+            (run / "capture").mkdir()
+            for name, text in cases.items():
+                with self.subTest(case=name):
+                    (run / "capture/runClient_1.log").write_text(text)
+                    self.assertGreater(validation.read_client_health(run)["exceptions"], 0)
+
     def test_java_tests_skip_the_serial_rust_rerun_and_use_the_release_library(self):
         command = validation.gradle_java_tests_command(["net.vulkanic.*"])
         self.assertIn("-x", command)

@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * pass state IDs and let Rust derive their tables from it; when it is not
  * {@link #ready()} they keep their Java paths. Layout: {@code content/block/export.rs}. */
 public final class NativeBlockRegistry {
-    private static final int FORMAT = 8;
+    private static final int FORMAT = 9;
     private static final int MAX_STATES = 65535;
     // Flag bits, shared with content/block/mod.rs StateFlags.
     static final int AIR = 1, BLOCKS_MOTION = 2, HAS_FLUID = 4, RANDOM_TICKS = 8, LIGHT_EMPTY_SHAPE = 16, LEAVES = 32, CUSTOM = 64,
@@ -125,17 +125,12 @@ public final class NativeBlockRegistry {
         return new Export(java.util.Arrays.copyOf(ints.values, ints.size), bytes.toByteArray());
     }
 
-    // AIR/CAN_OCCLUDE and fluid flags are derived by their native owners.
+    // Native physical/state policies own air, occlusion, tick, leaf, entity and fluid flags.
     static int flags(BlockState state) {
         int flags = 0;
         if (state.blocksMotion()) flags |= BLOCKS_MOTION;
-        if (state.isRandomlyTicking()) flags |= RANDOM_TICKS;
-        // LightEngine.isEmptyShape.
-        if (!state.canOcclude() || !state.useShapeForLightOcclusion()) flags |= LIGHT_EMPTY_SHAPE;
-        if (state.getBlock() instanceof LeavesBlock) flags |= LEAVES;
         if (state.getClass() != BlockState.class) flags |= CUSTOM;
         if (state.isSolidRender()) flags |= SOLID_RENDER;
-        if (state.hasBlockEntity()) flags |= BLOCK_ENTITY;
         return flags;
     }
 

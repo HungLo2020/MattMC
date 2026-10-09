@@ -70,6 +70,7 @@ pub enum TexturedMaterialFragmentOutput {
     LitColor,
     MaterialAuxiliary,
     TranslucencyAuxiliary,
+    ViewSpaceNormal,
 }
 
 /// The weather stage writes a single lit scene-color output. It is distinct
@@ -95,7 +96,7 @@ impl TexturedMaterialFragmentOutput {
         match self {
             Self::LitColor => 0,
             Self::MaterialAuxiliary => 1,
-            Self::TranslucencyAuxiliary => 2,
+            Self::TranslucencyAuxiliary | Self::ViewSpaceNormal => 2,
         }
     }
 
@@ -104,6 +105,7 @@ impl TexturedMaterialFragmentOutput {
             Self::LitColor => "out_textured_material_lit_color",
             Self::MaterialAuxiliary => "out_textured_material_auxiliary",
             Self::TranslucencyAuxiliary => "out_textured_material_translucency_auxiliary",
+            Self::ViewSpaceNormal => "out_textured_material_view_normal",
         }
     }
 }

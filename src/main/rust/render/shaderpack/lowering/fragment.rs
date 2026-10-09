@@ -296,6 +296,15 @@ pub(super) fn lower_textured_material_fragment_surface_with_contracts(
             TexturedMaterialFragmentOutput::MaterialAuxiliary,
             TexturedMaterialFragmentOutput::TranslucencyAuxiliary,
         ],
+        [0, 6, 5] => &[
+            TexturedMaterialFragmentOutput::LitColor,
+            TexturedMaterialFragmentOutput::MaterialAuxiliary,
+            TexturedMaterialFragmentOutput::ViewSpaceNormal,
+        ],
+        [0, 6] => &[
+            TexturedMaterialFragmentOutput::LitColor,
+            TexturedMaterialFragmentOutput::MaterialAuxiliary,
+        ],
         _ => return Err(GalError::unsupported_feature(format!(
             "textured material fragment '{}' has unsupported DRAWBUFFERS schema {slots:?}",
             source.entry_path(),

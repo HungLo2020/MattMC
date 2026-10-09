@@ -2,13 +2,44 @@
 from pathlib import Path
 import copy
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RunFeatureParity as feature
 
 
 class FeatureParityCompareTest(unittest.TestCase):
+    def test_shader_capture_requires_native_final_output_correlation(self):
+        class CaptureCommandObserved(Exception):
+            pass
+
+        for scenario, shaders in (("framed-map-shaders", True), ("chest-shaders", True),
+                                  ("framed-map", False)):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                argv = ["RunFeatureParity.py", "--label", "correlation-test", "--scenario", scenario,
+                        "--repo-root", str(root), "--run-source", str(root),
+                        "--shader-pack", str(root), "--frozen-repo", str(root)]
+                calls = []
+
+                def observe(command, **kwargs):
+                    calls.append(command)
+                    if len(calls) == 1:
+                        return 0
+                    raise CaptureCommandObserved()
+
+                with patch.object(feature, "REPO", root), patch.object(sys, "argv", argv), \
+                     patch.object(feature, "leftover_clients", return_value=[]), \
+                     patch.object(feature.subprocess, "call", side_effect=observe):
+                    with self.assertRaises(CaptureCommandObserved):
+                        feature.main()
+                command = calls[1]
+                self.assertEqual(shaders, "--rust-selected-source-execution" in command)
+                self.assertIn("--mode", command)
+                self.assertIn(f"frozen-opengl-shaders-{'on' if shaders else 'off'}", command)
+
     def test_only_changes_from_the_baseline_count(self):
         baseline = {"scenarios": {
             "chest": {"success": True, "reports": {"cross_repository_visual_parity": "complete"}, "mean_rgb": [1.0, 1.0, 1.0]},

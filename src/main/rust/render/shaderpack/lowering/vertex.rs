@@ -27,6 +27,7 @@ pub(super) enum SourceTransformSemantics {
     Entity,
     Hand,
     TexturedMaterial,
+    WorldGlyph,
     Weather,
     Cloud,
     Shadow,
@@ -44,7 +45,7 @@ impl SourceTransformSemantics {
             Self::Terrain | Self::Entity => "(gbufferModelView * vulkanic_source_model_transform)",
             Self::Shadow => "(shadowModelView * vulkanic_source_model_transform)",
             Self::DistantHorizons => "(dhModelView * vulkanic_source_model_transform)",
-            Self::TexturedMaterial | Self::Weather | Self::Cloud | Self::Fullscreen => {
+            Self::TexturedMaterial | Self::WorldGlyph | Self::Weather | Self::Cloud | Self::Fullscreen => {
                 "gbufferModelView"
             }
         }
@@ -56,6 +57,7 @@ impl SourceTransformSemantics {
             Self::Entity => "gbufferModelView",
             Self::Hand => "gbufferModelView",
             Self::TexturedMaterial => "gbufferModelView",
+            Self::WorldGlyph => "gbufferModelView",
             Self::Weather => "gbufferModelView",
             Self::Cloud => "gbufferModelView",
             Self::Shadow => "shadowModelView",
@@ -72,6 +74,7 @@ impl SourceTransformSemantics {
             // its legacy GL projection changes for first-person geometry.
             Self::Hand => "vulkanic_source_hand_projection",
             Self::TexturedMaterial => "gbufferProjection",
+            Self::WorldGlyph => "gbufferProjection",
             Self::Weather => "gbufferProjection",
             Self::Cloud => "gbufferProjection",
             Self::Shadow => "shadowProjection",
@@ -168,6 +171,9 @@ pub(super) fn lower_source_vertex_surface_with_contracts(
 }
 
 pub(super) fn vertex_semantic_preamble(transforms: SourceTransformSemantics) -> String {
+    if transforms == SourceTransformSemantics::WorldGlyph {
+        return format!("{TEXTURED_MATERIAL_VERTEX_SEMANTIC_PREAMBLE}\n{WORLD_GLYPH_VERTEX_SEMANTICS}");
+    }
     if transforms == SourceTransformSemantics::DistantHorizons {
         return DISTANT_HORIZONS_VERTEX_SEMANTIC_PREAMBLE.to_string();
     }
@@ -301,6 +307,8 @@ const int vulkanic_source_textured_quad_indices[6] = int[6](0, 1, 2, 2, 3, 0);
 #define vulkanic_source_entity vec4(0.0, 0.0, 0.0, 1.0)
 #define vulkanic_source_ftransform() (gbufferProjection * vulkanic_source_model_view * vulkanic_source_position)
 "#;
+
+const WORLD_GLYPH_VERTEX_SEMANTICS: &str = include_str!("glyph_vertex.glsl");
 
 /// Rust-owned source interface for the copied DH CPU stream. The storage
 /// layout matches `world_primitive_frontend::lod`'s 16-byte packed vertex

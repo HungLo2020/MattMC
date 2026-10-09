@@ -167,6 +167,23 @@ pub fn lower_textured_material_source_pair(
     vertex: &PreprocessedShaderSource,
     fragment: &PreprocessedShaderSource,
 ) -> GalResult<LoweredTexturedMaterialSourcePair> {
+    lower_compact_material_source_pair(vertex, fragment, SourceTransformSemantics::TexturedMaterial)
+}
+
+/// World glyphs carry quad-derived mid-UV/tangent/normal semantics and their
+/// producer's source IDs. They share owned compact storage, not particle policy.
+pub fn lower_world_glyph_source_pair(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+) -> GalResult<LoweredTexturedMaterialSourcePair> {
+    lower_compact_material_source_pair(vertex, fragment, SourceTransformSemantics::WorldGlyph)
+}
+
+fn lower_compact_material_source_pair(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+    transforms: SourceTransformSemantics,
+) -> GalResult<LoweredTexturedMaterialSourcePair> {
     // Shared pack headers may declare terrain attributes for every program.
     // An unused declaration is harmless. The compact stream models the
     // disabled generic mc_Entity attribute explicitly; no other terrain-only
@@ -174,7 +191,12 @@ pub fn lower_textured_material_source_pair(
     let vertex_identifiers = glsl_identifiers(&remove_known_legacy_attributes(
         vertex.expanded_source(),
     )?);
-    for name in ["mc_midTexCoord", "at_tangent", "at_midBlock"] {
+    let unsupported: &[&str] = if transforms == SourceTransformSemantics::WorldGlyph {
+        &["at_midBlock", "mc_Entity"]
+    } else {
+        &["mc_midTexCoord", "at_tangent", "at_midBlock"]
+    };
+    for &name in unsupported {
         if vertex_identifiers.contains(name) {
             return Err(GalError::unsupported_feature(format!(
                 "selected textured material source requires unsupported terrain-only attribute '{name}'"
@@ -184,7 +206,7 @@ pub fn lower_textured_material_source_pair(
     let owned_storage_bindings = TerrainSourceResourceBindings::default();
     let vertex = externalize_owned_semantic_storage_writes(vertex, &owned_storage_bindings)?;
     let fragment = externalize_owned_semantic_storage_writes(fragment, &owned_storage_bindings)?;
-    let uniform_contract = derive_terrain_source_uniform_contract(&vertex, &fragment)?;
+    let uniform_contract = derive_source_uniform_contract(&vertex, &fragment, transforms)?;
     let varying_contract = derive_terrain_source_varying_contract(&vertex, &fragment)?;
     let opaque_resource_contract =
         derive_terrain_source_opaque_resource_contract(&vertex, &fragment)?;
@@ -194,7 +216,7 @@ pub fn lower_textured_material_source_pair(
             &uniform_contract,
             &varying_contract,
             &opaque_resource_contract,
-            SourceTransformSemantics::TexturedMaterial,
+            transforms,
         )?,
         fragment: lower_textured_material_fragment_surface_with_contracts(
             &fragment,

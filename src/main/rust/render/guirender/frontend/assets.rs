@@ -153,7 +153,12 @@ impl GuiFrontend {
                     ),
                 ));
             }
-            total_bytes = total_bytes.checked_add(expected).ok_or_else(|| {
+            // Admission bounds the expanded resident bytes before any map allocation.
+            let resident_format = payload.format.resident_format();
+            let resident_bytes = pixel_count.checked_mul(resident_format.bytes_per_pixel()).ok_or_else(|| {
+                GalError::ffi(StatusCode::InvalidArgument, "raw GUI resident image size overflows")
+            })?;
+            total_bytes = total_bytes.checked_add(resident_bytes).ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::InvalidArgument,
                     "raw GUI image aggregate byte count overflows",
@@ -167,15 +172,19 @@ impl GuiFrontend {
                     ),
                 ));
             }
+            let pixels = match payload.format {
+                GuiRawImageSourceFormat::MapColor8 => crate::content::map_color::expand_rgba(&payload.pixels),
+                GuiRawImageSourceFormat::Alpha8 | GuiRawImageSourceFormat::Rgba8 => payload.pixels,
+            };
             if images
                 .insert(
                     payload.asset_id,
                     RawGuiImage {
                         sampling: payload.sampling,
-                        format: payload.format,
+                        format: resident_format,
                         width: payload.width,
                         height: payload.height,
-                        pixels: payload.pixels,
+                        pixels,
                     },
                 )
                 .is_some()

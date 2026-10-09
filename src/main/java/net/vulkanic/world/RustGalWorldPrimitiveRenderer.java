@@ -257,6 +257,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_ID_MODEL_CRUMBLING = 0x43524d42;
 	public static final int MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED = 0x50464331;
 	public static final int MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED = 0x50465431;
+	public static final int MATERIAL_ID_MAP_TEXT = 0x4D415051;
+	public static final int MATERIAL_ID_ITEM_FRAME_MAP = 0x464D4150;
+	public static final int MATERIAL_ID_GLOW_ITEM_FRAME_MAP = 0x474D4150;
 	public static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;
 	public static final int MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED = 0x54435554;
 	public static final int MATERIAL_ID_ENTITY_SHADOW = 0x5348444D;
@@ -4772,6 +4775,22 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static boolean isMapMaterial(int materialId) {
+		return materialId == MATERIAL_ID_MAP_TEXT || materialId == MATERIAL_ID_ITEM_FRAME_MAP
+			|| materialId == MATERIAL_ID_GLOW_ITEM_FRAME_MAP;
+	}
+
+	/** Copies a map image/decorative quad; Rust resolves text depth, alpha and ordering. */
+	public static boolean enqueueMapTexturedQuad(Matrix4f transform, ResourceLocation textureIdentity,
+		float[] vertices, float[] uvs, int color, int lightCoords) {
+		ItemFrameMapContext frame = currentItemFrameMapContext();
+		int material = frame == null ? MATERIAL_ID_MAP_TEXT
+			: frame.glowFrame() ? MATERIAL_ID_GLOW_ITEM_FRAME_MAP : MATERIAL_ID_ITEM_FRAME_MAP;
+		return enqueueTexturedQuadForMaterial(transform, textureIdentity, vertices, uvs, color, lightCoords,
+			material, MATERIAL_MODE_TRANSLUCENT_CUTOUT, DEPTH_POLICY_TEST_NO_WRITE,
+			MATERIAL_SOURCE_TEXTURED, "map-textured");
+	}
+
 	private static boolean enqueueTexturedQuadForMode(
 		Matrix4f transform, ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords, boolean translucent
 	) {
@@ -8112,7 +8131,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Marks the map-image quad emitted by a real item frame without exposing renderer state to Rust. */
 	public static void beginItemFrameMapSubmission(
 		int entityId, int mapId, ResourceLocation textureIdentity, int rotation,
-		boolean invisibleFrame, float contentOffset
+		boolean invisibleFrame, boolean glowFrame, float contentOffset
 	) {
 		if (entityId < 0 || mapId < 0 || textureIdentity == null || rotation < 0 || rotation > 7) {
 			throw new IllegalArgumentException("framed-map semantics require entity, map, texture, and bounded rotation identities");
@@ -8121,7 +8140,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			throw new IllegalArgumentException("framed-map semantics require a finite positive content offset");
 		}
 		ITEM_FRAME_MAP_CONTEXTS.get().addLast(new ItemFrameMapContext(
-			entityId, mapId, textureIdentity, rotation, invisibleFrame, contentOffset));
+			entityId, mapId, textureIdentity, rotation, invisibleFrame, glowFrame, contentOffset));
 	}
 
 	public static void endItemFrameMapSubmission() {
@@ -13339,6 +13358,10 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	private static boolean registerSemanticTextureAsset(ResourceLocation identity, int textureId, String source) {
 		if (identity == null || textureId == 0) return false;
+		if (net.vulkanic.gui.RustGalGuiRawImageAssets.hasCpuMapColor8(identity)) {
+			return registerIndexedMapTextureAsset(identity, textureId,
+				net.vulkanic.gui.RustGalGuiRawImageAssets.semanticSnapshotUnstaged(identity));
+		}
 		if (identity.equals(net.minecraft.client.renderer.Sheets.PAINTINGS_SHEET)
 			&& Minecraft.getInstance().getTextureManager().getTexture(identity) instanceof TextureAtlas atlas) {
 			long generation = atlas.semanticSnapshotGeneration();
@@ -13401,9 +13424,15 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Copies a registered CPU dynamic texture (maps, skins, and resource-pack UI sources) into the explicit world asset stream. */
 	private static boolean registerDynamicTextureAsset(ResourceLocation identity, int textureId) {
+		if (identity == null || textureId == 0) return false;
+		if (net.vulkanic.gui.RustGalGuiRawImageAssets.hasCpuMapColor8(identity)) {
+			return registerIndexedMapTextureAsset(identity, textureId,
+				net.vulkanic.gui.RustGalGuiRawImageAssets.semanticSnapshotUnstaged(identity));
+		}
 		var texture = Minecraft.getInstance().getTextureManager().getTexture(identity);
 		try {
 			BufferedImage image;
+			net.vulkanic.gui.RustGalGuiRawImageAssets.SemanticRawImageSnapshot semanticImage;
 			long fingerprint;
 			if (texture instanceof DynamicTexture dynamic && dynamic.getPixels() != null) {
 				var pixels = dynamic.getPixels();
@@ -13441,12 +13470,16 @@ public final class RustGalWorldPrimitiveRenderer {
 						image.setRGB(x, y, ARGB.color(rgba[offset + 3] & 0xff, rgba[offset] & 0xff, rgba[offset + 1] & 0xff, rgba[offset + 2] & 0xff));
 					}
 				}
-			} else if (net.vulkanic.gui.RustGalGuiRawImageAssets.semanticSnapshotUnstaged(identity) != null) {
+			} else if ((semanticImage = net.vulkanic.gui.RustGalGuiRawImageAssets.semanticSnapshotUnstaged(identity)) != null) {
 				// Mod-owned atlases (for example VoxelMap's waypoint atlas) are
 				// AbstractTexture implementations rather than Minecraft's TextureAtlas.
 				// Consume the already-copied CPU semantic image; never borrow their GPU
 				// object or native handle.
-				var snapshot = net.vulkanic.gui.RustGalGuiRawImageAssets.semanticSnapshotUnstaged(identity);
+				var snapshot = semanticImage;
+				if (snapshot.format() == net.vulkanic.gui.RustGalGuiRawImageAssets.RAW_MAP_COLOR8) {
+					return registerIndexedMapTextureAsset(identity, textureId, snapshot);
+				}
+				if (snapshot.format() != net.vulkanic.gui.RustGalGuiRawImageAssets.RAW_RGBA8) return false;
 				long pixelCount = (long) snapshot.width() * snapshot.height();
 				if (snapshot.width() <= 0 || snapshot.height() <= 0
 					|| pixelCount > MAX_DYNAMIC_WORLD_ASSET_PIXELS
@@ -13491,26 +13524,50 @@ public final class RustGalWorldPrimitiveRenderer {
 			ByteArrayOutputStream output = new ByteArrayOutputStream(image.getWidth() * image.getHeight());
 			if (!ImageIO.write(image, "png", output)) return false;
 			byte[] payload = output.toByteArray();
-			if (payload.length > MAX_WORLD_MESH_TEXTURE_PNG_BYTES) return false;
-			synchronized (LOCK) {
-				ensureWorldMeshRegistryCapacityLocked(DYNAMIC_WORLD_ASSET_FINGERPRINTS, identity,
-					MAX_DYNAMIC_WORLD_ASSET_FINGERPRINTS, "dynamic-asset-fingerprint");
-				long retainedBytes = 0L;
-				for (int bytes : DYNAMIC_WORLD_ASSET_BYTES.values()) retainedBytes += bytes;
-				int previousBytes = DYNAMIC_WORLD_ASSET_BYTES.getOrDefault(identity, 0);
-				if (retainedBytes - previousBytes > MAX_DYNAMIC_WORLD_ASSET_BYTES_TOTAL - payload.length) {
-					LOGGER.warn("Rust VulkanicGAL dynamic world asset byte residency bound exceeded {} bytes for {}",
-						MAX_DYNAMIC_WORLD_ASSET_BYTES_TOTAL, identity);
-					return false;
-				}
-				registerWorldMeshTexture(minecraftModelTextureAsset(textureId, payload), "dynamic:" + identity);
-				DYNAMIC_WORLD_ASSET_FINGERPRINTS.put(identity, fingerprint);
-				DYNAMIC_WORLD_ASSET_BYTES.put(identity, payload.length);
-			}
-			return true;
+			return publishDynamicTexturePayload(identity, textureId, fingerprint, payload);
 		} catch (RuntimeException | IOException error) {
 			return false;
 		}
+	}
+
+	/** Generated maps publish directly from CPU data, before any Java texture/resource lookup. */
+	private static boolean registerIndexedMapTextureAsset(ResourceLocation identity, int textureId,
+		net.vulkanic.gui.RustGalGuiRawImageAssets.SemanticRawImageSnapshot snapshot) {
+		if (snapshot == null || snapshot.format() != net.vulkanic.gui.RustGalGuiRawImageAssets.RAW_MAP_COLOR8
+			|| snapshot.width() != 128 || snapshot.height() != 128 || snapshot.pixels().length != 128 * 128) return false;
+		long fingerprint = fnv64("indexed-map-world-asset-v1");
+		fingerprint = fnv64Int(fingerprint, (int)snapshot.revision());
+		fingerprint = fnv64Int(fingerprint, (int)(snapshot.revision() >>> 32));
+		synchronized (LOCK) {
+			if (fingerprint == DYNAMIC_WORLD_ASSET_FINGERPRINTS.getOrDefault(identity, Long.MIN_VALUE)
+				&& WORLD_MESH_TEXTURES.containsKey(textureId)) return true;
+		}
+		try {
+			return publishDynamicTexturePayload(identity, textureId, fingerprint, encodeSemanticImageSnapshot(snapshot));
+		} catch (RuntimeException error) {
+			return false;
+		}
+	}
+
+	/** Shared bounded CPU publication for ordinary and native-encoded images. */
+	private static boolean publishDynamicTexturePayload(ResourceLocation identity, int textureId, long fingerprint, byte[] payload) {
+		if (payload == null || payload.length == 0 || payload.length > MAX_WORLD_MESH_TEXTURE_PNG_BYTES) return false;
+		synchronized (LOCK) {
+			ensureWorldMeshRegistryCapacityLocked(DYNAMIC_WORLD_ASSET_FINGERPRINTS, identity,
+				MAX_DYNAMIC_WORLD_ASSET_FINGERPRINTS, "dynamic-asset-fingerprint");
+			long retainedBytes = 0L;
+			for (int bytes : DYNAMIC_WORLD_ASSET_BYTES.values()) retainedBytes += bytes;
+			int previousBytes = DYNAMIC_WORLD_ASSET_BYTES.getOrDefault(identity, 0);
+			if (retainedBytes - previousBytes > MAX_DYNAMIC_WORLD_ASSET_BYTES_TOTAL - payload.length) {
+				LOGGER.warn("Rust VulkanicGAL dynamic world asset byte residency bound exceeded {} bytes for {}",
+					MAX_DYNAMIC_WORLD_ASSET_BYTES_TOTAL, identity);
+				return false;
+			}
+			registerWorldMeshTexture(minecraftModelTextureAsset(textureId, payload), "dynamic:" + identity);
+			DYNAMIC_WORLD_ASSET_FINGERPRINTS.put(identity, fingerprint);
+			DYNAMIC_WORLD_ASSET_BYTES.put(identity, payload.length);
+		}
+		return true;
 	}
 
 	private static byte[] missingTexturePayload() {
@@ -14205,6 +14262,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (snapshot == null || snapshot.width() <= 0 || snapshot.height() <= 0
 			|| (long)snapshot.width() * snapshot.height() > 16L * 1024L * 1024L) return null;
 		try {
+			if (snapshot.format() == net.vulkanic.gui.RustGalGuiRawImageAssets.RAW_MAP_COLOR8) {
+				if (snapshot.width() != 128 || snapshot.height() != 128) return null;
+				return net.minecraft.client.resources.NativeMapImages.encodePng(snapshot.pixels());
+			}
+			if (snapshot.format() != net.vulkanic.gui.RustGalGuiRawImageAssets.RAW_RGBA8) return null;
 			byte[] rgba = snapshot.pixels();
 			if (rgba.length != (long)snapshot.width() * snapshot.height() * 4L) return null;
 			BufferedImage image = new BufferedImage(snapshot.width(), snapshot.height(), BufferedImage.TYPE_INT_ARGB);
@@ -15408,7 +15470,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				for (VulkanicGalBridge.WorldMaterialQuadRecord quad : materialQuads) {
 					if (quad.textureId() == diagnostic.textureId()
 						&& quad.sourceProgram() == MATERIAL_SOURCE_TEXTURED
-						&& quad.materialMode() == MATERIAL_MODE_TRANSLUCENT) quads++;
+						&& isMapMaterial(quad.materialId())
+						&& quad.materialMode() == MATERIAL_MODE_TRANSLUCENT_CUTOUT) quads++;
 				}
 				if (quads <= 0) continue;
 				if (ITEM_FRAME_MAP_EXECUTION_DIAGNOSTICS.size() >= 128) ITEM_FRAME_MAP_EXECUTION_DIAGNOSTICS.remove(0);
@@ -15427,7 +15490,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				for (VulkanicGalBridge.WorldMaterialQuadRecord quad : materialQuads) {
 					if (quad.textureId() == diagnostic.textureId()
 						&& quad.sourceProgram() == MATERIAL_SOURCE_TEXTURED
-						&& quad.materialMode() == MATERIAL_MODE_TRANSLUCENT) quads++;
+						&& isMapMaterial(quad.materialId())
+						&& quad.materialMode() == MATERIAL_MODE_TRANSLUCENT_CUTOUT) quads++;
 				}
 				if (quads <= 0) continue;
 				if (ITEM_FRAME_MAP_DECORATION_EXECUTION_DIAGNOSTICS.size() >= 128) {
@@ -19119,7 +19183,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	) {}
 	private record ItemFrameMapContext(
 		int entityId, int mapId, ResourceLocation textureIdentity, int rotation,
-		boolean invisibleFrame, float contentOffset
+		boolean invisibleFrame, boolean glowFrame, float contentOffset
 	) {}
 	private record ItemFrameMapDecorationContext(
 		int entityId, int mapId, int frameRotation, ResourceLocation atlasIdentity,
@@ -19266,7 +19330,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static boolean hasPendingFabulousTransparencyWork() {
 		synchronized (LOCK) {
 			if (PENDING_PARTICLE_QUADS.stream().anyMatch(VulkanicGalBridge.WorldParticleQuadRecord::translucent)) return true;
-			if (PENDING_MATERIAL_QUADS.stream().anyMatch(quad -> quad.materialMode() == MATERIAL_MODE_TRANSLUCENT)) {
+			if (PENDING_MATERIAL_QUADS.stream().anyMatch(quad -> materialUsesAlphaBlending(quad.materialMode()))) {
 				return true;
 			}
 			boolean[] blended = {false};

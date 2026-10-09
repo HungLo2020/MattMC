@@ -160,7 +160,7 @@ fn native_fact_export_rejects_damage() {
         let mut damaged = ints.clone(); damaged[at] = value;
         assert!(decode(&damaged, &bytes).is_err());
     }
-    for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING, StateFlags::AIR, StateFlags::CAN_OCCLUDE] {
+    for flag in [StateFlags::HAS_FLUID, StateFlags::FLUID_FALLING, StateFlags::AIR, StateFlags::CAN_OCCLUDE, StateFlags::RANDOM_TICKS, StateFlags::LIGHT_EMPTY_SHAPE, StateFlags::LEAVES, StateFlags::BLOCK_ENTITY] {
         let mut damaged = ints.clone();
         let at = damaged.len() - 1; damaged[at] = flag.0 as i32;
         assert!(decode(&damaged, &bytes).is_err());

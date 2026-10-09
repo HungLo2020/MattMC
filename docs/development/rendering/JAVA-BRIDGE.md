@@ -147,6 +147,16 @@ expansion: an input rig is one mesh row but may emit zero or many. The unchanged
 orb boundary can split the expanded parts or exceed the resulting stream
 ([#819](https://github.com/HungLo2020/MattMC/issues/819), source-predicted).
 
+ABI 73 adds raw GUI source format 3 for indexed map colors. Input bytes stay
+compact; Rust frontend admission counts expanded RGBA residency, then converts
+before creating ordinary GAL textures. Resident texture formats remain Alpha8
+and RGBA8. Java and Rust reject malformed sizes and excessive expanded totals.
+World-map PNG encoding is a bounded standalone CPU asset call, not a GPU resource
+route. This map migration also introduces the semantic map-text material with
+blended-cutout mode 7; both compact whole-frame decoding and ordinary quad
+validation must admit that mode. Rust resolves its depth/lightmap/fog/order
+policy; see [map colors](../game-model/MAP-COLORS.md). Rebuild both sides together.
+
 ## Standalone query handles
 
 Some render-thread questions are answered by handles that share no context

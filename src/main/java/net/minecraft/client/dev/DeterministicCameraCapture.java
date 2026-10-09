@@ -1979,9 +1979,16 @@ public final class DeterministicCameraCapture {
 	 * gate. It never influences source routing or a producer's render decision.
 	 */
 	public static boolean requiresSourceEntityMeshCapture() {
-		return !MODEL_MESH_SCENARIO.isEmpty()
-			&& !"hidden".equals(MODEL_MESH_SCENARIO)
-			&& !"wind-charge".equals(MODEL_MESH_SCENARIO);
+		return requiresSourceEntityMeshCapture(MODEL_MESH_SCENARIO);
+	}
+
+	static boolean requiresSourceEntityMeshCapture(String scenario) {
+		return !scenario.isEmpty()
+			&& !"hidden".equals(scenario)
+			&& !"wind-charge".equals(scenario)
+			// Item-frame backing uses opaque source geometry. Exact source-frame
+			// producer matching still requires its backing and content at capture.
+			&& !isItemFrameScenario(scenario);
 	}
 
 	private static boolean captureStaticTerrainWaterAnimationFrameIfNeeded(Minecraft minecraft) {
@@ -5976,9 +5983,9 @@ public final class DeterministicCameraCapture {
 			// The selected-source entity fixture is spawned from this exact camera
 			// pose. Rotating the camera afterwards turns a valid producer-specific
 			// readback into unrelated world/entity work, which the source receipt
-			// must reject. It needs one exact final frame, not a synthetic pose
-			// sweep. Ordinary model coverage retains its existing multi-pose path.
-			fullSequence = selectedSourceCaptureRequested() && isModelMeshEntityScenario()
+			// must reject. Item frames retain the repeated, fixed-camera sequence:
+			// their backing/content correlation requires separately completed frames.
+			fullSequence = selectedSourceCaptureRequested() && isModelMeshEntityScenario() && !isItemFrameScenario()
 				? new Pose[] { initialPose }
 				: movingMeshPoseSequence(MODEL_MESH_SCENARIO, initialPose, 5);
 		} else if (!PRIMED_TNT_SCENARIO.isEmpty() && !"hidden".equals(PRIMED_TNT_SCENARIO)) {
@@ -10711,16 +10718,20 @@ if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) co
 	}
 
 	private static boolean isItemFrameScenario() {
-		return "item-frame".equals(MODEL_MESH_SCENARIO) || "item-frame-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-item".equals(MODEL_MESH_SCENARIO) || "item-frame-map".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-item-rotated".equals(MODEL_MESH_SCENARIO) || "item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-map-decorated".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame-item".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame-item-rotated".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-map-invisible".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map-invisible".equals(MODEL_MESH_SCENARIO);
+		return isItemFrameScenario(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isItemFrameScenario(String scenario) {
+		return "item-frame".equals(scenario) || "item-frame-invisible".equals(scenario)
+			|| "glow-item-frame".equals(scenario) || "glow-item-frame-invisible".equals(scenario)
+			|| "item-frame-item".equals(scenario) || "item-frame-map".equals(scenario)
+			|| "item-frame-item-rotated".equals(scenario) || "item-frame-map-rotated".equals(scenario)
+			|| "item-frame-map-decorated".equals(scenario)
+			|| "item-frame-item-invisible".equals(scenario)
+			|| "glow-item-frame-item-invisible".equals(scenario)
+			|| "glow-item-frame-item".equals(scenario) || "glow-item-frame-map".equals(scenario)
+			|| "glow-item-frame-item-rotated".equals(scenario) || "glow-item-frame-map-rotated".equals(scenario)
+			|| "item-frame-map-invisible".equals(scenario) || "glow-item-frame-map-invisible".equals(scenario);
 	}
 
 	private static boolean isSpawnerModelScenario() {

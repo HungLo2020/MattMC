@@ -14,8 +14,8 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
 		super(block, reference2ObjectArrayMap, mapCodec);
 	}
 
-    BlockState(Block owner, Reference2ObjectArrayMap<Property<?>, Comparable<?>> values, MapCodec<BlockState> codec, int nativeTraits, net.minecraft.world.level.block.SoundType nativeSound, NativeBlockMaterials.Offset nativeOffset) {
-        super(owner, values, codec, nativeTraits, nativeSound, nativeOffset);
+    BlockState(Block owner, Reference2ObjectArrayMap<Property<?>, Comparable<?>> values, MapCodec<BlockState> codec, int nativeTraits, net.minecraft.world.level.block.SoundType nativeSound, NativeBlockMaterials.Offset nativeOffset, int nativePolicy) {
+        super(owner, values, codec, nativeTraits, nativeSound, nativeOffset, nativePolicy);
     }
 
 	@Override

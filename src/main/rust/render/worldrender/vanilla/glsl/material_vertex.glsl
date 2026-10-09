@@ -24,6 +24,10 @@ layout(set = 0, binding = 0, std430) readonly buffer WorldMaterialBatch {
 #ifdef VULKANIC_GAL_SKY_FOG
     vec4 sky_fog_color;
 #endif
+#ifdef VULKANIC_GAL_MAP_TEXT
+    vec4 map_fog_color;
+    vec4 map_fog_ranges;
+#endif
     MaterialQuad quads[4096];
 };
 layout(location = 0) out vec2 v_uv;
@@ -31,7 +35,7 @@ layout(location = 1) out vec4 v_color;
 layout(location = 2) flat out vec4 v_material;
 layout(location = 3) out float v_camera_distance;
 layout(location = 4) out vec2 v_lightmap_uv;
-#ifdef VULKANIC_GAL_SKY_FOG
+#if defined(VULKANIC_GAL_SKY_FOG) || defined(VULKANIC_GAL_MAP_TEXT)
 layout(location = 5) out float v_cylindrical_distance;
 #endif
 const vec2 corner[4] = vec2[4](
@@ -72,6 +76,11 @@ void main() {
 #endif
     gl_Position = clip;
     v_uv = mix(uv_top, uv_bottom, c.y);
+#ifdef VULKANIC_GAL_MAP_UV_TOP_LEFT
+    // Maps copy Minecraft UVs. The shared image upload converts top-left
+    // rows, so normalize the consumer once; canonical assets need no change.
+    v_uv.y = 1.0 - v_uv.y;
+#endif
     vec4 color_top = mix(quad.color0, quad.color1, c.x);
     vec4 color_bottom = mix(quad.color3, quad.color2, c.x);
     v_color = mix(color_top, color_bottom, c.y);
@@ -94,5 +103,8 @@ void main() {
     v_cylindrical_distance = max(length(local_sky_position.xz), abs(local_sky_position.y));
 #else
     v_camera_distance = length(camera_position.xyz);
+#ifdef VULKANIC_GAL_MAP_TEXT
+    v_cylindrical_distance = max(length(camera_position.xz), abs(camera_position.y));
+#endif
 #endif
 }

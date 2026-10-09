@@ -17,12 +17,14 @@ behavior factories, remaining shapes, blocked light and world-dependent facts.
 [Sound and offset settings](BLOCK-SOUND-AND-OFFSETS.md) also originate in Rust.
 [`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
 exports those remaining facts once, lazily on the first `ready()` call.
-The current wire format is **8**: block/state/face counts, per-state face IDs
+The current wire format is **9**: block/state/face counts, per-state face IDs
 and remaining flags, blocked-light values and the face truth table. Names,
 schemas, defaults, value indices, emission, fluid associations and offsets are
 not exported; their definitions originate in Rust.
-Air and can-occlude flags derive from native physical definitions; imported
-packets supplying those bits are rejected. Fluid flags likewise derive natively.
+Air and can-occlude flags derive from native physical definitions.
+[State policy](STATE-POLICY.md) supplies tick eligibility, leaf/entity markers and
+light-shape policy; Rust derives the corresponding registry flags. Imported
+packets supplying any of these bits are rejected. Fluid flags likewise derive natively.
 Rust shares [property schemas](PROPERTY-DEFINITIONS.md) directly and resolves
 fluid facts from the [fluid registry](FLUID-DEFINITIONS.md).
 

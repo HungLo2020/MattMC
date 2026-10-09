@@ -3,6 +3,7 @@
 mod keys;
 mod terrain;
 mod materials;
+mod glyph;
 mod entities;
 mod teardown;
 
@@ -18,4 +19,3 @@ impl WorldPrimitiveFrontend {
 impl WorldPrimitiveFrontend {
 
 }
-

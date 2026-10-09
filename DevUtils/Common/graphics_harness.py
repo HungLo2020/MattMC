@@ -17258,6 +17258,18 @@ def deterministic_world_mesh_model_capture_evidence(
     return evidence
 
 
+def completed_item_frame_capture_evidence(evidence: object) -> bool:
+    """Item frames use identified block-model/map producers, not ModelPart."""
+    return (isinstance(evidence, dict)
+            and evidence.get("producer_family") == "item-frame"
+            and evidence.get("checked") is True
+            and evidence.get("status") == "structural_present"
+            and evidence.get("route_status") == "rust-vulkan-whole-frame"
+            and evidence.get("execution_status") == "completed"
+            and evidence.get("frame_sequence_status") == "passed"
+            and evidence.get("game_window_status") == "present")
+
+
 def deterministic_item_frame_backing_capture_evidence(doc: object, scenario: object = "item-frame") -> dict[str, object]:
     """Require the real empty frame and its identified completed block-model mesh."""
     scenario_name = str(scenario or "").strip().lower()
@@ -17273,7 +17285,8 @@ def deterministic_item_frame_backing_capture_evidence(doc: object, scenario: obj
     expected_item = "minecraft:diamond" if item_scenario else "minecraft:filled_map" if map_scenario else ""
     empty_invisible_scenario = invisible_scenario and not item_scenario and not map_scenario
     expected_identity = "minecraft:glow_item_frame" if expected_glow else "minecraft:item_frame"
-    evidence: dict[str, object] = {"checked": True, "status": "missing_real_setup", "scenario": scenario_name,
+    evidence: dict[str, object] = {"checked": True, "producer_family": "item-frame",
+                                  "status": "missing_real_setup", "scenario": scenario_name,
                                   "manual_review_required": True, "crops": []}
     if not isinstance(doc, dict):
         return evidence
@@ -17467,6 +17480,24 @@ def deterministic_item_frame_backing_capture_evidence(doc: object, scenario: obj
                    and (not item_scenario or item_model is not None and item_receipt_match is not None)
                    and (not map_scenario or map_model is not None and map_receipt_match is not None)
                    and (not decorated_map_scenario or decoration_model is not None and decoration_receipt_match is not None))
+        crop_fields: dict[str, object] = {}
+        crop_failure = None
+        if present and not empty_invisible_scenario:
+            try:
+                from PIL import Image
+                with Image.open(screenshot) as image:
+                    rgb = image.convert("RGB")
+                    crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=True)
+                    if crop_box is None:
+                        present = False
+                        crop_failure = "bounds_outside_game_viewport"
+                    else:
+                        crop_path = screenshot.with_name(f"item_frame_model_crop_{index}.png")
+                        rgb.crop(crop_box).save(crop_path)
+                        crop_fields = {"crop_box": list(crop_box), "crop_path": str(crop_path)}
+            except Exception as exc:
+                present = False
+                crop_failure = f"crop_failed:{exc}"
         if present:
             if not invisible_scenario:
                 used_semantic_indices.add(model_match[0])
@@ -17481,10 +17512,11 @@ def deterministic_item_frame_backing_capture_evidence(doc: object, scenario: obj
                 used_decoration_semantic_indices.add(decoration_model_match[0])
                 used_decoration_execution_indices.add(decoration_receipt_match[0])
         crops.append({"capture_index": index, "frame_index": frame,
-                      "status": "present" if present else "missing_item_frame_backing_execution",
-                      "submission_id": receipt.get("submissionId") if isinstance(receipt, dict) else None})
+                      "status": "present" if present else crop_failure or "missing_item_frame_backing_execution",
+                      "submission_id": receipt.get("submissionId") if isinstance(receipt, dict) else None,
+                      **crop_fields})
     evidence["crops"] = crops
-    if any(crop["status"] != "present" for crop in crops[:3]):
+    if any(crop["status"] != "present" for crop in crops):
         evidence["status"] = "incomplete_item_frame_backing_correlation"
         return evidence
     evidence.update({"status": "structural_present", "setup_status": "passed",
@@ -27532,6 +27564,8 @@ def parity_evidence_failures(baseline: dict[str, object], current: dict[str, obj
                     and observed.get("status") == "base_and_pumpkin_emission_observed"):
                     continue
             if fixture_scenario in {"item-frame", "item-frame-invisible", "glow-item-frame", "glow-item-frame-invisible", "item-frame-item", "item-frame-map",
+                                    "item-frame-item-rotated", "item-frame-map-rotated", "item-frame-map-decorated",
+                                    "item-frame-item-invisible", "glow-item-frame-item-invisible",
                                     "glow-item-frame-item", "glow-item-frame-map", "glow-item-frame-item-rotated", "glow-item-frame-map-rotated", "item-frame-map-invisible", "glow-item-frame-map-invisible"}:
                 observed = slice_metrics.get("frozen_item_frame_backing_evidence", {}) if isinstance(slice_metrics, dict) else {}
                 if (isinstance(observed, dict) and observed.get("passed") is True
@@ -31944,6 +31978,10 @@ def normalize_capture_artifact(
                     f"(status={world_beacon_beam_capture_evidence.get('status')})"
                 )
     world_mesh_model_workload_complete = True
+    # The item-frame checker already requires each actual backing mesh and
+    # map/item to share a completed submission at every captured pose. Its
+    # block-model route must not also supply unrelated ModelPart receipts.
+    item_frame_producer_complete = completed_item_frame_capture_evidence(world_mesh_model_capture_evidence)
     model_scenario = (requested_world_mesh_model_scenario or "").strip().lower()
     model_execution_provenance = "model-part" if model_scenario in {"decorated-pot", "decorated-pot-sherds", "decorated-pot-wobble-positive", "decorated-pot-wobble-negative", "decorated-pot-north", "decorated-pot-east", "decorated-pot-west", "conduit", "conduit-breaking", "conduit-active", "conduit-hunting"} else "model"
     # Copied model-producer scenarios are created by DeterministicCameraCapture. Gameplay
@@ -31986,7 +32024,7 @@ def normalize_capture_artifact(
                 validation_messages.append(
                     f"deterministic model scenario did not create its real producer (status={model_status!r})"
                 )
-            if model_rust_route_count <= 0:
+            if model_rust_route_count <= 0 and not item_frame_producer_complete:
                 world_mesh_model_workload_complete = False
                 validation_messages.append("model Rust route did not record a Rust whole-frame route decision")
             wind_charge_execution = (
@@ -31995,10 +32033,10 @@ def normalize_capture_artifact(
                 and isinstance(deterministic_doc.get("rustGalWorldEntityModelExecution"), list)
                 else []
             )
-            if (tool_kind != "capture" and model_submitted_count <= 0) or (not deterministic_models and not any(
+            if not item_frame_producer_complete and ((tool_kind != "capture" and model_submitted_count <= 0) or (not deterministic_models and not any(
                 isinstance(receipt, dict) and int(parse_number(receipt.get("quads")) or 0) > 0
                 for receipt in wind_charge_execution
-            )):
+            ))):
                 world_mesh_model_workload_complete = False
                 validation_messages.append("model Rust route did not emit matching semantic mesh work")
             if mode.backend == "rust-vulkan":
@@ -32026,7 +32064,7 @@ def normalize_capture_artifact(
                     and int(parse_number(receipt.get("submissionId")) or 0) > 0
                     for receipt in model_execution
                     )
-                if not execution_present:
+                if not execution_present and not item_frame_producer_complete:
                     world_mesh_model_workload_complete = False
                     validation_messages.append("model Rust route did not retain a frame/submission-correlated execution receipt")
                 if model_scenario == "end-crystal":

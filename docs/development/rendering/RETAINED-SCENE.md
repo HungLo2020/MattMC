@@ -162,6 +162,18 @@ callbacks and change notifications; missing generations request resending. This
 is separate from retained GPU terrain and phase 5's entity/block-entity target.
 Neither change establishes all-route scene ownership or Frozen parity.
 
+### Next proposed ownership slice
+
+Remove the visible-segment round trip: Rust currently selects the list, exports
+it into Java records, and decodes those records back into another native list.
+The next candidate is a bounded native CPU frame transaction consumed directly
+by the renderer, with Java carrying its identity and scalar counts. Move the
+coordinator's layer counting and diagnostic-copy consumers with this boundary;
+otherwise they would recreate the same list every frame. Preserve exact order,
+column generations, lifecycle rejection, queued-frame ownership and capture
+readback. This slice is not implemented yet. Profile the moving DH workload
+against Frozen first, then verify real transitions and images alongside timing.
+
 ## Phases
 
 Each phase ends with Rust/Java tests passing and the full parity matrix

@@ -375,6 +375,8 @@ pub struct WorldPrimitiveFrontend {
     entity_shadow_program_cache: Option<(u64, LoweredEntitySourceProgram)>,
     /// Per-generation/scope block-selection line program (pack `gbuffers_line`).
     line_source_program_cache: Option<((u64, TerrainProgramScope), LoweredTexturedMaterialSourceProgram)>,
+    /// One immutable glyph source generation/scope; frame data stays outside.
+    world_glyph_source_program_cache: std::cell::RefCell<Option<((u64, TerrainProgramScope), std::sync::Arc<crate::render::shaderpack::contracts::glyph::WorldGlyphSourceProgram>)>>,
     damaged_block_source_program_cache:
         Option<((u64, TerrainProgramScope), LoweredTexturedMaterialSourceProgram)>,
     entity_glint_source_program_cache: Option<((u64, TerrainProgramScope), LoweredEntitySourceProgram)>,

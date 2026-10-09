@@ -40,7 +40,24 @@ pub(crate) struct SemanticTexture {
     pub(crate) legacy_keys: &'static [u32],
 }
 
+const MAP_TEXT: SemanticMaterial = SemanticMaterial {
+    key: WORLD_MATERIAL_ID_MAP_TEXT,
+    resource_location: "minecraft:material/map_text",
+    mode: WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
+    cutout_threshold: 0.1,
+    perspective_layer_scale: 1.0,
+    sampler: MaterialSamplerPolicy::NearestClamp,
+    mip: MaterialMipPolicy::SingleMip,
+    tint: MaterialTintChannel::VertexColor,
+    emissive: false,
+    fullbright: false,
+    legacy_keys: &[],
+};
+
 const MATERIALS: &[SemanticMaterial] = &[
+    MAP_TEXT,
+    SemanticMaterial { key: WORLD_MATERIAL_ID_ITEM_FRAME_MAP, resource_location: "minecraft:material/item_frame_map", ..MAP_TEXT },
+    SemanticMaterial { key: WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP, resource_location: "minecraft:material/glow_item_frame_map", ..MAP_TEXT },
     SemanticMaterial {
         key: WORLD_MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED,
         resource_location: "minecraft:material/per_face_model_cutout_textured",

@@ -667,20 +667,12 @@ impl WorldPrimitiveFrontend {
         let weather_batches = source_weather_material_batches(frame)?;
         let cloud_batches = source_cloud_material_batches(frame)?;
         let clouds_suppressed = runtime.suppresses_vanilla_cloud_faces();
-        if !textured_batches.is_empty() {
-            let material = runtime
-                .prepared_lowered_textured_material_source_program()?
-                .ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source scalar admission has material work but no admitted gbuffers_textured program",
-                    )
-                })?;
-            for batch in textured_batches {
-                let mut material_uniforms = base_uniforms.clone();
-                material_uniforms.render_stage =
-                    Some(self.source_render_stage_for_material_mode(batch.material_mode)?);
-                material.pack_scalar_uniforms(&material_uniforms)?;
-            }
+        for batch in textured_batches {
+            let material = self.source_program_for_material_batch(frame, batch)?;
+            let mut material_uniforms = base_uniforms.clone();
+            material_uniforms.render_stage = Some(self.source_render_stage_for_material_mode(batch.material_mode)?);
+            self.apply_material_producer_source_uniforms(frame, batch, &mut material_uniforms)?;
+            material.pack_scalar_uniforms(&material_uniforms)?;
         }
         if !weather_batches.is_empty() {
             let weather = runtime
@@ -1088,30 +1080,9 @@ impl WorldPrimitiveFrontend {
                 ));
             }
         }
-        if !textured_batches.is_empty() {
-            let staged = stage_source_material_primitives_for_indices(
-                frame,
-                textured_batches.iter().flat_map(|batch| batch.indices()),
-            )?;
-            let runtime = self
-                .shader_runtime
-                .as_ref()
-                .ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source frame has source-textured material work but no Rust shader runtime",
-                    )
-                })?;
-            let program = runtime
-                .prepared_lowered_textured_material_source_program()?
-                .ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source frame has source-textured material work but no lowered gbuffers_textured writer",
-                    )
-                })?;
-            // This validates the semantic material stream and source program
-            // ABI at admission time. Per-batch atlas/local resource binding
-            // is staged in the one combined submission below, where a
-            // generation or resource failure remains explicit.
+        for batch in textured_batches {
+            let staged = stage_source_material_primitives_for_indices(frame, batch.indices())?;
+            let program = self.source_program_for_material_batch(frame, batch)?;
             program.pack_material_primitives(&staged)?;
         }
         if !weather_batches.is_empty() {

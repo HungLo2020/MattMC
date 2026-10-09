@@ -8,7 +8,7 @@ use super::{definitions, BlockRegistry, Builder, Error, FaceId, PropertyId, Stat
 use crate::content::property;
 use definitions::physics::PhysicalFlags;
 
-pub(crate) const FORMAT: i32 = 8;
+pub(crate) const FORMAT: i32 = 9;
 const STATE_INTS: usize = DIRECTIONS + 1;
 
 struct Cursor<'a, T> { values: &'a [T], at: usize }
@@ -72,11 +72,16 @@ pub(crate) fn decode(ints: &[i32], bytes: &[u8]) -> Result<BlockRegistry, Error>
                 *face = FaceId(u16::try_from(id).map_err(|_| Error::Invalid("export face"))?);
             }
             let mut flags = u16::try_from(row[DIRECTIONS]).map_err(|_| Error::Invalid("export flags"))?;
-            if flags & (StateFlags::AIR.0 | StateFlags::CAN_OCCLUDE.0) != 0 {
+            if flags & (StateFlags::AIR.0 | StateFlags::CAN_OCCLUDE.0 | StateFlags::RANDOM_TICKS.0 | StateFlags::LIGHT_EMPTY_SHAPE.0 | StateFlags::LEAVES.0 | StateFlags::BLOCK_ENTITY.0) != 0 {
                 return Err(Error::Invalid("native physical flags supplied by Java"));
             }
             if definition.physics.flags.contains(PhysicalFlags::AIR) { flags |= StateFlags::AIR.0; }
             if definition.physics.flags.contains(PhysicalFlags::CAN_OCCLUDE) { flags |= StateFlags::CAN_OCCLUDE.0; }
+            let policy = native.state_policy(super::StateId(state as u16)).expect("native state policy");
+            if policy.randomly_ticking() { flags |= StateFlags::RANDOM_TICKS.0; }
+            if !definition.physics.flags.contains(PhysicalFlags::CAN_OCCLUDE) || !policy.uses_light_shape() { flags |= StateFlags::LIGHT_EMPTY_SHAPE.0; }
+            if policy.leaves() { flags |= StateFlags::LEAVES.0; }
+            if policy.block_entity() { flags |= StateFlags::BLOCK_ENTITY.0; }
             let intrinsic = native.state_traits(super::StateId(state as u16)).expect("native intrinsic state");
             state_facts.push(StateFacts {
                 flags: StateFlags(flags),

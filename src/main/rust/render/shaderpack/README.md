@@ -6,7 +6,7 @@ Data-driven shader programs: Iris/OptiFine shader packs and Minecraft's own
 ```
 source/      copied source snapshots, manifest, preprocess, dialect, binary assets
 properties/  pack properties: entity/item ids, custom uniforms, held light, wetness, shadow
-contracts/   per-family semantic contracts (terrain, entity, hand, material, weather,
+contracts/   per-family semantic contracts (terrain, entity, glyph, hand, material, weather,
              cloud, line, damaged block, DH, fullscreen, vertex interface)
 lowering/    source -> explicit GLSL: stages, pairs, fragment/vertex/fullscreen surfaces,
              fullscreen_vertex/celestial owned geometry and transforms, varyings,

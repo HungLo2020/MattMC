@@ -66,6 +66,7 @@ pub(in crate::render::worldrender) fn validate_quad(
         WORLD_MATERIAL_MODE_OPAQUE
             | WORLD_MATERIAL_MODE_CUTOUT
             | WORLD_MATERIAL_MODE_TRANSLUCENT
+            | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
             | WORLD_MATERIAL_MODE_GLINT
     ) {
         return Err(GalError::ffi(

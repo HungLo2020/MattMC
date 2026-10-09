@@ -73,6 +73,10 @@ PARITY_PAIRS = {
 }
 
 CLIENT_FAILURES = re.compile(r"Exception|panicked at")
+CLIENT_STOPPING = re.compile(r"^\[\d{2}:\d{2}:\d{2}\] \[Render thread/INFO\]: Stopping!$")
+SHUTDOWN_DISCONNECT = re.compile(
+    r"^\[\d{2}:\d{2}:\d{2}\] \[Server thread/INFO\]: \S+ lost connection: "
+    r"Internal Exception: java\.nio\.channels\.ClosedChannelException$")
 
 
 def log(message: str) -> None:
@@ -204,7 +208,7 @@ def run_logged(command: list[str], log_path: Path, env: dict[str, str], timeout:
 
 
 def read_client_health(run_dir: Path) -> dict:
-    exceptions, terrain_failures = 0, None
+    exceptions, raw_exception_mentions, shutdown_disconnects, terrain_failures = 0, 0, 0, None
     for client_log in run_dir.glob("capture/runClient_*.log*"):
         if client_log.suffix == ".gz":
             text = gzip.decompress(client_log.read_bytes()).decode(errors="replace")
@@ -212,11 +216,25 @@ def read_client_health(run_dir: Path) -> dict:
             text = client_log.read_text(errors="replace")
         else:
             continue
-        exceptions += len(CLIENT_FAILURES.findall(text))
+        raw_exception_mentions += len(CLIENT_FAILURES.findall(text))
+        stopping = False
+        for line in text.splitlines():
+            if CLIENT_STOPPING.fullmatch(line):
+                stopping = True
+            # Minecraft.destroy closes the integrated connection after this
+            # marker. Only its exact INFO disconnect is expected; an earlier
+            # disconnect, stack trace or any other exception still rejects
+            # the run. The artifact must independently prove completion.
+            if stopping and SHUTDOWN_DISCONNECT.fullmatch(line):
+                shutdown_disconnects += 1
+            else:
+                exceptions += len(CLIENT_FAILURES.findall(line))
         found = re.findall(r"failureCount=(\d+)", text)
         if found:
             terrain_failures = int(found[-1])
-    return {"exceptions": exceptions, "terrain_failures": terrain_failures}
+    return {"exceptions": exceptions, "shutdown_disconnects": shutdown_disconnects,
+            "raw_exception_mentions": raw_exception_mentions,
+            "terrain_failures": terrain_failures}
 
 
 def positive_number(value) -> bool:

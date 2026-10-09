@@ -92,3 +92,7 @@ remain below Frozen; both shader modes pass this run. Root `SUMMARY.md` records
 both repeats and tail values. Sources/native hashes match the observer and
 Frozen remains unchanged; 25 generated fixture copies were retired. These
 static/lifecycle checks do not prove every gameplay case or complete migration.
+
+Palette RGB/shading now has a shared [map-color owner](MAP-COLORS.md), while
+these block rules continue selecting its typed identities. Historical v6
+measurements above do not verify that later image-processing slice.

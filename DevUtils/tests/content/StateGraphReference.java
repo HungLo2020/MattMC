@@ -296,6 +296,42 @@ public final class StateGraphReference {
                 if (type != null) configuredBlocks++;
             }
         }
+        MessageDigest policyDigest = MessageDigest.getInstance("SHA-256");
+        for (BlockState state : Block.BLOCK_STATE_REGISTRY) {
+            policyDigest.update((byte)((state.isRandomlyTicking() ? 1 : 0)
+                | (state.useShapeForLightOcclusion() ? 2 : 0)
+                | (state.getBlock() instanceof LeavesBlock ? 4 : 0)
+                | (state.hasBlockEntity() ? 8 : 0)));
+        }
+        MessageDigest mapPaletteDigest = MessageDigest.getInstance("SHA-256");
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), mapPaletteDigest))) {
+            var colors = new java.util.ArrayList<java.lang.reflect.Field>();
+            for (var field : MapColor.class.getFields()) if (field.getType() == MapColor.class) colors.add(field);
+            colors.sort(Comparator.comparingInt(field -> {
+                try { return ((MapColor)field.get(null)).id; } catch (Exception error) { throw new RuntimeException(error); }
+            }));
+            out.writeInt(colors.size());
+            for (var field : colors) {
+                MapColor color = (MapColor)field.get(null);
+                out.writeUTF(field.getName()); out.writeInt(color.id); out.writeInt(color.col);
+                for (var shade : MapColor.Brightness.values()) {
+                    out.writeByte(color.getPackedId(shade)); out.writeInt(color.calculateARGBColor(shade));
+                }
+            }
+            for (var shade : MapColor.Brightness.values()) {
+                out.writeUTF(shade.name()); out.writeInt(shade.id); out.writeInt(shade.modifier);
+            }
+            for (int id=0;id<64;id++) out.writeInt(MapColor.byId(id).id);
+            try (var image = new net.blaze3d.platform.NativeImage(256,1,true)) {
+                for (int code=0;code<256;code++) {
+                    int argb=MapColor.getColorFromPackedId(code); out.writeInt(argb); image.setPixel(code,0,argb);
+                }
+                byte[] rgba=new byte[1024]; org.lwjgl.system.MemoryUtil.memByteBuffer(image.getPointer(),rgba.length).get(rgba);
+                out.write(rgba);
+            }
+            for (int packed : new int[]{Integer.MIN_VALUE,-1025,-256,-1,0,255,256,1025,Integer.MAX_VALUE})
+                out.writeInt(MapColor.getColorFromPackedId(packed));
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
@@ -309,6 +345,8 @@ public final class StateGraphReference {
             + " material_sha256=" + HexFormat.of().formatHex(materialDigest.digest())
             + " block_sets=" + BlockSetType.values().count() + " wood_types=" + WoodType.values().count()
             + " configured_blocks=" + configuredBlocks + " family_sha256=" + HexFormat.of().formatHex(familyDigest.digest())
+            + " map_palette_sha256=" + HexFormat.of().formatHex(mapPaletteDigest.digest())
+            + " state_policy_sha256=" + HexFormat.of().formatHex(policyDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
     }
 

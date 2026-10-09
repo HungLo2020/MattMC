@@ -204,7 +204,7 @@ public final class WorldTextSemanticCollector {
 					imageHeight = raw.height();
 				} else {
 					rawImage = semanticRawImageSnapshot(glyph.atlasIdentity());
-					if (rawImage == null) return 1;
+					if (rawImage == null || rawImage.format() != RustGalGuiRawImageAssets.RAW_RGBA8) return 1;
 					imageGeneration = rawImage.generation();
 					imageRevision = rawImage.revision();
 					imageColored = true;

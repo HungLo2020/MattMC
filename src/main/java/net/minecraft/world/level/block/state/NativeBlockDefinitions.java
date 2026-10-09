@@ -35,12 +35,12 @@ public final class NativeBlockDefinitions {
         private final Template template;
         private final Physics physics;
         private final ScalarRule mapColor, light;
-        private final MemorySegment intrinsicStates, soundStates;
+        private final MemorySegment intrinsicStates, soundStates, policyStates;
         private final NativeBlockMaterials.Material material;
-        private Definition(int id, String name, int firstState, Template template, Physics physics, ScalarRule mapColor, ScalarRule light, MemorySegment intrinsicStates, MemorySegment soundStates, NativeBlockMaterials.Material material) {
+        private Definition(int id, String name, int firstState, Template template, Physics physics, ScalarRule mapColor, ScalarRule light, MemorySegment intrinsicStates, MemorySegment soundStates, MemorySegment policyStates, NativeBlockMaterials.Material material) {
             this.id = id; this.name = name; this.firstState = firstState; this.template = template; this.physics = physics;
             this.mapColor = mapColor; this.light = light; this.intrinsicStates = intrinsicStates;
-            this.soundStates = soundStates; this.material = material;
+            this.soundStates = soundStates; this.policyStates = policyStates; this.material = material;
         }
         void applyProperties(BlockBehaviour.Properties properties) {
             this.physics.apply(properties);
@@ -55,7 +55,7 @@ public final class NativeBlockDefinitions {
             builder.add(this.template.properties().toArray(Property<?>[]::new));
             return builder.createWithGraph(Block::defaultBlockState,
                 (block, values, codec, local) -> new BlockState(block, values, codec, word(this.intrinsicStates, this.firstState + local),
-                    SoundType.nativeView(soundId(this.soundStates, this.firstState + local)), this.material.offset()),
+                    SoundType.nativeView(soundId(this.soundStates, this.firstState + local)), this.material.offset(), this.policyStates.get(ValueLayout.JAVA_BYTE, this.firstState + local) & 255),
                 this.template.graph);
         }
     }
@@ -165,7 +165,7 @@ public final class NativeBlockDefinitions {
             int physicalProfiles = word(header, 7);
             int rules = word(header, 8), ruleProperties = word(header, 9), ruleValues = word(header, 10), fluidStates = word(header, 11);
             int materials = word(header, 12), offsets = word(header, 13), offsetValues = word(header, 14);
-            if (word(header, 0) != 4 || count <= 0 || count > 65535 || states <= 0 || states > 65535
+            if (word(header, 0) != 5 || count <= 0 || count > 65535 || states <= 0 || states > 65535
                 || templates <= 0 || templates > count || properties < 0 || properties > 1048576
                 || nameBytes <= 0 || nameBytes > 16777216 || graphs <= 0 || graphs > templates || physicalProfiles <= 0 || physicalProfiles > count
                 || rules <= 0 || rules > count * 2 || ruleProperties < 0 || ruleProperties > 1048576
@@ -193,6 +193,11 @@ public final class NativeBlockDefinitions {
                     throw new IllegalStateException("Invalid native physical profile: " + id);
                 }
                 physicalViews[id] = new Physics(hardness, resistance, friction, speed, jump, flags, reactions[reaction]);
+            }
+            MemorySegment policyStates = buffer(15, states, 1, inputs);
+            for (int state = 0; state < states; state++) {
+                if ((policyStates.get(ValueLayout.JAVA_BYTE, state) & 255) > 15)
+                    throw new IllegalStateException("Invalid native state policy");
             }
             MemorySegment intrinsicStates = buffer(6, states, Integer.BYTES, inputs);
             for (int state = 0; state < states; state++) {
@@ -265,7 +270,7 @@ public final class NativeBlockDefinitions {
                 if (colorRule < 0 || colorRule >= rules || lightRule < 0 || lightRule >= rules) throw new IllegalStateException("Invalid native block rule binding");
                 for (int value : ruleViews[lightRule].values) if (value > 15) throw new IllegalStateException("Native emission outside range");
                 String name = new String(names.asSlice(start, length).toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8);
-                if (result.put(name, new Definition(id, name, firstState, t, physicalViews[physical], ruleViews[colorRule], ruleViews[lightRule], intrinsicStates, soundStates, materialViews[material])) != null) throw new IllegalStateException("Duplicate native block name: " + name);
+                if (result.put(name, new Definition(id, name, firstState, t, physicalViews[physical], ruleViews[colorRule], ruleViews[lightRule], intrinsicStates, soundStates, policyStates, materialViews[material])) != null) throw new IllegalStateException("Duplicate native block name: " + name);
                 nextState += t.graph.stateCount;
             }
             if (nextState != states) throw new IllegalStateException("Incomplete native block states");

@@ -12,6 +12,24 @@
 Each phase is a normal migration slice: parity tests against Java, a
 production-path benchmark, and docs.
 
+## Current priority (2026-10-08)
+
+After the local map/state-policy batch, prioritize world-state systems and the
+per-frame Java → Rust path ahead of more static catalog migration. Profile
+producer work, allocations and transfer costs, then move data storage, producer
+logic and lifetime management together. Avoid retaining Java object construction
+just to repack data that Rust immediately reconstructs. Existing native chunk,
+terrain and DH owners provide starting points; their remaining Java consumers
+and orchestration are still unfinished. Preserve world/save behavior and bounded
+generation/reload handling, and verify realistic workloads against Frozen.
+
+The first candidate is the [DH frame transaction](../rendering/RETAINED-SCENE.md#next-proposed-ownership-slice),
+which still reconstructs Rust-selected segments on both sides of the bridge.
+For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
+from authoritative loaded-world ownership: Java installs stage results and
+still owns normal chunk mutation/orchestration. Move hot consumers with storage
+so ordinary block reads do not become individual cross-language calls.
+
 ## Phase 1: one block registry from Java (implemented)
 
 The original Phase 1 milestone established the shared registry:
@@ -21,7 +39,7 @@ The original Phase 1 milestone established the shared registry:
   - block/property definitions and every state's columns
   - interned light-occlusion face IDs and Java's truth table
 
-Current construction combines native declarations with a smaller format-8
+Current construction combines native declarations with a smaller format-9
 export of remaining Java state facts; see Phase 2 below.
 
 - These per-slice tables were replaced by views of it, and each Java bridge
@@ -61,8 +79,9 @@ The latter own map colors, emission and fluid associations.
 [Sound definitions](SOUND-DEFINITIONS.md) now own all sound events, profiles and
 instruments; [block settings](BLOCK-SOUND-AND-OFFSETS.md) select them and own
 model offsets. [Block-family configuration](BLOCK-FAMILY-TYPES.md) now supplies
-shared block-set/wood definitions and registered family parameters. Java still
-supplies factories, shapes/predicates, blocked light,
+shared block-set/wood definitions and registered family parameters. [State policy](STATE-POLICY.md) now owns tick/light-shape eligibility and
+leaf/entity markers. Java still
+supplies factories, shapes/contextual predicates, blocked light,
 codecs, state-object views and world-dependent gameplay. The
 [134 property declarations](PROPERTY-DEFINITIONS.md) also originate
 in Rust; block registries share their schemas and fluids use their typed
@@ -77,12 +96,12 @@ The remaining registry-definition migration below is unfinished.
 - Broader content registries and the builders proposed in
   [adding content](ADDING-CONTENT.md) remain future work.
 - Remaining shape, blocked-light and contextual predicate producers still
-  need migration with independent parity checks. Format 8 imports face IDs/truth
-  tables, blocked light and the flags not directly derived from native
-  physical/fluid definitions. Map-color identities, emitted light, canonical
-  fluid-state associations and model offsets now originate in native rules.
-  Family configuration does not migrate world callbacks, ticking or entity
-  queries; sound definitions do not migrate Java sound policy or resource caches.
+  need migration with independent parity checks. Format 9 imports face IDs/truth
+  tables, blocked light and motion/solid/custom flags. Physical, fluid and
+  state-policy flags and model offsets originate in Rust. Map-color identities,
+  emitted light and canonical fluid-state associations originate in native rules.
+  Family configuration and state policy do not migrate world callbacks, ticking
+  or entity queries; sound definitions do not migrate Java sound policy or resource caches.
 
 ## Phase 3: behavior and components by family
 

@@ -73,7 +73,7 @@ use crate::render::vulkanic::frame::{
 };
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::guirender::frontend::{
-    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
+    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat, GuiRawImageSourceFormat,
     GuiSpriteRequest, GuiSubmitStats, GuiTiledQuadRequest, GUI_MAX_RAW_IMAGES,
     GUI_MAX_VIEWPORT_AXIS,
 };

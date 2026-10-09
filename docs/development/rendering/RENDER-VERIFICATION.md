@@ -159,6 +159,12 @@ Treat the summary as an index into evidence, not an all-checks certificate:
   matching logs and absent terrain-failure counters; inspect retained logs and
   actual receipts alongside the [performance A/B](#4-performance-ab) equivalence
   checks. Health fields do not prove workload equivalence.
+  The log scan records raw exception mentions separately. It classifies only
+  the exact server INFO `ClosedChannelException` disconnect after the client's
+  INFO `Stopping!` marker as an orderly shutdown disconnect. Earlier disconnects,
+  stack traces, other exception types and error-level messages still fail; all
+  completion and timing requirements remain in force. Preserve failed historical
+  receipts and run a fresh comparison after fixing a classification error.
 - The parity reader takes the first pair from the lexically last matching
   report, requiring report success, three finite nonnegative RGB errors and
   nonempty current-client VUID records containing explicit integer zeroes.
@@ -218,6 +224,57 @@ defaults to ten Current/Frozen scenarios: `chest`, `chest-shaders`, `bed`,
 `held-shield-foil` and `empty-hand`. Only `chest-shaders` enables shaders;
 this is not a shader-on/off matrix for every feature. Repeat
 `--scenario <name>` to request a subset.
+
+The current driver also includes `framed-map`, `framed-map-rotated`,
+`framed-map-decorated` and `framed-map-shaders` (four additional scenarios).
+They exercise the real map asset/render paths with Frozen's existing fixture;
+its green/gray checkerboard is not a red/blue channel-order test. Keep the
+[complete map palette and GPU regressions](../game-model/MAP-COLORS.md) alongside
+these captures. Held-map coverage remains separate.
+Framed-map source verification must exercise the native glyph writer and its
+local map texture, with canonical ordinary/glow-frame identities. A generic
+particle/textured pass cannot prove glyph-family parity. Keep crop comparisons
+even when a whole-image average passes: a small incorrectly lit map can be
+hidden by otherwise similar terrain pixels.
+
+Shader-enabled feature rows request `--rust-selected-source-execution`, which
+waits for and correlates Rust's final shader output at every pose. External
+window samples without that requirement can capture a provisional image and
+do not establish final shader-path parity. The option is scoped to Current;
+Frozen keeps its OpenGL shader path.
+Source mesh samples prioritize model/moving producers within the existing
+16-record bound; aggregate counts still cover every source mesh. This prevents
+terrain volume from hiding a required producer identity without weakening the
+matching or completed-execution checks.
+The attachment's entity-mesh-only requirement excludes item-frame fixtures:
+their backing is opaque geometry. Exact captured-frame producer matching still
+requires the backing identity and map/item content; terrain alone cannot pass.
+Selected-source item frames retain five separate captures at the fixture camera
+pose. Each must have its own completed producer submission; the single-pose
+entity-fixture shortcut must not remove this temporal coverage.
+
+Item-frame crop evidence must include saved pixels and the exact projected
+viewport rectangle, correlated with completed backing/content submissions for
+every captured frame. Structural execution alone cannot satisfy the crop gate.
+The general model-workload gate accepts this completed typed item-frame proof:
+the backing uses block-model receipts and map/item content has its own receipts.
+Requiring unrelated ModelPart records can reject a correctly captured source
+frame; accepting a player's hand instead can conceal missing fixture work.
+Other model families keep their existing ModelPart requirements.
+`test_item_frame_capture_crops.py` checks that missing images, stale or duplicate
+map execution, wrong generations/submissions/map identities, unreadable PNGs
+and offscreen bounds reject that evidence.
+Frozen producer admission also recognizes rotated/decorated item-frame variants
+through their typed emission checks; missing map content, wrong rotation or
+incorrect decoration identity must still reject the pair.
+
+To run just map fixtures:
+
+```sh
+python3 DevUtils/tests/rendering/RunFeatureParity.py --label <new-map-label> \
+  --scenario framed-map --scenario framed-map-rotated \
+  --scenario framed-map-decorated --scenario framed-map-shaders
+```
 
 `--repo-root`, `--run-source`, `--shader-pack` and `--frozen-repo` must all exist,
 including the shader pack for shaders-off subsets. They default to the script's

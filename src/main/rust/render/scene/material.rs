@@ -53,6 +53,15 @@ pub const WORLD_MATERIAL_ID_MODEL_CUTOUT_TEXTURED: u32 = 0x4d43_4f31;
 pub const WORLD_MATERIAL_ID_MODEL_CRUMBLING: u32 = 0x4352_4d42;
 pub const WORLD_MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED: u32 = 0x5046_4331;
 pub const WORLD_MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED: u32 = 0x5046_5431;
+/// Map images and decorations use Frozen's lightmapped, blended text material.
+pub const WORLD_MATERIAL_ID_MAP_TEXT: u32 = 0x4d41_5051;
+/// CPU producer identity; Rust chooses the corresponding source writer.
+pub const WORLD_MATERIAL_ID_ITEM_FRAME_MAP: u32 = 0x464d_4150;
+pub const WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP: u32 = 0x474d_4150;
+
+pub const fn is_map_material(material_id: u32) -> bool {
+    matches!(material_id, WORLD_MATERIAL_ID_MAP_TEXT | WORLD_MATERIAL_ID_ITEM_FRAME_MAP | WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP)
+}
 pub const WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED: u32 = 0x4d21_a7c3;
 pub const WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED: u32 = 0x5443_5554;
 pub const WORLD_MATERIAL_ID_ENTITY_SHADOW: u32 = 0x5348_444d;

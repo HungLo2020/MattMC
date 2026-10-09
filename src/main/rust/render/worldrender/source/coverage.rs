@@ -14,6 +14,13 @@ pub(in crate::render::worldrender) fn source_material_writer_coverage(
     batches: &[SourceTexturedMaterialBatch],
     draws: Option<&[TexturedMaterialSourceDraw]>,
 ) -> GalResult<SourceMaterialWriterCoverage> {
+    source_material_writer_coverage_for_draws(batches, draws.unwrap_or_default().iter())
+}
+
+pub(in crate::render::worldrender) fn source_material_writer_coverage_for_draws<'a>(
+    batches: &[SourceTexturedMaterialBatch],
+    draws: impl IntoIterator<Item = &'a TexturedMaterialSourceDraw>,
+) -> GalResult<SourceMaterialWriterCoverage> {
     let quads = batches.iter().try_fold(0_u64, |total, batch| {
         total
             .checked_add(u64::try_from(batch.count).map_err(|_| {
@@ -21,18 +28,18 @@ pub(in crate::render::worldrender) fn source_material_writer_coverage(
             })?)
             .ok_or_else(|| GalError::invalid_argument("source material quad count overflows"))
     })?;
-    let draws = draws.unwrap_or_default();
-    let vertices = draws.iter().try_fold(0_u64, |total, draw| {
-        total
+    let (draws, vertices) = draws.into_iter().try_fold((0_u64, 0_u64), |(count, total), draw| {
+        let total = total
             .checked_add(u64::from(draw.vertices))
-            .ok_or_else(|| GalError::invalid_argument("source material vertex count overflows"))
+            .ok_or_else(|| GalError::invalid_argument("source material vertex count overflows"))?;
+        let count = count.checked_add(1).ok_or_else(|| GalError::invalid_argument("source material draw count overflows"))?;
+        Ok::<_, GalError>((count, total))
     })?;
     Ok(SourceMaterialWriterCoverage {
         batches: u64::try_from(batches.len())
             .map_err(|_| GalError::invalid_argument("source material batch count exceeds u64"))?,
         quads,
-        draws: u64::try_from(draws.len())
-            .map_err(|_| GalError::invalid_argument("source material draw count exceeds u64"))?,
+        draws,
         vertices,
     })
 }

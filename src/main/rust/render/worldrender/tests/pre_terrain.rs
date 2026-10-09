@@ -54,7 +54,7 @@ fn pre_terrain_fullscreen_recording_orders_shadows_and_publishes_opaque_before_d
         scene_coverage: Default::default(),
         terrain: PreparedLoweredSourceTerrainFramePlan { frame_id: source_frame.frame_id, draws: Vec::new(), transaction: None },
         shadow_only_draws: Vec::new(), entity_shadow_draws: Vec::new(),
-        entities: None, hands: None, textured_material: None, weather: None,
+        entities: None, hands: None, textured_material: Vec::new(), weather: None,
         clouds: None, lines: None, damaged_block: None, entity_glint: None, hand_glint: None,
         color_targets: targets.clone(),
         shadow_targets: Some(TerrainSourceShadowPassTargets {
