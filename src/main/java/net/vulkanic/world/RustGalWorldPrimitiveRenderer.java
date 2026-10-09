@@ -5142,14 +5142,20 @@ public final class RustGalWorldPrimitiveRenderer {
 			0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F,
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F
 		};
-		boolean queued = enqueueDebugLineSegments(transform, endpoints, 0xFFFFFFFF, 2.0F);
-		queued &= enqueueDebugLineSegments(transform,
-			new float[] {0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F}, 0xFFFF0000, 4.0F);
-		queued &= enqueueDebugLineSegments(transform,
-			new float[] {0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F}, 0xFF00FF00, 4.0F);
-		queued &= enqueueDebugLineSegments(transform,
-			new float[] {0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}, 0xFF7F7FFF, 4.0F);
-		return queued;
+		synchronized (LOCK) {
+			// Frozen's crosshair transform is already in camera space. The shared
+			// Rust line stream applies PENDING_VIEW, so convert back to camera-relative
+			// world space first; applying the view twice cancels the axes' rotation.
+			transform = new Matrix4f().set(PENDING_VIEW).invert().mul(transform);
+			boolean queued = enqueueDebugLineSegments(transform, endpoints, 0xFFFFFFFF, 2.0F);
+			queued &= enqueueDebugLineSegments(transform,
+				new float[] {0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F}, 0xFFFF0000, 4.0F);
+			queued &= enqueueDebugLineSegments(transform,
+				new float[] {0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F}, 0xFF00FF00, 4.0F);
+			queued &= enqueueDebugLineSegments(transform,
+				new float[] {0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}, 0xFF7F7FFF, 4.0F);
+			return queued;
+		}
 	}
 
 	private static boolean enqueueLineSegmentsForRoute(Matrix4f transform, float[] endpoints, int color, float lineWidth, WorldRenderRoutePolicy.Route route) {

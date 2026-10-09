@@ -578,8 +578,15 @@ public final class RustGalWholeFrameTerrainSource {
 		if (!this.graph.scheduleRebuild(sectionX, sectionY, sectionZ)) {
 			return;
 		}
-		// A capture must not photograph a frame while a dirty section's
-		// replacement CPU mesh is outstanding.
+		// The drained receipt describes the camera traversal, just like the
+		// build requests in updateDrainedState. Offscreen edits remain dirty in
+		// the graph and will be requested when visited; they must not reset a
+		// settled camera window on every ordinary server block-update packet.
+		if (!this.graph.boxVisible(sectionX, sectionY, sectionZ, sectionX, sectionY, sectionZ)) {
+			return;
+		}
+		// Visible edits must still retire the previous readiness receipt before
+		// a screenshot can use the old mesh while its replacement is pending.
 		wholeFrameSurfaceQueueDrained = false;
 		wholeFrameTerrainQueueDrained = false;
 		net.minecraft.client.dev.DeterministicCameraCapture.invalidateRustWholeFrameTerrainReadiness();

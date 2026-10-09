@@ -211,6 +211,22 @@ The graph's needs-build/urgent marks are node bits; visible slots use visit
 stamps and animated-sprite lists are interned. These bookkeeping changes do not
 move world/entity semantics or resource-reload publication into the graph.
 
+The whole-frame drained receipt describes the camera traversal, rather than
+every loaded section. An offscreen block update keeps its rebuild mark but
+does not invalidate that receipt; when the camera visits it, the ordinary build
+queue must drain before readiness can pass. Visible edits still invalidate
+readiness immediately, including when the build queue is already busy. The Java
+[`TerrainReadinessInvalidationTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/vulkanic/world/TerrainReadinessInvalidationTest.java)
+exercises both cases against the native graph and checks that an offscreen edit
+is requested after camera relocation.
+
+The real-world DH capture observer checks live execution every frame, but
+writes the full diagnostic metadata on stage transitions. The settled-work
+gate supplies periodic progress and the screenshot supplies the final receipt.
+Serializing the retained terrain history every ready DH frame can consume the
+capture's time budget; a timeout in another valid save must be investigated,
+rather than treated as a requirement to use the historical reference save.
+
 - Visible sections are visited sections that are built with geometry.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
@@ -381,6 +397,29 @@ At resource-reload commit, Java also drops the staged layers' CPU payloads after
 checking every staged generation was uploaded; earlier acknowledgements could
 only release published layers. This does not cover the omitted-layer staging
 case tracked by [#821](https://github.com/HungLo2020/MattMC/issues/821).
+
+Java DH preparation retains material and contributor provenance in
+[`ColumnRenderSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/ColumnRenderSource.java).
+Replacing a column clears its dense sidecars and removes sparse entries by that
+column's contiguous vertical index range. Keep this work bounded by the column
+height: scanning section-wide maps for every column makes fresh section builds
+quadratic as metadata accumulates. Other columns and the shared material identity
+table must survive replacement. The focused
+[`ColumnRenderSourceSemanticMaterialTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/com/seibel/distanthorizons/core/dataObjects/render/ColumnRenderSourceSemanticMaterialTest.java)
+covers column boundaries, heights and repeated clearing; it does not establish
+gameplay FPS or Frozen visual parity.
+
+The three-axis debug crosshair starts in camera space, unlike ordinary world
+lines. Its Java producer in
+[`RustGalWorldPrimitiveRenderer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java)
+applies the inverse of the current frame's view before enqueueing its endpoints
+in the shared camera-relative world-line stream. Rust then applies that view
+once during drawing. Omitting the inverse cancels the axes' camera rotation and
+can move the crosshair off-center or behind the camera. Keep the view snapshot
+and all six segments under the frame lock. The focused
+[`DebugCrosshairCameraTransformTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/vulkanic/world/DebugCrosshairCameraTransformTest.java)
+checks yaw, pitch, GUI scale and view matrices containing camera effects against
+Frozen's camera-space axis directions.
 
 DH asset preflight runs after the real quadtree selects visible generations.
 Keep those selected assets resident through submission and presentation. The DH

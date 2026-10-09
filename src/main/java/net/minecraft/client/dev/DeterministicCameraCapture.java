@@ -2767,9 +2767,16 @@ public final class DeterministicCameraCapture {
 			&& (!DISTANT_HORIZONS_REQUIRE_WATER || waterExecuted)
 			&& diagnostics.semanticUnpublishedCandidates() == 0;
 		if (requiredStreamsExecuted) {
+			boolean stageChanged = !"real-world-dh-executed".equals(distantHorizonsTexturePaletteStage);
 			distantHorizonsTexturePaletteSourceReady = true;
 			distantHorizonsTexturePaletteStage = "real-world-dh-executed";
-			writeMetadata(minecraft, "distant_horizons_real_world_executed");
+			// Keep checking the live route on every frame, but serialize the full
+			// terrain history only when this stage changes. The settled-work gate
+			// already writes periodic progress and the screenshot writes its receipt.
+			// Rewriting that history every ready DH frame can dominate capture time.
+			if (stageChanged) {
+				writeMetadata(minecraft, "distant_horizons_real_world_executed");
+			}
 			return true;
 		}
 		if (distantHorizonsTexturePaletteWaitFrames > SETTLED_READY_MAX_WAIT_FRAMES) {

@@ -272,22 +272,29 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	public void clearSemanticMaterialsForColumn(int posX, int posZ)
 	{
 		int firstIndex = dataPointIndex(posX, posZ, 0);
+		int endIndex = firstIndex + this.verticalDataCount;
 		java.util.Arrays.fill(
 			this.semanticMaterialByDataPoint,
 			firstIndex,
-			firstIndex + this.verticalDataCount,
+			endIndex,
 			(short) SEMANTIC_MATERIAL_UNAVAILABLE
 		);
 		java.util.Arrays.fill(this.semanticVariantStateByDataPoint, firstIndex,
-			firstIndex + this.verticalDataCount, SEMANTIC_VARIANT_UNAVAILABLE);
+			endIndex, SEMANTIC_VARIANT_UNAVAILABLE);
 		this.semanticHorizontalUniformByColumn[columnIndex(posX, posZ)] = false;
 		this.semanticHorizontalContributorsByColumn.remove(columnIndex(posX, posZ));
-		this.semanticMaterialSpansByDataPoint.keySet().removeIf(index ->
-			index >= firstIndex && index < firstIndex + this.verticalDataCount
-		);
-		this.semanticHorizontalContributorSpansByDataPoint.keySet().removeIf(index ->
-			index >= firstIndex && index < firstIndex + this.verticalDataCount
-		);
+		// Sparse sidecars use the same contiguous column range as the dense arrays.
+		// Scanning the entire section's maps for every column makes conversion
+		// quadratic as earlier columns accumulate provenance during a fresh build.
+		if (!this.semanticMaterialSpansByDataPoint.isEmpty()
+			|| !this.semanticHorizontalContributorSpansByDataPoint.isEmpty())
+		{
+			for (int index = firstIndex; index < endIndex; index++)
+			{
+				this.semanticMaterialSpansByDataPoint.remove(index);
+				this.semanticHorizontalContributorSpansByDataPoint.remove(index);
+			}
+		}
 	}
 
 	public void setSemanticMaterialId(int posX, int posZ, int verticalIndex, int materialId)

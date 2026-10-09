@@ -131,6 +131,12 @@ The first and third also accept `MATTMC_CAPTURE_RUN_SOURCE` and
 `MATTMC_CAPTURE_SHADER_PACK_SOURCE`. Override missing archived inputs with
 retained equivalent fixtures; existence checks do not prove equivalence.
 Run from the repository root with Java, Rust and capture prerequisites ready.
+The default save name is `Origin`. For another copied save, set
+`MATTMC_CAPTURE_WORLD` to its folder name under the input run's `saves/`, for
+example `MATTMC_CAPTURE_WORLD='New World' python3 DevUtils/tests/rendering/RunValidation.py ...`.
+Both clients use that selected save; generic loading and lifecycle readiness
+do not require the historical `Origin` world. Inspect the parity images when
+changing the source save or camera pose.
 Repeat `--jvm-arg=<option>` for gate, parity and current-client FPS options;
 these are not forwarded into Frozen's gameplay benchmark.
 
@@ -1261,6 +1267,24 @@ The status file reports `validity.measuredAverageFps`, per-phase CPU times
 under `exclusivePhaseNanos` (the native ones are `rust-gal.native-profile.*`:
 GAL validation, hazard analysis, backend encode and submit, renderer phases)
 and `submittedWorkCounts`.
+
+Inspect `producerWorkloadWaitFrames`, `lastProducerWorkloadBlocker`,
+`measurementRestartsAfterReadinessLoss` and `lastMeasurementRestartCause` even
+when a run completes. Current's DH producer gate checks visible columns and
+pending publication on every frame. A failed check discards the entire partial
+measurement window and starts settling again. Moving-camera mode permits
+terrain streaming during measurement, but does not disable those DH checks;
+the final retained window can omit earlier active publication work. A rendered
+world waiting at this gate is a benchmark readiness failure, not evidence that
+the selected save failed to load.
+
+A separate live-world diagnostic can set
+`mattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=false` and
+`mattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=false`.
+Record these overrides, match the effective JVM settings on both clients, and
+retain positive measured DH work: native DH GPU phase samples for Current and
+LOD render phase samples for Frozen. This probe does not pass the regular
+readiness gate or establish visual parity. Report it separately from validation.
 
 Run `cargo test ... whole_frame_resource_profile` after changing whole-frame
 resource accounting. The world/GUI counters include frontend preparation and
