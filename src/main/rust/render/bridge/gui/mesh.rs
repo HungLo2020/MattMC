@@ -173,6 +173,16 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
         };
         persistent_keys.push(persistent_key);
         validated_states.push(validated_state);
+        let model_transform = match (batch.native_item_transform, batch.native_item_transform_mode) {
+            (0, 0) => batch.model_transform,
+            (address, mode @ 1..=2) if address != 0 && address % std::mem::align_of::<crate::render::items::Owner>() as u64 == 0
+                && batch.model_transform == [0.;16] => {
+                // The CPU owner is pinned through decode. No pointer enters GPU policy.
+                let owner = unsafe { &*(address as *const crate::render::items::Owner) };
+                owner.poses[(mode-1) as usize].model
+            }
+            _ => return Err(GalError::ffi(StatusCode::InvalidArgument,"invalid native GUI item transform")),
+        };
         let request = GuiMeshBatchRequest {
             persistent_geometry: persistent_flag.then(|| crate::render::guirender::mesh::GuiPersistentGeometry {
                 vertices: batch.vertices.ptr as u64,
@@ -208,7 +218,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             material_mode,
             lighting_mode,
             alpha_cutoff: batch.alpha_cutoff,
-            model_transform: batch.model_transform,
+            model_transform,
             gui_pose: batch.gui_pose,
             bounds: [batch.left, batch.top, batch.right, batch.bottom],
             gui_extent: [

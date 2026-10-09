@@ -1098,7 +1098,7 @@ public final class RustGalGuiItemRenderer {
 						clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
 						clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
 						vertices, QUAD_INDICES,
-						layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache
+						layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache, layer.nativeTransform()
 					));
 				}
 		}

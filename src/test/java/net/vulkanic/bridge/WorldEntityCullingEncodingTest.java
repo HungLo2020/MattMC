@@ -9,6 +9,12 @@ import static net.vulkanic.bridge.VulkanicGalBridge.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class WorldEntityCullingEncodingTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void bootstrapRegistries() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+    }
+
     static WorldEntityCullingRecord inputs() {
         return new WorldEntityCullingRecord(1|16,
             new WorldAabbRecord(40.0+1e-10,-1,-2,41,2,3),
@@ -46,7 +52,7 @@ class WorldEntityCullingEncodingTest {
     }
     @Test void nativeEncoderPreservesDoubleBoundsAndClearsAbsentDirtyStorage() throws Exception {
         try(var bridge=VulkanicGalBridge.create("rust-vulkan");var arena=Arena.ofConfined()) {
-            assertEquals(75,ABI_VERSION);
+            assertEquals(76,ABI_VERSION);
             var layout=Struct.WORLD_MESH_INSTANCE_RECORD;
             var item=arena.allocate(layout.byteSize(),8);
             var encode=VulkanicGalBridge.class.getDeclaredMethod("encodeEntityCulling",MemorySegment.class,WorldEntityCullingRecord.class);

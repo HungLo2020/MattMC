@@ -29,9 +29,10 @@ final class GuiFlatItemMeshCollector {
 	private record FlatRasterIdentity(Object modelIdentity, boolean foil) {}
 	/** One cached layer; {@code foil} layers take each frame's foil clock, {@code specialFoil} its decal layout. */
 	private record FlatLayer(int material, long asset, float[] transform, List<GuiMeshVertexRecord> vertices,
-			List<Integer> indices, boolean foil, boolean specialFoil) {
+			List<Integer> indices, boolean foil, boolean specialFoil, net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform) {
 		private FlatLayer {
-			transform = transform.clone();
+			if (nativeTransform == null) transform = transform.clone();
+			else if (transform != null) throw new IllegalArgumentException("native flat item pose conflicts with matrix");
 			vertices = List.copyOf(vertices);
 		}
 	}
@@ -115,8 +116,8 @@ final class GuiFlatItemMeshCollector {
                 copied.getLast().vertices().addAll(vertices);
             }
             for (var faces : copied) {
-                layers.add(new FlatLayer(material, faces.asset(), layer.modelTransform(), faces.vertices(),
-                    quadIndices(faces.vertices().size()), false, false));
+                layers.add(new FlatLayer(material, faces.asset(), layer.nativeTransform() == null ? layer.modelTransform() : null, faces.vertices(),
+                    quadIndices(faces.vertices().size()), false, false, layer.nativeTransform()));
             }
             if(layer.foilType()!=ItemStackRenderState.FoilType.NONE) {
                 var glint=RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
@@ -125,8 +126,8 @@ final class GuiFlatItemMeshCollector {
                 List<GuiMeshVertexRecord> foilVertices = new ArrayList<>();
                 for (var faces : copied) foilVertices.addAll(faces.vertices());
                 if (foil == null) throw new IllegalArgumentException("flat mesh foil layer without foil semantics");
-                layers.add(new FlatLayer(4, glint.assetId(), layer.modelTransform(), foilVertices,
-                    quadIndices(foilVertices.size()), true, specialFoil));
+                layers.add(new FlatLayer(4, glint.assetId(), layer.nativeTransform() == null ? layer.modelTransform() : null, foilVertices,
+                    quadIndices(foilVertices.size()), true, specialFoil, layer.nativeTransform()));
             }
             if(layers.size()>64) throw new IllegalArgumentException("flat mesh layer bound exceeded");
         });
@@ -175,7 +176,7 @@ final class GuiFlatItemMeshCollector {
 		for (FlatLayer layer : topology.layers()) {
 			if (layer.foil() && foil == null) throw new IllegalArgumentException("flat mesh foil layer without foil semantics");
 			var batch = batch(item, guiWidth, guiHeight, guiScale, stratum, batches.size(), layer.material(),
-				layer.asset(), layer.transform(), layer.vertices(), layer.indices(), layer.foil() ? foil : null, 1);
+				layer.asset(), layer.transform(), layer.vertices(), layer.indices(), layer.foil() ? foil : null, 1, layer.nativeTransform());
 			if (layer.specialFoil()) batch = batch.withDecalFoil(GuiDecalFoilRecord.forNativeItemLayout());
 			batches.add(itemCache == null ? batch : batch.withItemCache(itemCache));
 		}
@@ -200,6 +201,11 @@ final class GuiFlatItemMeshCollector {
     private static GuiMeshBatchRecord batch(GuiItemRenderState item,int width,int height,int scale,int stratum,int layer,
                                            int material,long asset,float[] transform,List<GuiMeshVertexRecord> vertices,
                                            List<Integer> indices,StandardItemFoilRecord foil,int lighting) {
+        return batch(item,width,height,scale,stratum,layer,material,asset,transform,vertices,indices,foil,lighting,null);
+    }
+    private static GuiMeshBatchRecord batch(GuiItemRenderState item,int width,int height,int scale,int stratum,int layer,
+                                           int material,long asset,float[] transform,List<GuiMeshVertexRecord> vertices,
+                                           List<Integer> indices,StandardItemFoilRecord foil,int lighting,net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform) {
         var clip=item.scissorArea();
         var pose=item.pose();
         if (vertices.isEmpty() || vertices.size()%4!=0 || vertices.size()>MAX_COPIED_VERTICES)
@@ -208,6 +214,6 @@ final class GuiFlatItemMeshCollector {
             new float[]{pose.m00(),pose.m01(),pose.m10(),pose.m11(),pose.m20(),pose.m21()},
             item.x(),item.y(),item.x()+16,item.y()+16,width,height,0,0,0,
             clip==null?0:1,clip==null?0:clip.left(),clip==null?0:clip.top(),
-            clip==null?0:clip.width(),clip==null?0:clip.height(),vertices,indices,foil,scale);
+            clip==null?0:clip.width(),clip==null?0:clip.height(),vertices,indices,foil,scale,null,null,null,nativeTransform);
     }
 }

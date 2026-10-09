@@ -129,7 +129,8 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v73 adds indexed map-color CPU image input, expanded only by the Rust frontend.
 /// v74 appends a bounded native CPU DH visibility-frame reference.
 /// v75 appends native CPU cloud owner/pose fields to retained DH instances.
-pub const FFI_ABI_VERSION: u32 = 75;
+/// v76 appends immutable CPU item poses for direct GUI consumption.
+pub const FFI_ABI_VERSION: u32 = 76;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

@@ -45,6 +45,14 @@ whole-renderer performance acceptance remains open.
 [Live section mutation/counters](../world/chunk/RUST-SECTION-COUNTERS.md) now have full suite/lifecycle/coast verification; vanilla/DH performance floors
 still fail. Move
 remaining per-frame world-state extraction next rather than more static catalogs.
+The local [item-layer preparation](../rendering/RUST-ITEM-LAYERS.md) slice now
+owns authored poses in Rust and feeds block/flat GUI consumers directly;
+Full CPU/lifecycle checks and reviewed coast pairs pass; vanilla still misses
+Frozen performance floors. The measurements precede incoming Java rendering
+fixes; combined checks are recorded separately. World and
+hand consumers still project matrices. Continue coupling those consumers with
+native producers, then migrate entity scene preparation and contextual chunk
+inputs instead of only moving more static definitions.
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java still orchestrates stage
 installation and chunks, while ordinary canonical live palette mutation now uses

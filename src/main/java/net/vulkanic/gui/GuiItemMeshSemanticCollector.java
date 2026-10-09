@@ -136,7 +136,7 @@ public final class GuiItemMeshSemanticCollector {
 			if (layer.itemFoil() == null) continue;
 			if (result == null) result = new ArrayList<>(layers);
 			result.set(index, new GuiItemMeshLayer(layer.materialMode(), layer.blockLight(), layer.modelTransform,
-				layer.quads(), currentFoil(), layer.sourceFoilType()));
+				layer.quads(), currentFoil(), layer.sourceFoilType(), layer.nativeTransform()));
 		}
 		return result == null ? layers : result;
 	}
@@ -177,9 +177,9 @@ public final class GuiItemMeshSemanticCollector {
 			if (copied == null) return "unsupported-quad";
 			quads.add(copied);
 		}
-		float[] modelTransform = layer.modelTransform();
+		float[] modelTransform = layer.nativeTransform() == null ? layer.modelTransform() : null;
 		int sourceFoilType = layer.foilType() == ItemStackRenderState.FoilType.STANDARD ? 1 : 0;
-		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads, null, sourceFoilType));
+		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads, null, sourceFoilType, layer.nativeTransform()));
 		if (layer.foilType() == ItemStackRenderState.FoilType.STANDARD) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			if (glint == null) return "glint-texture-unavailable";
@@ -188,7 +188,7 @@ public final class GuiItemMeshSemanticCollector {
 				glintQuads.add(glintQuad(quad, glint.assetId()));
 			}
 			output.add(new GuiItemMeshLayer(MaterialMode.GLINT, false, modelTransform, glintQuads,
-				currentFoil(), sourceFoilType));
+				currentFoil(), sourceFoilType, layer.nativeTransform()));
 		}
 		return null;
 	}
@@ -393,7 +393,12 @@ public final class GuiItemMeshSemanticCollector {
 	}
 
 	public record GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
-		net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil, int sourceFoilType) {
+		net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil, int sourceFoilType,
+		net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform) {
+		public GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
+			net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil, int sourceFoilType) {
+			this(materialMode,blockLight,modelTransform,quads,itemFoil,sourceFoilType,null);
+		}
 		public GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
 			net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil) {
 			this(materialMode, blockLight, modelTransform, quads, itemFoil, 0);
@@ -404,13 +409,14 @@ public final class GuiItemMeshSemanticCollector {
 		public GuiItemMeshLayer {
 			if (sourceFoilType < 0 || sourceFoilType > 1) throw new IllegalArgumentException("unsupported source item foil type");
 			if (itemFoil != null && materialMode != MaterialMode.GLINT) throw new IllegalArgumentException("foil requires glint layer");
-			modelTransform = checkedCopy(modelTransform, 16, "GUI item model transform");
+			if (nativeTransform == null) modelTransform = checkedCopy(modelTransform, 16, "GUI item model transform");
+			else if (modelTransform != null) throw new IllegalArgumentException("native item transform conflicts with matrix");
 			quads = List.copyOf(quads);
 		}
 
 		@Override
 		public float[] modelTransform() {
-			return this.modelTransform.clone();
+			return this.nativeTransform == null ? this.modelTransform.clone() : this.nativeTransform.modelTransform();
 		}
 
 		/** See {@link GuiItemMesh#guiPoseOwned()} for the ownership contract. */

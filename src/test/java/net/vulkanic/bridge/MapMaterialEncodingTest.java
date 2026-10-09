@@ -14,6 +14,12 @@ import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.junit.jupiter.api.Test;
 
 class MapMaterialEncodingTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void bootstrapRegistries() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+    }
+
     @Test
     void mapTextKeepsItsSemanticKeyAndCopiedGeometryThroughCompactEncoding() throws Exception {
         var quad = mapQuad(0xf0001002);

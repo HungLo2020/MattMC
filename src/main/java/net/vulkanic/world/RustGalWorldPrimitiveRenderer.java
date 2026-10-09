@@ -8907,7 +8907,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			aggregateQuadCount += layerQuadCount * foilMultiplier;
 			if (modelMeshRenderSemantics(layer.renderType()) == null) return "render-type";
-			if (!isFinite(layer.modelTransform())) return "transform";
+			if (layer.nativeTransform() == null && !isFinite(layer.modelTransform())) return "transform";
 			for (BakedQuad quad : layer.quads()) {
 				if (!(quad instanceof BakedQuadView view)) return "non-sodium-quad";
 				TextureAtlasSprite sprite = view.getSprite();

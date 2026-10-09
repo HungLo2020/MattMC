@@ -17,6 +17,7 @@ render/
 ├── scene/        wire and data vocabulary (constants, data types)
 ├── dh_collector/ DH column state, copied payloads, publication and frame admission
 ├── clouds/       CPU cloud motion/placement/culling owners; no GPU dependencies
+├── items/        immutable authored item CPU poses; no GPU dependencies
 ├── vulkanic/     VulkanicGAL: the graphics abstraction layer and its backends
 └── chunk/        native chunk meshing, render lists and sorting used by Java's chunk renderer
 ```
@@ -66,6 +67,7 @@ or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe ch
 | Shader-pack parsing or pass planning | `shaderpack/` |
 | DH column generations, leases or publication/visibility bookkeeping | `dh_collector/`; keep Java wire handling in `bridge/dh_collector.rs` |
 | Built-in DH cloud motion, placement and culling policy | `clouds/`; see [cloud preparation](RUST-DH-CLOUDS.md) |
+| Authored item-layer transforms | `items/`; see [item preparation](RUST-ITEM-LAYERS.md) |
 | A new Java entry point or wire record | `bridge/` (see [Java Bridge](JAVA-BRIDGE.md)) |
 | A new GPU capability, resource type or command | `vulkanic/` (see [VulkanicGAL](VULKANIC-GAL.md)) |
 

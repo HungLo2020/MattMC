@@ -1088,6 +1088,8 @@ fn gui_mesh_batch_request(
     FfiGuiMeshBatchRequest {
         item_cache_identity: 0,
         item_cache_mode: 0,
+        native_item_transform: 0,
+        native_item_transform_mode: 0,
         decal_foil_mode: 0,
         decal_model_pose: [0.; 16],
         decal_normal_pose: [0.; 9],
@@ -1190,7 +1192,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         mesh_vertex.field_offsets[2]
     );
     let mesh_batch = crate::render::bridge::layout::layout_for_struct(97).expect("GUI mesh batch layout");
-    assert_eq!(40, mesh_batch.field_count);
+    assert_eq!(42, mesh_batch.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_identity) as u32,
         mesh_batch.field_offsets[38]
@@ -1400,6 +1402,34 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, post_effect_id) as u32,
         whole_frame.field_offsets[33]
     );
+}
+
+#[test]
+fn gui_native_item_pose_is_copied_and_conflicting_or_invalid_modes_decline() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32,1,2];
+    let owner = Box::new(crate::render::items::Owner::new([0.,0.,0.,2.,3.,4.,1.,1.,1.],false).unwrap());
+    let mut request = gui_mesh_batch_request(&vertices,&indices);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        crate::render::bridge::gui::decode_gui_mesh_batches(FfiSlice {ptr:request,count:1},320,180)
+    };
+    request.native_item_transform = (&*owner as *const crate::render::items::Owner) as u64;
+    request.native_item_transform_mode = 1;
+    assert!(decode(&request).is_err(), "conflicting inline pose");
+    request.model_transform = [0.;16];
+    let right = decode(&request).unwrap().remove(0);
+    request.native_item_transform_mode = 2;
+    let left = decode(&request).unwrap().remove(0);
+    request.native_item_transform_mode = 3;
+    assert!(decode(&request).is_err());
+    request.native_item_transform_mode = 0;
+    assert!(decode(&request).is_err());
+    request.native_item_transform=0;
+    request.native_item_transform_mode=1;
+    assert!(decode(&request).is_err());
+    drop(owner);
+    assert_eq!(&right.model_transform[12..], &[1.5,2.5,3.5,1.]);
+    assert_eq!(&left.model_transform[12..], &[-2.5,2.5,3.5,1.]);
 }
 
 #[test]

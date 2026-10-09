@@ -464,3 +464,11 @@ Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/
 Rust fills the state-ID halo directly; Java retains contextual light and model
 admission. Unsupported/debug containers retain their original CPU compatibility
 path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.
+
+## Native item transform owners
+
+ABI 76 appends a CPU owner address and hand mode to GUI mesh batch struct 97
+(fields 40/41). Mode 0 uses the inline matrix; modes 1/2 select immutable
+right/left poses, with zero inline model lanes. Rust copies the selected pose
+during decoding. See [item-layer preparation](RUST-ITEM-LAYERS.md) for admission,
+compatibility and synchronous/pipelined pinning rules.

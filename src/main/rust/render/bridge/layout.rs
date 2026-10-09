@@ -617,7 +617,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 block_model_bounds,
                 block_item_layout,
                 item_cache_identity,
-                item_cache_mode
+                item_cache_mode,
+                native_item_transform,
+                native_item_transform_mode
             ]
         ),
         91 => layout!(

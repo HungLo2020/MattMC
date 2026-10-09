@@ -148,6 +148,9 @@ pub struct FfiGuiMeshBatchRequest {
     pub block_item_layout: u32,
     pub item_cache_identity: u64,
     pub item_cache_mode: u32,
+    /// Immutable CPU transform owner. Mode 0 uses the inline matrix, 1 right, 2 left.
+    pub native_item_transform: u64,
+    pub native_item_transform_mode: u32,
 }
 
 #[repr(C)]
