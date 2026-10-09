@@ -1,5 +1,12 @@
 # Rust block-section palette packing
 
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+
 Standard 4096-entry block containers use Rust for `PalettedContainer.pack()`:
 decoding source words, compacting used IDs in first-use order, and encoding
 padded save words with identity-alias remapping when needed. Java owns the

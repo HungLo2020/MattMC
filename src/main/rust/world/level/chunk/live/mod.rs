@@ -1,0 +1,273 @@
+//! Authoritative live block palettes and packed storage. Java may retain atomic
+//! read views of a generation; only this owner changes words or palette policy.
+use std::collections::HashMap;
+use std::sync::{
+    atomic::{AtomicU32, AtomicU64, Ordering},
+    Arc, Mutex,
+};
+mod ffi;
+#[cfg(test)]
+mod tests;
+const ENTRIES: usize = 4096;
+
+struct Generation {
+    bits: usize,
+    requested: usize,
+    global: bool,
+    count: AtomicU32,
+    palette: Box<[AtomicU32]>,
+    words: Box<[AtomicU64]>,
+}
+impl Generation {
+    fn new(bits: usize, requested: usize, global: bool, palette: &[u32], words: &[u64]) -> Self {
+        let capacity = if global {
+            0
+        } else if bits == 0 {
+            1
+        } else {
+            (1 << bits) + usize::from(bits >= 5)
+        };
+        let ids: Vec<_> = (0..capacity)
+            .map(|i| AtomicU32::new(*palette.get(i).unwrap_or(&0)))
+            .collect();
+        Self {
+            bits,
+            requested,
+            global,
+            count: AtomicU32::new(palette.len() as u32),
+            palette: ids.into_boxed_slice(),
+            words: words.iter().map(|v| AtomicU64::new(*v)).collect(),
+        }
+    }
+    fn local(&self, index: usize) -> usize {
+        if self.bits == 0 {
+            return 0;
+        }
+        let per = 64 / self.bits;
+        ((self.words[index / per].load(Ordering::Acquire) >> (index % per * self.bits))
+            & ((1 << self.bits) - 1)) as usize
+    }
+    fn state(&self, index: usize) -> u32 {
+        let id = self.local(index);
+        if self.global {
+            id as u32
+        } else {
+            self.palette[id].load(Ordering::Acquire)
+        }
+    }
+    fn set(&self, index: usize, id: u32) {
+        if self.bits == 0 {
+            return;
+        }
+        let per = 64 / self.bits;
+        let shift = index % per * self.bits;
+        let mask = ((1u64 << self.bits) - 1) << shift;
+        let word = &self.words[index / per];
+        word.store(
+            (word.load(Ordering::Relaxed) & !mask) | ((id as u64) << shift),
+            Ordering::Release,
+        );
+    }
+    fn append(&self, state: u32) -> u32 {
+        let count = self.count.load(Ordering::Relaxed) as usize;
+        self.palette[count].store(state, Ordering::Release);
+        self.count.store((count + 1) as u32, Ordering::Release);
+        count as u32
+    }
+}
+struct State {
+    generation: Arc<Generation>,
+    ids: HashMap<u32, u32>,
+}
+pub struct Owner {
+    state: Mutex<State>,
+    limit: u32,
+    global_bits: usize,
+}
+impl Owner {
+    fn load(
+        bits: usize,
+        requested: usize,
+        palette: &[i32],
+        words: &[u64],
+        limit: u32,
+        global_bits: usize,
+    ) -> Option<Self> {
+        let global = palette.is_empty();
+        if limit == 0
+            || limit > 65535
+            || !(9..=16).contains(&global_bits)
+            || bits
+                != if global {
+                    global_bits
+                } else {
+                    match requested {
+                        0 => 0,
+                        1..=4 => 4,
+                        5..=8 => requested,
+                        _ => return None,
+                    }
+                }
+            || words.len()
+                != if bits == 0 {
+                    0
+                } else {
+                    ENTRIES.div_ceil(64 / bits)
+                }
+            || (!global
+                && (palette.is_empty() || palette.len() > if bits == 0 { 1 } else { 1 << bits }))
+            || (global && requested <= 8)
+        {
+            return None;
+        }
+        let mut ids = HashMap::new();
+        let mut entries = Vec::new();
+        for (i, &value) in palette.iter().enumerate() {
+            if value < 0 || value as u32 >= limit || ids.insert(value as u32, i as u32).is_some() {
+                return None;
+            }
+            entries.push(value as u32);
+        }
+        let generation = Arc::new(Generation::new(bits, requested, global, &entries, words));
+        for index in 0..ENTRIES {
+            let id = generation.local(index);
+            if id
+                >= if global {
+                    limit as usize
+                } else {
+                    palette.len()
+                }
+            {
+                return None;
+            }
+        }
+        Some(Self {
+            state: Mutex::new(State { generation, ids }),
+            limit,
+            global_bits,
+        })
+    }
+    fn copy(&self) -> Self {
+        let guard = self.state.lock().unwrap();
+        let g = &guard.generation;
+        // SingleValuePalette.copy returns itself. A zero-width network read
+        // mutates that shared palette; copies share only this single generation.
+        if g.bits == 0 {
+            return Self {
+                state: Mutex::new(State {
+                    generation: g.clone(),
+                    ids: guard.ids.clone(),
+                }),
+                limit: self.limit,
+                global_bits: self.global_bits,
+            };
+        }
+        let entries: Vec<_> = (0..g.count.load(Ordering::Acquire) as usize)
+            .map(|i| g.palette[i].load(Ordering::Acquire))
+            .collect();
+        let words: Vec<_> = g.words.iter().map(|v| v.load(Ordering::Acquire)).collect();
+        Self {
+            state: Mutex::new(State {
+                generation: Arc::new(Generation::new(
+                    g.bits,
+                    g.requested,
+                    g.global,
+                    &entries,
+                    &words,
+                )),
+                ids: guard.ids.clone(),
+            }),
+            limit: self.limit,
+            global_bits: self.global_bits,
+        }
+    }
+    // One fused write, including palette admission, first-use growth and packed mutation.
+    fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {
+        if index >= ENTRIES || value >= self.limit {
+            return None;
+        }
+        let mut s = self.state.lock().unwrap();
+        let old = s.generation.state(index);
+        if s.generation.global {
+            s.generation.set(index, value);
+            return Some((old, false));
+        }
+        // A shared single palette may have been replaced through another copy.
+        // Its current atomic value, rather than this owner's old map, is authoritative.
+        if s.generation.bits == 0 {
+            if old == value {
+                return Some((old, false));
+            }
+        } else if let Some(&id) = s.ids.get(&value) {
+            s.generation.set(index, id);
+            return Some((old, false));
+        }
+        let count = s.generation.count.load(Ordering::Relaxed) as usize;
+        let bits = s.generation.bits;
+        if bits != 0 && count < 1 << bits {
+            let id = s.generation.append(value);
+            s.ids.insert(value, id);
+            s.generation.set(index, id);
+            return Some((old, false));
+        }
+        // Hash palettes admit the overflow value before growing. The old view
+        // keeps that history, but no old packed index can reference the new id.
+        if bits >= 5 {
+            s.generation.append(value);
+        }
+        let requested = if bits == 0 { 4 } else { bits + 1 };
+        let global = requested > 8;
+        let new_bits = if global { self.global_bits } else { requested };
+        let mut entries = Vec::new();
+        let mut ids = HashMap::new();
+        let mut packed = vec![0u64; ENTRIES.div_ceil(64 / new_bits)];
+        let per = 64 / new_bits;
+        for i in 0..ENTRIES {
+            let state = s.generation.state(i);
+            let id = if global {
+                state
+            } else {
+                *ids.entry(state).or_insert_with(|| {
+                    let id = entries.len() as u32;
+                    entries.push(state);
+                    id
+                })
+            };
+            packed[i / per] |= (id as u64) << (i % per * new_bits);
+        }
+        let id = if global {
+            value
+        } else {
+            *ids.entry(value).or_insert_with(|| {
+                let id = entries.len() as u32;
+                entries.push(value);
+                id
+            })
+        };
+        let next = Arc::new(Generation::new(
+            new_bits, requested, global, &entries, &packed,
+        ));
+        next.set(index, id);
+        s.generation = next;
+        s.ids = ids;
+        Some((old, true))
+    }
+    fn read_single(&self, value: u32) -> bool {
+        if value >= self.limit {
+            return false;
+        }
+        let s = self.state.lock().unwrap();
+        if s.generation.bits != 0 {
+            return false;
+        }
+        s.generation.palette[0].store(value, Ordering::Release);
+        true
+    }
+    fn capture(&self) -> Box<[u16; ENTRIES]> {
+        let s = self.state.lock().unwrap();
+        if s.generation.bits == 0 {
+            return Box::new([s.generation.state(0) as u16; ENTRIES]);
+        }
+        Box::new(std::array::from_fn(|i| s.generation.state(i) as u16))
+    }
+}

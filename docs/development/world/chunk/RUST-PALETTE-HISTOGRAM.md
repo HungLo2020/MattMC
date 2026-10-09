@@ -1,5 +1,12 @@
 # Rust palette histograms
 
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+
 The multi-entry branch of `PalettedContainer.count()` uses Rust for standard
 4096-entry `SimpleBitStorage` and `ZeroBitStorage`, with source widths 0–16.
 This accelerates section block/fluid counter reconstruction and other count

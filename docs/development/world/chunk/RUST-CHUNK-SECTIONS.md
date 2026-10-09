@@ -1,5 +1,12 @@
 # Rust chunk section serialization
 
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+
 Eligible chunk saves and current-version loads handle the `sections` list in Rust. In
 [`storage/chunk/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/storage/chunk),
 each section is written straight as NBT tape:

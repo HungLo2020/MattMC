@@ -29,6 +29,6 @@ public final class SectionFingerprint {
 
     /** The container's live storage words, for tests that corrupt saved data. */
     public static long[] rawWords(PalettedContainer<?> container) {
-        return container.dataForNativeScan().storage().getRaw();
+        return container.dataForCompatibilityMutation().storage().getRaw();
     }
 }

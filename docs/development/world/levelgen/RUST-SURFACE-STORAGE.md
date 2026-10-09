@@ -110,7 +110,11 @@ checks or independently inspect the raw measurement artifacts.
 (`NativeSurface.canBatch`: known rules and conditions only, plain
 `SurfaceSystem`, `BiomeManager` and `ProtoChunk`).
 
-`-Dmattmc.worldgen.javaSurfaceStorage=true` keeps Java storage, for comparison runs.
+`-Dmattmc.worldgen.javaSurfaceStorage=true` keeps the Java stage loop, for
+comparison runs. Its canonical containers now use
+[Rust live storage](../chunk/RUST-LIVE-SECTIONS.md); the historical measurements
+below predate that ownership change. Stage import/install still builds temporary
+Java arrays and palettes. Direct Rust-to-Rust handoff remains migration work.
 
 ## Preserve these contracts
 

@@ -6,7 +6,10 @@ runs the decrease and increase queues of `LightEngine.runLightUpdates()` for
 `SkyLightEngine.propagateLightSources()`, which fills skylight above the
 lowest sources and seeds the increase queue. The bridge is
 `NativeLightPropagation` (lighting package) with `NativeLightBlocks` (chunk
-package, for palette data). Java still owns everything else: section statuses,
+package, for palette data). Ordinary block palettes and packed words now come
+directly from their [Rust live owner](../chunk/RUST-LIVE-SECTIONS.md), without
+reconstructing a Java palette or word array for the light handoff. Java still owns
+the remaining light orchestration: section statuses,
 `checkNode`, queued and retained data, `markNewInconsistencies`,
 `swapSectionMap` and light storage.
 

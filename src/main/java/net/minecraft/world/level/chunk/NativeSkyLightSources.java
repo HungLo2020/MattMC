@@ -36,7 +36,8 @@ public final class NativeSkyLightSources {
     private static final class Scratch {
         final MemorySegment frame = Arena.ofAuto().allocate(HEIGHTS_OFFSET + 256 * 8, 8);
         final MemorySegment words = Arena.ofAuto().allocate(2048 * 8, 8);
-        final MemorySegment ids = Arena.ofAuto().allocate(256 * 4, 4);
+        final MemorySegment exportHeader = Arena.ofAuto().allocate(16, 4);
+        final MemorySegment ids = Arena.ofAuto().allocate(257 * 4, 4);
     }
 
     /** False leaves the destination untouched so the caller can use its original reader. */
@@ -76,33 +77,42 @@ public final class NativeSkyLightSources {
             if (!section.hasOnlyAir()) {
                 var container = section.getStates();
                 if (container.getClass() != PalettedContainer.class) return false;
-                var data = container.dataForNativeScan();
-                var storage = data.storage();
-                var palette = data.palette();
-                if (storage.getClass() != SimpleBitStorage.class && storage.getClass() != ZeroBitStorage.class) return false;
-                if (storage.getSize() != 4096) return false;
-                count = palette.getSize();
-                bits = storage.getBits();
-                if (palette.getClass() == GlobalPalette.class) {
-                    if (container.registryForNativeScan() != Block.BLOCK_STATE_REGISTRY
-                        || count != Block.BLOCK_STATE_REGISTRY.size()) return false;
-                    // Palette ids are state ids; Rust declines custom subclasses.
-                    ids = MemorySegment.NULL;
+                var live = container.nativeLiveBlocks();
+                if (live != null) {
+                    len = live.export(scratch.words, scratch.ids, scratch.exportHeader);
+                    bits = scratch.exportHeader.getAtIndex(ValueLayout.JAVA_INT, 0);
+                    boolean global = scratch.exportHeader.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
+                    count = global ? Block.BLOCK_STATE_REGISTRY.size() : scratch.exportHeader.getAtIndex(ValueLayout.JAVA_INT, 3);
+                    ids = global ? MemorySegment.NULL : scratch.ids;
                 } else {
-                    if (palette.getClass() != SingleValuePalette.class && palette.getClass() != LinearPalette.class
-                        && palette.getClass() != HashMapPalette.class) return false;
-                    if (count > 256) return false;
-                    for (int i = 0; i < count; i++) {
-                        var state = palette.valueFor(i);
-                        if (state == null || state.getClass() != BlockState.class) return false;
-                        int id = Block.BLOCK_STATE_REGISTRY.getId(state);
-                        if (id < 0) return false;
-                        ids.setAtIndex(ValueLayout.JAVA_INT, i, id);
+                    var data = container.dataForNativeScan();
+                    var storage = data.storage();
+                    var palette = data.palette();
+                    if (storage.getClass() != SimpleBitStorage.class && storage.getClass() != ZeroBitStorage.class) return false;
+                    if (storage.getSize() != 4096) return false;
+                    count = palette.getSize();
+                    bits = storage.getBits();
+                    if (palette.getClass() == GlobalPalette.class) {
+                        if (container.registryForNativeScan() != Block.BLOCK_STATE_REGISTRY
+                            || count != Block.BLOCK_STATE_REGISTRY.size()) return false;
+                        // Palette ids are state ids; Rust declines custom subclasses.
+                        ids = MemorySegment.NULL;
+                    } else {
+                        if (palette.getClass() != SingleValuePalette.class && palette.getClass() != LinearPalette.class
+                            && palette.getClass() != HashMapPalette.class) return false;
+                        if (count > 256) return false;
+                        for (int i = 0; i < count; i++) {
+                            var state = palette.valueFor(i);
+                            if (state == null || state.getClass() != BlockState.class) return false;
+                            int id = Block.BLOCK_STATE_REGISTRY.getId(state);
+                            if (id < 0) return false;
+                            ids.setAtIndex(ValueLayout.JAVA_INT, i, id);
+                        }
                     }
+                    var raw = storage.getRaw();
+                    len = raw.length;
+                    MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, len * 8L);
                 }
-                var raw = storage.getRaw();
-                len = raw.length;
-                MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, len * 8L);
             }
             frame.setAtIndex(ValueLayout.JAVA_INT, 0, bits);
             frame.setAtIndex(ValueLayout.JAVA_INT, 3, minY + sectionIndex * 16);

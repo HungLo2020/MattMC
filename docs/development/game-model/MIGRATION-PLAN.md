@@ -31,21 +31,24 @@ profiles pass; the targeted Java allocation/encoding cost is reduced, with no
 accepted isolated throughput gain. See the retained-scene evidence for bounds.
 [Loaded-section snapshot ownership](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
 and bulk rebuild consumers now live in Rust. Lifecycle and paired image checks
-pass; performance floors remain unmet. Live chunk mutation remains Java. Next,
-move authoritative chunk storage with its lighting, heightmap, save and rebuild
-consumers, preserving palette history and avoiding per-block FFI reads.
+pass; performance floors remain unmet. [Live block sections](../world/chunk/RUST-LIVE-SECTIONS.md)
+now own canonical packed storage and palette mutation in Rust with CPU read views,
+plus native rebuild/light exports and heightmap/skylight handoffs. Enumeration,
+save/network and generation-stage compatibility exports remain temporary Java
+projections. Move those consumers and bulk producers next; verify performance.
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
-from authoritative loaded-world ownership: Java installs stage results and
-still owns normal chunk mutation/orchestration. Move hot consumers with storage
-so ordinary block reads do not become individual cross-language calls.
+from authoritative loaded-world ownership: Java still orchestrates stage
+installation and chunks, while ordinary canonical live palette mutation now uses
+its separate Rust owner. Move bulk producers with storage to reduce write-side
+boundary costs.
 
 A concrete remaining producer is terrain rebuild preparation:
 [`ClonedChunkSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/world/cloned/ClonedChunkSection.java)
-clones Java palettes, `LevelSlice` expands Java block arrays, and
+retains native captures, `LevelSlice` reads their CPU views, and
 [`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java)
 repackages padded state/light grids and per-block tint inputs for Rust meshing.
-Ordinary-flight profiling now identifies repeated tint sampling as a substantial
-part of Java snapshot preparation (159/383 sampled snapshot CPU frames). The
+Historical ordinary-flight profiling identified repeated tint sampling as a
+substantial part of Java snapshot preparation (159/383 sampled snapshot CPU frames). The
 local [shared section color fields](../world/biome/RUST-SECTION-COLORS.md) slice
 moves coordinate planning, overlap deduplication, storage and direct mesher
 consumption into Rust. Full suites, seven lifecycle cases and reviewed image

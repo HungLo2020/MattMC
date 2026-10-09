@@ -4,7 +4,10 @@
 for normal packed chunks. This reconstructs the lowest unblocked skylight entry
 in each column. Incremental `update()` stays Java; propagation itself is described in
 [Rust light propagation](RUST-LIGHT-PROPAGATION.md).
-The bridge lives beside Java chunk storage to borrow its package-private data.
+The bridge lives beside the transitional Java chunk API. Ordinary canonical
+sections export words and state IDs directly from their
+[Rust live owner](../chunk/RUST-LIVE-SECTIONS.md) into reusable native scratch.
+Compatibility storage still uses the Java palette accessors.
 
 ## Constraints when changing this code
 
@@ -34,10 +37,16 @@ The bridge lives beside Java chunk storage to borrow its package-private data.
   additions and invalid packed IDs retain the original compatibility path.
   Fallback precedes publication, preserving exceptions and partial writes.
 
-The palette snapshot accessors shared with heightmap priming are named
-`dataForNativeScan()` and `registryForNativeScan()`. Keep them package-private.
+Keep owner access and compatibility accessors (`dataForNativeScan()` and
+`registryForNativeScan()`) package-private. A native container's
+`dataForNativeScan()` result is a temporary projection, not mutable live storage.
 
 ## Verify a change
+
+For current ownership, use the Gradle checks in the
+[live-section guide](../chunk/RUST-LIVE-SECTIONS.md#verification), including
+`--tests '*NativeSkyLight*'`. The following pinned-source drivers describe the
+earlier helper milestone and need integration updates for the new owner.
 
 ```sh
 python3 DevUtils/tests/lighting/VerifyRustSkyLightSources.py --parity-only

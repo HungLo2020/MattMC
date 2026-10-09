@@ -45,6 +45,11 @@ public final class NativeBlockSectionSnapshot {
         }
     }
 
+    static NativeBlockSectionSnapshot adopt(MemorySegment owner, Arena arena) {
+        if (owner.address() == 0) throw new IllegalStateException("Missing native section capture");
+        return new NativeBlockSectionSnapshot(owner, arena);
+    }
+
     private static void release(MemorySegment owner) {
         try { RELEASE.invokeExact(owner); }
         catch (Throwable failure) { throw new IllegalStateException("Cannot release native block capture", failure); }
@@ -57,6 +62,8 @@ public final class NativeBlockSectionSnapshot {
     // The caller uses the same exclusion rules as PalettedContainer.copy(). Only immutable data escapes.
     static @Nullable NativeBlockSectionSnapshot capture(PalettedContainer<BlockState> source, Arena lifetime) {
         if (source.getClass() != PalettedContainer.class) return null;
+        var live = source.nativeLiveBlocks();
+        if (live != null) return live.snapshot(lifetime);
         var strategy = source.strategyForNativeSnapshot();
         if (strategy.getClass() != BLOCK_STRATEGY || strategy.globalMap() != Block.BLOCK_STATE_REGISTRY) return null;
         var data = source.dataForNativeScan();

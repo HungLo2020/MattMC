@@ -3,9 +3,11 @@
 `Heightmap.primeHeightmaps()` reconstructs column heights through
 `levelgen/heightmap/`. The Rust scanner consumes existing packed sections and
 updates packed heightmaps, stopping once each requested column/type is resolved.
-`NativeHeightmap` lives beside chunk storage in Java so its borrowed palette and
-storage access can remain package-private. Incremental `Heightmap.update()` is
-unchanged.
+`NativeHeightmap` lives beside the transitional Java chunk API. Ordinary
+canonical sections export their coherent words and state IDs from the
+[Rust live owner](../../chunk/RUST-LIVE-SECTIONS.md) into reusable native scratch;
+compatibility sections retain package-private palette access. Incremental
+`Heightmap.update()` is unchanged.
 
 ## Compatibility and ownership
 
@@ -20,10 +22,11 @@ unchanged.
 - Section traversal proceeds downward, with original X/Z order inside sections.
   Empty sections use the same AIR shortcut as normal chunk reads. Java publishes
   the native scratch results only after successful evaluation.
-- One ordinary FFM call handles each needed nonempty section. Input words are
-  copied into thread-owned native memory; Rust allocates nothing and retains no
-  pointers. Calls follow existing chunk ownership rules: sections must not be
-  concurrently mutated while priming.
+- One scanner call handles each needed nonempty section. A native live section
+  first makes a separate coherent export call. Its words/IDs never require a
+  Java palette or word-array projection. The scanner allocates nothing and
+  retains no pointers. Calls follow existing chunk ownership rules: sections
+  must not be concurrently mutated while priming.
 - Standard `ProtoChunk` and non-debug `LevelChunk` readers use Rust. Custom
   readers, sections, palettes, storages, state subclasses and non-`EnumSet`
   selections retain the compatibility path. Unsupported dimensions do too.
@@ -32,6 +35,11 @@ unchanged.
   global-palette snapshots.
 
 ## Verify a change
+
+For current ownership, use the Gradle checks in the
+[live-section guide](../../chunk/RUST-LIVE-SECTIONS.md#verification), including
+`--tests '*NativeHeightmap*'`. The following pinned-source drivers describe the
+earlier helper milestone and need integration updates for the new owner.
 
 ```sh
 python3 DevUtils/tests/worldgen/VerifyRustHeightmap.py --parity-only

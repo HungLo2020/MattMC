@@ -15,3 +15,6 @@
 
 - [Rust loaded-section snapshots](RUST-SECTION-SNAPSHOTS.md): immutable native
   rebuild state, Java compatibility views, bulk halo reads and lifetime rules.
+
+- [Rust live block sections](RUST-LIVE-SECTIONS.md): authoritative packed storage,
+  palette growth, CPU views, bulk consumers and remaining compatibility work.

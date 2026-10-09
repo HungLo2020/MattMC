@@ -124,9 +124,7 @@ class NativeHeightmapTest {
 
     @Test void corruptPackedIdPreservesOriginalFailureAndPartialWrites() throws Exception {
         var source = HeightmapFixtures.chunk("solid",-64,32,0);
-        var field = PalettedContainer.class.getDeclaredField("data");field.setAccessible(true);
-        var data = (PalettedContainer.Data<?>)field.get(source.getSection(1).getStates());
-        long[] words = data.storage().getRaw();words[words.length-1] |= 15L << 60;
+        long[] words = net.minecraft.world.level.chunk.SectionFingerprint.rawWords(source.getSection(1).getStates());words[words.length-1] |= 15L << 60;
         var a = HeightmapFixtures.withSections(source.getSections(),-64,32);
         var b = HeightmapFixtures.withSections(source.getSections(),-64,32);
         var expected = assertThrows(RuntimeException.class,()->JavaHeightmapPrimer.primeHeightmaps(a,types(63)));

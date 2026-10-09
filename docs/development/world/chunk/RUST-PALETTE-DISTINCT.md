@@ -2,7 +2,10 @@
 
 `PalettedContainer.getAll()` scans standard nonzero-width biome (64-entry) and
 block (4096-entry) storage in Rust. World generation uses this caller to gather
-biomes for decoration. Java retains palette objects and consumer calls.
+biomes for decoration. Biomes retain Java palette objects and consumer calls.
+Canonical block storage now has a [Rust live owner](RUST-LIVE-SECTIONS.md);
+this enumeration consumer currently creates a temporary Java compatibility
+palette/word projection. Direct owner enumeration remains migration work.
 
 The kernel lives in
 [`palette/distinct/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette/distinct).
@@ -45,6 +48,11 @@ cannot introduce another ID, so stopping early preserves the result. Java then
 uses the same captured palette and invokes the same callbacks in that order.
 
 ## Verify
+
+Current container ownership is covered by the Gradle checks in the
+[live-section guide](RUST-LIVE-SECTIONS.md#verification). The pinned-source
+commands below describe the earlier helper milestone; their integration audits
+need updates for the new owner.
 
 ```sh
 python3 DevUtils/tests/chunk/VerifyRustPaletteDistinct.py --parity-only

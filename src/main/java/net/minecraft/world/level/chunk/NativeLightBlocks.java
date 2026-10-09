@@ -99,6 +99,8 @@ public final class NativeLightBlocks {
         if (section.hasOnlyAir()) return uniform(buffer, id(Blocks.AIR.defaultBlockState()));
         var container = section.getStates();
         if (container.getClass() != PalettedContainer.class) return -2;
+        var live = container.nativeLiveBlocks();
+        if (live != null) return live.light(buffer);
         var data = container.dataForNativeScan();
         var storage = data.storage();
         var palette = data.palette();

@@ -106,9 +106,7 @@ class NativeSkyLightSourcesTest {
     }
     @Test void corruptedIdsAndCustomReadersKeepOriginalBehavior() throws Exception {
         var chunk=SkyLightSourcesFixtures.chunk("solid",-64,32,1);
-        var field=PalettedContainer.class.getDeclaredField("data");field.setAccessible(true);
-        var data=(PalettedContainer.Data<?>)field.get(chunk.getSection(1).getStates());
-        var words=data.storage().getRaw();words[words.length-1]|=15L<<60;
+        var words=net.minecraft.world.level.chunk.SectionFingerprint.rawWords(chunk.getSection(1).getStates());words[words.length-1]|=15L<<60;
         var a=new ChunkSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
         var expected=assertThrows(RuntimeException.class,()->JavaSkyLightSources.fill(a,chunk));
         var actual=assertThrows(RuntimeException.class,()->b.fillFrom(chunk));

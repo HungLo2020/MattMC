@@ -1,5 +1,12 @@
 # Rust global block-palette loading
 
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+
 `PalettedContainer.unpack()` uses Rust to repack a saved block section's
 palette IDs into global in-memory IDs. This applies to standard block palettes
 with 257–65,536 saved entries (9–16 bits). Small palettes already load by wrapping

@@ -28,12 +28,14 @@ public final class NativeHeightmap {
     private static final class Scratch {
         final MemorySegment frame = Arena.ofAuto().allocate(288 + 6 * 256 * 8, 8);
         final MemorySegment words = Arena.ofAuto().allocate(2048 * 8, 8);
-        final MemorySegment ids = Arena.ofAuto().allocate(256 * 4, 4);
+        final MemorySegment ids = Arena.ofAuto().allocate(257 * 4, 4);
+        final MemorySegment exportHeader = Arena.ofAuto().allocate(16, 4);
         final Heightmap[] maps = new Heightmap[6];
     }
 
     private static boolean supported(PalettedContainer<BlockState> container) {
         if (container.getClass() != PalettedContainer.class) return false;
+        if (container.nativeLiveBlocks() != null) return true;
         var data = container.dataForNativeScan();
         var storage = data.storage();
         if (storage.getClass() != SimpleBitStorage.class && storage.getClass() != ZeroBitStorage.class) return false;
@@ -96,28 +98,36 @@ public final class NativeHeightmap {
             var section = sections[sectionIndex];
             if (section.hasOnlyAir()) continue; // Exactly the original chunk read shortcut.
             if (!supported(section.getStates())) return false;
-            var data = section.getStates().dataForNativeScan();
-            var storage = data.storage();
-            var palette = data.palette();
-            int count = palette.getSize();
-            // Global palette ids are state ids; local entries are mapped to them.
-            var ids = MemorySegment.NULL;
-            if (palette.getClass() != GlobalPalette.class) {
-                ids = scratch.ids;
-                for (int i = 0; i < count; i++) {
-                    int id = Block.BLOCK_STATE_REGISTRY.getId(palette.valueFor(i));
-                    if (id < 0) return false;
-                    ids.setAtIndex(ValueLayout.JAVA_INT, i, id);
+            var live = section.getStates().nativeLiveBlocks();
+            int count, length, bits;
+            MemorySegment ids;
+            if (live != null) {
+                length = live.export(scratch.words, scratch.ids, scratch.exportHeader);
+                bits = scratch.exportHeader.getAtIndex(ValueLayout.JAVA_INT, 0);
+                boolean global = scratch.exportHeader.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
+                count = global ? Block.BLOCK_STATE_REGISTRY.size() : scratch.exportHeader.getAtIndex(ValueLayout.JAVA_INT, 3);
+                ids = global ? MemorySegment.NULL : scratch.ids;
+            } else {
+                var data = section.getStates().dataForNativeScan();
+                var storage = data.storage(); var palette = data.palette();
+                count = palette.getSize(); ids = MemorySegment.NULL;
+                if (palette.getClass() != GlobalPalette.class) {
+                    ids = scratch.ids;
+                    for (int i = 0; i < count; i++) {
+                        int id = Block.BLOCK_STATE_REGISTRY.getId(palette.valueFor(i));
+                        if (id < 0) return false;
+                        ids.setAtIndex(ValueLayout.JAVA_INT, i, id);
+                    }
                 }
+                var raw = storage.getRaw(); length = raw.length; bits = storage.getBits();
+                MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, length * 8L);
             }
-            var raw = storage.getRaw();
-            MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, raw.length * 8L);
-            frame.setAtIndex(ValueLayout.JAVA_INT, 0, storage.getBits());
+            frame.setAtIndex(ValueLayout.JAVA_INT, 0, bits);
             frame.setAtIndex(ValueLayout.JAVA_INT, 2, count);
             frame.setAtIndex(ValueLayout.JAVA_INT, 4, minY + sectionIndex * 16);
             int remaining;
             try {
-                remaining = (int)SECTION.invokeExact(scratch.words, raw.length, ids, count, frame, (int)frame.byteSize());
+                remaining = (int)SECTION.invokeExact(scratch.words, length, ids, count, frame, (int)frame.byteSize());
             } catch (RuntimeException | Error e) { throw e; }
             catch (Throwable e) { throw new IllegalStateException("Native heightmap priming failed", e); }
             // Malformed packed IDs and custom states take the original path, preserving

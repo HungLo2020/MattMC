@@ -457,4 +457,4 @@ for construction, sealing, lifetime and provider compatibility.
 Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
 Rust fills the state-ID halo directly; Java retains contextual light and model
 admission. Unsupported/debug containers retain their original CPU compatibility
-path. This does not transfer live chunk mutation or GPU ownership to Java.
+path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.

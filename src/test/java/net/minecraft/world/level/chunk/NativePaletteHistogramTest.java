@@ -398,7 +398,8 @@ class NativePaletteHistogramTest {
         var source = PalettePackingFixtures.states(2, 0, "cycle");
         var section = new LevelChunkSection(source, null);
         long before = rawCounts(section);
-        source.dataForNativeScan().storage().getRaw()[0] |= 15;
+        // Deliberately leave the native owner before injecting an invalid Java word.
+        source.dataForCompatibilityMutation().storage().getRaw()[0] |= 15;
         var a = new ArrayList<Occurrence>();
         var b = new ArrayList<Occurrence>();
         var first =

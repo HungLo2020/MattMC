@@ -7,18 +7,17 @@ a Java palette and expand it into 4,096 Java object references per slice.
 Rust also builds the mesher's 18³ state-ID neighbourhood in one bulk call.
 Java still computes contextual light and admits distinct states to model metadata.
 
-This migrates **snapshot ownership and its consumers**, not authoritative loaded
-chunk mutation. Ordinary world reads/writes, scheduling, biome/light snapshots,
-world orchestration and remaining gameplay callbacks still use Java. The native
-world-generation stage owner is a separate lifecycle. Move live storage and hot
-consumers together next; avoid replacing local block reads with individual FFI
-calls.
+Snapshots are immutable rebuild state. [Live block sections](RUST-LIVE-SECTIONS.md)
+now own ordinary canonical mutation separately and produce captures directly in
+Rust. Compatibility containers still copy packed words and palette identities at
+capture. Scheduling, biome/light snapshots, chunk orchestration and remaining
+gameplay callbacks use Java; world-generation stage owners remain separate.
 
 ## Working on the path
 
 - [`NativeBlockSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeBlockSectionSnapshot.java)
-  accepts only standard canonical block containers, copies packed words and
-  palette identities once, and exposes a read-only CPU view of native states.
+  accepts standard canonical block containers, captures native live owners
+  directly, and exposes a read-only CPU view of immutable native states.
 - [`chunk/snapshot/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/snapshot)
   owns decoding, immutable storage and neighbourhood reads, without rendering
   dependencies. Every capture owns 8 KiB; inputs and Java objects are not retained.

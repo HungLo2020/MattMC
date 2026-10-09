@@ -267,6 +267,13 @@ public class SimpleBitStorage implements BitStorage, BitStorageExtension {
 		}
 	}
 
+	/** Multipliers for a native CPU view using the identical packed layout. */
+	public static int[] nativeCellParameters(int bits) {
+		Validate.inclusiveBetween(1L, 32L, bits);
+		int start = 3 * (64 / bits - 1);
+		return java.util.Arrays.copyOfRange(MAGIC, start, start + 3);
+	}
+
 	private int cellIndex(int i) {
 		long l = Integer.toUnsignedLong(this.divideMul);
 		long m = Integer.toUnsignedLong(this.divideAdd);

@@ -1,6 +1,6 @@
 pub(super) const DENSE: usize = 65536;
 pub(super) const TABLE: usize = 8192;
-pub(super) const WORK: usize = DENSE + 2 * TABLE;
+pub(crate) const WORK: usize = DENSE + 2 * TABLE;
 
 fn insert(keys: &mut [u32], id: u32) {
     let hash = id.wrapping_mul(0x9e3779b9);
@@ -14,7 +14,7 @@ fn insert(keys: &mut [u32], id: u32) {
 
 /// The dense prefix starts zero and is restored to zero before returning.
 /// Remaining workspace and output contents need no initialization.
-pub(super) fn scan(words: &[u64], bits: usize, work: &mut [u32], out: &mut [u64]) -> usize {
+pub(crate) fn scan(words: &[u64], bits: usize, work: &mut [u32], out: &mut [u64]) -> usize {
     if bits == 0 {
         out[0] = 4096u64 << 32;
         return 1;
