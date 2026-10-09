@@ -79,6 +79,20 @@ semantic inputs and generation/lifetime checks. Keep game-specific state in the
 renderer or its CPU source, and use VulkanicGAL for all GPU work. This does not
 authorize borrowed Java GPU state, a fallback renderer or another presenter.
 
+Current chunk CPU inputs have separate world owners: [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md)
+own canonical storage/mutation, [immutable rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
+provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
+share resolver lattice samples within a capture. Java retains contextual light,
+biome blending, model admission and worker dispatch. Canonical
+[generation-stage transfers](../world/levelgen/RUST-STAGE-HANDOFF.md) copy/adopt
+inside Rust; stage and live formats remain separate. These CPU owners do not
+change GAL resources, completion or presentation.
+
+[Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
+Rust expands ordinary RGBA textures and owns native map material policy. The
+indexed GUI input arrived with ABI 73; the current whole-frame ABI is 74.
+Java retains map revisions, staging and contextual map production.
+
 Selected-source frames carry thousands of mesh instances (mostly off-camera
 shadow candidates), and several passes look each one up every frame. Keep
 those lookups hashed: `mesh_assets` is a `MeshAssetMap` keyed through
@@ -421,10 +435,15 @@ quadtree center, including Java integer arithmetic. Java still owns the quadtree
 walk and frustum decisions. With exact-atlas coverage, `LodRenderer` still
 admits each column through `recordVisibleMaterialColumn`; begin/consume,
 route selection, generic callbacks and render parameters remain separate.
-`consumeVisibleFrame` hands over segments only when the prepared frame is
-enabled and its Rust route is selected, then clears the pending segments and
-frame together. A lifecycle-tagged completion receipt is distinct from this
-handoff. The [ledger fixtures](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/dh_collector/tests.rs)
+`consumeVisibleFrame` publishes a native CPU frame identity/lifecycle/count only
+when the prepared frame is enabled and its Rust route is selected, then clears
+the pending segments and frame together. ABI 74 decode resolves and retains the
+immutable list before queueing; explicit readback/legacy inputs still copy.
+The collector ring holds at most three resolvable snapshots, but decoded `Arc`
+owners can outlive eviction/reset. Changed visible sets allocate new storage;
+this is not a total live-memory cap or an allocation-free frame path. See
+[native DH ownership](RETAINED-SCENE.md#native-dh-visibility-frame-ownership).
+A lifecycle-tagged completion receipt is distinct from this handoff. The [ledger fixtures](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/dh_collector/tests.rs)
 cover selection, ordering and stale generations in the batched walk; they do
 not exercise the actual native flush export's apply-failure/retry path or prove
 visual parity.

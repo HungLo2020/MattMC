@@ -631,8 +631,13 @@ and scoped successful termination repeats are recorded in
 [terrain movement checks](TERRAIN-MOVEMENT-CHECKS.md); they do not change those
 original rejected verdicts. Readiness and the severe performance gap remain open.
 
-Padded snapshot extraction now memoizes state IDs by `BlockState` identity for
-that extraction only. The first occurrence still registers through
+Current canonical [loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
+fill the 18³ state-ID halo in one native call, with Java admitting each distinct
+canonical ID to model metadata and still computing contextual light. The
+compatibility extraction keeps the identity memo below. [Current dispatch](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java#L357-L394).
+
+At the historical Native44 checkpoint, padded snapshot extraction memoized
+state IDs by `BlockState` identity for that extraction only. The first occurrence still registers through
 `NativeStaticBlockModelRegistry`; repeated cells copy the same integer without
 entering its synchronized method again. The memo has at most 5,832 entries and
 is discarded before later snapshots or reloads. Preserve the existing generation
@@ -656,6 +661,12 @@ an overall FPS gain. Both owned recordings finish, the clients are reaped, and
 post-run kernel audits observe no cores. Each side retains three 240-sample
 movies, which still show the cold exposed-seabed band. No exact presentation
 latency improvement, registered Frozen image parity or broad stability is proved.
+
+The following tint-lattice optimization describes the historical Java path.
+Current [color owners](../world/biome/RUST-SECTION-COLORS.md) share built-in
+lattice samples per resolver within a section; every active block still gets
+its origin tint evaluation, and enabled diagnostics can resample. Literal
+providers keep per-block rows inside the native owner.
 
 Tint lattice extraction classifies the existing built-in tint path once per
 block. On the provider path, absence of a registered color provider proves all

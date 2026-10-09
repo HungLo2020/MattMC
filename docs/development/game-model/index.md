@@ -4,7 +4,8 @@
 > [Rust block registry](RUST-BLOCK-REGISTRY.md) and Phase 2's native state
 > graphs, properties, fluids, registered block definitions, physical settings,
 > intrinsic state rules, sound-event/profile/instrument definitions, block
-> sound/offset settings and block-family configuration are current. Java still
+> sound/offset settings, block-family configuration, map palette/shading and
+> state policy are current. Java still
 > supplies block factories, objects/codecs, shapes, blocked light, contextual
 > predicates, sound policy/resource callbacks and world callbacks. Remaining
 > content registries, behavior and
@@ -15,8 +16,10 @@
 
 ## End state
 
-Java is removed completely. Rust owns the block, item and entity
-definitions, and the gameplay that uses them. The Java↔Rust stages in the
+The completed target is one Rust executable supporting client and dedicated-server
+modes, at most one separately loaded Rust library, and no Java. Rust owns the
+block, item and entity definitions, and the gameplay that uses them. The Java↔Rust
+stages in the
 [migration plan](MIGRATION-PLAN.md) are only a way to get there with parity
 checked at every step. Design choices are made for the Rust-only game, not
 for the bridge.
@@ -125,7 +128,8 @@ one set of systems.
 `content/` (registries and definitions) and `gameplay/` (behavior and systems)
 are the owners in the [project architecture](../PROJECT-ARCHITECTURE.md).
 `content/block/` holds the implemented block registry, definitions, offsets and
-shared `family/` configuration; `content/sound/` owns event/profile/instrument
+shared `family/` configuration and state policy; `content/map_color/` owns palette
+identities, RGB and shading arithmetic. `content/sound/` owns event/profile/instrument
 identities, separate from audio playback resources. `content/fluid/` owns
 built-in fluid definitions and intrinsic state facts. `content/property/` owns
 property declarations and immutable schemas. `gameplay/tacz/` already

@@ -44,7 +44,7 @@ python3 DevUtils/tests/content/VerifyStateGraphs.py \
   --java-home /path/to/jdk-25 --output build/state-graph-verification
 ```
 
-The [driver at this review](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/DevUtils/tests/content/VerifyStateGraphs.py)
+The [driver at this review](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/DevUtils/tests/content/VerifyStateGraphs.py)
 requires a new directory under this checkout's `build/`. It builds Current,
 reads Frozen's existing main classpath, compiles one observer against Frozen
 and alternates five fresh JVM pairs by default (`--pairs` permits at least
@@ -65,7 +65,7 @@ by its path, Git HEAD/status and existing classpath. The driver rechecks Frozen'
 Git identity, but does not individually hash its precompiled class bytes.
 Treat that reference-build provenance limit separately from semantic equality.
 
-The [reference observer](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/DevUtils/tests/content/StateGraphReference.java)
+The [reference observer](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/DevUtils/tests/content/StateGraphReference.java)
 uses identical public APIs on Current and Frozen. It hashes every definition,
 property domain, ordered state, default and single-property transition across
 blocks and fluids. Version 2 also emits an independent digest for fluid IDs,
@@ -78,11 +78,16 @@ adds default/cached map-color IDs, copied color/emission functions and canonical
 fluid associations. Version 7 also checks sound-event identities/ranges,
 profile/instrument references and per-state sound/instrument bindings. Its
 offset coverage exhausts finite indices and extreme coordinates; see
-[sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md). Current version 8 adds
-block-set/wood definitions, codec/alias identities and registered family
-parameters; see [block families](BLOCK-FAMILY-TYPES.md). Its eight semantic
-digests and receipt schema are separate from the registry’s format-8
-remaining-fact packet; the matching version numbers describe different contracts.
+[sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md). Version 8 adds block-set/wood
+definitions, codec/alias identities and registered family parameters; see
+[block families](BLOCK-FAMILY-TYPES.md). Current version 10 also includes
+[map palette](MAP-COLORS.md) and [state-policy](STATE-POLICY.md) digests, for ten
+in total. The observer/receipt version, definition schema 5, registry format-9
+remaining-fact packet and rendering ABI 74 are separate contracts.
+
+The policy digest's leaf bit still uses Java `instanceof LeavesBlock` on both
+sides. It does not directly verify Rust's leaf column; `NativeBlockPolicyTest`
+checks the native registry flag against the Frozen fixture separately.
 Other contextual probes use `EmptyBlockGetter` at `BlockPos.ZERO`; they do not cover arbitrary worlds.
 
 The observer's graph count combines block and fluid states; the recorded
@@ -91,11 +96,12 @@ digests cover the inspected semantics and samples, not all contextual
 collision/gameplay, rendering or save-lifecycle behavior. Use repeated
 unprofiled measurements and the
 [full rendering workflow](../rendering/RENDER-VERIFICATION.md) for runtime
-acceptance. This documentation review at `87046367` inspected source only,
+acceptance. This documentation review at `a908f78c` inspected source only,
 without rerunning suites, reading local runtime receipts or reviewing images.
 The author records five v7 pairs for the
 [sound/offset milestone](SOUND-DEFINITIONS.md#editing-and-verification) and
 five v8 pairs for the [family milestone](BLOCK-FAMILY-TYPES.md#editing-and-verification),
-alongside their full-client workflows. Those separate records remain scoped
-evidence; the latest performance result is still **FAIL**, and full gameplay
-and Rust-only application acceptance remain incomplete.
+alongside their full-client workflows. Later v10 map/state-policy results are
+recorded on [their own pages](MAP-COLORS.md#editing-and-verification). Those
+separate records remain scoped evidence; overall performance acceptance still
+fails, and full gameplay and Rust-only application acceptance remain incomplete.

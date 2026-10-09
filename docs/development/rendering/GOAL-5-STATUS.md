@@ -1,20 +1,23 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422):
-native sound, block offsets and block-family configuration now extend the earlier
-content and rendering ownership. The latest author-recorded family workflow
+[`a908f78c`](https://github.com/HungLo2020/MattMC/commit/a908f78cd909200f5f4f4424b124072cef0a17f6):
+map/state policy, native DH visibility frames, section colors, rebuild snapshots,
+live block storage and canonical generation-stage transfers extend the earlier
+ownership. The latest author-recorded stage-handoff workflow
 **fails overall performance acceptance** despite passing tests, lifecycle cases
-and settled coast comparisons. Vanilla+DH records a larger FPS and p99 gap that
-needs investigation; no isolated family regression is established. See the
-[current measured workload](#october-8-native-block-families-summary).
+and settled coast comparisons. Vanilla and vanilla+DH miss FPS and p99 floors;
+no isolated transfer regression or speedup is established. See the
+[current measured workload](#october-9-native-generation-handoff-summary).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
-payload publication, and GPU execution/resources. Java still supplies
+payload publication and retained visibility frames, and GPU execution/resources.
+Separate native world owners now supply canonical live/rebuild state and section
+color fields. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
 asset/reload bookkeeping, DH quadtree/frustum candidates, frame parameters and
 material-provenance diagnostics. Content definitions now have separate native
@@ -26,6 +29,11 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [whole-project migration plan](../RUST-MIGRATION.md),
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
+
+The current [generation-handoff source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6086170999)
+and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6086142300)
+retain those open acceptance limits. Earlier checkpoints below preserve their
+original source and workload scopes.
 
 The October 9 [content ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6073238616)
 and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6073232463)
@@ -74,6 +82,22 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 9 native frame and world-input checkpoint
+
+The `87046367` → `a908f78c` interval adds bounded ownership slices:
+
+- [Map colors/images](../game-model/MAP-COLORS.md) and [state policy](../game-model/STATE-POLICY.md) now originate in Rust. ABI 73 introduced indexed GUI source format 3; the current ABI is 74. Java still supplies contextual map/world behavior and compatibility objects
+- [DH visibility frames](RETAINED-SCENE.md#native-dh-visibility-frame-ownership) remain immutable native CPU lists through caller-side queued decode. Java passes identity/lifecycle/counts and still walks the quadtree; three resolvable ring slots do not cap all live decoded owners
+- [Section color fields](../world/biome/RUST-SECTION-COLORS.md) share lattice samples per resolver within a section capture. Origin tint calls, Java biome blending/context and literal provider callbacks remain
+- [Rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md) and [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md) own distinct immutable/mutable state. Native bulk state-ID halos replace Java halo decoding; model admission, CPU views, callback compatibility and GC lifetime limits remain
+- [Generation-stage handoff](../world/levelgen/RUST-STAGE-HANDOFF.md) keeps canonical NOISE output and SURFACE/CARVERS capture/install inside Rust. Inputs are isolated copies and outputs become independent live owners; Java retains orchestration, counters and heightmap publication
+
+Source inspection and the committed author reports establish these boundaries.
+This documentation review did not run clients, Java/Rust suites, captures or
+profiles, or inspect the unbundled runtime artifacts. Earlier map, DH, color and
+snapshot evidence retains its own release/hardening window; the later table
+below does not remeasure each change independently.
+
 ### October 8 sound, offset and block-family checkpoint
 
 The `3e1b2a94` → `87046367` interval adds three source boundaries:
@@ -89,7 +113,8 @@ retain test counts, image scope, repeats and receipt paths. This documentation
 review inspected committed source and author records, not the unbundled runtime
 receipts, clients or Java/Rust suites. The map-palette/image-processing work in
 [the pinned working record](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/PROGRESS.md)
-is staged only; it is not another landed runtime milestone.
+was staged only at that historical checkpoint; `84016f21` subsequently lands
+the map/state-policy ownership described above.
 
 `RunDev.py` also gains a Frozen launcher. It skips Frozen's launch-blocking test
 task and uses that checkout's ordinary game directory. It does not select the
@@ -295,6 +320,41 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 9 native generation handoff summary
+
+The [summary at `a908f78c`](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/SUMMARY.md)
+reports release `c7c95f4a` on RTX 3080 Ti: moving-camera ABAB, two runs per side
+and mode, with exactly 6,000 measured frames each. These are author-reported
+results, not measurements made by this documentation review.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median average-FPS change | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- | --- |
+| Vanilla | 1,027.8 / 1,033.3 | 1,101.9 / 1,127.6 | −7.6% | 4.021 / 3.467 |
+| Vanilla + DH | 615.2 / 610.6 | 731.2 / 614.0 | −8.9% | 6.649 / 5.731 |
+| Shaders | 326.9 / 332.2 | 312.4 / 307.6 | +6.3% | 6.223 / 6.820 |
+| Shaders + DH | 244.2 / 249.5 | 220.6 / 221.2 | +11.7% | 7.151 / 9.051 |
+
+**Performance FAIL:** vanilla/DH fail both floors; shader modes pass both in
+this workload. Frozen DH repeats vary substantially. The author reports 2,417
+Rust tests (three ignored), 1,751 full Java tests (two skipped), 26 focused Java
+tests, all seven lifecycle cases, reviewed vanilla/Iris+DH coast pairs and wiki
+2,485 pages/43 indexes passing. All sixteen performance rows are clean; VUIDs,
+exceptions and owned orphans are zero, source/library/user-edit/Frozen integrity
+passes, and 25 generated copies were retired. Receipt:
+`artifacts/graphics-captures/validation/native-stage-handoff-final-20261009/summary.json`.
+The diagnostic Java handoff allocation estimate falls from about 108 to 1–3
+KB/chunk; it includes sampling/observer limits and is not throughput acceptance.
+
+The earlier [map/state summary](https://github.com/HungLo2020/MattMC/blob/84016f210afdf7d5a8c6a61f9440e8f304f6aa74/SUMMARY.md)
+preserves its failed original workflow and separate accepted shader+DH repeat.
+The [DH frame record](RETAINED-SCENE.md#native-dh-visibility-frame-ownership)
+separates the pre-hardening sixteen-row comparison from final-release diagnostic
+profiles. [Color](../world/biome/RUST-SECTION-COLORS.md#work-and-verification),
+[snapshot](../world/chunk/RUST-SECTION-SNAPSHOTS.md#verification) and
+[live-storage](../world/chunk/RUST-LIVE-SECTIONS.md#verification) records retain
+later distinct test/profile windows. None proves a migration-specific FPS gain,
+broad visual/temporal parity, long-run resource bounds or a Rust-only application.
 
 #### October 8 native block families summary
 

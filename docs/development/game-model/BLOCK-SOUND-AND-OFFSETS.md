@@ -22,9 +22,10 @@ subtraction/multiplication, including the exact horizontal limits. Coordinate
 seeding moves to `core/math.rs` for shared use by content, world generation and
 terrain meshing. The x product wraps at 32 bits before widening.
 
-The remaining-fact packet uses format 8: native definitions now supply
-maximum offsets and offset kinds, so Java stops exporting them. Blocked light,
-remaining state flags and light-occlusion faces still await migration.
+The sound/offset milestone introduced remaining-fact format 8, removing
+maximum offsets and offset kinds from Java's export. Current format 9 also
+removes [state-policy flags](STATE-POLICY.md). Java still supplies blocked light,
+motion/solid/custom flags and light-occlusion faces/truth tables.
 
 ## Compatibility and allocation
 
@@ -51,7 +52,7 @@ rules dependent only on declared native properties. Changes to a shared
 configuration affect every selecting block.
 
 Run native content/core tests, `NativeBlockMaterialsTest`, existing meshing
-and chunk-save tests, and current v8 `VerifyStateGraphs.py` (which retains v7
+and chunk-save tests, and current v10 `VerifyStateGraphs.py` (which retains v7
 sound/offset coverage). Its offset check exhausts
 every finite table index through Frozen's real state API and includes extreme
 coordinates. The draft native evaluator matches all 9,250 exact samples from

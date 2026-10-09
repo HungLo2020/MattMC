@@ -17,10 +17,13 @@ content rules, not a checked-in dump of 31,809 state results.
 
 Native consumers read immutable `StateTraits` by `StateId`. The remaining-fact
 packet introduced format 7 to remove emitted light and fluid IDs from Java.
-The [sound/offset follow-up](BLOCK-SOUND-AND-OFFSETS.md) uses format 8 and
-also derives offset kinds and limits natively. Shapes, blocked light and contextual gameplay still await migration.
-Map palette identities are native; palette RGB values/shading remain separate
-work. Render-owned textures, materials and tints are unaffected by these rules.
+The [sound/offset follow-up](BLOCK-SOUND-AND-OFFSETS.md) introduced format 8
+and native offset kinds/limits; the current format 9 additionally derives
+[state-policy flags](STATE-POLICY.md) natively. Java still supplies motion/solid/custom
+flags, faces and blocked light, and retains shapes and contextual gameplay.
+[Map palette RGB and shading arithmetic](MAP-COLORS.md) now have a native owner;
+world-dependent shade selection and saved map data remain Java. These rules do
+not own render textures, materials or contextual tint sampling.
 
 Fluid selection goes through the native fluid owner's semantic lookup. It
 preserves both source/falling variants, including copper grates' falling source

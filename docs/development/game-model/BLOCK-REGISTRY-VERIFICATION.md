@@ -96,24 +96,28 @@ python3 DevUtils/tests/content/VerifyRustBlockRegistry.py --case none  # parity 
 
 The figures above remain the author's historical Phase 1 record. At the
 reviewed source
-[`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422),
+[`a908f78c`](https://github.com/HungLo2020/MattMC/commit/a908f78cd909200f5f4f4424b124072cef0a17f6),
 [registered definitions](BLOCK-DEFINITIONS.md), [physical profiles](BLOCK-PHYSICS.md),
 [intrinsic state rules](BLOCK-INTRINSICS.md), [properties](PROPERTY-DEFINITIONS.md),
 [fluids](FLUID-DEFINITIONS.md), [state graphs](STATE-GRAPHS.md),
-[sound definitions](SOUND-DEFINITIONS.md), [block sounds/offsets](BLOCK-SOUND-AND-OFFSETS.md)
-and [block-family configuration](BLOCK-FAMILY-TYPES.md) have native owners.
-The [format-8 decoder](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/src/main/rust/content/block/export.rs)
+[sound definitions](SOUND-DEFINITIONS.md), [block sounds/offsets](BLOCK-SOUND-AND-OFFSETS.md),
+[block-family configuration](BLOCK-FAMILY-TYPES.md), [map palette/shading](MAP-COLORS.md)
+and [state policy](STATE-POLICY.md) have native owners.
+The [format-9 decoder](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/rust/content/block/export.rs)
 reads native names, layouts/defaults, emission, fluid-state associations and
-offset kinds/limits. It derives air/can-occlude and fluid flags natively, while
-Java still exports face IDs/truth tables, remaining state flags and blocked
-light. Java also retains shapes, contextual predicates, cache initialization
+offset kinds/limits. It derives physical, fluid and state-policy flags natively,
+while Java still exports face IDs/truth tables, motion/solid/custom flags and
+blocked light. Java also retains shapes, contextual predicates, cache initialization
 and world callbacks. Synthetic/unregistered compatibility objects do not
 provide fallback for missing registered definitions.
 
-The current [v8 observer](STATE-GRAPHS.md#verification) retains v7 sound/offset
-coverage and adds family definitions, aliases/codecs and registered bindings.
+The current [v10 observer](STATE-GRAPHS.md#verification) retains v7 sound/offset
+and v8 family coverage and adds map-palette and state-policy digests, for ten
+total. Its leaf digest uses Java class identity; the native leaf flag is checked
+separately against the Frozen fixture. Observer version 10, definition schema 5,
+registry packet 9 and rendering ABI 74 are distinct contracts.
 Later milestone results belong to their linked pages, not the Phase 1 totals
-above. The author's [family summary](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/SUMMARY.md)
+above. The author's historical [family summary](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/SUMMARY.md)
 reports 1,711 Java/2,366 Rust passes (two skips/three ignores), seven lifecycle
 cases, two reviewed static image pairs and eight matching content digests.
 It also explicitly records **Performance FAIL**: vanilla and vanilla+DH fail

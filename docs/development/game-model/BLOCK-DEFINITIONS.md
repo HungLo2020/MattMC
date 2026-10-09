@@ -12,10 +12,10 @@
 contains the ordered catalog and 131 shared property/default sets. Definitions
 also select immutable [physical settings](BLOCK-PHYSICS.md) and
 [intrinsic state rules](BLOCK-INTRINSICS.md), plus
-[sound/instrument/offset settings](BLOCK-SOUND-AND-OFFSETS.md) and typed
-[family parameters](BLOCK-FAMILY-TYPES.md). Their state templates
-use typed [native properties](PROPERTY-DEFINITIONS.md) and serialized default
-values; Rust derives all 31,809 contiguous state IDs. Keep existing catalog
+[sound/instrument/offset settings](BLOCK-SOUND-AND-OFFSETS.md), typed
+[family parameters](BLOCK-FAMILY-TYPES.md) and [state policy](STATE-POLICY.md).
+Their state templates use typed [native properties](PROPERTY-DEFINITIONS.md) and
+serialized default values; Rust derives all 31,809 contiguous state IDs. Keep existing catalog
 order and append new entries to preserve IDs.
 
 The registry shares 63 immutable transition graphs, keyed by ordered domain
@@ -39,13 +39,14 @@ graphs. Dynamically constructed graphs still use automatic arenas; see
 [state graph ownership](STATE-GRAPHS.md). Neither path owns rendering resources.
 
 The [block registry](RUST-BLOCK-REGISTRY.md) now imports only remaining state
-facts and face data. Its format 8 packet contains block/state/face counts,
-per-state face IDs/flags, blocked-light values and the face-occlusion truth
-matrix. Offset kinds and limits
-now derive from native definitions. Emitted light and fluid associations derive
-from native intrinsic rules. Names, property schemas, defaults and value indices no longer
-make a native-to-Java-to-native trip. Air and can-occlude flags derive directly
-from native physical definitions; incoming packets must not supply them.
+facts and face data. Its format 9 packet contains block/state/face counts,
+per-state face IDs and motion/solid/custom flags, blocked-light values and the
+face-occlusion truth matrix. Offset kinds and limits derive from native definitions;
+emitted light and fluid associations derive from native intrinsic rules. Names,
+property schemas, defaults and value indices no longer make a native-to-Java-to-native
+trip. Physical, fluid and state-policy flags derive natively; packets must not
+supply the native physical or policy bits. Definition schema 5, registry packet 9
+and rendering ABI 74 are separate contracts.
 
 ## Working on this slice
 
@@ -81,6 +82,8 @@ Version 7 adds all sound content, per-state sound/instrument bindings and
 exhaustive finite offset samples; see [sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md).
 Version 8 adds shared block-set/wood definitions, codec/alias identities and
 every registered family binding; see [block families](BLOCK-FAMILY-TYPES.md).
+The current v10 observer retains that coverage and adds [map palette](MAP-COLORS.md)
+and [state-policy](STATE-POLICY.md) digests, for ten in total.
 Read the [observer scope and integrity limits](STATE-GRAPHS.md#verification)
 before interpreting a passing receipt or its JVM main-thread allocation figures.
 

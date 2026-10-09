@@ -11,7 +11,8 @@ The implementation is in
 [`chunk/live/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/live).
 [`NativeLiveBlockSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java)
 is its transitional CPU bridge. This covers fresh containers, valid saved/network
-imports, generated-section installation and independent copies. Biomes, chunk
+imports, generated-section installation and independent nonzero-width copies.
+Zero-width copies retain the shared single-value behavior described below. Biomes, chunk
 orchestration, scheduling and section block/fluid counters still use Java.
 
 ## Consumers and remaining work
@@ -32,10 +33,14 @@ improvement. A native executable and complete Java removal remain unfinished.
 
 ## Compatibility and lifetime rules
 
-- Accept only the exact standard block strategy, canonical registry, built-in
-  storage/palettes and canonical ordinary block states. Aliases, malformed data,
-  custom callbacks and unsupported widths retain the original owner. Do not
-  normalize imported palettes or probe custom implementations during admission.
+- Admission checks the exact standard block strategy, canonical registry,
+  built-in storage/palette classes and canonical ordinary block states. Alias
+  palettes, malformed data and unsupported widths decline native adoption.
+  Storage class checks precede its size/word reads, but `Configuration` is an
+  interface and its identity is not guarded before `bitsInStorage()` is called.
+  Do not infer a guarantee that all custom callbacks are untouched. Preserve
+  these actual admission boundaries without normalizing imported palettes.
+  [Admission source](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java#L56-L84)
 - Preserve packed padding, palette order, unused entries and requested global
   configuration bits. A resize uses fresh zero padding and first occurrence in
   storage order. Hash palettes append the overflow entry before growing.
@@ -75,7 +80,7 @@ custom callbacks, copies, retained views, GC readers and rebuild/light exports.
 Real gameplay, lifecycle and Frozen comparisons are still required; source tests
 and fixture timing alone do not establish performance acceptance.
 
-The preceding live-owner checkpoint, release `526af413`, passes 2,415 Rust tests (3 ignored), 113 focused Java
+The author reports that the preceding live-owner checkpoint, release `526af413`, passes 2,415 Rust tests (3 ignored), 113 focused Java
 tests and the full Java suite (1,746 passed, 2 skipped). All seven lifecycle cases
 and both reviewed vanilla/Iris+DH coast pairs pass; VUIDs are zero. All 16
 ABAB runs contain exactly 6,000 frames and have clean runtime/cleanup receipts.
@@ -86,7 +91,9 @@ Frozen and vanilla+DH 24.3% below, with worse p99 times. Both shader modes beat
 Frozen on average FPS and p99. These results do not establish an isolated
 storage speedup or identify the cause of the DH gap. Historical receipt:
 `validation/native-live-block-sections-alias-final-20261009/summary.json`.
-`SUMMARY.md` records the newer generation-handoff comparison.
+The [current generation-handoff comparison](../levelgen/RUST-STAGE-HANDOFF.md#verification-and-profiling)
+is newer. This documentation review did not rerun the suites or inspect the
+unbundled runtime receipts.
 
 Earlier diagnostic profiles used release `4a8f5d18`, before final alias hardening:
 `goal5/live-block-sections-flight-profile-20261009/` and

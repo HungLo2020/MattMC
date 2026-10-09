@@ -1,7 +1,9 @@
 # Map colors and image processing
 
-> Implemented. Integrated native, Java and Vulkan regression checks
-> pass for palette/image processing and map materials. Real vanilla and strict
+> Implemented. The author's recorded native, Java and Vulkan regression checks
+> pass for palette/image processing and map materials. This documentation review
+> inspected source only; it did not rerun tests or inspect local receipts/images.
+> Real vanilla and strict
 > shader-final framed-map comparisons pass after ordering, texture-origin and
 > source-writer corrections. Full suites/lifecycle checks pass; vanilla still
 > misses the performance floor. No isolated migration speedup is established.
@@ -24,8 +26,9 @@ and range checks retain their existing contracts.
 ## Map images
 
 Java stages the saved map's **16 KiB indexed colors** as an immutable CPU input,
-instead of expanding them into a 64 KiB Java RGBA array. ABI 73 format 3 carries
-those indices. The GUI frontend admits the expanded resident byte count first,
+instead of expanding them into a 64 KiB Java RGBA array. Image format 3,
+introduced by ABI 73, carries those indices under current rendering ABI 74.
+The GUI frontend admits the expanded resident byte count first,
 then converts once and stores ordinary RGBA8. VulkanicGAL has no map-specific
 texture format or resource policy. Map reset/close removes the staged asset;
 normal native generation replacement retires its GPU resources. Exact staged
@@ -94,8 +97,10 @@ successful proof retired by the normal retention driver.
 Other packs/lighting conditions and held-map source-family/runtime coverage
 remain unfinished.
 
-Saved map data, world scanning, map decorations, dirty tracking and the transitional
-Java CPU asset cache remain separate unfinished owners. This slice does not
+Saved map data, world scanning and world-dependent shade selection, map decorations,
+dirty tracking and the transitional Java CPU asset cache remain separate unfinished
+owners. Native shading arithmetic does not move the world's brightness-choice
+policy. This slice does not
 complete map gameplay, saving or the entire image asset pipeline.
 
 ## Editing and verification

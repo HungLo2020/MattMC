@@ -23,6 +23,7 @@ src/main/rust/
 │   │   ├── definitions/
 │   │   └── family/
 │   ├── fluid/
+│   ├── map_color/
 │   ├── property/
 │   ├── sound/
 │   └── state/
@@ -71,9 +72,13 @@ src/main/rust/
     └── level/
         ├── biome/
         │   ├── climate/
+        │   ├── color_fields/
         │   └── search/
         ├── chunk/
-        │   └── palette/
+        │   ├── live/
+        │   ├── palette/
+        │   ├── snapshot/
+        │   └── stage_transfer.rs
         ├── lighting/
         │   ├── priority_queue/
         │   ├── propagation/
@@ -135,6 +140,16 @@ slices and evaluates shared point programs for
 fills instantiate their programs without per-chunk Java graph wrapping. See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.
+
+Canonical [live block sections](world/chunk/RUST-LIVE-SECTIONS.md) in
+`world/level/chunk/live/` own packed storage and palette mutation; Java reads
+scoped CPU views. [Immutable captures and bulk state-ID halos](world/chunk/RUST-SECTION-SNAPSHOTS.md)
+live in `chunk/snapshot/`, and `chunk/stage_transfer.rs` supports native
+[generation capture/adoption](world/levelgen/RUST-STAGE-HANDOFF.md).
+[Shared section color fields](world/biome/RUST-SECTION-COLORS.md) live in
+`world/level/biome/color_fields/`. Java still supplies biome/custom color samples,
+contextual light, model admission and entity callbacks, and orchestrates chunks
+and generation stages. These owners do not complete the world migration.
 
 Packed chunk storage also uses [palette histograms](world/chunk/RUST-PALETTE-HISTOGRAM.md)
 under `world/level/chunk/palette/histogram/` for ordered counting and section
@@ -219,7 +234,7 @@ property declarations and ordered domains. The block registry shares immutable
 schemas directly; Java enum/property objects are temporary compatibility views.
 The 11 declarations for integrated content retain their distinct identities.
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/predicate functions and contextual gameplay, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/contextual-predicate functions, motion/solid/custom flags and contextual gameplay, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
 
 ### `render/`
 
@@ -270,8 +285,8 @@ Persistent encodings and region storage belong here. The
 [chunk-section serializer](world/chunk/RUST-CHUNK-SECTIONS.md) uses `storage/chunk/`
 to encode eligible section palettes, packed values, light layers and section Y
 straight into NBT tape. Rust derives the block-state save vocabulary and
-palette storage bits from the shared block registry. Java still snapshots live
-chunks, supplies per-chunk biome names, builds the remaining root compound
+palette storage bits from the shared block registry. Java still orchestrates chunk
+capture, supplies per-chunk biome names, builds the remaining root compound
 and owns save scheduling. Pending writes retain tape and create Java tags lazily when read;
 unsupported section inputs keep the Java encoding route. Eligible current-version
 loads also decode section tape natively; Java reconstructs containers and the

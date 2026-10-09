@@ -17,10 +17,11 @@ Native consumers read `definitions::registry().definition(block_id).physics`.
 The data has process lifetime, no world references and no rendering resources.
 Hot consumers can read their existing compact state columns; air and occlusion
 flags now derive from native physical definitions when those columns freeze.
-Java's remaining-fact packet rejects attempts to supply either flag. Other
-state flags still pass through Java's per-state evaluation, including the
-random-tick result; owning a physical setting does not migrate every derived
-or overridden state query.
+Java's format-9 remaining-fact packet rejects attempts to supply either flag.
+[Native state policy](STATE-POLICY.md) now also derives random-tick eligibility,
+light-shape use and leaf/entity markers. Java still supplies motion/solid/custom
+flags, blocked light and light-occlusion faces; physical settings alone do not
+migrate every derived or contextual state query.
 
 `NativeBlockDefinitions` borrows bounded metadata buffers and creates one
 temporary Java view per configuration. `BlockBehaviour` applies the native

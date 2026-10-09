@@ -1,8 +1,9 @@
 # Block states (proposal)
 
 > Partly implemented: native definitions own registered block names, state
-> layouts/defaults, physical settings and intrinsic map-color/emission/fluid
-> rules. Native properties and state graphs also back Java's compatibility views.
+> layouts/defaults, physical settings, intrinsic map-color/emission/fluid rules,
+> sound/offset settings, family parameters and state policy. Native properties
+> and state graphs also back Java's compatibility views.
 > The typed state-access API below,
 > complete per-state table and general shape interning remain proposals. See
 > [the current registry](RUST-BLOCK-REGISTRY.md) and [game model index](index.md).
@@ -82,8 +83,10 @@ bits directly from them. [Intrinsic state rules](BLOCK-INTRINSICS.md) evaluate
 map-color identities, emission and canonical fluid associations once into
 native `StateTraits`. [State sound rules](BLOCK-SOUND-AND-OFFSETS.md) also
 produce native columns, and native offset tables support Java views.
-Java still evaluates blocked light, shapes and contextual predicates. Its
-format-8 export includes blocked light, face IDs and remaining state flags.
+[Native state policy](STATE-POLICY.md) supplies random-tick/light-shape eligibility
+and leaf/entity markers. Java still evaluates blocked light, shapes and contextual
+predicates. Its format-9 export includes blocked light, face IDs/truth tables and
+motion/solid/custom flags.
 Dynamic-shape and world-dependent queries still use Java behavior. A native
 lookup column does not imply that every function producing or consuming it
 has migrated.

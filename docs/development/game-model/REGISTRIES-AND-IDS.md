@@ -1,7 +1,8 @@
 # Registries and IDs (proposal)
 
 > Partly implemented: block/fluid registries, native properties, state graphs
-> and registered block definitions, physical settings and intrinsic rules exist.
+> and registered block definitions, physical settings, intrinsic rules,
+> sound/offset settings, family configuration, map palettes and state policy exist.
 > The general registry container and remaining content registries below are proposals.
 > See the [game model index](index.md).
 
@@ -13,9 +14,11 @@ and block state with typed IDs (`BlockId`, `StateId(u16)`, `PropertyId`,
 own names, order, domains and defaults; [physical settings](BLOCK-PHYSICS.md)
 also originate in Rust. [Intrinsic state rules](BLOCK-INTRINSICS.md) own
 map colors, emission and fluid associations. [Sound and offset definitions](BLOCK-SOUND-AND-OFFSETS.md)
-also originate in Rust, alongside the [sound-event registry](SOUND-DEFINITIONS.md).
-Java exports remaining state facts
-once, lazily on the first `NativeBlockRegistry.ready()` call after its
+also originate in Rust, alongside the [sound-event registry](SOUND-DEFINITIONS.md),
+[family configuration](BLOCK-FAMILY-TYPES.md), [map palette/shading](MAP-COLORS.md)
+and [state policy](STATE-POLICY.md). Java exports remaining motion/solid/custom
+flags, blocked light and face IDs/truth tables in format 9 once, lazily on the
+first `NativeBlockRegistry.ready()` call after its
 compatibility registries are frozen. Lighting, heightmaps, worldgen and chunk saving
 derive their tables from it; terrain meshing combines its facts with
 render-owned columns when registering each meshing state.

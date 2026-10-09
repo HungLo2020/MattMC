@@ -1,29 +1,37 @@
 # Rust-owned section color snapshots
 
-Chunk rebuilding shares built-in biome color inputs by world coordinate. Rust
-plans the coordinates, owns the completed fields, and supplies vertex samples
-to the direct terrain mesher. Java still evaluates biome resolvers against its
-immutable `LevelSlice`; loaded-world storage and biome blending are not yet
-fully native.
+Chunk rebuilding shares built-in biome lattice samples by resolver and world
+coordinate within each section capture. Rust plans those coordinates, owns the
+completed fields, and supplies vertex samples to the direct terrain mesher.
+Java still evaluates resolvers, biome blending and contextual inputs against its
+immutable `LevelSlice`. Canonical block storage now has a separate
+[Rust live owner](../chunk/RUST-LIVE-SECTIONS.md); this color owner is not a
+cross-section cache or a native biome-blending implementation.
 
 ## Ownership and compatibility
 
 - A section needs coordinates `-1..17` in each axis for the existing `4×4×4`
   per-block domain. Rust requests only coordinates used by active blocks,
-  separately for grass, foliage and dry foliage. Adjacent blocks share samples.
+  separately for grass, foliage and dry foliage. Adjacent blocks in the same
+  capture share lattice samples for the same resolver. The existing origin
+  `blockTint` evaluation still runs for every active block, and enabled tint
+  diagnostics may resample a lattice.
 - Other provider paths, including remaining built-in callbacks and custom
   providers, retain their original per-block, Y/Z/X callback order and
   all 64 samples, including providers returning `-1` at the origin. Their
   temporary literal rows are captured separately; they are never deduplicated.
 - The compact meshing header is version **4**, 136 bytes. Its final `u64` is a
-  CPU color-owner identity. A zero identity uses the existing literal tensor
-  for replay/ABI fixtures. This does not change whole-frame render ABI 74.
+  CPU color-owner identity. Production owners contain both shared fields and
+  any copied literal-provider rows. A zero identity uses the old literal tensor
+  only for replay/ABI fixtures. This does not change whole-frame render ABI 74.
 - Construction is exclusive. Java fills native requested colors, then seals
   the owner before rendering. Decode validates completion, origin and active
   block order and holds an `Arc` until scanning finishes. Closing a lease
   rejects future decode but cannot invalidate an already decoded owner.
-- At most 128 construction/ready leases exist. Requests are bounded by three
-  `19³` fields; literal rows by 4096 blocks. Identities are never reused.
+- At most 128 construction/ready leases remain in the registry. Decoded `Arc`
+  owners can outlive lease removal, so this is not a cap on all live color memory.
+  Each request is bounded by three `19³` fields and 4096 literal rows. Identities
+  are never reused.
   Model generation is checked both before capture and again immediately before
   native mesh admission.
 - Frozen's vertex domain and fixed-point interpolation are unchanged. Dry
@@ -39,8 +47,9 @@ those records are not production rendering inputs.
 
 ## Work and verification
 
-Source: [world color fields](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/biome/color_fields),
-[Java semantic capture](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionColors.java),
+Source: [world color fields](https://github.com/HungLo2020/MattMC/tree/c9e2a71d415a7f6022e772ff0b8a2e01dd51d916/src/main/rust/world/level/biome/color_fields),
+[Java semantic capture](https://github.com/HungLo2020/MattMC/blob/c9e2a71d415a7f6022e772ff0b8a2e01dd51d916/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionColors.java),
+[origin tint and diagnostic resampling](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java),
 [compact ingestion](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/meshing/section.rs).
 
 ```sh
@@ -56,7 +65,7 @@ snapshot CPU samples in Current (8-second diagnostic interval). Evidence:
 inside actual forward-key intervals; source/library/Frozen identity and
 cleanup checks passed. These samples identify a target, not a proven FPS gain.
 
-**Current verification:** four core checks, 65 meshing checks and the full
+**Author-reported color checkpoint (`c9e2a71d`):** four core checks, 65 meshing checks and the full
 native suite (2402 passed, three ignored) pass. Full Java passes 1732 tests
 (two skips); release build and wiki check (2482 pages/43 indexes) pass.
 `validation/native-world-color-fields-20261009/` passed all seven lifecycle
@@ -72,14 +81,16 @@ a fresh reviewed Iris+DH proof passes (mean RGB 3.746/4.307/3.993, zero VUIDs).
 The Java generation recheck was added after profiling; 77 affected Java checks
 pass again. The final reviewed admission proof passes (mean RGB
 3.736/4.298/3.984, zero VUIDs, exact captured native identity, unchanged sources
-and Frozen, no owned orphans). `SUMMARY.md` records those
-scoped timings; an isolated throughput gain is not established.
+and Frozen, no owned orphans). The [pinned color summary](https://github.com/HungLo2020/MattMC/blob/c9e2a71d415a7f6022e772ff0b8a2e01dd51d916/SUMMARY.md)
+records that checkpoint; the root summary now describes a later workload.
+This documentation review did not rerun these checks or inspect the unbundled
+runtime receipts. An isolated throughput gain is not established.
 
 If capture fails, check provider exceptions, stale/released identities and
 model reload generation first. A failed construction must close its lease;
 never render an unsealed field or silently substitute another world snapshot.
 
-The repeated ordinary-flight profile passes in
+The author reports the repeated ordinary-flight profile passing in
 `goal5/world-color-fields-flight-profile-20261009/` (Current) and
 `goal5/world-color-fields-frozen-profile-v2-20261009/` (Frozen). Both eight-second
 windows lie inside actual forward input; reviewed cameras reached the same

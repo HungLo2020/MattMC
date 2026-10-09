@@ -5,8 +5,8 @@ In the current migration, Java drives the native renderer through a C ABI: the e
 [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java)
 binds by name with FFM downcalls. The Rust side is
 [`render/bridge/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge) (see its README for the file map). It decodes
-and copies what Java sends, calls the GAL or a renderer, and writes a status
-back. It makes no rendering decisions.
+and copies Java inputs or resolves owned native CPU references, calls the GAL
+or a renderer, and writes a status back. It makes no rendering decisions.
 
 This is a current compatibility boundary. The [completed runtime target](../PROJECT-ARCHITECTURE.md) has no Java dependency; [Goal 5 status](GOAL-5-STATUS.md) keeps current ownership and verified progress distinct.
 
@@ -20,7 +20,7 @@ This is a current compatibility boundary. The [completed runtime target](../PROJ
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **74**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
 
@@ -265,13 +265,15 @@ cover it. No runtime growth or exhausted budget was observed by this review.
 
 ### DH collector ledger
 
-[`DhCollectorLedger.java`](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/java/net/vulkanic/world/DhCollectorLedger.java)
+[`DhCollectorLedger.java`](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/src/main/java/net/vulkanic/world/DhCollectorLedger.java)
 binds the standalone `mattmc_dh_collector_*` exports. These calls use the
-collector's Java lock and Rust's ledger mutex; variable-length effects, text,
-segment and payload results live in thread-local native buffers and must be
-taken immediately on the calling thread. They are copied results, not a
-persistent native view. Keep segment staging and `record_built` together; the
-latter takes the staged payload even when recording fails.
+collector's Java lock and Rust's ledger mutex. Effects, text, payload copies and
+legacy/diagnostic segment readback use thread-local native result buffers and
+must be taken immediately on the calling thread. Ordinary ABI 74 consumption
+returns the native identity, lifecycle and scalar counts instead of segment
+records; frame decode retains its immutable `Arc` before queued execution.
+Keep build-segment staging and `record_built` together; the latter takes the
+staged payload even when recording fails.
 
 `mattmc_vulkanic_gal_world_lod_collector_flush` also enters the context registry:
 it selects and applies a ledger-owned update, then returns identities for
@@ -283,7 +285,8 @@ before requesting publication, sorting and admitting segments. Its count is the
 number of pairs, and the result's nine-long header includes a stale-container
 count before the sorted keys. This changed standalone buffer contract requires
 matching Java/native builds; it is separate from the whole-frame ABI version.
-Keys and segment records still cross through Java frame storage. See
+Walk keys still cross the Java boundary; ordinary consumed segment records stay
+in Rust. Explicit diagnostics and legacy inline frames retain copied records. See
 [ledger publication and selection](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 for route gating, protection, bounds and the remaining Java producers.
 
@@ -327,9 +330,9 @@ failure, and result alignment/capacity are checked before execution.
 ## Pipelined frames
 
 Ordinary whole frames use the [queued route](#queued-frames) by default when
-both pipelining and queuing are enabled. Queued submissions decode and copy on
-the calling thread; they do not retain borrowed Java request memory after the
-call. `MATTMC_PIPELINED_FRAMES=0` or
+both pipelining and queuing are enabled. Queued submissions decode/copy Java
+records and resolve native DH owners on the calling thread; they do not retain
+borrowed Java request memory after the call. `MATTMC_PIPELINED_FRAMES=0` or
 `-Dmattmc.rustGal.pipelinedFrames=false` disables both asynchronous routes.
 
 ### Single in-flight fallback
@@ -449,8 +452,9 @@ caller-decode path; they do not require two live Java request arenas today.
 ## Chunk rebuild color ownership
 
 The separate compact meshing header is version4 (136 bytes), with a final CPU
-color-owner identity. Ordinary snapshots use Rust-owned shared world-coordinate
-fields; literal tensors remain for compatibility fixtures. Whole-frame ABI74 is
+color-owner identity. Ordinary snapshots use Rust-owned shared fields and copied
+literal-provider rows; zero-owner literal tensors remain for compatibility
+fixtures. Sharing is per resolver within each section capture. Whole-frame ABI74 is
 unchanged. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
 for construction, sealing, lifetime and provider compatibility.
 

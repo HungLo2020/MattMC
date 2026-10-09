@@ -37,7 +37,10 @@ with import/export entries beside each stage. See
 
 Java still orchestrates chunks, biome inputs, marks and heightmap publication.
 The generation-stage dense representation and live packed representation remain
-separate Rust formats. General save/network enumeration still uses temporary
+separate Rust formats. Input copying and output packing/allocation remain; this
+is native-only capture/adoption, not zero-copy transfer. Counters are published
+by Java separately; a combined storage/counter transaction and whole-chunk
+failure atomicity are not established. General save/network enumeration still uses temporary
 Java compatibility projections; further producer/consumer migration remains work.
 
 ## Verification and profiling
@@ -51,7 +54,7 @@ python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --all-java
 python3 DevUtils/RunWiki.py check
 ```
 
-The focused Java suite currently passes all 26 tests. Handoff cases verify
+The author reports 26 focused Java tests passing at `a908f78c`. Handoff cases verify
 snapshot isolation, stage-release/GC lifetimes, unchanged-owner preservation,
 alias compatibility and every palette growth boundary through global storage.
 A custom NOISE chunk with extra untouched sections verifies that installation
@@ -77,7 +80,7 @@ sparse after samples limit precision. This is a scoped allocation estimate, not 
 or whole-game speedup. Retained receipt:
 `goal5/native-stage-handoff-profile-20261009/allocation-comparison.json`.
 
-Final release `c7c95f4a` passes 2,417 Rust tests (3 ignored), the full Java
+The author reports final release `c7c95f4a` passing 2,417 Rust tests (3 ignored), the full Java
 suite (1,751 passed, 2 skipped), all seven lifecycle cases, reviewed vanilla
 and Iris+DH coast pairs, and the wiki check (2,485 pages/43 indexes). VUIDs,
 exceptions, dependency failures and owned orphan clients are zero. All sixteen
@@ -88,5 +91,7 @@ Whole-renderer performance floors still fail: vanilla averages 7.6% below Frozen
 and vanilla+DH 8.9% below, both with worse p99. Shader modes pass both floors.
 Frozen DH repeats vary substantially; this does not establish an isolated
 transfer speedup or its regression cause. Retained final receipt:
-`validation/native-stage-handoff-final-20261009/summary.json`. See `SUMMARY.md`
-for repeats/p99 and `PROGRESS.md` for subsequent producer/consumer migration.
+`validation/native-stage-handoff-final-20261009/summary.json`. The [pinned summary](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/SUMMARY.md)
+records repeats/p99. This documentation review inspected source and committed
+author reports, not the unbundled receipts, profiles or images, and reran no
+Java/Rust suites or runtime workloads. Broader producer/consumer migration remains open.

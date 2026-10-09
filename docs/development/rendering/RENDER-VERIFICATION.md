@@ -57,11 +57,13 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
-The latest [native family checkpoint](GOAL-5-STATUS.md#october-8-native-block-families-summary)
-reports Java/Rust 1,711/2,366 tests passing, seven lifecycle cases and reviewed
+The latest [generation-handoff checkpoint](GOAL-5-STATUS.md#october-9-native-generation-handoff-summary)
+reports Java/Rust 1,751/2,417 tests passing, seven lifecycle cases and reviewed
 coast pairs, but an overall **performance FAIL**. Vanilla and vanilla+DH miss
-both FPS and p99 floors; the larger DH gap needs investigation. The preceding
-sound/offset workflow has its own [separate record](GOAL-5-STATUS.md#october-8-native-sound-and-offsets-summary).
+both FPS and p99 floors; shader modes pass both in that workload. The preceding
+[family](GOAL-5-STATUS.md#october-8-native-block-families-summary) and
+[sound/offset](GOAL-5-STATUS.md#october-8-native-sound-and-offsets-summary)
+workflows retain their separate historical records.
 Keep author-recorded runtime checks separate from source inspection and focused
 Python tooling verification; this documentation review did not rerun those
 clients or Java/Rust suites or inspect their unbundled runtime artifacts.
@@ -187,6 +189,21 @@ interrupted missing results, and skip combinations. These checks did not run
 Java/Rust suites, clients, live benchmarks or production cleanup. See the
 [integration records](#october-7-integration-batch-checks) for separate historical
 author reports.
+
+### Native frame, map and world-input evidence
+
+Use the [current workload record](GOAL-5-STATUS.md#october-9-native-generation-handoff-summary)
+for final stage-handoff numbers; the focused guides keep earlier evidence scopes:
+
+- [Map checks](../game-model/MAP-COLORS.md) cover indexed conversion, explicit map origins/materials and framed-map crops. The [Java staging test](https://github.com/HungLo2020/MattMC/blob/84016f210afdf7d5a8c6a61f9440e8f304f6aa74/src/test/java/net/vulkanic/gui/NativeMapImagesTest.java) checks GUI staging removal on reset and closes the manager in cleanup; it does not verify all world PNG cache closure. The failed original workflow and fresh shader+DH health repeat remain distinct author reports
+- [DH frame ownership](RETAINED-SCENE.md#native-dh-visibility-frame-ownership) checks exact identity/lifecycle/count/decision rejection and immutable-owner survival. The ledger's queued-owner fixture does not execute the actual queue. The full sixteen-row ABAB comparison predates native late-input hardening; final-release Iris+DH and 60,000-frame diagnostic profiles have separate scope
+- [Color fields](../world/biome/RUST-SECTION-COLORS.md#work-and-verification) retain the earlier full-suite/performance window, later native input/lifetime hardening, and final Java generation recheck with affected tests and fresh admission proof. Do not attribute every earlier benchmark to the final hardened source
+- [Rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md#verification), [live storage](../world/chunk/RUST-LIVE-SECTIONS.md#verification) and [stage handoff](../world/levelgen/RUST-STAGE-HANDOFF.md#verification-and-profiling) have separate alias, callback, view-lifetime, halo and transfer tests. Historical palette/worldgen helper drivers pin earlier owners and need integration updates before they can validate this boundary
+
+All results above are author-recorded unless explicitly stated otherwise. This
+review inspected committed source/text, not unbundled receipts, images or
+profiles, and ran no runtime suites. Sampled allocation and CPU stacks identify
+components; they do not establish isolated FPS improvements or long-run bounds.
 
 ### Sound, offset and family evidence
 

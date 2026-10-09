@@ -1,8 +1,8 @@
 # Native sound definitions
 
-> Current source ownership at
-> [`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422).
-> Runtime results below are author-recorded milestone evidence, not independently
+> Native ownership; the
+> [`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422)
+> sound/family checkpoint supplies the author-recorded evidence below, not independently
 > reproduced by this documentation review. The overall performance target remains unmet.
 
 ## Ownership
@@ -49,8 +49,8 @@ profile identity; append new definitions deliberately. Keep content independent
 of audio resources and render materials.
 
 Run native content tests, `NativeSoundDefinitionsTest`, the block/state/meshing
-checks and the current v8 Frozen observer described in [block definitions](BLOCK-DEFINITIONS.md).
-Version 8 retains the sound/offset coverage introduced by v7.
+checks and the current v10 Frozen observer described in [block definitions](BLOCK-DEFINITIONS.md).
+Version 10 retains the sound/offset coverage introduced by v7.
 The observer checks every event's identity/range, every profile's float bits and
 event references, and every instrument's name and behavior flags. Follow these
 with real-client verification before publishing a runtime change.

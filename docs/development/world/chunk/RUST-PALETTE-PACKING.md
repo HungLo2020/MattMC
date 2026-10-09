@@ -6,14 +6,20 @@ historical pinned-body drivers reject the new container ownership changes.
 Use the live-section guide's current Gradle checks; the older driver commands
 below describe the historical helper acceptance, not current-owner verification.
 
+Canonical `pack()` callers first export a temporary Java compatibility palette
+and word array from the live owner, then enter the helper below. Ordinary live
+storage and mutation are already Rust-owned; this save path is not a direct
+owner-to-serialized-output transfer.
 
 Standard 4096-entry block containers use Rust for `PalettedContainer.pack()`:
 decoding source words, compacting used IDs in first-use order, and encoding
 padded save words with identity-alias remapping when needed. Java owns the
 container lock, resolves used object identities, and builds the returned
 list/stream. This is save packing; [block palette growth](RUST-PALETTE-RESIZE.md)
-is a separate migration. Ordinary storage reads/writes, network serialization,
-unpacking and 64-entry biome packing remain their existing implementations.
+is a separate consumer. Network serialization and generic enumeration still
+use temporary compatibility data; 64-entry biome packing retains its existing
+implementation. [Global unpacking](RUST-PALETTE-UNPACKING.md) prepares compatible
+data before current canonical containers adopt a live owner.
 Chunk saves no longer call this path: the
 [section serializer](RUST-CHUNK-SECTIONS.md) packs inside its own Rust call. This
 path still serves other `pack()` and codec callers.
@@ -32,8 +38,9 @@ The Java bridge is
   single identity, and every output word. Unused padding must be zero even if
   input padding is nonzero. Packing must not mutate the source.
 - Keep the original `acquire()`/`finally release()` contract. Use thread-owned
-  native scratch and ordinary FFM downcalls; Rust borrows disjoint buffers,
-  allocates nothing and retains no pointers. Never use critical heap access
+  native scratch and ordinary FFM downcalls. The packing helper kernels borrow
+  disjoint buffers, allocate nothing and retain no pointers; that claim excludes
+  live-owner storage and its temporary compatibility export. Never use critical heap access
   for this full-section work.
 - Resolve local identities from used palette entries afresh each call; never
   cache their object references or inspect unused entries. Global labels are

@@ -6,8 +6,14 @@ historical pinned-body drivers reject the new container ownership changes.
 Use the live-section guide's current Gradle checks; the older driver commands
 below describe the historical helper acceptance, not current-owner verification.
 
+Canonical live containers count directly through the native owner under its
+mutex, then Java delivers the ordered records after the native call returns.
+Each callback resolves the current palette again, including after a callback
+mutates the container. The single-entry shortcut remains. The separate
+compatibility helper described below scans copied storage when applicable.
+[Current count dispatch](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java#L481-L520).
 
-The multi-entry branch of `PalettedContainer.count()` uses Rust for standard
+The compatibility multi-entry branch of `PalettedContainer.count()` uses Rust for standard
 4096-entry `SimpleBitStorage` and `ZeroBitStorage`, with source widths 0–16.
 This accelerates section block/fluid counter reconstruction and other count
 consumers. The existing single-entry shortcut, small containers, custom storage
@@ -35,10 +41,12 @@ invokes consumers; `LevelChunkSection` counter/update code is unchanged.
   callback**. Consumers may mutate the container or throw; preserve partial
   callback traces and exception behavior. Reentrant scans use the original
   path until the outer scratch lease closes in `finally`.
-- Keep the original ownership rules: counting adds no lock. Concurrent unchecked
-  mutation is not made safe by the native boundary. Independent readers have
-  separate scratch; ordinary downcalls allow GC during native scans.
-- Rust allocates nothing and retains no pointers. The caller owns disjoint
+- Keep caller exclusion rules. Live-owner scanning takes the owner mutex; it
+  does not hold that mutex across Java callbacks or make the entire callback
+  sequence atomic. The compatibility helper adds no lock. Independent readers
+  have separate scratch; ordinary downcalls allow GC during native scans.
+- The histogram helper kernel allocates nothing and retains no pointers; this
+  does not describe live-owner allocation/lifetime. The caller owns disjoint
   input, workspace and output buffers. The dense workspace starts zero and
   every touched count is reset before returning, before any Java callback.
 - Preserve existing section counter semantics. Recounting adds both a nonair

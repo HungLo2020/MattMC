@@ -4,7 +4,8 @@
 implemented in part; the full scene target remains open (October 2026).**
 ABI 70 carries compact terrain, and ordinary frames now select those compact
 camera layers and shadow candidates in the Rust section graph. Native
-publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups, retain CPU input data.
+publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups
+and ABI 74 visibility frames, retain CPU input data.
 Reduced-color DH geometry also uses shared GPU pages, with the separate
 ownership limits below. Diagnostic and
 other routes retain their documented producer and expansion paths. The phase list separates remaining targets
@@ -165,7 +166,7 @@ Neither change establishes all-route scene ownership or Frozen parity.
 
 ### Native DH visibility frame ownership
 
-Implemented; scoped verification on 2026-10-09. The first release passes all seven
+Implemented at `6324cd1d`; the author reports scoped verification on 2026-10-09. The first release passes all seven
 lifecycle cases and reviewed vanilla/Iris+DH images. Its sixteen clean ABAB
 runs still fail vanilla/DH FPS and p99 floors; neither static ownership changes
 nor earlier profiles establish an isolated throughput gain. After late-input hardening, the final release also passes a fresh reviewed
@@ -179,8 +180,11 @@ resolves that identity directly. It does not repack diagnostic readback into
 render inputs. The coordinator also consumes native layer counts, and completion
 copies capture records only when diagnostics request them.
 
-The collector retains at most three CPU frame snapshots, each bounded to 16,384
-segments. Unchanged ordered sets share storage and reuse their stability hash.
+The collector ring retains at most three resolvable CPU frame snapshots, each
+bounded to 16,384 segments. Decoded `Arc` owners survive ring eviction/reset, so
+three snapshots is not a cap on all live frame memory. Unchanged ordered sets
+share storage and reuse their stability hash; changed sets still allocate a new
+list.
 Decode verifies identity, lifecycle, count and the exact selected decision,
 then retains immutable ownership before queueing. Clearing/resetting the
 collector invalidates unresolved references; already decoded frames keep their
@@ -191,10 +195,17 @@ Compatibility appenders can add work after route selection; unclassified layers
 reject retained handoff without panicking or poisoning the ledger. Counts already
 computed for the immutable set establish this check without another full scan.
 
+The [ledger owner test](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/src/main/rust/render/dh_collector/frames.rs)
+resolves an owner, evicts/resets the ring and clears a derived list. It verifies
+shared CPU lifetime without running the actual queued frame integration. The
+[whole-frame decoder](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/src/main/rust/render/bridge/world/whole_frame.rs)
+provides the separate production identity-resolution path.
+
 Legacy inline inputs and explicit capture readback remain supported. Java still
 walks the DH tree, prepares frame matrices/configuration and owns exact-material
-provenance. This slice does not migrate loaded-world storage or the entire DH
-producer. GPU resources and presentation continue through the existing GAL.
+provenance. This DH slice does not migrate the entire producer. Later
+[live-section ownership](../world/chunk/RUST-LIVE-SECTIONS.md) is a separate
+loaded-world migration. GPU resources and presentation continue through the existing GAL.
 
 The accepted before/after diagnostic profiles are
 `goal5/map-policy-dh-profile-v2-20261008/` and
@@ -215,7 +226,9 @@ late-input rejection was hardened. Final release SHA77998a11 has2,396 Rust
 passes/3 ignores, a fresh reviewed Iris+DH pair in
 `goal5/native-dh-frame-hardened-proof-v2-20261009/`, and the accepted paired
 profiles above. Java1,729 passes/2 skips precede the native-only hardening;
-Java source and ABI are unchanged. Broad parity and long-run memory remain open.
+Java source and ABI are unchanged. These are [pinned author records](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/PROGRESS.md),
+not runtime reruns by this documentation review; unbundled receipts were not
+independently inspected. Broad parity and long-run memory remain open.
 
 ## Phases
 

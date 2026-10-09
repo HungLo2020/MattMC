@@ -11,7 +11,9 @@ Snapshots are immutable rebuild state. [Live block sections](RUST-LIVE-SECTIONS.
 now own ordinary canonical mutation separately and produce captures directly in
 Rust. Compatibility containers still copy packed words and palette identities at
 capture. Scheduling, biome/light snapshots, chunk orchestration and remaining
-gameplay callbacks use Java; world-generation stage owners remain separate.
+gameplay callbacks use Java. World-generation stage owners remain separate Rust
+representations, with [native capture/adoption](../levelgen/RUST-STAGE-HANDOFF.md)
+for canonical NOISE/SURFACE/CARVERS transfers.
 
 ## Working on the path
 
@@ -26,8 +28,12 @@ gameplay callbacks use Java; world-generation stage owners remain separate.
   objects from the CPU view without downcalls. Compatibility arrays are allocated
   only for unsupported containers and debug-world substitutes.
 
-Custom palette/storage/registry/strategy implementations keep their original
-clone/unpack path without extra callback probes. Preserve object identity,
+Unsupported palette/storage/registry/strategy implementations keep the original
+clone/unpack path. The compatibility capture checks `getSize()` and, when the
+size matches, `getBits()` before checking the exact storage class; custom storage
+can therefore observe these additional probes. Do not promise callback-free
+admission. [Capture guard order](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/minecraft/world/level/chunk/NativeBlockSectionSnapshot.java#L64-L80).
+Preserve object identity,
 coordinate order, air for absent sections, bounds and original provider behavior.
 An invalid native capture declines before publication; malformed compatibility
 inputs retain the original Java access behavior. Native padding requires the
@@ -43,8 +49,9 @@ exposed. Explicitly scoped arenas are used only by tests.
 
 Reset clears all **27** section slots, including captures, model data, lights and
 block-entity references. The former three-slot loop retained unrelated sections
-between tasks. Native memory is bounded by the existing cache and outstanding
-rebuild owners; there is no native global snapshot registry or duplicate cache.
+between tasks. The 512-entry cache bounds its own retained entries; outstanding rebuild owners
+and GC-delayed reclamation also retain memory. This is not a fixed total-memory
+cap. There is no native global snapshot registry or duplicate cache.
 Automatic reclamation follows GC rather than occurring immediately at eviction.
 GPU ownership and compact mesh header4/whole-frame ABI74 are unchanged.
 
@@ -65,7 +72,7 @@ invalid inputs, arena expiration and concurrent GC readers. These are supplement
 real streaming, lifecycle, Frozen image and performance evidence is required
 before this slice is accepted as a performance improvement.
 
-On 2026-10-09, native2409/Java1739 checks passed (3 ignored/2 skipped), including
+The author reports that on 2026-10-09, native2409/Java1739 checks passed (3 ignored/2 skipped), including
 seven new Java snapshot tests. Final Java view-adoption ordering hardening
 passes38 affected checks;full Java and benchmarks precede this hardening.
 The native library is unchanged. The release SHA`15c7ba5e` passed all seven lifecycle
@@ -83,6 +90,10 @@ observer overhead prevent a speedup claim. Two rejected Current recordings are
 preserved; the observer now retains microsecond timestamps in FFV1/NUT, without
 relaxing its validator. Before recordings used Matroska. Comparison:
 `build/map-policy-performance-profile/chunk-state-profile-comparison.json`.
+
+These are author-recorded results from the [snapshot checkpoint](https://github.com/HungLo2020/MattMC/blob/9afdb7d2cbca29a298e3ca0a4024a78eba93ed64/PROGRESS.md);
+this documentation review did not rerun suites, profiles or captures or inspect
+the unbundled receipts.
 
 Final hardened source passes a fresh reviewed Iris+DH pair (RGB3.746/4.309/3.992,
 VUID0, source/library/Frozen integrity and owned orphans0). Receipt:

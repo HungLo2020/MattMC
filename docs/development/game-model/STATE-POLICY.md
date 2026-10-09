@@ -1,7 +1,9 @@
 # Native block state policy
 
-> Implemented. Release build, 31 native content tests, 60 focused Java
-> regressions and five Frozen observer pairs pass. Full suites, lifecycle and
+> Implemented. The author's recorded release build, 31 native content tests,
+> 60 focused Java regressions and five Frozen observer pairs pass. This documentation
+> review inspected source only, without rerunning tests or inspecting local
+> receipts/images. Full suites, lifecycle and
 > reviewed image checks pass; vanilla still misses the performance floor.
 > No isolated speedup is established.
 
@@ -39,7 +41,8 @@ unfinished. Keep state-only rules independent of world, rendering and GPU owners
 Add explicit catalog policy bindings when adding blocks. Append identities
 without changing existing state ranges, and use typed properties for rules.
 Rebuild Java and Rust together after changing the definition schema or registry
-install format; this schema is separate from the rendering ABI.
+install format; definition schema 5, registry packet 9, observer version 10
+and rendering ABI 74 are separate contracts.
 
 The binary test fixture records untouched Frozen's four public policy answers
 in state-ID order. The native prototype matches every byte; four staged Java
@@ -58,7 +61,10 @@ DH timing is variable. See
 
 Run `cargo test --manifest-path src/main/rust/Cargo.toml --locked --lib content::block`
 and release Gradle tests for `NativeBlockPolicyTest` and `NativeBlockRegistryTest`.
-The former also checks generic Java state construction. The v10
-`DevUtils/tests/content/VerifyStateGraphs.py` observer adds the policy digest to
-nine earlier content digests. Before publishing, run the normal
+The former also checks generic Java state construction and compares the native
+leaf registry flag to the Frozen fixture for every state. The v10
+`DevUtils/tests/content/VerifyStateGraphs.py` observer includes the policy digest
+among ten content digests, but its leaf bit uses Java `instanceof LeavesBlock`
+on both sides; that digest alone does not directly verify native leaf classification.
+Before publishing, run the normal
 [real client and performance workflow](../rendering/RENDER-VERIFICATION.md).

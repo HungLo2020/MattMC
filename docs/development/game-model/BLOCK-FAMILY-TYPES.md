@@ -1,9 +1,8 @@
 # Block-family configuration
 
-> Current source ownership at
+> Native ownership; runtime results below are author-recorded evidence from
 > [`87046367`](https://github.com/HungLo2020/MattMC/commit/87046367cdf0a4a427f10066a9010dd6d39fd422).
-> Runtime results below are author-recorded; the overall performance target
-> remains unmet.
+> The overall performance target remains unmet.
 
 ## Ownership
 
@@ -54,8 +53,8 @@ until the Java views are removed. New behavior families should receive their
 own typed parameters, not unrelated nullable fields.
 
 Run the native content tests, `NativeBlockFamiliesTest`, existing state/codec
-checks, and the v8 Frozen observer in [block definitions](BLOCK-DEFINITIONS.md).
-It checks definitions, public aliases, codec round trips and every registered
+checks, and the current v10 Frozen observer in [block definitions](BLOCK-DEFINITIONS.md).
+It retains v8's definitions, public aliases, codec round trips and every registered
 family binding. Follow with realistic client/lifecycle/parity/performance
 verification.
 

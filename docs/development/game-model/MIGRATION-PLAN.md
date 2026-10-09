@@ -2,8 +2,9 @@
 
 > Phase 1 is implemented ([Rust block registry](RUST-BLOCK-REGISTRY.md));
 > Phase 2 now has native state graphs, properties, fluids, registered block
-> definitions, physical settings, intrinsic state rules, sound/offset definitions
-> and block-family configuration. Remaining producers, behavior and components
+> definitions, physical settings, intrinsic state rules, sound/offset definitions,
+> block-family configuration, map palette/shading and state policy.
+> Remaining producers, behavior and components
 > are unfinished. Source ownership does not certify
 > all acceptance work.
 > See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md) and
@@ -48,7 +49,9 @@ A concrete remaining producer is terrain rebuild preparation:
 [`ClonedChunkSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/world/cloned/ClonedChunkSection.java)
 retains native captures, `LevelSlice` reads their CPU views, and
 [`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java)
-repackages padded state/light grids and per-block tint inputs for Rust meshing.
+receives the canonical 18³ state-ID halo in one Rust bulk call. Java still
+admits states to model metadata, computes contextual light words and supplies
+biome/custom tint samples; compatibility containers retain the Java state-grid path.
 Historical ordinary-flight profiling identified repeated tint sampling as a
 substantial part of Java snapshot preparation (159/383 sampled snapshot CPU frames). The
 local [shared section color fields](../world/biome/RUST-SECTION-COLORS.md) slice
@@ -56,9 +59,10 @@ moves coordinate planning, overlap deduplication, storage and direct mesher
 consumption into Rust. Full suites, seven lifecycle cases and reviewed image
 pairs pass; vanilla still misses whole-renderer performance floors. Repeated
 ordinary-flight profiles show lower sampled tint/snapshot preparation cost;
-this is not an authoritative loaded-world migration or an isolated FPS gain. Continue moving
-section storage and bulk consumers together while preserving snapshot timing,
-contextual rules and reload handling.
+that earlier color slice did not migrate authoritative loaded-world storage or
+establish an isolated FPS gain. The later live-section owner now handles
+canonical storage/mutation. Continue moving remaining bulk producers and
+consumers while preserving snapshot timing, contextual rules and reload handling.
 
 ## Phase 1: one block registry from Java (implemented)
 
