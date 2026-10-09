@@ -24,6 +24,7 @@ mod lighting;
 mod model;
 mod packing;
 mod profile;
+mod preparation;
 mod quad;
 mod scan;
 mod section;

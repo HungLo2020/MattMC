@@ -149,5 +149,6 @@ final class NativeLightLayer {
             return (bytes.get(ValueLayout.JAVA_BYTE, index >> 1) >> ((index & 1) << 2)) & 15;
         }
         MemorySegment bytes() { return bytes; }
+        MemorySegment metadata() { return metadata; }
     }
 }

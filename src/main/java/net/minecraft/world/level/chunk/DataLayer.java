@@ -48,6 +48,13 @@ public class DataLayer {
     @Nullable
     NativeLightLayer nativeLightLayer() { return this.nativeLayer; }
 
+    /** A read-only CPU generation lease; the returned segment owns its lifetime. */
+    @Nullable
+    public java.lang.foreign.MemorySegment nativeLightView() {
+        return getClass() == DataLayer.class && this.nativeLayer != null
+            ? this.nativeLayer.view().metadata() : null;
+    }
+
     @Nullable
     public DataLayer repeatNativeFirstLightLayer() {
         return this.nativeLayer == null ? null : new DataLayer(this.nativeLayer.repeatFirst());

@@ -290,6 +290,25 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
         return true;
     }
 
+    /** Retained native light generations, in section Y/Z/X then block/sky order. */
+    public @Nullable MemorySegment[] borrowPaddedLightViews(int minX, int minY, int minZ) {
+        if (minX != this.originBlockX + 16 || minY != this.originBlockY + 16 || minZ != this.originBlockZ + 16
+                || !this.volume.isInside(minX - 1, minY - 1, minZ - 1)
+                || !this.volume.isInside(minX + 16, minY + 16, minZ + 16)) return null;
+        MemorySegment[] views = new MemorySegment[SECTION_ARRAY_SIZE * 2];
+        for (int section = 0; section < SECTION_ARRAY_SIZE; section++) {
+            for (int kind = 0; kind < 2; kind++) {
+                DataLayer layer = this.lightArrays[section][(kind == 0 ? LightLayer.BLOCK : LightLayer.SKY).ordinal()];
+                if (layer == null) continue; // A dimension without this light type reads zero.
+                if (layer.getClass() != DataLayer.class) return null;
+                MemorySegment view = layer.nativeLightView();
+                if (view == null) return null; // Mutable arrays and subclasses keep scalar callbacks.
+                views[section * 2 + kind] = view;
+            }
+        }
+        return views;
+    }
+
     @Override
     public @NotNull FluidState getFluidState(BlockPos pos) {
         return this.getBlockState(pos)

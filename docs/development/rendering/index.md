@@ -11,6 +11,8 @@ each module there has a short README with its own file map.
   model and its phased rollout toward Frozen parity.
 - [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,
   API overrides and direct pose consumption with bounded lifetime.
+- [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light
+  reads, contextual callback compatibility and local verification scope.
 - [Native item-layer preparation](RUST-ITEM-LAYERS.md): authored CPU poses,
   direct GUI/world/hand consumption and lazy mutable-mesh allocation.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:

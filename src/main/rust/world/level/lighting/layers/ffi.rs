@@ -10,6 +10,10 @@ pub struct Projection {
     _view: View,
 }
 
+impl Projection {
+    pub(crate) fn borrowed_view(&self) -> &View { &self._view }
+}
+
 pub(crate) fn projection(layer: &Layer) -> *mut Projection {
     let view = layer.view();
     Box::into_raw(Box::new(Projection {

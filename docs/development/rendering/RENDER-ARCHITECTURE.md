@@ -89,9 +89,10 @@ fuse eligible writes and recount directly, [immutable rebuild snapshots](../worl
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
 share resolver lattice samples within a capture. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
 own canonical lazy defaults and allocated nibble generations, including native
-propagation handoffs. Java retains light-engine orchestration and map publication;
-terrain slices still read scalar light through leased CPU views. Biome blending,
-model admission and worker dispatch also remain Java-owned. Canonical
+propagation handoffs. The [terrain-light consumer](RUST-TERRAIN-LIGHTING.md)
+borrows these generations and prepares mesher words directly. Java retains
+light-engine orchestration, map publication, contextual light predicates/shade,
+biome blending, model admission and worker dispatch. Canonical
 [generation-stage transfers](../world/levelgen/RUST-STAGE-HANDOFF.md) copy/adopt
 inside Rust; stage and live formats remain separate. These CPU owners do not
 change GAL resources, completion or presentation.

@@ -463,6 +463,10 @@ tasks.register('buildRustNative', Exec) {
     inputs.files(rustSourceFiles)
     inputs.property('mattmcRustProfile', rustCargoProfile)
     inputs.property('mattmcRustTracy', rustTracyRequested())
+    // Profiling changes the native artifact even when Rust source is unchanged.
+    // Never reuse stripped output for a symbol-enabled validation launch.
+    inputs.property('mattmcRustReleaseDebug', providers.environmentVariable('CARGO_PROFILE_RELEASE_DEBUG').orElse('cargo-default'))
+    inputs.property('mattmcRustReleaseStrip', providers.environmentVariable('CARGO_PROFILE_RELEASE_STRIP').orElse('cargo-default'))
     outputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath

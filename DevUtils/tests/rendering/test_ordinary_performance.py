@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -17,6 +18,51 @@ import RunOrdinaryPerformance as ordinary
 
 
 class OrdinaryPerformanceTest(unittest.TestCase):
+    def test_requested_jdk_controls_actual_child_launch_with_stale_inherited_java(self):
+        java = shutil.which('java')
+        if os.name != 'posix' or not java:
+            self.skipTest('requires POSIX and JDK 25')
+        jdk = Path(java).resolve().parent
+        if 'version "25' not in subprocess.run([java, '-version'], capture_output=True, text=True).stderr:
+            self.skipTest('requires JDK 25')
+        actual_popen = subprocess.Popen
+        launches = []
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_bin = root / 'old-jdk/bin'
+            old_bin.mkdir(parents=True)
+            old_java = old_bin / 'java'
+            old_java.write_text('#!/bin/sh\nexit 92\n')
+            old_java.chmod(0o755)
+            args = SimpleNamespace(repo=root, frozen_repo=root, run_source=root,
+                shaders='off', world='Test', width=1920, height=1080, fullscreen=True,
+                startup_timeout=30, seconds=5, render_distance=12, dh='on',
+                heap_gb=2, minimap='visible')
+            command = [sys.executable, 'unused-capture-engine', '--client-args', '',
+                       '--max-secs', '30', '--dump-secs', '20', '--validation', 'off']
+
+            def probe_child(command, **kwargs):
+                launches.append(kwargs['env'])
+                # Exercise actual executable resolution and the game VM flags,
+                # without opening a game window for this launch regression.
+                return actual_popen(['java', '-version'], **kwargs)
+
+            with patch.dict(os.environ, {'JAVA_HOME': str(old_bin.parent),
+                    'PATH': str(old_bin) + os.pathsep + os.environ.get('PATH', '')}), \
+                    patch.object(ordinary.flight, 'launch_command', return_value=(None, command)), \
+                    patch.object(ordinary.flight.artifact_retention, 'ensure_marker'), \
+                    patch.object(ordinary.flight, 'client_pid', return_value=None), \
+                    patch.object(ordinary.validation, 'stop_leftover_clients', return_value=0), \
+                    patch.object(ordinary.validation, 'read_client_health', return_value={
+                        'exceptions': 0, 'terrain_failures': 0}), \
+                    patch.object(ordinary.subprocess, 'Popen', side_effect=probe_child):
+                result = ordinary.run_client(args, 'current', root / 'observation', root / 'agent.jar', jdk)
+            self.assertEqual(len(launches), 1)
+            self.assertEqual(launches[0]['JAVA_HOME'], str(jdk.parent))
+            self.assertEqual(launches[0]['PATH'].split(os.pathsep)[0], str(jdk))
+            self.assertIn('version "25', (root / 'observation/driver.log').read_text())
+            self.assertEqual(result['engine_exit_code'], 0)
+
     def test_preflight_created_output_can_complete_and_retains_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

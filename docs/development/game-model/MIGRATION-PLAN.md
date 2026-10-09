@@ -63,18 +63,36 @@ full CPU/lifecycle checks and reviewed Frozen image pairs pass. Vanilla FPS/p99
 and DH p99 still miss performance floors. Paired streaming profiles pass their
 identity/movement checks; Java terrain-light preparation still samples about
 42 MB of allocations in eight seconds. No isolated speedup is established.
-Next move bulk terrain-light preparation, then retained scene mesh payloads
+The [bulk terrain-light consumer](../rendering/RUST-TERRAIN-LIGHTING.md) now
+reads retained native layers directly. Next move retained scene mesh payloads
 and entity preparation. Cached item mesh generation restamps still clone Java
 index payloads each frame; migrate that storage and its direct consumer together. These are ownership
 migrations; additional static definitions are not the main performance batch.
 
-The next coupled world-state target is bulk terrain lighting preparation.
+The pre-integration eight-second allocation profile attributes about 47 MiB to
+sky/background preparation, 30 MiB to model submission and 19 MiB to block-entity
+scopes, versus about 1 MiB to item generation restamps. These are weighted
+diagnostic samples, not isolated speedups. Prioritize live world/biome ownership
+and direct background/model consumers alongside retained geometry. Preserve
+missing-chunk behavior, height clamping, mutable biome containers, world unload
+and resource reload; retaining a stale cache is not an ownership migration.
+
+The current coupled world-state batch is bulk terrain lighting preparation.
 Canonical retained light ownership and direct propagation result installation
 are now implemented locally. Java rebuild preparation still performs scalar
 layer reads and constructs 5,832 contextual light words. Move that consumer to
 bulk Rust preparation while preserving mutable array escape compatibility,
 lazy-layer state, dimension defaults and contextual block callbacks. Measure
-ordinary movement and chunk rebuilds; this consumer migration remains proposed.
+ordinary movement and chunk rebuilds. The local
+[bulk consumer](../rendering/RUST-TERRAIN-LIGHTING.md) is now wired, with native
+oracle/halo checks passing. Combined Rust and Java suites, all seven lifecycle cases and reviewed settled
+compatibility image pairs pass. All sixteen benchmark runs are clean, but
+vanilla, shaders and DH still miss the p99 floor. Separate visible-minimap ordinary
+observations complete; entry and travel p99 still trail Frozen. Movement reaches
+a terrain barrier after about 16.45 blocks, so sustained streaming remains
+unverified. Follow this
+with retained state updates and direct render consumers, reducing full-frame
+Java construction rather than adding more static catalogs.
 
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java still orchestrates stage

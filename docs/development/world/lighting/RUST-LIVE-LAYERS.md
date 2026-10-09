@@ -21,8 +21,10 @@ payload directly instead of first allocating a Java clone. The public array
 constructor retains its existing alias contract.
 
 Java still owns light-engine orchestration, map publication and callbacks.
-Terrain slices currently read scalar light through the CPU view; direct bulk
-terrain-light preparation remains work. No whole-game speedup is established.
+The [bulk terrain-light consumer](../../rendering/RUST-TERRAIN-LIGHTING.md)
+now borrows retained generations directly; its latest verification is recorded
+separately. Compatibility slices still use scalar CPU views. No whole-game
+speedup is established.
 Follow the [Java handoff](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L204-L259)
 and [native installation](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/world/level/lighting/propagation/ffi.rs#L230-L242)
 when changing publication: result-transfer errors throw and do not roll back
@@ -77,9 +79,12 @@ vanilla median FPS is 1,096 versus Frozen 1,153; p99 is 3.781/3.439 ms. DH
 p99 is 5.524/5.519 ms. Shader and shader+DH FPS/p99 floors pass this set.
 These results do not isolate this storage change or establish a speedup.
 Final source, native-library, Frozen and protected-user-edit integrity checks
-pass. Twenty-five generated copies were retired. Receipt:
-`validation/native-live-light-final-20261009/summary.json`. Long-session memory
-and terrain bulk preparation remain work.
+pass. Twenty-five generated copies were retired. The original runtime invocation
+has since been retired by the existing retention policy. Historical results and
+integrity remain in `build/native-light-migration/runtime-final.log` and
+`production-verification.json`; the retained flight comparison below is separate.
+Long-session memory remains work. The later
+[bulk consumer](../../rendering/RUST-TERRAIN-LIGHTING.md) has its own verification.
 
 Paired ordinary-flight CPU/allocation profiles pass source/library identity,
 movement-window, cleanup and reviewed F3 position checks. Both allocation runs

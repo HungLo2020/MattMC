@@ -35,7 +35,9 @@ when it is no longer needed.
 
 The default runs Current then Frozen at fullscreen 1920×1080, render/simulation
 distance 12, an unlimited FPS slider, VSync off, and matched 8 GiB ZGC/JIT
-settings. DH radius and generation settings come from the shared source. These
+settings. `--jdk` controls both the game/Gradle launch and observer tools by
+setting the child `JAVA_HOME` and placing its `bin` first on the child `PATH`.
+DH radius and generation settings come from the shared source. These
 are explicit comparison controls, not a claim to preserve every RunDev setting.
 Use `--side`, `--heap-gb`, `--render-distance`, `--width`, `--height`,
 `--no-fullscreen`, `--shaders`, and `--dh` for other controls.

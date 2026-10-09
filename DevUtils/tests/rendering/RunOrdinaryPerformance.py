@@ -112,7 +112,9 @@ def run_client(args, side: str, output: Path, jar: Path, jdk: Path) -> dict:
     command[command.index('--dump-secs') + 1] = str(args.startup_timeout + 3 * args.seconds + 50)
     command[command.index('--validation') + 1] = 'off'
     env = dict(os.environ)
-    env.update({'MATTMC_CAPTURE_RUN_SOURCE': str(args.run_source),
+    env.update({'JAVA_HOME': str(jdk.parent),
+                'PATH': str(jdk) + os.pathsep + env.get('PATH', ''),
+                'MATTMC_CAPTURE_RUN_SOURCE': str(args.run_source),
                 'MATTMC_CAPTURE_PRESERVE_ISOLATED_GAME_DIR': 'true',
                 'MATTMC_GRAPHICS_TOOL_INTERNAL': '1', 'MATTMC_GRAPHICS_AUDIT': 'false',
                 'MATTMC_CAPTURE_WORLD': args.world, 'MATTMC_CAPTURE_MAX_FPS': '260',

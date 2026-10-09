@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-09; release31c8c8cc; RTX3080Ti; moving camera;6,000 frames)
+# Rust vs Frozen Java speed (2026-10-09; release d9d1a9d6; RTX3080Ti; settled rotating view;6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,059.3 / 1,132.7 | 1,152.4 / 1,153.9 |
-| Vanilla + DH | 685.2 / 720.5 | 608.0 / 730.7 |
-| Shaders | 352.9 / 351.6 | 316.9 / 316.1 |
-| Shaders + DH | 254.7 / 250.6 | 230.3 / 228.6 |
-Receipt:`validation/native-live-light-final-20261009/summary.json`:all16 ABAB/exact6000 clean,VUID/exception/orphan0;performance gate FAILS vanilla FPS/p99 and DH p99.25 generated copies retired;source/native/Frozen/user-edit integrity passes.
-Performance OPEN:median p99 Current/Frozen vanilla3.781/3.439ms,DH5.524/5.519,shaders5.370/6.693,shader+DH7.377/7.542.No isolated or overall gain claimed;streaming profiles pass identity/movement/cleanup.Weighted Java allocation0.934/2.186GB per8s(Current/Frozen),diagnostic only.
-Rust2436(3 ignored),Java1800(2 skipped),all7 lifecycle cases,reviewed vanilla/Iris+DH pairs,DH coverage andWiki2489/43 pass.Rust owns canonical live light generations,propagation/sky results and independent packet imports.Next:bulk terrain lighting and retained CPU mesh payloads;Rust-only app unfinished.
+| Vanilla | 1,053.6 / 1,473.1 | 1,160.8 / 1,155.7 |
+| Vanilla + DH | 748.0 / 565.6 | 612.6 / 673.1 |
+| Shaders | 337.5 / 335.4 | 317.3 / 316.9 |
+| Shaders + DH | 263.1 / 251.4 | 228.3 / 227.4 |
+Receipt:`validation/native-terrain-light-integrated-20261009/summary.json`:all16 ABAB/exact6000 clean,VUID/exception/orphan0;all7 lifecycle and reviewed diagnostic vanilla/Iris+DH compatibility pairs/DH coverage pass.25 generated copies retired;source/native/Frozen/user-edit integrity passes.
+Performance OPEN:averageFPS exceeds Frozen in all4 modes;medianp99 Current/Frozen vanilla3.216/3.072ms,DH6.839/5.749,shaders6.137/5.979,shaderDH6.212/7.446.Gate FAILS vanilla,shader andDH p99;substantial repeat variance,no isolated migration gain.
+CombinedRust2443 pass/3 ignored;Java1807 tests/2 skipped/no failures;Wiki2491/43 pass.Ordinary DH+visible-map C/F/F/C loopFPS median C/F entry535/555,standing619/601,travel634/623;p99ms6.740/5.904,2.625/2.911,3.000/2.904:entry/travel floors remain open;pop-in unproved.JDK fix6 checks pass;next biome owner/direct sky12 CPU checks pass,production wiring pending;Rust-only app unfinished.

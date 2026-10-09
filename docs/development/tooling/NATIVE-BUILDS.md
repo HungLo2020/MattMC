@@ -12,6 +12,18 @@ through `mattmc.rust.natives.dir`; Cargo outputs remain under
 [the build task](https://github.com/HungLo2020/MattMC/blob/master/build.gradle)
 for platform names and build inputs.
 
+For profiler-compatible release output, use the same environment for builds,
+tests and runtime verification:
+
+```sh
+CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ./gradlew buildRustNative -PmattmcRustProfile=release
+```
+
+The task now tracks both environment settings as build inputs, including their
+absence. Changing or restoring either setting rebuilds the native artifact;
+unchanged settings permit reuse. Check the actual mapped library's checksum
+when comparing runs. Release symbols are not a different rendering policy.
+
 ## Launch Current or Frozen
 
 From the current repository root:
@@ -96,6 +108,8 @@ The driver executes the real Gradle staging task in an isolated temporary build
 directory, replacing Cargo with deterministic payloads. It checks that existing
 read-only mappings retain their bytes across larger and smaller replacements,
 new readers receive the replacement, and no staging files leak. It does not
-touch the normal native library, compile Rust, or launch a client. Logs and the
+touch the normal native library, compile Rust, or launch a client. It also checks
+actual Gradle reuse for an unchanged profile and invalidation when debug/strip
+settings change or return to their defaults. Logs and the
 result are stored under `artifacts/native-library-staging/`; use
 `--artifact-root PATH` to choose another ignored evidence directory.

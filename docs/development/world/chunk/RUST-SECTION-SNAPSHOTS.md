@@ -5,7 +5,9 @@ storage. The existing 512-entry, five-second cloned-section cache retains these
 captures. Rebuild slices borrow them directly; ordinary sections no longer clone
 a Java palette and expand it into 4,096 Java object references per slice.
 Rust also builds the mesher's 18³ state-ID neighbourhood in one bulk call.
-Java still computes contextual light and admits distinct states to model metadata.
+Rust now also prepares canonical [terrain light words](../../rendering/RUST-TERRAIN-LIGHTING.md)
+from retained generations. Java supplies contextual predicates/shade and admits
+distinct states to model metadata; compatibility inputs retain scalar preparation.
 
 Snapshots are immutable rebuild state. [Live block sections](RUST-LIVE-SECTIONS.md)
 now own ordinary canonical mutation separately and produce captures directly in

@@ -361,6 +361,16 @@ final class NativeSectionSnapshot implements AutoCloseable {
         // snapshot or model reload. flushAll still rejects stale generations.
         boolean worldIds = slice.writePaddedBlockStateIds(this.minX, this.minY, this.minZ,
                 MemorySegment.ofAddress(this.paddedStateIdsAddress).reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES));
+        if (worldIds && !StaticTerrainParityDiagnostics.isEnabled()
+                && PlatformBlockAccess.getInstance().getClass() == net.sodium.fabric.block.FabricBlockAccess.class) {
+            MemorySegment[] lightViews = slice.borrowPaddedLightViews(this.minX, this.minY, this.minZ);
+            MemorySegment stateIdsView = MemorySegment.ofAddress(this.paddedStateIdsAddress)
+                .reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES);
+            if (lightViews != null && NativeTerrainLighting.admits(stateIdsView)) {
+                this.populateBulkLightGrid(slice, lightViews, stateIdsView);
+                return;
+            }
+        }
         var admittedIds = worldIds ? new IntOpenHashSet() : null;
         var stateIds = worldIds ? null : new Reference2IntOpenHashMap<BlockState>();
         if (stateIds != null) stateIds.defaultReturnValue(-1);
@@ -391,6 +401,31 @@ final class NativeSectionSnapshot implements AutoCloseable {
                             computeLightWord(slice, state, x, y, z));
                 }
             }
+        }
+    }
+
+    private void populateBulkLightGrid(LevelSlice slice, MemorySegment[] lightViews, MemorySegment stateIds) {
+        var admittedIds = new IntOpenHashSet();
+        // Frozen's production light cache reuses one synchronous mutable position.
+        // These remaining contextual callbacks receive the same coordinate order.
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        try (java.lang.foreign.Arena inputs = java.lang.foreign.Arena.ofConfined()) {
+            MemorySegment contexts = inputs.allocate((long) PADDED_BLOCK_COUNT * NativeTerrainLighting.CONTEXT_STRIDE, 8);
+            for (int py = 0; py < PADDED_LENGTH; py++) {
+                for (int pz = 0; pz < PADDED_LENGTH; pz++) {
+                    for (int px = 0; px < PADDED_LENGTH; px++) {
+                        int index = paddedIndex(px, py, pz);
+                        int stateId = MemoryUtil.memGetInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES);
+                        BlockState state = Block.BLOCK_STATE_REGISTRY.byId(stateId);
+                        if (admittedIds.add(stateId) && NativeStaticBlockModelRegistry.getStateId(state) != stateId)
+                            throw new IllegalStateException("Native model admission changed a canonical world state id");
+                        NativeTerrainLighting.writeContext(contexts.address() + (long) index * NativeTerrainLighting.CONTEXT_STRIDE,
+                            slice, state, pos.set(this.minX + px - 1, this.minY + py - 1, this.minZ + pz - 1));
+                    }
+                }
+            }
+            NativeTerrainLighting.prepare(lightViews, stateIds, contexts,
+                MemorySegment.ofAddress(this.paddedLightWordsAddress).reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES));
         }
     }
 

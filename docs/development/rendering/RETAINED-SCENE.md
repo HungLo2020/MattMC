@@ -7,7 +7,7 @@ camera layers and shadow candidates in the Rust section graph. Native
 publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups
 and ABI 74 visibility frames, retain CPU input data. These are their layout
 introduction versions; the [current whole-frame ABI](JAVA-BRIDGE.md#how-the-abi-stays-in-sync)
-is 77.
+is 78.
 Reduced-color DH geometry also uses shared GPU pages, with the separate
 ownership limits below. Diagnostic and
 other routes retain their documented producer and expansion paths. The phase list separates remaining targets

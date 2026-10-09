@@ -64,13 +64,16 @@ def main() -> None:
                    MATTMC_STAGING_TEST_CARGO_NAME=cargo_name,
                    MATTMC_STAGING_TEST_PAYLOAD=str(payload))
 
-        def stage(contents: bytes, label: str) -> None:
+        env.pop("CARGO_PROFILE_RELEASE_DEBUG", None)
+        env.pop("CARGO_PROFILE_RELEASE_STRIP", None)
+
+        def stage(contents: bytes, label: str, *, force: bool = True) -> None:
             payload.write_bytes(contents)
             with (artifact_root / f"{label}.log").open("wb") as log:
                 subprocess.run(
                     [gradle, "--no-daemon", "--offline", "--console=plain",
                      "-I", str(init), "-PmattmcRustProfile=release",
-                     "buildRustNative", "--rerun-tasks"],
+                     "buildRustNative"] + (["--rerun-tasks"] if force else []),
                     cwd=repo, env=env, stdout=log, stderr=subprocess.STDOUT,
                     check=True,
                 )
@@ -96,13 +99,35 @@ def main() -> None:
                         assert mapping[:] == original
                         assert second_mapping[:] == replacement, \
                             "A smaller replacement invalidated an existing mapping"
+        # Exercise actual Gradle reuse/invalidation without forcing the task.
+        # Payload changes alone are deliberately not task inputs in this fixture.
+        stage(b"must not run for unchanged profile", "same-profile", force=False)
+        assert native.read_bytes() == smaller, "Unchanged profile should reuse its artifact"
+        assert "buildRustNative UP-TO-DATE" in (artifact_root / "same-profile.log").read_text()
+        env["CARGO_PROFILE_RELEASE_DEBUG"] = "line-tables-only"
+        stage(b"debug policy payload", "debug-change", force=False)
+        assert native.read_bytes() == b"debug policy payload", "Debug policy failed to invalidate native output"
+        stage(b"must still reuse debug payload", "same-debug-profile", force=False)
+        assert native.read_bytes() == b"debug policy payload"
+        env["CARGO_PROFILE_RELEASE_STRIP"] = "none"
+        stage(b"strip policy payload", "strip-change", force=False)
+        assert native.read_bytes() == b"strip policy payload", "Strip policy failed to invalidate native output"
+        env.pop("CARGO_PROFILE_RELEASE_DEBUG")
+        stage(b"default debug payload", "debug-default", force=False)
+        assert native.read_bytes() == b"default debug payload", "Restoring debug default failed to invalidate output"
+        env.pop("CARGO_PROFILE_RELEASE_STRIP")
+        stage(b"default strip payload", "strip-default", force=False)
+        assert native.read_bytes() == b"default strip payload", "Restoring strip default failed to invalidate output"
         assert len(list(native.parent.iterdir())) == 1, "Temporary staging files leaked"
         (artifact_root / "verification.json").write_text(
             json.dumps({"status": "passed", "existing_mapping_preserved": True,
                         "replacement_complete": True, "old_inode_preserved": True,
                         "smaller_replacement_preserves_both_mappings": True,
                         "temporary_files_removed": True,
-                        "normal_build_directory_untouched": True}, indent=2) + "\n",
+                        "normal_build_directory_untouched": True,
+                        "unchanged_profile_reuses_output": True,
+                        "release_debug_and_strip_changes_invalidate_output": True,
+                        "restoring_release_defaults_invalidates_output": True}, indent=2) + "\n",
             encoding="utf-8",
         )
     print("Native staging preserves existing mappings and publishes a complete replacement.")

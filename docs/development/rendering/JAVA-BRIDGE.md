@@ -512,8 +512,12 @@ is 77. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
 for construction, sealing, lifetime and provider compatibility.
 
 Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
-Rust fills the state-ID halo directly; Java retains contextual light and model
-admission. Unsupported/debug containers retain their original CPU compatibility
+Rust fills the state-ID halo directly. The local
+[bulk terrain-light boundary](RUST-TERRAIN-LIGHTING.md) borrows 54 CPU generation
+leases plus eight-byte contextual records to write the mesher light span directly;
+Java retains contextual predicates/shade and model admission. These standalone
+CPU calls leave compact header4 and whole-frame ABI78 unchanged.
+Unsupported/debug containers retain their original CPU compatibility
 path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.
 
 ## Native item transform owners

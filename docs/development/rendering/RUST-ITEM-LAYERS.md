@@ -144,6 +144,28 @@ through `BlockMeshExtraction.withGeneration`. A proposed follow-up is retained
 Rust CPU mesh payloads with separate key/generation metadata and direct frame
 consumption. Preserve reload/retirement admission and mutable compatibility
 exports; an ignored ownership prototype is not production or speedup evidence.
+Resident meshes already avoid a full upload on each frame. The identified cost
+is generation restamping on cache hits and payload encoding on new admission or
+readmission. Keep those costs separate from per-frame instance extraction.
+The next owner must retain CPU geometry across facade reclamation and guarded
+retirement, share payloads across generation changes, and let the Rust asset
+decoder consume them directly. Preserve defensive mutable exports and texture
+budget admission; a native pointer must identify CPU storage, never a GPU handle.
+Moving quad assembly with the owner can remove Java vertex records, boxed
+indices and section rebuilding at cache misses. Before changing output, record
+Frozen's actual `BakedModelEncoder` stream: source inspection shows different
+fast-path color and embedded-light handling from the current copied mesh
+producer. That observation is a verification target, not a confirmed visible
+defect or permission to change Frozen.
+The independent Frozen recorder now captures 576 actual fast-item encoder
+cases and guards the encoder, item renderer, baked-quad and platform class
+hashes. Frozen disables baked-color multiplication on this path and merges
+embedded light with supplied light. An ignored candidate Rust builder matches
+the recorded colors, lights, normals and UVs, with numerically equivalent
+identity-transformed positions, and passes eight ownership/bounds checks.
+Receipt: `build/native-terrain-light-migration/next-mesh/oracle-receipt.json`.
+This candidate remains outside production; native publication, reload/retirement,
+foil/custom compatibility and real Frozen image/performance proof remain work.
 Additional actual world and hand captures exercise modes 1 and 3, including
 native special foil, on the worker-decoded route. A common frame boundary now
 keeps GUI/hand observers aligned through resource reloads; 184 affected Java
