@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-09; stage-handoff SHAc7c95f4a; RTX 3080 Ti; moving camera; 6,000 frames)
+# Rust vs Frozen Java speed (2026-10-09; release59171b74; RTX3080Ti; moving camera;6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,027.8 / 1,033.3 | 1,101.9 / 1,127.6 |
-| Vanilla + DH | 615.2 / 610.6 | 731.2 / 614.0 |
-| Shaders | 326.9 / 332.2 | 312.4 / 307.6 |
-| Shaders + DH | 244.2 / 249.5 | 220.6 / 221.2 |
-Receipt: `validation/native-stage-handoff-final-20261009/summary.json` FAILED performance floors. All16 ABAB/exact6000 runs clean,VUID0,exceptions0,orphans0;source/library/user-edit/Frozen integrity passes;25 copies retired. No isolated handoff speedup proven;Frozen DH repeats vary substantially.
-Performance OPEN:vanilla−7.6%,p99 4.021/3.467ms;DH−8.9%,p99 6.649/5.731ms;shaders+6.3%,p99 6.223/6.820ms;shader+DH+11.7%,p99 7.151/9.051ms. Vanilla/DH fail both floors;shader modes pass both.
-Rust2417(3 ignores),focused Java26,full Java1751(2 skips),all7 lifecycle cases,reviewed coast pairs andWiki2485/43 pass. Canonical NOISE/SURFACE/CARVERS transfer stays in Rust;JFR handoff Java allocation108→~1–3KB/chunk is diagnostic,not throughput acceptance. Per-frame producers,broader world orchestration andRust-only app remain unfinished.
+| Vanilla | 1,034.0 / 1,070.0 | 1,131.6 / 1,179.5 |
+| Vanilla + DH | 597.6 / 729.3 | 705.1 / 818.8 |
+| Shaders | 336.8 / 327.5 | 309.8 / 308.9 |
+| Shaders + DH | 247.5 / 241.5 | 222.8 / 221.2 |
+Receipt:`validation/native-section-counters-final-20261009/summary.json`:all16 ABAB/exact6000 clean,VUID/exception/orphan0;performance floors FAIL. Source/native/Frozen/protected-user-edit integrity passes;25 generated copies retired. No isolated transaction speedup proven.
+Performance OPEN:vanilla−9.0%,p99 3.583/3.253ms;DH−12.9%,p99 4.695/4.630;shaders+7.4%,p99 5.910/6.622;shader+DH+10.1%,p99 7.422/8.282. DH repeats vary substantially;the prior shader+DH14.764ms tail is absent here but its cause remains unproven.
+Rust2426(3 ignores),focused Java121/full Java1762(2 skips),all7 lifecycle cases,reviewed coast pairs andWiki2487/43 pass. Rust owns live section counters/fused writes/recounts/stage inputs and DH cloud preparation/direct pose consumption. Next:item-layer/scene preparation and world-state consumers;Rust-only app remains unfinished.

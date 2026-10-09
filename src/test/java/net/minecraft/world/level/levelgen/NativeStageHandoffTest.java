@@ -63,6 +63,21 @@ class NativeStageHandoffTest {
         section.setBlockState(1, 8, 0, Blocks.OAK_LEAVES.defaultBlockState());
         assertSame(Blocks.WATER.defaultBlockState(), capture.state(8 * 256 + 1));
     }
+    @Test void stageInputsCaptureNativeSignedCountersAndKeepTheirSnapshotIsolated() {
+        var chunk = fresh(); var section = chunk.getSection(0);
+        section.installGenerated(0, List.of(Blocks.AIR.defaultBlockState()), new long[0], 32767, -32768, -1);
+        var expected = section.copy();
+        try (var stage = NativeProtoChunk.create(chunk)) {
+            assertNotNull(stage);
+            section.setBlockState(3, 0, 0, Blocks.LAVA.defaultBlockState());
+            stage.set(1, -16, 0, Blocks.OAK_LEAVES.defaultBlockState(), false);
+            expected.setBlockState(1, 0, 0, Blocks.OAK_LEAVES.defaultBlockState());
+            assertEquals(1, NativeGenerationSections.installProto(section, stage.handle, 0));
+            assertEquals(expected.packedSectionCounts(), section.packedSectionCounts());
+            assertSame(Blocks.AIR.defaultBlockState(), section.getBlockState(3, 0, 0));
+        }
+        System.gc(); assertEquals(expected.packedSectionCounts(), section.packedSectionCounts());
+    }
     @Test void untouchedSectionsKeepTheirNativeOwnerAndNoJavaMirror() {
         var chunk = fresh(); var a = field(chunk.getSection(0).getStates(), "nativeBlocks");
         var b = field(chunk.getSection(1).getStates(), "nativeBlocks");

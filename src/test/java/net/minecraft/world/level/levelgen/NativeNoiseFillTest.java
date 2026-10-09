@@ -124,13 +124,13 @@ class NativeNoiseFillTest {
     }
 
     static int field(LevelChunkSection section, String name) {
-        try {
-            var field = LevelChunkSection.class.getDeclaredField(name);
-            field.setAccessible(true);
-            return (short)field.get(section);
-        } catch (ReflectiveOperationException error) {
-            throw new AssertionError(error);
-        }
+        int lane = switch (name) {
+            case "nonEmptyBlockCount" -> 0;
+            case "tickingBlockCount" -> 1;
+            case "tickingFluidCount" -> 2;
+            default -> throw new AssertionError(name);
+        };
+        return (short)(section.packedSectionCounts() >>> (lane * 16));
     }
 
     static long oreBlocks, rawOreBlocks;

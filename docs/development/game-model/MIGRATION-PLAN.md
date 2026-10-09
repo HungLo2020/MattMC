@@ -38,7 +38,13 @@ plus native rebuild/light exports and heightmap/skylight handoffs. Enumeration,
 save/network and custom generation compatibility exports remain temporary Java
 projections. Canonical [stage transfers](../world/levelgen/RUST-STAGE-HANDOFF.md)
 now capture/adopt sections within Rust. Move remaining consumers and bulk
-producers next; verify performance.
+producers next; verify performance. The per-frame slice now moves
+[DH cloud preparation](../rendering/RUST-DH-CLOUDS.md) and its direct native
+consumer together; seven lifecycle cases and settled coast pairs pass, while
+whole-renderer performance acceptance remains open.
+[Live section mutation/counters](../world/chunk/RUST-SECTION-COUNTERS.md) now have full suite/lifecycle/coast verification; vanilla/DH performance floors
+still fail. Move
+remaining per-frame world-state extraction next rather than more static catalogs.
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java still orchestrates stage
 installation and chunks, while ordinary canonical live palette mutation now uses

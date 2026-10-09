@@ -199,3 +199,37 @@ pub unsafe extern "C" fn mattmc_live_section_read_single(owner: *const Owner, va
         .filter(|o| o.read_single(value as u32))
         .map_or(-1, |_| 0)
 }
+
+/// Fused canonical block write + section-local counters under the owner lock.
+/// -2 declines before mutation. Pointers are aligned live CPU owners for this call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_section_write_counts(
+    owner: *const Owner,
+    counts: *const super::super::counters::Owner,
+    index: i32,
+    value: i32,
+) -> i64 {
+    let Some(policies) = super::super::counters::installed_policies() else {
+        return -2;
+    };
+    let (Some(owner), Some(counts)) = (owner.as_ref(), counts.as_ref()) else {
+        return -2;
+    };
+    owner
+        .write_counts(counts, index as usize, value as u32, policies)
+        .map_or(-2, |(old, changed)| old as i64 | ((changed as i64) << 32))
+}
+/// Recount live storage directly. Compatibility declines retain previous counts.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_section_recount(
+    owner: *const Owner,
+    counts: *const super::super::counters::Owner,
+) -> i32 {
+    let Some(policies) = super::super::counters::installed_policies() else {
+        return 0;
+    };
+    let (Some(owner), Some(counts)) = (owner.as_ref(), counts.as_ref()) else {
+        return 0;
+    };
+    i32::from(owner.recount(counts, policies))
+}

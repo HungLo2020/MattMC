@@ -9,6 +9,8 @@ each module there has a short README with its own file map.
   depend on, and where new code belongs.
 - [Retained render scene](RETAINED-SCENE.md): the proposed persistent scene
   model and its phased rollout toward Frozen parity.
+- [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,
+  API overrides and direct pose consumption with bounded lifetime.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:
   handles, validation, submission, hazards and common errors.
 - [Java Bridge](JAVA-BRIDGE.md): the C ABI Java calls, and how to change it

@@ -18,3 +18,6 @@
 
 - [Rust live block sections](RUST-LIVE-SECTIONS.md): authoritative packed storage,
   palette growth, CPU views, bulk consumers and remaining compatibility work.
+
+- [Rust section counters](RUST-SECTION-COUNTERS.md): fused live mutations,
+  direct recounts, section-local ownership and generation inputs.

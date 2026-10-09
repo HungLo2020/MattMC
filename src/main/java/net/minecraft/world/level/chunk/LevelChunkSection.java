@@ -16,27 +16,25 @@ public class LevelChunkSection {
 	public static final int SECTION_HEIGHT = 16;
 	public static final int SECTION_SIZE = 4096;
 	public static final int BIOME_CONTAINER_BITS = 2;
-	private short nonEmptyBlockCount;
-	private short tickingBlockCount;
-	private short tickingFluidCount;
+	private final NativeSectionCounters counters;
 	private final PalettedContainer<BlockState> states;
 	private PalettedContainerRO<Holder<Biome>> biomes;
 
 	private LevelChunkSection(LevelChunkSection levelChunkSection) {
-		this.nonEmptyBlockCount = levelChunkSection.nonEmptyBlockCount;
-		this.tickingBlockCount = levelChunkSection.tickingBlockCount;
-		this.tickingFluidCount = levelChunkSection.tickingFluidCount;
+		this.counters = new NativeSectionCounters(levelChunkSection.counters.packed());
 		this.states = levelChunkSection.states.copy();
 		this.biomes = levelChunkSection.biomes.copy();
 	}
 
 	public LevelChunkSection(PalettedContainer<BlockState> palettedContainer, PalettedContainerRO<Holder<Biome>> palettedContainerRO) {
+		this.counters = new NativeSectionCounters(0);
 		this.states = palettedContainer;
 		this.biomes = palettedContainerRO;
 		this.recalcBlockCounts();
 	}
 
 	public LevelChunkSection(PalettedContainerFactory palettedContainerFactory) {
+		this.counters = new NativeSectionCounters(0);
 		this.states = palettedContainerFactory.createForBlockStates();
 		this.biomes = palettedContainerFactory.createForBiomes();
 	}
@@ -62,6 +60,10 @@ public class LevelChunkSection {
 	}
 
 	public BlockState setBlockState(int i, int j, int k, BlockState blockState, boolean bl) {
+		if (this.getClass() == LevelChunkSection.class) {
+			var previous = this.states.trySetWithCounters(i, j, k, blockState, bl, this.counters);
+			if (previous != null) return previous;
+		}
 		BlockState blockState2;
 		if (bl) {
 			blockState2 = this.states.getAndSet(i, j, k, blockState);
@@ -72,25 +74,25 @@ public class LevelChunkSection {
 		FluidState fluidState = blockState2.getFluidState();
 		FluidState fluidState2 = blockState.getFluidState();
 		if (!blockState2.isAir()) {
-			this.nonEmptyBlockCount--;
+			this.counters.adjust(0, -1, false);
 			if (blockState2.isRandomlyTicking()) {
-				this.tickingBlockCount--;
+				this.counters.adjust(1, -1, false);
 			}
 		}
 
 		if (!fluidState.isEmpty()) {
-			this.tickingFluidCount--;
+			this.counters.adjust(2, -1, false);
 		}
 
 		if (!blockState.isAir()) {
-			this.nonEmptyBlockCount++;
+			this.counters.adjust(0, 1, false);
 			if (blockState.isRandomlyTicking()) {
-				this.tickingBlockCount++;
+				this.counters.adjust(1, 1, false);
 			}
 		}
 
 		if (!fluidState2.isEmpty()) {
-			this.tickingFluidCount++;
+			this.counters.adjust(2, 1, false);
 		}
 
 		return blockState2;
@@ -98,7 +100,7 @@ public class LevelChunkSection {
 
 	/** A fresh all-air section whose block palette has never grown. */
 	public boolean isUntouchedAirForGeneration() {
-		return this.nonEmptyBlockCount == 0 && this.tickingBlockCount == 0 && this.tickingFluidCount == 0
+		return this.counters.packed() == 0
 			&& this.states.isUntouched(Blocks.AIR.defaultBlockState());
 	}
 
@@ -110,9 +112,7 @@ public class LevelChunkSection {
 	 * and storage its writes produce and the counters setBlockState would keep. */
 	public void installGenerated(int requestedBits, List<BlockState> palette, long[] raw, int nonEmpty, int ticking, int fluid) {
 		this.states.installGenerated(requestedBits, palette, raw);
-		this.nonEmptyBlockCount = (short)nonEmpty;
-		this.tickingBlockCount = (short)ticking;
-		this.tickingFluidCount = (short)fluid;
+		this.counters.set(nonEmpty, ticking, fluid);
 	}
 
 	/** The block container's exact state and this section's counters (non-empty,
@@ -121,26 +121,23 @@ public class LevelChunkSection {
 	public GeneratedSection exportGenerated() {
 		var state = this.states.exportGenerated(net.minecraft.world.level.block.Block::getId);
 		return state == null ? null : new GeneratedSection(state.kind(), state.bits(), state.palette(), state.raw(),
-			this.nonEmptyBlockCount, this.tickingBlockCount, this.tickingFluidCount);
+			this.counters.get(0), this.counters.get(1), this.counters.get(2));
 	}
 
-	/** Native packed inputs are captured inside Rust; only counters cross here. */
+	/** Native stage pointers are borrowed only while this section is pinned. */
 	@org.jetbrains.annotations.Nullable
-	NativeLiveBlockSection nativeGenerationInput(java.lang.foreign.MemorySegment counters, int index) {
+	NativeLiveBlockSection nativeGenerationInput() {
 		if (this.getClass() != LevelChunkSection.class || this.states.getClass() != PalettedContainer.class) return null;
-		var owner = this.states.nativeLiveBlocks();
-		if (owner == null) return null;
-		counters.setAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, index * 3L, this.nonEmptyBlockCount);
-		counters.setAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, index * 3L + 1, this.tickingBlockCount);
-		counters.setAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, index * 3L + 2, this.tickingFluidCount);
-		return owner;
+		return this.states.nativeLiveBlocks();
 	}
+	java.lang.foreign.MemorySegment nativeGenerationCounters() { return this.counters.owner(); }
+
+	/** Coherent signed-short CPU snapshot: nonempty, ticking blocks, fluids in 16-bit lanes. */
+	public long packedSectionCounts() { return this.counters.packed(); }
 
 	void installNativeGenerated(NativeLiveBlockSection owner, int nonEmpty, int ticking, int fluid) {
 		this.states.installNativeGenerated(owner);
-		this.nonEmptyBlockCount = (short)nonEmpty;
-		this.tickingBlockCount = (short)ticking;
-		this.tickingFluidCount = (short)fluid;
+		this.counters.set(nonEmpty, ticking, fluid);
 	}
 
 	/** For a native biome fill: the recreated biome container's global palette
@@ -170,7 +167,7 @@ public class LevelChunkSection {
 	public record GeneratedSection(int kind, int bits, int[] palette, long[] raw, int nonEmpty, int ticking, int fluid) {}
 
 	public boolean hasOnlyAir() {
-		return this.nonEmptyBlockCount == 0;
+		return this.counters.get(0) == 0;
 	}
 
 	public boolean isRandomlyTicking() {
@@ -178,14 +175,18 @@ public class LevelChunkSection {
 	}
 
 	public boolean isRandomlyTickingBlocks() {
-		return this.tickingBlockCount > 0;
+		return this.counters.get(1) > 0;
 	}
 
 	public boolean isRandomlyTickingFluids() {
-		return this.tickingFluidCount > 0;
+		return this.counters.get(2) > 0;
 	}
 
 	public void recalcBlockCounts() {
+		if (this.getClass() == LevelChunkSection.class && this.states.getClass() == PalettedContainer.class) {
+			var live = this.states.nativeLiveBlocks();
+			if (live != null && live.recount(this.counters)) return;
+		}
 		class BlockCounter implements PalettedContainer.CountConsumer<BlockState> {
 			public int nonEmptyBlockCount;
 			public int tickingBlockCount;
@@ -211,9 +212,7 @@ public class LevelChunkSection {
 
 		BlockCounter lv = new BlockCounter();
 		this.states.count(lv);
-		this.nonEmptyBlockCount = (short)lv.nonEmptyBlockCount;
-		this.tickingBlockCount = (short)lv.tickingBlockCount;
-		this.tickingFluidCount = (short)lv.tickingFluidCount;
+		this.counters.set(lv.nonEmptyBlockCount, lv.tickingBlockCount, lv.tickingFluidCount);
 	}
 
 	public PalettedContainer<BlockState> getStates() {
@@ -225,7 +224,7 @@ public class LevelChunkSection {
 	}
 
 	public void read(FriendlyByteBuf friendlyByteBuf) {
-		this.nonEmptyBlockCount = friendlyByteBuf.readShort();
+		this.counters.adjust(0, friendlyByteBuf.readShort(), true);
 		this.states.read(friendlyByteBuf);
 		PalettedContainer<Holder<Biome>> palettedContainer = this.biomes.recreate();
 		palettedContainer.read(friendlyByteBuf);
@@ -239,7 +238,7 @@ public class LevelChunkSection {
 	}
 
 	public void write(FriendlyByteBuf friendlyByteBuf) {
-		friendlyByteBuf.writeShort(this.nonEmptyBlockCount);
+		friendlyByteBuf.writeShort(this.counters.get(0));
 		this.states.write(friendlyByteBuf);
 		this.biomes.write(friendlyByteBuf);
 	}

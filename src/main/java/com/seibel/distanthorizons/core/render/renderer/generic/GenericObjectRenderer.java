@@ -301,7 +301,8 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 				}
 				boolean cloudGroup = "Clouds".equals(boxGroup.resourceLocationPath);
 
-				DhApiVec3d origin = boxGroup.getOriginBlockPos();
+				var nativeCloud = boxGroup.nativeCloudState();
+                DhApiVec3d origin = nativeCloud == null ? boxGroup.getOriginBlockPos() : null;
 				DhApiRenderableBoxGroupShading shading = boxGroup.shading;
 				if (shading == null)
 				{
@@ -309,7 +310,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 				}
 				if (!finite(shading.north) || !finite(shading.south) || !finite(shading.east)
 					|| !finite(shading.west) || !finite(shading.top) || !finite(shading.bottom)
-					|| !finite(origin.x) || !finite(origin.y) || !finite(origin.z))
+					|| (origin != null && (!finite(origin.x) || !finite(origin.y) || !finite(origin.z))))
 				{
 					return false;
 				}
@@ -329,9 +330,15 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 						return false;
 					}
 				}
+                if (nativeCloud != null) {
+                    semanticBoxes.addNativeCloudGroupInstance(id, retained[0], nativeCloud,
+                        LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight), boxGroup.ssaoEnabled,
+                        shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom, boxCount);
+                } else {
 				semanticBoxes.addGroupInstance(id, retained[0], origin.x, origin.y, origin.z,
 					LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight), boxGroup.ssaoEnabled,
 					shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom, boxCount);
+                }
 				if (boxGroup.ssaoEnabled)
 				{
 					ssaoBoxes += boxCount;

@@ -31,6 +31,36 @@ pub unsafe extern "C" fn mattmc_proto_chunk_create_live(
         .map_or(0, |storage| Box::into_raw(Box::new(storage)) as u64)
 }
 
+/// Capture packed storage and native section-local counters in one locked snapshot.
+/// Arrays and both CPU owner pointers are aligned/live for the complete call;
+/// no pointer is retained. The caller excludes other stage mutation.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_proto_chunk_create_live_counters(
+    owners: *const *const crate::world::level::chunk::live::Owner,
+    counts: *const *const crate::world::level::chunk::counters::Owner,
+    count: i32, min_y: i32, height: i32, global_bits: i32,
+    surface: *const i64, floor: *const i64, heightmap_words: i32,
+) -> u64 {
+    let Some(flags) = crate::world::level::levelgen::noise_fill::installed_state_flags() else { return 0 };
+    if owners.is_null() || counts.is_null() || surface.is_null() || floor.is_null()
+        || owners as usize % 8 != 0 || counts as usize % 8 != 0
+        || surface as usize % 8 != 0 || floor as usize % 8 != 0
+        || !(1..=256).contains(&count) || heightmap_words <= 0 { return 0; }
+    let owners = unsafe { std::slice::from_raw_parts(owners, count as usize) };
+    let counters = unsafe { std::slice::from_raw_parts(counts, count as usize) };
+    let mut sections = Vec::with_capacity(count as usize);
+    for (&pointer, &counter) in owners.iter().zip(counters) {
+        if pointer.is_null() || counter.is_null() || pointer as usize % 8 != 0 || counter as usize % 8 != 0 { return 0; }
+        let Some(section) = (unsafe { &*pointer }).stage_with_counts(unsafe { &*counter }, flags.len() as u32, global_bits as u32)
+            else { return u64::MAX; };
+        sections.push(section);
+    }
+    let a = unsafe { std::slice::from_raw_parts(surface, heightmap_words as usize) };
+    let b = unsafe { std::slice::from_raw_parts(floor, heightmap_words as usize) };
+    ProtoStorage::new(min_y, height, sections, global_bits as u32, flags, a, b)
+        .map_or(0, |storage| Box::into_raw(Box::new(storage)) as u64)
+}
+
 /// Convert a modified stage section directly into a separately owned live
 /// section. 0 unmodified, 1 transferred, 2 compatibility, negative invalid.
 /// # Safety

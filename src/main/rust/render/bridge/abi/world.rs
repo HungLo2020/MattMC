@@ -551,10 +551,14 @@ pub struct FfiDhGenericGroupInstance {
     pub generation: u64,
     pub origin: [f64; 3],
     pub packed_light: u32,
-    /// Bit 0: SSAO.
+    /// Bit 0: SSAO. Bit 1: origin comes from the native CPU cloud owner.
     pub flags: u32,
     /// North, south, east, west, top, bottom directional multipliers.
     pub shading: [f32; 6],
+    /// ABI v75: pinned CPU cloud owner address; zero for API-supplied origins.
+    pub cloud_state: u64,
+    /// Requested immutable pose generation, copied before async execution.
+    pub cloud_pose_epoch: u64,
 }
 
 #[repr(C)]

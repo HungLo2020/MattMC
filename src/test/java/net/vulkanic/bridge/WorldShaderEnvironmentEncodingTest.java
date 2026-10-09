@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class WorldShaderEnvironmentEncodingTest {
     @Test void nativeLayoutAndEncoderPreserveCopiedShadowDistanceAndAdjacentFog() throws Exception {
         try (var bridge = VulkanicGalBridge.create("rust-vulkan"); var arena = Arena.ofConfined()) {
-            assertEquals(74, ABI_VERSION);
+            assertEquals(75, ABI_VERSION);
             var layout = Struct.WORLD_SHADER_ENVIRONMENT_FRAME;
             var item = arena.allocate(layout.byteSize(), 8);
             var encode = VulkanicGalBridge.class.getDeclaredMethod("encodeShaderEnvironment",

@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.Block;
 /** CPU-only native stage/live-storage handoff. No palette/word Java mirror. */
 public final class NativeGenerationSections {
     private NativeGenerationSections() {}
-    private static final MethodHandle CREATE_PROTO = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_proto_chunk_create_live",
+    private static final MethodHandle CREATE_PROTO = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_proto_chunk_create_live_counters",
             FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
@@ -33,16 +33,20 @@ public final class NativeGenerationSections {
         if (surface.length != floor.length || surface.length == 0) return 0;
         var sections = chunk.getSections();
         if (sections.length == 0 || sections.length > 256) return -1;
-        var owners = new NativeLiveBlockSection[sections.length];
+        // Pin exactly the borrowed owners/views, even if a caller later replaces an array entry.
+        var owners = new Object[sections.length * 2];
         try (var arena = Arena.ofConfined()) {
             var pointers = arena.allocate(sections.length * 8L, 8);
-            var counters = arena.allocate(sections.length * 12L, 4);
+            var counters = arena.allocate(sections.length * 8L, 8);
             for (int i = 0; i < sections.length; i++) {
                 var section = sections[i];
-                var owner = section == null ? null : section.nativeGenerationInput(counters, i);
+                var owner = section == null ? null : section.nativeGenerationInput();
                 if (owner == null) return -1;
-                owners[i] = owner;
+                var counterView = section.nativeGenerationCounters();
+                owners[i * 2] = owner;
+                owners[i * 2 + 1] = counterView;
                 pointers.setAtIndex(ValueLayout.ADDRESS, i, owner.stageOwner());
+                counters.setAtIndex(ValueLayout.ADDRESS, i, counterView);
             }
             var a = arena.allocateFrom(ValueLayout.JAVA_LONG, surface);
             var b = arena.allocateFrom(ValueLayout.JAVA_LONG, floor);
@@ -50,7 +54,7 @@ public final class NativeGenerationSections {
                     sections[0].generatedGlobalPaletteBits(), a, b, surface.length);
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot capture native generation sections", failure); }
-        finally { Reference.reachabilityFence(owners); }
+        finally { Reference.reachabilityFence(owners); Reference.reachabilityFence(chunk); Reference.reachabilityFence(sections); }
     }
 
     public static int installNoise(LevelChunkSection section, long handle, int index) {

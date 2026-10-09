@@ -1331,7 +1331,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         (55, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_count)),
     ] { assert_eq!(offset as u32, whole_frame.field_offsets[field]); }
     assert_eq!(size_of::<FfiDhGenericGroupBox>(), 56);
-    assert_eq!(size_of::<FfiDhGenericGroupInstance>(), 72);
+    assert_eq!(size_of::<FfiDhGenericGroupInstance>(), 88);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
         whole_frame.field_offsets[37]

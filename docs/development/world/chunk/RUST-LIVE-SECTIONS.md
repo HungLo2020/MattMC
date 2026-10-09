@@ -12,8 +12,10 @@ The implementation is in
 [`NativeLiveBlockSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java)
 is its transitional CPU bridge. This covers fresh containers, valid saved/network
 imports, generated-section installation and independent nonzero-width copies.
-Zero-width copies retain the shared single-value behavior described below. Biomes, chunk
-orchestration, scheduling and section block/fluid counters still use Java.
+Zero-width copies retain the shared single-value behavior described below.
+Section [block/fluid counters](RUST-SECTION-COUNTERS.md) now also have native
+owners and fuse with canonical writes. Biomes, chunk orchestration and
+scheduling still use Java.
 
 ## Consumers and remaining work
 

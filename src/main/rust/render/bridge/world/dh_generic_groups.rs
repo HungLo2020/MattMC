@@ -87,7 +87,9 @@ fn clear_groups() {
 
 /// Expands the frame's group instances (draw order) into camera-relative
 /// generic boxes; the instance index is the box's render-group ordinal.
-pub(super) fn expand_dh_generic_groups(
+/// # Safety
+/// Native cloud CPU owners must stay pinned until decoding completes.
+pub(super) unsafe fn expand_dh_generic_groups(
     instances: &[FfiDhGenericGroupInstance],
     camera: [f64; 3],
 ) -> GalResult<Vec<WorldDistantHorizonsGenericBoxRequest>> {
@@ -100,18 +102,31 @@ pub(super) fn expand_dh_generic_groups(
     let registry = lock();
     let mut boxes = Vec::new();
     for (ordinal, instance) in instances.iter().enumerate() {
-        if instance.flags & !1 != 0
+        if instance.flags & !3 != 0
             || instance.origin.iter().any(|value| !value.is_finite())
             || instance.shading.iter().any(|value| !value.is_finite())
         {
             return Err(GalError::invalid_argument("DH generic group instance has invalid flags, origin or shading"));
         }
+        let origin = if instance.flags & 2 != 0 {
+            if instance.origin != [0.0; 3] {
+                return Err(GalError::invalid_argument("native cloud origin must not be round-tripped through Java"));
+            }
+            crate::render::clouds::ffi::origin(instance.cloud_state, instance.cloud_pose_epoch)
+                .filter(|value| value.iter().all(|v| v.is_finite()))
+                .ok_or_else(|| GalError::invalid_argument("missing or expired native cloud pose"))?
+        } else {
+            if instance.cloud_state != 0 || instance.cloud_pose_epoch != 0 {
+                return Err(GalError::invalid_argument("API origin must not carry a native cloud owner"));
+            }
+            instance.origin
+        };
         let Some(group) = registry.groups.get(&instance.group_id).filter(|group| group.generation == instance.generation)
         else {
             RESEND_REQUESTED.store(true, Ordering::Release);
             continue;
         };
-        let place = |local: [f64; 3]| [0, 1, 2].map(|axis| ((local[axis] + instance.origin[axis]) - camera[axis]) as f32);
+        let place = |local: [f64; 3]| [0, 1, 2].map(|axis| ((local[axis] + origin[axis]) - camera[axis]) as f32);
         boxes.extend(group.boxes.iter().map(|item| WorldDistantHorizonsGenericBoxRequest {
             min: place(item.min),
             max: place(item.max),
@@ -180,6 +195,8 @@ mod tests {
             packed_light: 0x00f0_00f0,
             flags: 1,
             shading: [0.8, 0.8, 0.6, 0.6, 1.0, 0.5],
+            cloud_state: 0,
+            cloud_pose_epoch: 0,
         }
     }
 
@@ -190,7 +207,7 @@ mod tests {
             .unwrap();
         let origin = [100_000.25, 384.0, -2_048.75];
         let camera = [99_990.125, 70.5, -2_000.0];
-        let boxes = expand_dh_generic_groups(&[instance(id, 1, origin)], camera).unwrap();
+        let boxes = unsafe { expand_dh_generic_groups(&[instance(id, 1, origin)], camera) }.unwrap();
         assert_eq!(2, boxes.len());
         // Java: (float)(box.minPos.x + origin.x - camPos.x).
         assert_eq!((12.0f64 + origin[0] - camera[0]) as f32, boxes[1].min[0]);
@@ -200,11 +217,42 @@ mod tests {
     }
 
     #[test]
+    fn native_cloud_pose_is_consumed_without_java_coordinates_and_survives_owner_release() {
+        use crate::render::clouds::ffi::*;
+        let id = 0x9e00_0003;
+        set_group(id, 1, &[group_box([1.0,2.0,3.0], [4.0,5.0,6.0])]).unwrap();
+        unsafe {
+            let owner = mattmc_dh_cloud_create(2048,0,0,0);
+            let mut header = std::mem::MaybeUninit::uninit();
+            assert_eq!(0,mattmc_dh_cloud_prepare(owner,1000,6.0,0.0,70.0,0.0,0.0,0.0,1.0,128,320,header.as_mut_ptr()));
+            let pose = header.assume_init();
+            let mut direct = instance(id,1,[0.0;3]);
+            direct.flags = 2;
+            direct.cloud_state = owner as u64;
+            direct.cloud_pose_epoch = pose.epoch;
+            let camera = [12.25,70.5,-123.125];
+            let actual = expand_dh_generic_groups(&[direct],camera).unwrap();
+            let expected = expand_dh_generic_groups(&[instance(id,1,pose.origin.map(f64::from))],camera).unwrap();
+            assert_eq!(actual[0].min,expected[0].min);
+            assert_eq!(actual[0].max,expected[0].max);
+            assert!(!actual[0].ssao_enabled);
+            direct.origin = [1.0;3];
+            assert!(expand_dh_generic_groups(&[direct],camera).is_err());
+            direct.origin = [0.0;3];
+            direct.cloud_pose_epoch = 999;
+            assert!(expand_dh_generic_groups(&[direct],camera).is_err());
+            mattmc_dh_cloud_release(owner);
+            assert_eq!(actual[0].min,expected[0].min,"decoded frame contains coordinates, no borrowed owner");
+        }
+        release_group(id);
+    }
+
+    #[test]
     fn unknown_or_stale_groups_are_skipped_and_request_a_resend() {
         let id = 0x9e00_0002;
         set_group(id, 4, &[group_box([0.0; 3], [1.0; 3])]).unwrap();
         mattmc_vulkanic_dh_generic_groups_take_resend();
-        let boxes = expand_dh_generic_groups(&[instance(id, 3, [0.0; 3]), instance(id, 4, [0.0; 3])], [0.0; 3]).unwrap();
+        let boxes = unsafe { expand_dh_generic_groups(&[instance(id, 3, [0.0; 3]), instance(id, 4, [0.0; 3])], [0.0; 3]) }.unwrap();
         assert_eq!(1, boxes.len(), "the stale generation is skipped");
         assert_eq!(1, boxes[0].group, "ordinals follow the instance order");
         assert_eq!(1, mattmc_vulkanic_dh_generic_groups_take_resend());

@@ -27,6 +27,8 @@ final class NativeLiveBlockSection {
     private static final MethodHandle VIEW_RELEASE = handle("view_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle READ_SINGLE = handle("read_single", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle WRITE = handle("write", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    private static final MethodHandle WRITE_COUNTS = handle("write_counts", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    private static final MethodHandle RECOUNT = handle("recount", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle SNAPSHOT = handle("snapshot", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle HISTOGRAM = handle("histogram", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle LIGHT = handle("light", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
@@ -169,6 +171,29 @@ final class NativeLiveBlockSection {
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot mutate native live section", failure); }
         finally { Reference.reachabilityFence(current); Reference.reachabilityFence(this); }
+    }
+    int writeWithCounters(int index, int id, NativeSectionCounters counters) {
+        var current = this.view;
+        try {
+            // Exact admitted BlockStates expose cached facts. Replacing the
+            // same object has zero net short deltas, even for stale counters.
+            if (current.stateId(index) == id) return id;
+            if (!net.minecraft.world.level.block.NativeBlockRegistry.ready()) return -1;
+            long result = (long)WRITE_COUNTS.invokeExact(this.owner, counters.owner(), index, id);
+            if (result == -2) return -1;
+            if (result < 0) throw new IllegalArgumentException("Invalid native section/count write");
+            if ((result >>> 32) != 0) this.view = loadView();
+            return (int)result;
+        } catch (RuntimeException | Error failure) { throw failure; }
+        catch (Throwable failure) { throw new IllegalStateException("Cannot mutate native section counters", failure); }
+        finally { Reference.reachabilityFence(current); Reference.reachabilityFence(counters); Reference.reachabilityFence(this); }
+    }
+    boolean recount(NativeSectionCounters counters) {
+        if (!net.minecraft.world.level.block.NativeBlockRegistry.ready()) return false;
+        try { return (int)RECOUNT.invokeExact(this.owner, counters.owner()) == 1; }
+        catch (RuntimeException | Error failure) { throw failure; }
+        catch (Throwable failure) { throw new IllegalStateException("Cannot recount native section", failure); }
+        finally { Reference.reachabilityFence(counters); Reference.reachabilityFence(this); }
     }
     void readSingle(int id) {
         try {

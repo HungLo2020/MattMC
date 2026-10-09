@@ -1,6 +1,8 @@
 # Rust palette histograms
 
 Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+Canonical [section recounts](RUST-SECTION-COUNTERS.md) scan that owner directly
+and bypass callback records. General count consumers retain this ordered API.
 The helper path and historical acceptance below are narrower verification;
 historical pinned-body drivers reject the new container ownership changes.
 Use the live-section guide's current Gradle checks; the older driver commands
@@ -22,8 +24,8 @@ and wider formats keep their existing path.
 The kernel lives in
 [`palette/histogram/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette/histogram).
 [`NativePaletteHistogram`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativePaletteHistogram.java)
-owns transfers and scratch lifetime. Java still resolves palette objects and
-invokes consumers; `LevelChunkSection` counter/update code is unchanged.
+owns transfers and scratch lifetime. Java still resolves palette objects and invokes general count consumers;
+unsupported section recounts retain this compatibility path.
 
 ## Constraints when changing this code
 

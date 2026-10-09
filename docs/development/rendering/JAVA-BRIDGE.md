@@ -122,9 +122,11 @@ proxy root: both structural extraction and the posed fallback remain empty
 
 ABI 72 appends retained DH generic-group instances as whole-frame field 51 and
 the double camera origin as field 52. Group boxes use struct 116 (56 bytes:
-double min/max bounds, color and material); instances use struct 117 (72 bytes:
+double min/max bounds, color and material); ABI 75 instances use struct 117 (88 bytes:
 group id/generation, double origin, packed light, SSAO flag and six shading
-multipliers). Java registers changed boxes through `setDhGenericGroup`; Rust
+multipliers, CPU cloud owner and pose generation). Native cloud instances set
+flag bit 1 and carry zero origin lanes; ordinary API instances carry zero native
+fields. See [cloud preparation and lifetime](RUST-DH-CLOUDS.md). Java registers changed boxes through `setDhGenericGroup`; Rust
 copies them into its CPU registry, then expands each frame's instances into
 ordinary camera-relative boxes in draw order. This is retained input data,
 not a retained GPU scene or a borrowed Java array. Both id and generation must

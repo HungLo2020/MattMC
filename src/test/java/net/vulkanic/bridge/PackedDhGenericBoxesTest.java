@@ -46,4 +46,31 @@ class PackedDhGenericBoxesTest {
 			1, 1, 1, 1, 1, 1, false, 256, 0));
 		assertEquals(0, packed.size());
 	}
+    @Test void nativeInstancesCopyEpochsPinOwnersAndNeverReencodeProjectedOrigins() throws Exception {
+        var state=new net.vulkanic.world.NativeDhCloudGroupState(2048,0,0,0);
+        state.prepare(1000,6,0,70,0,0,0,1,128,320);
+        long epoch=state.poseEpoch();
+        var packed=new VulkanicGalBridge.PackedDhGenericBoxes();
+        packed.addNativeCloudGroupInstance(7,1,state,0,false,1,1,1,1,1,1,2);
+        var copy=new VulkanicGalBridge.PackedDhGenericBoxes();
+        copy.addAllPacked(packed);
+        packed.clear();
+        state.prepare(2000,6,0,70,0,0,0,1,128,320);
+        var encode=VulkanicGalBridge.PackedDhGenericBoxes.class.getDeclaredMethod("encodeInstances",Arena.class);
+        encode.setAccessible(true);
+        var owners=VulkanicGalBridge.PackedDhGenericBoxes.class.getDeclaredField("instanceCloudOwners");
+        owners.setAccessible(true);
+        assertEquals(state,((Object[])owners.get(copy))[0]);
+        try(var arena=Arena.ofConfined()) {
+            var bytes=(java.lang.foreign.MemorySegment)encode.invoke(copy,arena);
+            assertEquals(88,bytes.byteSize());
+            assertEquals(2,bytes.get(ValueLayout.JAVA_INT,44),"native origin flag must not enable SSAO");
+            for(int i=0;i<3;i++) assertEquals(0,bytes.get(ValueLayout.JAVA_DOUBLE,16+i*8));
+            assertEquals(state.ownerAddress(),bytes.get(ValueLayout.JAVA_LONG,72));
+            assertEquals(epoch,bytes.get(ValueLayout.JAVA_LONG,80),"copy holds the requested frame, not the latest projection");
+        }
+        copy.clear();
+        assertEquals(null,((Object[])owners.get(copy))[0],"clearing frame storage must release CPU owners");
+    }
+
 }

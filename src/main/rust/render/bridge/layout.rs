@@ -1646,7 +1646,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         117 => layout!(
             117,
             FfiDhGenericGroupInstance,
-            [group_id, generation, origin, packed_light, flags, shading]
+            [group_id, generation, origin, packed_light, flags, shading, cloud_state, cloud_pose_epoch]
         ),
         _ => {
             return Err(GalError::ffi(

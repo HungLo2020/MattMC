@@ -251,6 +251,22 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		return this.getAndSet(this.strategy.getIndex(i, j, k), object);
 	}
 
+	/** Exact standard containers only; a declined native policy mutates nothing. */
+	@Nullable
+	T trySetWithCounters(int x, int y, int z, T value, boolean locked, NativeSectionCounters counters) {
+		if (this.getClass() != PalettedContainer.class) return null;
+		var live = this.nativeBlocks;
+		int id = live == null ? -1 : nativeStateId(value);
+		if (id < 0) return null;
+		int index = this.strategy.getIndex(x, y, z);
+		if (index < 0 || index >= 4096) return null;
+		if (locked) this.acquire();
+		try {
+			int old = live.writeWithCounters(index, id, counters);
+			return old < 0 ? null : (T)net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.byId(old);
+		} finally { if (locked) this.release(); }
+	}
+
 	private T getAndSet(int i, T object) {
 		var live = this.nativeBlocks;
 		int id = live == null ? -1 : nativeStateId(object);

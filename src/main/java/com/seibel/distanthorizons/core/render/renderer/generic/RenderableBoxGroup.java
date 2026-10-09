@@ -1,5 +1,6 @@
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
+import net.vulkanic.world.NativeDhCloudGroupState;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3d;
@@ -187,8 +188,24 @@ public class RenderableBoxGroup
 		 * This is called before every frame, even if {@link this#isActive()} returns false. <br>
 		 * {@link this#isActive()} can be changed at this point before the object is rendered to the frame.
 		 */
+        private NativeDhCloudGroupState nativeCloudState;
+
+        void publishNativeCloud(NativeDhCloudGroupState state) {
+            originBlockPos.x = state.originX();
+            originBlockPos.y = state.originY();
+            originBlockPos.z = state.originZ();
+            nativeCloudState = state;
+        }
+
+        NativeDhCloudGroupState nativeCloudState() {
+            var state = nativeCloudState;
+            return state != null && state.matches(originBlockPos.x,originBlockPos.y,originBlockPos.z)
+                    ? state : null;
+        }
+
 		public void preRender(DhApiRenderParam renderEventParam) 
 		{
+            this.nativeCloudState = null;
 			if (this.beforeRenderFunc != null)
 			{
 				this.beforeRenderFunc.accept(renderEventParam);

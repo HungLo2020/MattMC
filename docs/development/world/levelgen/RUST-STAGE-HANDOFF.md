@@ -18,7 +18,9 @@ with import/export entries beside each stage. See
 
 - Import copies packed inputs under each native owner's lock. Stages retain no
   live-owner pointers: later live mutations cannot alter their input snapshots.
-  Stage storage still unpacks sections lazily on first access.
+  Native [section counters](../chunk/RUST-SECTION-COUNTERS.md) are sampled under
+  the same lock; Java no longer projects a three-counter input array. Stage
+  storage still unpacks sections lazily on first access.
 - Install packs a modified dense stage section once in Rust and creates a unique
   live owner. Java registers its cleanup before allocating the CPU projection,
   then publishes it and the original three counters. Releasing the stage cannot
@@ -30,7 +32,7 @@ with import/export entries beside each stage. See
   canonical live owners. Custom classes, alias palettes and unsupported metadata
   retain the original compatibility import/install. Check class identities before
   invoking custom methods; do not narrow the existing generation eligibility gate.
-- Pointer arrays, counters and small heightmaps use confined native scratch for
+- Storage/counter pointer arrays and small heightmaps use confined native scratch for
   ordinary FFM calls. Pin all input owners until import returns. A successful
   result transfers one owned pointer; consume it once. No native registry/cache,
   GPU handle, frame ownership or renderer ABI changes are involved.
@@ -38,9 +40,9 @@ with import/export entries beside each stage. See
 Java still orchestrates chunks, biome inputs, marks and heightmap publication.
 The generation-stage dense representation and live packed representation remain
 separate Rust formats. Input copying and output packing/allocation remain; this
-is native-only capture/adoption, not zero-copy transfer. Counters are published
-by Java separately; a combined storage/counter transaction and whole-chunk
-failure atomicity are not established. General save/network enumeration still uses temporary
+is native-only capture/adoption, not zero-copy transfer. Output counters are published
+through the Java bridge separately after live-owner adoption; whole-chunk
+failure atomicity is not established. General save/network enumeration still uses temporary
 Java compatibility projections; further producer/consumer migration remains work.
 
 ## Verification and profiling
@@ -54,7 +56,9 @@ python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --all-java
 python3 DevUtils/RunWiki.py check
 ```
 
-The author reports 26 focused Java tests passing at `a908f78c`. Handoff cases verify
+The preceding handoff milestone passed 26 focused Java tests at `a908f78c`.
+The section-counter follow-up passes the full 1,762-test Java suite (2 skipped),
+including the direct counter-owner input route. Handoff cases verify
 snapshot isolation, stage-release/GC lifetimes, unchanged-owner preservation,
 alias compatibility and every palette growth boundary through global storage.
 A custom NOISE chunk with extra untouched sections verifies that installation
@@ -95,3 +99,9 @@ transfer speedup or its regression cause. Retained final receipt:
 records repeats/p99. This documentation review inspected source and committed
 author reports, not the unbundled receipts, profiles or images, and reran no
 Java/Rust suites or runtime workloads. Broader producer/consumer migration remains open.
+
+The newer [section-counter verification](../chunk/RUST-SECTION-COUNTERS.md#verification)
+includes this handoff and DH cloud ownership, release `59171b74`. All seven
+lifecycle cases and reviewed coast pairs pass. Vanilla/DH performance floors
+still fail; shader modes pass. These scoped checks do not establish broad
+parity or an isolated transfer speedup.

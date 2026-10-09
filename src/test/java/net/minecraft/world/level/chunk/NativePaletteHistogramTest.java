@@ -268,20 +268,7 @@ class NativePaletteHistogramTest {
     }
 
     static long rawCounts(LevelChunkSection section) {
-        try {
-            long packed = 0;
-            int shift = 0;
-            for (var name :
-                    List.of("nonEmptyBlockCount", "tickingBlockCount", "tickingFluidCount")) {
-                var f = LevelChunkSection.class.getDeclaredField(name);
-                f.setAccessible(true);
-                packed |= (long) Short.toUnsignedInt(f.getShort(section)) << shift;
-                shift += 16;
-            }
-            return packed;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        return section.packedSectionCounts();
     }
 
     @Test

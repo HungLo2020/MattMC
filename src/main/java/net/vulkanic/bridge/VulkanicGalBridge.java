@@ -1,5 +1,7 @@
 package net.vulkanic.bridge;
 
+import net.vulkanic.world.NativeDhCloudGroupState;
+import java.lang.ref.Reference;
 import net.blaze3d.platform.Window;
 import net.minecraft.util.NativeLibraryLoader;
 import org.lwjgl.glfw.GLFW;
@@ -120,7 +122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 74;
+	public static final int ABI_VERSION = 75;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -635,6 +637,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	private PipelinedPresent pipelinedPresent;
 	/** Request memory of the in-flight pipelined frame, closed at its join. */
 	private Arena pipelinedRequestArena;
+    private NativeDhCloudGroupState[] pipelinedCloudOwners = new NativeDhCloudGroupState[0];
 
 	public PresentedFrame presentFrame(long frameId, long correlationId, long waitSubmissionId) {
 		MemorySegment request = Struct.FRAME_PRESENT.allocate(arena);
@@ -2500,6 +2503,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.FRAME_PRESENT.setLong(presentRequest, 2, present.correlationId());
 			Struct.FRAME_PRESENT.setLong(presentRequest, 3, 0L);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
+            if (worldDistantHorizonsGenericBoxes instanceof PackedDhGenericBoxes packed)
+                pipelinedCloudOwners = packed.pinCloudOwners(pipelinedCloudOwners);
 			int status = Native.wholeFrameSubmitPipelined(contextId, request, presentRequest, result);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 			checkStatus(status, "pipelined whole-frame submission");
@@ -2514,9 +2519,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 		checkStatus(status, wholeFrame ? "whole-frame submission" : "world primitive submission");
 		return readWholeFrameSubmitResult(result);
-		} finally {
-			arena = previousArena;
-			if (!requestHandedOff) {
+        } finally {
+            Reference.reachabilityFence(worldDistantHorizonsGenericBoxes);
+            arena = previousArena;
+            if (!requestHandedOff) {
+                Arrays.fill(pipelinedCloudOwners,null);
 				frameArena.close();
 			}
 		}
@@ -2550,6 +2557,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				if (pipelinedRequestArena != null) {
 					pipelinedRequestArena.close();
 					pipelinedRequestArena = null;
+                    Arrays.fill(pipelinedCloudOwners,null);
 				}
 			}
 			checkStatus(joined, "pipelined frame join");
@@ -4319,6 +4327,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private int[] instanceLights = new int[0];
 		private int[] instanceFlags = new int[0];
 		private float[] instanceShading = new float[0];
+        private NativeDhCloudGroupState[] instanceCloudOwners = new NativeDhCloudGroupState[0];
+        private long[] instanceCloudEpochs = new long[0];
 		private int instanceCount;
 		private int retainedBoxes;
 		private double cameraX;
@@ -4329,6 +4339,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override public int size() { return size; }
 
 		@Override public void clear() {
+            Arrays.fill(instanceCloudOwners, 0, instanceCount, null);
 			size = 0;
 			instanceCount = 0;
 			retainedBoxes = 0;
@@ -4367,6 +4378,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				instanceLights = Arrays.copyOf(instanceLights, capacity);
 				instanceFlags = Arrays.copyOf(instanceFlags, capacity);
 				instanceShading = Arrays.copyOf(instanceShading, capacity * 6);
+                instanceCloudOwners = Arrays.copyOf(instanceCloudOwners, capacity);
+                instanceCloudEpochs = Arrays.copyOf(instanceCloudEpochs, capacity);
 			}
 			int i = instanceCount;
 			instanceIds[i] = groupId;
@@ -4374,12 +4387,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			instanceOrigins[i * 3] = originX; instanceOrigins[i * 3 + 1] = originY; instanceOrigins[i * 3 + 2] = originZ;
 			instanceLights[i] = packedLight;
 			instanceFlags[i] = ssaoEnabled ? 1 : 0;
+            instanceCloudOwners[i] = null;
+            instanceCloudEpochs[i] = 0;
 			instanceShading[i * 6] = northShading; instanceShading[i * 6 + 1] = southShading;
 			instanceShading[i * 6 + 2] = eastShading; instanceShading[i * 6 + 3] = westShading;
 			instanceShading[i * 6 + 4] = topShading; instanceShading[i * 6 + 5] = bottomShading;
 			instanceCount++;
 			retainedBoxes += boxCount;
 		}
+
+        /** The requested native pose is consumed in Rust; no origin coordinates cross back. */
+        public void addNativeCloudGroupInstance(long id, long generation, NativeDhCloudGroupState owner,
+                int light, boolean ssao, float north, float south, float east, float west,
+                float top, float bottom, int boxes) {
+            Objects.requireNonNull(owner);
+            long epoch = owner.poseEpoch();
+            if (epoch == 0) throw new IllegalArgumentException("Cloud group has no prepared pose");
+            addGroupInstance(id,generation,0,0,0,light,ssao,north,south,east,west,top,bottom,boxes);
+            int index = instanceCount - 1;
+            instanceFlags[index] |= 2;
+            instanceCloudOwners[index] = owner;
+            instanceCloudEpochs[index] = epoch;
+        }
+
+        private NativeDhCloudGroupState[] pinCloudOwners(NativeDhCloudGroupState[] pins) {
+            if (pins.length < instanceCount) pins = new NativeDhCloudGroupState[instanceCloudOwners.length];
+            Arrays.fill(pins,null);
+            System.arraycopy(instanceCloudOwners,0,pins,0,instanceCount);
+            return pins;
+        }
 
 		private MemorySegment encodeInstances(Arena arena) {
 			var layout = Struct.WORLD_DH_GENERIC_GROUP_INSTANCE;
@@ -4393,6 +4429,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				records.set(ValueLayout.JAVA_INT, base + layout.offset(3), instanceLights[index]);
 				records.set(ValueLayout.JAVA_INT, base + layout.offset(4), instanceFlags[index]);
 				MemorySegment.copy(instanceShading, index * 6, records, ValueLayout.JAVA_FLOAT, base + layout.offset(5), 6);
+                var owner = instanceCloudOwners[index];
+                records.set(ValueLayout.JAVA_LONG,base + layout.offset(6),owner == null ? 0 : owner.ownerAddress());
+                records.set(ValueLayout.JAVA_LONG,base + layout.offset(7),instanceCloudEpochs[index]);
 			}
 			return records;
 		}
@@ -4470,9 +4509,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				for (int i = 0; i < other.instanceCount; i++) {
 					addGroupInstance(other.instanceIds[i], other.instanceGenerations[i], other.instanceOrigins[i * 3],
 						other.instanceOrigins[i * 3 + 1], other.instanceOrigins[i * 3 + 2], other.instanceLights[i],
-						other.instanceFlags[i] != 0, other.instanceShading[i * 6], other.instanceShading[i * 6 + 1],
+						(other.instanceFlags[i] & 1) != 0, other.instanceShading[i * 6], other.instanceShading[i * 6 + 1],
 						other.instanceShading[i * 6 + 2], other.instanceShading[i * 6 + 3],
 						other.instanceShading[i * 6 + 4], other.instanceShading[i * 6 + 5], 0);
+                    int added = instanceCount - 1;
+                    instanceFlags[added] = other.instanceFlags[i];
+                    instanceCloudOwners[added] = other.instanceCloudOwners[i];
+                    instanceCloudEpochs[added] = other.instanceCloudEpochs[i];
 				}
 				retainedBoxes += other.retainedBoxes;
 				setCamera(other.cameraX, other.cameraY, other.cameraZ);
@@ -5273,6 +5316,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (pipelinedRequestArena != null) {
 			pipelinedRequestArena.close();
 			pipelinedRequestArena = null;
+                    Arrays.fill(pipelinedCloudOwners,null);
 		}
 		queuedFrameCount = 0;
 		persistentGuiMeshTopologies.clear();

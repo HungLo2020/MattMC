@@ -192,7 +192,9 @@ impl Owner {
             return None;
         }
         let state = self.state.lock().unwrap();
-        let g = &state.generation;
+        Some(Self::stage_generation(&state.generation))
+    }
+    fn stage_generation(g: &Generation) -> (u32, u32, Vec<i32>, Vec<i64>) {
         let kind = if g.global {
             3
         } else if g.bits == 0 {
@@ -210,7 +212,21 @@ impl Owner {
             .iter()
             .map(|w| w.load(Ordering::Acquire) as i64)
             .collect();
-        Some((kind, g.bits as u32, palette, words))
+        (kind, g.bits as u32, palette, words)
+    }
+    /// Counts and storage are sampled under the mutation lock. No Java projection.
+    pub(crate) fn stage_with_counts(
+        &self,
+        counts: &super::counters::Owner,
+        limit: u32,
+        global_bits: u32,
+    ) -> Option<(u32, u32, Vec<i32>, Vec<i64>, [i32; 3])> {
+        if self.limit != limit || self.global_bits != global_bits as usize {
+            return None;
+        }
+        let state = self.state.lock().unwrap();
+        let (kind, bits, palette, words) = Self::stage_generation(&state.generation);
+        Some((kind, bits, palette, words, counts.values()))
     }
     // One fused write, including palette admission, first-use growth and packed mutation.
     fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {
@@ -218,6 +234,9 @@ impl Owner {
             return None;
         }
         let mut s = self.state.lock().unwrap();
+        self.write_locked(&mut s, index, value)
+    }
+    fn write_locked(&self, s: &mut State, index: usize, value: u32) -> Option<(u32, bool)> {
         let old = s.generation.state(index);
         if s.generation.global {
             s.generation.set(index, value);
@@ -282,6 +301,77 @@ impl Owner {
         s.generation = next;
         s.ids = ids;
         Some((old, true))
+    }
+    pub(super) fn write_counts(
+        &self,
+        counts: &super::counters::Owner,
+        index: usize,
+        value: u32,
+        policies: &[Option<super::counters::Policy>],
+    ) -> Option<(u32, bool)> {
+        if index >= ENTRIES || value >= self.limit || policies.len() != self.limit as usize {
+            return None;
+        }
+        let new_policy = policies[value as usize]?;
+        let mut s = self.state.lock().unwrap();
+        let old_policy = policies[s.generation.state(index) as usize]?;
+        // Admission completes before either state or counters changes.
+        let result = self.write_locked(&mut s, index, value)?;
+        counts.increment(old_policy, new_policy);
+        Some(result)
+    }
+    pub(super) fn recount(
+        &self,
+        counts: &super::counters::Owner,
+        policies: &[Option<super::counters::Policy>],
+    ) -> bool {
+        if policies.len() != self.limit as usize {
+            return false;
+        }
+        let s = self.state.lock().unwrap();
+        let g = &s.generation;
+        let mut values = [0; 3];
+        if g.bits == 0 {
+            let Some(policy) = policies[g.state(0) as usize] else {
+                return false;
+            };
+            let contribution = policy.recount();
+            for lane in 0..3 {
+                values[lane] = contribution[lane] * ENTRIES as i32;
+            }
+        } else {
+            let per = 64 / g.bits;
+            let mask = (1u64 << g.bits) - 1;
+            for (cell, word) in g.words.iter().enumerate() {
+                let count = per.min(ENTRIES - cell * per);
+                let bits = count * g.bits;
+                let valid = u64::MAX >> (64 - bits);
+                let raw = word.load(Ordering::Acquire) & valid;
+                let first = raw & mask;
+                // Preserve the existing histogram's uniform-word fast case;
+                // complete-word and final-word padding never contributes.
+                let uniform = raw == first * (valid / mask);
+                let fields = if uniform { 1 } else { count };
+                for field in 0..fields {
+                    let local = ((raw >> (field * g.bits)) & mask) as usize;
+                    let id = if g.global {
+                        local
+                    } else {
+                        g.palette[local].load(Ordering::Acquire) as usize
+                    };
+                    let Some(policy) = policies[id] else {
+                        return false;
+                    };
+                    let contribution = policy.recount();
+                    let frequency = if uniform { count as i32 } else { 1 };
+                    for lane in 0..3 {
+                        values[lane] += contribution[lane] * frequency;
+                    }
+                }
+            }
+        }
+        counts.set(values);
+        true
     }
     fn read_single(&self, value: u32) -> bool {
         if value >= self.limit {

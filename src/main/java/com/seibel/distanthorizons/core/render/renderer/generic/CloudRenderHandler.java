@@ -17,6 +17,9 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.world.WorldRenderRoutePolicy;
+import net.vulkanic.world.NativeDhCloudGroupState;
+import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
+import net.minecraft.client.Minecraft;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -242,7 +245,7 @@ public class CloudRenderHandler
 				boxGroup.setSsaoEnabled(false);
 				boxGroup.setShading(cloudShading);
 				
-				CloudParams cloudParams = new CloudParams(textureWidth, x, z);
+				CloudParams cloudParams = new CloudParams(textureWidth, x, z, boxGroup.getClass() == RenderableBoxGroup.class);
 				boxGroup.setPreRenderFunc((renderParam) -> this.preRender(renderParam, cloudParams));
 				
 				renderer.add(boxGroup);
@@ -271,19 +274,40 @@ public class CloudRenderHandler
 		
 		
 		
+        if (cloudParams.nativeState != null && boxGroup instanceof RenderableBoxGroup nativeGroup) {
+            var state = cloudParams.nativeState;
+            long now = System.currentTimeMillis();
+            var camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+            var position = camera.getPosition();
+            var look = camera.getLookVector();
+            boxGroup.setActive(state.prepare(now, this.moveSpeedInBlocksPerSecond,
+                    position.x, position.y, position.z, look.x(), look.y(), look.z(),
+                    Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get(),
+                    this.level.getLevelWrapper().getMaxHeight()));
+            if (!DEBUG_BORDER_COLORS && boxGroup.isActive()) {
+                Color color = this.level.getClientLevelWrapper().getCloudColor(renderParam.partialTicks);
+                if (!color.equals(boxGroup.get(0).color)) {
+                    for (DhApiRenderableBox box : boxGroup) box.color = color;
+                }
+                if (state.colorChanged(color.getRGB())) boxGroup.triggerBoxChange();
+            }
+            nativeGroup.publishNativeCloud(state);
+            return;
+        }
+
 		//================//
 		// cloud movement //
 		//================//
 		
 		long currentTime = System.currentTimeMillis();
-		float deltaTime = (currentTime - cloudParams.lastFrameTime) / 1000.0f; // Delta time in seconds
-		cloudParams.lastFrameTime = currentTime;
+		float deltaTime = (currentTime - cloudParams.legacy.lastFrameTime) / 1000.0f; // Delta time in seconds
+		cloudParams.legacy.lastFrameTime = currentTime;
 		
 		float deltaX = this.moveSpeedInBlocksPerSecond * deltaTime;
 		// negative delta is to match vanilla's cloud movement
-		cloudParams.deltaOffsetX -= deltaX;
+		cloudParams.legacy.deltaOffsetX -= deltaX;
 		// wrap the cloud around after reaching the edge
-		cloudParams.deltaOffsetX %= cloudParams.widthInBlocks;
+		cloudParams.legacy.deltaOffsetX %= cloudParams.widthInBlocks;
 		
 		
 		
@@ -307,11 +331,11 @@ public class CloudRenderHandler
 		
 		
 		float newMinPosX = 
-				cloudParams.deltaOffsetX
+				cloudParams.legacy.deltaOffsetX
 				+ (cloudParams.instanceOffsetX * cloudParams.widthInBlocks)
 				+ instanceOffsetX + cloudParams.halfWidthInBlocks;
 		float newMinPosY = this.level.getLevelWrapper().getMaxHeight() + 200;
-		float newMinPosZ = cloudParams.deltaOffsetZ
+		float newMinPosZ = cloudParams.legacy.deltaOffsetZ
 				+ (cloudParams.instanceOffsetZ * cloudParams.widthInBlocks)
 				+ instanceOffsetZ + cloudParams.halfWidthInBlocks;
 		
@@ -361,9 +385,9 @@ public class CloudRenderHandler
 			
 			// trigger an update if this cloud section has a different color
 			// TODO merge all cloud VBOs so we only need to trigger this once
-			if (!cloudParams.previousColor.equals(newCloudColor))
+			if (!cloudParams.legacy.previousColor.equals(newCloudColor))
 			{
-				cloudParams.previousColor = newCloudColor;
+				cloudParams.legacy.previousColor = newCloudColor;
 				
 				boxGroup.triggerBoxChange();
 			}
@@ -511,21 +535,19 @@ public class CloudRenderHandler
 		public final int instanceOffsetZ;
 		
 		
-		/** how far this cloud group has moved in the X direction based on time */
-		public float deltaOffsetX = 0;
-		/** how far this cloud group has moved in the Z direction based on time */
-		public float deltaOffsetZ = 0;
-		
-		public long lastFrameTime = System.currentTimeMillis();
-		
-		/** used so we can trigger a VBO update when necessary */
-		public Color previousColor = Color.WHITE;
-		
-		
-		
+        public final NativeDhCloudGroupState nativeState;
+        public final LegacyCloudState legacy;
+
+        private static final class LegacyCloudState {
+            float deltaOffsetX, deltaOffsetZ;
+            long lastFrameTime;
+            Color previousColor = Color.WHITE;
+            LegacyCloudState(long now) { lastFrameTime = now; }
+        }
+
 		// constructor //
 		
-		public CloudParams(int textureWidth, int instanceOffsetX, int instanceOffsetZ)
+		public CloudParams(int textureWidth, int instanceOffsetX, int instanceOffsetZ, boolean builtInGroup)
 		{
 			this.textureWidth = textureWidth;
 			this.widthInBlocks = (this.textureWidth * CLOUD_BOX_WIDTH);
@@ -533,6 +555,13 @@ public class CloudRenderHandler
 			
 			this.instanceOffsetX = instanceOffsetX;
 			this.instanceOffsetZ = instanceOffsetZ;
+            long now = System.currentTimeMillis();
+            // Custom wrappers retain their original getter timing and side effects.
+            boolean nativeLayout = builtInGroup && widthInBlocks > 0 && MC_RENDER != null
+                    && MC_RENDER.getClass() == MinecraftRenderWrapper.class;
+            this.nativeState = nativeLayout
+                    ? new NativeDhCloudGroupState(widthInBlocks, instanceOffsetX, instanceOffsetZ, now) : null;
+            this.legacy = nativeLayout ? null : new LegacyCloudState(now);
 		}
 		
 	}

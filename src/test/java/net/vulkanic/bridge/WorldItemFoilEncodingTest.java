@@ -54,7 +54,7 @@ class WorldItemFoilEncodingTest {
 
     @Test void exportedNativeLayoutCarriesExactAndCanonicalAbsentFields() throws Exception {
         try (var bridge = VulkanicGalBridge.create("rust-vulkan"); var arena = Arena.ofConfined()) {
-			assertEquals(74, ABI_VERSION);
+			assertEquals(75, ABI_VERSION);
             var layout = Struct.WORLD_MESH_INSTANCE_RECORD;
             var item = arena.allocate(layout.byteSize(), 8);
             var encode = VulkanicGalBridge.class.getDeclaredMethod("encodeWorldItemFoil", MemorySegment.class, StandardItemFoilRecord.class);

@@ -1,4 +1,5 @@
 //! World chunk storage helpers, independent of rendering.
+pub(crate) mod counters;
 pub(crate) mod live;
 pub(crate) mod palette;
 pub(crate) mod snapshot;
