@@ -702,28 +702,16 @@ pub(super) fn native_model_offset(
     if state.offset_type == OFFSET_NONE {
         return (0.0, 0.0, 0.0);
     }
-    let seed = mth_seed(block.absolute_x, 0, block.absolute_z);
-    let max_h = state.max_horizontal_offset;
-    let x = ((((seed & 15) as f32) / 15.0 - 0.5) * 0.5).clamp(-max_h, max_h);
-    let z = ((((seed >> 8 & 15) as f32) / 15.0 - 0.5) * 0.5).clamp(-max_h, max_h);
-    if state.offset_type == OFFSET_XYZ {
-        let y = (((seed >> 4 & 15) as f32) / 15.0 - 1.0) * state.max_vertical_offset;
-        (x, y, z)
-    } else if state.offset_type == OFFSET_XZ {
-        (x, 0.0, z)
-    } else {
-        (0.0, 0.0, 0.0)
-    }
-}
-
-pub(super) fn mth_seed(x: i32, y: i32, z: i32) -> i64 {
-    let mut value =
-        (x as i64).wrapping_mul(3_129_871) ^ (z as i64).wrapping_mul(116_129_781) ^ (y as i64);
-    value = value
-        .wrapping_mul(value)
-        .wrapping_mul(42_317_861)
-        .wrapping_add(value.wrapping_mul(11));
-    value >> 16
+    let kind = match state.offset_type {
+        OFFSET_XZ => crate::content::block::OffsetType::Xz,
+        OFFSET_XYZ => crate::content::block::OffsetType::Xyz,
+        _ => return (0.0,0.0,0.0),
+    };
+    let config = crate::content::block::offset::Config {
+        kind, horizontal: state.max_horizontal_offset, vertical: state.max_vertical_offset,
+    };
+    let [x,y,z] = config.offset(block.absolute_x,block.absolute_z);
+    (x as f32,y as f32,z as f32)
 }
 
 #[cfg(test)]

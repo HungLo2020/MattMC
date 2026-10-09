@@ -4,3 +4,7 @@
 mod content;
 #[path = "../../main/rust/world/mod.rs"]
 mod world;
+
+#[path = "../../main/rust/core/math.rs"]
+mod shared_math;
+mod core { pub(crate) use crate::shared_math as math; }

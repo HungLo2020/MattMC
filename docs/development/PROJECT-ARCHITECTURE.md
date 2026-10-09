@@ -102,7 +102,7 @@ Application-level orchestration belongs here. This is the intended home for futu
 
 ### `core/`
 
-Shared engine primitives belong here. Use this for low-level types, algorithms, memory utilities, math, identifiers, and cross-subsystem foundations that are not specifically rendering, world, platform, or gameplay code.
+Shared engine primitives belong here. Use this for low-level types, algorithms, memory utilities, math, identifiers, and cross-subsystem foundations that are not specifically rendering, world, platform, or gameplay code. `core/math.rs` supplies exact coordinate seeding shared by content, world generation and terrain meshing.
 
 ### `world/`
 
@@ -194,6 +194,9 @@ Java block/fluid views use it. [Block state definitions](game-model/BLOCK-DEFINI
 registered catalog and shared graphs; [physical definitions](game-model/BLOCK-PHYSICS.md)
 supply intrinsic block settings. [Intrinsic state rules](game-model/BLOCK-INTRINSICS.md)
 compute semantic map colors, emitted light and canonical fluid associations.
+[Sound content](game-model/SOUND-DEFINITIONS.md) owns event identities, profiles
+and note instruments; [block sound/offset definitions](game-model/BLOCK-SOUND-AND-OFFSETS.md)
+own state sound selection and model offsets. Playback resources stay in `audio/`.
 General gameplay remains Java.
 
 [`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,

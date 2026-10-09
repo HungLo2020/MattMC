@@ -23,6 +23,9 @@ import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.lighting.LightEngine;
@@ -192,6 +195,63 @@ public final class StateGraphReference {
                 }
             }
         }
+        MessageDigest materialDigest = MessageDigest.getInstance("SHA-256");
+        int soundProfiles = 0, offsetSamples = 0;
+        var soundNames = new IdentityHashMap<SoundType,String>();
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), materialDigest))) {
+            for (var event : BuiltInRegistries.SOUND_EVENT) {
+                out.writeInt(BuiltInRegistries.SOUND_EVENT.getId(event));
+                out.writeUTF(BuiltInRegistries.SOUND_EVENT.getKey(event).toString());out.writeUTF(event.location().toString());
+                out.writeBoolean(event.fixedRange().isPresent());
+                if(event.fixedRange().isPresent())out.writeInt(Float.floatToRawIntBits(event.fixedRange().get()));
+                for(float volume:new float[]{Float.NEGATIVE_INFINITY,-1.0F,-0.0F,0.0F,1.0F,1.0001F,2.0F,Float.NaN,Float.POSITIVE_INFINITY})
+                    out.writeInt(Float.floatToRawIntBits(event.getRange(volume)));
+            }
+            for(var owner:List.of(SoundType.class,Class.forName("net.alexscaves.server.block.ACSoundTypes"))) {
+                var fields=new java.util.ArrayList<java.lang.reflect.Field>();
+                for(var field:owner.getFields())if(field.getType()==SoundType.class)fields.add(field);
+                fields.sort(Comparator.comparing(java.lang.reflect.Field::getName));
+                for(var field:fields) {
+                    var sound=(SoundType)field.get(null);String name=owner.getName()+"."+field.getName();
+                    if(soundNames.put(sound,name)!=null)throw new AssertionError("Merged sound profile identities");
+                    out.writeUTF(name);soundProfile(out,sound);soundProfiles++;
+                }
+            }
+            for(var instrument:NoteBlockInstrument.values()) {
+                out.writeInt(instrument.ordinal());out.writeUTF(instrument.getSerializedName());
+                out.writeInt(BuiltInRegistries.SOUND_EVENT.getId(instrument.getSoundEvent().value()));
+                out.writeBoolean(instrument.isTunable());out.writeBoolean(instrument.hasCustomSound());out.writeBoolean(instrument.worksAboveNoteBlock());
+            }
+            var soundField=BlockBehaviour.Properties.class.getDeclaredField("soundType");soundField.setAccessible(true);
+            var maxH=BlockBehaviour.class.getDeclaredMethod("getMaxHorizontalOffset");maxH.setAccessible(true);
+            var maxV=BlockBehaviour.class.getDeclaredMethod("getMaxVerticalOffset");maxV.setAccessible(true);
+            var offsetConfigs=new java.util.HashSet<String>();
+            for(var block:BuiltInRegistries.BLOCK) {
+                out.writeInt(BuiltInRegistries.BLOCK.getId(block));
+                out.writeUTF(java.util.Objects.requireNonNull(soundNames.get(soundField.get(block.properties()))));
+                float h=(Float)maxH.invoke(block),v=(Float)maxV.invoke(block);
+                out.writeInt(Float.floatToRawIntBits(h));out.writeInt(Float.floatToRawIntBits(v));
+                for(var state:block.getStateDefinition().getPossibleStates()) {
+                    out.writeInt(Block.getId(state));out.writeUTF(java.util.Objects.requireNonNull(soundNames.get(state.getSoundType())));
+                    out.writeUTF(state.instrument().getSerializedName());
+                }
+                var state=block.defaultBlockState();
+                int kind=!state.hasOffsetFunction()?0:state.getOffset(new BlockPos(23,7,-13)).y!=0.0||state.getOffset(new BlockPos(121,0,47)).y!=0.0?2:1;
+                String key=kind+"/"+Float.floatToRawIntBits(h)+"/"+Float.floatToRawIntBits(v);
+                if(!offsetConfigs.add(key))continue;
+                out.writeUTF(key);int size=kind==2?4096:kind==1?256:1,filled=0;boolean[] seen=new boolean[size];
+                for(int x=0;x<1000000 && filled<size;x++) {
+                    int z=-113;long seed=Mth.getSeed(x,0,z);
+                    int at=kind==2?(int)seed&4095:kind==1?((int)seed&15)|((int)(seed>>4)&240):0;
+                    if(seen[at])continue;seen[at]=true;filled++;
+                    offset(out,state,new BlockPos(x,73,z));offsetSamples++;
+                }
+                if(filled!=size)throw new AssertionError("Incomplete offset key coverage: "+key);
+                for(int[] pos:new int[][]{{Integer.MIN_VALUE,Integer.MAX_VALUE},{Integer.MAX_VALUE,Integer.MIN_VALUE},{-30000000,30000000},{-687,687}}) {
+                    offset(out,state,new BlockPos(pos[0],-31,pos[1]));offsetSamples++;
+                }
+            }
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
@@ -200,7 +260,21 @@ public final class StateGraphReference {
             + " block_states=" + blockStates + " block_sha256=" + HexFormat.of().formatHex(blockDigest.digest())
             + " physical_sha256=" + HexFormat.of().formatHex(physicalDigest.digest())
             + " intrinsic_sha256=" + HexFormat.of().formatHex(intrinsicDigest.digest())
+            + " sound_events=" + BuiltInRegistries.SOUND_EVENT.size() + " sound_profiles=" + soundProfiles
+            + " instruments=" + NoteBlockInstrument.values().length + " offset_samples=" + offsetSamples
+            + " material_sha256=" + HexFormat.of().formatHex(materialDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
+    }
+
+    private static void soundProfile(DataOutputStream out, SoundType sound) throws Exception {
+        out.writeInt(Float.floatToRawIntBits(sound.getVolume()));out.writeInt(Float.floatToRawIntBits(sound.getPitch()));
+        for(var event:List.of(sound.getBreakSound(),sound.getStepSound(),sound.getPlaceSound(),sound.getHitSound(),sound.getFallSound()))
+            out.writeInt(BuiltInRegistries.SOUND_EVENT.getId(event));
+    }
+    private static void offset(DataOutputStream out, BlockState state, BlockPos pos) throws Exception {
+        out.writeInt(pos.getX());out.writeInt(pos.getY());out.writeInt(pos.getZ());
+        var value=state.getOffset(pos);
+        out.writeLong(Double.doubleToRawLongBits(value.x));out.writeLong(Double.doubleToRawLongBits(value.y));out.writeLong(Double.doubleToRawLongBits(value.z));
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

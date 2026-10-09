@@ -14,6 +14,8 @@ import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.sounds.NativeSoundDefinitions;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
@@ -33,13 +35,16 @@ public final class NativeBlockDefinitions {
         private final Template template;
         private final Physics physics;
         private final ScalarRule mapColor, light;
-        private final MemorySegment intrinsicStates;
-        private Definition(int id, String name, int firstState, Template template, Physics physics, ScalarRule mapColor, ScalarRule light, MemorySegment intrinsicStates) {
+        private final MemorySegment intrinsicStates, soundStates;
+        private final NativeBlockMaterials.Material material;
+        private Definition(int id, String name, int firstState, Template template, Physics physics, ScalarRule mapColor, ScalarRule light, MemorySegment intrinsicStates, MemorySegment soundStates, NativeBlockMaterials.Material material) {
             this.id = id; this.name = name; this.firstState = firstState; this.template = template; this.physics = physics;
             this.mapColor = mapColor; this.light = light; this.intrinsicStates = intrinsicStates;
+            this.soundStates = soundStates; this.material = material;
         }
         void applyProperties(BlockBehaviour.Properties properties) {
             this.physics.apply(properties);
+            this.material.apply(properties);
             properties.mapColor = this.mapColor.colorView;
             properties.lightEmission = this.light.lightView;
         }
@@ -49,7 +54,8 @@ public final class NativeBlockDefinitions {
             var builder = new StateDefinition.Builder<Block, BlockState>(owner);
             builder.add(this.template.properties().toArray(Property<?>[]::new));
             return builder.createWithGraph(Block::defaultBlockState,
-                (block, values, codec, local) -> new BlockState(block, values, codec, word(this.intrinsicStates, this.firstState + local)),
+                (block, values, codec, local) -> new BlockState(block, values, codec, word(this.intrinsicStates, this.firstState + local),
+                    SoundType.nativeView(soundId(this.soundStates, this.firstState + local)), this.material.offset()),
                 this.template.graph);
         }
     }
@@ -148,23 +154,26 @@ public final class NativeBlockDefinitions {
         if (pointer.address() == 0 || length.get(ValueLayout.JAVA_INT, 0) != expected) throw new IllegalStateException("Native block buffer mismatch: " + kind);
         return pointer.reinterpret((long) expected * bytes, Arena.global(), null).asReadOnly();
     }
+    private static int soundId(MemorySegment table, int index) { return table.getAtIndex(ValueLayout.JAVA_SHORT,index) & 65535; }
     private static int word(MemorySegment table, int index) { return table.getAtIndex(ValueLayout.JAVA_INT, index); }
 
     private static Map<String, Definition> load() {
         try (Arena inputs = Arena.ofConfined()) {
-            MemorySegment header = buffer(0, 12, Integer.BYTES, inputs);
+            MemorySegment header = buffer(0, 15, Integer.BYTES, inputs);
             int count = word(header, 1), states = word(header, 2), templates = word(header, 3);
             int properties = word(header, 4), nameBytes = word(header, 5), graphs = word(header, 6);
             int physicalProfiles = word(header, 7);
             int rules = word(header, 8), ruleProperties = word(header, 9), ruleValues = word(header, 10), fluidStates = word(header, 11);
-            if (word(header, 0) != 3 || count <= 0 || count > 65535 || states <= 0 || states > 65535
+            int materials = word(header, 12), offsets = word(header, 13), offsetValues = word(header, 14);
+            if (word(header, 0) != 4 || count <= 0 || count > 65535 || states <= 0 || states > 65535
                 || templates <= 0 || templates > count || properties < 0 || properties > 1048576
                 || nameBytes <= 0 || nameBytes > 16777216 || graphs <= 0 || graphs > templates || physicalProfiles <= 0 || physicalProfiles > count
                 || rules <= 0 || rules > count * 2 || ruleProperties < 0 || ruleProperties > 1048576
-                || ruleValues <= 0 || ruleValues > states * 2 || fluidStates <= 0 || fluidStates > 65535) {
+                || ruleValues <= 0 || ruleValues > states * 2 || fluidStates <= 0 || fluidStates > 65535
+                || materials <= 0 || materials > count || offsets <= 0 || offsets > materials || offsetValues <= 0 || offsetValues > offsets * 4096 * 3) {
                 throw new IllegalStateException("Unsupported native block schema");
             }
-            MemorySegment rows = buffer(1, count * 5, Integer.BYTES, inputs);
+            MemorySegment rows = buffer(1, count * 6, Integer.BYTES, inputs);
             MemorySegment templateRows = buffer(2, templates * 4, Integer.BYTES, inputs);
             MemorySegment propertyIds = buffer(3, properties, Integer.BYTES, inputs);
             MemorySegment names = buffer(4, nameBytes, 1, inputs);
@@ -216,6 +225,15 @@ public final class NativeBlockDefinitions {
                 nextRuleProperty += size; nextRuleValue += values;
             }
             if (nextRuleProperty != ruleProperties || nextRuleValue != ruleValues) throw new IllegalStateException("Incomplete native scalar rules");
+            MemorySegment materialRows = buffer(11, materials * 3, Integer.BYTES, inputs);
+            MemorySegment soundStates = buffer(12, states, Short.BYTES, inputs);
+            MemorySegment offsetRows = buffer(13, offsets * 5, Integer.BYTES, inputs);
+            MemorySegment offsetData = buffer(14, offsetValues, Double.BYTES, inputs);
+            var materialViews = NativeBlockMaterials.load(materials, offsets, offsetValues, materialRows, offsetRows, offsetData);
+            for (int state = 0; state < states; state++) {
+                int sound = soundId(soundStates,state);
+                if (sound < 0 || sound >= NativeSoundDefinitions.typeCount()) throw new IllegalStateException("Invalid native state sound");
+            }
             NativeStateGraph[] graphViews = new NativeStateGraph[graphs];
             for (int id = 0; id < graphs; id++) graphViews[id] = NativeStateGraph.borrowBlockGraph(id);
             Template[] views = new Template[templates];
@@ -237,17 +255,17 @@ public final class NativeBlockDefinitions {
             Map<String, Definition> result = new HashMap<>();
             int nextState = 0;
             for (int id = 0; id < count; id++) {
-                int base = id * 5, start = word(rows, base), length = word(rows, base + 1);
-                int firstState = word(rows, base + 2), template = word(rows, base + 3), physical = word(rows, base + 4);
+                int base = id * 6, start = word(rows, base), length = word(rows, base + 1);
+                int firstState = word(rows, base + 2), template = word(rows, base + 3), physical = word(rows, base + 4), material = word(rows, base + 5);
                 if (start < 0 || length <= 0 || (long) start + length > nameBytes || firstState != nextState
-                    || template < 0 || template >= templates || physical < 0 || physical >= physicalProfiles) throw new IllegalStateException("Invalid native block row: " + id);
+                    || template < 0 || template >= templates || physical < 0 || physical >= physicalProfiles || material < 0 || material >= materials) throw new IllegalStateException("Invalid native block row: " + id);
                 Template t = views[template];
                 if ((long) nextState + t.graph.stateCount > states) throw new IllegalStateException("Invalid native block range");
                 int colorRule = word(ruleRefs, id * 2), lightRule = word(ruleRefs, id * 2 + 1);
                 if (colorRule < 0 || colorRule >= rules || lightRule < 0 || lightRule >= rules) throw new IllegalStateException("Invalid native block rule binding");
                 for (int value : ruleViews[lightRule].values) if (value > 15) throw new IllegalStateException("Native emission outside range");
                 String name = new String(names.asSlice(start, length).toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8);
-                if (result.put(name, new Definition(id, name, firstState, t, physicalViews[physical], ruleViews[colorRule], ruleViews[lightRule], intrinsicStates)) != null) throw new IllegalStateException("Duplicate native block name: " + name);
+                if (result.put(name, new Definition(id, name, firstState, t, physicalViews[physical], ruleViews[colorRule], ruleViews[lightRule], intrinsicStates, soundStates, materialViews[material])) != null) throw new IllegalStateException("Duplicate native block name: " + name);
                 nextState += t.graph.stateCount;
             }
             if (nextState != states) throw new IllegalStateException("Incomplete native block states");

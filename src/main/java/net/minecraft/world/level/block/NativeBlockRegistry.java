@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * pass state IDs and let Rust derive their tables from it; when it is not
  * {@link #ready()} they keep their Java paths. Layout: {@code content/block/export.rs}. */
 public final class NativeBlockRegistry {
-    private static final int FORMAT = 7;
+    private static final int FORMAT = 8;
     private static final int MAX_STATES = 65535;
     // Flag bits, shared with content/block/mod.rs StateFlags.
     static final int AIR = 1, BLOCKS_MOTION = 2, HAS_FLUID = 4, RANDOM_TICKS = 8, LIGHT_EMPTY_SHAPE = 16, LEAVES = 32, CUSTOM = 64,
@@ -102,16 +102,12 @@ public final class NativeBlockRegistry {
 
         var ints = new Ints();
         for (int v : new int[]{FORMAT, blocks.size(), stateCount, 0}) ints.add(v);
-        for (Block block : blocks) {
-            ints.add(Float.floatToRawIntBits(block.defaultBlockState().sodium$getMaxHorizontalOffset()));
-            ints.add(Float.floatToRawIntBits(block.defaultBlockState().sodium$getMaxVerticalOffset()));
-        }
         // Light occlusion faces, interned by exact box list; the empty face is 0.
         var seen = new IdentityHashMap<VoxelShape, Integer>();
         var ids = new HashMap<List<AABB>, Integer>();
         var shapes = new ArrayList<VoxelShape>();
         face(Shapes.empty(), seen, ids, shapes);
-        var bytes = new ByteArrayOutputStream(stateCount * 2);
+        var bytes = new ByteArrayOutputStream(stateCount);
         Direction[] directions = Direction.values();
         for (int id = 0; id < stateCount; id++) {
             BlockState state = Block.BLOCK_STATE_REGISTRY.byId(id);
@@ -119,7 +115,6 @@ public final class NativeBlockRegistry {
             if (shapes.size() > 65535) return null;
             ints.add(flags(state));
             bytes.write(state.getLightBlock());
-            bytes.write(state.sodium$getOffsetType().ordinal());
         }
         int faces = shapes.size();
         ints.set(3, faces);

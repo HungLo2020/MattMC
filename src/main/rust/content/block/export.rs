@@ -1,14 +1,14 @@
 //! Installs remaining Java-owned state facts against native block definitions.
-//! Format: [version, block count, state count, face count], then two f32-bit
-//! offset bounds per block, then per state six face IDs and remaining flags.
-//! Bytes: light block and offset type per state, then face matrix.
+//! Format: [version, block count, state count, face count], then
+//! per state six face IDs and remaining flags.
+//! Bytes: blocked light per state, then face matrix.
 //! Java no longer exports names, defaults, properties, state value indices,
-//! emitted light or fluid associations; intrinsic state data is native-owned.
-use super::{definitions, BlockRegistry, Builder, Error, FaceId, OffsetType, PropertyId, StateFacts, StateFlags, DIRECTIONS};
+//! emitted light, fluid associations or offsets; intrinsic data is native-owned.
+use super::{definitions, BlockRegistry, Builder, Error, FaceId, PropertyId, StateFacts, StateFlags, DIRECTIONS};
 use crate::content::property;
 use definitions::physics::PhysicalFlags;
 
-pub(crate) const FORMAT: i32 = 7;
+pub(crate) const FORMAT: i32 = 8;
 const STATE_INTS: usize = DIRECTIONS + 1;
 
 struct Cursor<'a, T> { values: &'a [T], at: usize }
@@ -40,9 +40,8 @@ pub(crate) fn decode(ints: &[i32], bytes: &[u8]) -> Result<BlockRegistry, Error>
     let faces = ints.count(u16::MAX as usize)?;
     let expected_states: usize = native.definitions().iter().map(|d| native.state_count(d)).sum();
     if blocks != native.definitions().len() || states != expected_states { return Err(Error::Invalid("native definition count")); }
-    let offsets = ints.take(blocks * 2)?;
     let rows = ints.take(states * STATE_INTS)?;
-    let facts = bytes.take(states * 2)?;
+    let facts = bytes.take(states)?;
     let matrix = bytes.take(faces * faces)?.to_vec();
     ints.done()?;
     bytes.done()?;
@@ -67,7 +66,7 @@ pub(crate) fn decode(ints: &[i32], bytes: &[u8]) -> Result<BlockRegistry, Error>
         let mut state_facts = Vec::with_capacity(native.state_count(definition));
         for state in first..first + native.state_count(definition) {
             let row = &rows[state * STATE_INTS..(state + 1) * STATE_INTS];
-            let b = &facts[state * 2..state * 2 + 2];
+            let light = facts[state];
             let mut light_faces = [FaceId(0); DIRECTIONS];
             for (face, &id) in light_faces.iter_mut().zip(&row[..DIRECTIONS]) {
                 *face = FaceId(u16::try_from(id).map_err(|_| Error::Invalid("export face"))?);
@@ -81,14 +80,14 @@ pub(crate) fn decode(ints: &[i32], bytes: &[u8]) -> Result<BlockRegistry, Error>
             let intrinsic = native.state_traits(super::StateId(state as u16)).expect("native intrinsic state");
             state_facts.push(StateFacts {
                 flags: StateFlags(flags),
-                light_block: b[0], emission: intrinsic.emission, light_faces,
+                light_block: light, emission: intrinsic.emission, light_faces,
                 fluid_state: intrinsic.fluid,
-                offset: OffsetType::from_u8(b[1]).ok_or(Error::Invalid("export offset"))?,
+                offset: definition.material.offset.config().kind,
             });
         }
         let id = builder.block(definition.name, &properties, template.default_local, state_facts)?;
-        let at = definition.id.0 as usize * 2;
-        builder.max_offsets(id, f32::from_bits(offsets[at] as u32), f32::from_bits(offsets[at + 1] as u32))?;
+        let offset = definition.material.offset.config();
+        builder.max_offsets(id, offset.horizontal, offset.vertical)?;
     }
     builder.finish(faces, matrix)
 }

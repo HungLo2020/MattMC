@@ -111,7 +111,7 @@ properties! {
     ChestType, "CHEST_TYPE", "type", Domain::Enum(&["single", "left", "right"]);
     ModeComparator, "MODE_COMPARATOR", "mode", Domain::Enum(&["compare", "subtract"]);
     DoorHinge, "DOOR_HINGE", "hinge", Domain::Enum(&["left", "right"]);
-    NoteblockInstrument, "NOTEBLOCK_INSTRUMENT", "instrument", Domain::Enum(&["harp", "basedrum", "snare", "hat", "bass", "flute", "bell", "guitar", "chime", "xylophone", "iron_xylophone", "cow_bell", "didgeridoo", "bit", "banjo", "pling", "zombie", "skeleton", "creeper", "dragon", "wither_skeleton", "piglin", "custom_head"]);
+    NoteblockInstrument, "NOTEBLOCK_INSTRUMENT", "instrument", Domain::Enum(crate::content::sound::INSTRUMENT_NAMES);
     PistonType, "PISTON_TYPE", "type", Domain::Enum(&["normal", "sticky"]);
     SlabType, "SLAB_TYPE", "type", Domain::Enum(&["top", "bottom", "double"]);
     StairsShape, "STAIRS_SHAPE", "shape", Domain::Enum(&["straight", "inner_left", "inner_right", "outer_left", "outer_right"]);

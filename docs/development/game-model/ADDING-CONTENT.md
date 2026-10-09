@@ -8,7 +8,8 @@
 ## Current transition
 
 New registered blocks need a [native definition](BLOCK-DEFINITIONS.md),
-[physical settings](BLOCK-PHYSICS.md) and [intrinsic state rules](BLOCK-INTRINSICS.md),
+[physical settings](BLOCK-PHYSICS.md), [intrinsic rules](BLOCK-INTRINSICS.md) and
+[sound/offset settings](BLOCK-SOUND-AND-OFFSETS.md),
 plus the remaining Java behavior/codec/item bindings and assets. The single-file
 builder below is still proposed.
 

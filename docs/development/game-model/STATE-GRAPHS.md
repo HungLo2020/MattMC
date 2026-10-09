@@ -73,10 +73,13 @@ intrinsic facts, legacy block IDs and codec outputs/identity round trips.
 Version 3 adds all property declarations/codecs; version 4 adds block-state
 flags, lighting, fluid associations, two sampled offsets and light-occlusion
 boxes. Version 5 adds 18 physical settings, matching superclass caches where
-present, and seven cached physical facts per block state. Current version 6
+present, and seven cached physical facts per block state. Version 6
 adds default/cached map-color IDs, copied color/emission functions and canonical
-fluid associations. The contextual probes use `EmptyBlockGetter` at
-`BlockPos.ZERO`; the separate offset probes use two fixed positions.
+fluid associations. Current version 7 also checks sound-event identities/ranges,
+profile/instrument references and per-state sound/instrument bindings. Its
+offset coverage exhausts finite indices and extreme coordinates; see
+[sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md). Other contextual probes use
+`EmptyBlockGetter` at `BlockPos.ZERO`; they do not cover arbitrary worlds.
 
 The observer's graph count combines block and fluid states; the recorded
 31,846 total comprises 31,809 block states plus 37 fluid states. Matching
@@ -84,4 +87,7 @@ digests cover the inspected semantics and samples, not all contextual
 collision/gameplay, rendering or save-lifecycle behavior. Use repeated
 unprofiled measurements and the
 [full rendering workflow](../rendering/RENDER-VERIFICATION.md) for runtime
-acceptance. No observer or runtime suite was rerun for this documentation review.
+acceptance. The historical documentation review did not rerun these suites. The later
+sound/offset milestone ran five v7 Frozen pairs and its full client workflow;
+its [recorded results](SOUND-DEFINITIONS.md#editing-and-verification) remain
+scoped evidence rather than complete gameplay/application acceptance.

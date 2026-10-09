@@ -12,7 +12,9 @@ and block state with typed IDs (`BlockId`, `StateId(u16)`, `PropertyId`,
 `FaceId`) and per-state columns. [Native definitions](BLOCK-DEFINITIONS.md)
 own names, order, domains and defaults; [physical settings](BLOCK-PHYSICS.md)
 also originate in Rust. [Intrinsic state rules](BLOCK-INTRINSICS.md) own
-map colors, emission and fluid associations. Java exports remaining state facts
+map colors, emission and fluid associations. [Sound and offset definitions](BLOCK-SOUND-AND-OFFSETS.md)
+also originate in Rust, alongside the [sound-event registry](SOUND-DEFINITIONS.md).
+Java exports remaining state facts
 once, lazily on the first `NativeBlockRegistry.ready()` call after its
 compatibility registries are frozen. Lighting, heightmaps, worldgen and chunk saving
 derive their tables from it; terrain meshing combines its facts with

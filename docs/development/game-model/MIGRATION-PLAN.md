@@ -20,7 +20,7 @@ The original Phase 1 milestone established the shared registry:
   - block/property definitions and every state's columns
   - interned light-occlusion face IDs and Java's truth table
 
-Current construction combines native declarations with a smaller format-7
+Current construction combines native declarations with a smaller format-8
 export of remaining Java state facts; see Phase 2 below.
 
 - These per-slice tables were replaced by views of it, and each Java bridge
@@ -56,9 +56,11 @@ come from Rust, including all five registry entries and their 37 intrinsic
 state rows. [Block state definitions](BLOCK-DEFINITIONS.md) now supply the
 ordered catalog, property sets and defaults. [Physical settings](BLOCK-PHYSICS.md)
 and [intrinsic state rules](BLOCK-INTRINSICS.md) now also originate in Rust.
-The latter own map colors, emission and fluid associations. Java still supplies
-factories, shapes/predicates, blocked light, codecs, state-object views and
-world-dependent gameplay. The
+The latter own map colors, emission and fluid associations.
+[Sound definitions](SOUND-DEFINITIONS.md) now own all sound events, profiles and
+instruments; [block settings](BLOCK-SOUND-AND-OFFSETS.md) select them and own
+model offsets. Java still supplies factories, shapes/predicates, blocked light,
+codecs, state-object views and world-dependent gameplay. The
 [134 property declarations](PROPERTY-DEFINITIONS.md) also originate
 in Rust; block registries share their schemas and fluids use their typed
 domains. This includes all 11 additional properties for integrated content.

@@ -16,8 +16,9 @@ growth stages, spawner/vault states and waterlogging. These are executable
 content rules, not a checked-in dump of 31,809 state results.
 
 Native consumers read immutable `StateTraits` by `StateId`. The remaining-fact
-packet uses format 7 and no longer imports emitted light or fluid IDs from
-Java. Shapes, blocked light and contextual gameplay still await migration.
+packet introduced format 7 to remove emitted light and fluid IDs from Java.
+The [sound/offset follow-up](BLOCK-SOUND-AND-OFFSETS.md) uses format 8 and
+also derives offset kinds and limits natively. Shapes, blocked light and contextual gameplay still await migration.
 Map palette identities are native; palette RGB values/shading remain separate
 work. Render-owned textures, materials and tints are unaffected by these rules.
 

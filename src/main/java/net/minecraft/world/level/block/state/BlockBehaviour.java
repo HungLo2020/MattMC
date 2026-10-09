@@ -451,6 +451,8 @@ public abstract class BlockBehaviour implements FeatureElement {
 		private BlockBehaviour.BlockStateBase.Cache cache;
 		private FluidState fluidState = Fluids.EMPTY.defaultFluidState();
         private final boolean nativeIntrinsicState;
+        private final SoundType nativeSound;
+        private final NativeBlockMaterials.Offset nativeOffset;
 		private boolean isRandomlyTicking;
 		private boolean solidRender;
 		private VoxelShape occlusionShape;
@@ -459,12 +461,13 @@ public abstract class BlockBehaviour implements FeatureElement {
 		private int lightBlock;
 
 		protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec) {
-            this(block, reference2ObjectArrayMap, mapCodec, -1);
+            this(block, reference2ObjectArrayMap, mapCodec, -1, null, null);
         }
 
-        protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec, int nativeTraits) {
+        protected BlockStateBase(Block block, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<BlockState> mapCodec, int nativeTraits, SoundType nativeSound, NativeBlockMaterials.Offset nativeOffset) {
 			super(block, reference2ObjectArrayMap, mapCodec);
             this.nativeIntrinsicState = nativeTraits >= 0;
+            this.nativeSound = nativeSound; this.nativeOffset = nativeOffset;
 			BlockBehaviour.Properties properties = block.properties;
 			this.lightEmission = nativeTraits >= 0 ? (nativeTraits >>> 8) & 15 : properties.lightEmission.applyAsInt(this.asState());
 			this.useShapeForLightOcclusion = block.useShapeForLightOcclusion(this.asState());
@@ -716,6 +719,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public Vec3 getOffset(BlockPos blockPos) {
+            if (this.nativeOffset != null) return this.nativeOffset.at(blockPos);
 			BlockBehaviour.OffsetFunction offsetFunction = this.offsetFunction;
 			return offsetFunction != null ? offsetFunction.evaluate(this.asState(), blockPos) : Vec3.ZERO;
 		}
@@ -729,11 +733,11 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public float sodium$getMaxHorizontalOffset() {
-			return this.getBlock().getMaxHorizontalOffset();
+			return this.nativeOffset != null ? this.nativeOffset.horizontal : this.getBlock().getMaxHorizontalOffset();
 		}
 
 		public float sodium$getMaxVerticalOffset() {
-			return this.getBlock().getMaxVerticalOffset();
+			return this.nativeOffset != null ? this.nativeOffset.vertical : this.getBlock().getMaxVerticalOffset();
 		}
 
 		public boolean triggerEvent(Level level, BlockPos blockPos, int i, int j) {
@@ -912,7 +916,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public SoundType getSoundType() {
-			return this.getBlock().getSoundType(this.asState());
+			return this.nativeSound != null ? this.nativeSound : this.getBlock().getSoundType(this.asState());
 		}
 
 		public void onProjectileHit(Level level, BlockState blockState, BlockHitResult blockHitResult, Projectile projectile) {

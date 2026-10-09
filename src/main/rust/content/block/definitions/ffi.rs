@@ -4,7 +4,9 @@ use std::ffi::c_void;
 /// Selectors: 0 header, 1 block rows, 2 template rows, 3 property IDs (i32),
 /// 4 UTF-8 names, 5 physical profiles (seven i32 words), 6 packed intrinsic states,
 /// 7 block color/light rule IDs, 8 rule rows, 9 rule property IDs, 10 rule values.
-/// Counts are elements. Invalid selectors return null/zero.
+/// 11 material profiles (i32), 12 state sound IDs (u16), 13 offset descriptors (i32),
+/// 14 exact offset coordinates (f64). Counts are elements. Invalid selectors
+/// return null/zero.
 /// # Safety
 /// `length` is null or addresses one writable i32.
 #[no_mangle]
@@ -23,6 +25,10 @@ pub unsafe extern "C" fn mattmc_block_definitions_buffer(kind: i32, length: *mut
         8 => (r.rule_rows.as_ptr().cast(), r.rule_rows.len()),
         9 => (r.rule_properties.as_ptr().cast(), r.rule_properties.len()),
         10 => (r.rule_values.as_ptr().cast(), r.rule_values.len()),
+        11 => (r.material_rows.as_ptr().cast(), r.material_rows.len()),
+        12 => (r.state_sounds.as_ptr().cast(), r.state_sounds.len()),
+        13 => (r.offset_rows.as_ptr().cast(), r.offset_rows.len()),
+        14 => (r.offset_values.as_ptr().cast(), r.offset_values.len()),
         _ => (std::ptr::null(), 0),
     };
     *length = len as i32;

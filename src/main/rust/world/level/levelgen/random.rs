@@ -3,12 +3,7 @@
 //! and their positional factories' `at(x, y, z)`. Only the draws world
 //! generation uses natively are provided; Java keeps every other caller.
 
-/// `Mth.getSeed(int, int, int)`: the x product is an int multiply, sign-extended.
-pub(crate) fn position_seed(x: i32, y: i32, z: i32) -> i64 {
-    let l = (x.wrapping_mul(3_129_871) as i64) ^ (z as i64).wrapping_mul(116_129_781) ^ (y as i64);
-    let l = l.wrapping_mul(l).wrapping_mul(42_317_861).wrapping_add(l.wrapping_mul(11));
-    l >> 16
-}
+pub(crate) use crate::core::math::position_seed;
 
 /// `XoroshiroRandomSource`.
 pub(crate) struct Xoroshiro {

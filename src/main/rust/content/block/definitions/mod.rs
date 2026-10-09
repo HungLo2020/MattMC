@@ -5,6 +5,7 @@ mod ffi;
 mod templates;
 pub mod physics;
 pub mod intrinsic;
+pub mod material;
 #[cfg(test)]
 mod tests;
 
@@ -24,6 +25,7 @@ pub struct Definition {
     pub first_state: StateId,
     pub template: u16,
     pub physics: &'static physics::Physics,
+    pub material: &'static material::Material,
 }
 
 pub struct Registry {
@@ -31,13 +33,17 @@ pub struct Registry {
     templates: Vec<Template>,
     graphs: Vec<StateGraph>,
     by_name: HashMap<&'static str, BlockId>,
-    header: [i32; 12],
+    header: [i32; 15],
     rows: Vec<i32>,
     template_rows: Vec<i32>,
     properties: Vec<i32>,
     graph_headers: Vec<[i32; 5]>,
     names: Vec<u8>,
     physics_rows: Vec<i32>,
+    material_rows: Vec<i32>,
+    state_sounds: Vec<crate::content::sound::SoundType>,
+    offset_rows: Vec<i32>,
+    offset_values: Vec<f64>,
     intrinsic_states: Vec<intrinsic::StateTraits>,
     intrinsic_rows: Vec<i32>,
     rule_refs: Vec<i32>,
@@ -50,12 +56,18 @@ impl Registry {
     fn build() -> Self {
         let mut r = Self {
             definitions: Vec::new(), templates: Vec::new(), graphs: Vec::new(), by_name: HashMap::new(),
-            header: [0; 12], rows: Vec::new(), template_rows: Vec::new(), properties: Vec::new(),
+            header: [0; 15], rows: Vec::new(), template_rows: Vec::new(), properties: Vec::new(),
             graph_headers: Vec::new(), names: Vec::new(),
             physics_rows: physics::PROFILES.iter().flat_map(physics::Physics::words).collect(),
+            material_rows: material::PROFILES.iter().flat_map(|m| [m.base_sound as i32,m.instrument as i32,m.offset as i32]).collect(),
+            state_sounds: Vec::new(),offset_rows: Vec::new(),offset_values: Vec::new(),
             intrinsic_states: Vec::new(), intrinsic_rows: Vec::new(),
             rule_refs: Vec::new(), rule_rows: Vec::new(), rule_properties: Vec::new(), rule_values: Vec::new(),
         };
+        for config in super::offset::PROFILES {
+            r.offset_rows.extend([config.kind as i32,config.horizontal.to_bits() as i32,config.vertical.to_bits() as i32,r.offset_values.len() as i32,config.table_len() as i32]);
+            r.offset_values.extend(config.table());
+        }
         // Pure index/transition graphs depend only on ordered cardinalities.
         // The finite declaration table bounds this pool; there is no runtime
         // cache accepting arbitrary user-supplied keys.
@@ -82,20 +94,21 @@ impl Registry {
             r.templates.push(Template { properties, default_local, graph });
         }
         let mut next_state = 0;
-        for &(name, template, physical, intrinsic) in catalog::BLOCKS {
+        for &(name, template, physical, intrinsic, material) in catalog::BLOCKS {
             let id = BlockId(u16::try_from(r.definitions.len()).expect("bounded native block IDs"));
             let t = &r.templates[template as usize];
             let states = r.graph_headers[t.graph as usize][0] as usize;
             assert!(next_state + states <= u16::MAX as usize, "native block state ceiling");
             assert!(r.by_name.insert(name, id).is_none(), "duplicate native block name");
-            r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32, physical as i32]);
+            r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32, physical as i32, material as i32]);
             r.names.extend_from_slice(name.as_bytes());
-            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize] });
+            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize], material: &material::PROFILES[material as usize] });
             let values = r.graphs[t.graph as usize].buffer(0).expect("native graph values");
             let rules = &intrinsic::PROFILES[intrinsic as usize];
             for local in 0..states {
                 let width = t.properties.len();
                 let facts = rules.evaluate(&t.properties, &values[local * width..(local + 1) * width]);
+                r.state_sounds.push(material::PROFILES[material as usize].sound(&t.properties,&values[local * width..(local + 1) * width]));
                 r.intrinsic_rows.push(facts.packed());
                 r.intrinsic_states.push(facts);
             }
@@ -135,13 +148,16 @@ impl Registry {
                 r.rule_refs.push(id as i32);
             }
         }
-        r.header = [3, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
+        r.header = [4, r.definitions.len() as i32, next_state as i32, r.templates.len() as i32,
             r.properties.len() as i32, r.names.len() as i32, r.graphs.len() as i32, physics::PROFILES.len() as i32,
             (r.rule_rows.len() / 4) as i32, r.rule_properties.len() as i32, r.rule_values.len() as i32,
-            crate::content::fluid::registry().definitions().iter().map(|d| d.state_count()).sum::<usize>() as i32];
+            crate::content::fluid::registry().definitions().iter().map(|d| d.state_count()).sum::<usize>() as i32,material::PROFILES.len() as i32,super::offset::PROFILES.len() as i32,r.offset_values.len() as i32];
         r
     }
 
+    pub fn state_sound(&self, id: StateId) -> Option<&crate::content::sound::SoundTypeDefinition> {
+        self.state_sounds.get(id.0 as usize).map(|&sound| sound.definition())
+    }
     pub fn state_traits(&self, id: StateId) -> Option<&intrinsic::StateTraits> { self.intrinsic_states.get(id.0 as usize) }
     pub fn definitions(&self) -> &[Definition] { &self.definitions }
     pub fn definition(&self, id: BlockId) -> Option<&Definition> { self.definitions.get(id.0 as usize) }

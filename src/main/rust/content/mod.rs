@@ -5,3 +5,4 @@ pub mod block;
 pub mod fluid;
 pub mod property;
 pub mod state;
+pub mod sound;

@@ -32,9 +32,10 @@ retain their explicit Java settings while those APIs migrate.
 Java's registered catalog no longer supplies 2,229 scalar configuration calls.
 Factories and family constructors remain transitional; their physical values
 cannot override native registered definitions. [Intrinsic state rules](BLOCK-INTRINSICS.md)
-now also own semantic map colors, emission and fluid associations. Sounds,
-instruments, shapes, contextual predicates, offsets and gameplay hooks remain
-separate migration work. This slice does not establish complete block
+now also own semantic map colors, emission and fluid associations.
+[Sounds, instruments and model offsets](BLOCK-SOUND-AND-OFFSETS.md) have since
+moved into native definitions too. Shapes, contextual predicates and gameplay
+hooks remain separate migration work. This slice does not establish complete block
 behavior migration or an isolated frame-rate improvement.
 
 ## Editing and verification

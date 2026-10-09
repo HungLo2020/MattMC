@@ -121,8 +121,8 @@ fn the_state_ceiling_is_enforced() {
 /// layout/default/name input. Intrinsic light and fluid facts are always native.
 fn native_fact_packet() -> (Vec<i32>, Vec<u8>) {
     let mut ints = vec![FORMAT, 1235, 31809, 1];
-    ints.extend(std::iter::repeat_n(0, 1235 * 2 + 31809 * (DIRECTIONS + 1)));
-    (ints, vec![0; 31809 * 2 + 1])
+    ints.extend(std::iter::repeat_n(0, 31809 * (DIRECTIONS + 1)));
+    (ints, vec![0; 31809 + 1])
 }
 
 #[test]

@@ -80,11 +80,13 @@ The complete table is a destination, not the current producer boundary.
 constructor caches; native registry construction derives air and can-occlude
 bits directly from them. [Intrinsic state rules](BLOCK-INTRINSICS.md) evaluate
 map-color identities, emission and canonical fluid associations once into
-native `StateTraits`. Java still evaluates blocked light, shapes and contextual
-predicates. Its format-7 export includes blocked light, face IDs, offsets and
-the other state flags. Dynamic-shape and world-dependent queries still use
-Java behavior. A native lookup column does not imply that every function
-producing or consuming it has migrated.
+native `StateTraits`. [State sound rules](BLOCK-SOUND-AND-OFFSETS.md) also
+produce native columns, and native offset tables support Java views.
+Java still evaluates blocked light, shapes and contextual predicates. Its
+format-8 export includes blocked light, face IDs and remaining state flags.
+Dynamic-shape and world-dependent queries still use Java behavior. A native
+lookup column does not imply that every function producing or consuming it
+has migrated.
 
 ## Shapes are interned
 
