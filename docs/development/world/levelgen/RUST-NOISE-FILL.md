@@ -127,7 +127,9 @@ fill; see the [separate router contract](RUST-NOISE-ROUTER.md#eligibility).
   materials in Rust; otherwise it requests them from Java (status 1, before
   writing that cell). Preserve the material-request order and cache results
   on each route.
-- Section installs go through `LevelChunkSection.installGenerated`.
+- Canonical section installs adopt a Rust live owner through the
+  [native handoff](RUST-STAGE-HANDOFF.md). Custom/alias representations retain
+  `LevelChunkSection.installGenerated`; counters and palette history are unchanged.
 - The native traversal visits cells in the same order as Java's (X, then Z,
   then Y down) and requests materials for exactly the cells Java's loop would.
 

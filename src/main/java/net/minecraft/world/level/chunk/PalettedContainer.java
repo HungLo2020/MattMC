@@ -212,6 +212,12 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		this.adoptNative();
 	}
 
+	/** Canonical stage result already constructed and owned entirely in Rust. */
+	void installNativeGenerated(NativeLiveBlockSection live) {
+		this.nativeBlocks = live;
+		this.data = null;
+	}
+
 	@Override
 	public int onResize(int i, T object) {
 		var live = this.nativeBlocks;

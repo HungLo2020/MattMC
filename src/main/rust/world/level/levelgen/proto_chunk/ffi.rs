@@ -1,6 +1,51 @@
 use super::ProtoStorage;
 use crate::world::level::levelgen::noise_fill::FLAG_FLUID;
 
+/// Capture canonical live section inputs entirely within Rust. Counters and
+/// heightmaps preserve the original Java stage snapshot; no owner is retained.
+/// # Safety
+/// Arrays span the stated counts, are aligned, and remain live during this call.
+/// Each pointer is a live Owner excluded from concurrent stage mutation.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_proto_chunk_create_live(
+    owners: *const *const crate::world::level::chunk::live::Owner, counts: *const i32,
+    count: i32, min_y: i32, height: i32, global_bits: i32,
+    surface: *const i64, floor: *const i64, heightmap_words: i32,
+) -> u64 {
+    let Some(flags) = crate::world::level::levelgen::noise_fill::installed_state_flags() else { return 0 };
+    if owners.is_null() || counts.is_null() || surface.is_null() || floor.is_null()
+        || owners as usize % 8 != 0 || counts as usize % 4 != 0
+        || surface as usize % 8 != 0 || floor as usize % 8 != 0
+        || !(1..=256).contains(&count) || heightmap_words <= 0 { return 0; }
+    let owner_pointers = unsafe { std::slice::from_raw_parts(owners, count as usize) };
+    let counters = unsafe { std::slice::from_raw_parts(counts, count as usize * 3) };
+    let mut sections = Vec::with_capacity(count as usize);
+    for (index, &pointer) in owner_pointers.iter().enumerate() {
+        if pointer.is_null() || pointer as usize % 8 != 0 { return 0; }
+        let Some((kind, bits, palette, raw)) = (unsafe { &*pointer }).stage_snapshot(flags.len() as u32, global_bits as u32) else { return u64::MAX };
+        sections.push((kind, bits, palette, raw, [counters[index * 3], counters[index * 3 + 1], counters[index * 3 + 2]]));
+    }
+    let a = unsafe { std::slice::from_raw_parts(surface, heightmap_words as usize) };
+    let b = unsafe { std::slice::from_raw_parts(floor, heightmap_words as usize) };
+    ProtoStorage::new(min_y, height, sections, global_bits as u32, flags, a, b)
+        .map_or(0, |storage| Box::into_raw(Box::new(storage)) as u64)
+}
+
+/// Convert a modified stage section directly into a separately owned live
+/// section. 0 unmodified, 1 transferred, 2 compatibility, negative invalid.
+/// # Safety
+/// A live confined stage handle; output is aligned/writable for 24 bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_proto_chunk_section_live(
+    handle: u64, index: i32, limit: i32, global_bits: i32,
+    output: *mut crate::world::level::chunk::stage_transfer::ResultHeader,
+) -> i32 {
+    let s = unsafe { storage(handle) };
+    if index < 0 || index as usize >= s.section_count() || !s.valid() { return -1; }
+    let Some(section) = s.modified_section(index as usize) else { return 0 };
+    unsafe { crate::world::level::chunk::stage_transfer::write_result(section, limit, global_bits, output) }
+}
+
 /// A chunk's block storage for a generation stage. `ints`: [minY, height,
 /// sectionCount, globalBits, then per section kind, storage bits, palette
 /// length, raw length, three counters, then palette ids]. `longs`: [per section

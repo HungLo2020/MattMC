@@ -37,7 +37,7 @@ column's biome for the extensions. It answers only temperature and extension
 conditions, and any of the above whose noise, random factory or noise chunk is
 not the built-in kind. The eroded badlands and frozen ocean extensions read and write
 through a block column backed by the Rust storage. At the end Java installs
-the modified sections (`installGenerated`), both heightmaps and the fluid
+the modified sections through the [native handoff](RUST-STAGE-HANDOFF.md), both heightmaps and the fluid
 post-processing marks, in write order.
 
 ## Shared chunk storage
@@ -46,12 +46,14 @@ post-processing marks, in write order.
 and [`proto_chunk/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/proto_chunk)
 own a chunk's blocks while a stage runs on them (SURFACE and the
 [carvers](carver/RUST-CARVERS.md)): every section's exact palette, storage and
-counters (`LevelChunkSection.exportGenerated`) and the `WORLD_SURFACE_WG` and
+counters (copied directly from live owners in Rust for canonical sections) and the `WORLD_SURFACE_WG` and
 `OCEAN_FLOOR_WG` heightmaps. A section unpacks on its first block access;
 counters answer only-air checks without unpacking, so untouched sections are
 never unpacked or reinstalled. Stages borrow the storage's handle; Java
 installs modified sections, both heightmaps and the stage's post-processing
-marks once. `NativeProtoChunk.create` returns null, keeping `setBlockState`
+marks once. Custom/alias representations retain the original compatibility
+export/install; the direct handoff preserves the existing admission gate.
+`NativeProtoChunk.create` returns null, keeping `setBlockState`
 writes, unless:
 
 - the [block registry](../../game-model/RUST-BLOCK-REGISTRY.md) is installed;
@@ -60,7 +62,7 @@ writes, unless:
 - the chunk is a plain `ProtoChunk` whose persisted status is before
   `INITIALIZE_LIGHT` (no light updates) and whose heightmaps to update are
   exactly the primed world-generation pair;
-- every section is a plain `LevelChunkSection` with a modelled palette
+- every section exports a modelled palette
   (single, linear, hash map or global) and storage.
 
 ## Compiled rule programs

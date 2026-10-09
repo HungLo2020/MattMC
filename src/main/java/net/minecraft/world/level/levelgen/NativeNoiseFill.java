@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.NativeGenerationSections;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.synth.NativeNoiseState;
 import org.jetbrains.annotations.Nullable;
@@ -521,17 +522,25 @@ final class NativeNoiseFill {
     }
 
     private void install(long handle) throws Throwable {
-        int[] info = new int[7];
-        int[] palette = new int[256];
-        long[] raw = new long[4096];
+        int[] info = null;
+        int[] palette = null;
+        long[] raw = null;
+        // Custom ChunkAccess implementations retain the original accessor order:
+        // untouched sections never call getSection during result installation.
+        boolean nativeChunk = this.chunkAccess.getClass() == net.minecraft.world.level.chunk.ProtoChunk.class
+            || this.chunkAccess.getClass() == net.minecraft.world.level.chunk.LevelChunk.class;
         for (int index = 0; index < this.chunkAccess.getSectionsCount(); index++) {
+            LevelChunkSection section = nativeChunk ? this.chunkAccess.getSection(index) : null;
+            int nativeResult = section == null ? 2 : NativeGenerationSections.installNoise(section, handle, index);
+            if (nativeResult == 0 || nativeResult == 1) continue;
+            if (info == null) { info = new int[7]; palette = new int[256]; raw = new long[4096]; }
             int written = (int)SECTION.invokeExact(handle, index, MemorySegment.ofArray(info), MemorySegment.ofArray(palette), palette.length,
                 MemorySegment.ofArray(raw), raw.length);
             if (written == 0) continue;
             if (written != 1) throw new IllegalStateException("Native noise fill section overflow");
             List<BlockState> states = new ArrayList<>(info[2]);
             for (int entry = 0; entry < info[2]; entry++) states.add(Block.stateById(palette[entry]));
-            LevelChunkSection section = this.chunkAccess.getSection(index);
+            if (section == null) section = this.chunkAccess.getSection(index);
             section.installGenerated(info[0], states, java.util.Arrays.copyOf(raw, info[3]), info[4], info[5], info[6]);
         }
         Heightmap oceanFloor = this.chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);

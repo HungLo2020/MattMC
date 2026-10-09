@@ -85,7 +85,7 @@ pub struct Owner {
     global_bits: usize,
 }
 impl Owner {
-    fn load(
+    pub(crate) fn load(
         bits: usize,
         requested: usize,
         palette: &[i32],
@@ -180,6 +180,37 @@ impl Owner {
             limit: self.limit,
             global_bits: self.global_bits,
         }
+    }
+    /// A stage's isolated packed input, copied entirely within Rust. No Java
+    /// palette, state objects or word-array projection participates in this path.
+    pub(crate) fn stage_snapshot(
+        &self,
+        limit: u32,
+        global_bits: u32,
+    ) -> Option<(u32, u32, Vec<i32>, Vec<i64>)> {
+        if self.limit != limit || self.global_bits != global_bits as usize {
+            return None;
+        }
+        let state = self.state.lock().unwrap();
+        let g = &state.generation;
+        let kind = if g.global {
+            3
+        } else if g.bits == 0 {
+            0
+        } else if g.bits == 4 {
+            1
+        } else {
+            2
+        };
+        let palette = (0..g.count.load(Ordering::Acquire) as usize)
+            .map(|i| g.palette[i].load(Ordering::Acquire) as i32)
+            .collect();
+        let words = g
+            .words
+            .iter()
+            .map(|w| w.load(Ordering::Acquire) as i64)
+            .collect();
+        Some((kind, g.bits as u32, palette, words))
     }
     // One fused write, including palette admission, first-use growth and packed mutation.
     fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {

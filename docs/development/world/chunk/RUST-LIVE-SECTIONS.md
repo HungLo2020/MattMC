@@ -23,8 +23,9 @@ scratch; they avoid constructing Java palettes/arrays for the handoff. Their
 existing Rust kernels and publication rules remain unchanged.
 
 Rust also counts live storage into the existing ordered callback records.
-Generic enumeration, codec/network serialization and generation-stage
-exports currently materialize temporary compatibility data. It is never retained
+Canonical [generation-stage handoffs](../levelgen/RUST-STAGE-HANDOFF.md) now
+copy inputs and adopt results entirely within Rust. Generic enumeration and
+codec/network serialization still materialize temporary compatibility data. It is never retained
 beside the authoritative owner. Moving those consumers and bulk write producers
 onto the owner is remaining work: native allocation alone does not prove a speed
 improvement. A native executable and complete Java removal remain unfinished.
@@ -74,7 +75,7 @@ custom callbacks, copies, retained views, GC readers and rebuild/light exports.
 Real gameplay, lifecycle and Frozen comparisons are still required; source tests
 and fixture timing alone do not establish performance acceptance.
 
-Final release `526af413` passes 2,415 Rust tests (3 ignored), 113 focused Java
+The preceding live-owner checkpoint, release `526af413`, passes 2,415 Rust tests (3 ignored), 113 focused Java
 tests and the full Java suite (1,746 passed, 2 skipped). All seven lifecycle cases
 and both reviewed vanilla/Iris+DH coast pairs pass; VUIDs are zero. All 16
 ABAB runs contain exactly 6,000 frames and have clean runtime/cleanup receipts.
@@ -83,8 +84,9 @@ Source, library and untouched Frozen identity checks pass.
 Whole-renderer performance acceptance **fails**: vanilla averages 5.1% below
 Frozen and vanilla+DH 24.3% below, with worse p99 times. Both shader modes beat
 Frozen on average FPS and p99. These results do not establish an isolated
-storage speedup or identify the cause of the DH gap. See `SUMMARY.md` and
+storage speedup or identify the cause of the DH gap. Historical receipt:
 `validation/native-live-block-sections-alias-final-20261009/summary.json`.
+`SUMMARY.md` records the newer generation-handoff comparison.
 
 Earlier diagnostic profiles used release `4a8f5d18`, before final alias hardening:
 `goal5/live-block-sections-flight-profile-20261009/` and

@@ -191,6 +191,20 @@ pub unsafe extern "C" fn mattmc_noise_fill_section(
     1
 }
 
+/// Convert a completed NOISE result directly into separately owned live
+/// storage. 0 untouched, 1 transferred, 2 compatibility, negative invalid.
+/// # Safety
+/// A live confined fill handle; output is aligned/writable for 24 bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_noise_fill_section_live(
+    id: u64, index: i32, limit: i32, global_bits: i32,
+    output: *mut crate::world::level::chunk::stage_transfer::ResultHeader,
+) -> i32 {
+    let h = unsafe { handle(id) };
+    let Some(section) = h.fill.section(index.max(0) as usize).filter(|_| index >= 0) else { return 0 };
+    unsafe { crate::world::level::chunk::stage_transfer::write_result(section, limit, global_bits, output) }
+}
+
 /// Both heightmaps' raw data (OCEAN_FLOOR_WG then WORLD_SURFACE_WG) when each
 /// fits `cap` longs; returns the raw length, or -1 when too small.
 /// # Safety

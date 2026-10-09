@@ -38,7 +38,9 @@ The only call back into Java is `CarvingContext.topMaterial`, for dirt below a
 carved grass or mycelium block. It is an FFM upcall that first copies the
 storage's current heightmaps into the Java chunk, because the rule may test
 steep. The storage, the mask words, the aquifer's caches and its schedule flag
-install once at the end.
+install once at the end. Canonical sections use the
+[native handoff](../RUST-STAGE-HANDOFF.md), preserving isolated inputs and
+modified-only installation without Java palette/word reconstruction.
 
 ## Gate
 

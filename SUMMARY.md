@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-09; live-section SHA526af413; RTX 3080 Ti; moving camera; 6,000 frames)
+# Rust vs Frozen Java speed (2026-10-09; stage-handoff SHAc7c95f4a; RTX 3080 Ti; moving camera; 6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,072.4 / 1,032.0 | 1,079.4 / 1,137.0 |
-| Vanilla + DH | 608.6 / 597.1 | 867.0 / 725.3 |
-| Shaders | 324.3 / 337.5 | 307.7 / 308.0 |
-| Shaders + DH | 238.4 / 243.4 | 210.2 / 221.9 |
-Receipt: `validation/native-live-block-sections-alias-final-20261009/summary.json` FAILED performance floors. All 16 ABAB runs clean/exact6000,VUID0,exceptions0,owned orphans0; final source/library/Frozen integrity passes. No isolated storage speedup or DH regression cause proven.
-Performance OPEN: vanilla−5.1%,p99 3.631/3.319ms;DH−24.3%,p99 6.786/4.189ms;shaders+7.5%,p99 5.512/6.855ms;shader+DH+11.5%,p99 7.771/9.435ms. Vanilla/DH fail both floors;shader modes pass both. Historical DH repeats vary substantially.
-Final Rust2415(3 ignores),focused Java113,full Java1746(2 skips),seven lifecycle cases and reviewed coast pairs pass. Wiki2484/43 passes. Rust owns canonical live block palettes/mutation without a Java mirror or per-read FFI; stage/save/network projections, broader world orchestration and Rust-only app remain unfinished. Earlier flight/DH profiles are diagnostic only.
+| Vanilla | 1,027.8 / 1,033.3 | 1,101.9 / 1,127.6 |
+| Vanilla + DH | 615.2 / 610.6 | 731.2 / 614.0 |
+| Shaders | 326.9 / 332.2 | 312.4 / 307.6 |
+| Shaders + DH | 244.2 / 249.5 | 220.6 / 221.2 |
+Receipt: `validation/native-stage-handoff-final-20261009/summary.json` FAILED performance floors. All16 ABAB/exact6000 runs clean,VUID0,exceptions0,orphans0;source/library/user-edit/Frozen integrity passes;25 copies retired. No isolated handoff speedup proven;Frozen DH repeats vary substantially.
+Performance OPEN:vanilla−7.6%,p99 4.021/3.467ms;DH−8.9%,p99 6.649/5.731ms;shaders+6.3%,p99 6.223/6.820ms;shader+DH+11.7%,p99 7.151/9.051ms. Vanilla/DH fail both floors;shader modes pass both.
+Rust2417(3 ignores),focused Java26,full Java1751(2 skips),all7 lifecycle cases,reviewed coast pairs andWiki2485/43 pass. Canonical NOISE/SURFACE/CARVERS transfer stays in Rust;JFR handoff Java allocation108→~1–3KB/chunk is diagnostic,not throughput acceptance. Per-frame producers,broader world orchestration andRust-only app remain unfinished.

@@ -21,6 +21,8 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
   per-chunk Java graph wrapping, lazy wrapping and parity/performance checks.
 - [Aquifer Evaluation](RUST-AQUIFER.md): cell material decisions, fluid sources, and parity/performance checks.
 - [Surface Evaluation](RUST-SURFACE.md): column processing, callbacks, and compatibility limits.
+- [Native Generation Section Handoff](RUST-STAGE-HANDOFF.md): direct Rust
+  input snapshots and live-owner adoption for NOISE/SURFACE/CARVERS.
 - [Surface Chunk Storage](RUST-SURFACE-STORAGE.md): Rust-owned sections and
   heightmaps shared by the SURFACE and CARVERS stages, the install contract and
   parity/performance checks.

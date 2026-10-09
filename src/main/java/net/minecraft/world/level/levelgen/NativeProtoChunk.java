@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.BlockColumn;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.NativeGenerationSections;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jetbrains.annotations.Nullable;
@@ -77,6 +78,8 @@ final class NativeProtoChunk implements AutoCloseable {
         long[] surface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG).getRawData();
         long[] floor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG).getRawData();
         if (surface.length != floor.length) return null;
+        long nativeHandle = NativeGenerationSections.createProto(chunk, surface, floor);
+        if (nativeHandle != -1) return nativeHandle == 0 ? null : new NativeProtoChunk(nativeHandle, chunk);
         LevelChunkSection.GeneratedSection[] states = new LevelChunkSection.GeneratedSection[sections.length];
         int intCount = 4 + 7 * sections.length, longCount = 2 * surface.length;
         for (int index = 0; index < sections.length; index++) {
@@ -198,11 +201,14 @@ final class NativeProtoChunk implements AutoCloseable {
     /** Installs every modified section, both heightmaps and the post-processing marks. */
     void install() {
         try {
-            int[] info = new int[6];
-            int[] palette = new int[4096];
-            long[] raw = new long[4096];
+            int[] info = null;
+            int[] palette = null;
+            long[] raw = null;
             LevelChunkSection[] sections = this.chunk.getSections();
             for (int index = 0; index < sections.length; index++) {
+                int nativeResult = NativeGenerationSections.installProto(sections[index], this.handle, index);
+                if (nativeResult == 0 || nativeResult == 1) continue;
+                if (info == null) { info = new int[6]; palette = new int[4096]; raw = new long[4096]; }
                 int written = (int)SECTION.invokeExact(this.handle, index, MemorySegment.ofArray(info), MemorySegment.ofArray(palette), palette.length,
                     MemorySegment.ofArray(raw), raw.length);
                 if (written == 0) continue;

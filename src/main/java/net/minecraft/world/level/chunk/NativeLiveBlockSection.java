@@ -40,13 +40,19 @@ final class NativeLiveBlockSection {
     private final MemorySegment owner;
     private volatile View view;
 
-    private NativeLiveBlockSection(MemorySegment pointer) {
+    static NativeLiveBlockSection adoptOwned(MemorySegment pointer) {
+        if (pointer.address() == 0) throw new IllegalStateException("Missing native live section");
         MemorySegment scoped;
         try { scoped = pointer.asReadOnly().reinterpret(1, Arena.ofAuto(), p -> release(RELEASE, p)); }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
+        // Register the unique cleanup before allocating the Java projection.
+        return new NativeLiveBlockSection(scoped);
+    }
+    private NativeLiveBlockSection(MemorySegment scoped) {
         this.owner = scoped;
         this.view = loadView();
     }
+    MemorySegment stageOwner() { return this.owner; }
     private static void release(MethodHandle handle, MemorySegment pointer) {
         try { handle.invokeExact(pointer); }
         catch (Throwable failure) { throw new IllegalStateException("Cannot release native live section", failure); }
@@ -76,7 +82,7 @@ final class NativeLiveBlockSection {
             MemorySegment.copy(MemorySegment.ofArray(raw), 0, scratch.words, 0, raw.length * 8L);
             var result = (MemorySegment) CREATE.invokeExact(scratch.words, raw.length, storage.getBits(), data.configuration().bitsInStorage(),
                     scratch.palette, count, Block.BLOCK_STATE_REGISTRY.size(), strategy.getConfigurationForBitCount(32).bitsInMemory());
-            return result.address() == 0 ? null : new NativeLiveBlockSection(result);
+            return result.address() == 0 ? null : adoptOwned(result);
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot adopt native live section", failure); }
     }
@@ -172,7 +178,7 @@ final class NativeLiveBlockSection {
         finally { Reference.reachabilityFence(this); }
     }
     NativeLiveBlockSection copy() {
-        try { return new NativeLiveBlockSection((MemorySegment)COPY.invokeExact(this.owner)); }
+        try { return adoptOwned((MemorySegment)COPY.invokeExact(this.owner)); }
         catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot copy native live section", failure); }
         finally { Reference.reachabilityFence(this); }

@@ -280,11 +280,13 @@ impl ProtoStorage {
 
     /// A modified section's result: (requested bits, palette, raw, counters).
     pub(crate) fn section(&self, index: usize) -> Option<(u32, &[i32], Vec<i64>, [i32; 3])> {
-        if !self.modified.get(index).copied().unwrap_or(false) {
-            return None;
-        }
-        let s = self.sections[index].get()?;
+        let s = self.modified_section(index)?;
         Some((s.requested_bits(), s.palette(), s.packed(), [s.non_empty, s.ticking, s.fluid]))
+    }
+
+    pub(crate) fn modified_section(&self, index: usize) -> Option<&Section> {
+        if !self.modified.get(index).copied().unwrap_or(false) { return None; }
+        self.sections[index].get()
     }
 
     pub(crate) fn heightmap_raw(&self, ocean_floor: bool) -> Vec<i64> {

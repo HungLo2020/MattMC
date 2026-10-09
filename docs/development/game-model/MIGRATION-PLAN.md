@@ -34,8 +34,10 @@ and bulk rebuild consumers now live in Rust. Lifecycle and paired image checks
 pass; performance floors remain unmet. [Live block sections](../world/chunk/RUST-LIVE-SECTIONS.md)
 now own canonical packed storage and palette mutation in Rust with CPU read views,
 plus native rebuild/light exports and heightmap/skylight handoffs. Enumeration,
-save/network and generation-stage compatibility exports remain temporary Java
-projections. Move those consumers and bulk producers next; verify performance.
+save/network and custom generation compatibility exports remain temporary Java
+projections. Canonical [stage transfers](../world/levelgen/RUST-STAGE-HANDOFF.md)
+now capture/adopt sections within Rust. Move remaining consumers and bulk
+producers next; verify performance.
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java still orchestrates stage
 installation and chunks, while ordinary canonical live palette mutation now uses

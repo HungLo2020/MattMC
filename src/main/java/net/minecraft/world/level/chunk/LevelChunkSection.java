@@ -124,6 +124,25 @@ public class LevelChunkSection {
 			this.nonEmptyBlockCount, this.tickingBlockCount, this.tickingFluidCount);
 	}
 
+	/** Native packed inputs are captured inside Rust; only counters cross here. */
+	@org.jetbrains.annotations.Nullable
+	NativeLiveBlockSection nativeGenerationInput(java.lang.foreign.MemorySegment counters, int index) {
+		if (this.getClass() != LevelChunkSection.class || this.states.getClass() != PalettedContainer.class) return null;
+		var owner = this.states.nativeLiveBlocks();
+		if (owner == null) return null;
+		counters.setAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, index * 3L, this.nonEmptyBlockCount);
+		counters.setAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, index * 3L + 1, this.tickingBlockCount);
+		counters.setAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, index * 3L + 2, this.tickingFluidCount);
+		return owner;
+	}
+
+	void installNativeGenerated(NativeLiveBlockSection owner, int nonEmpty, int ticking, int fluid) {
+		this.states.installNativeGenerated(owner);
+		this.nonEmptyBlockCount = (short)nonEmpty;
+		this.tickingBlockCount = (short)ticking;
+		this.tickingFluidCount = (short)fluid;
+	}
+
 	/** For a native biome fill: the recreated biome container's global palette
 	 * bits, or -1 when its container or strategy is not the modelled one. */
 	public int generatedBiomeGlobalBits() {
