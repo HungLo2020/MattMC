@@ -30,7 +30,7 @@ impl CompactSnapshotStorage {
             seed_los: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             seed_his: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             tints: vec![0; COMPACT_SECTION_BLOCK_COUNT],
-            tint_lattices: vec![0; COMPACT_SECTION_BLOCK_COUNT * 9],
+            tint_lattices: vec![0; COMPACT_SECTION_BLOCK_COUNT * 64],
             fluid_tints: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             fluid_flow_x: vec![0.0; COMPACT_SECTION_BLOCK_COUNT],
             fluid_flow_z: vec![0.0; COMPACT_SECTION_BLOCK_COUNT],
@@ -60,13 +60,14 @@ impl CompactSnapshotStorage {
             fluid_block_ids_address: self.fluid_block_ids.as_ptr() as u64,
             flags_address: self.flags.as_ptr() as u64,
             tint_lattices_address: self.tint_lattices.as_ptr() as u64,
+            color_fields_id: 0,
         }
     }
 }
 
 #[test]
 fn compact_section_snapshot_header_layout_matches_java() {
-    assert_eq!(128, std::mem::size_of::<CompactSectionSnapshotHeader>());
+    assert_eq!(136, std::mem::size_of::<CompactSectionSnapshotHeader>());
     assert_eq!(
         0,
         std::mem::offset_of!(CompactSectionSnapshotHeader, version)
@@ -281,5 +282,57 @@ fn compact_section_snapshot_rejects_stale_or_invalid_active_indexes() {
 
     assert_eq!(Err(ERR_INVALID_ARGUMENT), unsafe {
         snapshot.record_at(0).map(|_| ())
+    });
+}
+
+#[test]
+fn compact_snapshot_requires_bound_complete_colors_and_keeps_decoded_owner_after_release() {
+    use crate::world::level::biome::color_fields::*;
+    let storage = CompactSnapshotStorage::new();
+    let mut header = storage.header(1);
+    let kinds = vec![1u8; 4096];
+    let mut lease = [0u64; 4];
+    assert_eq!(0, unsafe {
+        mattmc_world_section_colors_plan(
+            header.min_x,
+            header.min_y,
+            header.min_z,
+            storage.active_indices.as_ptr(),
+            1,
+            kinds.as_ptr(),
+            std::ptr::null(),
+            lease.as_mut_ptr(),
+        )
+    });
+    header.color_fields_id = lease[0];
+    header.tint_lattices_address = 0;
+    let address = &header as *const _ as u64;
+    assert!(unsafe { CompactSectionSnapshot::from_address(address) }.is_err());
+    unsafe {
+        std::slice::from_raw_parts_mut(lease[2] as *mut i32, lease[3] as usize).fill(-1);
+    }
+    assert_eq!(0, mattmc_world_section_colors_finish(lease[0]));
+    header.min_x += 1;
+    assert!(unsafe { CompactSectionSnapshot::from_address(address) }.is_err());
+    header.min_x -= 1;
+    header.active_count = 0;
+    assert!(unsafe { CompactSectionSnapshot::from_address(address) }.is_err());
+    header.active_count = 1;
+    let decoded = unsafe { CompactSectionSnapshot::from_address(address) }.unwrap();
+    assert_eq!(0, mattmc_world_section_colors_release(lease[0]));
+    assert!(unsafe { CompactSectionSnapshot::from_address(address) }.is_err());
+    assert_eq!(-1, decoded.color_fields().unwrap().sample(0, 3, 3, 3));
+    assert_eq!(
+        0,
+        unsafe { decoded.model_record_at(0) }.unwrap().tint_lattice[0][0][0],
+        "owned snapshots must not reconstruct the literal tensor per model record"
+    );
+}
+
+#[test]
+fn rejects_old_compact_header_from_only_its_version_prefix() {
+    let old_version = Box::new(3i32);
+    assert_eq!(Err(ERR_INVALID_ARGUMENT), unsafe {
+        CompactSectionSnapshot::from_address(&*old_version as *const i32 as u64).map(|_| ())
     });
 }

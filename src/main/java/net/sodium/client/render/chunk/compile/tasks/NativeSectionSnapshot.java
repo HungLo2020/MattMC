@@ -51,6 +51,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private static final int HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET = 104;
     private static final int HEADER_FLAGS_ADDRESS_OFFSET = 112;
     private static final int HEADER_TINT_LATTICES_ADDRESS_OFFSET = 120;
+    private static final int HEADER_COLOR_FIELDS_ID_OFFSET = 128;
     // Resource-pack models may legitimately extend beyond the unit block
     // (for example Stay True's leaf planes reach -7..25 model units). Java's
     // BlendedColorProvider floors vertex - 0.5 and therefore needs samples
@@ -73,6 +74,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private final int minY;
     private final int minZ;
     private final int modelReloadGeneration;
+    private final LevelSlice colorSlice;
     private final BlockOcclusionCache modelOcclusionCache = new BlockOcclusionCache();
     private final long totalBytes;
     private long address;
@@ -90,9 +92,12 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private long flagsAddress;
     private long tintLatticesAddress;
     private int activeRecordCount;
+    private long colorKindsAddress;
+    private NativeSectionColors colorFields;
 
     NativeSectionSnapshot(ChunkBuildBuffers buffers, int sectionIndex, int minX, int minY, int minZ,
             LevelSlice slice) {
+        this.colorSlice = slice;
         this.buffers = buffers;
         this.sectionIndex = sectionIndex;
         this.minX = minX;
@@ -126,8 +131,10 @@ final class NativeSectionSnapshot implements AutoCloseable {
         offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
         this.flagsAddress = offset;
         offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
-        this.tintLatticesAddress = offset;
-        offset += (long) SECTION_BLOCK_COUNT * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES;
+        this.colorKindsAddress = offset;
+        offset += SECTION_BLOCK_COUNT;
+        // Literal providers retain their original calls. Their staging rows are
+        // allocated only if one is encountered; built-in biome fields are Rust-owned.
         this.totalBytes = align(offset, Long.BYTES);
 
         this.address = MemoryUtil.nmemCalloc(1L, this.totalBytes);
@@ -135,8 +142,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
             throw new OutOfMemoryError("Could not allocate native section snapshot");
         }
         this.rebaseAddresses();
-        this.writeHeader();
-        this.populatePaddedGrids(slice);
+        try {
+            this.writeHeader();
+            this.populatePaddedGrids(slice);
+        } catch (Throwable failure) {
+            this.close();
+            throw failure;
+        }
     }
 
     void appendBlock(int localBlockIndex, LevelSlice slice, BlockState blockState, BlockPos blockPos,
@@ -162,8 +174,16 @@ final class NativeSectionSnapshot implements AutoCloseable {
         MemoryUtil.memPutInt(this.seedLosAddress + (long) localBlockIndex * Integer.BYTES, (int) seed);
         MemoryUtil.memPutInt(this.seedHisAddress + (long) localBlockIndex * Integer.BYTES, (int) (seed >>> 32));
         MemoryUtil.memPutInt(this.tintsAddress + (long) localBlockIndex * Integer.BYTES, tint);
-        this.writeTintLattice(localBlockIndex, slice, blockState, blockPos);
-        this.recordTintSource(localBlockIndex, blockState, blockPos, tint);
+        int colorKind = colorSourceKind(blockState, Minecraft.getInstance().getBlockColors());
+        MemoryUtil.memPutByte(this.colorKindsAddress + localBlockIndex, (byte) colorKind);
+        if (colorKind == 4) {
+            if (this.tintLatticesAddress == 0L) {
+                this.tintLatticesAddress = MemoryUtil.nmemCalloc(SECTION_BLOCK_COUNT, TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES);
+                if (this.tintLatticesAddress == 0L) throw new OutOfMemoryError("Could not allocate literal color samples");
+            }
+            this.writeTintLattice(localBlockIndex, slice, blockState, blockPos);
+        }
+        this.recordTintSource(localBlockIndex, slice, blockState, blockPos, tint, colorKind);
         MemoryUtil.memPutInt(this.fluidTintsAddress + (long) localBlockIndex * Integer.BYTES, fluidTint);
         MemoryUtil.memPutFloat(this.fluidFlowXAddress + (long) localBlockIndex * Float.BYTES, (float) flow.x);
         MemoryUtil.memPutFloat(this.fluidFlowZAddress + (long) localBlockIndex * Float.BYTES, (float) flow.z);
@@ -188,6 +208,22 @@ final class NativeSectionSnapshot implements AutoCloseable {
         if (this.modelReloadGeneration != NativeStaticBlockModelRegistry.reloadGeneration()) {
             throw new IllegalStateException("Native section snapshot was built against stale native model metadata");
         }
+        if (this.colorFields != null) throw new IllegalStateException("Native section snapshot was already flushed");
+        this.colorFields = NativeSectionColors.capture(this.minX, this.minY, this.minZ,
+                this.activeIndicesAddress, this.activeRecordCount, this.colorKindsAddress, this.tintLatticesAddress,
+                this.colorSlice);
+        // A reload can finish during color extraction. Revalidate immediately
+        // before native model/state admission, retaining the original guard too.
+        if (this.modelReloadGeneration != NativeStaticBlockModelRegistry.reloadGeneration()) {
+            throw new IllegalStateException("Native section snapshot was built against stale native model metadata");
+        }
+        // Rust copied literal rows into the sealed owner; no Java tensor is
+        // needed during the native scan, including custom-provider sections.
+        if (this.tintLatticesAddress != 0L) {
+            MemoryUtil.nmemFree(this.tintLatticesAddress);
+            this.tintLatticesAddress = 0L;
+        }
+        MemoryUtil.memPutLong(this.address + HEADER_COLOR_FIELDS_ID_OFFSET, this.colorFields.identity());
         MemoryUtil.memPutInt(this.address + HEADER_ACTIVE_COUNT_OFFSET, this.activeRecordCount);
         int[] nativeQuads = this.buffers.appendCompactNativeSectionSnapshotAllPasses(this.address,
                 this.sectionIndex, collector);
@@ -218,7 +254,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
         this.fluidFlowZAddress += this.address;
         this.fluidBlockIdsAddress += this.address;
         this.flagsAddress += this.address;
-        this.tintLatticesAddress += this.address;
+        this.colorKindsAddress += this.address;
     }
 
     private void writeHeader() {
@@ -291,7 +327,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
         }
     }
 
-    private void recordTintSource(int localBlockIndex, BlockState state, BlockPos pos, int tint) {
+    private void recordTintSource(int localBlockIndex, LevelSlice slice, BlockState state, BlockPos pos, int tint, int kind) {
         if (tint == -1) {
             return;
         }
@@ -301,13 +337,19 @@ final class NativeSectionSnapshot implements AutoCloseable {
         if (!StaticTerrainParityDiagnostics.tracesNativeTintSource(sectionKey)) {
             return;
         }
-        long base = this.tintLatticesAddress + (long) localBlockIndex * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES;
-        int[] lattice = new int[TINT_LATTICE_SAMPLE_COUNT];
-        for (int sample = 0; sample < lattice.length; sample++) {
-            lattice[sample] = MemoryUtil.memGetInt(base + (long) sample * Integer.BYTES);
+        long temporary = kind == 4 ? 0L : MemoryUtil.nmemAlloc((long) TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES);
+        try {
+            long base = kind == 4 ? this.tintLatticesAddress + (long) localBlockIndex * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES : temporary;
+            if (kind != 4) writeTintLattice(base, slice, state, pos);
+            int[] lattice = new int[TINT_LATTICE_SAMPLE_COUNT];
+            for (int sample = 0; sample < lattice.length; sample++) {
+                lattice[sample] = MemoryUtil.memGetInt(base + (long) sample * Integer.BYTES);
+            }
+            StaticTerrainParityDiagnostics.recordNativeTintSource(
+                    sectionKey, pos.getX(), pos.getY(), pos.getZ(), String.valueOf(state.getBlock()), tint, lattice);
+        } finally {
+            if (temporary != 0L) MemoryUtil.nmemFree(temporary);
         }
-        StaticTerrainParityDiagnostics.recordNativeTintSource(
-                sectionKey, pos.getX(), pos.getY(), pos.getZ(), String.valueOf(state.getBlock()), tint, lattice);
     }
 
     private void populatePaddedGrids(LevelSlice slice) {
@@ -359,6 +401,15 @@ final class NativeSectionSnapshot implements AutoCloseable {
 
     @Override
     public void close() {
+        try {
+            if (this.colorFields != null) { this.colorFields.close(); this.colorFields = null; }
+        } finally {
+            if (this.tintLatticesAddress != 0L) { MemoryUtil.nmemFree(this.tintLatticesAddress); this.tintLatticesAddress = 0L; }
+            this.freeSnapshot();
+        }
+    }
+
+    private void freeSnapshot() {
         if (this.address != 0L) {
             MemoryUtil.nmemFree(this.address);
             this.address = 0L;
@@ -419,6 +470,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
             return 0xFFFFFFFF;
         }
         return blockTint(slice, state, pos, tintKind(state.getBlock()), null);
+    }
+
+    static int colorSourceKind(BlockState state, BlockColors colors) {
+        if (NativeMeshingDiagnostics.forceWhiteTint()) return 0;
+        int kind = tintKind(state.getBlock());
+        if (kind >= TINT_GRASS && kind <= TINT_DRY_FOLIAGE) return kind;
+        return kind == TINT_REDSTONE || colors.hasColorProvider(state.getBlock()) ? 4 : 0;
     }
 
     private static int tintKind(Block block) {

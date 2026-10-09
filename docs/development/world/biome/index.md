@@ -6,3 +6,5 @@
   searches and section containers), its gate and parity/performance checks.
 - [Biome searches](RUST-BIOME-SEARCH.md): Rust `findBiomeHorizontal` and
   `findClosestBiome3d` for multi-noise sources (ring placement, `/locate biome`).
+- [Section color snapshots](RUST-SECTION-COLORS.md): shared native world-color
+  inputs, literal-provider compatibility, lifetime and chunk rebuilding checks.

@@ -1,15 +1,22 @@
 //! Compact all-pass section snapshot access.
 //!
-//! Java owns the backing arrays for one chunk section rebuild. Rust receives a
+//! Java owns the state/light backing arrays for one chunk section rebuild; Rust
+//! owns immutable shared color fields. Rust receives a
 //! stable header plus raw addresses for active local indexes, padded section
-//! state/light arrays, and per-block semantic data. This module is the only
+//! state/light arrays, per-block semantic data and a validated color owner. This module is the only
 //! place that converts that ABI into safe record-shaped values for the scan
 //! orchestrator; production must keep using this compact snapshot path.
 
 use super::*;
+use crate::world::level::biome::color_fields::{self, SectionColorFields};
+use std::sync::Arc;
 
 pub(super) trait NativeSectionRecordSource {
     fn record_count(&self) -> usize;
+
+    fn color_fields(&self) -> Option<&SectionColorFields> {
+        None
+    }
 
     unsafe fn state_id_at(&self, index: usize) -> Result<i32, i32> {
         Ok(self.record_at(index)?.state_id)
@@ -45,6 +52,7 @@ pub(super) trait NativeSectionRecordSource {
 
 pub(super) struct CompactSectionSnapshot<'a> {
     header: &'a CompactSectionSnapshotHeader,
+    color_fields: Option<Arc<SectionColorFields>>,
     active_indices: &'a [u16],
     padded_state_ids: &'a [i32],
     padded_light_words: &'a [i32],
@@ -65,11 +73,13 @@ impl<'a> CompactSectionSnapshot<'a> {
         if address == 0 {
             return Err(ERR_NULL_POINTER);
         }
+        // Older callers supplied a shorter header. Reject its leading version
+        // before creating a reference to the expanded v4 allocation.
+        if (address as *const i32).read_unaligned() != COMPACT_SECTION_SNAPSHOT_VERSION {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
         let header = &*(address as *const CompactSectionSnapshotHeader);
-        if header.version != COMPACT_SECTION_SNAPSHOT_VERSION
-            || header.active_count < 0
-            || header.active_count as usize > COMPACT_SECTION_BLOCK_COUNT
-        {
+        if header.active_count < 0 || header.active_count as usize > COMPACT_SECTION_BLOCK_COUNT {
             return Err(ERR_INVALID_ARGUMENT);
         }
         let active_count = header.active_count as usize;
@@ -80,7 +90,6 @@ impl<'a> CompactSectionSnapshot<'a> {
             || header.seed_los_address == 0
             || header.seed_his_address == 0
             || header.tints_address == 0
-            || header.tint_lattices_address == 0
             || header.fluid_tints_address == 0
             || header.fluid_flow_x_address == 0
             || header.fluid_flow_z_address == 0
@@ -89,11 +98,29 @@ impl<'a> CompactSectionSnapshot<'a> {
         {
             return Err(ERR_NULL_POINTER);
         }
+        let color_fields = if header.color_fields_id != 0 {
+            let fields = color_fields::resolve(header.color_fields_id)?;
+            if fields.origin != [header.min_x, header.min_y, header.min_z]
+                || !fields.matches_active(slice::from_raw_parts(
+                    header.active_indices_address as *const u16,
+                    active_count,
+                ))
+            {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            Some(fields)
+        } else {
+            if header.tint_lattices_address == 0 {
+                return Err(ERR_NULL_POINTER);
+            }
+            None
+        };
         let padded_len = COMPACT_SECTION_PADDED_LENGTH
             * COMPACT_SECTION_PADDED_LENGTH
             * COMPACT_SECTION_PADDED_LENGTH;
         Ok(Self {
             header,
+            color_fields,
             active_indices: slice::from_raw_parts(
                 header.active_indices_address as *const u16,
                 active_count,
@@ -122,10 +149,14 @@ impl<'a> CompactSectionSnapshot<'a> {
                 header.tints_address as *const i32,
                 COMPACT_SECTION_BLOCK_COUNT,
             ),
-            tint_lattices: slice::from_raw_parts(
-                header.tint_lattices_address as *const i32,
-                COMPACT_SECTION_BLOCK_COUNT * 64,
-            ),
+            tint_lattices: if header.color_fields_id == 0 {
+                slice::from_raw_parts(
+                    header.tint_lattices_address as *const i32,
+                    COMPACT_SECTION_BLOCK_COUNT * 64,
+                )
+            } else {
+                &[]
+            },
             fluid_tints: slice::from_raw_parts(
                 header.fluid_tints_address as *const i32,
                 COMPACT_SECTION_BLOCK_COUNT,
@@ -179,6 +210,9 @@ impl<'a> CompactSectionSnapshot<'a> {
 }
 
 impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
+    fn color_fields(&self) -> Option<&SectionColorFields> {
+        self.color_fields.as_deref()
+    }
     #[inline(always)]
     fn record_count(&self) -> usize {
         self.active_indices.len()
@@ -302,16 +336,17 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
             }
         }
 
-        let lattice_start = local_index * 64;
-        for y in 0..4 {
-            for z in 0..4 {
-                for x in 0..4 {
-                    record.tint_lattice[y][z][x] =
-                        self.tint_lattices[lattice_start + (y * 4 + z) * 4 + x];
+        if self.color_fields.is_none() {
+            let lattice_start = local_index * 64;
+            for y in 0..4 {
+                for z in 0..4 {
+                    for x in 0..4 {
+                        record.tint_lattice[y][z][x] =
+                            self.tint_lattices[lattice_start + (y * 4 + z) * 4 + x];
+                    }
                 }
             }
         }
-
         Ok(record)
     }
 

@@ -445,3 +445,11 @@ The caller-side decode and arena closure are visible in
 and [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2394-L2437).
 Earlier queued worker-decode/double-staging descriptions are superseded by this
 caller-decode path; they do not require two live Java request arenas today.
+
+## Chunk rebuild color ownership
+
+The separate compact meshing header is version4 (136 bytes), with a final CPU
+color-owner identity. Ordinary snapshots use Rust-owned shared world-coordinate
+fields; literal tensors remain for compatibility fixtures. Whole-frame ABI74 is
+unchanged. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
+for construction, sealing, lifetime and provider compatibility.

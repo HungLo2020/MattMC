@@ -35,6 +35,17 @@ pub(super) fn native_vertex_tint_color(
     y: f32,
     z: f32,
 ) -> i32 {
+    native_vertex_tint_color_from_fields(block, state, x, y, z, None)
+}
+
+pub(super) fn native_vertex_tint_color_from_fields(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    x: f32,
+    y: f32,
+    z: f32,
+    fields: Option<&crate::world::level::biome::color_fields::SectionColorFields>,
+) -> i32 {
     let base = native_tint_color(block, state, false);
     if base == -1
         || matches!(
@@ -59,13 +70,21 @@ pub(super) fn native_vertex_tint_color(
     if block.flags & TINT_LATTICE_FLAG == 0 {
         return base;
     }
-    if ix + 1 >= 4 || iy >= 4 || iz + 1 >= 4 {
+    if ix >= 3 || iy >= 4 || iz >= 3 {
         // A model outside the explicit semantic lattice is not admissible:
         // guessing a biome cell would violate parity. The route keeps this
         // capability private until a wider extractor is supplied.
         return -1;
     }
-    let sample = |x: usize, z: usize| block.tint_lattice[iy][z][x] as u32;
+    let sample = |x: usize, z: usize| match fields {
+        Some(fields) => fields.sample(
+            ((block.local_y as usize * 16) + block.local_z as usize) * 16 + block.local_x as usize,
+            x,
+            iy,
+            z,
+        ) as u32,
+        None => block.tint_lattice[iy][z][x] as u32,
+    };
     let x1 = (fx * 255.0) as u32;
     let z1 = (fz * 255.0) as u32;
     let mix = |a: u32, b: u32, weight: u32| ((a * (255 - weight) + b * weight + 255) >> 8) & 255;

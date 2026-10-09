@@ -39,10 +39,16 @@ A concrete remaining producer is terrain rebuild preparation:
 clones Java palettes, `LevelSlice` expands Java block arrays, and
 [`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java)
 repackages padded state/light grids and per-block tint inputs for Rust meshing.
-This is source-confirmed ownership/transfer work, not a measured hotspot or an
-implemented loaded-world migration. Profile rebuild/streaming workloads before
-choosing the slice; move authoritative section data and its bulk consumers
-together while preserving snapshot timing, contextual rules and reload handling.
+Ordinary-flight profiling now identifies repeated tint sampling as a substantial
+part of Java snapshot preparation (159/383 sampled snapshot CPU frames). The
+local [shared section color fields](../world/biome/RUST-SECTION-COLORS.md) slice
+moves coordinate planning, overlap deduplication, storage and direct mesher
+consumption into Rust. Full suites, seven lifecycle cases and reviewed image
+pairs pass; vanilla still misses whole-renderer performance floors. Repeated
+ordinary-flight profiles show lower sampled tint/snapshot preparation cost;
+this is not an authoritative loaded-world migration or an isolated FPS gain. Continue moving
+section storage and bulk consumers together while preserving snapshot timing,
+contextual rules and reload handling.
 
 ## Phase 1: one block registry from Java (implemented)
 

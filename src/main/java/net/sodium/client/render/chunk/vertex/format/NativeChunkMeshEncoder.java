@@ -26,8 +26,8 @@ public final class NativeChunkMeshEncoder {
      */
     @Deprecated(forRemoval = false)
     public static final int LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE = 316;
-    public static final int COMPACT_SECTION_SNAPSHOT_HEADER_STRIDE = 128;
-    public static final int COMPACT_SECTION_SNAPSHOT_VERSION = 3;
+    public static final int COMPACT_SECTION_SNAPSHOT_HEADER_STRIDE = 136;
+    public static final int COMPACT_SECTION_SNAPSHOT_VERSION = 4;
     public static final int COMPACT_SECTION_PADDED_LENGTH = 18;
     public static final int COMPACT_SECTION_PADDED_BLOCK_COUNT =
             COMPACT_SECTION_PADDED_LENGTH * COMPACT_SECTION_PADDED_LENGTH * COMPACT_SECTION_PADDED_LENGTH;

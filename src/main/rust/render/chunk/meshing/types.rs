@@ -181,6 +181,7 @@ pub(super) struct CompactSectionSnapshotHeader {
     pub(super) fluid_block_ids_address: u64,
     pub(super) flags_address: u64,
     pub(super) tint_lattices_address: u64,
+    pub(super) color_fields_id: u64,
 }
 
 #[repr(C)]

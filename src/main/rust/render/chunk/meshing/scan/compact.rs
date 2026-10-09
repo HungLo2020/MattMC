@@ -490,6 +490,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
                             facing,
                             profile_static_substages,
                             profile_scan_substages,
+                            source.color_fields(),
                         )?;
                         let builder = target.profile();
                         builder.add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);

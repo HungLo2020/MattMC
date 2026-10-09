@@ -37,7 +37,7 @@ impl CompactSnapshotStorage {
             seed_los: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             seed_his: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             tints: vec![-1; COMPACT_SECTION_BLOCK_COUNT],
-            tint_lattices: vec![-1; COMPACT_SECTION_BLOCK_COUNT * 9],
+            tint_lattices: vec![-1; COMPACT_SECTION_BLOCK_COUNT * 64],
             fluid_tints: vec![-1; COMPACT_SECTION_BLOCK_COUNT],
             fluid_flow_x: vec![0.0; COMPACT_SECTION_BLOCK_COUNT],
             fluid_flow_z: vec![0.0; COMPACT_SECTION_BLOCK_COUNT],
@@ -66,6 +66,7 @@ impl CompactSnapshotStorage {
             fluid_flow_z_address: self.fluid_flow_z.as_ptr() as u64,
             fluid_block_ids_address: self.fluid_block_ids.as_ptr() as u64,
             tint_lattices_address: self.tint_lattices.as_ptr() as u64,
+            color_fields_id: 0,
             flags_address: self.flags.as_ptr() as u64,
         }
     }
