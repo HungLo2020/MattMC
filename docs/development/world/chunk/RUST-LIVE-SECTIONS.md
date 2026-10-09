@@ -8,8 +8,8 @@ native call per read. Changing Java writes currently make one fused downcall;
 unchanged positions need no native mutation.
 
 The implementation is in
-[`chunk/live/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/live).
-[`NativeLiveBlockSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java)
+[`chunk/live/`](https://github.com/HungLo2020/MattMC/tree/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/world/level/chunk/live).
+[`NativeLiveBlockSection`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java)
 is its transitional CPU bridge. This covers fresh containers, valid saved/network
 imports, generated-section installation and independent nonzero-width copies.
 Zero-width copies retain the shared single-value behavior described below.
@@ -42,7 +42,7 @@ improvement. A native executable and complete Java removal remain unfinished.
   interface and its identity is not guarded before `bitsInStorage()` is called.
   Do not infer a guarantee that all custom callbacks are untouched. Preserve
   these actual admission boundaries without normalizing imported palettes.
-  [Admission source](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java#L56-L84)
+  [Admission source](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java#L62-L89)
 - Preserve packed padding, palette order, unused entries and requested global
   configuration bits. A resize uses fresh zero padding and first occurrence in
   storage order. Hash palettes append the overflow entry before growing.
@@ -93,8 +93,9 @@ Frozen and vanilla+DH 24.3% below, with worse p99 times. Both shader modes beat
 Frozen on average FPS and p99. These results do not establish an isolated
 storage speedup or identify the cause of the DH gap. Historical receipt:
 `validation/native-live-block-sections-alias-final-20261009/summary.json`.
-The [current generation-handoff comparison](../levelgen/RUST-STAGE-HANDOFF.md#verification-and-profiling)
-is newer. This documentation review did not rerun the suites or inspect the
+The [section-counter comparison](RUST-SECTION-COUNTERS.md#verification)
+is a later checkpoint that includes live storage and generation handoff. This
+documentation review did not rerun the suites or inspect the
 unbundled runtime receipts.
 
 Earlier diagnostic profiles used release `4a8f5d18`, before final alias hardening:

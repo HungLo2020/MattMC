@@ -1,5 +1,9 @@
 # Native item-layer preparation
 
+> Current ownership is source-inspected at [`64294324`](https://github.com/HungLo2020/MattMC/commit/642943247003d7d8d756a65180f0872b088c13f0).
+> Runtime results below are author-recorded checkpoints; this documentation
+> review did not rerun suites or inspect the unbundled receipts, profiles or images.
+
 Canonical authored item transforms now have immutable Rust CPU owners. Semantic
 layer extraction captures that owner instead of creating a Java pose, quaternion
 and matrix arrays. GUI, ordinary world-item and first-person collectors pass CPU owners to native
@@ -8,9 +12,11 @@ parent poses and operation modes. Rust resolves the final pose once and copies
 it into its owned request before rendering. GPU resources still belong to GAL.
 
 Implementation:
-[`render/items/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/items),
-[`NativeItemLayerTransform`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/NativeItemLayerTransform.java)
-and [GUI decoding](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/gui/mesh.rs).
+[`render/items/`](https://github.com/HungLo2020/MattMC/tree/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/items),
+[`NativeItemLayerTransform`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/vulkanic/world/NativeItemLayerTransform.java)
+and [GUI decoding](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/gui/mesh.rs).
+[World/hand decoding](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/world/item_poses.rs#L5-L93)
+resolves CPU poses before ordinary semantic validation and clears their owner fields.
 
 ## Constraints
 
@@ -21,6 +27,8 @@ and [GUI decoding](https://github.com/HungLo2020/MattMC/blob/master/src/main/rus
 - The temporary Java cache holds at most 256 transform identities. Check current
   scalar bits before reuse. Each changed transform creates an independent owner;
   existing captures remain immutable and valid after cache eviction or reload.
+  The cache limit does not bound all retained owners: captures pin evicted owners
+  until their automatic arenas become reclaimable.
 - A scoped read-only CPU view pins each owner. Synchronous and queued submission
   fence batch references through decode. The older pipelined route separately
   pins captures until join or context destruction, independently of mutable lists.
@@ -53,6 +61,8 @@ Java CPU semantics. They still feed the Rust renderer. Java continues to resolve
 models, tints, quads and parent animation; entity scene preparation and contextual
 world inputs remain migration work. Moving a local transform alone does not
 establish complete item ownership or a whole-game speedup.
+
+Related tracking: [#772](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6089031512).
 
 ## Verification and profiling
 
@@ -94,10 +104,16 @@ combined-source checks separate from that performance evidence. After integratio
 RGB differences are 0.203/0.348/0.382 and 3.712/4.266/3.901, DH coverage passes
 and VUIDs are zero. Receipt: `validation/native-item-layer-upstream-pairs-20261009/reviewed-integration.json`.
 
-Current world/hand integration matches all 12,000 Frozen CPU oracle cases
-exactly, including model/normal bits and trust flags. Seeded Java checks exercise
-both composition orders and immutable parent capture; wire tests cover dirty
-storage, copies and independent worker pins. Full Rust checks pass (2,432 cases, 3 ignored), as does full Java (1,793 cases,
+The author reports that the world/hand checkpoint matches all 12,000 Frozen CPU
+oracle cases exactly, including model/normal bits and trust flags. The committed
+[seeded Java checks](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/test/java/net/vulkanic/world/NativeWorldItemPoseTest.java#L13-L58)
+exercise 800 transforms across both hands and composition orders, plus immutable
+parent capture. The [wire tests](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/test/java/net/vulkanic/bridge/NativeWorldItemPoseEncodingTest.java#L18-L57)
+cover dirty storage and copies; the worker-pin case invokes the pinning helper
+directly and does not execute submission, join, failure or context destruction.
+
+For that recorded checkpoint, full Rust checks pass (2,432 cases, 3 ignored),
+as does full Java (1,793 cases,
 2 skipped). The final release also passes 89 affected Java cases after a
 diagnostic-only change to use best-effort console writes. The decoder and
 closed-pipe checks pass on that final source. Final release `0d54a098` passes all seven lifecycle cases and reviewed

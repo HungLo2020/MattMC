@@ -143,7 +143,10 @@ ownership, native boundaries, and recorded verification.
 
 Canonical [live block sections](world/chunk/RUST-LIVE-SECTIONS.md) in
 `world/level/chunk/live/` own packed storage and palette mutation; Java reads
-scoped CPU views. [Immutable captures and bulk state-ID halos](world/chunk/RUST-SECTION-SNAPSHOTS.md)
+scoped CPU views. [Section-local counters](world/chunk/RUST-SECTION-COUNTERS.md)
+in `world/level/chunk/counters/` fuse eligible canonical writes with count updates
+and scan live storage for recounts; aliases retain independent counters.
+[Immutable captures and bulk state-ID halos](world/chunk/RUST-SECTION-SNAPSHOTS.md)
 live in `chunk/snapshot/`, and `chunk/stage_transfer.rs` supports native
 [generation capture/adoption](world/levelgen/RUST-STAGE-HANDOFF.md).
 [Shared section color fields](world/biome/RUST-SECTION-COLORS.md) live in
@@ -152,9 +155,10 @@ contextual light, model admission and entity callbacks, and orchestrates chunks
 and generation stages. These owners do not complete the world migration.
 
 Packed chunk storage also uses [palette histograms](world/chunk/RUST-PALETTE-HISTOGRAM.md)
-under `world/level/chunk/palette/histogram/` for ordered counting and section
-counter reconstruction, and [palette resizing](world/chunk/RUST-PALETTE-RESIZE.md)
-under `world/level/chunk/palette/resize/` for bulk remapping during block palette growth.
+under `world/level/chunk/palette/histogram/` for general ordered counting and
+compatibility section recounts; canonical recounts scan the live owner directly.
+[Palette resizing](world/chunk/RUST-PALETTE-RESIZE.md) under
+`world/level/chunk/palette/resize/` provides bulk remapping during block palette growth.
 [Global palette loading](world/chunk/RUST-PALETTE-UNPACKING.md) uses
 `world/level/chunk/palette/unpack/` and the existing encoder for saved-data repacking.
 [Player chunk distances](world/chunk-loading/RUST-PLAYER-DISTANCE.md) use
@@ -247,6 +251,8 @@ Important current subdirectories:
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
 - `render/dh_collector/`: the Distant Horizons column ledger: generations, column payloads, publication, retirement, owner leases, the prepared frame's visible segments and route receipts ([rendering architecture](rendering/RENDER-ARCHITECTURE.md)). Its Java exports are `render/bridge/dh_collector.rs`. Java still supplies the DH quadtree candidates, material provenance and frame parameters; native ledger ownership does not move those producers into Rust.
+- `render/clouds/`: built-in DH cloud motion, placement, culling and color-change history in CPU owners. Java retains texture/API boxes, world-color queries and callbacks; see [cloud preparation](rendering/RUST-DH-CLOUDS.md).
+- `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). This does not implement native item registries or gameplay.
 - `render/scene/`: wire and data vocabulary shared by Java and the renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).
 - `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
 - `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).

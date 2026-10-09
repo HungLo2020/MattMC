@@ -1,21 +1,22 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`a908f78c`](https://github.com/HungLo2020/MattMC/commit/a908f78cd909200f5f4f4424b124072cef0a17f6):
-map/state policy, native DH visibility frames, section colors, rebuild snapshots,
-live block storage and canonical generation-stage transfers extend the earlier
-ownership. The latest author-recorded stage-handoff workflow
-**fails overall performance acceptance** despite passing tests, lifecycle cases
-and settled coast comparisons. Vanilla and vanilla+DH miss FPS and p99 floors;
-no isolated transfer regression or speedup is established. See the
-[current measured workload](#october-9-native-generation-handoff-summary).
+[`64294324`](https://github.com/HungLo2020/MattMC/commit/642943247003d7d8d756a65180f0872b088c13f0):
+native section counters, DH cloud preparation and GUI/world/hand item poses
+extend the earlier ownership. The latest author-recorded item workflow passes
+all median average-FPS floors in its measured window but **fails overall
+performance acceptance on vanilla p99**. Large repeat variance prevents a
+robust or isolated speedup claim. Later reload/memory observer corrections have
+narrower fresh evidence; they were not followed by another full performance
+matrix. See the [current measured workload](#october-9-native-world-and-hand-input-summary).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
-payload publication and retained visibility frames, and GPU execution/resources.
+payload publication, retained visibility frames and built-in cloud preparation,
+native authored item poses and GPU execution/resources.
 Separate native world owners now supply canonical live/rebuild state and section
 color fields. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
@@ -30,7 +31,10 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [generation-handoff source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6086170999)
+The [current performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6088997781)
+keeps the failed tail-latency gate and measured/observer-only windows explicit.
+
+The preceding [generation-handoff source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6086170999)
 and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6086142300)
 retain those open acceptance limits. Earlier checkpoints below preserve their
 original source and workload scopes.
@@ -43,7 +47,7 @@ The earlier [intrinsics ownership review](https://github.com/HungLo2020/MattMC/i
 and [intrinsics evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6070924916)
 retain their historical checkpoint scope.
 
-The current [terrain publication](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6053377956),
+The earlier [terrain publication](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6053377956),
 [DH lifecycle](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6053379365),
 [shared pages](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6053380774)
 and [validation/performance](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6053382027)
@@ -82,15 +86,31 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 9 section counters, clouds and item inputs
+
+The `a908f78c` → `64294324` interval advances three bounded owners:
+
+- [Section counters](../world/chunk/RUST-SECTION-COUNTERS.md) move signed-short lanes and canonical mutation/recount into Rust. Generation input capture reads storage and counters under the storage lock; Java still orchestrates chunk work and publishes results
+- [DH cloud preparation](RUST-DH-CLOUDS.md) moves built-in motion, placement, culling and color history into native CPU owners. API callbacks, custom groups and Java DH world orchestration remain
+- [Item layers](RUST-ITEM-LAYERS.md) retain authored poses through GUI and world/hand decoding. Java model selection, topology, parent animation and custom paths remain. ABI 75 introduced cloud references, 76 direct GUI poses, and the current ABI 77 adds world/hand inputs
+
+The intervening [readiness/cleanup fixes](https://github.com/HungLo2020/MattMC/commit/111d7a9c48b5d5876c1649e81a3c5608d98fb6f3)
+remove column sidecars by their index range, transform debug axes through the
+frame view, and preserve offscreen rebuild marks without resetting camera
+readiness. These changes do not waive benchmark producer checks or establish
+broad visual acceptance. Source-only light-owner draft results in the working
+record are not evidence that production light propagation/rebuild consumers
+have migrated.
+
 ### October 9 native frame and world-input checkpoint
 
 The `87046367` → `a908f78c` interval adds bounded ownership slices:
 
-- [Map colors/images](../game-model/MAP-COLORS.md) and [state policy](../game-model/STATE-POLICY.md) now originate in Rust. ABI 73 introduced indexed GUI source format 3; the current ABI is 74. Java still supplies contextual map/world behavior and compatibility objects
+- [Map colors/images](../game-model/MAP-COLORS.md) and [state policy](../game-model/STATE-POLICY.md) now originate in Rust. ABI 73 introduced indexed GUI source format 3; this historical interval reached ABI 74. Java still supplies contextual map/world behavior and compatibility objects
 - [DH visibility frames](RETAINED-SCENE.md#native-dh-visibility-frame-ownership) remain immutable native CPU lists through caller-side queued decode. Java passes identity/lifecycle/counts and still walks the quadtree; three resolvable ring slots do not cap all live decoded owners
 - [Section color fields](../world/biome/RUST-SECTION-COLORS.md) share lattice samples per resolver within a section capture. Origin tint calls, Java biome blending/context and literal provider callbacks remain
 - [Rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md) and [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md) own distinct immutable/mutable state. Native bulk state-ID halos replace Java halo decoding; model admission, CPU views, callback compatibility and GC lifetime limits remain
-- [Generation-stage handoff](../world/levelgen/RUST-STAGE-HANDOFF.md) keeps canonical NOISE output and SURFACE/CARVERS capture/install inside Rust. Inputs are isolated copies and outputs become independent live owners; Java retains orchestration, counters and heightmap publication
+- [Generation-stage handoff](../world/levelgen/RUST-STAGE-HANDOFF.md) keeps canonical NOISE output and SURFACE/CARVERS capture/install inside Rust. Inputs are isolated copies and outputs become independent live owners; Java retained orchestration, counters and heightmap publication at that checkpoint; the newer counter guide describes its subsequent native owner
 
 Source inspection and the committed author reports establish these boundaries.
 This documentation review did not run clients, Java/Rust suites, captures or
@@ -320,6 +340,42 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 9 native world and hand input summary
+
+The [summary at `64294324`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/SUMMARY.md)
+records release `0d54a098` on RTX 3080 Ti: moving-camera ABAB, two runs per side
+and mode, with exactly 6,000 measured frames each. These are author reports;
+this maintenance review did not run the clients or inspect raw runtime receipts.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- |
+| Vanilla | 1,076.9 / 1,457.3 | 1,178.0 / 1,161.7 | 3.506 / 3.019 |
+| Vanilla + DH | 748.1 / 738.2 | 797.4 / 602.7 | 4.862 / 5.604 |
+| Shaders | 356.3 / 351.8 | 319.6 / 320.0 | 4.725 / 5.826 |
+| Shaders + DH | 257.1 / 246.4 | 228.4 / 226.6 | 6.733 / 7.695 |
+
+**Performance FAIL:** all median average-FPS floors pass, but vanilla p99 fails.
+Current vanilla and Frozen DH vary substantially between repeats; differing
+streaming work is a lead, not a proven tail cause. The author records 2,432 Rust
+tests (three ignored), 1,793 full Java tests (two skipped), seven lifecycle
+cases, reviewed coast/HUD pairs and sixteen clean performance rows. Receipt:
+`validation/native-world-item-final-20261009/summary.json`.
+
+The [working record](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/PROGRESS.md)
+separates this measured source from subsequent observer corrections: 184 affected
+Java cases and a fresh strict held-clock foil capture pass after reload-boundary
+and managed-memory-path fixes. That short-session image/memory result does not
+remeasure the full performance matrix or prove long-run bounds. Ground pairs
+closely match live Frozen but fail older fixed probes; the strict ground fixture
+remains unaccepted. The prior GUI-item benchmark also predates integration of
+`111d7a9c`; its later focused checks and paired images have separate scope.
+
+Sampled source-flag allocation falls from about 194 MB to zero per 15 seconds,
+and world-matrix samples also fall, while total Java estimates vary across
+profiles. These diagnostic observations do not isolate throughput. Earlier
+cloud, counter and GUI-item workflows retain their failed floors and original
+release identities in the pinned working record; their results are not additive.
 
 #### October 9 native generation handoff summary
 

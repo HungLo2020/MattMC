@@ -7,9 +7,9 @@ Java no longer exports canonical palettes/packed words, constructs state lists,
 or rebuilds a second container for these transfers.
 
 The transitional bridge is
-[`NativeGenerationSections`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeGenerationSections.java).
+[`NativeGenerationSections`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeGenerationSections.java).
 The ownership boundary lives in
-[`stage_transfer.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/stage_transfer.rs),
+[`stage_transfer.rs`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/world/level/chunk/stage_transfer.rs),
 with import/export entries beside each stage. See
 [live storage](../chunk/RUST-LIVE-SECTIONS.md) and
 [stage semantics](RUST-SURFACE-STORAGE.md#shared-chunk-storage).
@@ -19,7 +19,8 @@ with import/export entries beside each stage. See
 - Import copies packed inputs under each native owner's lock. Stages retain no
   live-owner pointers: later live mutations cannot alter their input snapshots.
   Native [section counters](../chunk/RUST-SECTION-COUNTERS.md) are sampled under
-  the same lock; Java no longer projects a three-counter input array. Stage
+  the same lock; Java no longer projects a three-counter input array. This is
+  per-owner capture, not a whole-chunk atomic snapshot. Stage
   storage still unpacks sections lazily on first access.
 - Install packs a modified dense stage section once in Rust and creates a unique
   live owner. Java registers its cleanup before allocating the CPU projection,
@@ -57,7 +58,8 @@ python3 DevUtils/RunWiki.py check
 ```
 
 The preceding handoff milestone passed 26 focused Java tests at `a908f78c`.
-The section-counter follow-up passes the full 1,762-test Java suite (2 skipped),
+The author reports that the section-counter follow-up passes the full
+1,762-test Java suite (2 skipped),
 including the direct counter-owner input route. Handoff cases verify
 snapshot isolation, stage-release/GC lifetimes, unchanged-owner preservation,
 alias compatibility and every palette growth boundary through global storage.

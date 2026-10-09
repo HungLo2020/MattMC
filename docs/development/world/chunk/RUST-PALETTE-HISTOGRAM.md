@@ -13,12 +13,13 @@ mutex, then Java delivers the ordered records after the native call returns.
 Each callback resolves the current palette again, including after a callback
 mutates the container. The single-entry shortcut remains. The separate
 compatibility helper described below scans copied storage when applicable.
-[Current count dispatch](https://github.com/HungLo2020/MattMC/blob/a908f78cd909200f5f4f4424b124072cef0a17f6/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java#L481-L520).
+[Current count dispatch](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java#L496-L535).
 
 The compatibility multi-entry branch of `PalettedContainer.count()` uses Rust for standard
 4096-entry `SimpleBitStorage` and `ZeroBitStorage`, with source widths 0–16.
-This accelerates section block/fluid counter reconstruction and other count
-consumers. The existing single-entry shortcut, small containers, custom storage
+This helper serves compatibility section recounts and other general count
+consumers; canonical recounts bypass these callback records. The existing
+single-entry shortcut, small containers, custom storage
 and wider formats keep their existing path.
 
 The kernel lives in

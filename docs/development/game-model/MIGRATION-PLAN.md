@@ -15,6 +15,10 @@ production-path benchmark, and docs.
 
 ## Current priority (2026-10-09)
 
+The linked guides distinguish current source ownership from author-recorded
+acceptance checkpoints. Their historical suite/image/performance results do not
+certify every later source revision.
+
 After the local map/state-policy batch, prioritize world-state systems and the
 per-frame Java → Rust path ahead of more static catalog migration. Profile
 producer work, allocations and transfer costs, then move data storage, producer
@@ -47,7 +51,7 @@ still fail. Move
 remaining per-frame world-state extraction next rather than more static catalogs.
 The local [item-layer preparation](../rendering/RUST-ITEM-LAYERS.md) slice now
 owns authored poses in Rust and feeds block/flat GUI consumers directly;
-Full CPU/lifecycle checks and reviewed coast pairs pass; vanilla still misses
+full CPU/lifecycle checks and reviewed coast pairs pass; vanilla still misses
 Frozen performance floors. The measurements precede incoming Java rendering
 fixes; combined checks are recorded separately. The local follow-up now composes ordinary world and hand poses in Rust, with
 copied parents and pinned CPU owners. Full CPU suites, lifecycle checks and

@@ -1,15 +1,19 @@
 # Rust section mutation and counters
 
-Canonical `LevelChunkSection` writes update packed blocks and section counters
-in one Rust call, under the live-storage mutation lock. Recounts scan owned
+> Current ownership is source-inspected at [`64294324`](https://github.com/HungLo2020/MattMC/commit/642943247003d7d8d756a65180f0872b088c13f0).
+> Runtime results below are author-recorded checkpoints; this documentation
+> review did not rerun suites or inspect the unbundled receipts, profiles or images.
+
+Eligible canonical `LevelChunkSection` writes update packed blocks and section
+counters in one Rust call, under the live-storage mutation lock. Recounts scan owned
 storage directly; they do not build Java histogram records or block callbacks.
 Java status queries read an eight-byte, read-only CPU view without downcalls.
 The three mutable Java short fields have been removed.
 
 Implementation:
-[`counters/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/counters)
+[`counters/`](https://github.com/HungLo2020/MattMC/tree/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/world/level/chunk/counters)
 and the [live-storage owner](RUST-LIVE-SECTIONS.md).
-[`NativeSectionCounters`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeSectionCounters.java)
+[`NativeSectionCounters`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeSectionCounters.java)
 is a temporary CPU bridge, not a second authority.
 
 ## Constraints
@@ -32,6 +36,8 @@ is a temporary CPU bridge, not a second authority.
   lane, before decoding blocks; failed block reads retain that changed lane.
 - Each counter owner has one automatic arena cleanup. Retained CPU views pin
   it; mutation and generation downcalls fence their section/owner references.
+  The packed word is an atomic counter snapshot, not an atomic combined read of
+  block storage and counts; callers must retain the existing exclusion rules.
   No global registry of sections or GPU handles is introduced.
 
 [Generation handoff](../levelgen/RUST-STAGE-HANDOFF.md) borrows both storage and
@@ -40,6 +46,8 @@ and copies isolated stage inputs; Java no longer builds three-counter input
 arrays. Stage result installation still returns three small counter values and
 publishes them after adopting the block owner. Compatibility serialization,
 biomes, chunk orchestration and broader world simulation remain migration work.
+
+Related tracking: [#776](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6089009016).
 
 ## Verification
 
@@ -58,7 +66,8 @@ retained views. These checks establish CPU semantics only. Runtime parity,
 bounded resources and realistic Frozen-equivalent performance remain required;
 no section-transaction speedup is claimed before production measurements.
 
-Release `59171b74` passes 2,426 Rust tests (3 ignored), 121 focused Java tests,
+The author reports that release `59171b74` passes 2,426 Rust tests (3 ignored),
+121 focused Java tests,
 the full Java suite (1,762 passed/2 skipped), all seven lifecycle transitions
 and Wiki checks (2,487 pages/43 indexes). The direct-entry regression asserts
 native admission after registry readiness, alongside the original Java count

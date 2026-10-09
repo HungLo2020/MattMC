@@ -5,7 +5,9 @@ implemented in part; the full scene target remains open (October 2026).**
 ABI 70 carries compact terrain, and ordinary frames now select those compact
 camera layers and shadow candidates in the Rust section graph. Native
 publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups
-and ABI 74 visibility frames, retain CPU input data.
+and ABI 74 visibility frames, retain CPU input data. These are their layout
+introduction versions; the [current whole-frame ABI](JAVA-BRIDGE.md#how-the-abi-stays-in-sync)
+is 77.
 Reduced-color DH geometry also uses shared GPU pages, with the separate
 ownership limits below. Diagnostic and
 other routes retain their documented producer and expansion paths. The phase list separates remaining targets
@@ -157,10 +159,13 @@ still emits individual indexed draws. See [page upload and retirement](RENDER-AR
 for submission-gated reuse and idle binding retention. Shared storage is
 implemented; DH multi-draw and all-route retained scene ownership remain targets.
 
-ABI 72 similarly retains DH generic-group boxes in a CPU registry, with one
-per-frame group instance carrying origin, light, shading and SSAO. Native decode
-still expands these into ordinary camera-relative box requests. Java owns the
-callbacks and change notifications; missing generations request resending. This
+DH generic-group boxes have used a retained CPU registry since ABI 72, with one
+per-frame group instance carrying light, shading, SSAO and an origin. ABI 75
+added a native owner/epoch in place of the inline origin for eligible
+[built-in clouds](RUST-DH-CLOUDS.md); ordinary API origins still come from Java.
+Native decode resolves the origin and expands ordinary camera-relative box
+requests. Java owns callbacks and change notifications; missing registered-group
+generations request resending, while expired native cloud epochs are rejected. This
 is separate from retained GPU terrain and phase 5's entity/block-entity target.
 Neither change establishes all-route scene ownership or Frozen parity.
 

@@ -67,7 +67,7 @@ or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe ch
 | Shader-pack parsing or pass planning | `shaderpack/` |
 | DH column generations, leases or publication/visibility bookkeeping | `dh_collector/`; keep Java wire handling in `bridge/dh_collector.rs` |
 | Built-in DH cloud motion, placement and culling policy | `clouds/`; see [cloud preparation](RUST-DH-CLOUDS.md) |
-| Authored item-layer transforms | `items/`; see [item preparation](RUST-ITEM-LAYERS.md) |
+| Authored item-layer transforms and world/hand pose composition | `items/`; see [item preparation](RUST-ITEM-LAYERS.md) |
 | A new Java entry point or wire record | `bridge/` (see [Java Bridge](JAVA-BRIDGE.md)) |
 | A new GPU capability, resource type or command | `vulkanic/` (see [VulkanicGAL](VULKANIC-GAL.md)) |
 
@@ -84,7 +84,8 @@ renderer or its CPU source, and use VulkanicGAL for all GPU work. This does not
 authorize borrowed Java GPU state, a fallback renderer or another presenter.
 
 Current chunk CPU inputs have separate world owners: [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md)
-own canonical storage/mutation, [immutable rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
+own canonical storage/mutation, [section-local counters](../world/chunk/RUST-SECTION-COUNTERS.md)
+fuse eligible writes and recount directly, [immutable rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
 share resolver lattice samples within a capture. Java retains contextual light,
 biome blending, model admission and worker dispatch. Canonical
@@ -603,14 +604,16 @@ multi-draw, zero-copy publication or full retained-scene ownership.
 Generic boxes group by four `(SSAO, translucency)` key classes and pack fixed
 uniform blocks; Java uses the [packed-buffer transport](JAVA-BRIDGE.md).
 DH generic groups (clouds, beacons, API objects) are retained in Rust
-([`bridge/world/dh_generic_groups.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/dh_generic_groups.rs), ABI 72):
+([`bridge/world/dh_generic_groups.rs`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/world/dh_generic_groups.rs#L91-L143),
+introduced in ABI 72, with native cloud fields added in ABI 75):
 - `GenericObjectRenderer` registers a group's boxes, in group coordinates,
   only when DH marks it changed (`triggerBoxChange`), its box count changes,
   or it is new. That's the same contract DH's own renderer used for re-uploads.
-- Each frame then sends one instance per active group (origin, light, shading,
-  SSAO). The whole-frame decode expands them into the frame's camera-relative
-  boxes as `(box + origin) - camera` in f64. Clouds, which only move their
-  origin, no longer resend about 2,600 boxes per frame.
+- Each frame sends one instance per active group (light, shading, SSAO, plus
+  an API origin or native cloud owner/epoch). The whole-frame decode resolves
+  the origin and expands camera-relative boxes as `(box + origin) - camera`
+  in f64. Cloud motion alone no longer resends about 2,600 boxes per frame;
+  [native cloud preparation](RUST-DH-CLOUDS.md) also avoids round-tripping origins.
 - An instance whose group generation Rust lacks is skipped and raises a resend
   flag. Java then re-registers every group on the next collection. Removed
   groups are released during collection, and clearing the Java renderer releases
@@ -628,7 +631,9 @@ DH generic groups (clouds, beacons, API objects) are retained in Rust
   trigger it. This source mismatch was not reproduced in a client run.
 
 Java retains API callbacks, active/cancelled-group selection, dirty notifications,
-origins, light and shading. Same-count geometry edits must trigger the existing
+ordinary API origins, light and shading. Built-in cloud motion/placement/culling
+and color-change history use their separate Rust CPU owner; Java still supplies
+world color and shared API boxes. Same-count geometry edits must trigger the existing
 change notification. These retained DH boxes do not implement retained entities
 or block entities in the [scene plan](RETAINED-SCENE.md#phases).
 

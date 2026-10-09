@@ -149,16 +149,17 @@ proxy root: both structural extraction and the posed fallback remain empty
 
 ABI 72 appends retained DH generic-group instances as whole-frame field 51 and
 the double camera origin as field 52. Group boxes use struct 116 (56 bytes:
-double min/max bounds, color and material); ABI 75 instances use struct 117 (88 bytes:
+double min/max bounds, color and material); struct 117 uses the 88-byte layout
+introduced in ABI 75 and retained in the current ABI 77:
 group id/generation, double origin, packed light, SSAO flag and six shading
-multipliers, CPU cloud owner and pose generation). Native cloud instances set
+multipliers, CPU cloud owner and pose generation. Native cloud instances set
 flag bit 1 and carry zero origin lanes; ordinary API instances carry zero native
 fields. See [cloud preparation and lifetime](RUST-DH-CLOUDS.md). Java registers changed boxes through `setDhGenericGroup`; Rust
 copies them into its CPU registry, then expands each frame's instances into
 ordinary camera-relative boxes in draw order. This is retained input data,
 not a retained GPU scene or a borrowed Java array. Both id and generation must
 be nonzero. Rebuild Java and native code together; see
-[registration and expansion](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/bridge/world/dh_generic_groups.rs)
+[registration and expansion](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/world/dh_generic_groups.rs#L91-L143)
 and [group lifetime and bounds](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
 The Java group allocator can supply id 0 to this nonzero-only path;
 [#820](https://github.com/HungLo2020/MattMC/issues/820) tracks that admission
@@ -402,8 +403,9 @@ also share persistent instance arrays. This was the default at the earlier
   the native thread-local key contains no new-context identity. Same-thread
   context recreation with address reuse is an unverified lifecycle case, not
   a demonstrated defect or a guarantee supplied by the generation field.
-- `PackedDhGenericBoxes` carries ABI 72 retained-group instances and camera
-  data for the ordinary DH generic producer (up to 10,000 boxes per frame).
+- `PackedDhGenericBoxes` carries retained-group instances and camera data
+  introduced in ABI 72, with native cloud fields added in ABI 75, for the
+  ordinary DH generic producer (up to 10,000 boxes per frame).
   Its primitive per-box arrays remain available for direct box input; unchanged
   groups no longer resend those arrays every frame. The pending buffer rotates
   through a ring of three; a consumed frame takes the buffer itself, and the
@@ -483,8 +485,9 @@ caller-decode path; they do not require two live Java request arenas today.
 The separate compact meshing header is version4 (136 bytes), with a final CPU
 color-owner identity. Ordinary snapshots use Rust-owned shared fields and copied
 literal-provider rows; zero-owner literal tensors remain for compatibility
-fixtures. Sharing is per resolver within each section capture. Whole-frame ABI74 is
-unchanged. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
+fixtures. Sharing is per resolver within each section capture. That color
+transport left the then-current whole-frame ABI 74 unchanged; the current ABI
+is 77. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
 for construction, sealing, lifetime and provider compatibility.
 
 Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
@@ -506,6 +509,7 @@ apply right/left authored transforms for world items; 3/4 compose prepared poses
 for hands. Existing transform lanes carry the copied parent. Ordinary inline
 records zero every appended lane. Native special foil keeps its inline model
 and normal lanes zero; Rust resolves both before ordinary semantic validation.
-The native pointer is a pinned immutable CPU owner, copied during decode and
-cleared before frontend admission. Worker-decoded requests pin owners separately
-from caller lists until join/error/destruction. GPU ownership is unchanged.
+The [native decoder](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/world/item_poses.rs#L5-L93)
+resolves the pinned immutable CPU owner into a copied pose, then clears the
+owner fields before frontend admission. Worker-decoded requests pin owners
+separately from caller lists until join/error/destruction. GPU ownership is unchanged.
