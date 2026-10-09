@@ -25,6 +25,14 @@ so a closed launcher pipe cannot turn an otherwise valid submission into a
 logging panic. Keep the overlap trace enabled when checking that failure;
 turning it off would remove the triggering write.
 
+Foil capture observers use one Rust whole-frame boundary for GUI, hand and
+world samples, including reload-overlay frames that skip item collection.
+Require matching observed frame IDs; do not relabel stale samples. Process
+memory observation accepts both in-tree game copies and the Python runner's
+exact marked-root `.tmp/<run-id>/game_dir_<run-id>` path. Fresh metadata,
+isolated cwd and stable Java process/start identity remain mandatory;
+external paths, wrong-run siblings and symlink escapes are rejected.
+
 ## 1. Tests
 
 Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.

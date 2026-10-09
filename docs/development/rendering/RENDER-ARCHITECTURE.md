@@ -17,7 +17,7 @@ render/
 ├── scene/        wire and data vocabulary (constants, data types)
 ├── dh_collector/ DH column state, copied payloads, publication and frame admission
 ├── clouds/       CPU cloud motion/placement/culling owners; no GPU dependencies
-├── items/        immutable authored item CPU poses; no GPU dependencies
+├── items/        authored item poses and world/hand composition; no GPU dependencies
 ├── vulkanic/     VulkanicGAL: the graphics abstraction layer and its backends
 └── chunk/        native chunk meshing, render lists and sorting used by Java's chunk renderer
 ```
@@ -94,7 +94,7 @@ change GAL resources, completion or presentation.
 
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The
-indexed GUI input arrived with ABI 73; the current whole-frame ABI is 74.
+indexed GUI input arrived with ABI 73; the current whole-frame ABI is 77.
 Java retains map revisions, staging and contextual map production.
 
 Selected-source frames carry thousands of mesh instances (mostly off-camera

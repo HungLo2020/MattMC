@@ -49,10 +49,23 @@ The local [item-layer preparation](../rendering/RUST-ITEM-LAYERS.md) slice now
 owns authored poses in Rust and feeds block/flat GUI consumers directly;
 Full CPU/lifecycle checks and reviewed coast pairs pass; vanilla still misses
 Frozen performance floors. The measurements precede incoming Java rendering
-fixes; combined checks are recorded separately. World and
-hand consumers still project matrices. Continue coupling those consumers with
-native producers, then migrate entity scene preparation and contextual chunk
-inputs instead of only moving more static definitions.
+fixes; combined checks are recorded separately. The local follow-up now composes ordinary world and hand poses in Rust, with
+copied parents and pinned CPU owners. Full CPU suites, lifecycle checks and
+reviewed coast pairs pass; vanilla p99 still misses Frozen and repeat variance
+limits throughput conclusions. See the item-layer guide for evidence scope.
+Next move live light storage with propagation and terrain consumers, then
+entity scene preparation and contextual world inputs. These are ownership
+migrations; additional static definitions are not the main performance batch.
+
+The next coupled world-state target is light storage and terrain rebuild inputs.
+The native propagation pass currently exports changed 2 KiB layers into Java
+arrays, Java copies them into `DataLayer`, and rebuilds copy/read those layers
+again to construct 5,832 contextual light words. Move retained light ownership,
+copy-on-write publication and canonical padded preparation together. Preserve
+mutable array escape compatibility, lazy-layer state, dimension defaults and
+contextual block callbacks; measure ordinary movement and chunk rebuilds.
+This is proposed follow-up work, not implemented ownership.
+
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java still orchestrates stage
 installation and chunks, while ordinary canonical live palette mutation now uses

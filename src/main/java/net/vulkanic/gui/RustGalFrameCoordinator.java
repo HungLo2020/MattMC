@@ -1864,8 +1864,7 @@ public final class RustGalFrameCoordinator {
 		).trim().isEmpty()) {
 			return true;
 		}
-		String value = System.getenv("MATTMC_RUST_SELECTED_SOURCE_EXECUTION");
-		return value != null && (value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes"));
+		return net.vulkanic.world.NativeRenderLaunchConfiguration.selectedSourceExecutionRequested();
 	}
 
 	private static int wholeFramePresentMode(Minecraft minecraft) {

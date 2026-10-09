@@ -1199,7 +1199,12 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 entity_culling_flags,
                 entity_culling_bounds,
                 entity_culling_leash_bounds,
-                entity_culling_camera
+                entity_culling_camera,
+                native_item_transform,
+                native_item_transform_mode,
+                native_item_parent_properties,
+                native_item_parent_normal,
+                native_item_parent_trusted
             ]
         ),
         70 => layout!(

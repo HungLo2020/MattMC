@@ -2,10 +2,10 @@
 
 Canonical authored item transforms now have immutable Rust CPU owners. Semantic
 layer extraction captures that owner instead of creating a Java pose, quaternion
-and matrix arrays. The block/flat-item GUI collectors and their native decoder consume
-the owner directly. ABI 76 appends the CPU address and hand selection to GUI
-mesh batches; inline model lanes are zero for that route. Rust copies the pose
-into its owned request before rendering. GPU resources still belong to GAL.
+and matrix arrays. GUI, ordinary world-item and first-person collectors pass CPU owners to native
+decoding. ABI 76 introduced direct GUI consumption; ABI 77 adds world/hand
+parent poses and operation modes. Rust resolves the final pose once and copies
+it into its owned request before rendering. GPU resources still belong to GAL.
 
 Implementation:
 [`render/items/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/items),
@@ -32,13 +32,27 @@ and [GUI decoding](https://github.com/HungLo2020/MattMC/blob/master/src/main/rus
   traversal inspects absent meshes directly; subclass getter callbacks retain
   their existing invocation. Emitted/custom meshes keep their original path.
 
-World/hand consumers still request compatibility
-matrix projections. Their proposed direct lowering must preserve two operations:
-ordinary world items apply authored TRS to the parent pose; hands multiply a
-prepared local pose. JOML rotation and matrix multiplication associate float sums
-differently, including the independent normal matrix. Java still resolves model layers, tints, quads and special
-renderers. Moving those producers and consumers together remains work; this
-slice does not claim complete item rendering or world-state ownership.
+## World and first-person consumers
+
+Ordinary world items apply authored TRS to a copied parent; hands compose a
+prepared local pose. `world_pose.rs` preserves the distinct JOML float ordering
+and the independent normal matrix. The immutable owner is 340 bytes, including
+the existing 208-byte right/left pose prefix and cached authored operations.
+Canonical layers bypass Java local-pose construction and multiplication.
+
+Each request captures the parent model, normal and trust flag once. Base and
+foil copies retain that capture. Native special foil resolves from the same
+pose instead of constructing another Java matrix projection. Public compatibility
+getters and enabled CPU diagnostics can still request a native projection.
+Synchronous/queued calls fence request lists; worker-decoded submissions keep
+independent owner pins until join, failure or context destruction.
+
+Custom layers, emitted meshes, special renderers, custom quad/sprite callbacks,
+non-affine parents, unusual numeric inputs and fastmath/FMA retain the existing
+Java CPU semantics. They still feed the Rust renderer. Java continues to resolve
+models, tints, quads and parent animation; entity scene preparation and contextual
+world inputs remain migration work. Moving a local transform alone does not
+establish complete item ownership or a whole-game speedup.
 
 ## Verification and profiling
 
@@ -46,12 +60,12 @@ Use JDK 25 and the same release profile for Java and runtime checks:
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml -- --test-threads=4
-CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeItemLayerTransformTest' --tests '*ItemLayerLazyMeshTest' --tests '*ItemStackRenderStateSemanticLayerTest' --tests 'net.vulkanic.gui.*' --tests 'net.vulkanic.bridge.*'
+CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeWorldItemPose*' --tests '*NativeItemLayerTransformTest' --tests '*ItemLayerLazyMeshTest' --tests '*ItemStackRenderStateSemanticLayerTest' --tests 'net.vulkanic.gui.*' --tests 'net.vulkanic.bridge.*'
 python3 DevUtils/RunWiki.py check
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --all-java-tests --perf
 ```
 
-The local implementation passes 2,429 Rust tests (3 ignored), 153 focused Java
+The preceding published GUI-only checkpoint passed 2,429 Rust tests (3 ignored), 153 focused Java
 cases, 1,768 full Java cases (2 skipped), all seven lifecycle cases and
 Wiki checks (2,488 pages/43 indexes). Reviewed vanilla/Iris+DH coast and HUD
 pairs pass. These settled views do not certify broad gameplay or temporal parity.
@@ -79,3 +93,45 @@ combined-source checks separate from that performance evidence. After integratio
 179 focused Java cases and fresh reviewed vanilla/Iris+DH coast pairs pass;
 RGB differences are 0.203/0.348/0.382 and 3.712/4.266/3.901, DH coverage passes
 and VUIDs are zero. Receipt: `validation/native-item-layer-upstream-pairs-20261009/reviewed-integration.json`.
+
+Current world/hand integration matches all 12,000 Frozen CPU oracle cases
+exactly, including model/normal bits and trust flags. Seeded Java checks exercise
+both composition orders and immutable parent capture; wire tests cover dirty
+storage, copies and independent worker pins. Full Rust checks pass (2,432 cases, 3 ignored), as does full Java (1,793 cases,
+2 skipped). The final release also passes 89 affected Java cases after a
+diagnostic-only change to use best-effort console writes. The decoder and
+closed-pipe checks pass on that final source. Final release `0d54a098` passes all seven lifecycle cases and reviewed
+vanilla/Iris+DH coast/HUD pairs (RGB mean differences 0.300/0.538/0.638 and
+3.650/4.151/3.848; DH coverage passes; VUIDs zero). These are settled views.
+Receipt: `validation/native-world-item-final-20261009/summary.json`.
+
+All sixteen ABAB runs contain exactly 6,000 frames with no exceptions, VUIDs,
+terrain failures or owned orphans. Median average FPS passes every mode here,
+but vanilla p99 is 3.506 ms versus Frozen 3.019 ms, so the overall performance
+gate fails. Current vanilla repeats are 1,076.9/1,457.3 FPS and Frozen DH
+797.4/602.7 FPS; this variance prevents a robust or isolated speedup claim.
+Current vanilla streaming spans 68 versus 2 measured frames, which identifies
+a work-phase difference without establishing a tail root cause. Source, native
+library, Frozen and protected-user-edit integrity checks pass; 25 generated
+run copies were retired.
+
+The final Current moving-DH profile proves native world-owner consumption and
+zero sampled source-flag environment allocation, previously 194 MB/15 seconds.
+Sampled old world-layer matrix allocation falls from 2.10 MB to zero, while
+parent capture adds 5.24 MB and total Java allocation rises from 2.228 to
+2.576 GB. Sparse weighted samples and different workload phases limit
+attribution; Java asset/topology preparation remains substantial. Receipt:
+`goal5/native-world-item-profile-20261009/current/item-allocation-comparison.json`.
+Additional actual world and hand captures exercise modes 1 and 3, including
+native special foil, on the worker-decoded route. A common frame boundary now
+keeps GUI/hand observers aligned through resource reloads; 184 affected Java
+cases pass after that diagnostic correction. The final held-clock fixture
+passes complete normal-route admission: inspected Frozen pixels, native pose
+inputs, reload, routine Vulkan validation and actual process-memory observation.
+Receipt: `goal5/native-world-item-foil-memory-20261009/held-clock/`; one generated
+copy retired, no owned orphans. Short-session peak RSS is 4,845,148 KB Current
+and 8,413,100 KB Frozen; this does not establish long-session memory behavior.
+Ground images match the live Frozen capture, but both disagree with the older
+fixed pixel probes: the strict ground fixture remains unaccepted. Frozen is
+unchanged; no Frozen behavior is classified as a bug. Earlier performance
+measurements precede these observer-only changes.

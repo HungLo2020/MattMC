@@ -10,6 +10,33 @@ or a renderer, and writes a status back. It makes no rendering decisions.
 
 This is a current compatibility boundary. The [completed runtime target](../PROJECT-ARCHITECTURE.md) has no Java dependency; [Goal 5 status](GOAL-5-STATUS.md) keeps current ownership and verified progress distinct.
 
+## Immutable launch inputs
+
+`NativeRenderLaunchConfiguration` reads one scalar flag projection from
+[`render/shared/launch_configuration.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/launch_configuration.rs)
+on first use. Rust owns parsing and caches the process launch input; ordinary
+Java consumers perform no environment lookup or FFM call per query. Source
+capture requests accept untrimmed `1`, case-insensitive `true` or `yes`;
+graphics audit accepts only `1` or case-insensitive `true`. Source override
+presence is separate from its value, preserving automatic shader admission
+when absent. Java's `equalsIgnoreCase` also admits long-s in `yeſ`; preserve it.
+
+Runtime options and diagnostic system properties remain live at their original
+callsites. The shader execution route has a different trimmed override grammar
+(including `on`) and retains its existing path. These predicates must not be
+merged. This scalar CPU export changes no GAL resources or record layouts.
+Rebuild the native library before testing the new symbol. Use
+`cargo test ... launch_configuration` and `NativeRenderLaunchConfigurationTest`;
+the latter checks the actual process inputs against the original Java predicates.
+The profile target is recorded in the [item-layer guide](RUST-ITEM-LAYERS.md);
+release `d650bb27` passes 76 focused Java cases and 12 isolated JVM predicate
+cases. A valid moving-DH profile records source-flag `getenv` allocation falling
+from 194.0 MB to zero sampled bytes over 15 seconds. Total sampled allocation
+falls from 2.736 to 2.228 GB across Java checkpoints that also include upstream
+DH/capture fixes; no isolated total or FPS gain is established. Source/library,
+exact measurement window and cleanup checks pass. Receipt:
+`goal5/native-launch-policy-profile-20261009/current/allocation-comparison.json`.
+
 ## How the ABI stays in sync
 
 - **Records are `#[repr(C)]` structs** in [`bridge/abi/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi),
@@ -20,7 +47,7 @@ This is a current compatibility boundary. The [completed runtime target](../PROJ
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** the current whole-frame ABI is **74**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **77**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
 
@@ -472,3 +499,13 @@ ABI 76 appends a CPU owner address and hand mode to GUI mesh batch struct 97
 right/left poses, with zero inline model lanes. Rust copies the selected pose
 during decoding. See [item-layer preparation](RUST-ITEM-LAYERS.md) for admission,
 compatibility and synchronous/pipelined pinning rules.
+
+ABI 77 appends CPU item owner, operation mode, parent matrix properties, parent
+normal matrix and trust flag to world mesh struct 69 (fields 36–40). Modes 1/2
+apply right/left authored transforms for world items; 3/4 compose prepared poses
+for hands. Existing transform lanes carry the copied parent. Ordinary inline
+records zero every appended lane. Native special foil keeps its inline model
+and normal lanes zero; Rust resolves both before ordinary semantic validation.
+The native pointer is a pinned immutable CPU owner, copied during decode and
+cleared before frontend admission. Worker-decoded requests pin owners separately
+from caller lists until join/error/destruction. GPU ownership is unchanged.

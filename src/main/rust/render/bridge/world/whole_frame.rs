@@ -1120,6 +1120,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             raw_instance.byte_size,
             "world primitive mesh instance",
         )?;
+        let resolved_item = unsafe { super::item_poses::resolve_item_pose(raw_instance,false)? };
+        let raw_instance = &*resolved_item;
         // A model-rig instance stands for its drawn parts, in place.
         let expanded = if raw_instance.flags & super::model_rigs::WORLD_MESH_INSTANCE_FLAG_MODEL_RIG != 0 {
             rig_parts.clear();

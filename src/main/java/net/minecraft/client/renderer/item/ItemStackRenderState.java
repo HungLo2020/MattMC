@@ -448,6 +448,25 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 					);
 				}
 				if (ownership.usesRustWholeFrameVulkan()) {
+                    if(this.getClass()==LayerRenderState.class&&poseStack.getClass()==PoseStack.class
+                        &&this.specialRenderer==null&&!this.hasMutableMesh()
+                        &&RustGalWorldPrimitiveRenderer.nativeItemPoseInputsSafe(this.quads,this.renderType)) {
+                        var capture=net.vulkanic.world.NativeItemLayerTransform.capture(this.transform,ItemStackRenderState.this.displayContext.leftHand());
+                        var nativePose=net.vulkanic.world.NativeItemLayerTransform.WorldPose.capture(capture,poseStack.last(),true);
+                        if(nativePose!=null) {
+                            String unavailable=RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
+                                ItemStackRenderState.this.displayContext,i,j,k,this.tintLayers,this.quads,this.renderType,this.foilType);
+                            if(unavailable!=null) {
+                                RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision("rust-vulkan-unavailable",false,unavailable,false,false,false);
+                                throw new IllegalStateException("Rust whole-frame item route has no semantic mesh: "+unavailable);
+                            }
+                            boolean queued=RustGalWorldPrimitiveRenderer.enqueueNativeItemEntityMesh(nativePose,
+                                ItemStackRenderState.this.displayContext,i,j,this.tintLayers,this.quads,this.renderType,this.foilType,k);
+                            RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision("rust-vulkan-whole-frame",true,null,true,queued,false);
+                            if(!queued)throw new IllegalStateException("Rust whole-frame item-entity layer was eligible but did not enqueue a copied indexed mesh request");
+                            return;
+                        }
+                    }
 					poseStack.pushPose();
 					this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
 					if ((Object)this.specialRenderer instanceof net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer taczRenderer) {

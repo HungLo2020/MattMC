@@ -46,6 +46,8 @@ pub(super) unsafe fn decode_world_first_person_mesh_instances(
             instance.byte_size,
             "world first-person mesh instance",
         )?;
+        let resolved_item = unsafe { super::item_poses::resolve_item_pose(instance,true)? };
+        let instance = &*resolved_item;
         validate_mesh_instance_semantic_identity(instance, "world first-person mesh instance")?;
         if instance.terrain_placement_mode != 0 {
             return Err(GalError::invalid_argument(

@@ -454,13 +454,11 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static boolean selectedSourceExecutionRequested() {
-		String value = System.getenv("MATTMC_RUST_SELECTED_SOURCE_EXECUTION");
-		return value != null && (value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes"));
+		return net.vulkanic.world.NativeRenderLaunchConfiguration.selectedSourceExecutionRequested();
 	}
 
 	private static boolean graphicsAuditEnabled() {
-		String value = System.getenv("MATTMC_GRAPHICS_AUDIT");
-		return value != null && (value.equals("1") || value.equalsIgnoreCase("true"));
+		return NativeRenderLaunchConfiguration.graphicsAuditEnabled();
 	}
 
 	/**

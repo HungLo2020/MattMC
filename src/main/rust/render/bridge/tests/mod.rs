@@ -2904,8 +2904,9 @@ fn mesh_asset<'a>(
 }
 
 fn mesh_instance() -> FfiWorldMeshInstanceRecord {
-
     FfiWorldMeshInstanceRecord {
+        native_item_transform:0, native_item_transform_mode:0, native_item_parent_properties:0, native_item_parent_normal:[0.;9], native_item_parent_trusted:0,
+
         entity_culling_mode: 0,
         entity_culling_flags: 0,
         entity_culling_bounds: [0.0; 6],
@@ -3730,6 +3731,7 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         translucent_hand_mask: 0,
     };
     let mut hands = vec![FfiWorldMeshInstanceRecord {
+        native_item_transform:0, native_item_transform_mode:0, native_item_parent_properties:0, native_item_parent_normal:[0.;9], native_item_parent_trusted:0,
         entity_culling_mode: 0,
         entity_culling_flags: 0,
         entity_culling_bounds: [0.0; 6],
@@ -3944,7 +3946,7 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
         );
     }
     let layout = crate::render::bridge::layout::layout_for_struct(69).unwrap();
-    assert_eq!(layout.field_count, 36);
+    assert_eq!(layout.field_count, 41);
     assert_eq!(
         layout.field_offsets[24],
         std::mem::offset_of!(FfiWorldMeshInstanceRecord, decal_foil_mode) as u32
@@ -6717,4 +6719,40 @@ fn indexed_map_ffi_copies_indices_and_bounds_expanded_residency() {
     let error = unsafe { decode_gui_raw_image_update(&excessive, test_capabilities()) }.unwrap_err();
     assert_eq!(StatusCode::LengthOverflow, error.code);
     assert!(error.message.contains("aggregate"));
+}
+
+#[test]
+fn native_world_item_decode_copies_pose_and_rejects_conflicting_inputs() {
+    let owner=Box::new(crate::render::items::Owner::new([0.,0.,0.,2.,3.,4.,1.,2.,3.],false).unwrap());
+    let mut instance=mesh_instance();instance.stratum=WORLD_STRATUM_ENTITY_MESH;
+    instance.native_item_transform=(&*owner as *const crate::render::items::Owner) as u64;
+    instance.native_item_transform_mode=3;instance.native_item_parent_properties=30;
+    instance.native_item_parent_normal=[1.,0.,0.,0.,1.,0.,0.,0.,1.];instance.native_item_parent_trusted=1;
+    instance.item_foil_mode=1;instance.item_foil_strength=1.;instance.item_foil_speed=1.;instance.decal_foil_mode=2;
+    let copied=unsafe {crate::render::bridge::world::resolve_item_pose(&instance,true)}.unwrap().into_owned();
+    assert_eq!(copied.transform[12..],[1.5,2.,2.5,1.]);
+    assert_eq!(copied.decal_model_pose,copied.transform);
+    assert_eq!(copied.decal_normal_pose,[1.,0.,0.,0.,0.5,0.,0.,0.,1./3.]);
+    assert_eq!(copied.decal_normal_mode,1);assert_eq!(copied.native_item_transform,0);
+    assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&instance,false)}.is_err());
+    for bad in 0..9 {
+        let mut invalid=instance;
+        match bad {
+            0=>invalid.native_item_transform_mode=5,
+            1=>invalid.native_item_parent_properties=0,
+            2=>invalid.native_item_parent_trusted=2,
+            3=>invalid.native_item_parent_normal[0]=f32::NAN,
+            4=>invalid.terrain_placement_mode=1,
+            5=>invalid.flags=0x4000_0000,
+            6=>invalid.decal_model_pose[0]=1.,
+            7=>invalid.decal_normal_pose[0]=-0.,
+            8=>invalid.native_item_transform+=1,
+            _=>unreachable!(),
+        }
+        assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&invalid,true)}.is_err(),"case{bad}");
+    }
+    drop(owner);
+    assert_eq!(copied.transform[12..],[1.5,2.,2.5,1.]);
+    let mut inline=mesh_instance();inline.native_item_parent_normal[0]=-0.;
+    assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&inline,false)}.is_err());
 }

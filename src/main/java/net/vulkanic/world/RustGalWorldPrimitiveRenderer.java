@@ -8285,6 +8285,16 @@ public final class RustGalWorldPrimitiveRenderer {
 		) == null;
 	}
 
+    public static boolean nativeItemPoseInputsSafe(List<BakedQuad> quads,RenderType type) {
+        if(type==null || type.getClass()!=RenderType.CompositeRenderType.class || quads==null)return false;
+        for(var quad:quads) {
+            if(quad==null||quad.getClass()!=BakedQuad.class)return false;
+            var sprite=quad.sprite();
+            if(sprite==null||sprite.getClass()!=TextureAtlasSprite.class||sprite.contents()==null
+                ||sprite.contents().getClass()!=net.minecraft.client.renderer.texture.SpriteContents.class)return false;
+        }
+        return true;
+    }
 	/** Capture-only route provenance; native resource/presentation proof is separate. */
 	public static String worldDecalFoilAdmissionReceipt() {
 		return "{\"schema\":\"rust-owned-world-decal-foil-v1\",\"normalRoute\":" + true
@@ -8376,13 +8386,31 @@ public final class RustGalWorldPrimitiveRenderer {
 		ItemStackRenderState.FoilType foilType,
 		int entityOutlineColor
 	) {
+        return enqueueItemEntityMesh(itemPose,null,displayContext,packedLight,overlayCoords,tintLayers,quads,renderType,foilType,entityOutlineColor);
+    }
+    public static boolean enqueueNativeItemEntityMesh(NativeItemLayerTransform.WorldPose pose,ItemDisplayContext display,
+        int light,int overlay,int[] tints,List<BakedQuad> quads,RenderType type,ItemStackRenderState.FoilType foil,int outline) {
+        return enqueueItemEntityMesh(null,java.util.Objects.requireNonNull(pose),display,light,overlay,tints,quads,type,foil,outline);
+    }
+	private static boolean enqueueItemEntityMesh(
+		PoseStack.Pose itemPose,
+        NativeItemLayerTransform.WorldPose nativePose,
+		ItemDisplayContext displayContext,
+		int packedLight,
+		int overlayCoords,
+		int[] tintLayers,
+		List<BakedQuad> quads,
+		RenderType renderType,
+		ItemStackRenderState.FoilType foilType,
+		int entityOutlineColor
+	) {
 		boolean eligible = isItemEntityMeshEligible(
 			displayContext, packedLight, overlayCoords, entityOutlineColor, tintLayers, quads, renderType, foilType
 		);
 		if (!eligible) {
 			return false;
 		}
-		if (itemPose == null || !itemPose.pose().isFinite()) {
+		if (nativePose==null && (itemPose == null || !itemPose.pose().isFinite())) {
 			throw new IllegalArgumentException("Rust item-entity route selected without an item transform");
 		}
 		ModelMeshRenderSemantics semantics = modelMeshRenderSemantics(renderType);
@@ -8403,7 +8431,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.StandardItemFoilRecord standardFoil = null;
 		VulkanicGalBridge.WorldDecalFoilRecord decalFoil = null;
 		if (foilType == ItemStackRenderState.FoilType.STANDARD || foilType == ItemStackRenderState.FoilType.SPECIAL) {
-			if (foilType == ItemStackRenderState.FoilType.SPECIAL) {
+			if (nativePose==null && foilType == ItemStackRenderState.FoilType.SPECIAL) {
 				decalFoil = copiedWorldDecalFoil(false, itemPose.trustedNormals, itemPose.pose(), itemPose.normal());
 			}
 			standardFoil = new VulkanicGalBridge.StandardItemFoilRecord(
@@ -8429,9 +8457,11 @@ public final class RustGalWorldPrimitiveRenderer {
 				ensureMeshAssetLocked(extraction);
 				VulkanicGalBridge.WorldMeshAssetRecord cachedAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
 				long meshGeneration = cachedAsset == null ? extraction.meshGeneration() : cachedAsset.meshGeneration();
-				float[] transform = new float[16];
-				itemPose.pose().get(transform);
-				PENDING_MESH_INSTANCES.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
+				float[] transform = nativePose==null?itemPose.pose().get(new float[16]):null;
+				PENDING_MESH_INSTANCES.add(nativePose!=null?VulkanicGalBridge.WorldMeshInstanceRecord.nativeItem(
+                    STRATUM_WORLD_ENTITY_MESH,extraction.meshKey(),meshGeneration,MESH_SECTION_ALL,semantics.depthPolicy(),semantics.cullPolicy(),
+                    WORLD_WINDING_CCW,0xffffffff,viewportWidth,viewportHeight,0,overlayColorArgb(overlayCoords),entityOutlineColor,nativePose)
+                    :new VulkanicGalBridge.WorldMeshInstanceRecord(
 					STRATUM_WORLD_ENTITY_MESH,
 					extraction.meshKey(),
 					meshGeneration,
@@ -8450,7 +8480,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				if (glintExtraction != null) {
 					ensureMeshAssetLocked(glintExtraction);
 					VulkanicGalBridge.WorldMeshAssetRecord glintAsset = WORLD_MESH_ASSETS.get(glintExtraction.meshKey());
-					var glintInstance = new VulkanicGalBridge.WorldMeshInstanceRecord(
+					var glintInstance = nativePose!=null?VulkanicGalBridge.WorldMeshInstanceRecord.nativeItem(
+                        STRATUM_WORLD_ENTITY_MESH,glintExtraction.meshKey(),glintAsset==null?glintExtraction.meshGeneration():glintAsset.meshGeneration(),
+                        MESH_SECTION_ALL,DEPTH_POLICY_TEST_NO_WRITE,CULL_NONE,WORLD_WINDING_CCW,0xffffffff,viewportWidth,viewportHeight,
+                        0,overlayColorArgb(overlayCoords),entityOutlineColor,nativePose):new VulkanicGalBridge.WorldMeshInstanceRecord(
 						STRATUM_WORLD_ENTITY_MESH, glintExtraction.meshKey(),
 						glintAsset == null ? glintExtraction.meshGeneration() : glintAsset.meshGeneration(),
 						MESH_SECTION_ALL, DEPTH_POLICY_TEST_NO_WRITE, CULL_NONE, WORLD_WINDING_CCW,
@@ -8458,7 +8491,8 @@ public final class RustGalWorldPrimitiveRenderer {
 						overlayColorArgb(overlayCoords), entityOutlineColor);
 					if (standardFoil != null) glintInstance = glintInstance.withItemFoil(standardFoil);
 					if (decalFoil != null) glintInstance = glintInstance.withDecalFoil(decalFoil);
-                    if (decalFoil != null && standardFoil != null)
+                    if(nativePose!=null&&foilType==ItemStackRenderState.FoilType.SPECIAL)glintInstance=glintInstance.withNativeDecalFoil();
+                    if ((decalFoil != null || nativePose!=null&&foilType==ItemStackRenderState.FoilType.SPECIAL) && standardFoil != null)
                         net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.observeSemanticClock(glintExtraction.meshKey(),
                             standardFoil.clockMillis(), standardFoil.speed(), standardFoil.strength());
 					PENDING_MESH_INSTANCES.add(glintInstance);
@@ -8490,6 +8524,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					extraction.asset(),
 					packedLight,
 					transform,
+                    nativePose,
 					viewportWidth,
 					viewportHeight
 				);
@@ -8773,14 +8808,17 @@ public final class RustGalWorldPrimitiveRenderer {
 				if (semantics == null) {
 					throw new IllegalStateException("Rust first-person route selected without supported render semantics");
 				}
-				Matrix4f transform = new Matrix4f(outerPose.pose()).mul(new Matrix4f().set(layer.modelTransform()));
+				var nativePose = nativeItemPoseInputsSafe(layer.quads(),layer.renderType())
+                    ? NativeItemLayerTransform.WorldPose.capture(layer.nativeTransform(),outerPose,false) : null;
+                Matrix4f transform = nativePose==null
+                    ? new Matrix4f(outerPose.pose()).mul(new Matrix4f().set(layer.modelTransform())) : null;
 				BlockMeshExtraction extraction = extractItemQuadMesh(
 					layer.quads(), layer.tintLayers(), packedLight, semantics, itemIdentity
 				);
 				if (extraction == null) {
 					throw new IllegalStateException("Rust first-person route selected but copied baked-quad extraction produced no mesh");
 				}
-				extractions.add(new FirstPersonMeshExtraction(extraction, semantics, transform));
+				extractions.add(new FirstPersonMeshExtraction(extraction,semantics,transform,null,null,nativePose));
 				if (layer.foilType() == ItemStackRenderState.FoilType.STANDARD || layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
 					ModelMeshRenderSemantics glintSemantics = new ModelMeshRenderSemantics(
 						MATERIAL_ID_GLINT_TEXTURED, MATERIAL_MODE_GLINT,
@@ -8796,10 +8834,11 @@ public final class RustGalWorldPrimitiveRenderer {
 					if (glintExtraction == null) {
 						throw new IllegalStateException("Rust first-person foil route produced no glint mesh");
 					}
-					var decal = layer.foilType() == ItemStackRenderState.FoilType.SPECIAL
+					var decal = nativePose==null && layer.foilType() == ItemStackRenderState.FoilType.SPECIAL
 						? copiedFirstPersonDecalFoil(outerPose, layer, transform)
 						: null;
-					extractions.add(new FirstPersonMeshExtraction(glintExtraction, glintSemantics, transform, foil, decal));
+					extractions.add(new FirstPersonMeshExtraction(glintExtraction,glintSemantics,transform,foil,decal,
+                        nativePose!=null&&layer.foilType()==ItemStackRenderState.FoilType.SPECIAL?nativePose.withDecalFoil():nativePose));
 				}
 			}
 		} finally {
@@ -8834,9 +8873,19 @@ public final class RustGalWorldPrimitiveRenderer {
 					// require a Java GPU residency check at this callsite.
 					VulkanicGalBridge.WorldMeshAssetRecord cachedAsset = WORLD_MESH_ASSETS.get(prepared.extraction().meshKey());
 					long meshGeneration = cachedAsset == null ? prepared.extraction().meshGeneration() : cachedAsset.meshGeneration();
-					float[] transform = new float[16];
+					VulkanicGalBridge.WorldMeshInstanceRecord instance;
+                    if(prepared.nativePose()!=null) {
+                        // Foil marker is attached after its timing record to preserve admission.
+                        var pose=prepared.nativePose();
+                        instance=VulkanicGalBridge.WorldMeshInstanceRecord.nativeItem(
+                            STRATUM_WORLD_ENTITY_MESH,prepared.extraction().meshKey(),meshGeneration,MESH_SECTION_ALL,
+                            prepared.semantics().depthPolicy(),prepared.semantics().cullPolicy(),WORLD_WINDING_CCW,
+                            0xffffffff,pendingViewportWidth,pendingViewportHeight,0,0,0,
+                            pose.withoutDecalFoil());
+                    }else {
+float[] transform = new float[16];
 					prepared.transform().get(transform);
-					VulkanicGalBridge.WorldMeshInstanceRecord instance = new VulkanicGalBridge.WorldMeshInstanceRecord(
+					instance = new VulkanicGalBridge.WorldMeshInstanceRecord(
 						STRATUM_WORLD_ENTITY_MESH,
 						prepared.extraction().meshKey(),
 						meshGeneration,
@@ -8849,8 +8898,10 @@ public final class RustGalWorldPrimitiveRenderer {
 						pendingViewportWidth,
 						pendingViewportHeight
 					);
+                    }
 					if (prepared.itemFoil() != null) instance = instance.withItemFoil(prepared.itemFoil());
 					if (prepared.decalFoil() != null) instance = instance.withDecalFoil(prepared.decalFoil());
+                    if(prepared.nativePose()!=null&&prepared.nativePose().decalFoil())instance=instance.withNativeDecalFoil();
 					PENDING_FIRST_PERSON_MESH_INSTANCES.add(instance);
 				}
 				if (mainHand) {
@@ -10801,9 +10852,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		).trim().isEmpty()) {
 			return DeterministicCameraCapture.isSelectedSourceCoverageReady();
 		}
-		String value = System.getenv("MATTMC_RUST_SELECTED_SOURCE_EXECUTION");
-		if (value != null) {
-			return value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes");
+		if (NativeRenderLaunchConfiguration.hasSelectedSourceOverride()) {
+			return NativeRenderLaunchConfiguration.selectedSourceExecutionRequested();
 		}
 		// Production Rust source admission is automatic for a staged immutable
 		// non-disabled snapshot. Coverage must follow that same signal so an
@@ -13853,10 +13903,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		ModelMeshRenderSemantics semantics,
 		Matrix4f transform,
 		VulkanicGalBridge.StandardItemFoilRecord itemFoil,
-		VulkanicGalBridge.WorldDecalFoilRecord decalFoil
+		VulkanicGalBridge.WorldDecalFoilRecord decalFoil,
+        NativeItemLayerTransform.WorldPose nativePose
 	) {
 		FirstPersonMeshExtraction(BlockMeshExtraction extraction, ModelMeshRenderSemantics semantics, Matrix4f transform) {
-			this(extraction, semantics, transform, null, null);
+			this(extraction, semantics, transform, null, null,null);
 		}
 	}
 
@@ -14500,6 +14551,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.WorldMeshAssetRecord asset,
 		int packedLight,
 		float[] transform,
+        NativeItemLayerTransform.WorldPose nativePose,
 		int viewportWidth,
 		int viewportHeight
 	) {
@@ -14509,7 +14561,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (ITEM_ENTITY_DIAGNOSTICS.size() >= 512) {
 			ITEM_ENTITY_DIAGNOSTICS.remove(0);
 		}
-		ProjectedBounds projectedBounds = projectMeshBounds(asset.vertices(), transform, viewportWidth, viewportHeight);
+		if(nativePose!=null)transform=nativePose.modelTransform();
+        ProjectedBounds projectedBounds = projectMeshBounds(asset.vertices(), transform, viewportWidth, viewportHeight);
 		ITEM_ENTITY_DIAGNOSTICS.add(new ItemEntityDiagnostic(
 			DeterministicCameraCapture.currentRenderedFrameIndex(), route, producer, semanticIdentity, entityId, itemFrameRotation,
 			itemFrameInvisible, itemFrameContentOffset, materialIdentity, meshKey, meshGeneration,
@@ -18713,57 +18766,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances = new ArrayList<>(frame.meshInstances().size());
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
-			meshInstances.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
-				instance.stratum(),
-				instance.meshKey(),
-				instance.meshGeneration(),
-				instance.meshSectionIndex(),
-				instance.depthPolicy(),
-				instance.cullPolicy(),
-				instance.winding(),
-				instance.colorArgb(),
-				instance.transform(),
-				viewportWidth,
-				viewportHeight,
-				instance.entityId(),
-				instance.entityColorArgb(),
-				instance.outlineColorArgb(),
-				instance.flags(),
-				instance.blockEntityId(),
-				instance.terrainPlacement(),
-                instance.itemFoil(),
-                instance.decalFoil(),
-                instance.modelSubmissionOrder(),
-                instance.packedLight(),
-                instance.entityCulling()
-			));
+			meshInstances.add(instance.withViewport(viewportWidth,viewportHeight));
 		}
 		List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances = new ArrayList<>(frame.firstPersonMeshInstances().size());
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.firstPersonMeshInstances()) {
-			firstPersonMeshInstances.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
-				instance.stratum(),
-				instance.meshKey(),
-				instance.meshGeneration(),
-				instance.meshSectionIndex(),
-				instance.depthPolicy(),
-				instance.cullPolicy(),
-				instance.winding(),
-				instance.colorArgb(),
-				instance.transform(),
-				viewportWidth,
-				viewportHeight,
-				instance.entityId(),
-				instance.entityColorArgb(),
-				instance.outlineColorArgb(),
-				instance.flags(),
-				instance.blockEntityId(),
-				instance.terrainPlacement(),
-                instance.itemFoil(),
-                instance.decalFoil(),
-                instance.modelSubmissionOrder(),
-                instance.packedLight(),
-                instance.entityCulling()
-			));
+			firstPersonMeshInstances.add(instance.withViewport(viewportWidth,viewportHeight));
 		}
 		VulkanicGalBridge.WorldBackgroundRecord background = frame.background();
 		VulkanicGalBridge.WorldBackgroundRecord normalizedBackground = new VulkanicGalBridge.WorldBackgroundRecord(

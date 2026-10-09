@@ -122,7 +122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 76;
+	public static final int ABI_VERSION = 77;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -637,6 +637,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	private PipelinedPresent pipelinedPresent;
 	/** Request memory of the in-flight pipelined frame, closed at its join. */
 	private Arena pipelinedRequestArena;
+    private net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pipelinedWorldItemPoses = new net.vulkanic.world.NativeItemLayerTransform.WorldPose[0];
     private NativeDhCloudGroupState[] pipelinedCloudOwners = new NativeDhCloudGroupState[0];
     private net.vulkanic.world.NativeItemLayerTransform.Capture[] pipelinedItemTransforms = new net.vulkanic.world.NativeItemLayerTransform.Capture[0];
 
@@ -788,6 +789,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			frameArena.close();
 		}
 	}
+
+    private static net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pinWorldItemPoses(
+        net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pins,List<WorldMeshInstanceRecord> world,List<WorldMeshInstanceRecord> hands) {
+        int count=0;for(var record:world)if(record.nativeItemPose!=null)count++;
+        for(var record:hands)if(record.nativeItemPose!=null)count++;
+        if(pins.length<count)pins=new net.vulkanic.world.NativeItemLayerTransform.WorldPose[count];
+        int i=0;for(var record:world)if(record.nativeItemPose!=null)pins[i++]=record.nativeItemPose;
+        for(var record:hands)if(record.nativeItemPose!=null)pins[i++]=record.nativeItemPose;
+        Arrays.fill(pins,i,pins.length,null);return pins;
+    }
 
     private void pinItemTransforms(List<GuiMeshBatchRecord> batches) {
         int count=0;
@@ -2240,31 +2251,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WorldMeshInstanceRecord instance = firstPersonMeshInstances.get(i);
 			if (instance.terrainPlacement() != null) throw new IllegalArgumentException("first-person meshes cannot carry terrain placement");
 			MemorySegment item = Abi.item(firstPersonMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_INSTANCE_RECORD.offset(0), Struct.WORLD_MESH_INSTANCE_RECORD.byteSize());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 1, instance.stratum());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 2, instance.meshSectionIndex());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 3, instance.depthPolicy());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 4, instance.cullPolicy());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 5, instance.winding());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 6, instance.colorArgb());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 7, instance.viewportWidth());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 8, instance.viewportHeight());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 9, instance.meshKey());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 10, instance.meshGeneration());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 11, instance.entityId());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 12, instance.entityColorArgb());
-			long transformOffset = Struct.WORLD_MESH_INSTANCE_RECORD.offset(13);
-			float[] transform = instance.transform;
-			MemorySegment.copy(transform, 0, item, ValueLayout.JAVA_FLOAT, transformOffset, 16);
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 14, instance.outlineColorArgb());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 15, instance.flags());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 16, instance.blockEntityId());
-			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 30, instance.packedLight());
-			encodeWorldItemFoil(item, instance.itemFoil());
-			encodeWorldDecalFoil(item, instance.decalFoil());
-	            encodeModelSubmissionOrder(item, instance.modelSubmissionOrder());
-            if (instance.entityCulling() != null) throw new IllegalArgumentException("first-person meshes cannot carry world entity culling");
-            encodeEntityCulling(item, null);
+            if(instance.entityCulling()!=null)throw new IllegalArgumentException("first-person meshes cannot carry world entity culling");
+            encodeWorldMeshInstance(item,instance);
+
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-meshes");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-world-text-and-lod");
@@ -2520,6 +2509,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
             if (worldDistantHorizonsGenericBoxes instanceof PackedDhGenericBoxes packed)
                 pipelinedCloudOwners = packed.pinCloudOwners(pipelinedCloudOwners);
             pinItemTransforms(guiMeshBatches);
+            pipelinedWorldItemPoses=pinWorldItemPoses(pipelinedWorldItemPoses,worldMeshInstances,firstPersonMeshInstances);
 			int status = Native.wholeFrameSubmitPipelined(contextId, request, presentRequest, result);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 			checkStatus(status, "pipelined whole-frame submission");
@@ -2537,10 +2527,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
         } finally {
             Reference.reachabilityFence(worldDistantHorizonsGenericBoxes);
             Reference.reachabilityFence(guiMeshBatches);
+            Reference.reachabilityFence(worldMeshInstances);
+            Reference.reachabilityFence(firstPersonMeshInstances);
             arena = previousArena;
             if (!requestHandedOff) {
                 Arrays.fill(pipelinedCloudOwners,null);
                     Arrays.fill(pipelinedItemTransforms,null);
+                    Arrays.fill(pipelinedWorldItemPoses,null);
 				frameArena.close();
 			}
 		}
@@ -2576,6 +2569,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					pipelinedRequestArena = null;
                     Arrays.fill(pipelinedCloudOwners,null);
                     Arrays.fill(pipelinedItemTransforms,null);
+                    Arrays.fill(pipelinedWorldItemPoses,null);
 				}
 			}
 			checkStatus(joined, "pipelined frame join");
@@ -2912,15 +2906,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 10, instance.meshGeneration());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 11, instance.entityId());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 12, instance.entityColorArgb());
-		MemorySegment.copy(instance.transform, 0, item, ValueLayout.JAVA_FLOAT,
-			Struct.WORLD_MESH_INSTANCE_RECORD.offset(13), 16);
+		if(instance.nativeItemPose==null) MemorySegment.copy(instance.transform,0,item,ValueLayout.JAVA_FLOAT,
+            Struct.WORLD_MESH_INSTANCE_RECORD.offset(13),16);
+        else instance.nativeItemPose.encodeParentModel(item,Struct.WORLD_MESH_INSTANCE_RECORD.offset(13));
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 14, instance.outlineColorArgb());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 15, instance.flags());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 16, instance.blockEntityId());
 		encodeTerrainPlacement(item, instance.terrainPlacement(), terrainFrameCamera);
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 30, instance.packedLight());
 		encodeWorldItemFoil(item, instance.itemFoil());
-		encodeWorldDecalFoil(item, instance.decalFoil());
+		encodeWorldDecalFoil(item,instance.decalFoil);
+        var pose=instance.nativeItemPose;
+        var layout=Struct.WORLD_MESH_INSTANCE_RECORD;
+        layout.setLong(item,36,pose==null?0:pose.ownerAddress());
+        layout.setInt(item,37,pose==null?0:pose.wireMode());
+        layout.setInt(item,38,pose==null?0:pose.parentProperties());
+        if(pose==null)for(int i=0;i<9;i++)item.set(ValueLayout.JAVA_FLOAT,layout.offset(39)+i*4L,0.0F);
+        else pose.encodeParentNormal(item,layout.offset(39));
+        layout.setInt(item,40,pose!=null&&pose.parentTrusted()?1:0);
+        if(pose!=null&&pose.decalFoil())layout.setInt(item,24,pose.firstPerson()?2:1);
 		encodeModelSubmissionOrder(item, instance.modelSubmissionOrder());
 		encodeEntityCulling(item, instance.entityCulling());
 	}
@@ -5336,6 +5340,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			pipelinedRequestArena = null;
                     Arrays.fill(pipelinedCloudOwners,null);
                     Arrays.fill(pipelinedItemTransforms,null);
+                    Arrays.fill(pipelinedWorldItemPoses,null);
 		}
 		queuedFrameCount = 0;
 		persistentGuiMeshTopologies.clear();
@@ -7062,8 +7067,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		WorldDecalFoilRecord decalFoil,
 		Integer modelSubmissionOrder,
 		int packedLight,
-		WorldEntityCullingRecord entityCulling
+		WorldEntityCullingRecord entityCulling,
+        net.vulkanic.world.NativeItemLayerTransform.WorldPose nativeItemPose
 	) {
+        public WorldMeshInstanceRecord(int stratum,long meshKey,long meshGeneration,int meshSectionIndex,
+            int depthPolicy,int cullPolicy,int winding,int colorArgb,float[] transform,int viewportWidth,int viewportHeight,
+            int entityId,int entityColorArgb,int outlineColorArgb,int flags,int blockEntityId,TerrainSectionPlacement terrainPlacement,
+            StandardItemFoilRecord itemFoil,WorldDecalFoilRecord decalFoil,Integer modelSubmissionOrder,int packedLight,WorldEntityCullingRecord entityCulling) {
+            this(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,transform,viewportWidth,viewportHeight,
+                entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,modelSubmissionOrder,packedLight,entityCulling,null);
+        }
+        public static WorldMeshInstanceRecord nativeItem(int stratum,long key,long generation,int section,int depth,int cull,int winding,
+            int color,int width,int height,int entityId,int entityColor,int outline,
+            net.vulkanic.world.NativeItemLayerTransform.WorldPose pose) {
+            int blockId=pose.firstPerson()?-1:activeSemanticBlockEntityId();
+            return new WorldMeshInstanceRecord(stratum,key,generation,section,depth,cull,winding,color,null,width,height,entityId,entityColor,outline,
+                0,blockId,null,null,null,stratum==WORLD_MESH_ENTITY_STRATUM?activeSemanticModelOrder():null,0,
+                stratum==WORLD_MESH_ENTITY_STRATUM&&blockId==-1?activeSemanticEntityCulling():null,Objects.requireNonNull(pose));
+        }
+        public WorldMeshInstanceRecord withNativeDecalFoil() {
+            if(nativeItemPose==null)throw new IllegalArgumentException("native decal requires a native item pose");
+            return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,
+                transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,terrainPlacement,itemFoil,
+                decalFoil,modelSubmissionOrder,packedLight,entityCulling,nativeItemPose.withDecalFoil());
+        }
+        public WorldMeshInstanceRecord withViewport(int width,int height) {
+            return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,
+                transform,width,height,entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,terrainPlacement,itemFoil,
+                decalFoil,modelSubmissionOrder,packedLight,entityCulling,nativeItemPose);
+        }
         public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
             int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
             int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
@@ -7123,14 +7155,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				meshSectionIndex, depthPolicy == 3 ? 1 : depthPolicy, cullPolicy, winding, colorArgb, transform,
 				viewportWidth, viewportHeight, entityId, entityColorArgb, 0, flags & WORLD_MESH_INSTANCE_FLAG_MODEL_RIG, -1,
 				(TerrainSectionPlacement) null,
-				(StandardItemFoilRecord) null, (WorldDecalFoilRecord) null, (Integer) null, packedLight, entityCulling);
+				(StandardItemFoilRecord) null, (WorldDecalFoilRecord) null, (Integer) null, packedLight, entityCulling,nativeItemPose);
 		}
 
 		public WorldMeshInstanceRecord withPackedLight(int light) {
 			return new WorldMeshInstanceRecord(stratum, meshKey, meshGeneration, meshSectionIndex,
 				depthPolicy, cullPolicy, winding, colorArgb, transform, viewportWidth, viewportHeight,
 				entityId, entityColorArgb, outlineColorArgb, flags, blockEntityId, terrainPlacement,
-				itemFoil, decalFoil, modelSubmissionOrder, light, entityCulling);
+				itemFoil, decalFoil, modelSubmissionOrder, light, entityCulling,nativeItemPose);
 		}
 
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
@@ -7147,7 +7179,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshInstanceRecord withDecalFoil(WorldDecalFoilRecord decal) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-				flags,blockEntityId,terrainPlacement,itemFoil,Objects.requireNonNull(decal),modelSubmissionOrder,packedLight,entityCulling);
+				flags,blockEntityId,terrainPlacement,itemFoil,Objects.requireNonNull(decal),modelSubmissionOrder,packedLight,entityCulling,nativeItemPose);
 		}
 
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
@@ -7161,7 +7193,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshInstanceRecord withItemFoil(StandardItemFoilRecord foil) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-				flags,blockEntityId,terrainPlacement,Objects.requireNonNull(foil),decalFoil,modelSubmissionOrder,packedLight,entityCulling);
+				flags,blockEntityId,terrainPlacement,Objects.requireNonNull(foil),decalFoil,modelSubmissionOrder,packedLight,entityCulling,nativeItemPose);
 		}
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
 			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
@@ -7256,7 +7288,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				|| (flags & ~WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) != 0 || blockEntityId != -1)) {
 				throw new IllegalArgumentException("standard foil requires an ordinary entity mesh instance");
 			}
-			Objects.requireNonNull(transform, "transform");
+			if(nativeItemPose==null)Objects.requireNonNull(transform,"transform");
+            else if(transform!=null || terrainPlacement!=null || (flags&WORLD_MESH_INSTANCE_FLAG_MODEL_RIG)!=0
+                || (stratum!=WORLD_MESH_ENTITY_STRATUM&&stratum!=WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM)
+                || decalFoil!=null || (nativeItemPose.decalFoil()&&itemFoil==null))
+                throw new IllegalArgumentException("native item pose requires its ordinary CPU domain and neutral inline pose");
 			if (terrainPlacement != null && (stratum != 60 || meshSectionIndex != -1 || entityId != 0
 				|| blockEntityId != -1 || !isTerrainIdentityTransform(transform))) {
 				throw new IllegalArgumentException("terrain placement requires a complete terrain instance and neutral matrix");
@@ -7298,33 +7334,36 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if ((flags & 1) != 0 && (stratum != WORLD_MESH_ENTITY_STRATUM || outlineColorArgb == 0)) {
 				throw new IllegalArgumentException("outline-only mesh instances require an entity stratum and outline color");
 			}
-			if (transform.length != 16) {
+			if (nativeItemPose == null && transform.length != 16) {
 				throw new IllegalArgumentException("world mesh instance transform must contain 16 floats");
 			}
 			// Terrain placement is immutable, full-precision frame data. Its neutral
 			// matrix is a private canonical value used only to preserve the common
 			// mesh ABI; the public accessor still returns a detached copy. General
 			// model poses retain their ordinary defensive construction copy.
-			transform = terrainPlacement == null ? transform.clone() : TERRAIN_IDENTITY_TRANSFORM;
+			if(nativeItemPose==null) transform = terrainPlacement == null ? transform.clone() : TERRAIN_IDENTITY_TRANSFORM;
 		}
 
 		@Override
 		public float[] transform() {
-			return transform.clone();
+			return nativeItemPose==null?transform.clone():nativeItemPose.modelTransform();
 		}
 
+        @Override public WorldDecalFoilRecord decalFoil() {
+            return nativeItemPose!=null&&nativeItemPose.decalFoil()?nativeItemPose.decalProjection():decalFoil;
+        }
         public WorldMeshInstanceRecord withModelSubmissionOrder(Integer order) {
             if (order != null && terrainPlacement != null)
                 throw new IllegalArgumentException("terrain placement cannot carry model submission order");
             return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
                 winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order,packedLight,entityCulling);
+                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order,packedLight,entityCulling,nativeItemPose);
         }
 
 		public WorldMeshInstanceRecord withTerrainPlacement(TerrainSectionPlacement placement) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,TERRAIN_IDENTITY_TRANSFORM,viewportWidth,viewportHeight,
-				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight,entityCulling);
+				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight,entityCulling,nativeItemPose);
 		}
 	}
 

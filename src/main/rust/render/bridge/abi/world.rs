@@ -252,6 +252,13 @@ pub struct FfiWorldMeshInstanceRecord {
     pub entity_culling_bounds: [f64; 6],
     pub entity_culling_leash_bounds: [f64; 6],
     pub entity_culling_camera: [f64; 3],
+    /// ABI77: immutable authored CPU owner; parent transform stays inline.
+    pub native_item_transform: u64,
+    /// 0 inline; 1/2 authored right/left; 3/4 prepared right/left.
+    pub native_item_transform_mode: u32,
+    pub native_item_parent_properties: u32,
+    pub native_item_parent_normal: [f32;9],
+    pub native_item_parent_trusted: u32,
 }
 
 #[repr(C)]

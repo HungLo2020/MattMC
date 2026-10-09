@@ -55,6 +55,25 @@ class ClientMemoryTest(unittest.TestCase):
         self.meta.write_text('run_id=test\nisolated_game_dir=/tmp/game_dir_test\n')
         o=self.observer();o.tick(1);self.assertFalse(o.receipt(terminal=True)['complete'])
 
+    def test_managed_sibling_game_requires_exact_run_path_and_no_symlink_escape(self):
+        import artifact_retention
+        artifact_retention.ensure_marker(self.root)
+        nested=self.root/'runs'/'current'/'capture';nested.mkdir(parents=True)
+        managed=self.root/'.tmp'/'test'/'game_dir_test';managed.mkdir(parents=True)
+        meta=nested/'meta_test.txt';meta.write_text(f'run_id=test\nisolated_game_dir={managed}\n')
+        (self.client/'cwd').unlink();(self.client/'cwd').symlink_to(managed)
+        def observe():
+            o=ClientMemoryObserver(nested,nested.parent,proc_root=self.proc)
+            o.tick(1);o.tick(2);return o.receipt(terminal=True)
+        self.assertTrue(observe()['complete'])
+        wrong=self.root/'.tmp'/'different'/'game_dir_test';wrong.mkdir(parents=True)
+        meta.write_text(f'run_id=test\nisolated_game_dir={wrong}\n')
+        self.assertIn('unowned-game-directory',observe()['errors'])
+        external=self.root/'external'/'game_dir_test';external.mkdir(parents=True)
+        managed.rmdir();managed.symlink_to(external,target_is_directory=True)
+        meta.write_text(f'run_id=test\nisolated_game_dir={managed}\n')
+        self.assertIn('unowned-game-directory',observe()['errors'])
+
     def test_ambiguous_clients_and_pid_reuse_invalidate_measurement(self):
         o=self.observer();o.tick(1);o.tick(2);self.process(101);o.tick(3)
         self.assertIn('ambiguous-client-process',o.receipt(terminal=True)['errors'])
