@@ -4,6 +4,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -52,6 +53,11 @@ public class TrapDoorBlock extends HorizontalDirectionalBlock implements SimpleW
 	@Override
 	public MapCodec<? extends TrapDoorBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public TrapDoorBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.set(properties, NativeBlockFamilies.Kind.TRAPDOOR), properties);
 	}
 
 	public TrapDoorBlock(BlockSetType blockSetType, BlockBehaviour.Properties properties) {

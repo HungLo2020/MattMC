@@ -3,6 +3,7 @@ package net.minecraft.world.level.block;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -29,6 +30,11 @@ public class WeightedPressurePlateBlock extends BasePressurePlateBlock {
 	@Override
 	public MapCodec<WeightedPressurePlateBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public WeightedPressurePlateBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.parameter(properties, NativeBlockFamilies.Kind.WEIGHTED_PLATE), NativeBlockFamilies.set(properties, NativeBlockFamilies.Kind.WEIGHTED_PLATE), properties);
 	}
 
 	public WeightedPressurePlateBlock(int i, BlockSetType blockSetType, BlockBehaviour.Properties properties) {

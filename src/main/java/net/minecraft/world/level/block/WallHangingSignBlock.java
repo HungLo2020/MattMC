@@ -3,6 +3,7 @@ package net.minecraft.world.level.block;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
@@ -49,6 +50,11 @@ public class WallHangingSignBlock extends SignBlock {
 	@Override
 	public MapCodec<WallHangingSignBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public WallHangingSignBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.wood(properties, NativeBlockFamilies.Kind.WALL_HANGING_SIGN), properties);
 	}
 
 	public WallHangingSignBlock(WoodType woodType, BlockBehaviour.Properties properties) {

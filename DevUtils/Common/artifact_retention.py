@@ -475,6 +475,7 @@ def retire_old_invocations(current: Path, schema: str, *, protected_labels: Iter
 
     Only completed, marked invocations with the exact driver's schema qualify.
     Unknown/older tools and live work remain outside automatic retirement.
+    A workspace retained by fixture cleanup also protects its parent invocation.
     """
     current = assert_marked_root(current)
     groups: dict[bool, list[Path]] = {}
@@ -492,6 +493,11 @@ def retire_old_invocations(current: Path, schema: str, *, protected_labels: Iter
     for group in groups.values():
         for candidate in sorted(group, key=lambda path: (path / "summary.json").stat().st_mtime, reverse=True)[1:]:
             if candidate == current or not Path("/proc").is_dir() or _live_process_references(candidate, str(candidate)):
+                continue
+            # Recheck workspace evidence now: the source can disappear after
+            # the invocation's earlier fixture pass. Parent retirement must
+            # respect the same missing-source/unknown/live/crash decisions.
+            if retire_completed_fixtures(candidate)["retained_workspaces"]:
                 continue
             shutil.rmtree(candidate)
             removed.append(str(candidate))

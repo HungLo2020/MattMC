@@ -26,6 +26,7 @@ pub struct Definition {
     pub template: u16,
     pub physics: &'static physics::Physics,
     pub material: &'static material::Material,
+    pub family: super::family::Family,
 }
 
 pub struct Registry {
@@ -94,7 +95,7 @@ impl Registry {
             r.templates.push(Template { properties, default_local, graph });
         }
         let mut next_state = 0;
-        for &(name, template, physical, intrinsic, material) in catalog::BLOCKS {
+        for &(name, template, physical, intrinsic, material, family) in catalog::BLOCKS {
             let id = BlockId(u16::try_from(r.definitions.len()).expect("bounded native block IDs"));
             let t = &r.templates[template as usize];
             let states = r.graph_headers[t.graph as usize][0] as usize;
@@ -102,7 +103,7 @@ impl Registry {
             assert!(r.by_name.insert(name, id).is_none(), "duplicate native block name");
             r.rows.extend([r.names.len() as i32, name.len() as i32, next_state as i32, template as i32, physical as i32, material as i32]);
             r.names.extend_from_slice(name.as_bytes());
-            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize], material: &material::PROFILES[material as usize] });
+            r.definitions.push(Definition { id, name, first_state: StateId(next_state as u16), template: template as u16, physics: &physics::PROFILES[physical as usize], material: &material::PROFILES[material as usize], family });
             let values = r.graphs[t.graph as usize].buffer(0).expect("native graph values");
             let rules = &intrinsic::PROFILES[intrinsic as usize];
             for local in 0..states {

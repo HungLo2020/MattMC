@@ -22,7 +22,9 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.state.properties.BlockSetType;
+import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.util.Mth;
@@ -252,6 +254,48 @@ public final class StateGraphReference {
                 }
             }
         }
+        MessageDigest familyDigest = MessageDigest.getInstance("SHA-256");
+        int configuredBlocks = 0;
+        try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), familyDigest))) {
+            for (var set : BlockSetType.values().toList()) {
+                familyRecord(out, set, soundNames);
+                var encoded = BlockSetType.CODEC.encodeStart(JsonOps.INSTANCE, set).getOrThrow();
+                out.writeUTF(encoded.toString());
+                if (BlockSetType.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow() != set) throw new AssertionError("Block-set codec identity");
+            }
+            for (var wood : WoodType.values().toList()) {
+                familyRecord(out, wood, soundNames);
+                var encoded = WoodType.CODEC.encodeStart(JsonOps.INSTANCE, wood).getOrThrow();
+                out.writeUTF(encoded.toString());
+                if (WoodType.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow() != wood) throw new AssertionError("Wood codec identity");
+            }
+            for (var owner : List.of(BlockSetType.class, WoodType.class)) {
+                var fields = new java.util.ArrayList<java.lang.reflect.Field>();
+                for (var field : owner.getFields()) if (field.getType() == owner) fields.add(field);
+                fields.sort(Comparator.comparing(java.lang.reflect.Field::getName));
+                for (var field : fields) {
+                    out.writeUTF(owner.getName() + "." + field.getName());
+                    familyRecord(out, field.get(null), soundNames);
+                }
+            }
+            for (var block : BuiltInRegistries.BLOCK) {
+                int kind = 0, parameter = 0; Object type = null;
+                if (block instanceof DoorBlock) { kind = 1; type = familyField(block, "type"); }
+                else if (block instanceof TrapDoorBlock) { kind = 2; type = familyField(block, "type"); }
+                else if (block instanceof ButtonBlock) { kind = 3; type = familyField(block, "type"); parameter = (int) familyField(block, "ticksToStayPressed"); }
+                else if (block instanceof PressurePlateBlock) { kind = 4; type = familyField(block, "type"); }
+                else if (block instanceof WeightedPressurePlateBlock) { kind = 5; type = familyField(block, "type"); parameter = (int) familyField(block, "maxWeight"); }
+                else if (block instanceof FenceGateBlock) { kind = 6; type = familyField(block, "type"); }
+                else if (block instanceof StandingSignBlock) { kind = 7; type = ((SignBlock) block).type(); }
+                else if (block instanceof WallSignBlock) { kind = 8; type = ((SignBlock) block).type(); }
+                else if (block instanceof CeilingHangingSignBlock) { kind = 9; type = ((SignBlock) block).type(); }
+                else if (block instanceof WallHangingSignBlock) { kind = 10; type = ((SignBlock) block).type(); }
+                else if (block instanceof SignBlock || block instanceof BasePressurePlateBlock) throw new AssertionError("Unhandled block family: " + block);
+                out.writeInt(BuiltInRegistries.BLOCK.getId(block)); out.writeInt(kind); out.writeInt(parameter);
+                out.writeUTF(type instanceof BlockSetType set ? set.name() : type instanceof WoodType wood ? wood.name() : "");
+                if (type != null) configuredBlocks++;
+            }
+        }
         System.out.println("STATE_GRAPH_REFERENCE blocks=" + BuiltInRegistries.BLOCK.size()
             + " fluids=" + BuiltInRegistries.FLUID.size() + " states=" + states + " transitions=" + transitions
             + " sha256=" + HexFormat.of().formatHex(digest.digest())
@@ -263,7 +307,30 @@ public final class StateGraphReference {
             + " sound_events=" + BuiltInRegistries.SOUND_EVENT.size() + " sound_profiles=" + soundProfiles
             + " instruments=" + NoteBlockInstrument.values().length + " offset_samples=" + offsetSamples
             + " material_sha256=" + HexFormat.of().formatHex(materialDigest.digest())
+            + " block_sets=" + BlockSetType.values().count() + " wood_types=" + WoodType.values().count()
+            + " configured_blocks=" + configuredBlocks + " family_sha256=" + HexFormat.of().formatHex(familyDigest.digest())
             + " bootstrap_ns=" + bootstrapNs + " bootstrap_thread_bytes=" + bootstrapBytes);
+    }
+
+    private static Object familyField(Object value, String name) throws Exception {
+        for (Class<?> type = value.getClass(); type != null; type = type.getSuperclass()) {
+            try { var field = type.getDeclaredField(name); field.setAccessible(true); return field.get(value); }
+            catch (NoSuchFieldException ignored) { }
+        }
+        throw new NoSuchFieldException(value.getClass() + "." + name);
+    }
+    private static void familyRecord(DataOutputStream out, Object record, IdentityHashMap<SoundType,String> sounds) throws Exception {
+        for (var component : record.getClass().getRecordComponents()) {
+            out.writeUTF(component.getName());
+            Object value = component.getAccessor().invoke(record);
+            if (value instanceof Boolean flag) out.writeBoolean(flag);
+            else if (value instanceof SoundType sound) out.writeUTF(java.util.Objects.requireNonNull(sounds.get(sound)));
+            else if (value instanceof net.minecraft.sounds.SoundEvent event) out.writeInt(BuiltInRegistries.SOUND_EVENT.getId(event));
+            else if (value instanceof BlockSetType set) out.writeUTF(set.name());
+            else if (value instanceof String text) out.writeUTF(text);
+            else if (value instanceof Enum<?> choice) out.writeUTF(choice.name());
+            else throw new AssertionError("Unobserved family component: " + component);
+        }
     }
 
     private static void soundProfile(DataOutputStream out, SoundType sound) throws Exception {

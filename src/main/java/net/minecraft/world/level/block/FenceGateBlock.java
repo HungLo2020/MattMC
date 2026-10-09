@@ -5,6 +5,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -62,6 +63,11 @@ public class FenceGateBlock extends HorizontalDirectionalBlock {
 	@Override
 	public MapCodec<FenceGateBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public FenceGateBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.wood(properties, NativeBlockFamilies.Kind.FENCE_GATE), properties);
 	}
 
 	public FenceGateBlock(WoodType woodType, BlockBehaviour.Properties properties) {

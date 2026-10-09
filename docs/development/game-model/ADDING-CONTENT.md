@@ -9,8 +9,8 @@
 
 New registered blocks need a [native definition](BLOCK-DEFINITIONS.md),
 [physical settings](BLOCK-PHYSICS.md), [intrinsic rules](BLOCK-INTRINSICS.md) and
-[sound/offset settings](BLOCK-SOUND-AND-OFFSETS.md),
-plus the remaining Java behavior/codec/item bindings and assets. The single-file
+[sound/offset settings](BLOCK-SOUND-AND-OFFSETS.md) and an appropriate
+[family binding](BLOCK-FAMILY-TYPES.md), plus the remaining Java behavior/codec/item bindings and assets. The single-file
 builder below is still proposed.
 
 Before these ownership slices, adding the three TaCZ workbenches took:

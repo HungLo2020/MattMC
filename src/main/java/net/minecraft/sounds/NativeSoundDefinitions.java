@@ -51,7 +51,7 @@ public final class NativeSoundDefinitions {
     }
     // Standalone registry holders bind at freeze. Constructors need the same
     // canonical event objects earlier, without changing that registry lifecycle.
-    private static SoundEvent event(int id) { return Events.VALUES.events.get(id); }
+    public static SoundEvent event(int id) { return Events.VALUES.events.get(id); }
     public static SoundEvent event(String key) { return event(eventId(key)); }
     private static int eventId(String key) {
         Integer id = DATA.eventIds.get(key.indexOf(':') < 0 ? "minecraft:" + key : key);

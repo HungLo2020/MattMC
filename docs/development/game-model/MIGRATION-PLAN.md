@@ -59,7 +59,9 @@ and [intrinsic state rules](BLOCK-INTRINSICS.md) now also originate in Rust.
 The latter own map colors, emission and fluid associations.
 [Sound definitions](SOUND-DEFINITIONS.md) now own all sound events, profiles and
 instruments; [block settings](BLOCK-SOUND-AND-OFFSETS.md) select them and own
-model offsets. Java still supplies factories, shapes/predicates, blocked light,
+model offsets. [Block-family configuration](BLOCK-FAMILY-TYPES.md) now supplies
+shared block-set/wood definitions and registered family parameters. Java still
+supplies factories, shapes/predicates, blocked light,
 codecs, state-object views and world-dependent gameplay. The
 [134 property declarations](PROPERTY-DEFINITIONS.md) also originate
 in Rust; block registries share their schemas and fluids use their typed

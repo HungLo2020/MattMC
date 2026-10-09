@@ -163,6 +163,44 @@ class VerificationArtifactTest(unittest.TestCase):
             self.assertIn(str(run), result["retained_workspaces"])
             self.assertEqual("generated copy", (run / "copied-world.dat").read_text())
 
+    def test_parent_retirement_preserves_missing_source_copy_until_source_returns(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            old = base / "old"; retention.ensure_marker(old)
+            current = base / "current"; retention.ensure_marker(current)
+            for index, invocation in enumerate((old, current)):
+                summary = invocation / "summary.json"
+                summary.write_text(json.dumps({'schema': 'test-invocation-v2', 'passed': True}))
+                os.utime(summary, (1000 + index, 1000 + index))
+            source = base / "missing-source"
+            run = self.fixture(old, source)
+            with patch.object(retention, "_live_process_references", return_value=False):
+                fixture_result = retention.retire_completed_fixtures(old)
+                self.assertIn(str(run), fixture_result["retained_workspaces"])
+                self.assertEqual([], retention.retire_old_invocations(current, 'test-invocation-v2'))
+                self.assertEqual("generated copy", (run / "copied-world.dat").read_text())
+                source.mkdir()
+                (source / "world.dat").write_text("restored reference")
+                self.assertEqual([str(old)], retention.retire_old_invocations(current, 'test-invocation-v2'))
+            self.assertFalse(old.exists())
+            self.assertEqual("restored reference", (source / "world.dat").read_text())
+
+    def test_parent_retirement_rechecks_source_after_previous_cleanup_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            old = base / "old"; retention.ensure_marker(old)
+            current = base / "current"; retention.ensure_marker(current)
+            for index, invocation in enumerate((old, current)):
+                summary = invocation / "summary.json"
+                summary.write_text(json.dumps({'schema': 'test-invocation-v2', 'passed': False,
+                    'workspace_retention': {'retained_workspaces': []}}))
+                os.utime(summary, (1000 + index, 1000 + index))
+            source = base / "missing-source"
+            run = self.fixture(old, source)
+            with patch.object(retention, "_live_process_references", return_value=False):
+                self.assertEqual([], retention.retire_old_invocations(current, 'test-invocation-v2'))
+            self.assertEqual("generated copy", (run / "copied-world.dat").read_text())
+
     def test_old_invocations_keep_latest_success_failure_baseline_and_pins(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary); paths = {}

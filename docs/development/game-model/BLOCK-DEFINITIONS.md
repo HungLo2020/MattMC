@@ -77,6 +77,8 @@ also checks map colors and copied color/emission functions; see
 [intrinsic state rules](BLOCK-INTRINSICS.md) for that milestone’s verification.
 Version 7 adds all sound content, per-state sound/instrument bindings and
 exhaustive finite offset samples; see [sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md).
+Version 8 adds shared block-set/wood definitions, codec/alias identities and
+every registered family binding; see [block families](BLOCK-FAMILY-TYPES.md).
 Read the [observer scope and integrity limits](STATE-GRAPHS.md#verification)
 before interpreting a passing receipt or its JVM main-thread allocation figures.
 

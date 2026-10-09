@@ -3,7 +3,8 @@
 > **Status: proposal with implemented ownership slices.** Phase 1's
 > [Rust block registry](RUST-BLOCK-REGISTRY.md) and Phase 2's native state
 > graphs, properties, fluids, registered block definitions, physical settings,
-> intrinsic state rules and sound/offset definitions are current. Java still
+> intrinsic state rules, sound/offset definitions and block-family configuration
+> are current. Java still
 > supplies block factories, objects/codecs, shapes, blocked light, contextual
 > predicates and world callbacks. Remaining content registries, behavior and
 > component systems are proposals.
@@ -105,6 +106,8 @@ one set of systems.
   block sound profiles and note instruments.
 - [Block sounds and model offsets](BLOCK-SOUND-AND-OFFSETS.md) (current work):
   state sound rules, finite offset tables and shared coordinate arithmetic.
+- [Block-family configuration](BLOCK-FAMILY-TYPES.md) (current work): shared
+  block sets, wood types and typed door/button/plate/gate/sign parameters.
 - [Native state graphs](STATE-GRAPHS.md) (current work): shared state construction,
   temporary Java projections, CPU buffer ownership and verification.
 - [Shared property definitions](PROPERTY-DEFINITIONS.md) (current work): native

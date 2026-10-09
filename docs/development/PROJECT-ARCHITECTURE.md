@@ -196,7 +196,9 @@ supply intrinsic block settings. [Intrinsic state rules](game-model/BLOCK-INTRIN
 compute semantic map colors, emitted light and canonical fluid associations.
 [Sound content](game-model/SOUND-DEFINITIONS.md) owns event identities, profiles
 and note instruments; [block sound/offset definitions](game-model/BLOCK-SOUND-AND-OFFSETS.md)
-own state sound selection and model offsets. Playback resources stay in `audio/`.
+own state sound selection and model offsets. [Block-family configuration](game-model/BLOCK-FAMILY-TYPES.md)
+provides shared block sets, wood types and registered family parameters.
+Playback resources stay in `audio/`.
 General gameplay remains Java.
 
 [`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,

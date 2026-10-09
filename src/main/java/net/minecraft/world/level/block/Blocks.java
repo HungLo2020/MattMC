@@ -38,11 +38,9 @@ import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.NativeBlockDefinitions;
-import net.minecraft.world.level.block.state.properties.BlockSetType;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.block.state.properties.SculkSensorPhase;
-import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.block.custom.DirectionalFacingBlock;
 import net.minecraft.world.level.block.custom.SmoothLimestoneBlock;
 import net.minecraft.world.level.block.custom.FlytrapBlock;
@@ -951,57 +949,57 @@ public class Blocks {
 	);
 	public static final Block OAK_SIGN = register(
 		"oak_sign",
-		properties -> new StandingSignBlock(WoodType.OAK, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block SPRUCE_SIGN = register(
 		"spruce_sign",
-		properties -> new StandingSignBlock(WoodType.SPRUCE, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BIRCH_SIGN = register(
 		"birch_sign",
-		properties -> new StandingSignBlock(WoodType.BIRCH, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block ACACIA_SIGN = register(
 		"acacia_sign",
-		properties -> new StandingSignBlock(WoodType.ACACIA, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CHERRY_SIGN = register(
 		"cherry_sign",
-		properties -> new StandingSignBlock(WoodType.CHERRY, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block JUNGLE_SIGN = register(
 		"jungle_sign",
-		properties -> new StandingSignBlock(WoodType.JUNGLE, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block DARK_OAK_SIGN = register(
 		"dark_oak_sign",
-		properties -> new StandingSignBlock(WoodType.DARK_OAK, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PALE_OAK_SIGN = register(
 		"pale_oak_sign",
-		properties -> new StandingSignBlock(WoodType.PALE_OAK, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block MANGROVE_SIGN = register(
 		"mangrove_sign",
-		properties -> new StandingSignBlock(WoodType.MANGROVE, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BAMBOO_SIGN = register(
 		"bamboo_sign",
-		properties -> new StandingSignBlock(WoodType.BAMBOO, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block OAK_DOOR = register(
 		"oak_door",
-		properties -> new DoorBlock(BlockSetType.OAK, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block LADDER = register(
@@ -1013,172 +1011,172 @@ public class Blocks {
 	public static final Block COBBLESTONE_STAIRS = registerLegacyStair("cobblestone_stairs", COBBLESTONE);
 	public static final Block OAK_WALL_SIGN = register(
 		"oak_wall_sign",
-		properties -> new WallSignBlock(WoodType.OAK, properties),
+		WallSignBlock::new,
 		wallVariant(OAK_SIGN, true)
 	);
 	public static final Block SPRUCE_WALL_SIGN = register(
 		"spruce_wall_sign",
-		properties -> new WallSignBlock(WoodType.SPRUCE, properties),
+		WallSignBlock::new,
 		wallVariant(SPRUCE_SIGN, true)
 	);
 	public static final Block BIRCH_WALL_SIGN = register(
 		"birch_wall_sign",
-		properties -> new WallSignBlock(WoodType.BIRCH, properties),
+		WallSignBlock::new,
 		wallVariant(BIRCH_SIGN, true)
 	);
 	public static final Block ACACIA_WALL_SIGN = register(
 		"acacia_wall_sign",
-		properties -> new WallSignBlock(WoodType.ACACIA, properties),
+		WallSignBlock::new,
 		wallVariant(ACACIA_SIGN, true)
 	);
 	public static final Block CHERRY_WALL_SIGN = register(
 		"cherry_wall_sign",
-		properties -> new WallSignBlock(WoodType.CHERRY, properties),
+		WallSignBlock::new,
 		wallVariant(CHERRY_SIGN, true)
 	);
 	public static final Block JUNGLE_WALL_SIGN = register(
 		"jungle_wall_sign",
-		properties -> new WallSignBlock(WoodType.JUNGLE, properties),
+		WallSignBlock::new,
 		wallVariant(JUNGLE_SIGN, true)
 	);
 	public static final Block DARK_OAK_WALL_SIGN = register(
 		"dark_oak_wall_sign",
-		properties -> new WallSignBlock(WoodType.DARK_OAK, properties),
+		WallSignBlock::new,
 		wallVariant(DARK_OAK_SIGN, true)
 	);
 	public static final Block PALE_OAK_WALL_SIGN = register(
 		"pale_oak_wall_sign",
-		properties -> new WallSignBlock(WoodType.PALE_OAK, properties),
+		WallSignBlock::new,
 		wallVariant(PALE_OAK_SIGN, true)
 	);
 	public static final Block MANGROVE_WALL_SIGN = register(
 		"mangrove_wall_sign",
-		properties -> new WallSignBlock(WoodType.MANGROVE, properties),
+		WallSignBlock::new,
 		wallVariant(MANGROVE_SIGN, true)
 	);
 	public static final Block BAMBOO_WALL_SIGN = register(
 		"bamboo_wall_sign",
-		properties -> new WallSignBlock(WoodType.BAMBOO, properties),
+		WallSignBlock::new,
 		wallVariant(BAMBOO_SIGN, true)
 	);
 	public static final Block OAK_HANGING_SIGN = register(
 		"oak_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.OAK, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block SPRUCE_HANGING_SIGN = register(
 		"spruce_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.SPRUCE, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BIRCH_HANGING_SIGN = register(
 		"birch_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.BIRCH, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block ACACIA_HANGING_SIGN = register(
 		"acacia_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.ACACIA, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CHERRY_HANGING_SIGN = register(
 		"cherry_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.CHERRY, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block JUNGLE_HANGING_SIGN = register(
 		"jungle_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.JUNGLE, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block DARK_OAK_HANGING_SIGN = register(
 		"dark_oak_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.DARK_OAK, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PALE_OAK_HANGING_SIGN = register(
 		"pale_oak_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.PALE_OAK, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CRIMSON_HANGING_SIGN = register(
 		"crimson_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.CRIMSON, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block WARPED_HANGING_SIGN = register(
 		"warped_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.WARPED, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block MANGROVE_HANGING_SIGN = register(
 		"mangrove_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.MANGROVE, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BAMBOO_HANGING_SIGN = register(
 		"bamboo_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.BAMBOO, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block OAK_WALL_HANGING_SIGN = register(
 		"oak_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.OAK, properties),
+		WallHangingSignBlock::new,
 		wallVariant(OAK_HANGING_SIGN, true)
 	);
 	public static final Block SPRUCE_WALL_HANGING_SIGN = register(
 		"spruce_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.SPRUCE, properties),
+		WallHangingSignBlock::new,
 		wallVariant(SPRUCE_HANGING_SIGN, true)
 	);
 	public static final Block BIRCH_WALL_HANGING_SIGN = register(
 		"birch_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.BIRCH, properties),
+		WallHangingSignBlock::new,
 		wallVariant(BIRCH_HANGING_SIGN, true)
 	);
 	public static final Block ACACIA_WALL_HANGING_SIGN = register(
 		"acacia_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.ACACIA, properties),
+		WallHangingSignBlock::new,
 		wallVariant(ACACIA_HANGING_SIGN, true)
 	);
 	public static final Block CHERRY_WALL_HANGING_SIGN = register(
 		"cherry_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.CHERRY, properties),
+		WallHangingSignBlock::new,
 		wallVariant(CHERRY_HANGING_SIGN, true)
 	);
 	public static final Block JUNGLE_WALL_HANGING_SIGN = register(
 		"jungle_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.JUNGLE, properties),
+		WallHangingSignBlock::new,
 		wallVariant(JUNGLE_HANGING_SIGN, true)
 	);
 	public static final Block DARK_OAK_WALL_HANGING_SIGN = register(
 		"dark_oak_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.DARK_OAK, properties),
+		WallHangingSignBlock::new,
 		wallVariant(DARK_OAK_HANGING_SIGN, true)
 	);
 	public static final Block PALE_OAK_WALL_HANGING_SIGN = register(
 		"pale_oak_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.PALE_OAK, properties),
+		WallHangingSignBlock::new,
 		wallVariant(PALE_OAK_HANGING_SIGN, true)
 	);
 	public static final Block MANGROVE_WALL_HANGING_SIGN = register(
 		"mangrove_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.MANGROVE, properties),
+		WallHangingSignBlock::new,
 		wallVariant(MANGROVE_HANGING_SIGN, true)
 	);
 	public static final Block CRIMSON_WALL_HANGING_SIGN = register(
 		"crimson_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.CRIMSON, properties),
+		WallHangingSignBlock::new,
 		wallVariant(CRIMSON_HANGING_SIGN, true)
 	);
 	public static final Block WARPED_WALL_HANGING_SIGN = register(
 		"warped_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.WARPED, properties),
+		WallHangingSignBlock::new,
 		wallVariant(WARPED_HANGING_SIGN, true)
 	);
 	public static final Block BAMBOO_WALL_HANGING_SIGN = register(
 		"bamboo_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.BAMBOO, properties),
+		WallHangingSignBlock::new,
 		wallVariant(BAMBOO_HANGING_SIGN, true)
 	);
 	public static final Block LEVER = register(
@@ -1186,62 +1184,62 @@ public class Blocks {
 	);
 	public static final Block STONE_PRESSURE_PLATE = register(
 		"stone_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.STONE, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block IRON_DOOR = register(
 		"iron_door",
-		properties -> new DoorBlock(BlockSetType.IRON, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block OAK_PRESSURE_PLATE = register(
 		"oak_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.OAK, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block SPRUCE_PRESSURE_PLATE = register(
 		"spruce_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.SPRUCE, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BIRCH_PRESSURE_PLATE = register(
 		"birch_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.BIRCH, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block JUNGLE_PRESSURE_PLATE = register(
 		"jungle_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.JUNGLE, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block ACACIA_PRESSURE_PLATE = register(
 		"acacia_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.ACACIA, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CHERRY_PRESSURE_PLATE = register(
 		"cherry_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.CHERRY, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block DARK_OAK_PRESSURE_PLATE = register(
 		"dark_oak_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.DARK_OAK, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PALE_OAK_PRESSURE_PLATE = register(
 		"pale_oak_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.PALE_OAK, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block MANGROVE_PRESSURE_PLATE = register(
 		"mangrove_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.MANGROVE, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BAMBOO_PRESSURE_PLATE = register(
 		"bamboo_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.BAMBOO, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block REDSTONE_ORE = register(
@@ -1264,7 +1262,7 @@ public class Blocks {
 		RedstoneWallTorchBlock::new,
 		wallVariant(REDSTONE_TORCH, true)
 	);
-	public static final Block STONE_BUTTON = register("stone_button", properties -> new ButtonBlock(BlockSetType.STONE, 20, properties), buttonProperties());
+	public static final Block STONE_BUTTON = register("stone_button", ButtonBlock::new, buttonProperties());
 	public static final Block SNOW = register(
 		"snow",
 		SnowLayerBlock::new,
@@ -1417,61 +1415,61 @@ public class Blocks {
 	public static final Block BLACK_STAINED_GLASS = registerStainedGlass("black_stained_glass", DyeColor.BLACK);
 	public static final Block OAK_TRAPDOOR = register(
 		"oak_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.OAK, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block SPRUCE_TRAPDOOR = register(
 		"spruce_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.SPRUCE, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block BIRCH_TRAPDOOR = register(
 		"birch_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.BIRCH, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block JUNGLE_TRAPDOOR = register(
 		"jungle_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.JUNGLE, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block ACACIA_TRAPDOOR = register(
 		"acacia_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.ACACIA, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block CHERRY_TRAPDOOR = register(
 		"cherry_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.CHERRY, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block DARK_OAK_TRAPDOOR = register(
 		"dark_oak_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.DARK_OAK, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block PALE_OAK_TRAPDOOR = register(
 		"pale_oak_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.PALE_OAK, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block MANGROVE_TRAPDOOR = register(
 		"mangrove_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.MANGROVE, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block BAMBOO_TRAPDOOR = register(
 		"bamboo_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.BAMBOO, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
@@ -1605,7 +1603,7 @@ public class Blocks {
 	);
 	public static final Block OAK_FENCE_GATE = register(
 		"oak_fence_gate",
-		properties -> new FenceGateBlock(WoodType.OAK, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BRICK_STAIRS = registerLegacyStair("brick_stairs", BRICKS);
@@ -1825,22 +1823,22 @@ public class Blocks {
 		PotatoBlock::new,
 		BlockBehaviour.Properties.of()
 	);
-	public static final Block OAK_BUTTON = register("oak_button", properties -> new ButtonBlock(BlockSetType.OAK, 30, properties), buttonProperties());
-	public static final Block SPRUCE_BUTTON = register("spruce_button", properties -> new ButtonBlock(BlockSetType.SPRUCE, 30, properties), buttonProperties());
-	public static final Block BIRCH_BUTTON = register("birch_button", properties -> new ButtonBlock(BlockSetType.BIRCH, 30, properties), buttonProperties());
-	public static final Block JUNGLE_BUTTON = register("jungle_button", properties -> new ButtonBlock(BlockSetType.JUNGLE, 30, properties), buttonProperties());
-	public static final Block ACACIA_BUTTON = register("acacia_button", properties -> new ButtonBlock(BlockSetType.ACACIA, 30, properties), buttonProperties());
-	public static final Block CHERRY_BUTTON = register("cherry_button", properties -> new ButtonBlock(BlockSetType.CHERRY, 30, properties), buttonProperties());
+	public static final Block OAK_BUTTON = register("oak_button", ButtonBlock::new, buttonProperties());
+	public static final Block SPRUCE_BUTTON = register("spruce_button", ButtonBlock::new, buttonProperties());
+	public static final Block BIRCH_BUTTON = register("birch_button", ButtonBlock::new, buttonProperties());
+	public static final Block JUNGLE_BUTTON = register("jungle_button", ButtonBlock::new, buttonProperties());
+	public static final Block ACACIA_BUTTON = register("acacia_button", ButtonBlock::new, buttonProperties());
+	public static final Block CHERRY_BUTTON = register("cherry_button", ButtonBlock::new, buttonProperties());
 	public static final Block DARK_OAK_BUTTON = register(
-		"dark_oak_button", properties -> new ButtonBlock(BlockSetType.DARK_OAK, 30, properties), buttonProperties()
+		"dark_oak_button", ButtonBlock::new, buttonProperties()
 	);
 	public static final Block PALE_OAK_BUTTON = register(
-		"pale_oak_button", properties -> new ButtonBlock(BlockSetType.PALE_OAK, 30, properties), buttonProperties()
+		"pale_oak_button", ButtonBlock::new, buttonProperties()
 	);
 	public static final Block MANGROVE_BUTTON = register(
-		"mangrove_button", properties -> new ButtonBlock(BlockSetType.MANGROVE, 30, properties), buttonProperties()
+		"mangrove_button", ButtonBlock::new, buttonProperties()
 	);
-	public static final Block BAMBOO_BUTTON = register("bamboo_button", properties -> new ButtonBlock(BlockSetType.BAMBOO, 30, properties), buttonProperties());
+	public static final Block BAMBOO_BUTTON = register("bamboo_button", ButtonBlock::new, buttonProperties());
 	public static final Block SKELETON_SKULL = register(
 		"skeleton_skull",
 		properties -> new SkullBlock(SkullBlock.Types.SKELETON, properties),
@@ -1927,12 +1925,12 @@ public class Blocks {
 	);
 	public static final Block LIGHT_WEIGHTED_PRESSURE_PLATE = register(
 		"light_weighted_pressure_plate",
-		properties -> new WeightedPressurePlateBlock(15, BlockSetType.GOLD, properties),
+		WeightedPressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block HEAVY_WEIGHTED_PRESSURE_PLATE = register(
 		"heavy_weighted_pressure_plate",
-		properties -> new WeightedPressurePlateBlock(150, BlockSetType.IRON, properties),
+		WeightedPressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block COMPARATOR = register(
@@ -2153,7 +2151,7 @@ public class Blocks {
 	);
 	public static final Block IRON_TRAPDOOR = register(
 		"iron_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.IRON, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of().isValidSpawn(Blocks::never)
 	);
 	public static final Block PRISMARINE = register(
@@ -2634,47 +2632,47 @@ public class Blocks {
 	);
 	public static final Block SPRUCE_FENCE_GATE = register(
 		"spruce_fence_gate",
-		properties -> new FenceGateBlock(WoodType.SPRUCE, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BIRCH_FENCE_GATE = register(
 		"birch_fence_gate",
-		properties -> new FenceGateBlock(WoodType.BIRCH, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block JUNGLE_FENCE_GATE = register(
 		"jungle_fence_gate",
-		properties -> new FenceGateBlock(WoodType.JUNGLE, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block ACACIA_FENCE_GATE = register(
 		"acacia_fence_gate",
-		properties -> new FenceGateBlock(WoodType.ACACIA, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CHERRY_FENCE_GATE = register(
 		"cherry_fence_gate",
-		properties -> new FenceGateBlock(WoodType.CHERRY, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block DARK_OAK_FENCE_GATE = register(
 		"dark_oak_fence_gate",
-		properties -> new FenceGateBlock(WoodType.DARK_OAK, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PALE_OAK_FENCE_GATE = register(
 		"pale_oak_fence_gate",
-		properties -> new FenceGateBlock(WoodType.PALE_OAK, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block MANGROVE_FENCE_GATE = register(
 		"mangrove_fence_gate",
-		properties -> new FenceGateBlock(WoodType.MANGROVE, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BAMBOO_FENCE_GATE = register(
 		"bamboo_fence_gate",
-		properties -> new FenceGateBlock(WoodType.BAMBOO, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block SPRUCE_FENCE = register(
@@ -2724,47 +2722,47 @@ public class Blocks {
 	);
 	public static final Block SPRUCE_DOOR = register(
 		"spruce_door",
-		properties -> new DoorBlock(BlockSetType.SPRUCE, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BIRCH_DOOR = register(
 		"birch_door",
-		properties -> new DoorBlock(BlockSetType.BIRCH, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block JUNGLE_DOOR = register(
 		"jungle_door",
-		properties -> new DoorBlock(BlockSetType.JUNGLE, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block ACACIA_DOOR = register(
 		"acacia_door",
-		properties -> new DoorBlock(BlockSetType.ACACIA, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CHERRY_DOOR = register(
 		"cherry_door",
-		properties -> new DoorBlock(BlockSetType.CHERRY, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block DARK_OAK_DOOR = register(
 		"dark_oak_door",
-		properties -> new DoorBlock(BlockSetType.DARK_OAK, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PALE_OAK_DOOR = register(
 		"pale_oak_door",
-		properties -> new DoorBlock(BlockSetType.PALE_OAK, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block MANGROVE_DOOR = register(
 		"mangrove_door",
-		properties -> new DoorBlock(BlockSetType.MANGROVE, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block BAMBOO_DOOR = register(
 		"bamboo_door",
-		properties -> new DoorBlock(BlockSetType.BAMBOO, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block END_ROD = register(
@@ -3714,12 +3712,12 @@ public class Blocks {
 	);
 	public static final Block CRIMSON_PRESSURE_PLATE = register(
 		"crimson_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.CRIMSON, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block WARPED_PRESSURE_PLATE = register(
 		"warped_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.WARPED, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CRIMSON_FENCE = register(
@@ -3734,58 +3732,58 @@ public class Blocks {
 	);
 	public static final Block CRIMSON_TRAPDOOR = register(
 		"crimson_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.CRIMSON, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block WARPED_TRAPDOOR = register(
 		"warped_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.WARPED, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block CRIMSON_FENCE_GATE = register(
 		"crimson_fence_gate",
-		properties -> new FenceGateBlock(WoodType.CRIMSON, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block WARPED_FENCE_GATE = register(
 		"warped_fence_gate",
-		properties -> new FenceGateBlock(WoodType.WARPED, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CRIMSON_STAIRS = registerLegacyStair("crimson_stairs", CRIMSON_PLANKS);
 	public static final Block WARPED_STAIRS = registerLegacyStair("warped_stairs", WARPED_PLANKS);
-	public static final Block CRIMSON_BUTTON = register("crimson_button", properties -> new ButtonBlock(BlockSetType.CRIMSON, 30, properties), buttonProperties());
-	public static final Block WARPED_BUTTON = register("warped_button", properties -> new ButtonBlock(BlockSetType.WARPED, 30, properties), buttonProperties());
+	public static final Block CRIMSON_BUTTON = register("crimson_button", ButtonBlock::new, buttonProperties());
+	public static final Block WARPED_BUTTON = register("warped_button", ButtonBlock::new, buttonProperties());
 	public static final Block CRIMSON_DOOR = register(
 		"crimson_door",
-		properties -> new DoorBlock(BlockSetType.CRIMSON, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block WARPED_DOOR = register(
 		"warped_door",
-		properties -> new DoorBlock(BlockSetType.WARPED, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CRIMSON_SIGN = register(
 		"crimson_sign",
-		properties -> new StandingSignBlock(WoodType.CRIMSON, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block WARPED_SIGN = register(
 		"warped_sign",
-		properties -> new StandingSignBlock(WoodType.WARPED, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block CRIMSON_WALL_SIGN = register(
 		"crimson_wall_sign",
-		properties -> new WallSignBlock(WoodType.CRIMSON, properties),
+		WallSignBlock::new,
 		wallVariant(CRIMSON_SIGN, true)
 	);
 	public static final Block WARPED_WALL_SIGN = register(
 		"warped_wall_sign",
-		properties -> new WallSignBlock(WoodType.WARPED, properties),
+		WallSignBlock::new,
 		wallVariant(WARPED_SIGN, true)
 	);
 	public static final Block STRUCTURE_BLOCK = register(
@@ -3901,11 +3899,11 @@ public class Blocks {
 	);
 	public static final Block POLISHED_BLACKSTONE_PRESSURE_PLATE = register(
 		"polished_blackstone_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.POLISHED_BLACKSTONE, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block POLISHED_BLACKSTONE_BUTTON = register(
-		"polished_blackstone_button", properties -> new ButtonBlock(BlockSetType.STONE, 20, properties), buttonProperties()
+		"polished_blackstone_button", ButtonBlock::new, buttonProperties()
 	);
 	public static final Block POLISHED_BLACKSTONE_WALL = register(
 		"polished_blackstone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(POLISHED_BLACKSTONE)
@@ -4234,73 +4232,73 @@ public class Blocks {
 	);
 	public static final Block COPPER_DOOR = register(
 		"copper_door",
-		properties -> new WeatheringCopperDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.UNAFFECTED, properties),
+		properties -> new WeatheringCopperDoorBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block EXPOSED_COPPER_DOOR = register(
 		"exposed_copper_door",
-		properties -> new WeatheringCopperDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.EXPOSED, properties),
+		properties -> new WeatheringCopperDoorBlock(WeatheringCopper.WeatherState.EXPOSED, properties),
 		BlockBehaviour.Properties.ofFullCopy(COPPER_DOOR)
 	);
 	public static final Block OXIDIZED_COPPER_DOOR = register(
 		"oxidized_copper_door",
-		properties -> new WeatheringCopperDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.OXIDIZED, properties),
+		properties -> new WeatheringCopperDoorBlock(WeatheringCopper.WeatherState.OXIDIZED, properties),
 		BlockBehaviour.Properties.ofFullCopy(COPPER_DOOR)
 	);
 	public static final Block WEATHERED_COPPER_DOOR = register(
 		"weathered_copper_door",
-		properties -> new WeatheringCopperDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.WEATHERED, properties),
+		properties -> new WeatheringCopperDoorBlock(WeatheringCopper.WeatherState.WEATHERED, properties),
 		BlockBehaviour.Properties.ofFullCopy(COPPER_DOOR)
 	);
 	public static final Block WAXED_COPPER_DOOR = register(
-		"waxed_copper_door", properties -> new DoorBlock(BlockSetType.COPPER, properties), BlockBehaviour.Properties.ofFullCopy(COPPER_DOOR)
+		"waxed_copper_door", DoorBlock::new, BlockBehaviour.Properties.ofFullCopy(COPPER_DOOR)
 	);
 	public static final Block WAXED_EXPOSED_COPPER_DOOR = register(
-		"waxed_exposed_copper_door", properties -> new DoorBlock(BlockSetType.COPPER, properties), BlockBehaviour.Properties.ofFullCopy(EXPOSED_COPPER_DOOR)
+		"waxed_exposed_copper_door", DoorBlock::new, BlockBehaviour.Properties.ofFullCopy(EXPOSED_COPPER_DOOR)
 	);
 	public static final Block WAXED_OXIDIZED_COPPER_DOOR = register(
-		"waxed_oxidized_copper_door", properties -> new DoorBlock(BlockSetType.COPPER, properties), BlockBehaviour.Properties.ofFullCopy(OXIDIZED_COPPER_DOOR)
+		"waxed_oxidized_copper_door", DoorBlock::new, BlockBehaviour.Properties.ofFullCopy(OXIDIZED_COPPER_DOOR)
 	);
 	public static final Block WAXED_WEATHERED_COPPER_DOOR = register(
-		"waxed_weathered_copper_door", properties -> new DoorBlock(BlockSetType.COPPER, properties), BlockBehaviour.Properties.ofFullCopy(WEATHERED_COPPER_DOOR)
+		"waxed_weathered_copper_door", DoorBlock::new, BlockBehaviour.Properties.ofFullCopy(WEATHERED_COPPER_DOOR)
 	);
 	public static final Block COPPER_TRAPDOOR = register(
 		"copper_trapdoor",
-		properties -> new WeatheringCopperTrapDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.UNAFFECTED, properties),
+		properties -> new WeatheringCopperTrapDoorBlock(WeatheringCopper.WeatherState.UNAFFECTED, properties),
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 	);
 	public static final Block EXPOSED_COPPER_TRAPDOOR = register(
 		"exposed_copper_trapdoor",
-		properties -> new WeatheringCopperTrapDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.EXPOSED, properties),
+		properties -> new WeatheringCopperTrapDoorBlock(WeatheringCopper.WeatherState.EXPOSED, properties),
 		BlockBehaviour.Properties.ofFullCopy(COPPER_TRAPDOOR)
 	);
 	public static final Block OXIDIZED_COPPER_TRAPDOOR = register(
 		"oxidized_copper_trapdoor",
-		properties -> new WeatheringCopperTrapDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.OXIDIZED, properties),
+		properties -> new WeatheringCopperTrapDoorBlock(WeatheringCopper.WeatherState.OXIDIZED, properties),
 		BlockBehaviour.Properties.ofFullCopy(COPPER_TRAPDOOR)
 	);
 	public static final Block WEATHERED_COPPER_TRAPDOOR = register(
 		"weathered_copper_trapdoor",
-		properties -> new WeatheringCopperTrapDoorBlock(BlockSetType.COPPER, WeatheringCopper.WeatherState.WEATHERED, properties),
+		properties -> new WeatheringCopperTrapDoorBlock(WeatheringCopper.WeatherState.WEATHERED, properties),
 		BlockBehaviour.Properties.ofFullCopy(COPPER_TRAPDOOR)
 	);
 	public static final Block WAXED_COPPER_TRAPDOOR = register(
-		"waxed_copper_trapdoor", properties -> new TrapDoorBlock(BlockSetType.COPPER, properties), BlockBehaviour.Properties.ofFullCopy(COPPER_TRAPDOOR)
+		"waxed_copper_trapdoor", TrapDoorBlock::new, BlockBehaviour.Properties.ofFullCopy(COPPER_TRAPDOOR)
 	);
 	public static final Block WAXED_EXPOSED_COPPER_TRAPDOOR = register(
 		"waxed_exposed_copper_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.COPPER, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.ofFullCopy(EXPOSED_COPPER_TRAPDOOR)
 	);
 	public static final Block WAXED_OXIDIZED_COPPER_TRAPDOOR = register(
 		"waxed_oxidized_copper_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.COPPER, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.ofFullCopy(OXIDIZED_COPPER_TRAPDOOR)
 	);
 	public static final Block WAXED_WEATHERED_COPPER_TRAPDOOR = register(
 		"waxed_weathered_copper_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.COPPER, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.ofFullCopy(WEATHERED_COPPER_TRAPDOOR)
 	);
 	public static final Block COPPER_GRATE = register(
@@ -4833,47 +4831,47 @@ public class Blocks {
 	);
 	public static final Block PEWEN_FENCE_GATE = register(
 		"pewen_fence_gate",
-		properties -> new FenceGateBlock(WoodType.OAK, properties),
+		FenceGateBlock::new,
 		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
 	);
 	public static final Block PEWEN_DOOR = register(
 		"pewen_door",
-		properties -> new DoorBlock(BlockSetType.CHERRY, properties),
+		DoorBlock::new,
 		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
 	);
 	public static final Block PEWEN_TRAPDOOR = register(
 		"pewen_trapdoor",
-		properties -> new TrapDoorBlock(BlockSetType.CHERRY, properties),
+		TrapDoorBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PEWEN_BUTTON = register(
 		"pewen_button",
-		properties -> new ButtonBlock(BlockSetType.CHERRY, 30, properties),
+		ButtonBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PEWEN_PRESSURE_PLATE = register(
 		"pewen_pressure_plate",
-		properties -> new PressurePlateBlock(BlockSetType.CHERRY, properties),
+		PressurePlateBlock::new,
 		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
 	);
 	public static final Block PEWEN_SIGN = register(
 		"pewen_sign",
-		properties -> new StandingSignBlock(WoodType.OAK, properties),
+		StandingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PEWEN_WALL_SIGN = register(
 		"pewen_wall_sign",
-		properties -> new WallSignBlock(WoodType.OAK, properties),
+		WallSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PEWEN_HANGING_SIGN = register(
 		"pewen_hanging_sign",
-		properties -> new CeilingHangingSignBlock(WoodType.OAK, properties),
+		CeilingHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PEWEN_WALL_HANGING_SIGN = register(
 		"pewen_wall_hanging_sign",
-		properties -> new WallHangingSignBlock(WoodType.OAK, properties),
+		WallHangingSignBlock::new,
 		BlockBehaviour.Properties.of()
 	);
 	public static final Block PEWEN_BRANCH = register(

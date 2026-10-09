@@ -74,14 +74,18 @@ scenario's pair and again at the end. Both prune older completed invocations
 after writing their summary. Failed comparisons are eligible too. A driver
 exception before these calls can leave copies and no final retention receipt.
 
-**Known retention gap:** [#823](https://github.com/HungLo2020/MattMC/issues/823)
-tracks a canonical fixture whose recorded source directory is missing: the
-workspace pass retains the copy, but an older parent invocation can still be
-deleted after a newer completed invocation of the same schema and outcome.
-The parent-retirement pass does not honor `retained_workspaces`. Pin the affected
-invocation root with `.keep` before later runs and preserve required sources
-outside retirement-managed outputs. The root pin protects the parent only;
-it does not prevent ordinary eligible workspace retirement.
+**Parent retirement:** the local repair for [#823](https://github.com/HungLo2020/MattMC/issues/823)
+rechecks fixture/workspace eligibility immediately before deleting an old
+invocation. Any retained workspace also retains its parent. This covers a
+missing recorded source even when an earlier summary reports no retained
+workspaces. Once an external source is available again, an otherwise eligible
+old invocation can retire normally. Eleven focused retention tests pass,
+including the two-phase missing-source regression and source-restoration case.
+
+Keep required sources outside retirement-managed outputs. Source existence is
+still only a bounded eligibility check, not proof of recoverability or a backup.
+Explicit `.keep` protects parent retirement; ordinary eligible workspace
+retirement continues within a pinned invocation.
 
 For workspace retirement, only paths inside a marked invocation are candidates:
 
@@ -106,7 +110,7 @@ plus source-directory existence, not input hashes or recoverability. The drivers
 existence before creating a fresh output, and the capture harness requires a
 source world. The retirement helper does not compare recorded input hashes or independently
 protect sources placed inside disposable output trees.
-An exact-source synthetic check for #823 used a source that existed at fixture
+Before the repair, an exact-source synthetic check for #823 used a source that existed at fixture
 creation and was then relocated. With process discovery mocked inactive, the
 workspace survived its pass but was deleted with its old parent; the explicit
 root `.keep` control survived. This demonstrates the two-pass gap, not actual
@@ -135,8 +139,9 @@ review independently ran four temporary-fixture tests with mocked process
 checks. The [repair commit's author](https://github.com/HungLo2020/MattMC/commit/a0f5abeb27f122ace8a44265b0ed82320a39c0a7)
 reports nine retention tests, including a real child-process lifetime check,
 within 37 passing harness regressions. Those reported checks do not cover the
-later demonstrated #823 parent-retirement gap or establish safe cleanup of
-every live filesystem state.
+later demonstrated #823 parent-retirement gap. The new focused checks above
+exercise that sequence; they do not establish safe cleanup of every live
+filesystem state.
 
 The capture runner also retires its isolated game directories after shutdown.
 The [`a0f5abeb` repair](https://github.com/HungLo2020/MattMC/blob/a0f5abeb27f122ace8a44265b0ed82320a39c0a7/DevUtils/Common/artifact_retention.py#L158-L167)

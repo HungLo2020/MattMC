@@ -2,6 +2,7 @@ package net.minecraft.world.level.block;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -27,6 +28,11 @@ public class StandingSignBlock extends SignBlock {
 	@Override
 	public MapCodec<StandingSignBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public StandingSignBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.wood(properties, NativeBlockFamilies.Kind.STANDING_SIGN), properties);
 	}
 
 	public StandingSignBlock(WoodType woodType, BlockBehaviour.Properties properties) {

@@ -75,11 +75,12 @@ flags, lighting, fluid associations, two sampled offsets and light-occlusion
 boxes. Version 5 adds 18 physical settings, matching superclass caches where
 present, and seven cached physical facts per block state. Version 6
 adds default/cached map-color IDs, copied color/emission functions and canonical
-fluid associations. Current version 7 also checks sound-event identities/ranges,
+fluid associations. Version 7 also checks sound-event identities/ranges,
 profile/instrument references and per-state sound/instrument bindings. Its
 offset coverage exhausts finite indices and extreme coordinates; see
-[sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md). Other contextual probes use
-`EmptyBlockGetter` at `BlockPos.ZERO`; they do not cover arbitrary worlds.
+[sounds and offsets](BLOCK-SOUND-AND-OFFSETS.md). Current version 8 adds block-set/wood definitions, codec/alias identities and
+registered family parameters; see [block families](BLOCK-FAMILY-TYPES.md).
+Other contextual probes use `EmptyBlockGetter` at `BlockPos.ZERO`; they do not cover arbitrary worlds.
 
 The observer's graph count combines block and fluid states; the recorded
 31,846 total comprises 31,809 block states plus 37 fluid states. Matching

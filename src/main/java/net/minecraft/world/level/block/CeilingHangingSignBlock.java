@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
@@ -56,6 +57,11 @@ public class CeilingHangingSignBlock extends SignBlock {
 	@Override
 	public MapCodec<CeilingHangingSignBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public CeilingHangingSignBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.wood(properties, NativeBlockFamilies.Kind.CEILING_HANGING_SIGN), properties);
 	}
 
 	public CeilingHangingSignBlock(WoodType woodType, BlockBehaviour.Properties properties) {

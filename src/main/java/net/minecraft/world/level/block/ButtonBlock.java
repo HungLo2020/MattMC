@@ -6,6 +6,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -56,6 +57,11 @@ public class ButtonBlock extends FaceAttachedHorizontalDirectionalBlock {
 	@Override
 	public MapCodec<ButtonBlock> codec() {
 		return CODEC;
+	}
+
+	/** Registered content takes its family configuration from Rust. */
+	public ButtonBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.set(properties, NativeBlockFamilies.Kind.BUTTON), NativeBlockFamilies.parameter(properties, NativeBlockFamilies.Kind.BUTTON), properties);
 	}
 
 	public ButtonBlock(BlockSetType blockSetType, int i, BlockBehaviour.Properties properties) {
