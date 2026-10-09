@@ -33,6 +33,8 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	// Borrow a consistent storage/palette pair for the chunk's bulk heightmap reader.
 	// The caller observes the same ownership/exclusion rules as ordinary reads.
 	Data<T> dataForNativeScan() { return this.data; }
+
+	Strategy<T> strategyForNativeSnapshot() { return this.strategy; }
 	net.minecraft.core.IdMap<T> registryForNativeScan() { return this.strategy.globalMap(); }
 
 	public void acquire() {

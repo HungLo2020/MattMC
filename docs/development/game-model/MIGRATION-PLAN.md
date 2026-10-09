@@ -12,7 +12,7 @@
 Each phase is a normal migration slice: parity tests against Java, a
 production-path benchmark, and docs.
 
-## Current priority (2026-10-08)
+## Current priority (2026-10-09)
 
 After the local map/state-policy batch, prioritize world-state systems and the
 per-frame Java → Rust path ahead of more static catalog migration. Profile
@@ -29,6 +29,11 @@ locally. Four-mode comparisons completed with sixteen clean runs but still fail 
 performance floors. The handoff is implemented. Final release image proof and paired diagnostic
 profiles pass; the targeted Java allocation/encoding cost is reduced, with no
 accepted isolated throughput gain. See the retained-scene evidence for bounds.
+[Loaded-section snapshot ownership](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
+and bulk rebuild consumers now live in Rust. Lifecycle and paired image checks
+pass; performance floors remain unmet. Live chunk mutation remains Java. Next,
+move authoritative chunk storage with its lighting, heightmap, save and rebuild
+consumers, preserving palette history and avoiding per-block FFI reads.
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java installs stage results and
 still owns normal chunk mutation/orchestration. Move hot consumers with storage

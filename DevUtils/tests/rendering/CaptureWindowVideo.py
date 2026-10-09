@@ -40,6 +40,13 @@ def window_extent(target: str) -> tuple[int, int]:
     return int(width[1]), int(height[1])
 
 
+def lossless_encoder_args() -> list[str]:
+    # Matroska rounds PTS to milliseconds. Catch-up X11 samples can then
+    # collide; keep the input microsecond clock in NUT, without resampling.
+    return ["-c:v", "ffv1", "-level", "3", "-threads", "1", "-pix_fmt", "bgr0",
+            "-enc_time_base", "1:1000000", "-fps_mode", "passthrough"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pid", type=int, required=True)
@@ -94,16 +101,14 @@ def main() -> int:
             raise RuntimeError("region exceeds client extent")
         if x + width > screenshot_extent[0] or y + height > screenshot_extent[1]:
             raise RuntimeError("region exceeds the visible screenshot extent")
-        video = args.output / "window-crop.mkv"
+        video = args.output / "window-crop.nut"
         with (args.output / "ffmpeg.log").open("w") as log:
             command = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "warning", "-n",
                        "-f", "x11grab", "-window_id", target, "-framerate", str(args.fps),
                        "-draw_mouse", "0", "-grab_x", str(x), "-grab_y", str(y),
                        "-video_size", f"{width}x{height}",
                        "-i", os.environ["DISPLAY"], "-t", str(args.seconds),
-                       "-c:v", "ffv1",
-                       "-level", "3", "-threads", "1", "-pix_fmt", "bgr0",
-                       "-fps_mode", "passthrough", str(video)]
+                       *lossless_encoder_args(), str(video)]
             report["capture_command"] = command
             report["source_region_only"] = True
             report["ffmpeg_wall_start_ns"] = time.time_ns()

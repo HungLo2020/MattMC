@@ -29,12 +29,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.NativeBlockSectionSnapshot;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -84,6 +86,7 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
 
     // (Local Section -> Block States) table.
     private final BlockState[][] blockArrays;
+    private final NativeBlockSectionSnapshot[] nativeBlockArrays = new NativeBlockSectionSnapshot[SECTION_ARRAY_SIZE];
 
     // (Local Section -> Light Manager) table.
     @SuppressWarnings("MismatchedReadAndWriteOfArray")
@@ -156,7 +159,7 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
     public LevelSlice(ClientLevel level) {
         this.level = level;
 
-        this.blockArrays = new BlockState[SECTION_ARRAY_SIZE][SECTION_BLOCK_COUNT];
+        this.blockArrays = new BlockState[SECTION_ARRAY_SIZE][];
         this.lightArrays = new DataLayer[SECTION_ARRAY_SIZE][LIGHT_TYPES.length];
 
         this.blockEntityArrays = new Int2ReferenceMap[SECTION_ARRAY_SIZE];
@@ -166,10 +169,6 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
 
         this.biomeSlice = new LevelBiomeSlice();
         this.biomeColors = new LevelColorCache(this.biomeSlice, Minecraft.getInstance().options.biomeBlendRadius().get());
-
-        for (BlockState[] blockArray : this.blockArrays) {
-            Arrays.fill(blockArray, EMPTY_BLOCK_STATE);
-        }
     }
 
     public void copyData(ChunkRenderContext context) {
@@ -196,7 +195,16 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
 
         Objects.requireNonNull(section, "Chunk section must be non-null");
 
-        this.unpackBlockData(this.blockArrays[sectionIndex], context, section);
+        this.nativeBlockArrays[sectionIndex] = section.getNativeBlockData();
+        if (this.nativeBlockArrays[sectionIndex] != null || section.getBlockData() == null) {
+            this.blockArrays[sectionIndex] = null;
+        } else {
+            if (this.blockArrays[sectionIndex] == null) {
+                this.blockArrays[sectionIndex] = new BlockState[SECTION_BLOCK_COUNT];
+                Arrays.fill(this.blockArrays[sectionIndex], EMPTY_BLOCK_STATE);
+            }
+            this.unpackBlockData(this.blockArrays[sectionIndex], context, section);
+        }
 
         this.lightArrays[sectionIndex][LightLayer.BLOCK.ordinal()] = section.getLightArray(LightLayer.BLOCK);
         this.lightArrays[sectionIndex][LightLayer.SKY.ordinal()] = section.getLightArray(LightLayer.SKY);
@@ -237,10 +245,11 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
     }
 
     public void reset() {
-        // erase any pointers to resources we no longer need
-        // no point in cleaning the pre-allocated arrays (such as block state storage) since we hold the
-        // only reference.
-        for (int sectionIndex = 0; sectionIndex < SECTION_ARRAY_LENGTH; sectionIndex++) {
+        // Release all 27 borrowed sections, including native captures and compatibility state views.
+        for (int sectionIndex = 0; sectionIndex < SECTION_ARRAY_SIZE; sectionIndex++) {
+            this.nativeBlockArrays[sectionIndex] = null;
+            this.blockArrays[sectionIndex] = null;
+            this.modelMapArrays[sectionIndex] = null;
             Arrays.fill(this.lightArrays[sectionIndex], null);
 
             this.blockEntityArrays[sectionIndex] = null;
@@ -263,8 +272,22 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
         int relBlockY = blockY - this.originBlockY;
         int relBlockZ = blockZ - this.originBlockZ;
 
-        return this.blockArrays[getLocalSectionIndex(relBlockX >> 4, relBlockY >> 4, relBlockZ >> 4)]
-                [getLocalBlockIndex(relBlockX & 15, relBlockY & 15, relBlockZ & 15)];
+        int section = getLocalSectionIndex(relBlockX >> 4, relBlockY >> 4, relBlockZ >> 4);
+        int block = getLocalBlockIndex(relBlockX & 15, relBlockY & 15, relBlockZ & 15);
+        var nativeStates = this.nativeBlockArrays[section];
+        if (nativeStates != null) return nativeStates.state(block);
+        var states = this.blockArrays[section];
+        return states == null ? EMPTY_BLOCK_STATE : states[block];
+    }
+
+    /** Bulk canonical world IDs; model registration remains a separate semantic admission step. */
+    public boolean writePaddedBlockStateIds(int minX, int minY, int minZ, MemorySegment output) {
+        if (minX != this.originBlockX + 16 || minY != this.originBlockY + 16 || minZ != this.originBlockZ + 16) return false;
+        if (!this.volume.isInside(minX - 1, minY - 1, minZ - 1)
+                || !this.volume.isInside(minX + 16, minY + 16, minZ + 16)) return false;
+        for (var states : this.blockArrays) if (states != null) return false;
+        NativeBlockSectionSnapshot.writePadded(this.nativeBlockArrays, output);
+        return true;
     }
 
     @Override

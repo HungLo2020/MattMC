@@ -39,6 +39,7 @@ public class ClonedChunkSection {
     private final @Nullable SodiumAuxiliaryLightManager auxLightManager;
 
     private final @Nullable PalettedContainerRO<BlockState> blockData;
+    private final @Nullable NativeBlockSectionSnapshot nativeBlockData;
 
     private final @Nullable PalettedContainerRO<Holder<Biome>> biomeData;
     private final SodiumModelDataContainer modelMap;
@@ -49,6 +50,7 @@ public class ClonedChunkSection {
         this.pos = pos;
 
         PalettedContainerRO<BlockState> blockData = null;
+        NativeBlockSectionSnapshot nativeBlockData = null;
         PalettedContainerRO<Holder<Biome>> biomeData = null;
 
         Int2ReferenceMap<BlockEntity> blockEntityMap = null;
@@ -59,7 +61,8 @@ public class ClonedChunkSection {
         if (section != null) {
             if (!section.hasOnlyAir()) {
                 if (!level.isDebug()) {
-                    blockData = PalettedContainerROExtension.clone(section.getStates());
+                    nativeBlockData = NativeBlockSectionSnapshot.capture(section.getStates());
+                    if (nativeBlockData == null) blockData = PalettedContainerROExtension.clone(section.getStates());
                 } else {
                     blockData = constructDebugWorldContainer(pos);
                 }
@@ -73,6 +76,7 @@ public class ClonedChunkSection {
         }
 
         this.blockData = blockData;
+        this.nativeBlockData = nativeBlockData;
         this.biomeData = biomeData;
         this.modelMap = modelMap;
 
@@ -235,6 +239,10 @@ public class ClonedChunkSection {
 
     public SectionPos getPosition() {
         return this.pos;
+    }
+
+    public @Nullable NativeBlockSectionSnapshot getNativeBlockData() {
+        return this.nativeBlockData;
     }
 
     public @Nullable PalettedContainerRO<BlockState> getBlockData() {

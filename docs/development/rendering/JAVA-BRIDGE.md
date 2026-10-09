@@ -453,3 +453,8 @@ color-owner identity. Ordinary snapshots use Rust-owned shared world-coordinate
 fields; literal tensors remain for compatibility fixtures. Whole-frame ABI74 is
 unchanged. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
 for construction, sealing, lifetime and provider compatibility.
+
+Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
+Rust fills the state-ID halo directly; Java retains contextual light and model
+admission. Unsupported/debug containers retain their original CPU compatibility
+path. This does not transfer live chunk mutation or GPU ownership to Java.

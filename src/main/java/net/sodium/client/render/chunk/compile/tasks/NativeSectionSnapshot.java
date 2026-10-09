@@ -1,6 +1,8 @@
 package net.sodium.client.render.chunk.compile.tasks;
 
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import java.lang.foreign.MemorySegment;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
 import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 import net.sodium.client.render.chunk.compile.pipeline.BlockOcclusionCache;
@@ -357,8 +359,11 @@ final class NativeSectionSnapshot implements AutoCloseable {
         // first use, then reuse its immutable id within this extraction only.
         // At most PADDED_BLOCK_COUNT entries; nothing survives into a later
         // snapshot or model reload. flushAll still rejects stale generations.
-        var stateIds = new Reference2IntOpenHashMap<BlockState>();
-        stateIds.defaultReturnValue(-1);
+        boolean worldIds = slice.writePaddedBlockStateIds(this.minX, this.minY, this.minZ,
+                MemorySegment.ofAddress(this.paddedStateIdsAddress).reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES));
+        var admittedIds = worldIds ? new IntOpenHashSet() : null;
+        var stateIds = worldIds ? null : new Reference2IntOpenHashMap<BlockState>();
+        if (stateIds != null) stateIds.defaultReturnValue(-1);
         for (int py = 0; py < PADDED_LENGTH; py++) {
             int y = this.minY + py - 1;
             for (int pz = 0; pz < PADDED_LENGTH; pz++) {
@@ -366,14 +371,22 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 for (int px = 0; px < PADDED_LENGTH; px++) {
                     int x = this.minX + px - 1;
                     int index = paddedIndex(px, py, pz);
-                    BlockState state = slice.getBlockState(x, y, z);
-                    int stateId = stateIds.getInt(state);
-                    if (stateId == -1) {
-                        stateId = NativeStaticBlockModelRegistry.getStateId(state);
-                        stateIds.put(state, stateId);
+                    BlockState state;
+                    if (worldIds) {
+                        int stateId = MemoryUtil.memGetInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES);
+                        state = Block.BLOCK_STATE_REGISTRY.byId(stateId);
+                        if (admittedIds.add(stateId) && NativeStaticBlockModelRegistry.getStateId(state) != stateId) {
+                            throw new IllegalStateException("Native model admission changed a canonical world state id");
+                        }
+                    } else {
+                        state = slice.getBlockState(x, y, z);
+                        int stateId = stateIds.getInt(state);
+                        if (stateId == -1) {
+                            stateId = NativeStaticBlockModelRegistry.getStateId(state);
+                            stateIds.put(state, stateId);
+                        }
+                        MemoryUtil.memPutInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES, stateId);
                     }
-                    MemoryUtil.memPutInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES,
-                            stateId);
                     MemoryUtil.memPutInt(this.paddedLightWordsAddress + (long) index * Integer.BYTES,
                             computeLightWord(slice, state, x, y, z));
                 }

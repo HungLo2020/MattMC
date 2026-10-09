@@ -1,56 +1,44 @@
-# Java-to-Rust migration — working record
-## Objective and authority
-- Complete when Java/JVM is removed and one Rust library plus one Rust executable provide client/server modes.
-- Preserve or improve behavior, visuals and performance against untouched Frozen Java OpenGL.
-- Active goal authorizes tested milestone commits/pushes to master and routine artifact pruning.
-- Plan: `docs/development/RUST-MIGRATION.md`; ownership details: `docs/development/game-model/`; assumptions: `ASSUMPTIONS.md`.
-## Working state — 2026-10-09
-- Work in this MattMC checkout on master. The map/state-policy checkpoint`84016f210` includes upstream documentation`2e62eed92`. Scoped sync preserved other files/user edits;recovery:`build/map-palette-migration-draft/docs-upstream-sync/`.
-- Preserve the user's local `docs/STANDARD-COPILOT-PROMPTS.md` edit; exclude it from migration commits. Prior `batch` branch, stash and transfer receipts remain preserved.
-- Rust owns Vulkan rendering, terrain visibility/assembly/publication, DH ledger/payloads and several world/storage kernels. General gameplay, world orchestration, platform/assets/startup remain Java.
-- Cargo builds only a cdylib; `app/` is empty. Native executable, application lifecycle and complete Java removal remain unfinished.
-## Published ownership milestones
-- `a0f5abeb2`: verification and retention guards. Missing scenarios/receipts or failed captures cannot pass through historical comparisons.
-- `6ccbfdf41`, `df6c6dc77`: native Cartesian state graphs, five fluid definitions and134 property schemas. Java objects are compatibility projections.
-- `2f2158cc4`:1235 registered block identities/domains/defaults and31809 state ranges. Generic codec objects retain compatibility.
-- `1b1837931`, `d0141162d`:181 physical profiles and205 shared intrinsic rules for map colors, emission and canonical fluids. Shapes, blocked light and contextual predicates remain Java.
-- `059c95621`:2011 sound events,125 sound profiles,23 instruments and native block sound/offset rules. Playback and world behavior remain separate owners.
-- `48a6e051e`:17 block sets,12 woods and141 typed family bindings;141 Java factory parameter lists removed. Gameplay/scheduling remain Java.
-- Each milestone retains Frozen observations, native/Java tests and full-client receipts in its focused developer page and `artifacts/graphics-captures/validation/`. Sources/native matched, Frozen unchanged; performance target remained unmet.
-## Published maps/state-policy batch (`84016f210`)
-- Rust owns62 RGB definitions/four shades/256 packed colors and whole-image RGBA/PNG processing. Java sends16 KiB indexed maps;the former red/blue swap for208 packed colors is corrected against Frozen CPU bytes.
-- Rust owns25 typed tick/light-shape/leaf/block-entity rules across31809 states. Definition schema5/registry format9 remove four Java-exported policy flags. World callbacks,scheduling,shapes and ordinary world updates remain Java.
-- Native framed-map shader policy owns writer ordering,depth,lighting,cutoff,blending,fog and UV normalization. Held maps,other packs/lighting and broader gameplay coverage remain unfinished.
-- Final source tests:1725 Java passes/2 skips;2389 Rust passes/3 ignores;Wiki2481 pages/43 indexes. Seven lifecycle cases and reviewed vanilla/Iris+DH images pass,VUID0 and owned orphans0.
-- Full V2 workflow FAILED:vanilla performance floors and one exact INFO shutdown-disconnect health classification. Original failure preserved;the narrow classifier has13 tests. Fresh shader+DH ABAB passes. SUMMARY.md combines only the12 clean V2 rows and4 fresh V3 rows.
-- Final five-frame shader-map/crop proof passes unchanged tolerance6;whole RGB2.337/1.819/2.160. Final five-pair observer matches all10 semantic digests:bootstrap2.303/2.277s,allocation960.26/1067.78MB. No isolated map gain claim.
-- Receipts:`validation/native-map-policy-master-v2-20261008/`,`validation/native-map-policy-shader-dh-health-v3-20261008/`,`feature-parity/native-map-policy-final-glyph-20261008/`,and`build/map-policy-rejection-contract-verification-20261008/`.
-- Ownership/contracts/evidence:`docs/development/game-model/MAP-COLORS.md`,`STATE-POLICY.md`,and rendering bridge/verification guides. Draft manifests remain under`build/map-palette-migration-draft/`and`build/block-policy-migration-draft/`;do not rerun preparation over integrated files.
-## Performance evidence and unresolved acceptance
-- SUMMARY.md now contains the local DH handoff measurements;the map/state-policy rows are historical. The historical published family checkpoint had all16 ABAB/6000 runs were clean;FPS medians−6.9%,−28.9%,+8.1%,+9.2% (vanilla,DH,shaders,shaders+DH). Vanilla/DH average and p99 failed;both shader modes passed. No isolated family regression attribution established.
-- That workflow passed1711 Java/2366 Rust tests (2 skips/3 ignores), all seven lifecycle cases and reviewed vanilla/Iris+DH images with VUID0. Receipt: `validation/native-block-families-master-20261008/summary.json`;these results predate the local map/state-policy batch.
-- Valid prior vanilla profile:20.25s inside measurement,10126 render-thread samples;coordinator28.1%,terrain enqueue12.4%,selectVisible6.9% inclusive. Evidence: `goal5/state-graph-performance-profile-v3/`;costs: `build/state-graph-migration/phase-costs.json`.
-- Rejected/removed dense mesh-slot cache:1.6µs semantic saving did not improve overall throughput/tails. Evidence: `goal5/dense-mesh-cache-measurement-v3/`;do not restore it without new evidence.
-- Whole-renderer performance gaps guide continued ownership migration; they do not halt tested milestones. Full acceptance still requires realistic Frozen-equivalent workloads, clean timing, bounded resources and broad parity.
-- Broad feature coverage remains incomplete: bed/banner/zombie/held-item cases and other gameplay/transition scenarios cannot be inferred from settled coast captures. Distinguish harness defects from renderer defects.
-## DH frame ownership milestone — scoped verification
-- Implemented native immutable visible-set ownership from DH selection through renderer decode. ABI74 carries CPU frame identity/lifecycle/count;Java ordinary frames avoid list export,record construction and re-encoding. Coordinator layer counts also come from Rust;capture records remain explicit readback.
-- Three bounded snapshots,≤16384 segments each;unchanged sets share storage/hash. Decode validates identity/lifecycle/count/decision and owns data before queueing;resets invalidate unresolved refs,decoded owners survive. Existing GPU/GAL/presenter/resource ownership remains unchanged. Java DH tree/frame-parameter preparation and loaded-world storage remain unfinished.
-- Java compilation and69 focused Java tests pass, including production no-readback and capture-readback behavior. Full native suite passes2395/3 ignored, including new ordering/counts/signed-key/reuse,stale-reference,bounded eviction,reset/queued ownership and malformed-input regressions. Full Java suite passes1729/2 skips;Wiki2481/43 passes. Restored the original inline LOD error domain/message;all six focused whole-frame FFI checks pass. Runtime workflow`validation/native-dh-frame-ownership-20261009/`:all seven lifecycle cases and reviewed vanilla/Iris+DH pairs pass;all16 ABAB/6000 rows are clean, but vanilla/DH FPS and p99 floors fail. Measured SHA1ad43eea and source/Frozen integrity pass,owned orphans0. SUMMARY.md records the new results;no isolated speedup claimed. No isolated throughput gain established.
-- Final review reproduced a panic when a malformed layer was appended after route selection. Retained handoff now rejects incomplete classification using existing counts;no new full scan. The final full native suite passes2396/3 ignored;release rebuild and Wiki2481/43 pass. Final SHA77998a11 passes fresh reviewed Iris+DH proof and paired60000-frame diagnostic profiles,including timing-window/source/library/Frozen integrity and health;owned orphans0. The complete benchmark above predates this rejection-path hardening.
-- Paired before/after profiles:consumption432.01→33.55MB/15s;encoder191.89MB→no observed samples. Target CPU share~4.7→1.5% render-thread samples. Sampling1MiB,diagnostic only;no exact per-frame or isolated FPS claim. Native frame worker remains~61% of all CPU samples. Receipts:`goal5/native-dh-frame-profile-20261009/`and`build/map-policy-performance-profile/dh-frame-profile-comparison.json`.
-## Next ownership milestone — user's priority
-- After this batch, prioritize performance-relevant world-state systems and per-frame producer/storage/lifetime ownership. Further static catalogs are lower priority (user steering2026-10-08).
-- DH frame milestone is published in6324cd1dd;the earlier round trip is removed and profiles show lower sampled Java consumption/encoding costs. Broad performance acceptance remains open.
-- Current local slice: Rust-owned immutable chunk color fields. Rust plans/deduplicates built-in world-coordinate queries and owns storage;direct meshing reads vertex samples without rebuilding per-block rows. Custom provider callback order remains literal. Java loaded-world palettes,LevelSlice expansion,biome evaluation/light inputs and orchestration remain unfinished.
-- Paired ordinary-flight CPU profiles in`goal5/chunk-snapshot-flight-profile-20261009/` pass timing/source/library/Frozen/cleanup checks. Reviewed forward F3 positions are266/95/561 on both sides,seven chunk columns from start;diagnostic only. Current lattice preparation159/383 snapshot samples motivated this slice. Four core/65 focused meshing tests and full native2402/3 ignored pass. Full Java1732/2 skips passes. Workflow`validation/native-world-color-fields-20261009/` finished:seven lifecycle/reviewed vanilla+IrisDH pairs pass,16 ABAB6000 rows clean,VUID0/source/library/Frozen unchanged/orphans0. Vanilla still fails FPS/p99;other modes pass but DH repeats vary. SHA6d637127;no isolated speedup claim. Twenty-five generated copies retired. Final header/tint-boundary guards and early literal-staging retirement are implemented. Negative-vertex overflow reproduced before fix. Final native2405/3 ignored and77 affected Java checks pass on SHA953ac5b4;reviewed final Iris+DH proof passes RGB3.746/4.307/3.993,VUID0/integrity/orphans0. Paired streaming profiles pass;reviewed positions cross the same seven columns. Target color preparation159/13989→101/13892 samples;snapshot383→313,diagnostic only. First Frozen repeat failed return-video timestamps and is preserved;v2 passes. Final Java model-generation recheck passes77 checks;reviewed admission proof passes RGB3.736/4.298/3.984,VUID0/identity/integrity/orphans0. Four final proof/accepted-profile copies retired;failed Frozen workspace preserved. Compact mesh header4/136;whole-frame ABI74 unchanged. Practical docs:`docs/development/world/biome/RUST-SECTION-COLORS.md`.
-- Native chunk, terrain and DH owners are starting points; Java still owns chunk storage/mutation, world orchestration and several per-frame producers. Move consumers alongside authoritative storage to avoid replacing local reads with per-block FFI.
-- Preserve IDs, state/property/save bytes, Frozen selection/order and reload/generation handling. Java may expose bounded immutable CPU semantics; Rust/GAL retain all GPU resources, submission, completion and presentation.
-- Subsequent work: world simulation/behavior/components, remaining assets/platform/network owners, native application lifecycle, then Java/bridge/build removal.
-## Verification and storage rules
-- Real clients establish runtime evidence; source tests/synthetic fixtures supplement it. Frozen Java OpenGL is the only baseline; never alter Frozen or silently reinterpret its behavior.
-- Performance:≥2 paired repeats per side across all four modes, exact6000 frames, valid/crash-free/publishable receipts, VUID0;average FPS must reach Frozen and p99 must not worsen. No extra builds/profilers/games during clean FPS windows.
-- Cleanup checks invocation scope and process start identity. Killed owned orphans reject acceptance. Preserve live/crashed/symlink/unproven fixtures and sources; retire generated copies only after eligibility rechecks.
-- Two-phase retirement fix is published in48a6e051e;11 focused tests pass. Prior workflows retired25 generated fixtures each while retaining compact receipts/images.
-- Bulk pruning recovered~350 GiB;latest disk free310 GiB. Storage receipts: `goal5/disk-cleanup-20261008/`;guide: `ARTIFACT-STORAGE.md`. Retained comparison sources must remain available.
-- Wiki check2481 pages/43 indexes passes;rerun after final documentation updates. Keep this record≤100 lines and SUMMARY.md≤10;put practical subsystem documentation in its proper developer directory.
+# Rust migration working record
+## Goal and rules
+- Remove Java/JVM completely: one Rust library and one executable for client/server. Goal remains ACTIVE.
+- Maintain/improve correctness and performance against untouched Frozen Java OpenGL; no Java Vulkan baseline or fallback.
+- Publish tested larger milestones on master in this checkout. No separate migration checkout. Assumptions:`ASSUMPTIONS.md`.
+- Preserve/exclude the user's `docs/STANDARD-COPILOT-PROMPTS.md` edit (SHAc5695e9b). Keep SUMMARY≤10 lines and this record≤100.
+- Developer documentation belongs in relevant `docs/development/` directories; run Wiki checks. Test drivers belong in `DevUtils/tests/`.
+## Current ownership
+- Rust owns Vulkan/GAL rendering and presentation, terrain visibility/assembly/publication, DH ledger/visible payloads, native state graphs and many world/storage kernels.
+- Native registered block/fluid facts and policies support Java compatibility projections. General gameplay, live world storage/mutation, orchestration, platform/assets/startup remain Java.
+- Cargo still builds a cdylib only; `app/` is empty. Native executable/lifecycle and complete Java removal remain unfinished.
+- Rust/GAL must retain all GPU resources, passes, synchronization, submission, completion and presentation. Transitional Java exposes bounded immutable CPU semantics only.
+## Latest implementation — loaded-section snapshots
+- Rust owns immutable 4096-state rebuild captures, decoding and bulk18³ halo reads. Ordinary sections avoid Java palette cloning/4096-object expansion. Java callbacks use read-only CPU views without per-block FFI.
+- Existing512-entry/5-second cache and outstanding jobs retain owners; each capture8KiB. Automatic arenas release Rust storage after readers disappear; no native global cache. All27 reset slots now clear state/model/light/entity references.
+- Custom palettes/registries/storage/strategies and debug-world substitutes preserve their CPU compatibility path. Canonical state IDs, model-generation admission and compact header4/whole-frame ABI74 remain unchanged.
+- Live loaded-world mutation is still Java. Practical constraints/commands:`docs/development/world/chunk/RUST-SECTION-SNAPSHOTS.md`.
+## Verification and performance — 2026-10-09
+- Native2409 pass/3 ignored;full Java1739 pass/2 skipped;38 affected Java checks pass, including7 new snapshot tests. Wiki2483 pages/43 indexes passes.
+- Release SHA15c7ba5e: all7 lifecycle cases and reviewed vanilla/Iris+DH pairs pass. RGB0.203/0.348/0.382 and3.717/4.266/3.963;DH coverage passes,VUID0.
+- Full workflow`validation/native-chunk-state-snapshots-20261009/summary.json` FAILS performance floors. All16 ABAB/exact6000 runs clean,exceptions0,VUID0,owned orphans0;game source/library/Frozen unchanged. Twenty-five generated copies retired.
+- SUMMARY.md records current measurements:vanilla−9.8% versus Frozen;DH+3.0%;shaders+7.6%;shader+DH+9.4%. Vanilla FPS/p99 and both shader p99 floors fail. DH repeats vary;no isolated ownership speedup claim.
+- Paired normal-flight profiles`goal5/chunk-state-snapshots-flight-profile-v3-20261009/` pass timing/source/library/Frozen/cleanup checks. Reviewed identical start150.5/95/530.5 and terminal block266/95/561,seven X columns;about half-block terminal drift. Diagnostic only.
+- CPU samples/8s:capture+slice preparation35→24;NativeSectionSnapshot313→334;whole meshing task475→470. Small samples/scene scheduling/observer overhead prevent a speedup claim. Comparison:`build/map-policy-performance-profile/chunk-state-profile-comparison.json`.
+- Two Current profile attempts rejected video timestamp collisions and remain preserved. Reproduced Matroska400µs→duplicatePTS;FFV1/NUT preservesµs without resampling or relaxed validation. Seven observer tests pass. Historical profiles used MKV;container change is a comparison limitation. Two accepted profile copies retired.
+- Frozen remains clean at7a4d18171. Benchmark/full Java precede final Java view-adoption ordering hardening;38 affected checks pass again. Read-only wrapper now precedes cleanup registration;closed-arena/read-only tests pass. Native library unchanged;reviewed final Iris+DH proof passes RGB3.746/4.309/3.992,VUID0/integrity/owned orphans0. One final proof copy retired. Video-observer correction is separate.
+## Published foundations and retained evidence
+- `a0f5abeb2`: verification/retention guards;missing/failed evidence cannot pass through historical comparisons.
+- `6ccbfdf41`,`df6c6dc77`,`2f2158cc4`:state graphs,fluid/property definitions,1235 blocks/31809 states. Java objects remain views.
+- `1b1837931`,`d0141162d`,`059c95621`,`48a6e051e`:physical/intrinsic/sound/offset/family ownership. World callbacks/scheduling/shapes remain unfinished.
+- `84016f210`:native map colors/image processing/state policy and framed-map shader ordering. Full acceptance remained open;focused game-model pages retain evidence.
+- `6324cd1dd`:native DH visibility frames avoid ordinary Java export/list/re-encoding. Target allocation432→34MB/15s,diagnostic;whole-renderer performance remained open. See retained-scene guide.
+- `c9e2a71d4`:native shared world-color fields avoid per-block64-sample reconstruction. Full native2405/Java1732 plus77 affected/final admission proof passed;world-color throughput comparison failed vanilla floors. See biome section-color guide.
+- Scoped upstream documentation sync preserved user work;recovery:`build/map-palette-migration-draft/docs-upstream-sync/`. Prior batch/stash/transfer receipts remain preserved.
+## Next work — user's performance priority
+- Prioritize live world-state ownership and hot producer/consumer paths over further static catalogs. Move authoritative chunk storage with lighting,heightmap,save and rebuild consumers;reuse the existing native stage/storage kernels carefully.
+- Preserve palette identity/history,IDs,state/property/save bytes,callback ordering and generation/lifecycle rules. Avoid a Java mirror or per-block native downcalls. Profile complete callers and real workloads.
+- Investigate remaining per-frame preparation and native frame-worker costs alongside migration. Current performance gaps guide work;they do not halt tested ownership milestones. Full acceptance still requires realistic Frozen-equivalent workloads and bounded resources.
+- Broad gameplay/transition coverage remains incomplete,including bed/banner/zombie/held-item cases. Settled coast captures and source tests cannot certify unseen cases or temporal flicker absence.
+- Later:world simulation/behavior/components,assets/platform/network ownership,native application lifecycle,then Java/bridge/build removal.
+## Storage and verification discipline
+- Preserve live/crashed/symlink/unproven fixtures and sources. Retire generated copies only after process/start-identity and terminal-receipt checks;retain compact evidence.
+- Bulk pruning recovered~350GiB;routine workflow/profile retirement continues. Storage guide:`docs/development/rendering/ARTIFACT-STORAGE.md`;receipts:`goal5/disk-cleanup-20261008/`.
+- Clean FPS windows exclude builds/profilers/games. Require≥2 repeats per side/mode,exact6000 frames,clean receipts,VUID0;average FPS≥Frozen and p99≤Frozen for full performance acceptance.

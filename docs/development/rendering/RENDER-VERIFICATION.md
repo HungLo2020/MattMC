@@ -1055,7 +1055,12 @@ python3 DevUtils/tests/rendering/CaptureWindowVideo.py \
 
 It records up to ten seconds at 30, 60 or 120 samples per second, keeps actual
 video timestamps without duplicating frames, and streams decoded pixel deltas
-with bounded memory. Inspect the timestamps for gaps: sampling still cannot
+with bounded memory. New recordings use FFV1 in `window-crop.nut` with a
+microsecond encoder clock. Matroska's millisecond clock can merge distinct X11
+sample times and trigger the strict timestamp validator; existing MKV evidence
+remains readable. No timestamps are rewritten and the validator stays strict.
+Run `python3 -m unittest discover -s DevUtils/tests/rendering -p 'test_window_video_*.py'`
+to check ownership and timestamp precision. Inspect the timestamps for gaps: sampling still cannot
 prove that every presented frame was observed. The video's overhead makes it
 unsuitable for performance acceptance.
 
