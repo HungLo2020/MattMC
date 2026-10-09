@@ -104,6 +104,10 @@ public class SkyLightSectionStorage extends LayerLightSectionStorage<SkyLightSec
 	}
 
 	private static DataLayer repeatFirstLayer(DataLayer dataLayer) {
+        if (dataLayer.getClass() == DataLayer.class) {
+            DataLayer nativeCopy = dataLayer.repeatNativeFirstLightLayer();
+            if (nativeCopy != null) return nativeCopy;
+        }
 		if (dataLayer.isDefinitelyHomogenous()) {
 			return dataLayer.copy();
 		} else {

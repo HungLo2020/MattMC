@@ -2515,7 +2515,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			boolean bl2 = bitSet.get(k);
 			boolean bl3 = bitSet2.get(k);
 			if (bl2 || bl3) {
-				levelLightEngine.queueSectionData(lightLayer, SectionPos.of(i, l, j), bl2 ? new DataLayer((byte[])((byte[])iterator.next()).clone()) : new DataLayer());
+				levelLightEngine.queueSectionData(lightLayer, SectionPos.of(i, l, j), bl2 ? DataLayer.copyOf(iterator.next()) : new DataLayer());
 				if (bl) {
 					this.level.setSectionDirtyWithNeighbors(i, l, j);
 				}

@@ -57,18 +57,24 @@ fixes; combined checks are recorded separately. The local follow-up now composes
 copied parents and pinned CPU owners. Full CPU suites, lifecycle checks and
 reviewed coast pairs pass; vanilla p99 still misses Frozen and repeat variance
 limits throughput conclusions. See the item-layer guide for evidence scope.
-Next move live light storage with propagation and terrain consumers, then
-entity scene preparation and contextual world inputs. These are ownership
+Local [live light storage](../world/lighting/RUST-LIVE-LAYERS.md) now owns
+generations, propagation/sky handoffs and independent client packet imports;
+full CPU/lifecycle checks and reviewed Frozen image pairs pass. Vanilla FPS/p99
+and DH p99 still miss performance floors. Paired streaming profiles pass their
+identity/movement checks; Java terrain-light preparation still samples about
+42 MB of allocations in eight seconds. No isolated speedup is established.
+Next move bulk terrain-light preparation, then retained scene mesh payloads
+and entity preparation. Cached item mesh generation restamps still clone Java
+index payloads each frame; migrate that storage and its direct consumer together. These are ownership
 migrations; additional static definitions are not the main performance batch.
 
-The next coupled world-state target is light storage and terrain rebuild inputs.
-The native propagation pass currently exports changed 2 KiB layers into Java
-arrays, Java copies them into `DataLayer`, and rebuilds copy/read those layers
-again to construct 5,832 contextual light words. Move retained light ownership,
-copy-on-write publication and canonical padded preparation together. Preserve
-mutable array escape compatibility, lazy-layer state, dimension defaults and
-contextual block callbacks; measure ordinary movement and chunk rebuilds.
-This is proposed follow-up work, not implemented ownership.
+The next coupled world-state target is bulk terrain lighting preparation.
+Canonical retained light ownership and direct propagation result installation
+are now implemented locally. Java rebuild preparation still performs scalar
+layer reads and constructs 5,832 contextual light words. Move that consumer to
+bulk Rust preparation while preserving mutable array escape compatibility,
+lazy-layer state, dimension defaults and contextual block callbacks. Measure
+ordinary movement and chunk rebuilds; this consumer migration remains proposed.
 
 For world storage, distinguish [native world-generation stage storage](../world/levelgen/RUST-SURFACE-STORAGE.md#shared-chunk-storage)
 from authoritative loaded-world ownership: Java still orchestrates stage

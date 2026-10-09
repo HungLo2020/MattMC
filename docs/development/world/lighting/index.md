@@ -4,6 +4,8 @@ Server-side light-source data and propagation are separate from rendering.
 
 - [Rust skylight-source reconstruction](RUST-SKYLIGHT-SOURCES.md): packed scans,
   exact occlusion tables, ownership and focused acceptance checks.
+- [Rust live light layers](RUST-LIVE-LAYERS.md): retained light ownership, direct
+  propagation handoffs, array compatibility and current verification scope.
 - [Rust light propagation](RUST-LIGHT-PROPAGATION.md): block and sky light
   queues and sky-source seeding in Rust, section callbacks, parity and benchmarks.
 - [Rust leveled work queue](RUST-PRIORITY-QUEUE.md): the queue behind the Rust

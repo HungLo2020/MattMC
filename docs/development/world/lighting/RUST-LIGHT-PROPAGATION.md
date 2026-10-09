@@ -11,23 +11,27 @@ directly from their [Rust live owner](../chunk/RUST-LIVE-SECTIONS.md), without
 reconstructing a Java palette or word array for the light handoff. Java still owns
 the remaining light orchestration: section statuses,
 `checkNode`, queued and retained data, `markNewInconsistencies`,
-`swapSectionMap` and light storage.
+`swapSectionMap`. Canonical live light bytes now have a
+[Rust owner](RUST-LIVE-LAYERS.md); public mutable arrays and subclasses retain
+compatibility ownership.
 
 ## How a pass works
 
 1. Java drains both queues into native memory. Rust replays the original
    loops in the same order: every decrease, then every increase.
 2. One callback function supplies two separately cached snapshots per section:
-   the updating `DataLayer` (bytes, or the default value of a lazy layer) and
+   the updating `DataLayer` (a pinned native CPU owner for canonical layers;
+   bytes or a lazy default for compatibility layers) and
    `lightOnInSection` on the first layer request, then block states only when
    first needed. The block snapshot contains palette state IDs plus packed
    words, or one state ID per block for chunk kinds the bridge does not model;
    Rust maps state IDs to light types in place. A section needing both
    snapshots makes two callback invocations.
-3. Rust writes levels into its own copies. At the end Java installs each
-   written section with the original copy-on-write: the first write in a pass
-   copies the layer. Java then adds the `sectionsAffectedByLightUpdates`
-   entries.
+3. Rust writes levels into its own pass copies. Java receives ordered section
+   keys and performs the original map copy-on-write: the first write in a pass
+   copies the layer. Rust installs bytes directly into canonical target owners;
+   mutable-array targets use a bounded compatibility export. Java then adds
+   `sectionsAffectedByLightUpdates` entries.
 4. Unsupported input or a failed section callback returns before propagation
    writes are installed. Java restores both drained queues in their original
    order and runs the original loops, which may complete or throw. This is a
@@ -36,8 +40,10 @@ the remaining light orchestration: section statuses,
    and result-transfer failures throw instead of replaying in Java; see the
    [bridge status handling](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L274-L325).
 
-Sky seeding runs one critical downcall per section. It needs no allocations
-or callbacks. Java keeps the section iteration, `getDataLayerToWrite` and the
+Sky seeding runs one critical downcall per section. Canonical native owners
+retain lazy allocation until the loop writes; allocated layers update in place.
+Compatibility arrays use the original bounded heap-access downcall. Neither
+route invokes callbacks during the downcall. Java keeps the section iteration, `getDataLayerToWrite` and the
 `enqueueIncrease` calls, in the original order. A rejected sky-seeding call
 throws; it does not use the propagation pass's Java replay path.
 
@@ -70,8 +76,11 @@ python3 DevUtils/tests/lighting/VerifyRustLightPropagation.py --parity-only
 python3 DevUtils/tests/lighting/VerifyRustLightPropagation.py --forks 3
 ```
 
-The driver audits the edits to `LightEngine`, `SkyLightEngine` and `DataLayer`
-against Git `54611cfc2`. It then runs `NativeLightPropagationTest` and the Rust
+The historical driver audits edits to `LightEngine`, `SkyLightEngine` and
+`DataLayer` against Git `54611cfc2`; that source-shape audit predates live light
+ownership. Do not interpret its rejection of the new storage shape as a
+semantic verdict. Use the live-layer Frozen oracle and production checks above
+for this local batch. The driver also runs `NativeLightPropagationTest` and the Rust
 lighting tests. The parity tests light worlds on both routes over the same
 chunks and compare all light storage after every pass:
 

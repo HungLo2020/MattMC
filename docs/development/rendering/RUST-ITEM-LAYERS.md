@@ -138,6 +138,12 @@ parent capture adds 5.24 MB and total Java allocation rises from 2.228 to
 2.576 GB. Sparse weighted samples and different workload phases limit
 attribution; Java asset/topology preparation remains substantial. Receipt:
 `goal5/native-world-item-profile-20261009/current/item-allocation-comparison.json`.
+The profile includes about 102 MB of weighted allocation beneath native world-item
+enqueue over 15 seconds. Cached extraction restamps still clone index payloads
+through `BlockMeshExtraction.withGeneration`. A proposed follow-up is retained
+Rust CPU mesh payloads with separate key/generation metadata and direct frame
+consumption. Preserve reload/retirement admission and mutable compatibility
+exports; an ignored ownership prototype is not production or speedup evidence.
 Additional actual world and hand captures exercise modes 1 and 3, including
 native special foil, on the worker-decoded route. A common frame boundary now
 keeps GUI/hand observers aligned through resource reloads; 184 affected Java

@@ -34,8 +34,11 @@ final class NativeLightPropagation {
     private static final MethodHandle RUN = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_run",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    private static final MethodHandle RESULTS = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_results",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+    private static final MethodHandle RESULTS = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_result_keys",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
+    private static final MethodHandle COPY_RESULT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_result_copy",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
     private static final MethodHandle SKY_SECTION = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_sky_section",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
@@ -92,6 +95,11 @@ final class NativeLightPropagation {
          * and enqueues the same increases in the same order. Returns whether a
          * source lies below the section (the original's loop condition). */
         boolean section(SkyLightEngine engine, DataLayer layer, int bottom, int minX, int minZ) {
+            if (layer.getClass() == DataLayer.class
+                    && layer.seedNativeSkyLight(this.columns, bottom, minX, minZ, this.entries, this.out)) {
+                for (int i = 0; i < this.out[0]; i++) engine.enqueueIncrease(this.entries[2 * i], this.entries[2 * i + 1]);
+                return this.out[2] != 0;
+            }
             byte[] data = layer.dataForNativeLight();
             int status;
             try {
@@ -136,6 +144,9 @@ final class NativeLightPropagation {
     private final long handle;
     private final boolean sky;
     private final LightEngine<?, ?> engine;
+    // Keep the callback's CPU owner live until Rust has copied its generation.
+    @Nullable private DataLayer borrowedLayer;
+    @Nullable private byte[] compatibilityResult;
     private final Arena arena = Arena.ofAuto();
     private final MemorySegment out = arena.allocate(3 * 8L, 8);
     private MemorySegment decreases = arena.allocate(512 * 8L, 8);
@@ -208,6 +219,7 @@ final class NativeLightPropagation {
         } catch (Throwable error) {
             throw new IllegalStateException("Native light propagation failed", error);
         } finally {
+            this.borrowedLayer = null;
             CURRENT.remove();
         }
         if (status != 0) {
@@ -222,10 +234,9 @@ final class NativeLightPropagation {
         int written = (int)this.out.getAtIndex(ValueLayout.JAVA_LONG, 1);
         int affected = (int)this.out.getAtIndex(ValueLayout.JAVA_LONG, 2);
         long[] keys = new long[written];
-        byte[] layers = new byte[written * 2048];
         long[] sections = new long[affected];
         try {
-            status = (int)RESULTS.invokeExact(this.handle, MemorySegment.ofArray(keys), MemorySegment.ofArray(layers), written,
+            status = (int)RESULTS.invokeExact(this.handle, MemorySegment.ofArray(keys), written,
                 MemorySegment.ofArray(sections), affected);
         } catch (RuntimeException | Error error) {
             throw error;
@@ -237,7 +248,13 @@ final class NativeLightPropagation {
             long key = keys[i];
             // setStoredLevel's copy-on-write: the first write of a pass copies the layer.
             DataLayer layer = storage.changedSections.add(key) ? storage.updatingSectionData.copyDataLayer(key) : storage.getDataLayer(key, true);
-            System.arraycopy(layers, i * 2048, layer.getData(), 0, 2048);
+            if (layer.getClass() == DataLayer.class && layer.installNativeLightResult(this.handle, i)) continue;
+            if (this.compatibilityResult == null) this.compatibilityResult = new byte[2048];
+            try {
+                status = (int)COPY_RESULT.invokeExact(this.handle, i, MemorySegment.ofArray(this.compatibilityResult), 2048);
+            } catch (Throwable error) { throw new IllegalStateException("Native light compatibility export failed", error); }
+            if (status != 0) throw new IllegalStateException("Native light compatibility export rejected: " + status);
+            System.arraycopy(this.compatibilityResult, 0, layer.getData(), 0, 2048);
         }
         for (long section : sections) storage.sectionsAffectedByLightUpdates.add(section);
         PASSES.incrementAndGet();
@@ -255,6 +272,7 @@ final class NativeLightPropagation {
             LayerLightSectionStorage<?> storage = current.engine.storage;
             if (mode == 0) {
                 DataLayer layer = storage.getDataLayer(section, true);
+                current.borrowedLayer = layer;
                 return layer == null ? 0 : NativeLightBlocks.layer(layer, storage.lightOnInSection(section), buffer);
             }
             int x = SectionPos.x(section), z = SectionPos.z(section);

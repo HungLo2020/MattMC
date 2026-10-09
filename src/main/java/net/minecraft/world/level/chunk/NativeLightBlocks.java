@@ -32,6 +32,11 @@ public final class NativeLightBlocks {
     public static int layer(DataLayer layer, boolean lightOn, MemorySegment buffer) {
         if (layer.getClass() != DataLayer.class) return -1;
         buffer.setAtIndex(ValueLayout.JAVA_INT, 0, lightOn ? 1 : 0);
+        var owner = layer.nativeLightLayer();
+        if (owner != null) {
+            buffer.set(ValueLayout.JAVA_LONG, 8, owner.ownerForNativeCall().address());
+            return 2; // CPU owner is pinned by NativeLightPropagation's callback.
+        }
         byte[] data = layer.dataForNativeLight();
         if (data == null) {
             buffer.setAtIndex(ValueLayout.JAVA_INT, 1, layer.defaultValueForNativeLight());

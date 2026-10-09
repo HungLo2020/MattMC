@@ -2,6 +2,7 @@
 //! per Java light engine, and a pass with a section callback. See
 //! `NativeLightPropagation`.
 use super::{Blocks, Engine, Error, Source, Tables, LAYER};
+use crate::world::level::lighting::layers::{Layer, ffi::{Projection, projection}};
 
 /// Java's section callback: (mode, section, buffer). Mode 0 reports the
 /// stored layer (0 absent, 1 stored); mode 1 the block states (0). Negative
@@ -23,6 +24,7 @@ pub(crate) const BUFFER: usize = FULL_AT + 4096 * 2;
 pub(crate) struct Handle {
     engine: Engine,
     buffer: Vec<u64>,
+    written_indices: Vec<usize>,
 }
 
 struct Callback<'a> {
@@ -55,6 +57,21 @@ impl Source for Callback<'_> {
                     layer.fill((default * 17) as u8);
                 } else {
                     return Err(Error::Unsupported);
+                }
+                Ok(Some(self.header(0) != 0))
+            }
+            2 => {
+                // The callback pins the live CPU owner until this native read
+                // finishes; the pass then owns its independent byte snapshot.
+                let pointer = self.buffer[1] as *const Layer;
+                if pointer.is_null() || pointer as usize % std::mem::align_of::<Layer>() != 0 {
+                    return Err(Error::Callback);
+                }
+                let view = unsafe { &*pointer }.view();
+                if !view.copy_bytes_into(layer) {
+                    let default = view.default_value();
+                    if !(0..16).contains(&default) { return Err(Error::Unsupported); }
+                    layer.fill((default * 17) as u8);
                 }
                 Ok(Some(self.header(0) != 0))
             }
@@ -113,7 +130,7 @@ pub extern "C" fn mattmc_light_tables_create() -> u64 {
 
 #[no_mangle]
 pub extern "C" fn mattmc_light_engine_create(sky: i32) -> u64 {
-    Box::into_raw(Box::new(Handle { engine: Engine::new(sky != 0), buffer: vec![0; BUFFER / 8] })) as u64
+    Box::into_raw(Box::new(Handle { engine: Engine::new(sky != 0), buffer: vec![0; BUFFER / 8], written_indices: Vec::new() })) as u64
 }
 
 /// # Safety
@@ -145,8 +162,11 @@ pub unsafe extern "C" fn mattmc_light_run(handle: u64, tables: u64, decreases: *
     let tables = &*(tables as *const Tables);
     let slice = |p: *const i64, n: i32| if n == 0 { &[][..] } else { std::slice::from_raw_parts(p, n as usize) };
     let mut source = Callback { call, buffer: &mut handle.buffer, tables };
+    handle.written_indices.clear();
     match handle.engine.run(tables, &mut source, slice(decreases, decrease_len), slice(increases, increase_len), lowest) {
         Ok(outcome) => {
+            handle.written_indices.extend(handle.engine.sections.iter().enumerate()
+                .filter_map(|(index, section)| section.written.then_some(index)));
             *out = outcome.processed;
             *out.add(1) = handle.engine.written_count() as i64;
             *out.add(2) = handle.engine.affected().len() as i64;
@@ -178,6 +198,59 @@ pub unsafe extern "C" fn mattmc_light_results(handle: u64, keys: *mut i64, layer
     if affected_len > 0 {
         std::ptr::copy_nonoverlapping(engine.affected().as_ptr(), affected, affected_len as usize);
     }
+    0
+}
+
+/// Export only ordered section identities; owned results remain in Rust.
+/// # Safety
+/// The live, excluded handle owns the last successful pass. Output spans are
+/// writable for their lengths and disjoint from the engine and one another.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_result_keys(handle: u64, keys: *mut i64,
+    written: i32, affected: *mut i64, affected_len: i32) -> i32 {
+    if handle == 0 || written < 0 || affected_len < 0
+        || (written > 0 && keys.is_null()) || (affected_len > 0 && affected.is_null()) { return -1; }
+    let handle = &*(handle as *const Handle);
+    if handle.written_indices.len() != written as usize || handle.engine.affected().len() != affected_len as usize { return -1; }
+    for (i, index) in handle.written_indices.iter().enumerate() {
+        *keys.add(i) = handle.engine.sections[*index].key;
+    }
+    if affected_len > 0 {
+        std::ptr::copy_nonoverlapping(handle.engine.affected().as_ptr(), affected, affected_len as usize);
+    }
+    0
+}
+
+fn written_layer(handle: &Handle, index: i32) -> Option<&[u8; LAYER]> {
+    if index < 0 { return None; }
+    let section = handle.engine.sections.get(*handle.written_indices.get(index as usize)?)?;
+    handle.engine.layers.get(section.layer)
+}
+
+/// Preserve the target layer's materialization/default and map COW semantics.
+/// # Safety
+/// Handle and target are live and caller-excluded; view addresses one writable
+/// pointer. The caller retains the returned CPU lease until releasing it once.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_result_install(handle: u64, index: i32,
+    target: *const Layer, view: *mut *mut Projection) -> i32 {
+    if handle == 0 || target.is_null() || view.is_null() { return -1; }
+    let Some(bytes) = written_layer(&*(handle as *const Handle), index) else { return -1; };
+    let target = &*target;
+    let changed = target.install_bytes(*bytes);
+    *view = if changed { projection(target) } else { std::ptr::null_mut() };
+    0
+}
+
+/// Compatibility export for mutable Java arrays/subclass targets only.
+/// # Safety
+/// The handle is live/excluded and output spans exactly LAYER writable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_result_copy(handle: u64, index: i32,
+    output: *mut u8, length: i32) -> i32 {
+    if handle == 0 || output.is_null() || length != LAYER as i32 { return -1; }
+    let Some(bytes) = written_layer(&*(handle as *const Handle), index) else { return -1; };
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), output, LAYER);
     0
 }
 
@@ -223,4 +296,33 @@ pub unsafe extern "C" fn mattmc_light_state_types(out: *mut u16, out_len: i32) -
         std::slice::from_raw_parts_mut(out, tables.state_types.len()).copy_from_slice(&tables.state_types);
     }
     tables.state_types.len() as i32
+}
+
+/// Seed a retained native layer without any Java light-byte projection.
+/// # Safety
+/// Owner is live/excluded; columns, entries, out and view cover 1280 i32s,
+/// 8192 i64s, 3 i32s and one pointer, respectively, all valid and disjoint.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_sky_owned(layer: *const Layer, columns: *const i32,
+    bottom: i32, min_x: i32, min_z: i32, entries: *mut i64, out: *mut i32,
+    projection_out: *mut *mut Projection) -> i32 {
+    if layer.is_null() || columns.is_null() || entries.is_null() || out.is_null()
+        || projection_out.is_null() || bottom % 16 != 0 { return -1; }
+    let layer = &*layer;
+    let view = layer.view();
+    let mut bytes = [0u8; LAYER];
+    if !view.copy_bytes_into(&mut bytes) {
+        if !(0..16).contains(&view.default_value()) { return -1; }
+        bytes.fill((view.default_value() * 17) as u8);
+    }
+    let columns = std::slice::from_raw_parts(columns, super::seed::COLUMNS);
+    let entries = std::slice::from_raw_parts_mut(entries, 8192);
+    let mut pairs = 0;
+    let (wrote, below) = super::seed::sky_section(&mut bytes, columns, bottom, min_x, min_z, &mut |pos, entry| {
+        entries[pairs * 2] = pos; entries[pairs * 2 + 1] = entry as i64; pairs += 1;
+    });
+    let changed = wrote && layer.install_bytes(bytes);
+    *projection_out = if changed { projection(layer) } else { std::ptr::null_mut() };
+    *out = pairs as i32; *out.add(1) = wrote as i32; *out.add(2) = below as i32;
+    0
 }
