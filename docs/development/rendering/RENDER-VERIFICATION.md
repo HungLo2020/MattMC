@@ -1278,6 +1278,12 @@ does not prove correctness of the unobserved part of a larger framebuffer.
 
 ## 4. Performance A/B
 
+For visible-HUD gameplay, initial playable entry and actual terrain travel, use
+the [ordinary gameplay comparison](GAMEPLAY-PERFORMANCE.md). Keep its continuous
+frame recording alongside the settled measurements below. The capture launcher
+hides the minimap in settled rows, and readiness resets can exclude publication
+stalls; those rows alone must not be reported as ordinary gameplay parity.
+
 For the current original-pack moving workload, batching probes and rejected
 optimization evidence, see [shader terrain profiling](SHADER-TERRAIN-PROFILING.md).
 

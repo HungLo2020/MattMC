@@ -64,8 +64,13 @@ public final class RustGalGuiRawImageAssets {
 	 * remains an inert metadata object and is never read by Rust.
 	 */
 	public static void registerDynamicTexture(ResourceLocation identity, DynamicTexture texture) {
+		registerDynamicTexture(identity, texture, true);
+	}
+
+	/** A clean producer reuses its immutable snapshot, including after native cache invalidation. */
+	public static void registerDynamicTexture(ResourceLocation identity, DynamicTexture texture, boolean pixelsChanged) {
 		registerDynamicTextureBinding(identity, texture);
-		stageDynamicTexture(texture);
+		stageDynamicTexture(texture, pixelsChanged);
 	}
 
 	/** Binds a dynamic source without publishing pixels; callers stage after admission. */
@@ -82,7 +87,10 @@ public final class RustGalGuiRawImageAssets {
 				);
 			}
 			DynamicTexture previous = DYNAMIC_TEXTURES.put(identity, texture);
-			if (previous != null && previous != texture) DYNAMIC_TEXTURE_IDS.remove(previous);
+			if (previous != texture) {
+				DYNAMIC_ASSETS.remove(identity);
+				if (previous != null) DYNAMIC_TEXTURE_IDS.remove(previous);
+			}
 			DYNAMIC_TEXTURE_IDS.put(texture, identity);
 		}
 	}
@@ -105,7 +113,11 @@ public final class RustGalGuiRawImageAssets {
 	 * not admitted to rendering.
 	 */
 	public static boolean stageDynamicTexture(DynamicTexture texture) {
-		Asset asset = prepareDynamicTexture(texture);
+		return stageDynamicTexture(texture, true);
+	}
+
+	private static boolean stageDynamicTexture(DynamicTexture texture, boolean pixelsChanged) {
+		Asset asset = prepareDynamicTexture(texture, pixelsChanged);
 		if (asset == null) return false;
 		stage(asset);
 		return true;
@@ -114,9 +126,18 @@ public final class RustGalGuiRawImageAssets {
 	/** Copies a registered DynamicTexture into the semantic cache without staging pixels. */
 	@Nullable
 	public static Asset prepareDynamicTexture(DynamicTexture texture) {
+		return prepareDynamicTexture(texture, true);
+	}
+
+	@Nullable
+	static Asset prepareDynamicTexture(DynamicTexture texture, boolean pixelsChanged) {
 		ResourceLocation identity;
 		synchronized (LOCK) {
 			identity = DYNAMIC_TEXTURE_IDS.get(texture);
+			if (!pixelsChanged && identity != null) {
+				Asset cached = DYNAMIC_ASSETS.get(identity);
+				if (cached != null) return cached;
+			}
 		}
 		if (identity == null) return null;
 		NativeImage image = texture.getPixels();

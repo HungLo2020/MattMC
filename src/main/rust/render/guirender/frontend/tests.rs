@@ -5846,6 +5846,52 @@ fn malformed_raw_image_update_rolls_back_without_destroying_valid_generation() {
 }
 
 #[test]
+fn raw_image_patch_retains_pixels_without_copying_and_evicts_missing_identities() {
+    let mut gal = mock_gal();
+    let mut frontend = GuiFrontend::default();
+    let image = |asset_id, value| GuiRawImageAssetPayload {
+        sampling: None, asset_id, format: GuiRawImageSourceFormat::Rgba8,
+        width: 1, height: 1, pixels: vec![value; 4],
+    };
+    frontend.apply_raw_image_update(&mut gal, 1, vec![image(7, 10), image(8, 20)]).unwrap();
+    let retained_pixels = frontend.raw_images[&7].pixels.as_ptr();
+    frontend.apply_raw_image_patch(&mut gal, 2, vec![image(8, 30)], vec![7, 8]).unwrap();
+    assert_eq!(retained_pixels, frontend.raw_images[&7].pixels.as_ptr());
+    assert_eq!(vec![30; 4], frontend.raw_images[&8].pixels);
+    frontend.apply_raw_image_patch(&mut gal, 3, vec![], vec![7]).unwrap();
+    assert!(!frontend.raw_images.contains_key(&8));
+    assert_eq!(retained_pixels, frontend.raw_images[&7].pixels.as_ptr());
+    frontend.apply_raw_image_patch(&mut gal, 4, vec![], vec![]).unwrap();
+    assert!(frontend.raw_images.is_empty());
+}
+
+#[test]
+fn raw_image_patch_rejection_preserves_generation_for_retry() {
+    let mut gal = mock_gal();
+    let mut frontend = GuiFrontend::default();
+    let image = |asset_id| GuiRawImageAssetPayload {
+        sampling: None, asset_id, format: GuiRawImageSourceFormat::Rgba8,
+        width: 1, height: 1, pixels: vec![1; 4],
+    };
+    frontend.apply_raw_image_update(&mut gal, 1, vec![image(7)]).unwrap();
+    let pixels = frontend.raw_images[&7].pixels.as_ptr();
+    for (updates, ids) in [
+        (vec![], vec![7, 9]), (vec![], vec![7, 7]), (vec![], vec![0, 7]),
+        (vec![image(8)], vec![7]),
+        (vec![GuiRawImageAssetPayload { pixels: vec![1; 3], ..image(8) }], vec![7, 8]),
+    ] {
+        assert!(frontend.apply_raw_image_patch(&mut gal, 2, updates, ids).is_err());
+        assert_eq!(1, frontend.raw_image_generation);
+        assert_eq!(1, frontend.raw_images.len());
+        assert_eq!(pixels, frontend.raw_images[&7].pixels.as_ptr());
+    }
+    frontend.apply_raw_image_patch(&mut gal, 2, vec![image(8)], vec![7, 8]).unwrap();
+    assert_eq!(2, frontend.raw_image_generation);
+    assert_eq!(2, frontend.raw_images.len());
+    assert!(frontend.apply_raw_image_patch(&mut gal, 2, vec![], vec![7, 8]).is_err());
+}
+
+#[test]
 fn oversized_raw_image_pixel_count_is_rejected_before_payload_validation() {
     let mut gal = mock_gal();
     let mut frontend = GuiFrontend::default();

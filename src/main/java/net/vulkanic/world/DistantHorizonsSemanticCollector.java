@@ -3561,6 +3561,18 @@ public final class DistantHorizonsSemanticCollector {
 				if (buffer.vertices().isEmpty() || buffer.vertices().size() > MAX_LOD_VERTICES_PER_SEGMENT) {
 					throw new IllegalArgumentException("Distant Horizons LOD segment vertex count exceeds Rust bound");
 				}
+				if (buffer.vertices() instanceof PackedLodVertexList packed) {
+					// Position and light fields are unsigned u16 by construction.
+					// Validate the restricted byte fields directly, without decoding
+					// a ByteBuffer and Java record for every ordinary DH vertex.
+					for (int offset = 0; offset < packed.bytes.length; offset += VERTEX_STRIDE_BYTES) {
+						if (Byte.toUnsignedInt(packed.bytes[offset + 12]) > MAX_LOD_MATERIAL_ID
+							|| Byte.toUnsignedInt(packed.bytes[offset + 13]) > MAX_LOD_NORMAL_INDEX) {
+							throw new IllegalArgumentException("Distant Horizons LOD vertex is outside Rust semantic bounds");
+						}
+					}
+					continue;
+				}
 				for (LodVertex vertex : buffer.vertices()) {
 					if (vertex.localX() < 0 || vertex.localX() > 0xFFFF
 						|| vertex.localY() < 0 || vertex.localY() > 0xFFFF

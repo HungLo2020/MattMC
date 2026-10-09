@@ -625,7 +625,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         91 => layout!(
             91,
             FfiGuiRawImageUpdateRequest,
-            [header, generation, assets, negotiated_feature_bits]
+            [header, generation, assets, negotiated_feature_bits, retained_asset_ids]
         ),
         49 => layout!(
             49,

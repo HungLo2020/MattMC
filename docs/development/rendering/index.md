@@ -19,6 +19,8 @@ each module there has a short README with its own file map.
   without breaking Java.
 - [Render Verification](RENDER-VERIFICATION.md): tests, Frozen image
   comparisons, real-config sessions and A/B performance checks.
+- [Ordinary gameplay performance](GAMEPLAY-PERFORMANCE.md): visible minimap,
+  continuous frame timing and actual travel alongside settled renderer tests.
 - [Capture storage and recovery](ARTIFACT-STORAGE.md): reclaim reproducible
   caches and restore losslessly archived historical capture data.
 - [Shader terrain profiling](SHADER-TERRAIN-PROFILING.md): compare moving shader

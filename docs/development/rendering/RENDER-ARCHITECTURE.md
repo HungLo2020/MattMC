@@ -95,7 +95,7 @@ change GAL resources, completion or presentation.
 
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The
-indexed GUI input arrived with ABI 73; the current whole-frame ABI is 77.
+indexed GUI input arrived with ABI 73; the current whole-frame ABI is 78.
 Java retains map revisions, staging and contextual map production.
 
 Selected-source frames carry thousands of mesh instances (mostly off-camera

@@ -14,6 +14,7 @@ mod shadow_batch_selection;
 mod shadow_facing;
 mod sky_dark_disc;
 mod map_material;
+mod atlas_retirement;
 use crate::render::vulkanic::test_support::{MockBackend, presentation_capabilities, vulkan_capabilities};
 use crate::render::vulkanic::commands::ClearColor;
 use crate::render::guirender::frontend::{GuiFrontend, GuiSpriteRequest};

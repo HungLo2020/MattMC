@@ -503,6 +503,8 @@ def main() -> int:
         comparisons = performance_comparison(fps_summary) if args.perf else []
         steps["fps"] = {"protocol": f"{'interleaved ' + ''.join('A' if s == 'current' else 'B' for s in sides) if args.perf else 'single'}"
                                     f", {frames} frames", "modes": fps_summary, "runs": rows,
+                        "coverage": "settled rotating view, hidden minimap; readiness losses can discard partial windows",
+                        "ordinary_gameplay_verified": False,
                         "comparison_failures": comparisons,
                         "performance_verified": args.perf and not comparisons,
                         "passed": all(v["clean"] for by in fps_summary.values() for v in by.values())

@@ -738,6 +738,30 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void packedValidationPreservesMaterialNormalAndUnsignedCoordinateBoundsWithoutPerVertexAllocations() {
+		byte[] packet = new byte[65_536 * DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES];
+		java.util.Arrays.fill(packet, 0, 8, (byte)0xFF);
+		packet[12] = 15;
+		packet[13] = 5;
+		var segment = DistantHorizonsSemanticCollector.LodBufferSnapshot.fromPacked(0, packet);
+		var allocation = (com.sun.management.ThreadMXBean)java.lang.management.ManagementFactory.getThreadMXBean();
+		long thread = Thread.currentThread().threadId();
+		long before = allocation.getThreadAllocatedBytes(thread);
+		var snapshot = new DistantHorizonsSemanticCollector.LodColumnSnapshot(9L, 1L, 0, 0, 0,
+			List.of(segment), List.of(), List.of(), List.of());
+		long allocated = allocation.getThreadAllocatedBytes(thread) - before;
+		assertEquals(65_536, snapshot.opaque().getFirst().vertices().size());
+		assertTrue(allocated < 256 * 1024, "packed admission allocated per-vertex objects: " + allocated);
+		for (int offset : new int[]{12, 13}) {
+			byte[] invalid = new byte[4 * DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES];
+			invalid[offset] = (byte)(offset == 12 ? 16 : 6);
+			var malformed = DistantHorizonsSemanticCollector.LodBufferSnapshot.fromPacked(0, invalid);
+			assertThrows(IllegalArgumentException.class, () -> new DistantHorizonsSemanticCollector.LodColumnSnapshot(
+				9L, 1L, 0, 0, 0, List.of(malformed), List.of(), List.of(), List.of()));
+		}
+	}
+
+	@Test
 	void rustOwnedPacketsBecomeTheBoundedSemanticAssetWithoutLegacyDirectBuffers() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		byte[] packet = new byte[DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES * 4];

@@ -314,9 +314,16 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_update_raw_images(
             .saturating_add(size_of::<FfiStatusResult>() as u64);
         let result = decode_gui_raw_image_update(request, context.gal.capabilities()).and_then(
             |(generation, assets)| {
+                let request = read_struct(request, "raw GUI retained identity manifest")?;
+                context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(
+                    assets.iter().map(|asset| asset.pixels.len() as u64).sum::<u64>());
+                let retained = read_limited_slice(request.retained_asset_ids, true, "raw GUI retained identities")?;
+                if retained.len() > GUI_MAX_RAW_IMAGES {
+                    return Err(GalError::invalid_argument("raw GUI retained identity bound exceeded"));
+                }
                 context
                     .gui_frontend
-                    .apply_raw_image_update(&mut context.gal, generation, assets)
+                    .apply_raw_image_patch(&mut context.gal, generation, assets, retained.to_vec())
             },
         );
         match result {

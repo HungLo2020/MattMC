@@ -92,7 +92,7 @@ The `a908f78c` → `64294324` interval advances three bounded owners:
 
 - [Section counters](../world/chunk/RUST-SECTION-COUNTERS.md) move signed-short lanes and canonical mutation/recount into Rust. Generation input capture reads storage and counters under the storage lock; Java still orchestrates chunk work and publishes results
 - [DH cloud preparation](RUST-DH-CLOUDS.md) moves built-in motion, placement, culling and color history into native CPU owners. API callbacks, custom groups and Java DH world orchestration remain
-- [Item layers](RUST-ITEM-LAYERS.md) retain authored poses through GUI and world/hand decoding. Java model selection, topology, parent animation and custom paths remain. ABI 75 introduced cloud references, 76 direct GUI poses, and the current ABI 77 adds world/hand inputs
+- [Item layers](RUST-ITEM-LAYERS.md) retain authored poses through GUI and world/hand decoding. Java model selection, topology, parent animation and custom paths remain. ABI 75 introduced cloud references, 76 direct GUI poses, ABI 77 world/hand inputs, and the current ABI 78 adds incremental raw GUI image updates
 
 The intervening [readiness/cleanup fixes](https://github.com/HungLo2020/MattMC/commit/111d7a9c48b5d5876c1649e81a3c5608d98fb6f3)
 remove column sidecars by their index range, transform debug axes through the

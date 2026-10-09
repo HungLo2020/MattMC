@@ -54,6 +54,14 @@ cargo doc --no-deps --open    # then open mattmc_rust::render::vulkanic
    [lifecycle gate](RENDER-VERIFICATION.md#lifecycle-gate) fails on a logged
    dependency violation.
 
+When clearing or replacing the terrain material atlas, release the cached
+terrain, textured-material, entity and DH source descriptor sets before their
+material sampler wrappers. Those caches can retain the same shader-pack/world
+generation across an atlas replacement; keeping them would reuse bindings to
+the old atlas. The ordering lives in
+[`candidates.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/source/resources/candidates.rs)
+and is covered by the atlas-retirement regression test.
+
 Dependency retirement and submission retirement are separate. At
 [`7f256b53`](https://github.com/HungLo2020/MattMC/commit/7f256b5354033eff7553f51a10539fac5a68a0bd),
 [`retire`](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/vulkanic/gal/lifetime.rs#L33-L52)

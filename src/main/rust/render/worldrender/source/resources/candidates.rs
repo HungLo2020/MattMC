@@ -1105,6 +1105,14 @@ impl WorldPrimitiveFrontend {
     }
 
     pub(crate) fn clear_candidate_source_material_texture_resources(&mut self, gal: &mut VulkanicGal) {
+        // Atlas removal also replaces semantic sampler identities without
+        // changing the shader-pack/world cache keys. Release every cached
+        // consumer before the runtime destroys those sampler wrappers.
+        self.destroy_lowered_source_terrain_pack_resources(gal);
+        self.destroy_lowered_textured_material_source_pack_resources(gal);
+        self.destroy_lowered_entity_source_pack_resources(gal);
+        self.lod_exact_atlas_source_pass_resources.destroy(gal);
+        self.lod_source_pass_resources.destroy(gal);
         if let Some(runtime) = self.shader_runtime.as_mut() {
             let _ = runtime.clear_candidate_source_material_texture_resources(gal);
         }

@@ -123,7 +123,7 @@ public class Map implements Runnable, IChangeObserver {
     private final DynamicMoveableTexture[] mapImagesUnfiltered = new DynamicMoveableTexture[5];
     private BlockState transparentBlockState;
     private BlockState surfaceBlockState;
-    private boolean imageChanged = true;
+    private final java.util.concurrent.atomic.AtomicBoolean imageChanged = new java.util.concurrent.atomic.AtomicBoolean(true);
     /** True after the semantic route has synchronously published its first map. */
     private boolean semanticBootstrapComplete;
     private boolean semanticPixelDiagnosticLogged;
@@ -715,6 +715,21 @@ public class Map implements Runnable, IChangeObserver {
         return ARGB.toABGR(this.lightmapColors[blockLight + skyLight * 16]);
     }
 
+    /** Called under coordinateLock. Consuming first preserves updates completed during the copy. */
+    private void publishRustMapImage(ResourceLocation identity, DynamicTexture texture) {
+        boolean changed = this.imageChanged.getAndSet(false);
+        try {
+            RustGalGuiRawImageAssets.registerDynamicTexture(identity, texture, changed);
+            if (changed) {
+                this.lastImageX = this.lastX;
+                this.lastImageZ = this.lastZ;
+            }
+        } catch (RuntimeException error) {
+            if (changed) this.imageChanged.set(true);
+            throw error;
+        }
+    }
+
     /**
      * Publishes the CPU map image through the semantic GUI route. The snapshot
      * performs the same source-space rotation/offset transform as the legacy
@@ -744,13 +759,8 @@ public class Map implements Runnable, IChangeObserver {
 			ResourceLocation mapTexture = this.mapResources[this.zoom];
 			if (!(this.mapImages[this.zoom] instanceof DynamicTexture dynamicMap)) return false;
 			synchronized (this.coordinateLock) {
-				if (this.imageChanged) {
-					this.imageChanged = false;
-					this.lastImageX = this.lastX;
-					this.lastImageZ = this.lastZ;
-				}
+				this.publishRustMapImage(mapTexture, dynamicMap);
 			}
-			RustGalGuiRawImageAssets.registerDynamicTexture(mapTexture, dynamicMap);
 			Matrix3x2fStack pose = drawContext.pose();
 			pose.pushMatrix();
 			pose.scale(scaleProj, scaleProj);
@@ -777,10 +787,8 @@ public class Map implements Runnable, IChangeObserver {
         }
 
         synchronized (this.coordinateLock) {
-            if (this.imageChanged) {
-                this.imageChanged = false;
-                this.lastImageX = this.lastX;
-                this.lastImageZ = this.lastZ;
+            if (this.mapImages[this.zoom] instanceof DynamicTexture dynamicMap) {
+                this.publishRustMapImage(this.mapResources[this.zoom], dynamicMap);
             }
             this.percentX = (float)(GameVariableAccessShim.xCoordDouble() - this.lastImageX) / (float)this.zoomScale;
             this.percentY = (float)(GameVariableAccessShim.zCoordDouble() - this.lastImageZ) / (float)this.zoomScale;
@@ -797,7 +805,6 @@ public class Map implements Runnable, IChangeObserver {
 					this.options.minimapAllowed, this.options.hide, this.world != null, this.semanticBootstrapComplete);
 				this.semanticPixelDiagnosticLogged = true;
 			}
-			RustGalGuiRawImageAssets.registerDynamicTexture(semanticMapTexture, dynamicMap);
 		}
 		drawContext.pose().pushMatrix();
 		drawContext.pose().scale(scaleProj, scaleProj);
@@ -1051,7 +1058,7 @@ public class Map implements Runnable, IChangeObserver {
 
         this.lastFullscreen = this.fullscreenMap;
         if (full || offsetX != 0 || offsetZ != 0 || needHeightMap || needLight || skyColorChanged) {
-            this.imageChanged = true;
+            this.imageChanged.set(true);
         }
 
         if (needLight || skyColorChanged) {
@@ -1121,7 +1128,7 @@ public class Map implements Runnable, IChangeObserver {
             }
         }
 
-        this.imageChanged = true;
+        this.imageChanged.set(true);
     }
 
     private int getPixelColor(boolean needBiome, boolean needHeightAndID, boolean needTint, boolean needLight, boolean nether, boolean caves, ClientLevel world, int zoom, int multi, int startX, int startZ, int imageX, int imageY) {
@@ -1732,8 +1739,7 @@ public class Map implements Runnable, IChangeObserver {
         }
 
         synchronized (this.coordinateLock) {
-            if (this.imageChanged) {
-                this.imageChanged = false;
+            if (this.imageChanged.getAndSet(false)) {
                 this.mapImages[this.zoom].upload();
                 this.lastImageX = this.lastX;
                 this.lastImageZ = this.lastZ;

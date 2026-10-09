@@ -47,11 +47,19 @@ exact measurement window and cleanup checks pass. Receipt:
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** the current whole-frame ABI is **77**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **78**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
 
 ## Changing the ABI
+
+ABI 78 appends a retained asset-ID manifest to raw GUI image request 91. A
+nonempty manifest sends only changed pixel payloads and retains the other native
+images; omitted IDs are evicted. An empty manifest preserves full-replacement
+semantics, including clearing all images. Combined resident bounds and identity
+validation complete before mutation; rejected updates preserve the generation
+for retry. See [gameplay performance](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints)
+for Java dirty publication and context recreation.
 
 1. Add or extend the record in the right `bridge/abi/` family file. Append
    fields; reordering or removing fields breaks every Java writer.
@@ -150,7 +158,7 @@ proxy root: both structural extraction and the posed fallback remain empty
 ABI 72 appends retained DH generic-group instances as whole-frame field 51 and
 the double camera origin as field 52. Group boxes use struct 116 (56 bytes:
 double min/max bounds, color and material); struct 117 uses the 88-byte layout
-introduced in ABI 75 and retained in the current ABI 77:
+introduced in ABI 75 and retained in the current ABI 78:
 group id/generation, double origin, packed light, SSAO flag and six shading
 multipliers, CPU cloud owner and pose generation. Native cloud instances set
 flag bit 1 and carry zero origin lanes; ordinary API instances carry zero native

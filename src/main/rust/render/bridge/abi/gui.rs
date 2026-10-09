@@ -230,6 +230,9 @@ pub struct FfiGuiRawImageUpdateRequest {
     pub generation: u64,
     pub assets: FfiSlice<FfiGuiRawImageAssetPayload>,
     pub negotiated_feature_bits: u64,
+    /// Nonempty: complete live identity set, with pixels supplied only for updates.
+    /// Empty: legacy full replacement (including an explicit empty reset).
+    pub retained_asset_ids: FfiSlice<u64>,
 }
 
 /// Immutable semantic atlas identity and region, never pixels or GPU handles.

@@ -321,6 +321,7 @@ pub(crate) fn input_bytes_for_gui_raw_image_update(request: &FfiGuiRawImageUpdat
     (size_of::<FfiGuiRawImageUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
+        .saturating_add(request.retained_asset_ids.count.saturating_mul(size_of::<u64>() as u64))
 }
 
 pub(crate) fn input_bytes_for_world_text_image_update(

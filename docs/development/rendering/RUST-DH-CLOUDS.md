@@ -30,7 +30,7 @@ ordinary semantic-origin path. Shading, light and cancellation remain ordered.
 ## Transfer and lifetime
 
 ABI 75 introduced the 88-byte retained DH group instance layout; the current
-whole-frame ABI is 77. Flag bit 1 selects a
+whole-frame ABI is 78. Flag bit 1 selects a
 CPU cloud owner address and an immutable pose generation; the three ordinary
 origin lanes must be zero. The native decoder resolves that generation and
 copies coordinates before constructing owned frame data. Ordinary API groups

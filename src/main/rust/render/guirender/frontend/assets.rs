@@ -85,6 +85,18 @@ impl GuiFrontend {
         generation: u64,
         payloads: Vec<GuiRawImageAssetPayload>,
     ) -> GalResult<()> {
+        self.apply_raw_image_patch(gal, generation, payloads, Vec::new())
+    }
+
+    /// A nonempty manifest retains resident identities without copying their pixels.
+    /// All admission checks precede eviction or resource retirement, so failures are retryable.
+    pub fn apply_raw_image_patch(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        payloads: Vec<GuiRawImageAssetPayload>,
+        retained_asset_ids: Vec<u64>,
+    ) -> GalResult<()> {
         if generation == 0 || generation <= self.raw_image_generation {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -201,9 +213,36 @@ impl GuiFrontend {
                 "raw GUI image collides with explicit atlas reference",
             ));
         }
-        let changed_assets = self.changed_raw_image_assets(&images);
-        self.destroy_dynamic_resources_for_assets(gal, &changed_assets);
-        self.raw_images = images;
+        if retained_asset_ids.is_empty() {
+            let changed_assets = self.changed_raw_image_assets(&images);
+            self.destroy_dynamic_resources_for_assets(gal, &changed_assets);
+            self.raw_images = images;
+        } else {
+            if retained_asset_ids.len() > GUI_MAX_RAW_IMAGES {
+                return Err(GalError::invalid_argument("raw GUI retained identity bound exceeded"));
+            }
+            let retained: BTreeSet<_> = retained_asset_ids.iter().copied().collect();
+            if retained.contains(&0) || retained.len() != retained_asset_ids.len()
+                || images.keys().any(|id| !retained.contains(id)) {
+                return Err(GalError::invalid_argument("invalid raw GUI retained identity manifest"));
+            }
+            let mut resident_bytes = 0usize;
+            for id in &retained {
+                let image = images.get(id).or_else(|| self.raw_images.get(id))
+                    .ok_or_else(|| GalError::invalid_argument("retained raw GUI image has no resident or incoming pixels"))?;
+                resident_bytes = resident_bytes.checked_add(image.pixels.len())
+                    .ok_or_else(|| GalError::invalid_argument("raw GUI resident byte count overflow"))?;
+            }
+            if resident_bytes > GUI_MAX_RAW_IMAGE_BYTES_TOTAL {
+                return Err(GalError::invalid_argument("raw GUI resident byte bound exceeded"));
+            }
+            let changed_assets: BTreeSet<_> = self.raw_images.keys().filter(|id| !retained.contains(id)).copied()
+                .chain(images.iter().filter(|(id, image)| self.raw_images.get(id) != Some(*image)).map(|(id, _)| *id))
+                .collect();
+            self.destroy_dynamic_resources_for_assets(gal, &changed_assets);
+            self.raw_images.retain(|id, _| retained.contains(id));
+            self.raw_images.append(&mut images);
+        }
         self.raw_image_generation = generation;
         Ok(())
     }

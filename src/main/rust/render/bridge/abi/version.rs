@@ -130,8 +130,9 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v74 appends a bounded native CPU DH visibility-frame reference.
 /// v75 appends native CPU cloud owner/pose fields to retained DH instances.
 /// v76 appends immutable CPU item poses for direct GUI consumption.
-// ABI77: direct native world/hand item poses and parent normal semantics.
-pub const FFI_ABI_VERSION: u32 = 77;
+/// v77 adds direct native world/hand item poses and parent normal semantics.
+/// v78 adds a retained identity manifest to incremental raw GUI image updates.
+pub const FFI_ABI_VERSION: u32 = 78;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

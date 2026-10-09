@@ -122,7 +122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 77;
+	public static final int ABI_VERSION = 78;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -3113,7 +3113,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * other source-owned images; callers cannot pass atlas objects or textures.
 	 */
 	public Status updateGuiRawImages(long generation, List<GuiRawImageAssetRecord> assets) {
+		return patchGuiRawImages(generation, assets, List.of());
+	}
+
+	/** Transfers changed pixels plus the complete live identity set. An empty set replaces/clears the cache. */
+	public Status patchGuiRawImages(long generation, List<GuiRawImageAssetRecord> assets, List<Long> retainedAssetIds) {
 		Objects.requireNonNull(assets, "assets");
+		Objects.requireNonNull(retainedAssetIds, "retainedAssetIds");
 		try (Arena updateArena = Arena.ofConfined()) {
 			MemorySegment assetArray = Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.array(updateArena, assets.size());
 			for (int i = 0; i < assets.size(); i++) {
@@ -3136,6 +3142,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_RAW_IMAGE_UPDATE.setLong(request, 1, generation);
 			Abi.writeSlice(request, Struct.GUI_RAW_IMAGE_UPDATE, 2, assetArray, assets.size());
 			Struct.GUI_RAW_IMAGE_UPDATE.setLong(request, 3, negotiatedFeatures);
+			MemorySegment retained = updateArena.allocate(ValueLayout.JAVA_LONG, Math.max(1, retainedAssetIds.size()));
+			for (int i = 0; i < retainedAssetIds.size(); i++) retained.setAtIndex(ValueLayout.JAVA_LONG, i, retainedAssetIds.get(i));
+			Abi.writeSlice(request, Struct.GUI_RAW_IMAGE_UPDATE, 4, retained, retainedAssetIds.size());
 			MemorySegment status = Struct.STATUS.allocate(updateArena);
 			checkStatus(Native.guiUpdateRawImages(contextId, request, status), "raw GUI image update");
 			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));

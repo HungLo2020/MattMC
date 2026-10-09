@@ -5285,6 +5285,7 @@ fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
             count: assets.len() as u64,
         },
         negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let (generation, owned) =
         unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
@@ -5375,6 +5376,7 @@ fn semantic_raw_gui_image_ffi_preserves_frozen_rgba8_metadata() {
             count: assets.len() as u64,
         },
         negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
     assert_eq!(GuiRawImageSourceFormat::Rgba8, owned[0].format);
@@ -5408,6 +5410,7 @@ fn semantic_raw_gui_image_ffi_rejects_oversized_dimensions_before_copying() {
             count: 1,
         },
         negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let error = unsafe { decode_gui_raw_image_update(&request, test_capabilities()) }
         .expect_err("oversized raw GUI dimensions must fail before pixel copying");
@@ -6701,6 +6704,7 @@ fn indexed_map_ffi_copies_indices_and_bounds_expanded_residency() {
     let request = FfiGuiRawImageUpdateRequest {
         header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiGuiRawImageUpdateRequest>() as u32 },
         generation: 1, assets: FfiSlice { ptr: &asset, count: 1 }, negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
     pixels.fill(0);

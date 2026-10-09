@@ -92,6 +92,8 @@ public final class RustGalFrameCoordinator {
 	/** Matches the Rust-owned aggregate raw GUI image payload bound. */
 	private static final long MAX_PENDING_RAW_IMAGE_BYTES = 256L * 1024L * 1024L;
 	private static final Map<Long, VulkanicGalBridge.GuiRawImageAssetRecord> pendingRawImages = new LinkedHashMap<>();
+	/** Payloads changed since the last accepted native generation; failures keep them retryable. */
+	private static final Map<Long, VulkanicGalBridge.GuiRawImageAssetRecord> changedRawImages = new LinkedHashMap<>();
 	private static long nextShaderPackSourceGeneration = 1L;
 	private static long uploadedShaderPackSourceGeneration;
 	private static long attemptedShaderPackSourceGeneration;
@@ -416,6 +418,7 @@ public final class RustGalFrameCoordinator {
 				);
 			}
 			pendingRawImages.put(asset.assetId(), asset);
+			changedRawImages.put(asset.assetId(), asset);
 			rawImageGeneration++;
 			attemptedRawImageGeneration = Math.min(attemptedRawImageGeneration, uploadedRawImageGeneration);
 		}
@@ -447,6 +450,7 @@ public final class RustGalFrameCoordinator {
 	static void releaseGuiRawImage(long assetId) {
 		synchronized (LOCK) {
 			if (pendingRawImages.remove(assetId) == null) return;
+			changedRawImages.remove(assetId);
 			rawImageGeneration++;
 			attemptedRawImageGeneration = Math.min(attemptedRawImageGeneration, uploadedRawImageGeneration);
 		}
@@ -461,6 +465,7 @@ public final class RustGalFrameCoordinator {
 		synchronized (LOCK) {
 			GUI_ATLAS_REFERENCES.invalidate();
 			pendingRawImages.clear();
+			changedRawImages.clear();
 			rawImageGeneration++;
 			attemptedRawImageGeneration = Math.min(attemptedRawImageGeneration, uploadedRawImageGeneration);
 		}
@@ -2422,9 +2427,14 @@ public final class RustGalFrameCoordinator {
 		}
 		attemptedRawImageGeneration = rawImageGeneration;
 		try {
-			List<VulkanicGalBridge.GuiRawImageAssetRecord> assets = List.copyOf(pendingRawImages.values());
-			recordStatus(Operation.GUI_ASSET_UPDATE, bridge.updateGuiRawImages(rawImageGeneration, assets));
+			List<VulkanicGalBridge.GuiRawImageAssetRecord> assets = List.copyOf(
+				(uploadedRawImageGeneration == 0L ? pendingRawImages : changedRawImages).values());
+			recordStatus(Operation.GUI_ASSET_UPDATE, bridge.patchGuiRawImages(
+				rawImageGeneration, assets, List.copyOf(pendingRawImages.keySet())));
+			METRICS.rawImageUpdateCalls++;
+			for (var asset : assets) METRICS.rawImageUpdatePayloadBytes += asset.pixelByteLength();
 			uploadedRawImageGeneration = rawImageGeneration;
+			changedRawImages.clear();
 			auditMessage("Rust VulkanicGAL GUI raw image update accepted generation=" + rawImageGeneration
 				+ " payloads=" + assets.size());
 		} catch (RuntimeException error) {
@@ -3271,6 +3281,8 @@ public final class RustGalFrameCoordinator {
 		long worldMaterialAssetUpdateCalls;
 		long worldTextAssetUpdateCalls;
 		long worldMeshAssetUpdateCalls;
+		long rawImageUpdateCalls;
+		long rawImageUpdatePayloadBytes;
 		long worldLodAssetUpdateCalls;
 		long worldLodSelectedFrames;
 		long worldLodInstancesSubmitted;
