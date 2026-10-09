@@ -12,6 +12,33 @@ through `mattmc.rust.natives.dir`; Cargo outputs remain under
 [the build task](https://github.com/HungLo2020/MattMC/blob/master/build.gradle)
 for platform names and build inputs.
 
+## Launch Current or Frozen
+
+From the current repository root:
+
+```sh
+python3 DevUtils/RunDev.py          # Current, release native profile
+python3 DevUtils/RunDev.py --frozen # Frozen Java/OpenGL checkout
+```
+
+`--frozen` resolves `java_perf_repo` from
+`DevUtils/Common/platform/directory/directories.json`. Use
+`--frozen-repo /path/to/Frozen` to launch another full clone. Frozen uses its own
+`run/` directory for settings and saves; its default backend is OpenGL. Keep
+that backend selected when using it as the performance reference.
+
+Prepare a missing checkout with `python3 DevUtils/ProvisionFrozenBaseline.py`;
+see [Frozen preparation](../rendering/RENDER-VERIFICATION.md#2-frozen-image-comparison).
+The Frozen launcher runs `runClient -x test`, without `clean`. Frozen's old
+`DevUtils/RunDev.sh` runs `clean runClient`, which triggers its test dependency:
+its bundled Byte Buddy rejects Java 25 in Mockito tests and prevents launch.
+Skipping those tests allows ordinary play; it does not verify that suite or
+change Frozen's source. To launch directly inside Frozen:
+
+```sh
+./gradlew runClient -x test
+```
+
 ## Preserve loaded libraries
 
 The build task copies the Cargo output to a unique temporary file beside the

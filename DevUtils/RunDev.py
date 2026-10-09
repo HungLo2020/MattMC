@@ -55,6 +55,33 @@ def gradle_command(root: Path, platform_name: str) -> list[str]:
     raise SystemExit("ERROR: Could not find gradlew. Are you in the MattMC project?")
 
 
+def frozen_repo(root: Path, platform_name: str, explicit: str | None) -> Path:
+    if explicit:
+        target = Path(explicit).expanduser().resolve()
+    else:
+        helper = root / "DevUtils" / "Common" / "platform" / "directory" / "directory_helper.py"
+        result = subprocess.run(
+            [sys.executable, str(helper), "java_perf_repo", "--platform", platform_name],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise SystemExit(result.stderr.strip() or "ERROR: Could not resolve java_perf_repo.")
+        target = Path(result.stdout.strip()).resolve()
+
+    if target == root:
+        raise SystemExit("ERROR: Frozen must be a separate checkout from the current repository.")
+    if not target.is_dir() or not (target / ".git").is_dir():
+        raise SystemExit(
+            f"ERROR: Frozen checkout is missing or is not a full clone: {target}\n"
+            "Run python3 DevUtils/ProvisionFrozenBaseline.py to prepare it, "
+            "or pass --frozen-repo PATH."
+        )
+    return target
+
+
 def nvidia_version(path: Path) -> str | None:
     """Read an NVIDIA version without depending on the broken user-space driver."""
     try:
@@ -118,6 +145,15 @@ def parse_args() -> argparse.Namespace:
         "--platform",
         help="platform to pass to shared helpers: linux, windows, or macos",
     )
+    parser.add_argument(
+        "--frozen",
+        action="store_true",
+        help="launch the configured Frozen Java checkout, skipping its launch-blocking tests",
+    )
+    parser.add_argument(
+        "--frozen-repo",
+        help="launch Frozen from this path instead of the configured java_perf_repo",
+    )
     return parser.parse_args()
 
 
@@ -130,11 +166,19 @@ def main() -> int:
         check_linux_nvidia_driver()
 
     root = repo_root()
+    use_frozen = args.frozen or args.frozen_repo is not None
+    if use_frozen:
+        root = frozen_repo(root, platform_name, args.frozen_repo)
     gradle = gradle_command(root, platform_name)
     environment = os.environ.copy()
-    environment.setdefault("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS", "true")
+    if use_frozen:
+        command = [*gradle, "runClient", "-x", "test"]
+        print(f"Launching Frozen Java from {root} (tests skipped)", flush=True)
+    else:
+        environment.setdefault("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS", "true")
+        command = [*gradle, "-PmattmcRustProfile=release", "runClient"]
     return subprocess.run(
-        [*gradle, "-PmattmcRustProfile=release", "runClient"],
+        command,
         cwd=root,
         env=environment,
     ).returncode
