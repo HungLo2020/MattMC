@@ -23,20 +23,20 @@ public class LevelChunkSection {
 	private LevelChunkSection(LevelChunkSection levelChunkSection) {
 		this.counters = new NativeSectionCounters(levelChunkSection.counters.packed());
 		this.states = levelChunkSection.states.copy();
-		this.biomes = levelChunkSection.biomes.copy();
+		this.installBiomeContainer(levelChunkSection.biomes.copy());
 	}
 
 	public LevelChunkSection(PalettedContainer<BlockState> palettedContainer, PalettedContainerRO<Holder<Biome>> palettedContainerRO) {
 		this.counters = new NativeSectionCounters(0);
 		this.states = palettedContainer;
-		this.biomes = palettedContainerRO;
+		this.installBiomeContainer(palettedContainerRO);
 		this.recalcBlockCounts();
 	}
 
 	public LevelChunkSection(PalettedContainerFactory palettedContainerFactory) {
 		this.counters = new NativeSectionCounters(0);
 		this.states = palettedContainerFactory.createForBlockStates();
-		this.biomes = palettedContainerFactory.createForBiomes();
+		this.installBiomeContainer(palettedContainerFactory.createForBiomes());
 	}
 
 	public BlockState getBlockState(int i, int j, int k) {
@@ -161,7 +161,7 @@ public class LevelChunkSection {
 	public void installGeneratedBiomes(int requestedBits, List<Holder<Biome>> palette, long[] raw) {
 		PalettedContainer<Holder<Biome>> container = this.biomes.recreate();
 		container.installGenerated(requestedBits, palette, raw);
-		this.biomes = container;
+		this.installBiomeContainer(container);
 	}
 
 	public record GeneratedSection(int kind, int bits, int[] palette, long[] raw, int nonEmpty, int ticking, int fluid) {}
@@ -219,6 +219,16 @@ public class LevelChunkSection {
 		return this.states;
 	}
 
+	private Runnable nativeBiomeListener;
+
+	/** Loaded client index notification; no listener exists during world generation. */
+	public void setNativeBiomeListener(Runnable listener) { this.nativeBiomeListener = listener; }
+
+	private void installBiomeContainer(PalettedContainerRO<Holder<Biome>> container) {
+		this.biomes = container;
+		if (this.nativeBiomeListener != null) this.nativeBiomeListener.run();
+	}
+
 	public PalettedContainerRO<Holder<Biome>> getBiomes() {
 		return this.biomes;
 	}
@@ -228,13 +238,13 @@ public class LevelChunkSection {
 		this.states.read(friendlyByteBuf);
 		PalettedContainer<Holder<Biome>> palettedContainer = this.biomes.recreate();
 		palettedContainer.read(friendlyByteBuf);
-		this.biomes = palettedContainer;
+		this.installBiomeContainer(palettedContainer);
 	}
 
 	public void readBiomes(FriendlyByteBuf friendlyByteBuf) {
 		PalettedContainer<Holder<Biome>> palettedContainer = this.biomes.recreate();
 		palettedContainer.read(friendlyByteBuf);
-		this.biomes = palettedContainer;
+		this.installBiomeContainer(palettedContainer);
 	}
 
 	public void write(FriendlyByteBuf friendlyByteBuf) {
@@ -265,7 +275,7 @@ public class LevelChunkSection {
                 for (int dx = 0; dx < 4; dx++) for (int dy = 0; dy < 4; dy++) for (int dz = 0; dz < 4; dz++) {
                     palettedContainer.getAndSetUnchecked(dx, dy, dz, values[index++]);
                 }
-                this.biomes = palettedContainer;
+                this.installBiomeContainer(palettedContainer);
                 return;
             }
         }
@@ -279,7 +289,7 @@ public class LevelChunkSection {
 			}
 		}
 
-		this.biomes = palettedContainer;
+		this.installBiomeContainer(palettedContainer);
 	}
 
 	public LevelChunkSection copy() {

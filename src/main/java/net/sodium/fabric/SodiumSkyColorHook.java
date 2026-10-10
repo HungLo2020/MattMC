@@ -21,6 +21,10 @@ public class SodiumSkyColorHook implements SkyColorHooks {
         // FastCubicSampler will floor the position and add offsets, maintaining quart coordinates
         // So the ColorFetcher receives quart coordinates, matching what getNoiseBiomeAtQuart expects
         if (level instanceof ClientLevel clientLevel) {
+            if (level.getClass() == ClientLevel.class) {
+                Vec3 nativeColor = clientLevel.getChunkSource().sampleNativeSky(pos);
+                if (nativeColor != null) return nativeColor;
+            }
             return FastCubicSampler.sampleColor(
                 pos,
                 (x, y, z) -> clientLevel.getBiomeManager().getNoiseBiomeAtQuart(x, y, z).value().getSkyColor(),

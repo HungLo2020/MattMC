@@ -38,7 +38,8 @@ See [Cargo.toml](https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfe
 
 - `test` skips classes tagged `@Tag("parity")` and runs in parallel JVMs.
 - `parityTest` runs only the tagged classes, also in parallel JVMs.
-- `check` runs both.
+- `check` runs both. The rendering validation driver also runs both when
+  `--all-java-tests` is selected.
 - An explicit `--tests` filter on `test` also selects tagged classes, so
   per-slice commands in subsystem docs keep working. The existing
   `*PerformanceTest`/`*Benchmark` class exclusions still apply to `test`.
@@ -46,11 +47,11 @@ See [Cargo.toml](https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfe
   cores). Each fork has a maximum 2 GB Java heap; lower the fork count on a
   machine short of memory.
 
-The validation driver's `--all-java-tests` removes its `--tests` patterns but
-still runs only `test`. With no explicit filter, the parity-tag exclusion takes
-effect, so that option does not include `parityTest`. Run the separate parity
-command above or `check` when both Java suites are required. Explicitly filtered
-runs can still select matching tagged classes.
+The current validation driver's `--all-java-tests` removes its `--tests`
+patterns and runs both `test` and `parityTest`. Collect results from both
+`build/test-results/test/` and `build/test-results/parityTest/`; the ordinary
+task alone is not the full Java suite. Explicitly filtered runs can still
+select matching tagged classes.
 
 Tag a class `parity` when it runs a large Frozen-vs-Rust workload (roughly
 10 s or more). Keep fast parity checks untagged so ordinary runs still cover

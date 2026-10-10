@@ -50,7 +50,7 @@ public final class NativeSkyLightSources {
         if (minY % 16 != 0 || height % 16 != 0 || height < 16 || height > 4096
             || Math.abs((long)minY) > 1_000_000 || minSourceY != minY - 1
             || destination.getBits() != Mth.ceillog2(height + 3)) return false;
-        var sections = chunk.getSections();
+        var sections = chunk.getSectionsForRead();
         if (sections.length != height / 16) return false;
         for (var section : sections) {
             if (section == null || section.getClass() != LevelChunkSection.class) return false;

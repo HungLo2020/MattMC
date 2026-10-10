@@ -76,7 +76,11 @@ The pre-integration eight-second allocation profile attributes about 47 MiB to
 sky/background preparation, 30 MiB to model submission and 19 MiB to block-entity
 scopes, versus about 1 MiB to item generation restamps. These are weighted
 diagnostic samples, not isolated speedups. Prioritize live world/biome ownership
-and direct background/model consumers alongside retained geometry. Preserve
+and direct background/model consumers alongside retained geometry. The local
+[live biome owner and sky consumer](../world/biome/RUST-LIVE-BIOMES.md) is now
+wired; full Java/Rust suites, seven lifecycle cases and reviewed settled
+Frozen pairs pass. The preceding comparison still misses vanilla p99;
+ordinary streaming and broad parity remain open. Preserve
 missing-chunk behavior, height clamping, mutable biome containers, world unload
 and resource reload; retaining a stale cache is not an ownership migration.
 

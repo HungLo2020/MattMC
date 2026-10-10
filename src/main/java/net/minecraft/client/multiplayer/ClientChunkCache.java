@@ -24,6 +24,7 @@ import net.minecraft.world.level.chunk.ChunkSource;
 import net.minecraft.world.level.chunk.EmptyLevelChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.NativeBiomeWorld;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap.Types;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -37,12 +38,28 @@ public class ClientChunkCache extends ChunkSource {
 	private final LevelLightEngine lightEngine;
 	volatile ClientChunkCache.Storage storage;
 	final ClientLevel level;
+	private final NativeBiomeWorld nativeBiomes;
+	private boolean readingBiomePacket;
 
 	public ClientChunkCache(ClientLevel clientLevel, int i) {
 		this.level = clientLevel;
 		this.emptyChunk = new EmptyLevelChunk(clientLevel, new ChunkPos(0, 0), clientLevel.registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS));
 		this.lightEngine = new LevelLightEngine(this, true, clientLevel.dimensionType().hasSkyLight());
 		this.storage = new ClientChunkCache.Storage(calculateStorageRange(i));
+		this.nativeBiomes = clientLevel.getClass() == ClientLevel.class
+			? NativeBiomeWorld.create(clientLevel.palettedContainerFactory(), clientLevel.getMinY(), clientLevel.getHeight()) : null;
+		if (this.nativeBiomes != null) this.nativeBiomes.range(0, 0, this.storage.chunkRadius);
+	}
+
+	public net.minecraft.world.phys.Vec3 sampleNativeSky(net.minecraft.world.phys.Vec3 position) {
+		return this.nativeBiomes == null ? null : this.nativeBiomes.sample(position);
+	}
+
+	private void publishNativeBiomes(LevelChunk chunk) {
+		if (this.nativeBiomes == null || this.readingBiomePacket) return;
+		var storage = this.storage;
+		if (storage.getChunk(storage.getIndex(chunk.getPos().x, chunk.getPos().z)) != chunk) return;
+		this.nativeBiomes.replace(chunk);
 	}
 
 	public LevelLightEngine getLightEngine() {
@@ -93,7 +110,9 @@ public class ClientChunkCache extends ChunkSource {
 			if (!isValidChunk(levelChunk, i, j)) {
 				LOGGER.warn("Ignoring chunk since it's not present: {}, {}", i, j);
 			} else {
-				levelChunk.replaceBiomes(friendlyByteBuf);
+				this.readingBiomePacket = true;
+				try { levelChunk.replaceBiomes(friendlyByteBuf); }
+				finally { this.readingBiomePacket = false; this.publishNativeBiomes(levelChunk); }
 			}
 		}
 	}
@@ -109,10 +128,20 @@ public class ClientChunkCache extends ChunkSource {
 			ChunkPos chunkPos = new ChunkPos(i, j);
 			if (!isValidChunk(levelChunk, i, j)) {
 				levelChunk = new LevelChunk(this.level, chunkPos);
-				levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer);
+				this.readingBiomePacket = true;
+				try { levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer); }
+				finally { this.readingBiomePacket = false; this.publishNativeBiomes(levelChunk); }
 				this.storage.replace(k, levelChunk);
+				this.publishNativeBiomes(levelChunk);
+				if (this.nativeBiomes != null) {
+					LevelChunk installed = levelChunk;
+					installed.setNativeSectionArrayEscapeListener(() -> this.publishNativeBiomes(installed));
+					for (var section : installed.getSectionsForRead()) section.setNativeBiomeListener(() -> this.publishNativeBiomes(installed));
+				}
 			} else {
-				levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer);
+				this.readingBiomePacket = true;
+				try { levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer); }
+				finally { this.readingBiomePacket = false; this.publishNativeBiomes(levelChunk); }
 				this.storage.refreshEmptySections(levelChunk);
 			}
 
@@ -133,6 +162,7 @@ public class ClientChunkCache extends ChunkSource {
 	public void updateViewCenter(int i, int j) {
 		this.storage.viewCenterX = i;
 		this.storage.viewCenterZ = j;
+		if (this.nativeBiomes != null) this.nativeBiomes.range(i, j, this.storage.chunkRadius);
 	}
 
 	public void updateViewRadius(int i) {
@@ -153,6 +183,17 @@ public class ClientChunkCache extends ChunkSource {
 				}
 			}
 
+			if (this.nativeBiomes != null) {
+				for (int l = 0; l < this.storage.chunks.length(); l++) {
+					var old = this.storage.chunks.get(l);
+					if (old != null && !storage.inRange(old.getPos().x, old.getPos().z)) {
+						this.nativeBiomes.remove(old.getPos().x, old.getPos().z);
+						old.setNativeSectionArrayEscapeListener(null);
+						for (var section : old.getSectionsForRead()) section.setNativeBiomeListener(null);
+					}
+				}
+				this.nativeBiomes.range(storage.viewCenterX, storage.viewCenterZ, storage.chunkRadius);
+			}
 			this.storage = storage;
 		}
 	}
@@ -228,6 +269,9 @@ public class ClientChunkCache extends ChunkSource {
 			if (levelChunk2 != null) {
 				this.chunkCount--;
 				ChunkPos oldPos = levelChunk2.getPos();
+				levelChunk2.setNativeSectionArrayEscapeListener(null);
+				if (ClientChunkCache.this.nativeBiomes != null) ClientChunkCache.this.nativeBiomes.remove(oldPos.x, oldPos.z);
+				for (var section : levelChunk2.getSectionsForRead()) section.setNativeBiomeListener(null);
 				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(oldPos.x, oldPos.z));
 				this.dropEmptySections(levelChunk2);
 				ClientChunkCache.this.level.unload(levelChunk2);
@@ -245,6 +289,9 @@ public class ClientChunkCache extends ChunkSource {
 			if (this.chunks.compareAndSet(i, levelChunk, null)) {
 				this.chunkCount--;
 				ChunkPos chunkPos = levelChunk.getPos();
+				levelChunk.setNativeSectionArrayEscapeListener(null);
+				if (ClientChunkCache.this.nativeBiomes != null) ClientChunkCache.this.nativeBiomes.remove(chunkPos.x, chunkPos.z);
+				for (var section : levelChunk.getSectionsForRead()) section.setNativeBiomeListener(null);
 				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(chunkPos.x, chunkPos.z));
 				this.dropEmptySections(levelChunk);
 			}
@@ -269,7 +316,7 @@ public class ClientChunkCache extends ChunkSource {
 		}
 
 		private void dropEmptySections(LevelChunk levelChunk) {
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 
 			for (int i = 0; i < levelChunkSections.length; i++) {
 				ChunkPos chunkPos = levelChunk.getPos();
@@ -278,7 +325,7 @@ public class ClientChunkCache extends ChunkSource {
 		}
 
 		private void addEmptySections(LevelChunk levelChunk) {
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 
 			for (int i = 0; i < levelChunkSections.length; i++) {
 				LevelChunkSection levelChunkSection = levelChunkSections[i];
@@ -291,7 +338,7 @@ public class ClientChunkCache extends ChunkSource {
 
 		void refreshEmptySections(LevelChunk levelChunk) {
 			ChunkPos chunkPos = levelChunk.getPos();
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 
 			for (int i = 0; i < levelChunkSections.length; i++) {
 				LevelChunkSection levelChunkSection = levelChunkSections[i];

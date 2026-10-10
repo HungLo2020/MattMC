@@ -24,6 +24,7 @@ public record PalettedContainerFactory(
 		BlockState blockState = Blocks.AIR.defaultBlockState();
 		Registry<Biome> registry = registryAccess.lookupOrThrow(Registries.BIOME);
 		Strategy<Holder<Biome>> strategy2 = Strategy.createForBiomes(registry.asHolderIdMap());
+		NativeLiveBiomeSection.register(strategy2, registry);
 		Holder.Reference<Biome> reference = registry.getOrThrow(Biomes.PLAINS);
 		return new PalettedContainerFactory(
 			strategy,

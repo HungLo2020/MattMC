@@ -907,7 +907,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	private void enableChunkLight(LevelChunk levelChunk, int i, int j) {
 		LevelLightEngine levelLightEngine = this.level.getChunkSource().getLightEngine();
-		LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+		LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 		ChunkPos chunkPos = levelChunk.getPos();
 
 		for (int k = 0; k < levelChunkSections.length; k++) {

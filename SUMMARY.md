@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-09; release d9d1a9d6; RTX3080Ti; settled rotating view;6,000 frames)
+# Rust vs Frozen Java speed (2026-10-09; release bc2207fb; RTX3080Ti; settled rotating view;6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,053.6 / 1,473.1 | 1,160.8 / 1,155.7 |
-| Vanilla + DH | 748.0 / 565.6 | 612.6 / 673.1 |
-| Shaders | 337.5 / 335.4 | 317.3 / 316.9 |
-| Shaders + DH | 263.1 / 251.4 | 228.3 / 227.4 |
-Receipt:`validation/native-terrain-light-integrated-20261009/summary.json`:all16 ABAB/exact6000 clean,VUID/exception/orphan0;all7 lifecycle and reviewed diagnostic vanilla/Iris+DH compatibility pairs/DH coverage pass.25 generated copies retired;source/native/Frozen/user-edit integrity passes.
-Performance OPEN:averageFPS exceeds Frozen in all4 modes;medianp99 Current/Frozen vanilla3.216/3.072ms,DH6.839/5.749,shaders6.137/5.979,shaderDH6.212/7.446.Gate FAILS vanilla,shader andDH p99;substantial repeat variance,no isolated migration gain.
-CombinedRust2443 pass/3 ignored;Java1807 tests/2 skipped/no failures;Wiki2491/43 pass.Ordinary DH+visible-map C/F/F/C loopFPS median C/F entry535/555,standing619/601,travel634/623;p99ms6.740/5.904,2.625/2.911,3.000/2.904:entry/travel floors remain open;pop-in unproved.JDK fix6 checks pass;next biome owner/direct sky12 CPU checks pass,production wiring pending;Rust-only app unfinished.
+| Vanilla | 1,379.7 / 1,094.1 | 1,152.2 / 1,182.9 |
+| Vanilla + DH | 709.3 / 751.0 | 749.6 / 613.8 |
+| Shaders | 342.0 / 344.6 | 317.3 / 316.4 |
+| Shaders + DH | 255.1 / 251.8 | 228.1 / 227.1 |
+Receipt:`validation/native-live-biomes-20261009/summary.json`:all16 ABAB/exact6000 clean,VUID/exception/orphan0;all7 lifecycle and reviewed diagnostic vanilla/Iris+DH compatibility pairs/DH coverage pass.Source/native/Frozen/user-edit integrity passes.
+Performance OPEN:medianFPS exceeds Frozen in all4 modes;p99 Current/Frozen vanilla3.498/3.075ms,DH5.429/5.601,shaders5.024/6.317,shaderDH7.167/8.242.Gate FAILS vanilla p99;repeat variance,no isolated migration gain.
+FullRust2454 pass/3 ignored;Java1812tests/2 skipped/0failures(test1714+parity98);6 executors mapbc2207fb;Wiki2494/43+13 driver checks pass.Live-biome owner/direct sky verified;Current CPU flight validated,native sky sampled13 times/Java sky-grid0.All4 profiles/12F3 reviews pass,4 copies retired;Java alloc0.974/2.319GB,sampledsky0/168MB (Rust excluded).Range arithmetic fixed viaactualFrozen12288case oracle;finalc3aa5fed suitesRust2455/3ignored+Java1812/2skip pass;revised-library7 lifecycle/newreviewed pairs pass,VUID/orphan0,DHcoverage pass;9 copies retired,allidentity guards pass.Ordinary visible-map/entry/pop-in and Rust-only app remain open.

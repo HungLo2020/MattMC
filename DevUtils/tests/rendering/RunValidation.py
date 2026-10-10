@@ -98,6 +98,10 @@ def base_env(args: argparse.Namespace) -> dict[str, str]:
 
 def gradle_java_tests_command(filters: list[str] | None) -> list[str]:
     command = ["./gradlew", "-PmattmcRustProfile=release", "test", "-x", "testRustNative", "--console=plain"]
+    if filters is None:
+        # Plain test excludes heavy @Tag("parity") classes after the split.
+        # --all-java-tests must keep its complete-suite meaning.
+        command.insert(3, "parityTest")
     for pattern in filters or ():
         command += ["--tests", pattern]
     return command

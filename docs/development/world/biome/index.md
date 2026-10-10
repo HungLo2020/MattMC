@@ -8,3 +8,4 @@
   `findClosestBiome3d` for multi-noise sources (ring placement, `/locate biome`).
 - [Section color snapshots](RUST-SECTION-COLORS.md): shared native world-color
   inputs, literal-provider compatibility, lifetime and chunk rebuilding checks.
+- [Live biome ownership and sky sampling](RUST-LIVE-BIOMES.md): retained native sections/index, compatibility constraints and scoped Frozen verification.

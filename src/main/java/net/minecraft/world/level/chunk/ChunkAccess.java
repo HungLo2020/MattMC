@@ -137,7 +137,7 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	public abstract void addEntity(Entity entity);
 
 	public int getHighestFilledSectionIndex() {
-		LevelChunkSection[] levelChunkSections = this.getSections();
+		LevelChunkSection[] levelChunkSections = this.getSectionsForRead();
 
 		for (int i = levelChunkSections.length - 1; i >= 0; i--) {
 			LevelChunkSection levelChunkSection = levelChunkSections[i];
@@ -160,12 +160,26 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		return set;
 	}
 
+	private boolean sectionArrayEscaped;
+	private Runnable nativeSectionArrayEscapeListener;
+
+	public void setNativeSectionArrayEscapeListener(Runnable listener) { this.nativeSectionArrayEscapeListener = listener; }
+	public boolean hasEscapedSectionArray() { return this.sectionArrayEscaped; }
+
+	/** Existing mutable array API transfers native index authority to compatibility. */
 	public LevelChunkSection[] getSections() {
+		this.sectionArrayEscaped = true;
+		if (this.nativeSectionArrayEscapeListener != null) this.nativeSectionArrayEscapeListener.run();
 		return this.sections;
 	}
 
+	/** Borrow for synchronous reads only. Never replace slots or retain a mutable alias. */
+	public LevelChunkSection[] getSectionsForRead() {
+		return this.getClass() == LevelChunk.class ? this.sections : this.getSections();
+	}
+
 	public LevelChunkSection getSection(int i) {
-		return this.getSections()[i];
+		return this.getSectionsForRead()[i];
 	}
 
 	public Collection<Entry<Heightmap.Types, Heightmap>> getHeightmaps() {

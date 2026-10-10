@@ -59,7 +59,11 @@ class RunValidationTest(unittest.TestCase):
         self.assertEqual("testRustNative", command[command.index("-x") + 1])
         self.assertIn("-PmattmcRustProfile=release", command)
         self.assertEqual(["--tests", "net.vulkanic.*"], command[-2:])
-        self.assertNotIn("--tests", validation.gradle_java_tests_command(None))
+        self.assertNotIn("parityTest", command)
+        full = validation.gradle_java_tests_command(None)
+        self.assertNotIn("--tests", full)
+        self.assertIn("test", full)
+        self.assertIn("parityTest", full)
 
     def test_perf_protocol_interleaves_current_first(self):
         self.assertEqual(["current", "frozen", "current", "frozen"], validation.perf_order(2))

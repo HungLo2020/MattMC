@@ -126,7 +126,7 @@ public class ChunkWrapper implements IChunkWrapper
 		this.minNonEmptyHeight = this.getInclusiveMinBuildHeight();
 		
 		// determine the lowest empty section (bottom up)
-		LevelChunkSection[] sections = this.chunk.getSections();
+		LevelChunkSection[] sections = this.chunk.getSectionsForRead();
 		for (int index = 0; index < sections.length; index++)
 		{
 			if (sections[index] == null)
@@ -158,7 +158,7 @@ public class ChunkWrapper implements IChunkWrapper
 		this.maxNonEmptyHeight = this.getExclusiveMaxBuildHeight();
 		
 		// determine the highest empty section (top down)
-		LevelChunkSection[] sections = this.chunk.getSections();
+		LevelChunkSection[] sections = this.chunk.getSectionsForRead();
 		for (int index = sections.length-1; index >= 0; index--)
 		{
 			// update at each position to fix using the max height if the chunk is empty
@@ -328,7 +328,7 @@ public class ChunkWrapper implements IChunkWrapper
 	{
 		// other constructor logic //
 		
-		LevelChunkSection[] sections = this.chunk.getSections();	 
+		LevelChunkSection[] sections = this.chunk.getSectionsForRead();
 		this.levelChunkSections = new LevelChunkSection[sections.length];
 		for (int i = 0; i < sections.length; i++)
 		{

@@ -77,7 +77,7 @@ public final class NativeLightBlocks {
             if (level != null && level.getClass() == LevelChunk.class && !level.getLevel().isDebug()) access = level;
         }
         if (access != null) {
-            LevelChunkSection[] sections = access.getSections();
+            LevelChunkSection[] sections = access.getSectionsForRead();
             int index = access.getSectionIndexFromSectionY(sectionY);
             if (access.getMinY() % 16 == 0 && sections.length * 16 == access.getHeight()) {
                 if (index < 0 || index >= sections.length) {

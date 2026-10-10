@@ -43,6 +43,9 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 	private final Map<TagKey<T>, HolderSet.Named<T>> frozenTags = new IdentityHashMap();
 	MappedRegistry.TagSet<T> allTags = MappedRegistry.TagSet.unbound();
 	private boolean frozen;
+
+	/** Whether registry values and their numeric IDs are sealed for native consumers. */
+	public boolean isFrozen() { return this.frozen; }
 	@Nullable
 	private Map<T, Holder.Reference<T>> unregisteredIntrusiveHolders;
 

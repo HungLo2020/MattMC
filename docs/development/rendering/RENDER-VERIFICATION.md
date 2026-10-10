@@ -47,7 +47,9 @@ checks with the limits below. The individual test commands are:
 ```
 
 See [Running tests quickly](../tooling/TESTING.md) for the `suite` profile,
-the `test`/`parityTest` split and fork settings.
+the `test`/`parityTest` split and fork settings. The validation driver
+includes both Java tasks when `--all-java-tests` is selected; a plain `test`
+result alone is no longer the full Java suite.
 Plain `./gradlew test` first runs the whole Rust suite serially
 (`testRustNative`, `--test-threads=1`, `suite` profile) in Gradle's own target
 directory, then can reuse its passing stamp while declared inputs/output are
@@ -71,7 +73,15 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
-The latest complete author-recorded
+The [live-biome milestone](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
+adds retained native palette/index ownership and direct sky sampling. Final
+release `c3aa5fed` passes both Java tasks (1,812 tests/two skips), Rust
+(2,455 passes/three ignored), seven lifecycle cases and manually reviewed
+vanilla/Iris+DH settled pairs. Its preceding `bc2207fb` performance comparison
+still fails vanilla p99. These scoped checks do not establish broad gameplay,
+temporal rendering or long-session memory acceptance.
+
+The preceding author-recorded
 [terrain-light matrix](GOAL-5-STATUS.md#october-9-bulk-terrain-light-and-ordinary-gameplay-summary),
 release `d9d1a9d6`, reports Java/Rust 1,807/2,443 tests (two Java skips and three
 Rust ignored), seven lifecycle cases and reviewed diagnostic compatibility
@@ -96,18 +106,17 @@ clients or Java/Rust suites or inspect their unbundled runtime artifacts.
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
 ```
 
-The [driver at `f8620676`](https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/DevUtils/tests/rendering/RunValidation.py)
+The [current driver](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/RunValidation.py)
 orchestrates a bounded set of tests and workloads:
 
 1. Java tests in `net.vulkanic.*`, `net.sodium.*`, `com.seibel.*` and
    `net.minecraft.client.dev.*` use `-PmattmcRustProfile=release` and skip
    Gradle's serial `testRustNative` dependency. Repeat `--java-test <pattern>`
    to change the filters; explicit filters can select matching parity-tagged
-   classes. `--all-java-tests` removes the filters but still invokes only
-   `test`: with no `--tests` argument, Gradle now excludes `@Tag("parity")`
-   classes, along with its existing performance/benchmark class exclusions.
-   The option does not run `parityTest`; run that task separately, or use
-   `check`, when both Java suites are required. `--skip java-tests` still runs
+   classes. `--all-java-tests` removes the filters and invokes both `test` and
+   `parityTest`, retaining their performance/benchmark class exclusions.
+   An unfiltered `test` alone excludes `@Tag("parity")` classes.
+   `--skip java-tests` still runs
    `buildRustNative` and `classes` with the release profile.
 2. `cargo test --locked --profile suite --lib` runs with four threads by default and
    `ALSOFT_DRIVERS=null`; this is not a `--release` test command. Named failures

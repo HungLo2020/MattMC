@@ -114,7 +114,7 @@ public final class LevelSlice implements BlockAndTintGetter, FabricBlockView {
 
     public static ChunkRenderContext prepare(Level level, SectionPos pos, ClonedChunkSectionCache cache) {
         LevelChunk chunk = level.getChunk(pos.getX(), pos.getZ());
-        LevelChunkSection section = chunk.getSections()[level.getSectionIndexFromSectionY(pos.getY())];
+        LevelChunkSection section = chunk.getSection(level.getSectionIndexFromSectionY(pos.getY()));
 
         // If the chunk section is absent or empty, simply terminate now. There will never be anything in this chunk
         // section to render, so we need to signal that a chunk render task shouldn't be created. This saves a considerable

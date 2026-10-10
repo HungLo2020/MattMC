@@ -62,7 +62,7 @@ public final class NativeHeightmap {
         if (chunk instanceof LevelChunk level && level.getLevel().isDebug()) return false;
         int minY = chunk.getMinY(), height = chunk.getHeight();
         if (minY % 16 != 0 || height % 16 != 0 || height < 16 || height > 4096 || Math.abs((long)minY) > 1_000_000) return false;
-        var sections = chunk.getSections();
+        var sections = chunk.getSectionsForRead();
         if (sections.length != height / 16) return false;
         for (var section : sections) {
             if (section == null || section.getClass() != LevelChunkSection.class) return false;

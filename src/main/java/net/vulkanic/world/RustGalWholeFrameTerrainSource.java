@@ -213,7 +213,7 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	private void addColumn(int chunkX, int chunkZ) {
-		LevelChunkSection[] chunkSections = this.level.getChunk(chunkX, chunkZ).getSections();
+		LevelChunkSection[] chunkSections = this.level.getChunk(chunkX, chunkZ).getSectionsForRead();
 		long nonAirMask = 0L;
 		for (int sectionY = this.level.getMinSectionY(); sectionY <= this.level.getMaxSectionY(); sectionY++) {
 			int index = this.level.getSectionIndexFromSectionY(sectionY);

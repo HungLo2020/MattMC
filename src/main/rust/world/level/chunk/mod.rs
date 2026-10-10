@@ -4,3 +4,4 @@ pub(crate) mod live;
 pub(crate) mod palette;
 pub(crate) mod snapshot;
 pub(crate) mod stage_transfer;
+pub(crate) mod biomes;
