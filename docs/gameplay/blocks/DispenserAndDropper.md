@@ -54,6 +54,33 @@ A Dropper can point up for upward item transfer. It needs a new activation for e
 
 Water still follows its [dimension and placement restrictions](../items/WaterBucket.md). A successful bucket action can mean evaporation rather than placed water in an ultrawarm dimension. Some other items use equipment, vehicle, tool, or special block behaviors; this table is deliberately not a complete catalog. Do not assume every integrated item has registered automation support.
 
+### Returned containers and collection
+
+Successful registered bucket actions and Glass Bottle filling consume one input and produce a returned item, such as an empty Bucket or a Honey Bottle. **Check the Dispenser inventory before looking for a loose drop.**
+
+- If that consumes the last item in the selected slot, the returned item replaces it in that same slot
+- If input remains, the return goes into another empty slot or a matching stack with room; anything that cannot fit is ejected from the opening
+
+For example, one Glass Bottle at a full hive leaves a Honey Bottle in its slot. With several Glass Bottles in that slot and all other slots unable to accept the Honey Bottle, the filled bottle is ejected instead. Plan collection for the actual inventory arrangement.
+
+**Returned items participate in later random selection.** A Honey Bottle retained inside can be selected and ejected on another activation; an empty Bucket can be selected for pickup. Remove or sort returned items if subsequent activations must use only the intended input. Leaving spare slots helps retain output, but does not keep those slots out of the selection pool.
+
+### Equipment and other targets
+
+For ordinary equipment using the general equipment action, the Dispenser transfers one item to the **first eligible living entity found overlapping the block directly in front**. The relevant slot must be usable and empty, and the item must allow dispensing onto that entity type. Species-specific restrictions still apply; see [Harnesses](../items/Harnesses.md#equipping-and-riding) and [Nautilus armor](../mobs/Nautilus.md#nautilus-armor).
+
+Keep only the intended recipient in that space. If none qualifies, this general action ejects one item. Special registered actions take priority: Carved Pumpkin and Wither Skeleton Skull have separate placement/equipping rules and can remain loaded after failure.
+
+Use the dedicated guides for other target checks and output:
+
+- [Shears](../items/Shears.md#using-a-dispenser): hive-first harvesting, leash cutting and eligible mob shearing
+- [Bee housing](BeeHousing.md#dispenser-collection): bottle collection and Bee-release conditions
+- [Brush](../items/Brush.md#using-it-on-an-armadillo): adult Armadillo scutes
+- [Flint and Steel](../items/FlintAndSteel.md#dispenser-use): ignition targets and tool retention
+- [TNT](TNT.md#priming-routes): primed output and [game-rule restrictions](TNT.md#rules-and-permissions)
+
+Check tool condition as well as inventory count: MattMC [retains broken equipment](../mechanics/Durability.md), and the tool guides explain their separate Dispenser exceptions.
+
 ## Small example: one item per button press
 
 This layout is source-derived and has **not been tested in game**.
@@ -104,3 +131,14 @@ Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Reg
 - [Game-time scheduling](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/LevelAccessor.java)
 - [Pending-tick deduplication](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/ticks/LevelChunkTicks.java)
 - [Scheduled-tick execution](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/server/level/ServerLevel.java)
+
+Additional returned-item routing, selection consequences, equipment eligibility and linked action guidance were source-reviewed at `1b9b103398fd70d5b5152b93a1d0abc581fffc19` on **2026-10-10**. No in-game output-collection, equipment, tool or broken-item test was run for this expansion; the earlier review above remains its own historical scope.
+
+- [Returned-item replacement, insertion and overflow ejection](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/core/dispenser/DefaultDispenseItemBehavior.java#L65-L84)
+- [Random occupied-slot selection and matching-stack insertion](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/DispenserBlockEntity.java#L34-L70)
+- [Active dispatch, returned-stack assignment and registered-action priority](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/DispenserBlock.java#L84-L115)
+- [General equipment targeting and fallback](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/core/dispenser/EquipmentDispenseItemBehavior.java#L15-L37)
+- [Equipment eligibility and empty-slot checks](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/LivingEntity.java#L3555-L3572)
+- [Bucket, bottle, special equipment, ignition, TNT and Brush registrations](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/core/dispenser/DispenseItemBehavior.java#L165-L400)
+- [Shears target priority and retained tool](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/core/dispenser/ShearsDispenseItemBehavior.java#L19-L67)
+- [Retained broken stacks and wear processing](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/ItemStack.java#L449-L485)
