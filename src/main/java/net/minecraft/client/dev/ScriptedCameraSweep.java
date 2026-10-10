@@ -14,6 +14,11 @@ import net.minecraft.client.player.LocalPlayer;
  * sections and rotating minimap change every frame. After
  * {@code mattmc.dev.scriptedCamera.seconds} in the world the client stops
  * normally, so recorders flush and JFR dumps.
+ *
+ * <p>Optional timed actions (seconds since the sweep started):
+ * {@code .enableShadersAt} turns shaders on mid-world, as the shader-pack
+ * screen does, and {@code .screenshotsAt} (comma separated) saves
+ * {@code screenshots/scripted-<seconds>s.png} into the game directory.
  */
 public final class ScriptedCameraSweep {
 	private static final boolean ENABLED = Boolean.getBoolean("mattmc.dev.scriptedCamera");
@@ -22,10 +27,16 @@ public final class ScriptedCameraSweep {
 	private static final double YAW_PERIOD = doubleProperty("yawPeriod", 2.4);
 	private static final double PITCH_AMPLITUDE = doubleProperty("pitchAmplitude", 60.0);
 	private static final double PITCH_PERIOD = doubleProperty("pitchPeriod", 1.6);
+	private static final double ENABLE_SHADERS_AT = doubleProperty("enableShadersAt", -1.0);
+	/** {@code toggle} (keybind) or {@code screen} (the shader-pack screen's Apply). */
+	private static final String ENABLE_SHADERS_VIA = System.getProperty("mattmc.dev.scriptedCamera.enableShadersVia", "toggle");
+	private static final double[] SCREENSHOTS_AT = doubleListProperty("screenshotsAt");
 
 	private static long startNanos;
 	private static float baseYaw;
 	private static boolean stopIssued;
+	private static boolean shadersEnabled;
+	private static int screenshotsTaken;
 
 	private ScriptedCameraSweep() {}
 
@@ -33,6 +44,15 @@ public final class ScriptedCameraSweep {
 		String value = System.getProperty("mattmc.dev.scriptedCamera." + name);
 		if (value == null || value.isBlank()) return fallback;
 		return Double.parseDouble(value.trim());
+	}
+
+	private static double[] doubleListProperty(String name) {
+		String value = System.getProperty("mattmc.dev.scriptedCamera." + name);
+		if (value == null || value.isBlank()) return new double[0];
+		double[] values = java.util.Arrays.stream(value.split(",")).map(String::trim)
+			.mapToDouble(Double::parseDouble).toArray();
+		java.util.Arrays.sort(values);
+		return values;
 	}
 
 	/** Yaw (degrees) relative to the starting yaw at {@code seconds} into the sweep. */
@@ -64,6 +84,33 @@ public final class ScriptedCameraSweep {
 			System.out.println("MattMC scripted camera sweep complete after " + elapsed + "s; stopping client");
 			minecraft.stop();
 			return;
+		}
+		if (ENABLE_SHADERS_AT >= 0.0 && !shadersEnabled && elapsed >= ENABLE_SHADERS_AT) {
+			shadersEnabled = true;
+			System.out.println("MattMC scripted camera enabling shaders at " + elapsed + "s");
+			if ("screen".equals(ENABLE_SHADERS_VIA)) {
+				// ShaderPackScreen.applyChanges: enable, then reapply the pack when
+				// the first load requests an option reset.
+				var config = net.irisshaders.iris.apiimpl.IrisApiV0Impl.INSTANCE.getConfig();
+				config.setShadersEnabledAndApply(true);
+				if (net.irisshaders.iris.Iris.shouldResetShaderPackOptionsOnNextReload()) {
+					net.irisshaders.iris.Iris.getIrisConfig().getShaderPackName()
+						.ifPresent(net.irisshaders.iris.Iris.getIrisConfig()::setShaderPackName);
+					config.setShadersEnabledAndApply(true);
+				}
+			} else {
+				try {
+					net.irisshaders.iris.Iris.toggleShaders(minecraft, true);
+				} catch (java.io.IOException error) {
+					throw new java.io.UncheckedIOException(error);
+				}
+			}
+		}
+		if (screenshotsTaken < SCREENSHOTS_AT.length && elapsed >= SCREENSHOTS_AT[screenshotsTaken]) {
+			String name = "scripted-" + Math.round(SCREENSHOTS_AT[screenshotsTaken]) + "s.png";
+			screenshotsTaken++;
+			net.minecraft.client.Screenshot.grab(minecraft.gameDirectory, name, minecraft.getMainRenderTarget(), 1,
+				message -> System.out.println("MattMC scripted camera screenshot " + name + ": " + message.getString()));
 		}
 		// The sweep stands in for mouse movement: without input the vanilla AFK
 		// throttle caps the client at 30 FPS after 60 s.

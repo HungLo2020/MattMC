@@ -4509,6 +4509,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
             instanceCloudEpochs[index] = epoch;
         }
 
+        /**
+         * Marks the last appended instance as DH's "Clouds" group. Rust drops
+         * it when the selected shader pack disables DH clouds, as Iris does.
+         */
+        public void markLastGroupInstanceClouds() {
+            if (instanceCount == 0) throw new IllegalStateException("no DH generic group instance to mark");
+            instanceFlags[instanceCount - 1] |= 4;
+        }
+
         private NativeDhCloudGroupState[] pinCloudOwners(NativeDhCloudGroupState[] pins) {
             if (pins.length < instanceCount) pins = new NativeDhCloudGroupState[instanceCloudOwners.length];
             Arrays.fill(pins,null);

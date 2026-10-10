@@ -873,37 +873,46 @@ impl WorldPrimitiveFrontend {
     /// A frame carrying a Java feature family without a source writer is not
     /// admissible: presenting it would silently omit visible work. Keep the
     /// source route unarmed until that family has a real semantic writer.
+    /// The first visible mesh uploaded without retained source semantics
+    /// (built while shaders were off). No source frame can be admitted until
+    /// its rebuild arrives.
+    pub(crate) fn visible_mesh_lacking_source_semantics(
+        &self,
+        frame: &WorldPrimitiveFrame,
+    ) -> Option<(u64, u32, String)> {
+        let lacking = &self.mesh_assets_lacking_source_semantics;
+        if lacking.is_empty() {
+            return None;
+        }
+        let compact_terrain = frame
+            .static_terrain_sections
+            .sections
+            .iter()
+            .map(|section| section.mesh_key)
+            .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
+            .map(|mesh_key| (mesh_key, WORLD_STRATUM_TERRAIN));
+        frame
+            .mesh_instances
+            .iter()
+            .map(|instance| (instance.mesh_key, instance.stratum))
+            .chain(compact_terrain)
+            .find_map(|(mesh_key, stratum)| {
+                lacking.contains(&mesh_key).then(|| {
+                    let identity = self
+                        .mesh_assets
+                        .get(&mesh_key)
+                        .map(|asset| asset.entity_identity.clone())
+                        .unwrap_or_default();
+                    (mesh_key, stratum, identity)
+                })
+            })
+    }
+
     pub(crate) fn validate_selected_source_frame_coverage(
         &mut self,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<()> {
-        let lacking = &self.mesh_assets_lacking_source_semantics;
-        if let Some((mesh_key, stratum, identity)) = (!lacking.is_empty())
-            .then(|| {
-                let compact_terrain = frame
-                    .static_terrain_sections
-                    .sections
-                    .iter()
-                    .map(|section| section.mesh_key)
-                    .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
-                    .map(|mesh_key| (mesh_key, WORLD_STRATUM_TERRAIN));
-                frame
-                    .mesh_instances
-                    .iter()
-                    .map(|instance| (instance.mesh_key, instance.stratum))
-                    .chain(compact_terrain)
-                    .find_map(|(mesh_key, stratum)| {
-                        lacking.contains(&mesh_key).then(|| {
-                            let identity = self
-                                .mesh_assets
-                                .get(&mesh_key)
-                                .map(|asset| asset.entity_identity.clone())
-                                .unwrap_or_default();
-                            (mesh_key, stratum, identity)
-                        })
-                    })
-            })
-            .flatten()
+        if let Some((mesh_key, stratum, identity)) = self.visible_mesh_lacking_source_semantics(frame)
         {
             // Uploaded while shaders were off; the rebuild requested when the
             // source route activated will resend it with source semantics.
@@ -1583,6 +1592,18 @@ impl WorldPrimitiveFrontend {
         self.last_source_route_extent = Some(extent);
     }
 
+    /// Iris cancels DH's "Clouds" group while a pack is selected whose
+    /// directives disable DH clouds, whichever route draws the frame.
+    pub(crate) fn drop_shader_pack_disabled_dh_clouds(&self, frame: &mut WorldPrimitiveFrame) {
+        if self
+            .shader_pack_sources
+            .active_cloud_policy()
+            .is_some_and(|policy| policy.avoids_distant_horizons_clouds())
+        {
+            frame.dh_generic_boxes.retain(|item| !item.cloud);
+        }
+    }
+
     /// Admits an armed frame before any source work is recorded. A frame the
     /// shader route cannot cover (a producer or resource it does not model yet)
     /// disarms the route and is drawn by the vanilla Rust route instead, with
@@ -1590,6 +1611,9 @@ impl WorldPrimitiveFrontend {
     /// their own clouds drop vanilla cloud faces here, before validation.
     #[cfg(not(test))]
     pub(crate) fn admit_armed_source_frame(&mut self, mut frame: WorldPrimitiveFrame) -> WorldPrimitiveFrame {
+        if self.source_execution_enabled() {
+            self.drop_shader_pack_disabled_dh_clouds(&mut frame);
+        }
         if !self.runtime_source_execution_is_armed() {
             return frame;
         }

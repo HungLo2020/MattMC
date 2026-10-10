@@ -48,6 +48,17 @@ the native library together after changing this layout.
 
 Related tracking: [#777](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6089017758).
 
+## Shader-pack cloud directives
+
+Iris cancels the "Clouds" group when the selected pack sets `dhClouds=off`, or
+leaves `dhClouds` unset and sets `clouds=off` (Complementary sets
+`dhClouds = off` inside `#ifdef DISTANT_HORIZONS`). Java marks that group's
+instance with flag bit 2;
+[`ShaderPackCloudPolicy`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/properties/clouds.rs)
+resolves the directives from the pack's `shaders.properties` with its option
+and environment defines, and frame admission drops marked boxes while a pack is
+selected. Vanilla clouds still follow `LevelRenderer`'s own rule.
+
 ## Verification
 
 With JDK 25 selected:

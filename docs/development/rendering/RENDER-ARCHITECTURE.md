@@ -207,6 +207,18 @@ and [`frame/static_terrain.rs`](https://github.com/HungLo2020/MattMC/blob/54611c
 A caster whose newer generation has not crossed yet keeps casting with the
 acknowledged one. Java keeps no active-instance state for casters.
 
+Turning shaders on mid-world behaves like Frozen's `allChanged()`. Terrain
+built with shaders off lacks the pack's block ids and retained source
+semantics, and the shader route rejects any frame showing such a mesh. Once
+Rust accepts the pack source,
+[`RustGalFrameCoordinator`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java)
+calls `RustGalTerrainRenderer.requestSourceSemanticRebuild()`: the terrain
+source retires every published layer, replaces its worker pool and rebuilds
+all sections, keeping the graph's loaded columns. `LevelRenderer.allChanged()`
+is a no-op on this route, so do not rely on it. While a visible mesh still
+lacks semantics, frames also skip the offscreen source-preparation
+submission, which cannot arm and corrupted the fallback frame.
+
 Ordinary whole frames use a native FIFO worker by default. The queued bridge
 decodes/copies Java records and acquires native terrain/DH owners on the calling
 thread before Java releases its arena; the worker then acquires the swapchain

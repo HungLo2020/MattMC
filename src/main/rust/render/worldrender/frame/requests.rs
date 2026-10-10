@@ -667,6 +667,8 @@ pub struct WorldDistantHorizonsGenericBoxRequest {
     /// Render-group ordinal within this frame: boxes of one group share its
     /// origin, so one source range (and model offset) per group is exact.
     pub group: u32,
+    /// Belongs to DH's "Clouds" group, which a shader pack can disable.
+    pub cloud: bool,
 }
 
 impl WorldPrimitiveFrame {

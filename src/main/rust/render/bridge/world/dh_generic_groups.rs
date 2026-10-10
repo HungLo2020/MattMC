@@ -102,7 +102,7 @@ pub(super) unsafe fn expand_dh_generic_groups(
     let registry = lock();
     let mut boxes = Vec::new();
     for (ordinal, instance) in instances.iter().enumerate() {
-        if instance.flags & !3 != 0
+        if instance.flags & !7 != 0
             || instance.origin.iter().any(|value| !value.is_finite())
             || instance.shading.iter().any(|value| !value.is_finite())
         {
@@ -136,6 +136,7 @@ pub(super) unsafe fn expand_dh_generic_groups(
             ssao_enabled: instance.flags & 1 != 0,
             material: item.material,
             group: ordinal as u32,
+            cloud: instance.flags & 4 != 0,
         }));
     }
     Ok(boxes)

@@ -15,6 +15,7 @@ use crate::render::shaderpack::properties::custom_uniforms::ShaderPackCustomUnif
 use crate::render::shaderpack::properties::held_light::ShaderPackHeldLightPolicy;
 use crate::render::shaderpack::properties::item_ids::ShaderPackItemIdMap;
 use crate::render::shaderpack::properties::shadow::ShaderPackShadowPolicy;
+use crate::render::shaderpack::properties::clouds::ShaderPackCloudPolicy;
 use crate::render::shaderpack::properties::wetness::ShaderPackWetnessPolicy;
 
 /// Reserved semantic configuration file generated alongside one complete
@@ -558,6 +559,7 @@ pub struct ShaderPackSourceStore {
     active_held_light_policy: Option<ShaderPackHeldLightPolicy>,
     active_shadow_policy: Option<ShaderPackShadowPolicy>,
     active_wetness_policy: Option<ShaderPackWetnessPolicy>,
+    active_cloud_policy: Option<ShaderPackCloudPolicy>,
     failed_generations: Vec<u64>,
 }
 
@@ -620,7 +622,9 @@ impl ShaderPackSourceStore {
                 return Err(error);
             }
         };
+        let cloud_policy = ShaderPackCloudPolicy::from_source(&candidate);
         self.active = Some(candidate);
+        self.active_cloud_policy = Some(cloud_policy);
         self.active_item_id_map = Some(item_id_map);
         self.active_custom_uniform_policy = Some(custom_uniform_policy);
         self.active_held_light_policy = Some(held_light_policy);
@@ -648,6 +652,11 @@ impl ShaderPackSourceStore {
     /// semantic evaluators.
     pub fn active_custom_uniform_policy(&self) -> Option<&ShaderPackCustomUniformPolicy> {
         self.active_custom_uniform_policy.as_ref()
+    }
+
+    /// Cloud directives of the active source generation.
+    pub fn active_cloud_policy(&self) -> Option<ShaderPackCloudPolicy> {
+        self.active_cloud_policy
     }
 
     /// The held-light policy belongs to the exact immutable source generation

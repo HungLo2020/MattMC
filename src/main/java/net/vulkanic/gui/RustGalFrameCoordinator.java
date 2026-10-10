@@ -2720,10 +2720,7 @@ public final class RustGalFrameCoordinator {
 				if (shaderPackSemanticRebuildPending) {
 					shaderPackSemanticRebuildPending = false;
 					RustGalWorldPrimitiveRenderer.resendRetainedWorldMeshAssets();
-					Minecraft minecraft = Minecraft.getInstance();
-					if (minecraft.level != null && minecraft.levelRenderer != null) {
-						minecraft.levelRenderer.allChanged();
-					}
+					RustGalTerrainRenderer.requestSourceSemanticRebuild();
 				}
 				auditMessage("Rust VulkanicGAL shader-pack source update accepted generation="
 					+ uploadedShaderPackSourceGeneration

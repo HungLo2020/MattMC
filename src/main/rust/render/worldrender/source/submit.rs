@@ -120,6 +120,16 @@ impl WorldPrimitiveFrontend {
         {
             return Ok(());
         }
+        // Coverage would reject this frame after the whole offscreen
+        // preparation: skip that doubled work while shader-off meshes are
+        // still being rebuilt with source semantics.
+        if let Some((mesh_key, stratum, identity)) = self.visible_mesh_lacking_source_semantics(frame) {
+            self.source_execution_armed = false;
+            self.last_admission_decision = Some(format!(
+                "selected-source frame coverage is incomplete: visible mesh {mesh_key} (stratum {stratum}, identity '{identity}') has no retained source semantics yet"
+            ));
+            return Ok(());
+        }
         let owner = passes::oriented_target::OrientedWorldTarget::create(
             gal,
             "minecraft.source.entry-preparation",

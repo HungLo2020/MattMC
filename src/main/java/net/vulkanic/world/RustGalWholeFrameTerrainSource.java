@@ -61,6 +61,8 @@ public final class RustGalWholeFrameTerrainSource {
 	private static volatile String lastWholeFrameTerrainFailure = "none";
 	private static volatile long wholeFrameTerrainFailureCount;
 	private static volatile long resourceReloadEpoch;
+	private static volatile long fullRebuildEpoch;
+	private long observedFullRebuildEpoch = fullRebuildEpoch;
 
 	private ClientLevel level;
 	private ClonedChunkSectionCache sectionCache;
@@ -145,6 +147,10 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		if (this.workerBuilder == null || this.sectionCache == null) {
 			return;
+		}
+		if (this.observedFullRebuildEpoch != fullRebuildEpoch) {
+			this.observedFullRebuildEpoch = fullRebuildEpoch;
+			this.clearAndRebuildAll();
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.source-select");
 		this.completedBuildsConsumedThisFrame = 0;
@@ -555,6 +561,11 @@ public final class RustGalWholeFrameTerrainSource {
 		resourceReloadEpoch++;
 	}
 
+	/** Discards all built terrain and rebuilds it from scratch (see {@code requestSourceSemanticRebuild}). */
+	static void requestFullRebuild() {
+		fullRebuildEpoch++;
+	}
+
 	/**
 	 * Readiness for the client loading gate: the section's current build has
 	 * been consumed (an empty section counts) and no rebuild is outstanding.
@@ -625,6 +636,27 @@ public final class RustGalWholeFrameTerrainSource {
 		this.visibleKeys.clear();
 		this.buildFrame = 0;
 		this.level = null;
+	}
+
+	/**
+	 * Frozen's {@code allChanged()}: drop every published section and rebuild
+	 * all of them. The graph keeps its loaded columns (the chunk tracker only
+	 * reports changes); in-flight builds of the retired pool are cancelled.
+	 */
+	private void clearAndRebuildAll() {
+		this.workerBuilder.shutdown();
+		this.destroyCompletedBuilds();
+		this.workerSeparateAo = RustGalTerrainRenderer.copiedShaderPackSeparateAo();
+		this.workerBuilder = new ChunkBuilder(this.level, ChunkMeshFormats.COMPACT, this.workerSeparateAo,
+			semanticMeshWorkerCount());
+		RustGalTerrainRenderer.removeAllSections("shader-semantics-rebuild");
+		this.geometrySections.clear();
+		this.blockEntitySections.clear();
+		this.visibleSections.clear();
+		this.visibleKeys.clear();
+		this.graph.reloadResources(true);
+		wholeFrameSurfaceQueueDrained = false;
+		wholeFrameTerrainQueueDrained = false;
 	}
 
 	/**

@@ -339,6 +339,10 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 					LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight), boxGroup.ssaoEnabled,
 					shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom, boxCount);
                 }
+				if (cloudGroup)
+				{
+					semanticBoxes.markLastGroupInstanceClouds();
+				}
 				if (boxGroup.ssaoEnabled)
 				{
 					ssaoBoxes += boxCount;

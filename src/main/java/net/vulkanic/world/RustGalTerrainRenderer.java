@@ -153,6 +153,23 @@ public final class RustGalTerrainRenderer {
 			minecraft.levelRenderer.allChanged();
 		}
 	}
+	/**
+	 * Frozen's {@code allChanged()} on a shader toggle: once Rust has accepted
+	 * a selected pack, drop all terrain and rebuild it. Sections built while
+	 * shaders were off lack the pack's block ids and retained source semantics,
+	 * and the source route cannot arm while one is visible.
+	 * {@code LevelRenderer.allChanged()} does nothing on this route.
+	 */
+	public static void requestSourceSemanticRebuild() {
+		RustGalWholeFrameTerrainSource.requestFullRebuild();
+	}
+
+	/** Retires every published terrain layer; the terrain source rebuilds them. */
+	static void removeAllSections(String reason) {
+		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
+			removeLayer(key.sectionPos(), key.layer(), reason);
+		}
+	}
 	private static volatile long registeredAtlasGeneration;
 	private static volatile long publishedWorldMeshAtlasGeneration;
 	private static VulkanicGalBridge.WorldMeshTextureAssetRecord publishedWorldMeshAtlasPayload;

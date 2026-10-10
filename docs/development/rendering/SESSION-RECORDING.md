@@ -78,6 +78,13 @@ variation with external load. Those observations are not renderer speedups.
 Compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
 "everything else" CPU (`cpu.csv` system minus client) alongside FPS.
 
+Timed actions take seconds since the sweep started:
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersAt=25` turns shaders on
+mid-world (`...enableShadersVia=screen` repeats the shader-pack screen's Apply),
+and `...screenshotsAt=20,45` saves `screenshots/scripted-<n>s.png`; add
+`--keep-game-dir` to keep them and `--yaw-amplitude 0 --pitch-amplitude 0` for
+a still camera. Start with `--config 'config/iris.properties:enableShaders=false'`.
+
 Independent review at `fc1d529d` passed five synthetic scripted-setup fixtures,
 including config separators/quotes and missing-key rejection. They do not run
 the client or establish live AFK prevention, profiling correctness or performance.

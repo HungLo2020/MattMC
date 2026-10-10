@@ -559,6 +559,7 @@ pub struct FfiDhGenericGroupInstance {
     pub origin: [f64; 3],
     pub packed_light: u32,
     /// Bit 0: SSAO. Bit 1: origin comes from the native CPU cloud owner.
+    /// Bit 2: DH's "Clouds" group (dropped when the shader pack disables DH clouds).
     pub flags: u32,
     /// North, south, east, west, top, bottom directional multipliers.
     pub shading: [f32; 6],
