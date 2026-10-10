@@ -11,6 +11,8 @@ each module there has a short README with its own file map.
   model and its phased rollout toward Frozen parity.
 - [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,
   API overrides and direct pose consumption with bounded lifetime.
+- [Rust DH render columns](RUST-DH-RENDER-COLUMNS.md): compact-column reduction,
+  water/material policy, borrowed storage and actual Frozen CPU replay.
 - [Native terrain face policy](RUST-TERRAIN-CULLING.md): direct retained-state
   culling, immutable geometry ownership and callback compatibility.
 - [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light

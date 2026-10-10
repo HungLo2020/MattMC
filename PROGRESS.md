@@ -16,7 +16,7 @@
 - Java still binds atomic chunk references, supplies reference-CAS facts, projects ring reads, orchestrates relocation and delivers world/biome/hook callbacks. Malformed radii/custom inputs retain compatibility behavior.
 - General gameplay/simulation, platform/network/startup and remaining extraction still belong to Java; app/ is empty. This is not Java-removal completion.
 - Loaded-world sky/fog and DH columns now share one retained native biome binding; unchanged publication avoids Java pointer arrays and Rust owner-row reconstruction while checking primary generations.
-- Prioritize authoritative world-state producers and direct consumers together. Next: DH neighborhood orchestration or remaining render-column production, guided by streaming samples; preserve callbacks, cached wrapper fields and compatibility escape.
+- Prioritize authoritative world-state producers and direct consumers together. Next: contextual DH render-column color conversion or neighborhood orchestration, guided by streaming samples; preserve callbacks, cached wrapper fields and compatibility escape.
 
 ## Preceding shared-biome CPU checkpoint
 
@@ -30,13 +30,21 @@
 - Native admission now declines custom world/height bindings before metadata reads. Added regression preserves stateful per-row getter calls/keys. Rust/native stayed unchanged; final Java suites include this revision.
 - Additional strong native leases and obsolete cached bindings need sustained memory checks. CPU contract evidence is not runtime, FPS or full-parity acceptance. Twenty interleaved/exact6000 timing runs are predeclared for this image, not started.
 
-## Current combined CPU checkpoint
+## Previous combined world-producer CPU checkpoint
 
 - Release628cfd97 adds DH change-hash sampling, cached-surface policy, UTF16 identity hashes and emitter folding to Rust over retained inputs. Java admits identities and delivers the original emitter boundary; no sampled voxel arrays cross it. Renderer ABI79/layout58 and Rust/GAL ownership remain.
 - Actual Frozen recorder pins15 classes and records96 cases:16 saved block chunks/two declared biome patterns/three cached-field-edit phases. Rust and the ordinary Java consumer match every hash, including stale-empty masking and public emitter reorder/duplicates.
 - Final253 Rust world,132 bridge,155 chunk and2 terrain-expansion checks pass. FocusedJava31 pass; fullJava1755 ordinary/two skips plus154 parity,1909 reported/1907 executed across342 suites, zero failures/errors. Six final workers map exact628cfd97.
 - All39481 Current/38176 Frozen source pins, native library and protected prompt match; Frozen HEAD unchanged. Receipts: build/native-dh-chunk-hash/; guide: docs/development/world/chunk/RUST-DH-CHANGE-HASH.md. Initial Java fixture rejection retained: raw palette edit was correctly masked by the empty counter; corrected test uses the section setter. Production hash unchanged.
 - Custom callback/exception prefixes, escaped biome/public wrapper replacement and mutable emitter subclasses keep compatibility behavior. Native identity readers share locks; scratch grows geometrically within fixed bounds. Hardware/FPS/long-memory remain unverified; twenty ABAB/exact6000 runs predeclared, not started.
+
+## Current render-column CPU checkpoint
+
+- Complete compact render-column reduction now belongs to render/dh_columns: exact unstable sort ties, small/adjacent/erase/forced merge passes, water restoration, highest-to-lowest output and semantic mixed identities.
+- Canonical Java views borrow existing heap spans and receive direct destination writes, without point-array packing or Java reducer graph/sort construction. Custom inputs preserve callbacks/failures; native decline leaves output untouched. Contextual colors, faces/greedy merges and final packets remain Java.
+- Actual untouched Frozen recorder pins6 classes and executes3616 synthetic CPU cases. All outputs/exceptions/sentinels match Rust; alias/material and four independent scratch-worker controls pass. Reused per-thread capacities are bounded8192nodes/8192indices/4096output pairs, with no source pointer/world retained.
+- Releaseee1676ec passes4 focused Rust/27 architecture checks and5 focused JNI controls. FullJava1755 ordinary/two skips plus159 parity,1914 reported/1912 executed across343 suites, zero failures/errors; six final workers map exact image. All39492 Current/38176 Frozen/native/prompt/inventory guards pass; Frozen HEAD unchanged.
+- No new runtime/FPS/long-memory claim;20 ABAB/exact6000 runs predeclared, not started. Receipts: build/native-dh-render-reduction/; guide: docs/development/rendering/RUST-DH-RENDER-COLUMNS.md. Initial fixture-include compilation error retained and corrected. Native scratch has no source/world pointers; Apache2.0 sort attribution/license bundled.
 
 ## Prior accepted hardware evidence
 
@@ -56,7 +64,8 @@
 
 ## Sync and artifact integrity
 
-- Latest publication instruction supersedes the earlier no-commit restriction. Combined tested batch prepared for incremental master publication with sync-and-push; no hardware performance acceptance implied.
+- Next renderer batch uses sync-and-push:21 intended paths; upstream already matchesd3c427a79, empty index, no conflict/stash needed. Final CPU gates pass; prepared for incremental publication.
+- Latest publication instruction supersedes the earlier no-commit restriction. Combined batchd3c427a79 published and remote master verified with sync-and-push. Worktree clean; workflow stash retired and both old stashes preserved. No hardware performance acceptance implied.
 - Integrated368c10a87 documentation ontofc1d529db. Preserved150 pending paths:146 byte/mode/symlink exact, four overlapping docs reconciled; lighting conflict preserves historical #826 finding plus executable fix. Two additional rendering docs reflect that newer CPU scope. Original empty index restored; recovery: build/native-dh-chunk-hash/publish/.
 - Earlier requested600s work interval/sync preserved134 paths across5323a216f→fc1d529db, reconciled packed-word decoding/mutation stamps and DH retained LongList/preservation-policy tests. Earlier temporary stash retired; original two stashes retained. Failures/receipts: build/native-client-residency/sync/.
 - Bulk pruning recovered~350GiB earlier;~179GiB free. No new world/capture copies. Preserve prepared DH source and five open first-view/startup/closed-pipe investigation worlds; completed inactive timing copies are absent.

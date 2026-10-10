@@ -17,7 +17,10 @@ while appending remapped points. Java stores the resulting bytes and reads seede
 hashes; it does not repeat these policies per group. Java still owns source update
 orchestration, custom material-map mutation, metadata storage, contextual callbacks,
 persistence and render-data transformation.
-Legacy or explicitly replaced Java lists remain compatibility inputs.
+Legacy or explicitly replaced Java lists remain compatibility inputs. The subsequent
+[render-column reducer](../../rendering/RUST-DH-RENDER-COLUMNS.md) owns compact
+reduction policy in Rust; contextual full-data colors and final render geometry
+remain Java.
 
 The subsequent [material-map migration](RUST-DH-MATERIAL-MAPS.md) moves admitted
 ordered material identities/indexes, whole-map remapping and hash policy to Rust.

@@ -445,3 +445,12 @@ the31 focused Java checks and full1,909 reported Java tests pass (two skips,
 zero failures/errors), alongside253 Rust world checks. Hardware/FPS and
 long-memory verification remain pending. Java retains compatibility
 admission and callbacks, not per-voxel packing or the hash loops.
+
+The subsequent [DH render-column reduction](../rendering/RUST-DH-RENDER-COLUMNS.md)
+owns the whole compact reduction policy in Rust and borrows existing canonical
+CPU storage. It removes Java reducer graph/sort construction; contextual color
+callbacks, face construction and final packets remain subsequent migration work.
+Actual Frozen3,616-case synthetic CPU replay is supplemental. Releaseee1676ec
+passes four focused Rust checks,27 architecture checks, five focused Java controls
+and full1,914 reported Java tests (two skips, zero failures/errors). Hardware,
+realistic performance and long-memory verification remain pending.

@@ -261,6 +261,7 @@ public class RenderDataPointUtil
 	 */
 	public static void mergeMultiData(IColumnDataView sourceData, ColumnArrayView output)
 	{
+		if (net.vulkanic.world.NativeDhRenderReduction.reduce(sourceData, null, output, null)) return;
 		int target = output.verticalSize();
 		if (target <= 0)
 		{
@@ -302,6 +303,7 @@ public class RenderDataPointUtil
 		{
 			throw new IllegalArgumentException("Semantic material arrays must cover their render-data views");
 		}
+		if (net.vulkanic.world.NativeDhRenderReduction.reduce(sourceData, sourceSemanticMaterials, output, outputSemanticMaterials)) return;
 		try (RenderDataPointReducingList list = new RenderDataPointReducingList(sourceData, sourceSemanticMaterials))
 		{
 			list.reduce(output.verticalSize());

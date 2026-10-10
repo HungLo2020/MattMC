@@ -16,6 +16,7 @@ render/
 ├── shared/       helpers used by both renderers
 ├── scene/        wire and data vocabulary (constants, data types)
 ├── dh_collector/ DH column state, copied payloads, publication and frame admission
+├── dh_columns/   CPU render-column reduction, water/material policy and bounded scratch
 ├── clouds/       CPU cloud motion/placement/culling owners; no GPU dependencies
 ├── items/        authored item poses and world/hand composition; no GPU dependencies
 ├── vulkanic/     VulkanicGAL: the graphics abstraction layer and its backends
@@ -499,10 +500,17 @@ The subsequent [contributor migration](../world/chunk/RUST-DH-CONTRIBUTORS.md)
 retains bounded point footprints, clipping and ID remapping in Rust instead of
 exporting Java point arrays; disabled preservation still skips that work. Java
 continues to own the render-column conversion, faces, merges and final packets.
+
 Exact-topology merge restrictions require both the exact flag and the Rust
 geometry route. Use separate launches for A/B switches: the exact flag is
 latched at class initialization; live reads of the other flags do not establish
 a supported mid-session toggle or rebuild invalidation contract.
+
+The later [render-column reduction](RUST-DH-RENDER-COLUMNS.md) owns the complete
+compact reduction algorithm in Rust. Canonical Java views borrow existing heap
+storage for one bounded native call and direct destination publication; they do
+not construct or sort a second Java reducer graph. Contextual full-data color
+conversion, faces, greedy merging and final packet construction still remain.
 
 DH's greedy merge sorts each face list by
 [`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):
