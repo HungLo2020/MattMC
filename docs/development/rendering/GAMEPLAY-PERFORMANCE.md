@@ -6,7 +6,10 @@ rotates at a fixed point. Readiness losses can discard partial timing windows.
 Those results do not establish startup, streaming, or visible-minimap performance.
 The [driver at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/DevUtils/tests/rendering/RunOrdinaryPerformance.py)
 records a separate `ordinary-gameplay-v1` protocol. To diagnose a session you
-play by hand instead, see [Recording a hand-played session](SESSION-RECORDING.md). A `complete` result means
+play by hand instead, see [Recording a hand-played session](SESSION-RECORDING.md).
+That recorder observes Current only and adds diagnostic overhead; it does not
+supply a matched Frozen comparison or acceptance verdict. An ordinary driver's
+`complete` result means
 the requested observation finished and passed its state/health checks; the
 driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 
@@ -101,6 +104,26 @@ An empty manifest means full replacement, including an empty reset. A recreated
 native context receives all Java resident payloads. This prevents a changing
 minimap/font from retransmitting a retained title panorama.
 
+The [allocation follow-up](https://github.com/HungLo2020/MattMC/commit/dd8852a5717d0fc4fd2fe75f2aba173614ee8faa)
+lets internal raw-image assets adopt freshly produced arrays. Public staging
+entry points still copy caller-owned arrays, the public pixel accessor remains
+defensive, and the bridge record copies the internal immutable payload. Keep
+that ownership boundary when changing VoxelMap or atlas publication; fewer
+intermediate copies do not make the path zero-copy.
+The same change skips diagnostic identity strings when diagnostics are disabled,
+avoids per-block sprite iterators and `Direction.values()` clones, and uses
+primitive keys in hot model-sprite/DH provenance maps.
+
+The later [mesh/bridge follow-up](https://github.com/HungLo2020/MattMC/commit/90d31038f246143bc2c4449e6b9db896f83e0d58)
+copies or converts only absent geometry, creates per-mesh resource sets lazily
+outside the shared-page route, and splits `submitWorldFrame` packing into helpers.
+Its author-recorded hand-played measurements reduce GAL creates per new mesh
+key from 2.6–3.8 to 2.3 and mesh preparation from 475–534 to 446 µs per new key.
+The reported C2 compilation change from 60.6 to 9.3 seconds is also a component
+observation. Session FPS varied with terrain throughput; none of these reports
+isolates an FPS gain or validates the current head. See
+[the ownership constraints](RENDER-ARCHITECTURE.md).
+
 Packed DH admission checks restricted material/normal bytes directly. Position
 and light fields are unsigned 16-bit values by representation; validation must
 not recreate a ByteBuffer and Java vertex record for each packed vertex.
@@ -126,6 +149,25 @@ These fixtures do not replace ordinary visible-map gameplay and normal
 visual/lifecycle checks.
 
 ## Recorded evidence and limits
+
+The later [fog/cache record at `3adbe6d5`](https://github.com/HungLo2020/MattMC/blob/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a/PROGRESS.md#L73)
+reports four ordinary CPU/allocation profiles for release `f449557e`, separate
+from the three-window protocol below. Process, source, library, movement and
+cleanup guards pass; twelve actual F3 positions were reviewed, and four verified
+copies were retired. Forward/return endpoints differ by at most 0.545 blocks.
+Weighted Java allocation over eight seconds is 0.951 GB Current / 2.437 GB
+Frozen, with no sampled Current Java sky/fog-grid allocation. This excludes
+Rust allocation. Zero sampled Current native color-method CPU stacks do not
+prove absence of execution, and substantial Current JIT activity limits
+attribution. The 89.13 MB of sampled Current light-map copying identifies further
+work, not an accepted speedup or long-session memory result. Receipt:
+`goal5/native-live-biome-fog-cache-flight-profile-20261009/profile-comparison.json`.
+
+Those profiles and the [settled matrix](GOAL-5-STATUS.md#october-9-live-fog-and-validated-color-reuse-summary)
+predate the session recorder and allocation/lazy-mesh changes above. Vanilla p99
+still fails in that matrix; entry, sustained streaming, pop-in/flicker and broad
+visual acceptance remain open. The following record retains its earlier
+`ee34f2ad` source and ordinary-driver workload scope.
 
 The [record at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/PROGRESS.md#L53-L55)
 reports a completed DH-on, shaders-off, visible-minimap comparison after fixing

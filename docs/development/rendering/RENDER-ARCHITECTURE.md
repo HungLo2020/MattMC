@@ -88,9 +88,10 @@ own canonical storage/mutation, [section-local counters](../world/chunk/RUST-SEC
 fuse eligible writes and recount directly, [immutable rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
 share resolver lattice samples within a capture. [Live biome owners](../world/biome/RUST-LIVE-BIOMES.md)
-retain admitted palettes and the loaded-client index used by direct raw sky
-sampling. Java still delivers chunk/packet/range events and retains fog and
-terrain-tint consumers. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
+retain admitted palettes and the loaded-client index used by direct raw sky/fog
+sampling and generation-validated result reuse. Java still delivers
+chunk/packet/range events and retains hooks, terrain tint/blending and later
+brightness/weather adjustments. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
 own canonical lazy defaults and allocated nibble generations, including native
 propagation handoffs. The [terrain-light consumer](RUST-TERRAIN-LIGHTING.md)
 borrows these generations and prepares mesher words directly. Java retains
@@ -124,14 +125,16 @@ and nothing may depend on its iteration order. Derive per-asset facts once
 instance. On the Java side, resource texture bytes requested during frame
 extraction go through `TexturePayloadCache`, which resource reload clears.
 
-The local live-biome migration moves canonical sky/fog sampling and result
-reuse into Rust. Each result is keyed by exact position and color field after
-validating world residency and every captured section generation/revision.
+The [published live-biome extension](https://github.com/HungLo2020/MattMC/commit/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a)
+moves canonical sky/fog sampling and result reuse into Rust. Each result is keyed
+by exact position and color field after validating world residency and every captured section generation/revision.
 Java dispatches hooks and applies brightness/weather on every call. Custom
 providers retain their original callbacks. The previous Java camera/tick memos
 could return stale hook results and are removed. See [live biome ownership](../world/biome/RUST-LIVE-BIOMES.md)
-for admission, source mutation and current verification scope. Runtime results
-for release `29e3fd54` precede the result-cache change.
+for admission, source mutation and verification scope. Runtime results for
+release `29e3fd54` precede the result-cache change; the later author-recorded
+`f449557e` checks cover that migration, before the recorder/allocation/lazy-mesh
+follow-ups. Its vanilla p99 gate still fails; see [the measured workload](GOAL-5-STATUS.md#october-9-live-fog-and-validated-color-reuse-summary).
 Native admission can decline; Sodium then uses the Java fast cubic sampler,
 and the outer caller retains its Gaussian fallback when no hook supplies a
 result. Keep native generation checks separate from custom callback lifetimes.
@@ -195,17 +198,24 @@ The empty Citadel proxy remains unsupported ([#803](https://github.com/HungLo202
 [#819](https://github.com/HungLo2020/MattMC/issues/819) tracks the source-predicted
 orb-boundary error when a rig changes the mesh stream length.
 
-The shared mesh instance stream is bound into every mesh resource set, so
-growing it rebuilds them all. It grows to at least twice its previous capacity;
-growing to the exact requirement while terrain streamed caused ~30 ms frames.
+The mesh instance stream is part of existing mesh resource-set bindings, so
+growing it invalidates those bindings for rebuilding. It grows to at least twice
+its previous capacity; the source records ~30 ms frames when exact-capacity
+growth repeatedly rebuilt sets while terrain streamed.
 
 Ordinary opaque/cutout terrain draws through shared page resource sets.
-Per-mesh resource sets are created on first use
-(`ensure_mesh_resource_set`) only for draws outside that path, and a mesh's
-vertex/index bytes are copied or compacted only when its geometry is not yet
-resident. Creating both eagerly for every new section key dominated frame time
-while moving through new terrain; see
-[the session recordings](SESSION-RECORDING.md) for how this was measured.
+Per-mesh resource sets remain absent until first use
+(`ensure_mesh_resource_set`) by draws outside that path, including ordered
+translucency, entities/items and Fabulous. The set binds the caller's actual
+instance-stream buffer. Vertex bytes are copied or compact-converted, and index
+bytes copied, only when that geometry key is not yet resident; distinct
+section/material keys can share it within the same mesh generation and vertex
+ABI. This preserves copies for new geometry and does not create a zero-copy contract. The
+[author's follow-up](https://github.com/HungLo2020/MattMC/commit/90d31038f246143bc2c4449e6b9db896f83e0d58)
+reports lower per-new-key creation/preparation costs in hand-played sessions,
+with FPS varying by terrain throughput. Those component reports do not establish
+isolated FPS gains; see [session recording](SESSION-RECORDING.md) and
+[allocation evidence](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints).
 
 Distant Horizons builds its render list on the render thread without
 `LodQuadTree`'s lock while the tick thread can recenter the tree. The node

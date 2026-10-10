@@ -29,13 +29,14 @@ and orchestration are still unfinished. Preserve world/save behavior and bounded
 generation/reload handling, and verify realistic workloads against Frozen.
 
 Use the [Goal 5 rendering checkpoint](../rendering/GOAL-5-STATUS.md) for
-current source ownership through
-[`1b9b1033`](https://github.com/HungLo2020/MattMC/commit/1b9b103398fd70d5b5152b93a1d0abc581fffc19),
-and [live-biome verification](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
-for the latest author-recorded comparison and final range-fix checks. Those
-checks have different release identities; performance, ordinary gameplay,
-temporal parity and long-session memory acceptance remain open. This
-documentation review adds no runtime verification.
+current rendering ownership and evidence limits, and the
+[live-biome guide](../world/biome/RUST-LIVE-BIOMES.md) for native sky/fog sampling
+and generation-validated color reuse. Its author-recorded comparisons have
+different release identities; the
+[earlier verification](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
+also preserves the sky-only and range-fix checkpoints. Performance, ordinary
+gameplay, temporal parity and long-session memory acceptance remain open.
+This documentation review adds no runtime verification.
 
 Follow the owner boundary relevant to the next change:
 
@@ -52,13 +53,19 @@ Follow the owner boundary relevant to the next change:
   Java still supplies model admission, contextual light predicates/shade and
   biome/custom tint samples; unsupported and diagnostic inputs retain
   compatibility paths.
-- **Live biomes and sky:** the [admitted palette owner and direct raw sky consumer](../world/biome/RUST-LIVE-BIOMES.md)
-  are native. Java retains chunk lifecycle events, fog, terrain tint/blending
-  and later sky brightness/weather adjustments. Preserve the guide's missing
-  chunk, mutable-container, view-range and world-lifetime boundaries.
+- **Live biomes and colors:** the [admitted palette owner and direct raw sky/fog consumers](../world/biome/RUST-LIVE-BIOMES.md)
+  are native. Rust reuses exact-position colors only after validating the world
+  revision and retained source generations. Java retains chunk lifecycle events,
+  compatibility sampling, terrain tint/blending and later brightness/weather
+  adjustments; hooks still run on every call. Preserve custom-hook/source
+  dispatch and the guide's missing-chunk, mutable-container, view-range and
+  world-lifetime boundaries.
 - **Per-frame scene and entity work:** [DH visibility frames](../rendering/RETAINED-SCENE.md#native-dh-visibility-frame-ownership),
   [built-in DH clouds](../rendering/RUST-DH-CLOUDS.md) and
   [item-layer poses](../rendering/RUST-ITEM-LAYERS.md) have native owners for admitted paths.
+  Native [mesh-resource preparation](../rendering/RENDER-ARCHITECTURE.md) now
+  reuses resident geometry across section/material keys for the same mesh
+  generation and vertex ABI, and creates per-mesh resource sets only when a draw needs them outside shared-page terrain binding.
   Remaining retained mesh payloads, entity preparation, Java animation and
   contextual inputs still need work with their direct consumers.
 

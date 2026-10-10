@@ -13,8 +13,8 @@ each module there has a short README with its own file map.
   API overrides and direct pose consumption with bounded lifetime.
 - [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light
   reads, contextual callback compatibility and local verification scope.
-- [Live biome sky sampling](../world/biome/RUST-LIVE-BIOMES.md): direct raw sky
-  colors from retained native palettes, Java lifecycle events and bounded evidence.
+- [Live biome color sampling](../world/biome/RUST-LIVE-BIOMES.md): direct raw sky/fog
+  colors and generation-validated reuse, Java lifecycle events and bounded evidence.
 - [Native item-layer preparation](RUST-ITEM-LAYERS.md): authored CPU poses,
   direct GUI/world/hand consumption and lazy mutable-mesh allocation.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:

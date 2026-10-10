@@ -18,8 +18,9 @@
 
 - [Rust live block sections](RUST-LIVE-SECTIONS.md): authoritative packed storage,
   palette growth, CPU views, bulk consumers and remaining compatibility work.
-- [Live biome sections and sky sampling](../biome/RUST-LIVE-BIOMES.md): admitted
-  4³ palettes, loaded-client residency and the direct native color consumer.
+- [Live biome sections and color sampling](../biome/RUST-LIVE-BIOMES.md): admitted
+  4³ palettes, loaded-client residency, direct native sky/fog consumers and
+  generation-validated reuse.
 
 - [Rust section counters](RUST-SECTION-COUNTERS.md): fused live mutations,
   direct recounts, section-local ownership and generation inputs.

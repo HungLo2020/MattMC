@@ -73,13 +73,28 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
-The [live-biome milestone](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
-adds retained native palette/index ownership and direct sky sampling. Final
-release `c3aa5fed` passes both Java tasks (1,812 tests/two skips), Rust
-(2,455 passes/three ignored), seven lifecycle cases and manually reviewed
-vanilla/Iris+DH settled pairs. Its preceding `bc2207fb` performance comparison
-still fails vanilla p99. These scoped checks do not establish broad gameplay,
-temporal rendering or long-session memory acceptance.
+The [fog/cache milestone](../world/biome/RUST-LIVE-BIOMES.md)
+adds canonical native sky/fog sampling and generation-validated result reuse.
+The author reports release `f449557e` passing both Java tasks (1,818 tests/two
+skips), Rust (2,456 passes/three ignored), seven lifecycle cases and manually
+reviewed vanilla/Iris+DH settled diagnostic pairs with DH coverage. All sixteen
+ABAB/6,000-frame runs are clean, but vanilla p99 **fails** at 3.394 ms Current
+versus 3.322 ms Frozen. See [the full recorded matrix](GOAL-5-STATUS.md#october-9-live-fog-and-validated-color-reuse-summary).
+These results predate the later recorder, allocation and lazy-mesh source
+changes; they are not full current-head acceptance. Broad gameplay, temporal
+rendering and long-session memory acceptance remain open.
+
+The preceding sky-only milestone retains its own evidence: range-corrected
+`c3aa5fed` passed both Java tasks (1,812 tests/two skips), Rust (2,455 passes/three
+ignored), seven lifecycle cases and reviewed settled pairs, without an FPS
+repeat. Its earlier `bc2207fb` comparison failed vanilla p99. Keep these build
+identities separate from the later fog/cache results.
+
+For hand-played diagnosis, [session recording](SESSION-RECORDING.md) captures
+Current only, with observer overhead. Neither a recording nor the later
+allocation/mesh commit's component measurements replace a matched Frozen
+performance comparison. Two independently run synthetic recorder-summary tests
+cover tooling only; they do not validate client recording or live JFR data.
 
 The preceding author-recorded
 [terrain-light matrix](GOAL-5-STATUS.md#october-9-bulk-terrain-light-and-ordinary-gameplay-summary),
@@ -235,8 +250,8 @@ author reports.
 
 ### Native frame, map and world-input evidence
 
-Use the [current workload record](GOAL-5-STATUS.md#october-9-native-world-and-hand-input-summary)
-for the measured item-input release and subsequent observer corrections. The
+Use the [item-input workload record](GOAL-5-STATUS.md#october-9-native-world-and-hand-input-summary)
+for that measured release and subsequent observer corrections. The
 focused guides keep earlier evidence scopes:
 
 - [Map checks](../game-model/MAP-COLORS.md) cover indexed conversion, explicit map origins/materials and framed-map crops. The [Java staging test](https://github.com/HungLo2020/MattMC/blob/84016f210afdf7d5a8c6a61f9440e8f304f6aa74/src/test/java/net/vulkanic/gui/NativeMapImagesTest.java) checks GUI staging removal on reset and closes the manager in cleanup; it does not verify all world PNG cache closure. The failed original workflow and fresh shader+DH health repeat remain distinct author reports

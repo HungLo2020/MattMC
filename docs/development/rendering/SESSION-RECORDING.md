@@ -1,7 +1,8 @@
 # Recording a hand-played session
 
 Use this when the game feels slow while you play and the scripted benchmarks
-don't show it. You control the game; the recorder captures every frame.
+don't show it. You control the game; the recorder buffers frame and tick samples for diagnosis.
+Check the dropped-row counters before treating a recording as a complete timeline.
 
 ```sh
 python3 DevUtils/RunDev.py --record [--record-label vsync-on]
@@ -28,30 +29,52 @@ one world (`--world`, default `New World`) into the recording folder, forces
 VSync off, `pauseOnLostFocus:false` and windowed 1920×1012, and launches
 Current straight into the copy. Every frame,
 [`ScriptedCameraSweep`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
-sets yaw to ±150° over 2.4 s and pitch to ±60° over 1.6 s (`--yaw-*`,
-`--pitch-*`), with the player's own minimap, DH and video settings. The client
-stops by itself after `--seconds` in the world; the copied world is deleted
+sets yaw to ±150° around the initial yaw with a 2.4 s full sine period, and
+pitch to ±60° with a 1.6 s period (`--yaw-*`, `--pitch-*`), with the player's
+own minimap, DH and video settings. Updates require a player and world with no
+screen open. The client
+stops by itself after `--seconds` in the world; ordinary end-of-run cleanup deletes the copied world
 unless `--keep-game-dir`. `--perf-after N` adds a flat `perf` profile N seconds
-into the sweep (needs `kernel.perf_event_paranoid` ≤ 1). `harness.json` records
+into the sweep (needs `kernel.perf_event_paranoid` ≤ 1); no profile is produced
+if the client or `perf` cannot be found. `harness.json` records
 the sweep, the commit and memory/swap before and after; compare runs only from
-similar machine states. Tests: `python3 DevUtils/tests/rendering/test_scripted_look.py`.
+similar machine states. This is a Current-only diagnostic run, not a paired
+Frozen acceptance test. A zero exit status follows the sweep-completion log
+marker; it does not independently require a successful Gradle exit, clean
+runtime health or rendering parity. Tests: `python3 DevUtils/tests/rendering/test_scripted_look.py`.
+
+The current recorder PID lookup selects the first JVM matching a recorded
+KnotClient, without matching this invocation’s recording directory or process
+start identity. Concurrent recorded clients can therefore misattribute samples
+or profiling, and the scripted timeout can signal another matching client.
+Avoid concurrent recorded sessions; [#824](https://github.com/HungLo2020/MattMC/issues/824)
+tracks the invocation-identity defect. Synthetic process-directory fixtures
+confirmed the selector mismatch; no real client was signaled or launched in
+that review.
+
+The stall sampler’s `blocked_ms` column is elapsed time minus running and
+run-queue time, so it includes sleeping and is not proof of blocking on a
+particular resource. System PSI and reclaim figures describe the whole machine. Stall sampling
+requires Linux `/proc/pressure/cpu`; raw PSI fields are microsecond deltas, with
+percentages derived in the summary.
 
 ## What is recorded
 
 | File | Contents |
 | --- | --- |
 | `summary.md` | Device, settings, FPS, frame-interval percentiles, per-stage breakdown, slowest frames, slowest loop phases, GC, GPU and CPU use |
-| `frames.csv` | Every presented Rust frame: Java acquire/submit/present timestamps plus every field of the native whole-frame result and profile (Vulkan acquire/present/wait times, present mode, GPU timestamps, draw counts) |
-| `ticks.csv`, `phases.csv` | Every `Minecraft.runTick`: start, start-to-start interval, duration and exclusive time per instrumented phase (`id:ns;…`) |
+| `frames.csv` | Buffered presented Rust frames: Java acquire/submit/present timestamps plus every field of the native whole-frame result and profile (Vulkan acquire/present/wait times, present mode, GPU timestamps, draw counts) |
+| `ticks.csv`, `phases.csv` | Buffered `Minecraft.runTick` samples: start, start-to-start interval, duration and exclusive time per instrumented phase (`id:ns;…`) |
 | `seconds.csv` | Once a second: GC, heap, JVM CPU, JIT time, FPS counter, VSync, FPS limit, render distance, window size, current screen |
 | `client.jfr` | Java Flight Recorder profile of the client JVM (`settings=profile`) |
 | `gpu.csv`, `cpu.csv` | Once a second: `nvidia-smi` utilization/clocks/power, system CPU, iowait and client process CPU |
 | `console.log` | The client console, including the `MattMC Vulkan device selection` line |
-| `stalls.csv`, `stalls-system.csv` | Once a second: per client thread on-CPU time, run-queue wait, blocked time and page faults; system PSI (CPU/memory/IO stall %), swap and reclaim counters |
+| `stalls.csv`, `stalls-system.csv` | Once a second: per selected client thread on-CPU time, run-queue wait, residual time and page faults; system-wide PSI deltas, swap and reclaim counters |
 
-Times in the recorder's CSVs are nanoseconds from recording start. The frame
-columns follow the bridge records automatically, so new ABI fields appear
-without recorder changes.
+Frame/tick timing columns use nanoseconds relative to recording start or
+durations as named in their headers. External CPU/stall samplers use epoch
+seconds and their stated units. The frame columns follow the bridge records
+automatically, so new ABI fields appear without recorder changes.
 
 ## Reading a recording
 
@@ -85,7 +108,13 @@ without recorder changes.
   logs its candidates for every windowed device, recording or not.
 - Recording adds a little overhead (JFR sampling and per-frame buffering). Use
   the scripted benchmarks for acceptance numbers.
-- Stop the client normally, or with SIGTERM, so JFR and the final rows are
-  written. A killed (`SIGKILL`) client loses its last 250 ms of rows and the JFR
-  file.
+- Stop the client normally so shutdown can flush pending rows and finalize JFR.
+  Shutdown flushing is best effort. Forced termination such as `SIGKILL` can
+  lose buffered rows and leave JFR incomplete; the 250 ms writer cadence is
+  not a maximum data-loss window.
 - Summary tests: `python3 DevUtils/PerfAudit/test_recording.py`.
+
+The summary can be generated from incomplete or missing CSV inputs. Its existence
+is not proof of a complete recording or a passing performance gate. The two
+summary fixtures exercise synthetic CSV aggregation and missing inputs; they do
+not establish live recorder throughput, shutdown reliability or JFR capture.

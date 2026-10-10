@@ -1,16 +1,18 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`1b9b1033`](https://github.com/HungLo2020/MattMC/commit/1b9b103398fd70d5b5152b93a1d0abc581fffc19):
-Rust now owns admitted live biome palettes and a loaded-client index whose sky
-consumer samples retained generations directly. Java retains lifecycle events,
-fog/tint consumers, weather adjustments and compatibility paths. The latest
-author-recorded comparison, release `bc2207fb`, **fails vanilla p99**
-(3.498 ms Current / 3.075 ms Frozen), while all median average-FPS floors pass.
-Final range-corrected release `c3aa5fed` has new suite/lifecycle/image checks,
-but no FPS repeat. Ordinary profiles remain bounded attribution evidence;
-entry, sustained streaming, temporal rendering and long-session memory
-acceptance remain open. See [live-biome evidence](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification).
+[`52eb4dc9`](https://github.com/HungLo2020/MattMC/commit/52eb4dc9bbac2e6b26ed26f3e5a1736c628ea903):
+Rust owns admitted live biome palettes, the loaded-client index and canonical
+sky/fog sampling, with exact-position result reuse after source-generation
+validation. Java retains lifecycle events, hooks, tint/blending, brightness,
+weather and compatibility paths. The latest author-recorded matrix, release
+`f449557e`, **fails vanilla p99** (3.394 ms Current / 3.322 ms Frozen), while all
+median average-FPS floors pass. Its suite, lifecycle and settled-image checks
+predate the later session recorder and allocation/lazy-mesh changes; they do
+not establish current-head acceptance. Ordinary profiles remain bounded
+attribution evidence; entry, sustained streaming, temporal rendering and
+long-session memory acceptance remain open. See [the measured workload](#october-9-live-fog-and-validated-color-reuse-summary)
+and [live-biome evidence](../world/biome/RUST-LIVE-BIOMES.md).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
@@ -20,8 +22,8 @@ selection and assembly, rig hierarchy composition, the DH ledger and ordinary
 payload publication, retained visibility frames and built-in cloud preparation,
 native authored item poses and GPU execution/resources.
 Separate native world owners now supply canonical live/rebuild state, section
-color fields, live biome palettes and live light generations. The native sky
-consumer reads its retained loaded-biome index; the native terrain-light consumer
+color fields, live biome palettes and live light generations. Native sky/fog
+consumers read the retained loaded-biome index; the native terrain-light consumer
 prepares canonical mesher words from those generations. Java still orchestrates
 light storage maps and publication and supplies contextual light predicates and
 shade, with mutable-array, subclass/platform and diagnostic compatibility paths.
@@ -39,9 +41,17 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [live-biome ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6092342346)
+The current [fog/cache ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6093641438)
+and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6093641948)
+retain the open acceptance boundaries and distinguish the `f449557e` runtime
+record from later recorder/allocation/lazy-mesh source changes. Two independent
+synthetic recorder-summary tests pass; they do not run clients or validate live
+JFR capture, Java/Rust suites or rendering acceptance. Neither review closes its
+issue.
+
+The preceding sky-only [live-biome ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6092342346)
 and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6092343227)
-retain these open acceptance boundaries. The independent validation-driver check
+retain their historical source scope. The independent validation-driver check
 initially hit a protected-sibling `PermissionError` under the default temporary
 root; a dedicated `TMPDIR` rerun passed 13 Python tests. This is tooling evidence,
 not a rerun of the reported Java/Rust suites or gameplay workloads.
@@ -114,6 +124,33 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+The later [scripted look-around recorder](SESSION-RECORDING.md#unattended-look-around-runs)
+adds a copied-world camera sweep and system/thread stall observations. It remains
+Current-only diagnosis, with a log-marker completion result and a shared PID
+lookup limitation; it supplies no newer matched runtime acceptance matrix.
+
+### October 9 live fog, color reuse and allocation follow-up
+
+The [fog/cache milestone](https://github.com/HungLo2020/MattMC/commit/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a)
+adds canonical fog sampling through the live biome index and removes Java's
+camera/tick-only sky/fog memos. Rust retains one exact-position result per color
+field after validating world residency and captured source generations/revisions.
+Custom hooks, sources and virtual biome effects retain compatible callbacks;
+Java hooks and later brightness/weather adjustments still run on each call.
+See [the ownership contract](../world/biome/RUST-LIVE-BIOMES.md) and
+[the author-recorded runtime scope](#october-9-live-fog-and-validated-color-reuse-summary).
+This is not a confirmed explanation of reported terrain pop-in or flickering.
+
+The later [session recorder](SESSION-RECORDING.md) diagnoses hand-played Current
+sessions. The following [allocation reductions](https://github.com/HungLo2020/MattMC/commit/dd8852a5717d0fc4fd2fe75f2aba173614ee8faa)
+remove avoidable meshing objects, GUI pixel copies and boxed DH keys.
+The [mesh/bridge follow-up](https://github.com/HungLo2020/MattMC/commit/90d31038f246143bc2c4449e6b9db896f83e0d58)
+defers per-mesh resource sets on non-page draw paths, copies or converts geometry
+only when absent, and splits whole-frame packing into helpers. Its hand-played
+component measurements are author reports, not isolated FPS or current-head
+acceptance evidence. See [allocation constraints](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints)
+and [render ownership](RENDER-ARCHITECTURE.md).
+
 ### October 9 live biome ownership and sky sampling
 
 The `6a80b211` → `1b9b1033` interval adds admitted 4³ biome palette/storage
@@ -121,8 +158,9 @@ owners, a retained client loaded-biome index and a direct raw sky-color consumer
 Java still delivers chunk loads, packets, section-biome replacement, range
 changes and chunk unloads. Mutable section-array access transfers that chunk's
 index entry to compatibility; the trusted synchronous accessor returns the
-same array under a borrow contract. Fog, tint/blending, chunk orchestration and
-world simulation remain separate work. See the
+same array under a borrow contract. At this historical sky-only checkpoint,
+fog, tint/blending, chunk orchestration and world simulation remained separate
+work; the later fog/cache milestone above adds the admitted fog consumer. See the
 [owner guide](../world/biome/RUST-LIVE-BIOMES.md) for admission, alias/generation
 rules and the distinction between terminal native disablement and automatic
 world-owner reclamation. GAL ownership and whole-frame ABI 78 are unchanged.
@@ -134,8 +172,9 @@ split. The independent 13-test Python check validates driver construction and
 related harness behavior only. Recorded 1,600 palette operations, 256 sky
 sampler cases and 12,288 view-range cases are supplemental CPU fixtures.
 
-The author reports final release `c3aa5fed` passing 2,455 Rust checks (three
-ignored), 1,812 Java tests (two skipped), seven lifecycle cases and newly
+For that sky-only milestone, the author reports final release `c3aa5fed`
+passing 2,455 Rust checks (three ignored), 1,812 Java tests (two skipped), seven
+lifecycle cases and newly
 reviewed settled vanilla/Iris+DH pairs. Its arithmetic fix was not followed by
 another FPS matrix; `bc2207fb` performance and ordinary profiles retain their
 earlier identity. Runtime receipts are not tracked with this source, and this
@@ -363,7 +402,7 @@ The [`20e157ca` source checkpoint](https://github.com/HungLo2020/MattMC/commit/2
 - **GUI reuse:** flat and standard-foil items keep topology/raster identities; foil pixels remain animated through a per-draw UV transform. Cached TACZ captures can use persistent bridge storage. Native decode, prepared-geometry and accepted GPU-range reuse avoid repeated work, with separate bounds and lifetimes. Geometry idle age counts mesh transactions, not every displayed frame. Same-thread context recreation/address reuse remains a verification gap, not a demonstrated failure. [Bridge](JAVA-BRIDGE.md) · [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 - **Terrain and block entities:** solid/cutout compact selection preserves graph visit order; translucent selection stays back to front. This is not a strict Euclidean near-to-far sort. Shader-disabled block-entity extraction consumes visited built sections plus global block entities when a current search exists; shader frames and unavailable-search cases keep the range-scan path. Java still owns the semantic extraction. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 - **DH and resources:** generic boxes use bounded primitive buffers and a three-slot pending ring; source opaque and late-water ranges each use an ordered pass. Ordinary DH pack-set release filters changed resource roles; exact-atlas teardown remains broader. Empty world geometry pages retire only their dependent bindings. These changes do not establish long-run bounds or cross-route temporal parity. [Architecture](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
-- **Java and diagnostics:** four exact-key sky samples, throttled disk-state checks, single-pass chunk vertex construction, bulk native-profile reads and optional per-item phases reduce collection/instrumentation work. Disk-state reuse is unconditional within a nonzero frame epoch and may outlast 250 ms; the interval applies between epochs. [Profiling](SHADER-TERRAIN-PROFILING.md) · [Verification](RENDER-VERIFICATION.md)
+- **Java and diagnostics:** at this checkpoint, four exact-key sky samples, throttled disk-state checks, single-pass chunk vertex construction, bulk native-profile reads and optional per-item phases reduced collection/instrumentation work. The later fog/cache milestone removes those Java sky memos. Disk-state reuse is unconditional within a nonzero frame epoch and may outlast 250 ms; the interval applies between epochs. [Profiling](SHADER-TERRAIN-PROFILING.md) · [Verification](RENDER-VERIFICATION.md)
 
 This review inspected pinned source and test definitions only. It did not rerun
 Java/native tests, live captures or benchmarks, and did not inspect the author's
@@ -399,7 +438,7 @@ record selection; use the October 7 scope above for current ownership.
 - **Camera and shadow selection:** the Rust section graph follows Frozen-derived search rules, while Java mirrors readiness/build facts, consumes visited sections and schedules work. Shadow candidates use already-built geometry, with the leaf test also applied to camera-visible twins and supplement faces; no shadow-only build sweep is retained. Java's current limits remain 4,096 camera sections and 12,288 shadow-candidate sections, with different overflow handling. Region draw order, Iris's non-culling frustum and a scene-owned visible list remain outstanding. [Selection boundary](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 - **Entity shadow prefilter:** a standalone Rust query uses the active pack's copied shadow policy before Java extracts off-camera entities; unresolved policy keeps candidates. The frame plan applies admission again. Java still extracts poses/geometry for retained candidates, and this does not repair the Citadel geometry limitation in [#803](https://github.com/HungLo2020/MattMC/issues/803). [Query contract](JAVA-BRIDGE.md#standalone-query-handles)
 - **Submission and reuse:** host-buffer writes with safe local ordering move to each command list's start; staging reuses best-fit chunks and keeps smaller idle chunks first. Fullscreen plans park and reuse complete matching inputs with up to four variants per stage path. Source-role, voxel-selection and shared entity-uniform memos avoid repeated work. [GAL](VULKANIC-GAL.md) · [Profiling](SHADER-TERRAIN-PROFILING.md)
-- **Source data and color history:** terrain/entity/hand source vertices now pack into 64 bytes and decode to the same eight semantic lanes. Initialized clear-enabled feedback targets skip dead end-of-frame copies, and valid mip chains survive until level-zero changes. Java raw biome sky/fog samples reuse exact position/partial-tick/game-time keys; Java still owns those semantic producers. [Architecture](RENDER-ARCHITECTURE.md)
+- **Source data and color history:** terrain/entity/hand source vertices now pack into 64 bytes and decode to the same eight semantic lanes. Initialized clear-enabled feedback targets skip dead end-of-frame copies, and valid mip chains survive until level-zero changes. At this historical checkpoint, Java raw biome sky/fog samples reused exact position/partial-tick/game-time keys. The later fog/cache milestone removes those memos and moves admitted canonical sampling/reuse into Rust. [Architecture](RENDER-ARCHITECTURE.md)
 - **Validation and evidence:** normal release play skips per-frame GAL op/handle/hazard checks; debug builds, tests, watched uploads and explicit GAL-validation runs keep them. Standard validation captures enable the checks. Optional benchmark segment means describe sample-order slices, not broad parity. Source presence and local benchmark changes do not certify acceptance. [Verification](RENDER-VERIFICATION.md) · [Native builds](../tooling/NATIVE-BUILDS.md) · [Artifact storage](ARTIFACT-STORAGE.md)
 
 
@@ -439,14 +478,51 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 
 ### Latest author-recorded workloads
 
+#### October 9 live fog and validated color reuse summary
+
+The [summary at `3adbe6d5`](https://github.com/HungLo2020/MattMC/blob/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a/SUMMARY.md)
+records release `f449557e` on RTX 3080 Ti: settled rotating-view ABAB, two runs
+per side and mode, with exactly 6,000 measured frames each. These are committed
+author reports; this maintenance review did not rerun or inspect the unbundled
+runtime receipts. The measured build predates the later recorder, allocation
+and lazy-mesh commits.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- |
+| Vanilla | 1,390.1 / 1,059.3 | 1,178.1 / 1,140.1 | 3.394 / 3.322 |
+| Vanilla + DH | 730.9 / 709.5 | 600.6 / 722.3 | 5.235 / 6.405 |
+| Shaders | 349.3 / 341.1 | 319.0 / 316.4 | 4.773 / 6.196 |
+| Shaders + DH | 255.1 / 255.8 | 228.0 / 225.7 | 6.810 / 8.602 |
+
+**Performance FAIL:** vanilla misses the p99 floor. Median average FPS exceeds
+Frozen in all four modes, and the other three modes meet their p99 floors;
+substantial repeat variance prevents an isolated migration-gain claim.
+The [author's record](https://github.com/HungLo2020/MattMC/blob/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a/PROGRESS.md#L73)
+reports both Java tasks totaling 1,818 tests (two skipped), 2,456 Rust passes
+(three ignored), six native-enabled Java executors mapped to the exact library,
+seven lifecycle cases, and newly reviewed vanilla/Iris+DH settled diagnostic
+pairs with DH coverage. All sixteen timing runs are clean with zero VUIDs,
+exceptions or orphaned clients. Source/library/Frozen/protected-edit guards pass;
+25 verified generated copies were retired. Receipts:
+`build/native-biome-fog-cache-migration/runtime-verification.json` and
+`validation/native-live-biome-fog-cache-20261009/summary.json`.
+
+The separate [ordinary CPU/allocation profiles](GAMEPLAY-PERFORMANCE.md#recorded-evidence-and-limits)
+retain short observation windows and exclude Rust allocation. They do not prove
+isolated FPS gains, long-session memory bounds, bulk-path pixel parity or absence
+of pop-in/flicker. The preceding fog build `29e3fd54` and sky-only releases
+`c3aa5fed`/`bc2207fb` keep their separate
+[historical evidence](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification).
+
 #### October 9 bulk terrain-light and ordinary gameplay summary
 
 The [summary at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/SUMMARY.md)
 records combined release `d9d1a9d6` on RTX 3080 Ti: settled rotating-view ABAB,
 two runs per side and mode, with exactly 6,000 measured frames each. These are
 committed author reports, not a rerun or raw-receipt review by this maintenance
-pass. They supersede the earlier local `a25a1281` and live-light `31c8c8cc`
-matrices as the latest combined recorded workload.
+pass. At that historical checkpoint, they superseded the earlier local
+`a25a1281` and live-light `31c8c8cc` matrices; later biome/fog records above
+retain their own build identities and workload scopes.
 
 | Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median run p99, Current / Frozen (ms) |
 | --- | --- | --- | --- |

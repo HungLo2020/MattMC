@@ -1,7 +1,7 @@
 # Live biome ownership and color sampling
 
 The migration moves admitted canonical 4³ biome palettes and packed storage into
-Rust, together with a loaded-chunk index and its direct sky-color consumer.
+Rust, together with a loaded-chunk index and admitted sky/fog-color consumers.
 Java retains scoped CPU views for ordinary biome reads. Chunk load, packet
 replacement, section-biome replacement, view-center changes and chunk unload update the
 native index. Rust retains typed section owners, resolves biome IDs against a
@@ -9,9 +9,13 @@ world's immutable color table and reuses its cubic window while source
 generations remain current. The admitted native path avoids Java's 216-color grid; compatibility
 sampling retains its original callbacks.
 
-The local fog extension reuses the same residency and generation capture for
-both color fields. Seven focused Rust checks and nine Java boundary checks
-pass, including 256 recorded Frozen color cases through live storage.
+All suite, runtime and profile outcomes reported below are committed author
+records. Their external receipts were not independently inspected or rerun by
+this documentation review.
+
+The fog extension published in `3adbe6d5` reuses the same residency and generation capture for
+both color fields. The author reports seven focused Rust checks and nine Java boundary checks
+passing, including 256 recorded Frozen color cases through live storage.
 A world-context fog-hook overload delegates existing hook
 implementations to their original method. Native fog admission requires the
 exact Sodium hook, client level, client cache and biome manager, with that
@@ -19,13 +23,13 @@ manager's immutable source matching the level. Custom hooks and sources keep
 their original callbacks. Registries containing biome-effect subclasses also
 retain Java rather than capturing virtual color providers as constants.
 
-The subsequent local cache migration removes Java's camera/tick-only color
+The same published milestone includes the cache migration, which removes Java's camera/tick-only color
 memos. A regression reproduced a stale fog-hook result at an unchanged camera
 and tick. Rust retains one exact-position result per field only after validating
 the world revision and every captured owner/generation/revision. Replacing or
 mutating a biome source invalidates reuse; Java hook, brightness and weather
-callbacks execute on every call. The `29e3fd54` results below precede this change;
-Seven focused Rust and seven Java cache/boundary checks pass, including live
+callbacks execute on every call. The `29e3fd54` results below precede this change.
+The author reports seven focused Rust and seven Java cache/boundary checks passing, including live
 source mutations, fractional movement within one window and per-call hook
 changes. Build `f449557e` passes all 1,818 Java tests (two skipped), and six
 native-enabled executors map that exact library. Current/Frozen source and
@@ -51,6 +55,11 @@ remain open. Profile receipt:
 `goal5/native-live-biome-fog-cache-flight-profile-20261009/profile-comparison.json`. Runtime receipt:
 `build/native-biome-fog-cache-migration/runtime-verification.json`. This finding is not a confirmed cause of
 the reported terrain pop-in or flickering.
+
+The `f449557e` results above belong to the fog/cache milestone. They predate
+the later manual recorder, Java allocation and lazy mesh-binding changes through
+[`90d31038`](https://github.com/HungLo2020/MattMC/commit/90d31038f246143bc2c4449e6b9db896f83e0d58);
+those changes have not been remeasured by this documentation review.
 
 ## Boundaries to preserve
 
