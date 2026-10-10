@@ -205,12 +205,15 @@ def run_recorded(root: Path, command: list[str], environment: dict[str, str], la
     directory = Recording.new_recording_dir(root, label)
     print(f"Recording this session to {directory}", flush=True)
     samplers = Recording.Samplers(directory)
+    stalls = Recording.StallSampler(directory)
     samplers.start()
+    stalls.start()
     try:
         code = Recording.run_with_console(
             [*command, f"-PmattmcRecordDir={directory}"], root, environment, directory / "console.log")
     finally:
         samplers.stop()
+        stalls.stop()
     print(Recording.summarize(directory), end="", flush=True)
     print(f"Recording saved to {directory}", flush=True)
     return code

@@ -14,6 +14,28 @@ with `python3 DevUtils/PerfAudit/Recording.py summarize <directory>`.
 `--record` records Current only. Delete recordings you no longer need; see
 [capture storage](ARTIFACT-STORAGE.md).
 
+## Unattended look-around runs
+
+[`RunScriptedLook.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/RunScriptedLook.py)
+records the same data without anyone at the keyboard:
+
+```sh
+python3 DevUtils/tests/rendering/RunScriptedLook.py --label baseline [--seconds 150] [--perf-after 30]
+```
+
+It copies `run/`'s `options.txt`, `config/`, `voxelmap/`, `resourcepacks/` and
+one world (`--world`, default `New World`) into the recording folder, forces
+VSync off, `pauseOnLostFocus:false` and windowed 1920×1012, and launches
+Current straight into the copy. Every frame,
+[`ScriptedCameraSweep`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
+sets yaw to ±150° over 2.4 s and pitch to ±60° over 1.6 s (`--yaw-*`,
+`--pitch-*`), with the player's own minimap, DH and video settings. The client
+stops by itself after `--seconds` in the world; the copied world is deleted
+unless `--keep-game-dir`. `--perf-after N` adds a flat `perf` profile N seconds
+into the sweep (needs `kernel.perf_event_paranoid` ≤ 1). `harness.json` records
+the sweep, the commit and memory/swap before and after; compare runs only from
+similar machine states. Tests: `python3 DevUtils/tests/rendering/test_scripted_look.py`.
+
 ## What is recorded
 
 | File | Contents |
@@ -25,6 +47,7 @@ with `python3 DevUtils/PerfAudit/Recording.py summarize <directory>`.
 | `client.jfr` | Java Flight Recorder profile of the client JVM (`settings=profile`) |
 | `gpu.csv`, `cpu.csv` | Once a second: `nvidia-smi` utilization/clocks/power, system CPU, iowait and client process CPU |
 | `console.log` | The client console, including the `MattMC Vulkan device selection` line |
+| `stalls.csv`, `stalls-system.csv` | Once a second: per client thread on-CPU time, run-queue wait, blocked time and page faults; system PSI (CPU/memory/IO stall %), swap and reclaim counters |
 
 Times in the recorder's CSVs are nanoseconds from recording start. The frame
 columns follow the bridge records automatically, so new ABI fields appear

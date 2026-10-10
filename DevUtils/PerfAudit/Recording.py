@@ -102,6 +102,122 @@ class Samplers:
                 out.flush()
 
 
+class StallSampler:
+    """Once a second: per-thread run / run-queue wait / blocked time and page
+    faults for the client (`stalls.csv`), plus system reclaim counters and PSI
+    (`stalls-system.csv`). Shows whether slow frames wait on CPU, memory or I/O."""
+
+    VMSTAT = ("pgmajfault", "pswpin", "pswpout", "allocstall_normal", "allocstall_movable",
+              "compact_stall", "pgscan_direct", "pgsteal_direct", "pgscan_kswapd")
+
+    def __init__(self, directory: Path) -> None:
+        self.directory = directory
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._loop, name="recording-stalls", daemon=True)
+
+    def start(self) -> None:
+        if Path("/proc/pressure/cpu").is_file():
+            self.thread.start()
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        if self.thread.is_alive():
+            self.thread.join(timeout=5)
+
+    @classmethod
+    def _vmstat(cls) -> dict[str, int]:
+        values = {}
+        with open("/proc/vmstat", encoding="utf-8") as stat:
+            for line in stat:
+                key, value = line.split()
+                if key in cls.VMSTAT:
+                    values[key] = int(value)
+        return values
+
+    @staticmethod
+    def _psi(kind: str) -> dict[str, int]:
+        values = {}
+        with open(f"/proc/pressure/{kind}", encoding="utf-8") as pressure:
+            for line in pressure:
+                parts = line.split()
+                values[parts[0]] = int(parts[4].split("=")[1])
+        return values
+
+    @staticmethod
+    def _threads(pid: int) -> dict[str, tuple]:
+        result = {}
+        for tid in os.listdir(f"/proc/{pid}/task"):
+            base = f"/proc/{pid}/task/{tid}"
+            try:
+                comm = Path(base, "comm").read_text().strip()
+                run, wait, _ = map(int, Path(base, "schedstat").read_text().split())
+                fields = Path(base, "stat").read_text().rsplit(")", 1)[1].split()
+                result[tid] = (comm, run, wait, int(fields[7]), int(fields[9]))
+            except (OSError, ValueError):
+                continue
+        return result
+
+    def _loop(self) -> None:
+        pid = None
+        while pid is None and not self.stop_event.wait(1.0):
+            pid = _client_pid()
+        if pid is None:
+            return
+        with open(self.directory / "stalls.csv", "w", encoding="utf-8") as threads_out, \
+                open(self.directory / "stalls-system.csv", "w", encoding="utf-8") as system_out:
+            threads_out.write("epoch_s,thread,run_ms,runqueue_wait_ms,blocked_ms,minflt,majflt\n")
+            system_out.write("epoch_s," + ",".join(self.VMSTAT)
+                             + ",psi_cpu_some_us,psi_mem_some_us,psi_mem_full_us,psi_io_some_us,psi_io_full_us\n")
+            try:
+                previous = (self._threads(pid), self._vmstat(), self._psi("cpu"), self._psi("memory"), self._psi("io"))
+            except OSError:
+                return
+            last = time.monotonic()
+            while not self.stop_event.wait(1.0):
+                try:
+                    current = (self._threads(pid), self._vmstat(), self._psi("cpu"), self._psi("memory"), self._psi("io"))
+                except OSError:
+                    return
+                now = time.monotonic()
+                elapsed_ms = (now - last) * 1000.0
+                last = now
+                stamp = f"{time.time():.1f}"
+                old_threads = previous[0]
+                for tid, (comm, run, wait, minflt, majflt) in current[0].items():
+                    old = old_threads.get(tid)
+                    if old is None:
+                        continue
+                    run_ms = (run - old[1]) / 1e6
+                    wait_ms = (wait - old[2]) / 1e6
+                    if run_ms + wait_ms < 1.0 and majflt == old[4]:
+                        continue
+                    threads_out.write(f"{stamp},{comm.replace(',', ' ')}#{tid},{run_ms:.1f},{wait_ms:.1f},"
+                                      f"{max(0.0, elapsed_ms - run_ms - wait_ms):.1f},{minflt - old[3]},{majflt - old[4]}\n")
+                vm_old, vm_new = previous[1], current[1]
+                system_out.write(stamp + "," + ",".join(str(vm_new[k] - vm_old.get(k, 0)) for k in self.VMSTAT if k in vm_new)
+                                 + f",{current[2]['some'] - previous[2]['some']},{current[3]['some'] - previous[3]['some']}"
+                                 + f",{current[3]['full'] - previous[3]['full']},{current[4]['some'] - previous[4]['some']}"
+                                 + f",{current[4]['full'] - previous[4]['full']}\n")
+                threads_out.flush()
+                system_out.flush()
+                previous = current
+
+
+def memory_snapshot() -> dict[str, int]:
+    """MemTotal/MemAvailable/SwapTotal/SwapFree in MiB, for the run's environment record."""
+    wanted = {"MemTotal", "MemAvailable", "SwapTotal", "SwapFree"}
+    values = {}
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as meminfo:
+            for line in meminfo:
+                key, rest = line.split(":", 1)
+                if key in wanted:
+                    values[key + "_mb"] = int(rest.split()[0]) // 1024
+    except OSError:
+        pass
+    return values
+
+
 def _read_cpu_totals() -> list[int]:
     with open("/proc/stat", encoding="utf-8") as stat:
         return [int(value) for value in stat.readline().split()[1:]]
@@ -260,6 +376,8 @@ def summarize(directory: Path) -> str:
                   f"- iowait %: {_stats([_num(r, 'iowait_pct') for r in cpu_rows])}",
                   f"- client process CPU % (one core = 100): {_stats(client)}", ""]
 
+    lines += _stall_section(directory)
+
     text = "\n".join(lines) + "\n"
     (directory / "summary.md").write_text(text, encoding="utf-8")
     return text
@@ -313,6 +431,42 @@ def _jfr_gc_lines(recording: Path) -> list[str]:
         return f"{len(values)}, total {sum(values):.1f} ms, max {max(values):.1f} ms" if values else "none"
     return [f"- GC stop-the-world pauses (JFR): {describe(pauses)}",
             f"- ZGC allocation stalls, threads blocked waiting for memory (JFR): {describe(stalls)}"]
+
+
+def _stall_section(directory: Path) -> list[str]:
+    rows = _read_csv(directory / "stalls.csv")
+    system = _read_csv(directory / "stalls-system.csv")
+    if not rows and not system:
+        return []
+    import re
+    lines: list[str] = []
+    if rows:
+        seconds = len({row["epoch_s"] for row in rows}) or 1
+        groups: dict[str, list[float]] = {}
+        for row in rows:
+            name = re.sub(r"\d+", "#", row["thread"].rsplit("#", 1)[0])
+            group = groups.setdefault(name, [0.0, 0.0, 0.0])
+            group[0] += _num(row, "run_ms", 0)
+            group[1] += _num(row, "runqueue_wait_ms", 0)
+            group[2] += _num(row, "majflt", 0)
+        lines += [f"## Client threads ({seconds} s sampled; cores = CPU-seconds per second)",
+                  "| thread | on CPU (cores) | waiting for CPU (cores) | major faults/s |", "| --- | --- | --- | --- |"]
+        for name, (run, wait, faults) in sorted(groups.items(), key=lambda item: -(item[1][0] + item[1][1]))[:12]:
+            lines.append(f"| {name} | {run / 1000 / seconds:.2f} | {wait / 1000 / seconds:.2f} | {faults / seconds:.0f} |")
+        lines.append("")
+    if system:
+        count = len(system)
+        def mean_pct(key: str) -> float:
+            return sum(_num(row, key, 0) for row in system) / count / 1e4
+        def per_second(key: str) -> float:
+            return sum(_num(row, key, 0) for row in system) / count
+        lines += ["## System pressure (PSI, % of time some/all tasks stalled)",
+                  f"- CPU some {mean_pct('psi_cpu_some_us'):.1f}%; memory some {mean_pct('psi_mem_some_us'):.1f}%, "
+                  f"full {mean_pct('psi_mem_full_us'):.1f}%; IO some {mean_pct('psi_io_some_us'):.1f}%, "
+                  f"full {mean_pct('psi_io_full_us'):.1f}%",
+                  f"- swap in {per_second('pswpin'):.0f} pages/s, swap out {per_second('pswpout'):.0f} pages/s, "
+                  f"major faults {per_second('pgmajfault'):.0f}/s, direct-reclaim scans {per_second('pgscan_direct'):.0f}/s", ""]
+    return lines
 
 
 FRAME_BREAKDOWN = [

@@ -1263,6 +1263,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.dev-before-tick");
 		net.minecraft.client.dev.GraphicsSubsystemBenchmark.runIfRequested(this);
 		net.minecraft.client.dev.DeterministicCameraCapture.beforeTick(this);
+		net.minecraft.client.dev.ScriptedCameraSweep.beforeFrame(this);
 		net.minecraft.client.dev.StoragePerfRunController.beforeTick(this);
 		net.minecraft.client.dev.PoiStorageValidationController.beforeTick(this);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.dev-before-tick");

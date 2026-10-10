@@ -994,6 +994,12 @@ tasks.register('runClient', JavaExec) {
     if (extraRunArgs) {
         args(extraRunArgs.trim().split(/\s+/) as List)
     }
+    // Extra client JVM arguments for scripted dev runs, e.g.
+    // -PmattmcRunJvmArgs="-Dmattmc.dev.scriptedCamera=true" (RunScriptedLook.py).
+    def extraRunJvmArgs = providers.gradleProperty('mattmcRunJvmArgs').getOrNull()
+    if (extraRunJvmArgs) {
+        jvmArgs(extraRunJvmArgs.trim().split(/\s+/) as List)
+    }
     // `python3 DevUtils/RunDev.py --record`: per-frame session recording and a
     // JFR profile of the client JVM only, written into this directory.
     def recordDir = providers.gradleProperty('mattmcRecordDir').getOrNull()
