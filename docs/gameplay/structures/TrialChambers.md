@@ -90,6 +90,8 @@ Removing Trial Omen prevents you supplying it to later scans, but **does not rev
 
 ## Choose a reward route
 
+For building materials, see [salvaging Trial Chambers copper](../blocks/CopperConstruction.md#salvaging-trial-chambers-copper) for selected placed-block finds, the required pickaxe and uses that keep their waxed finish.
+
 | Goal | Route and limitation |
 | --- | --- |
 | Supplies and ordinary container treasure | Search generated Chests and Barrels. Assigned tables differ: entrance, corridor, intersection and supply loot are not one shared contents list |

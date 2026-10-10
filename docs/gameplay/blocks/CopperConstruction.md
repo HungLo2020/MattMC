@@ -19,6 +19,24 @@ All IDs below use the `minecraft:` namespace. **Each of these 32 unwaxed IDs als
 
 Copper Ores and Raw Copper Block, Bulbs, Chests, Golem Statues, and torches are outside this construction guide. Lightning Rods appear only where they affect oxidation removal. Use [ore resources](OreResources.md) and [Copper Ingots](../items/CopperIngot.md) for metal production; a copper name alone does not establish the same recipe, loot, or behavior.
 
+## Salvaging Trial Chambers copper
+
+[Trial Chambers](../structures/TrialChambers.md) provide a natural route to ready-made building copper. The bundled starting pool selects one of two corridor-end templates, and **both contain placed Waxed Block of Copper, Waxed Oxidized Copper, Waxed Chiseled Copper, Waxed Copper Grates, Waxed Oxidized Cut Copper and Waxed Oxidized Cut Copper Stairs**. These are blocks to collect from the structure; no chest or Vault roll is needed to obtain those placed blocks. [Structure's starting pool][acq-structure] · [Template selection][acq-pool] · [First starting template][acq-end-one] · [Second starting template][acq-end-two]
+
+Follow the [expedition guide](../structures/TrialChambers.md#pack-for-a-controlled-expedition), secure your immediate work area and keep a route out before dismantling floors, stairs or walls. The checked starting pieces establish this selected acquisition route, not a guaranteed quantity of accessible, untouched copper in a found chamber. Placement can be limited by protected blocks, and previous visitors or world changes can alter what remains. [Starting-piece processors][acq-processors]
+
+Bring an **unbroken Stone, Copper, Iron, Diamond or Netherite Pickaxe** for these six forms. Ordinary mining returns one matching item, keeping its oxidation stage and wax; Wooden and Golden Pickaxes do not meet the tier requirement. Leave the wax intact when you want to keep the mined finish. Use [mining and collection](#mining-and-collection) for the shared rules and [waxing and scraping](#waxing-and-scraping) when you want to change that finish. [Current harvest gate][acq-harvest] · [Broken-item guard][acq-broken] · [Pickaxe targets][acq-pickaxe] · [Stone-tier targets][acq-stone] · [Tool-material rules][acq-tool] · [Full-block loot][acq-loot-full] · [Aged-block loot][acq-loot-aged] · [Chiseled loot][acq-loot-chiseled] · [Grate loot][acq-loot-grate] · [Cut loot][acq-loot-cut] · [Stair loot][acq-loot-stairs]
+
+Sort full blocks from Cut Copper before choosing a use:
+
+| Recovered input | Selected use for 1 item |
+| --- | --- |
+| Waxed Block of Copper | Craft directly into **9 Copper Ingots**; this is the unaffected full block. [Exact unpacking recipe][acq-unpack] |
+| Waxed Oxidized Copper | Stonecut into **8 Waxed Oxidized Cut Copper Slabs** or **4 Waxed Oxidized Copper Grates**. [Slab recipe][acq-full-slabs] · [Grate recipe][acq-full-grates] |
+| Waxed Oxidized Cut Copper | Stonecut into **2 Waxed Oxidized Cut Copper Slabs**. [Cut-block recipe][acq-cut-slabs] |
+
+The aged full blocks and the Cut, Chiseled, Grate and Stair forms do **not** directly unpack into ingots. Follow the existing [packing and conversion guidance](#crafting-and-stonecutter-yields) before changing a recovered block; the matching stonecutting recipes above preserve its green, waxed finish.
+
 ## Crafting and Stonecutter yields
 
 Start with the [Copper Ingot page's storage-block recipe](../items/CopperIngot.md#selected-uses), and follow its [packing/unpacking guidance](../items/CopperIngot.md#obtaining) for converting between ingots and the storage block. Both the ordinary **Block of Copper** and **Waxed Block of Copper** unpack directly into **9 Copper Ingots**. Exposed, Weathered, and Oxidized full blocks must be scraped back to the unaffected stage first, removing any wax before scraping; Cut and Chiseled Copper do not unpack into ingots. [Packing recipe][r-copper_block] · [Ordinary unpacking input][unpack] · [Waxed unpacking input][unpack-waxed]
@@ -219,9 +237,11 @@ The checked inventory contains **43 shaped recipes, 32 shapeless waxing recipes,
 
 ## Sources and verification
 
-Source-reviewed on **2026-10-02** at `2f6c6d4689df9796912eea87cf9def80fc320ee1`. The scope includes every selected registry entry, all 139 production recipes, all 64 loot tables, relevant tool tags, 32 waxing pairs, 24 oxidation steps, and the active placement, random-tick, tool-use, and lightning callbacks. No in-game crafting, aging, scraping, lightning, waterlogging, power, or mining test was run. Data packs can change recipes, tags, and loot; random ticks, server rules, and placement context affect results. Structures, trades, copper mobs, and the excluded copper devices were not reviewed as acquisition or use guides.
+Source-reviewed on **2026-10-02** at `2f6c6d4689df9796912eea87cf9def80fc320ee1`. The scope includes every selected registry entry, all 139 production recipes, all 64 loot tables, relevant tool tags, 32 waxing pairs, 24 oxidation steps, and the active placement, random-tick, tool-use, and lightning callbacks. No in-game crafting, aging, scraping, lightning, waterlogging, power, or mining test was run. Data packs can change recipes, tags, and loot; random ticks, server rules, and placement context affect results. Structures, trades, copper mobs, and the excluded copper devices were not reviewed as acquisition or use guides in that original review.
 
 The two unaffected full-block unpacking recipes were rechecked on **2026-10-04** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`; the waxed recipe already exists at the original source pin. This is a documentation correction, not a gameplay change.
+
+The selected Trial Chambers salvage route was source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19`: the active starting-pool references, actual block entries in both starting templates, their processors, current native mining properties and tool/drop gates, six matching block-loot tables and the four conversion recipes cited above. This bounded addition supplements the original structure exclusion; it is not an exhaustive structure-acquisition survey. No in-game generation, excavation, mining or recipe test was run. [Full/cut/chiseled/stair mapping][acq-native-map] · [Grate mapping][acq-native-grate-map] · [Full-block mining properties][acq-native-physics] · [Grate mining properties][acq-native-grate-physics] · [Property application][acq-native-apply]
 
 Related: [Blocks](Blocks.md) · [Copper catalog](catalog/copper.md) · [Stonecutter](Stonecutter.md) · [Copper Ingot](../items/CopperIngot.md) · [Honeycomb](../items/Honeycomb.md) · [Axes and Hoes](../mechanics/AxesAndHoes.md) · [Mining](../mechanics/Mining.md) · [Wood construction](WoodConstruction.md)
 
@@ -497,3 +517,29 @@ Related: [Blocks](Blocks.md) · [Copper catalog](catalog/copper.md) · [Stonecut
 [unpack]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/recipe/crafting/copper_ingot.json
 
 [unpack-waxed]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/recipe/crafting/copper_ingot_from_waxed_copper_block.json
+
+[acq-structure]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/worldgen/structure/trial_chambers.json
+[acq-pool]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/worldgen/template_pool/trial_chambers/chamber/end.json
+[acq-end-one]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/structure/trial_chambers/corridor/end_1.nbt
+[acq-end-two]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/structure/trial_chambers/corridor/end_2.nbt
+[acq-processors]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/worldgen/processor_list/trial_chambers_copper_bulb_degradation.json
+[acq-harvest]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/player/Player.java#L655-L657
+[acq-broken]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/ItemStack.java#L587-L589
+[acq-pickaxe]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[acq-stone]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/tags/block/needs_stone_tool.json
+[acq-tool]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/ToolMaterial.java#L20-L50
+[acq-loot-full]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/loot_table/blocks/waxed_copper_block.json
+[acq-loot-aged]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/loot_table/blocks/waxed_oxidized_copper.json
+[acq-loot-chiseled]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/loot_table/blocks/waxed_chiseled_copper.json
+[acq-loot-grate]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/loot_table/blocks/waxed_copper_grate.json
+[acq-loot-cut]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/loot_table/blocks/waxed_oxidized_cut_copper.json
+[acq-loot-stairs]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/loot_table/blocks/waxed_oxidized_cut_copper_stairs.json
+[acq-unpack]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/recipe/crafting/copper_ingot_from_waxed_copper_block.json
+[acq-full-slabs]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/recipe/stonecutting/waxed_oxidized_cut_copper_slab_from_waxed_oxidized_copper_stonecutting.json
+[acq-full-grates]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/recipe/stonecutting/waxed_oxidized_copper_grate_from_waxed_oxidized_copper_stonecutting.json
+[acq-cut-slabs]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/recipe/stonecutting/waxed_oxidized_cut_copper_slab_from_waxed_oxidized_cut_copper_stonecutting.json
+[acq-native-map]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/rust/content/block/definitions/catalog.rs#L1071-L1088
+[acq-native-grate-map]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/rust/content/block/definitions/catalog.rs#L1116
+[acq-native-physics]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/rust/content/block/definitions/physics.rs#L266-L271
+[acq-native-grate-physics]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/rust/content/block/definitions/physics.rs#L988-L993
+[acq-native-apply]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/state/NativeBlockDefinitions.java#L99-L122
