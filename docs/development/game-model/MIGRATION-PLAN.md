@@ -53,6 +53,15 @@ Follow the owner boundary relevant to the next change:
   Java still supplies model admission, contextual light predicates/shade and
   biome/custom tint samples; unsupported and diagnostic inputs retain
   compatibility paths.
+- **Light publication and scalar reads:** [canonical light maps](../world/lighting/RUST-LIGHT-MAPS.md)
+  retain section entries, typed layer owners and sky column metadata in Rust.
+  Snapshots share 64-shard roots, and exact canonical block/sky scalar consumers
+  sample those owners directly. Java retains light-engine orchestration,
+  queued-section precedence, publication sequencing and temporary object-identity
+  pins. Preserve supplied-map aliases, custom/escaped-layer callbacks and rebuild
+  timing: retain the original layer references, then lease their generations when
+  the terrain-light consumer runs. This source ownership does not extend the
+  linked guide's recorded verification to later revisions.
 - **Live biomes and colors:** the [admitted palette owner and direct raw sky/fog consumers](../world/biome/RUST-LIVE-BIOMES.md)
   are native. Rust reuses exact-position colors only after validating the world
   revision and retained source generations. Java retains chunk lifecycle events,

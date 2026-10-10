@@ -82,6 +82,8 @@ src/main/rust/
         │   ├── snapshot/
         │   └── stage_transfer.rs
         ├── lighting/
+        │   ├── layers/
+        │   ├── maps/
         │   ├── priority_queue/
         │   ├── propagation/
         │   └── skylight_sources/
@@ -161,6 +163,19 @@ immutable color tables, chunk/packet/range events, compatibility sky/fog samplin
 terrain tint/blending, brightness/weather adjustments, contextual light, model
 admission and entity callbacks, and orchestrates chunks and generation stages.
 These owners do not complete the world migration.
+
+[Live light layers](world/lighting/RUST-LIVE-LAYERS.md) in
+`world/level/lighting/layers/` own lazy defaults and nibble generations.
+[Canonical block/sky light maps](world/lighting/RUST-LIGHT-MAPS.md) in
+`world/level/lighting/maps/` retain typed layer owners and shared 64-shard roots
+for section entries and sky column tops. Snapshots share roots; a later mutation
+detaches the root and its changed shard. Exact canonical block/sky scalar reads
+sample retained owners directly, including sky traversal through missing layers.
+Java retains light-engine orchestration, queued-section precedence, publication
+sequencing, section callbacks and temporary `DataLayer` identity slots. Supplied
+Java maps, custom storage/layers and escaped mutable arrays retain compatibility
+behavior. Terrain rebuilds retain layer references before the bulk consumer leases
+their current generations. These are CPU owners, separate from renderer resources.
 
 Packed chunk storage also uses [palette histograms](world/chunk/RUST-PALETTE-HISTOGRAM.md)
 under `world/level/chunk/palette/histogram/` for general ordered counting and

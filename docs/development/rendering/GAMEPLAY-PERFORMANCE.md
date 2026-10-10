@@ -150,7 +150,60 @@ visual/lifecycle checks.
 
 ## Recorded evidence and limits
 
-The later [fog/cache record at `3adbe6d5`](https://github.com/HungLo2020/MattMC/blob/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a/PROGRESS.md#L73)
+### Integrated light-map profiles
+
+The [record at `971e0226`](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L60-L65)
+reports four ordinary eight-second CPU/allocation flights for integrated release
+`b7297d06`, after combining native light maps/direct scalar consumers with the
+upstream recorder, allocation and lazy-mesh changes. These profiles are separate
+from the three-window ordinary-gameplay protocol below. The author reports
+terminal, process, source/library/Frozen/protected-edit, movement and cleanup
+guards passing, with all twelve F3 images reviewed. Both CPU flights have
+identical endpoints; allocation endpoints differ by at most 1.089 blocks, and
+both sides cross seven X chunk columns. Four completed copies were retired.
+The initial PID/focus rejection remains retained; no failed profile was relabeled
+or validator relaxed.
+
+Weighted Java allocation is **0.823 GB Current / 2.398 GB Frozen**. The map-copy
+path has zero sampled Current allocation versus 94.37 MB Frozen. This excludes
+Rust allocation; zero sampled Java allocation does not make the entire native
+or FFM path allocation-free. Canonical map snapshots now share a native sharded
+root, while sparse Java pins preserve layer identity. Public Java-map aliases,
+custom layers and escaped arrays retain compatibility paths. See
+[the ownership contract](../world/lighting/RUST-LIGHT-MAPS.md).
+
+Current section preparation samples 25.17 MB, including 8.39 MB in Java
+occlusion-cache tables; those categories are not additive. Direction-array
+cloning and legacy packet export have zero samples after the upstream changes,
+while `ResourceLocation` strings sample 5.24 MB. CPU leaf samples include
+native translucent sorting (962), Java section preparation (319), culling (40)
+and scalar light (56). Diagnostics remain enabled. Sparse sampling and combined
+changes limit attribution; none of these values isolates a migration FPS gain.
+Short RSS windows do not prove long-session memory bounds. Receipt:
+`goal5/native-light-map-integrated-flight-profile-v2-20261009/profile-comparison.json`.
+
+The [integrated settled matrix](GOAL-5-STATUS.md#october-9-integrated-light-map-and-scalar-summary)
+still fails vanilla p99 (3.277 ms Current / 3.097 ms Frozen), although its
+median average-FPS floors pass in all modes. Clean profiles and diagnostic
+settled images do not establish entry, sustained streaming, bulk-input pixel
+parity, absence of pop-in/flicker or broad visual acceptance.
+
+### Earlier profile checkpoints
+
+The [pre-sync light-map record](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L36-L53)
+for `7580a46e` reports four eight-second profiles and twelve reviewed F3 images,
+with movement/integrity/cleanup guards passing. Weighted Java allocation is
+0.757 / 2.369 GB Current/Frozen; the map-copy path samples 1.05 / 74.45 MB.
+The remaining Current copy-path sample is an FFM lease object. Both sides cross
+seven X chunk columns with endpoint drift at most 1.089 blocks. Native scalar
+light has 46 samples, map-related work 71 and dynamic translucent sorting 1,020;
+diagnostics affect attribution and these categories must not be added together.
+Native allocations are excluded. The associated settled matrix fails vanilla
+FPS and p99. These profiles precede the resource/allocation integration and do
+not measure `b7297d06`. Receipt:
+`goal5/native-light-map-flight-profile-20261009/profile-comparison.json`.
+
+The earlier [fog/cache record at `3adbe6d5`](https://github.com/HungLo2020/MattMC/blob/3adbe6d5d85ecf82a8b43c58b81c4535cec8007a/PROGRESS.md#L73)
 reports four ordinary CPU/allocation profiles for release `f449557e`, separate
 from the three-window protocol below. Process, source, library, movement and
 cleanup guards pass; twelve actual F3 positions were reviewed, and four verified
@@ -163,9 +216,9 @@ attribution. The 89.13 MB of sampled Current light-map copying identifies furthe
 work, not an accepted speedup or long-session memory result. Receipt:
 `goal5/native-live-biome-fog-cache-flight-profile-20261009/profile-comparison.json`.
 
-Those profiles and the [settled matrix](GOAL-5-STATUS.md#october-9-live-fog-and-validated-color-reuse-summary)
-predate the session recorder and allocation/lazy-mesh changes above. Vanilla p99
-still fails in that matrix; entry, sustained streaming, pop-in/flicker and broad
+The `f449557e` profiles and [settled matrix](GOAL-5-STATUS.md#october-9-live-fog-and-validated-color-reuse-summary)
+predate the session recorder, allocation/lazy-mesh and native light-map changes.
+Vanilla p99 still fails in that matrix; entry, sustained streaming, pop-in/flicker and broad
 visual acceptance remain open. The following record retains its earlier
 `ee34f2ad` source and ordinary-driver workload scope.
 

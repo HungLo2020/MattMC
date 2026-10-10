@@ -1,18 +1,19 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`52eb4dc9`](https://github.com/HungLo2020/MattMC/commit/52eb4dc9bbac2e6b26ed26f3e5a1736c628ea903):
-Rust owns admitted live biome palettes, the loaded-client index and canonical
-sky/fog sampling, with exact-position result reuse after source-generation
-validation. Java retains lifecycle events, hooks, tint/blending, brightness,
-weather and compatibility paths. The latest author-recorded matrix, release
-`f449557e`, **fails vanilla p99** (3.394 ms Current / 3.322 ms Frozen), while all
-median average-FPS floors pass. Its suite, lifecycle and settled-image checks
-predate the later session recorder and allocation/lazy-mesh changes; they do
-not establish current-head acceptance. Ordinary profiles remain bounded
-attribution evidence; entry, sustained streaming, temporal rendering and
-long-session memory acceptance remain open. See [the measured workload](#october-9-live-fog-and-validated-color-reuse-summary)
-and [live-biome evidence](../world/biome/RUST-LIVE-BIOMES.md).
+[`971e0226`](https://github.com/HungLo2020/MattMC/commit/971e0226b5c45b6fb3b2699e6bdb92be27021261):
+Rust owns canonical light-map snapshots, sky-column metadata and direct scalar
+block/sky sampling, in addition to the admitted live biome and fog owners.
+Java retains light-engine orchestration, publication scheduling, contextual
+callbacks and compatibility paths. The latest author-recorded matrix, integrated
+release `b7297d06`, **fails vanilla p99** (3.277 ms Current / 3.097 ms Frozen),
+while all median average-FPS floors pass. The initial lifecycle gate was 6/7;
+all seven retained logs pass the corrected strict shutdown classifier, and one
+fresh affected transition passes. This is not seven fresh lifecycle runs.
+Ordinary profiles remain bounded attribution evidence; entry, sustained
+streaming, temporal rendering and long-session memory acceptance remain open.
+See [the measured workload](#october-9-integrated-light-map-and-scalar-summary)
+and [light-map ownership](../world/lighting/RUST-LIGHT-MAPS.md).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
@@ -24,9 +25,12 @@ native authored item poses and GPU execution/resources.
 Separate native world owners now supply canonical live/rebuild state, section
 color fields, live biome palettes and live light generations. Native sky/fog
 consumers read the retained loaded-biome index; the native terrain-light consumer
-prepares canonical mesher words from those generations. Java still orchestrates
-light storage maps and publication and supplies contextual light predicates and
-shade, with mutable-array, subclass/platform and diagnostic compatibility paths.
+prepares canonical mesher words from those generations. Native light-map
+publication shares a 64-shard root and detaches only the root and touched shard
+on mutation. Exact canonical scalar consumers read the retained typed owners;
+Java still schedules publication, maintains sparse `DataLayer` identity pins,
+and supplies contextual light predicates and shade, with mutable-array,
+subclass/platform and diagnostic compatibility paths.
 Raw GUI image publication retains unchanged native images while Java supplies
 semantic identities and changed CPU snapshots. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
@@ -41,7 +45,14 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [fog/cache ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6093641438)
+The current [light-map ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6094520281)
+and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6094520995)
+retain the ownership, lifecycle and performance limits at `971e0226`. Independent
+verification passed four runtime-log classifier and thirteen validation-driver
+fixtures. These seventeen synthetic checks do not rerun Java/Rust suites,
+clients, actual lifecycle logs or profiles. Neither review closes its issue.
+
+The preceding [fog/cache ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6093641438)
 and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6093641948)
 retain the open acceptance boundaries and distinguish the `f449557e` runtime
 record from later recorder/allocation/lazy-mesh source changes. Two independent
@@ -124,7 +135,40 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
-The later [scripted look-around recorder](SESSION-RECORDING.md#unattended-look-around-runs)
+### October 9 light-map snapshots and direct scalar sampling
+
+The [light-map milestone](https://github.com/HungLo2020/MattMC/commit/971e0226b5c45b6fb3b2699e6bdb92be27021261)
+moves canonical block/sky map snapshots, the two-entry cache and sky-column
+metadata into Rust. Snapshot publication retains the sharded root; later writes
+detach only affected ownership. Sparse Java object pins preserve `DataLayer`
+identity until native map/cache pins retire and Java acknowledges clearing.
+Removal holds the shared retirement lock through return-value resolution;
+ordinary and idle scalar reads drain at most 64 retired identities.
+
+Exact canonical block/sky scalar consumers read retained native owners,
+including missing-layer sky traversal. Visible maps use a shared read lock;
+custom storages, virtual layers and escaped arrays retain callbacks. Public
+Java-map constructors preserve caller aliases and the original protected API.
+Queued light still precedes visible storage, and terrain captures retain layer
+references until preparation leases their current generations. These are CPU
+owners in the existing Rust library; GAL ownership and whole-frame ABI 78
+remain unchanged. See
+[the full contracts and fixture limits](../world/lighting/RUST-LIGHT-MAPS.md).
+Java retains section status, queued entries, retained columns, inconsistency
+processing, callbacks and publication scheduling.
+
+The [shared shutdown classifier](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/DevUtils/tests/rendering/runtime_log_health.py)
+separates only a server INFO `ClosedChannelException` connection-close line
+following the exact render-thread INFO `Stopping!` marker. Earlier closes,
+ERROR lines, exception stack traces, panics and dependency failures remain
+rejecting evidence. Independent checks passed four classifier and thirteen
+validation-driver tests at this source pin. Those synthetic tooling fixtures do
+not replay the author's actual logs or rerun clients, Java/Rust suites or
+profiles. The [integrated author record](#october-9-integrated-light-map-and-scalar-summary)
+keeps the original failed report, corrected replay and one fresh transition
+separate.
+
+The preceding [scripted look-around recorder](SESSION-RECORDING.md#unattended-look-around-runs)
 adds a copied-world camera sweep and system/thread stall observations. It remains
 Current-only diagnosis, with a log-marker completion result and a shared PID
 lookup limitation; it supplies no newer matched runtime acceptance matrix.
@@ -477,6 +521,71 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 9 integrated light-map and scalar summary
+
+The [summary at `971e0226`](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/SUMMARY.md)
+records integrated release `b7297d06` after the recorder, allocation and lazy-mesh
+changes through `81440bf19`. On RTX 3080 Ti, the settled rotating-view matrix
+uses ABAB order, two runs per side and mode, with exactly 6,000 measured frames
+in each of sixteen runs. These are committed author reports; this documentation
+review did not rerun or inspect the unbundled runtime receipts.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- |
+| Vanilla | 1,358.8 / 1,297.1 | 1,149.6 / 1,193.5 | 3.277 / 3.097 |
+| Vanilla + DH | 718.7 / 820.5 | 607.9 / 682.4 | 3.868 / 6.245 |
+| Shaders | 354.7 / 340.1 | 313.6 / 316.4 | 4.590 / 6.411 |
+| Shaders + DH | 259.2 / 258.7 | 227.1 / 227.2 | 6.004 / 8.191 |
+
+**Performance FAIL:** vanilla misses the p99 floor. Median average FPS passes
+in every mode; the other three modes meet their p99 floors. Upstream resource
+and allocation changes are integrated with light maps, so the comparison does
+not isolate a light-map speedup.
+
+The [author's integrated record](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L60-L65)
+reports a fresh full Rust suite (2,467 passes, three ignored), both Java tasks
+(1,829 tests, two skipped, no failures), and six actual JNI workers mapped to
+release `b7297d06`. Both new vanilla/Iris+DH settled diagnostic pairs were
+manually reviewed and pass, including DH coverage. All sixteen timing rows are
+clean, with zero VUIDs, errors or orphaned clients. Source/library/Frozen/
+protected-edit guards pass; 25 completed runtime copies were retired. Receipt:
+`validation/native-light-map-integrated-20261009/summary.json`; compact evidence
+also remains under `build/native-light-map-migration/integrated/`.
+
+The original integrated lifecycle gate is **6/7**: view-distance decrease
+counted two exception mentions on one INFO connection-close line after
+`Stopping!`. The corrected shared classifier passes replay of all seven
+retained logs, preserving earlier/errors/panics/dependency rejection. The
+original failed report remains intact. **One fresh affected transition** then
+passes with the exact native library and source/Frozen/protected-edit/cleanup
+guards; one additional completed copy was retired. Replay and that transition
+do not constitute a fresh seven-case gate.
+
+Four fresh ordinary eight-second CPU/allocation profiles report weighted Java
+allocation of 0.823 GB Current / 2.398 GB Frozen; the map-copy path has zero
+sampled Current allocation versus 94.37 MB Frozen. These exclude Rust allocation
+and do not prove a zero-allocation path or isolate FPS gains. See
+[the profile controls and limits](GAMEPLAY-PERFORMANCE.md#integrated-light-map-profiles).
+Diagnostic settled pairs cannot establish ordinary bulk-input pixel parity,
+streaming/pop-in/flicker acceptance or long-session memory bounds. The
+`7580a46e` and `f449557e` records below retain their historical source identities.
+
+#### October 9 pre-sync light-map summary
+
+The [pre-sync record](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L36-L53)
+for release `7580a46e` reports 2,467 Rust passes (three ignored), final Java
+1,827 tests (two skipped), six exact-library JNI workers, seven lifecycle cases
+and reviewed diagnostic pairs. The intentionally interrupted constructor-fix
+fixture remains; the preserved Rust result was reused only after checking
+unchanged Rust source/library. Its sixteen exact-6,000-frame ABAB rows were clean,
+but vanilla failed both median FPS (1,099.8 Current / 1,158.0 Frozen) and p99
+(4.090 / 3.114 ms). DH, shaders and shaders+DH passed both floors. The separate
+ordinary profiles sampled 0.757 / 2.369 GB weighted Java allocation and
+1.05 / 74.45 MB in the map-copy path, excluding native allocation. These
+measurements precede the upstream resource/allocation integration; they do not
+verify `b7297d06` or establish an isolated migration gain. Detailed historical
+controls remain in [the owner guide](../world/lighting/RUST-LIGHT-MAPS.md).
 
 #### October 9 live fog and validated color reuse summary
 

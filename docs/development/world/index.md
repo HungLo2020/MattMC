@@ -6,7 +6,9 @@
   growth, histograms, save packing and verification.
 - [Chunk loading](chunk-loading/index.md): native-owned player chunk-distance
   fields for natural spawning and player tickets.
-- [World Lighting](lighting/index.md): skylight-source reconstruction, Rust light propagation and focused verification.
+- [World Lighting](lighting/index.md): skylight-source reconstruction, live light
+  layers, canonical map snapshots and scalar sampling, Rust propagation and
+  scoped verification.
 - [Biomes](biome/index.md): climate selection, live native palettes, sky/fog
   sampling with generation-validated reuse, section color fields and scoped
   Java/native parity checks.

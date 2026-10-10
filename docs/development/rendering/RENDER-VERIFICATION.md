@@ -71,9 +71,62 @@ resolved and two stale atlas/shield expectations corrected at `7f256b53`.
 Do not classify a new mocking failure as an accepted baseline automatically;
 check the effective JVM, Byte Buddy configuration and actual failure.
 
+### Light-map source and fixture boundaries
+
+The [map fixtures](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/src/test/java/net/minecraft/world/level/lighting/NativeLightMapTest.java)
+and [native owner fixtures](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/src/main/rust/world/level/lighting/maps/mod.rs)
+cover copied/cache identities, null membership, sky defaults, escaped-owner
+fallback and canonical scalar sampling. Actual Frozen fixtures record 4,096
+map operations and 1,024 scalar block/sky cases, including missing layers,
+sky enablement and extreme packed coordinates. Regenerate with the
+[pinned Frozen oracle](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/DevUtils/tests/lighting/GenerateFrozenLightMapOracle.java)
+and adjacent scalar oracle, not Current classes; the generators verify the
+Frozen class hashes. See [the owner guide](../world/lighting/RUST-LIGHT-MAPS.md)
+for focused commands and compatibility constraints.
+
+The author reports 29 focused Rust and 26 Java checks, a 20,000-cycle
+concurrent-snapshot regression for premature identity retirement, and 100,000
+native retirement cycles with bounded slot tables. The external `super(null)`
+regression preserves the protected Java constructor API after making the new
+native constructor package-private. Fixture coverage and these reported bounds
+do not prove arbitrary concurrent schedules, long-session memory limits or
+live visual parity. This review inspected their definitions and committed
+reports; it did not execute the Java/Rust fixtures.
+
 ### One-command validation
 
-The [fog/cache milestone](../world/biome/RUST-LIVE-BIOMES.md)
+The [light-map milestone](../world/lighting/RUST-LIGHT-MAPS.md) adds retained
+canonical map snapshots and direct scalar block/sky consumers. The
+[author's integrated record](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L60-L65)
+reports release `b7297d06` passing a fresh Rust suite (2,467 passes/three ignored)
+and both Java tasks (1,829 tests/two skips/no failures), with six actual JNI
+workers mapped to the exact library. Both newly reviewed vanilla/Iris+DH
+settled diagnostic pairs and DH coverage pass. All sixteen ABAB/6,000-frame
+rows are clean, but vanilla p99 **fails** at 3.277 ms Current / 3.097 ms Frozen.
+See [the full integrated matrix](GOAL-5-STATUS.md#october-9-integrated-light-map-and-scalar-summary).
+
+The original integrated lifecycle gate is **6/7**. The corrected strict
+shutdown classifier passes all seven retained logs on replay; **one fresh
+affected transition** also passes with exact-library and integrity/cleanup
+guards. Keep the original failed report. This is not a fresh seven-case run.
+The [lifecycle gate](#lifecycle-gate) documents the exact ordered INFO exception
+that is separated; earlier closes, ERROR lines, stack traces, panics and
+dependency failures still reject the run. Four classifier and thirteen
+validation-driver tests independently pass at `971e0226`; the
+[tracker review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6094520995)
+records synthetic plain/gzip-log and driver fixtures, not author-log replay or
+game runs.
+
+The pre-sync `7580a46e` results remain historical: final Java 1,827 tests/two
+skips, Rust 2,467 passes/three ignored, six mapped JNI workers, seven lifecycle
+cases and reviewed settled pairs. That matrix failed vanilla median FPS and
+p99. Its preserved full Rust result followed an intentionally interrupted
+validation and was reused after verifying unchanged Rust source/library.
+Do not mix it with the fresh integrated suite and workload evidence above.
+Broad gameplay, temporal rendering and long-session memory acceptance remain
+open; diagnostic scalar pairs do not prove ordinary bulk-input pixels.
+
+The preceding [fog/cache milestone](../world/biome/RUST-LIVE-BIOMES.md)
 adds canonical native sky/fog sampling and generation-validated result reuse.
 The author reports release `f449557e` passing both Java tasks (1,818 tests/two
 skips), Rust (2,456 passes/three ignored), seven lifecycle cases and manually
@@ -81,8 +134,7 @@ reviewed vanilla/Iris+DH settled diagnostic pairs with DH coverage. All sixteen
 ABAB/6,000-frame runs are clean, but vanilla p99 **fails** at 3.394 ms Current
 versus 3.322 ms Frozen. See [the full recorded matrix](GOAL-5-STATUS.md#october-9-live-fog-and-validated-color-reuse-summary).
 These results predate the later recorder, allocation and lazy-mesh source
-changes; they are not full current-head acceptance. Broad gameplay, temporal
-rendering and long-session memory acceptance remain open.
+changes; they do not validate the integrated light-map release.
 
 The preceding sky-only milestone retains its own evidence: range-corrected
 `c3aa5fed` passed both Java tasks (1,812 tests/two skips), Rust (2,455 passes/three
@@ -445,7 +497,7 @@ a fresh label to rerun the affected transition. The combined validation driver's
 client cleanup is described [above](#one-command-validation); do not confuse
 it with ownership-scoped termination of one capture process group.
 
-The [gate source](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/DevUtils/tests/rendering/RunLifecycleGate.py)
+The [gate source](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/DevUtils/tests/rendering/RunLifecycleGate.py)
 defaults to seven scenarios: same-world unload/reload, different-world reload,
 resource reload, resize, swapchain recreation, and view-distance decrease and
 increase. It requires a successful capture command and audit rows marked

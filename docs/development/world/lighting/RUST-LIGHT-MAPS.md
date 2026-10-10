@@ -46,17 +46,28 @@ verification projections are separate from gameplay.
 
 ## Verification and current limits
 
+The suite, runtime, profile and artifact-retirement outcomes below are committed
+author reports for the named builds. This documentation review inspected source
+and these reports, without rerunning Java/Rust suites, clients or benchmarks or
+independently inspecting the unbundled runtime receipts. Keep the earlier
+`7580a46e` and integrated `b7297d06` evidence separate.
+
 The focused production suites pass 29 Rust and 26 Java checks, including
 retained generations, queue/publication ordering, the bulk terrain consumer
 and both scalar consumers. The 4,096-operation actual Frozen map fixture
 preserves identity/cache/default behavior. Another actual Frozen fixture covers
 1,024 scalar block/sky samples, including extreme packed positions, missing
 layers, sky enablement, allocated nibbles and arbitrary lazy defaults.
+These scalar fixtures use a chunk getter that returns null and an
+`EmptyBlockGetter` level view; they do not exercise a complete loaded-world lighting
+lifecycle. The concurrent retirement test covers distinct snapshots sharing
+identity pins, while mutation of the same map still requires caller exclusion.
 
 A concurrent-snapshot regression reproduced premature CPU-slot retirement.
 Removal now holds the shared retirement lock through result resolution; the
 20,000-cycle Java regression passes. Native tests cover 100,000 retirement
-cycles with bounded slot tables. The full suites pass 2,467 Rust tests (three ignored) and 1,826 Java tests
+cycles with immediate retirement acknowledgements and bounded slot tables in
+that fixture; this is not a process-wide or long-session memory bound. The full suites pass 2,467 Rust tests (three ignored) and 1,826 Java tests
 (two skipped), with six JNI executors mapping release `7580a46e` and all
 source/library/Frozen/prompt guards passing. Validation was intentionally
 interrupted after reproducing an external `super(null)` constructor ambiguity.

@@ -8,8 +8,9 @@ contextual rendering callbacks.
 
 - [Rust skylight-source reconstruction](RUST-SKYLIGHT-SOURCES.md): packed scans,
   exact occlusion tables, ownership and focused acceptance checks.
-- [Rust light-map publication](RUST-LIGHT-MAPS.md): shared snapshots, CPU identity
-  pins, sky metadata and compatibility contracts.
+- [Rust light-map publication](RUST-LIGHT-MAPS.md): shared 64-shard snapshots,
+  direct block/sky scalar reads, CPU identity pins, sky metadata and compatibility
+  contracts.
 - [Rust live light layers](RUST-LIVE-LAYERS.md): retained light ownership, direct
   propagation handoffs, array compatibility and current verification scope.
 - [Rust light propagation](RUST-LIGHT-PROPAGATION.md): block and sky light

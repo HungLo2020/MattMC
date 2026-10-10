@@ -93,10 +93,16 @@ sampling and generation-validated result reuse. Java still delivers
 chunk/packet/range events and retains hooks, terrain tint/blending and later
 brightness/weather adjustments. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
 own canonical lazy defaults and allocated nibble generations, including native
-propagation handoffs. The [terrain-light consumer](RUST-TERRAIN-LIGHTING.md)
-borrows these generations and prepares mesher words directly. Java retains
-light-engine orchestration, map publication, contextual light predicates/shade,
-biome blending, model admission and worker dispatch. Canonical
+propagation handoffs. [Canonical light maps](../world/lighting/RUST-LIGHT-MAPS.md)
+retain typed layer owners, shared 64-shard section/sky-top roots and direct
+block/sky scalar sampling in Rust. Java retains temporary `DataLayer` identity
+slots, light-engine orchestration, queued-section precedence and publication
+sequencing. Rebuild captures keep the original layer references; the
+[terrain-light consumer](RUST-TERRAIN-LIGHTING.md) later leases their current
+generations and prepares mesher words directly. Capturing generation bytes
+earlier would change fill semantics. Supplied maps, custom storage/layers and
+escaped arrays retain compatibility paths. Java still supplies contextual light
+predicates/shade, biome blending, model admission and worker dispatch. Canonical
 [generation-stage transfers](../world/levelgen/RUST-STAGE-HANDOFF.md) copy/adopt
 inside Rust; stage and live formats remain separate. These CPU owners do not
 change GAL resources, completion or presentation.
