@@ -587,17 +587,12 @@ public class ColumnBox
 
 	private static boolean isTransparentMaterial(int materialId)
 	{
-		return isWaterMaterial(materialId) || isLeavesMaterial(materialId);
+		return isWaterMaterial(materialId);
 	}
 
 	static boolean isWaterMaterial(int materialId)
 	{
 		return materialId == EDhApiBlockMaterial.WATER.index;
-	}
-
-	private static boolean isLeavesMaterial(int materialId)
-	{
-		return materialId == EDhApiBlockMaterial.LEAVES.index;
 	}
 
 	static boolean isWaterSurfaceOccludingMaterial(int materialId)

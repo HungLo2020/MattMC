@@ -2025,9 +2025,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		if ((this.level == null) || camera == null) {
 			return;
 		}
-		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasDistantHorizonsPrivateClouds()) {
-			return;
-		}
+		// Frozen draws vanilla and DH clouds independently.
 		CloudStatus cloudStatus = this.minecraft.options.getCloudsType();
 		Optional<Integer> cloudHeight = this.level.dimensionType().cloudHeight();
 		if (cloudStatus == CloudStatus.OFF || cloudHeight.isEmpty()) {

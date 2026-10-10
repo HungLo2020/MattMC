@@ -1,8 +1,10 @@
 //! Source-derived cloud directives.
 //!
-//! Iris reads `clouds` and `dhClouds` from the resolved `shaders.properties`
-//! and cancels DH's "Clouds" generic group when `dhClouds=off`, or when
+//! Iris reads `clouds` and `dhClouds` from the resolved `shaders.properties`.
+//! `clouds` overrides the vanilla cloud option (`Options.getCloudsType`), and
+//! DH's "Clouds" generic group is cancelled when `dhClouds=off`, or when
 //! `dhClouds` is unset and `clouds=off` (`DHCompatInternal.avoidRenderingClouds`).
+//! Java reads both through `mattmc_vulkanic_gal_shader_pack_cloud_settings`.
 //! The properties are resolved with the source's option and environment
 //! defines, so `#ifdef DISTANT_HORIZONS` blocks apply exactly as in Iris.
 
@@ -13,7 +15,8 @@ enum CloudSetting {
     #[default]
     Default,
     Off,
-    On,
+    Fast,
+    Fancy,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,9 +52,10 @@ impl ShaderPackCloudPolicy {
             // java.util.Properties keeps the last value of a repeated key.
             match (key.trim(), value.trim()) {
                 ("clouds", "off") => policy.clouds = CloudSetting::Off,
-                ("clouds", "fast" | "fancy") => policy.clouds = CloudSetting::On,
+                ("clouds", "fast") => policy.clouds = CloudSetting::Fast,
+                ("clouds", "fancy") => policy.clouds = CloudSetting::Fancy,
                 ("dhClouds", "off") => policy.dh_clouds = CloudSetting::Off,
-                ("dhClouds", "on" | "fancy") => policy.dh_clouds = CloudSetting::On,
+                ("dhClouds", "on" | "fancy") => policy.dh_clouds = CloudSetting::Fancy,
                 _ => {}
             }
         }
@@ -60,6 +64,21 @@ impl ShaderPackCloudPolicy {
 
     pub fn generation(self) -> u64 {
         self.generation
+    }
+
+    /// The pack's vanilla cloud override: 0 none, 1 off, 2 fast, 3 fancy.
+    pub fn vanilla_cloud_override(self) -> u32 {
+        match self.clouds {
+            CloudSetting::Default => 0,
+            CloudSetting::Off => 1,
+            CloudSetting::Fast => 2,
+            CloudSetting::Fancy => 3,
+        }
+    }
+
+    /// Bits 0-1: [`Self::vanilla_cloud_override`]; bit 2: DH clouds cancelled.
+    pub fn packed(self) -> u32 {
+        self.vanilla_cloud_override() | (u32::from(self.avoids_distant_horizons_clouds()) << 2)
     }
 
     /// Whether DH's own "Clouds" generic group must not be drawn.
@@ -99,6 +118,15 @@ mod tests {
         assert!(!policy("clouds=off\ndhClouds=on\n").avoids_distant_horizons_clouds());
         assert!(!policy("clouds=fancy\n").avoids_distant_horizons_clouds());
         assert!(!policy("dhClouds=off\ndhClouds=on\n").avoids_distant_horizons_clouds());
+    }
+
+    #[test]
+    fn vanilla_override_and_packing() {
+        assert_eq!(0, policy("").packed());
+        assert_eq!(1 | 4, policy("clouds=off\n").packed());
+        assert_eq!(2, policy("clouds=fast\n").packed());
+        assert_eq!(3 | 4, policy("clouds=fancy\ndhClouds=off\n").packed());
+        assert_eq!(1, policy("clouds = off\ndhClouds = on\n").packed());
     }
 
     #[test]

@@ -3351,6 +3351,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * This is semantic source transport only: it neither selects nor executes a
 	 * pack and intentionally carries no Iris/OpenGL/Vulkan runtime objects.
 	 */
+	/**
+	 * The accepted shader-pack source's cloud directives, as Rust resolved them:
+	 * bits 0-1 the vanilla cloud override (0 none, 1 off, 2 fast, 3 fancy),
+	 * bit 2 set when DH's "Clouds" group is cancelled.
+	 */
+	public int shaderPackCloudSettings() {
+		return Native.shaderPackCloudSettings(contextId);
+	}
+
 	public Status updateShaderPackSources(long generation, String packName, List<ShaderPackSourceFileRecord> files) {
 		Objects.requireNonNull(packName, "packName");
 		Objects.requireNonNull(files, "files");
@@ -4507,15 +4516,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
             instanceFlags[index] |= 2;
             instanceCloudOwners[index] = owner;
             instanceCloudEpochs[index] = epoch;
-        }
-
-        /**
-         * Marks the last appended instance as DH's "Clouds" group. Rust drops
-         * it when the selected shader pack disables DH clouds, as Iris does.
-         */
-        public void markLastGroupInstanceClouds() {
-            if (instanceCount == 0) throw new IllegalStateException("no DH generic group instance to mark");
-            instanceFlags[instanceCount - 1] |= 4;
         }
 
         private NativeDhCloudGroupState[] pinCloudOwners(NativeDhCloudGroupState[] pins) {
@@ -8122,6 +8122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle WORLD_LOD_COLLECTOR_FLUSH = downcall("mattmc_vulkanic_gal_world_lod_collector_flush", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_LOD_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_lod_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle SHADER_PACK_UPDATE_SOURCES = downcall("mattmc_vulkanic_gal_shader_pack_update_sources", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle SHADER_PACK_CLOUD_SETTINGS = downcall("mattmc_vulkanic_gal_shader_pack_cloud_settings", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
 		private static final MethodHandle SHADER_PACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_shader_pack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
@@ -8522,6 +8523,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) SHADER_PACK_UPDATE_SOURCES.invokeExact(contextId, request, result);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to update Rust VulkanicGAL shader-pack sources", throwable);
+			}
+		}
+
+		static int shaderPackCloudSettings(long contextId) {
+			try {
+				return (int) SHADER_PACK_CLOUD_SETTINGS.invokeExact(contextId);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to read Rust VulkanicGAL shader-pack cloud settings", throwable);
 			}
 		}
 

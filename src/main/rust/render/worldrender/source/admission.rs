@@ -1592,16 +1592,9 @@ impl WorldPrimitiveFrontend {
         self.last_source_route_extent = Some(extent);
     }
 
-    /// Iris cancels DH's "Clouds" group while a pack is selected whose
-    /// directives disable DH clouds, whichever route draws the frame.
-    pub(crate) fn drop_shader_pack_disabled_dh_clouds(&self, frame: &mut WorldPrimitiveFrame) {
-        if self
-            .shader_pack_sources
-            .active_cloud_policy()
-            .is_some_and(|policy| policy.avoids_distant_horizons_clouds())
-        {
-            frame.dh_generic_boxes.retain(|item| !item.cloud);
-        }
+    /// The active pack's packed cloud directives (see `ShaderPackCloudPolicy::packed`).
+    pub fn shader_pack_cloud_settings(&self) -> u32 {
+        self.shader_pack_sources.active_cloud_policy().map_or(0, |policy| policy.packed())
     }
 
     /// Admits an armed frame before any source work is recorded. A frame the
@@ -1611,9 +1604,6 @@ impl WorldPrimitiveFrontend {
     /// their own clouds drop vanilla cloud faces here, before validation.
     #[cfg(not(test))]
     pub(crate) fn admit_armed_source_frame(&mut self, mut frame: WorldPrimitiveFrame) -> WorldPrimitiveFrame {
-        if self.source_execution_enabled() {
-            self.drop_shader_pack_disabled_dh_clouds(&mut frame);
-        }
         if !self.runtime_source_execution_is_armed() {
             return frame;
         }

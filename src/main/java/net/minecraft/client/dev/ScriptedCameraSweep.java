@@ -17,7 +17,7 @@ import net.minecraft.client.player.LocalPlayer;
  *
  * <p>Optional timed actions (seconds since the sweep started):
  * {@code .enableShadersAt} turns shaders on mid-world, as the shader-pack
- * screen does, and {@code .screenshotsAt} (comma separated) saves
+ * screen does, {@code .disableShadersAt} turns them off again, and {@code .screenshotsAt} (comma separated) saves
  * {@code screenshots/scripted-<seconds>s.png} into the game directory.
  */
 public final class ScriptedCameraSweep {
@@ -28,6 +28,7 @@ public final class ScriptedCameraSweep {
 	private static final double PITCH_AMPLITUDE = doubleProperty("pitchAmplitude", 60.0);
 	private static final double PITCH_PERIOD = doubleProperty("pitchPeriod", 1.6);
 	private static final double ENABLE_SHADERS_AT = doubleProperty("enableShadersAt", -1.0);
+	private static final double DISABLE_SHADERS_AT = doubleProperty("disableShadersAt", -1.0);
 	/** {@code toggle} (keybind) or {@code screen} (the shader-pack screen's Apply). */
 	private static final String ENABLE_SHADERS_VIA = System.getProperty("mattmc.dev.scriptedCamera.enableShadersVia", "toggle");
 	private static final double[] SCREENSHOTS_AT = doubleListProperty("screenshotsAt");
@@ -36,6 +37,7 @@ public final class ScriptedCameraSweep {
 	private static float baseYaw;
 	private static boolean stopIssued;
 	private static boolean shadersEnabled;
+	private static boolean shadersDisabled;
 	private static int screenshotsTaken;
 
 	private ScriptedCameraSweep() {}
@@ -104,6 +106,15 @@ public final class ScriptedCameraSweep {
 				} catch (java.io.IOException error) {
 					throw new java.io.UncheckedIOException(error);
 				}
+			}
+		}
+		if (DISABLE_SHADERS_AT >= 0.0 && !shadersDisabled && elapsed >= DISABLE_SHADERS_AT) {
+			shadersDisabled = true;
+			System.out.println("MattMC scripted camera disabling shaders at " + elapsed + "s");
+			try {
+				net.irisshaders.iris.Iris.toggleShaders(minecraft, false);
+			} catch (java.io.IOException error) {
+				throw new java.io.UncheckedIOException(error);
 			}
 		}
 		if (screenshotsTaken < SCREENSHOTS_AT.length && elapsed >= SCREENSHOTS_AT[screenshotsTaken]) {

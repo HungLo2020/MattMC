@@ -85,6 +85,8 @@ pack. The default `enableShadersVia=toggle` uses the enable/reload API;
 `--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersVia=screen` follows the
 shader-pack screen's Apply logic, including its optional second apply after an
 option reset. It calls that logic directly; it does not open or click the UI.
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.disableShadersAt=75` turns shaders off
+again through the same toggle API.
 The enable attempt is marked before application; a thrown failure does not
 turn this into an automatic retry loop. Start with `--config 'config/iris.properties:enableShaders=false'` and a valid
 selected pack available in the copied game. The scripted driver copies config,

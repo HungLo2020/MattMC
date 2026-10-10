@@ -295,11 +295,14 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 				boolean cancelRendering = ApiEventInjector.INSTANCE.fireAllEvents(
 					DhApiBeforeGenericObjectRenderEvent.class,
 					new DhApiBeforeGenericObjectRenderEvent.EventParam(renderEventParam, boxGroup));
-				if (cancelRendering)
+				boolean cloudGroup = "Clouds".equals(boxGroup.resourceLocationPath);
+				// Iris cancels the "Clouds" group when the selected pack disables
+				// DH clouds (DHCompatInternal.avoidRenderingClouds).
+				if (cancelRendering
+					|| (cloudGroup && net.vulkanic.gui.RustGalFrameCoordinator.shaderPackAvoidsDistantHorizonsClouds()))
 				{
 					continue;
 				}
-				boolean cloudGroup = "Clouds".equals(boxGroup.resourceLocationPath);
 
 				var nativeCloud = boxGroup.nativeCloudState();
                 DhApiVec3d origin = nativeCloud == null ? boxGroup.getOriginBlockPos() : null;
@@ -339,10 +342,6 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 					LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight), boxGroup.ssaoEnabled,
 					shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom, boxCount);
                 }
-				if (cloudGroup)
-				{
-					semanticBoxes.markLastGroupInstanceClouds();
-				}
 				if (boxGroup.ssaoEnabled)
 				{
 					ssaoBoxes += boxCount;
@@ -358,10 +357,6 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 				groupsToPostRender.add(boxGroup);
 			}
 			RustGalWorldPrimitiveRenderer.enqueueDistantHorizonsGenericBoxes(semanticBoxes);
-			if (cloudGroups > 0)
-			{
-				RustGalWorldPrimitiveRenderer.markDistantHorizonsPrivateClouds();
-			}
 		}
 		catch (RuntimeException rejected)
 		{

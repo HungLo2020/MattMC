@@ -484,7 +484,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		PENDING_DH_GENERIC_BOXES.clear();
 		return taken;
 	}
-	private static boolean pendingDistantHorizonsPrivateClouds;
 	// Capture-only provenance stays beside the coarse generic material records.
 	// It never crosses the FFI boundary or changes material/GAL policy.
 	private static int pendingEntityFlameQuadCount;
@@ -1043,18 +1042,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	/** Records that DH supplied its cloud boxes to the private DH pass. */
-	public static void markDistantHorizonsPrivateClouds() {
-		synchronized (LOCK) {
-			pendingDistantHorizonsPrivateClouds = true;
-		}
-	}
-
-	public static boolean hasDistantHorizonsPrivateClouds() {
-		synchronized (LOCK) {
-			return pendingDistantHorizonsPrivateClouds;
-		}
-	}
-
 	public static WorldRenderRoutePolicy.Route currentBlockOutlineRoute() {
 		return WorldRenderRoutePolicy.currentBlockOutlineRoute();
 	}
@@ -2256,7 +2243,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MATERIAL_QUADS.clear();
 			PENDING_PARTICLE_QUADS.clear();
 			PENDING_DH_GENERIC_BOXES.clear();
-			pendingDistantHorizonsPrivateClouds = false;
 			PENDING_TEXT_QUADS.clear();
 			pendingUnsupportedWorldTextSubmits = 0;
 			worldTextDiagnostic = WorldTextDiagnostic.empty(semanticFrameSequence);
@@ -3296,7 +3282,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_TEXT_QUADS.clear();
 			PENDING_PARTICLE_QUADS.clear();
 			PENDING_DH_GENERIC_BOXES.clear();
-			pendingDistantHorizonsPrivateClouds = false;
 			pendingUnsupportedWorldTextSubmits = 0;
 			PENDING_MESH_INSTANCES.clear();
 			pendingModelRigPoseCount = 0;

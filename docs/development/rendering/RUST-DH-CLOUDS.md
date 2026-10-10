@@ -60,14 +60,16 @@ is set. Missing or unresolvable properties retain the
 default of allowing DH clouds; this is a bounded parser, not a guarantee of
 all Java Properties syntax or unknown-value behavior.
 
-Java marks admitted generic groups whose resource path is exactly `Clouds`
-with instance flag bit 2 (mask 4), on both native-cloud and ordinary group
-routes. Frame admission removes marked boxes when source execution is enabled
-and the active policy suppresses them, **before** checking whether the selected
-route is armed. Thus the rule also applies to a Rust fallback frame under that
-active source. It does not suppress all generic boxes or replace vanilla
-`LevelRenderer` cloud policy. Existing cloud-owner generation/lifetime and
-[#820](https://github.com/HungLo2020/MattMC/issues/820) admission limits are separate.
+Clouds follow Frozen's Iris rules, and vanilla and DH clouds never suppress
+each other. After each accepted source update, `RustGalFrameCoordinator` reads
+the policy through `mattmc_vulkanic_gal_shader_pack_cloud_settings`:
+
+- `clouds=off|fast|fancy` overrides the vanilla cloud option in
+  `Options.getCloudsType` (render distance 4 or more), as Iris does.
+- `GenericObjectRenderer` skips the `Clouds` group before submission when the
+  policy suppresses DH clouds, as Iris cancels that DH event. This replaces
+  the `c00b11c8` instance flag bit and admission filter.
+- `LevelRenderer` no longer hides vanilla clouds while DH cloud groups exist.
 
 Three new Rust policy fixtures inspect supported directives, explicit override,
 recognized duplicate ordering, conditional `DISTANT_HORIZONS` and missing

@@ -1668,8 +1668,14 @@ public class Options {
 	}
 
 	public CloudStatus getCloudsType() {
-		// Rust cloud semantics consume the copied gameplay setting and source
-		// pack snapshot; do not query Iris' renderer pipeline here.
+		// Iris: the selected pack's clouds= directive overrides the option.
+		// Rust resolves it from the copied pack source; no Iris pipeline here.
+		if (renderDistance.get() >= 4) {
+			CloudStatus packOverride = net.vulkanic.gui.RustGalFrameCoordinator.shaderPackVanillaCloudOverride();
+			if (packOverride != null) {
+				return packOverride;
+			}
+		}
 		return this.cloudStatus.get();
 	}
 

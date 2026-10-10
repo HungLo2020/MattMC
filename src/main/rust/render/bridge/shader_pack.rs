@@ -229,6 +229,18 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_shader_pack_update_sources(
     })
 }
 
+/// The active shader-pack source's cloud directives, packed as
+/// `ShaderPackCloudPolicy::packed` (0 for no pack or an unknown context).
+#[no_mangle]
+pub extern "C" fn mattmc_vulkanic_gal_shader_pack_cloud_settings(context_id: u64) -> u32 {
+    with_registry_mut(|registry| {
+        registry
+            .contexts
+            .get(&context_id)
+            .map_or(0, |context| context.world_primitive_frontend.shader_pack_cloud_settings())
+    })
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_shader_pack_update_assets(
     context_id: u64,

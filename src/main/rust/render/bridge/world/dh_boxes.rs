@@ -42,7 +42,6 @@ pub(super) fn decode_dh_generic_box_semantics(
                 ssao_enabled: record.flags & 1 != 0,
                 material: (record.flags >> 8) & 0xff,
                 group: record.flags >> 16,
-                cloud: false,
             })
         })
         .collect()

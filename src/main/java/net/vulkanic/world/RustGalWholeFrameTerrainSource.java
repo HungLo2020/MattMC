@@ -712,6 +712,10 @@ public final class RustGalWholeFrameTerrainSource {
 			try {
 				ChunkBuildOutput output = completed.result().unwrap();
 				if (output != null) {
+					// As in draining: translucent sort data owns native plane/BSP state.
+					if (output.translucentData != null) {
+						output.translucentData.close();
+					}
 					output.destroy();
 				}
 			} catch (RuntimeException ignored) {

@@ -624,6 +624,27 @@ public final class RustGalFrameCoordinator {
 	/** Lock-free view of {@link #isRustShaderPackSourceReady()} for producer threads. */
 	private static volatile boolean shaderPackSourceActive;
 	private static boolean shaderPackSemanticRebuildPending;
+	private static boolean shaderPackTerrainRebuildPending;
+	/** Cloud directives of the accepted source (see {@code VulkanicGalBridge.shaderPackCloudSettings}). */
+	private static volatile int shaderPackCloudSettings;
+
+	/**
+	 * Iris's {@code Options.getCloudsType} override: the selected pack's
+	 * {@code clouds=} directive, or null when it leaves the vanilla option.
+	 */
+	public static net.minecraft.client.CloudStatus shaderPackVanillaCloudOverride() {
+		return switch (shaderPackSourceActive ? shaderPackCloudSettings & 3 : 0) {
+			case 1 -> net.minecraft.client.CloudStatus.OFF;
+			case 2 -> net.minecraft.client.CloudStatus.FAST;
+			case 3 -> net.minecraft.client.CloudStatus.FANCY;
+			default -> null;
+		};
+	}
+
+	/** Whether the selected pack cancels DH's "Clouds" group (Iris DH compat). */
+	public static boolean shaderPackAvoidsDistantHorizonsClouds() {
+		return shaderPackSourceActive && (shaderPackCloudSettings & 4) != 0;
+	}
 
 	public static boolean shaderPackSourceActive() {
 		return shaderPackSourceActive;
@@ -2688,6 +2709,12 @@ public final class RustGalFrameCoordinator {
 			// semantics in Rust. Resend them once Rust has accepted this source.
 			shaderPackSemanticRebuildPending = true;
 		}
+		if (shaderPackSourceActive || wasShaderPackSourceActive) {
+			// Frozen's Iris rebuilds all terrain for every new pipeline (pack,
+			// options, enabling or disabling shaders): baked block ids follow
+			// the pack. Rebuild once Rust has accepted this source.
+			shaderPackTerrainRebuildPending = true;
+		}
 		attemptedShaderPackSourceGeneration = Math.min(
 			attemptedShaderPackSourceGeneration,
 			uploadedShaderPackSourceGeneration
@@ -2717,9 +2744,13 @@ public final class RustGalFrameCoordinator {
 					)
 				);
 				uploadedShaderPackSourceGeneration = generation;
+				shaderPackCloudSettings = bridge.shaderPackCloudSettings();
 				if (shaderPackSemanticRebuildPending) {
 					shaderPackSemanticRebuildPending = false;
 					RustGalWorldPrimitiveRenderer.resendRetainedWorldMeshAssets();
+				}
+				if (shaderPackTerrainRebuildPending) {
+					shaderPackTerrainRebuildPending = false;
 					RustGalTerrainRenderer.requestSourceSemanticRebuild();
 				}
 				auditMessage("Rust VulkanicGAL shader-pack source update accepted generation="

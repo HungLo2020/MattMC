@@ -216,8 +216,10 @@ destroys completed old work, retires published layers, clears built/visible
 geometry and block-entity lists, replaces the workers and reloads the existing
 graph **while retaining its loaded columns**. Previously built geometry is
 marked dirty and rebuilt through normal selection; accepted empty sections
-need no remesh. The pending rebuild is set on inactive-to-active source
-transition, not every active-pack change. Ordinary resource reload retains its
+need no remesh. Like Frozen's Iris, which calls `allChanged()` for every new
+pipeline, the rebuild now follows every staged source while shaders were or
+become active (enabling, disabling, pack or option changes); the asset resend
+remains limited to the inactive-to-active transition. Ordinary resource reload retains its
 separate replacement behavior. This repairs the route that
 previously called `LevelRenderer.allChanged()`, a no-op for this terrain source.
 It is not a synchronous promise that all replacement meshes are ready when the
@@ -233,14 +235,10 @@ no new independently reviewed image or lifecycle result. Use the
 [mid-world transition checks](RENDER-VERIFICATION.md#mid-world-shader-enable-check)
 before accepting the changed image.
 
-A source-level lifetime gap remains in discarded completed builds:
-[`destroyCompletedBuilds()`](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java#L709-L720)
-calls `output.destroy()`, whereas normal draining first closes
-`output.translucentData`. Dynamic translucent data can own native plane/BSP
-resources, and the build-output destroy method only frees its index/vertex
-buffers. Do not infer complete sort-owner retirement from worker shutdown or
-layer retirement. This is an inspected cleanup-path discrepancy, not a measured
-runtime memory leak; [the #747 review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
+Discarded completed builds now close `output.translucentData` before
+`output.destroy()`, as normal draining does: dynamic translucent data can own
+native plane/BSP resources that the build-output destroy does not free.
+[The #747 review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
 keeps repeated-toggle/resource acceptance open.
 
 Ordinary whole frames use a native FIFO worker by default. The queued bridge

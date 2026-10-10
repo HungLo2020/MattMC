@@ -63,7 +63,6 @@ class DistantHorizonsGenericBoxContractTest {
         assertTrue(generic.contains("distant-horizons-generic-semantics"));
         assertTrue(generic.contains(":cloudDelegated=0"));
         assertTrue(generic.contains(":cloudPrivate="));
-        assertTrue(generic.contains("markDistantHorizonsPrivateClouds"));
         assertTrue(renderer.contains("STRATUM_DH_GENERIC"));
         assertTrue(generic.contains(":boxes="));
         assertTrue(generic.contains(":ssaoBoxes="));

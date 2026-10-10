@@ -9514,7 +9514,6 @@ fn generic_box(min: [f32; 3], max: [f32; 3], ssao: bool) -> WorldDistantHorizons
         ssao_enabled: ssao,
         material: 15,
         group: 0,
-        cloud: false,
     }
 }
 
