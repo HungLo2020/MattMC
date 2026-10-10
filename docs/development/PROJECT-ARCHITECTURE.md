@@ -164,6 +164,13 @@ terrain tint/blending, brightness/weather adjustments, contextual light, model
 admission and entity callbacks, and orchestrates chunks and generation stages.
 These owners do not complete the world migration.
 
+[Canonical terrain face policy](rendering/RUST-TERRAIN-CULLING.md) now runs in
+Rust meshing over retained world IDs, using one bounded intrinsic geometry table
+and facts from the native block registry. Java keeps contextual/tag/hook callbacks
+and exports source geometry once. Model/state/selector cache reads can overlap
+across independent builders; registration and reload remain exclusive. These are
+renderer CPU owners, separate from authoritative world storage and GAL resources.
+
 [Live light layers](world/lighting/RUST-LIVE-LAYERS.md) in
 `world/level/lighting/layers/` own lazy defaults and nibble generations.
 [Canonical block/sky light maps](world/lighting/RUST-LIGHT-MAPS.md) in

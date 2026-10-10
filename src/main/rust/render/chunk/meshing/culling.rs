@@ -12,10 +12,10 @@ pub(super) fn native_section_culls_quad(
     state: NativeMeshingState,
     quad_record: StaticModelQuadRecord,
     states: &[Option<NativeMeshingState>],
-) -> bool {
+) -> Result<bool, i32> {
     if quad_record.cull_face < 0 || quad_record.cull_face >= 6 {
         trace_cull_decision(record, state, quad_record, None, false, "uncullable-face");
-        return false;
+        return Ok(false);
     }
 
     let neighbor_id = record.neighbor_state_ids[quad_record.cull_face as usize];
@@ -28,15 +28,29 @@ pub(super) fn native_section_culls_quad(
             false,
             "neighbor-state-missing",
         );
-        return false;
+        return if record.flags & NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL != 0 {
+            Err(ERR_INVALID_ARGUMENT)
+        } else {
+            Ok(false)
+        };
     };
 
-    // Java computes this bit from BlockOcclusionCache.shouldDrawSide for the
+    // Canonical records read Rust policy directly. Compatibility Java computes
+    // this bit from BlockOcclusionCache.shouldDrawSide for the
     // exact source block, neighbor, and face while the immutable snapshot is
     // made. It is consequently a final per-face occlusion decision, not a
     // same-material hint. Requiring skip-group agreement here resurrected
     // faces Java had already culled (notably underwater terrain).
-    let semantic_culled = ((semantic_cull_mask(record.flags) >> quad_record.cull_face) & 1) != 0;
+    let semantic_culled = if record.flags & NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL != 0 {
+        !face_policy::draw(
+            state.block_id,
+            neighbor.block_id,
+            quad_record.cull_face as usize,
+        )
+        .ok_or(ERR_INVALID_ARGUMENT)?
+    } else {
+        ((semantic_cull_mask(record.flags) >> quad_record.cull_face) & 1) != 0
+    };
     let full_or_solid =
         (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0;
     let same_skip_group = same_skip_group_culls_face(quad_record.cull_face, state, neighbor);
@@ -51,7 +65,7 @@ pub(super) fn native_section_culls_quad(
         "neighbor-does-not-cull"
     };
     trace_cull_decision(record, state, quad_record, Some(neighbor), culled, reason);
-    culled
+    Ok(culled)
 }
 
 #[inline(always)]
@@ -257,12 +271,7 @@ mod tests {
             ..StaticModelQuadRecord::default()
         };
 
-        assert!(native_section_culls_quad(
-            &record,
-            state,
-            quad,
-            &[None, Some(neighbor)]
-        ));
+        assert!(native_section_culls_quad(&record, state, quad, &[None, Some(neighbor)]).unwrap());
     }
 
     #[test]
@@ -282,11 +291,6 @@ mod tests {
             ..StaticModelQuadRecord::default()
         };
 
-        assert!(!native_section_culls_quad(
-            &record,
-            state,
-            quad,
-            &[None, Some(air)]
-        ));
+        assert!(!native_section_culls_quad(&record, state, quad, &[None, Some(air)]).unwrap());
     }
 }

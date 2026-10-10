@@ -57,7 +57,9 @@ between tasks. The 512-entry cache bounds its own retained entries; outstanding 
 and GC-delayed reclamation also retain memory. This is not a fixed total-memory
 cap. There is no native global snapshot registry or duplicate cache.
 Automatic reclamation follows GC rather than occurring immediately at eviction.
-GPU ownership and compact mesh header4/whole-frame ABI74 are unchanged.
+That snapshot milestone used compact header4/whole-frame ABI74. The later
+[native face policy](../../rendering/RUST-TERRAIN-CULLING.md) uses private compact
+header5 and consumes these same retained IDs; GPU ownership is unchanged.
 
 ## Verification
 

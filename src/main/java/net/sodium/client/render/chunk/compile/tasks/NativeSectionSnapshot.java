@@ -77,7 +77,8 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private final int minZ;
     private final int modelReloadGeneration;
     private final LevelSlice colorSlice;
-    private final BlockOcclusionCache modelOcclusionCache = new BlockOcclusionCache();
+    private BlockOcclusionCache modelOcclusionCache;
+    private boolean nativeCulling;
     private final long totalBytes;
     private long address;
     private long activeIndicesAddress;
@@ -199,7 +200,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
         flags |= NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_TINT_LATTICE;
         if (blockState.getRenderShape() == RenderShape.MODEL
                 && NativeStaticBlockModelRegistry.hasNativeModel(blockState)) {
-            flags |= this.modelCullMask(slice, blockState, blockPos) << SEMANTIC_CULL_MASK_SHIFT;
+            int id = MemoryUtil.memGetInt(this.paddedStateIdsAddress
+                + (long)paddedIndex(localX + 1, localY + 1, localZ + 1) * Integer.BYTES);
+            if (this.nativeCulling && NativeTerrainCulling.admitsState(id, blockState)) {
+                flags |= NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL;
+            } else {
+                flags |= this.modelCullMask(slice, blockState, blockPos) << SEMANTIC_CULL_MASK_SHIFT;
+            }
         }
         MemoryUtil.memPutInt(this.flagsAddress + (long) localBlockIndex * Integer.BYTES, flags);
     }
@@ -361,6 +368,10 @@ final class NativeSectionSnapshot implements AutoCloseable {
         // snapshot or model reload. flushAll still rejects stale generations.
         boolean worldIds = slice.writePaddedBlockStateIds(this.minX, this.minY, this.minZ,
                 MemorySegment.ofAddress(this.paddedStateIdsAddress).reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES));
+        this.nativeCulling = worldIds
+            && PlatformBlockAccess.getInstance().getClass() == net.sodium.fabric.block.FabricBlockAccess.class
+            && NativeTerrainCulling.admitsGrid(MemorySegment.ofAddress(this.paddedStateIdsAddress)
+                .reinterpret((long)PADDED_BLOCK_COUNT * Integer.BYTES));
         if (worldIds && !StaticTerrainParityDiagnostics.isEnabled()
                 && PlatformBlockAccess.getInstance().getClass() == net.sodium.fabric.block.FabricBlockAccess.class) {
             MemorySegment[] lightViews = slice.borrowPaddedLightViews(this.minX, this.minY, this.minZ);
@@ -437,6 +448,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private static final Direction[] CULL_DIRECTIONS = Direction.values();
 
     private int modelCullMask(LevelSlice slice, BlockState state, BlockPos position) {
+        if (this.modelOcclusionCache == null) this.modelOcclusionCache = new BlockOcclusionCache();
         int mask = 0;
         for (Direction direction : CULL_DIRECTIONS) {
             if (!this.modelOcclusionCache.shouldDrawSide(state, slice, position, direction)) {

@@ -407,11 +407,36 @@ def remove_copied_game_dirs(root: Path, scope: Path | None = None) -> list[Path]
     return removed
 
 
+def _flight_receipts_complete(root: Path, workspace: Path) -> bool:
+    """A parent-wide cleanup must not sweep up unfinished sibling flights."""
+    directory = workspace.parent
+    while directory.is_relative_to(root):
+        receipt = directory / "flight.json"
+        if receipt.exists() or receipt.is_symlink():
+            if receipt.is_symlink():
+                return False
+            try:
+                data = json.loads(receipt.read_text())
+            except (OSError, ValueError):
+                return False
+            if (not isinstance(data, dict)
+                    or data.get("schema") != "terrain-flight-observation-v1"
+                    or data.get("status") != "observation_complete_requires_position_review"
+                    or type(data.get("engine_exit_code")) is not int
+                    or data["engine_exit_code"] != 0):
+                return False
+        if directory == root:
+            break
+        directory = directory.parent
+    return True
+
+
 def retire_completed_fixtures(root: Path) -> dict[str, list[str]]:
     """Called only after the invocation's comparisons finish; keep input receipts.
 
     Capture preservation protects evidence, not regenerable workspace copies.
-    Unknown fixtures, external paths and live process workspaces are retained.
+    Unknown fixtures, external paths, unfinished flights and live process
+    workspaces are retained. Flight completion does not replace position review.
     """
     root = assert_marked_root(root)
     removed: list[str] = []
@@ -453,6 +478,9 @@ def retire_completed_fixtures(root: Path) -> dict[str, list[str]]:
             retained.append(str(candidate))
             continue
         candidate = assert_inside_marked_root(root, candidate)
+        if not _flight_receipts_complete(root, candidate):
+            retained.append(str(candidate))
+            continue
         # Without process visibility, leave workspace ownership unproven.
         if not Path("/proc").is_dir() or _live_process_references(candidate, str(candidate)):
             retained.append(str(candidate))

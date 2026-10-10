@@ -138,6 +138,52 @@ class VerificationArtifactTest(unittest.TestCase):
             self.assertTrue((root / ".keep").exists())
             self.assertEqual("native crash", (run / "hs_err_pid1.log").read_text())
 
+    def test_parent_cleanup_retains_unfinished_flights_but_retires_completed_siblings(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "profiles"; retention.ensure_marker(root)
+            completed = root / "completed"
+            game = completed / ".tmp/game_dir_complete"; game.mkdir(parents=True)
+            (completed / "flight.json").write_text(json.dumps({
+                "schema": "terrain-flight-observation-v1",
+                "status": "observation_complete_requires_position_review", "engine_exit_code": 0,
+                "runtime": {"status": "bounded_timeout_reaped", "client_exit_code": 143}}))
+            retained = []
+            for name, receipt in {
+                "starting": {"schema": "terrain-flight-observation-v1", "status": "starting"},
+                "failed": {"schema": "terrain-flight-observation-v1", "status": "failed", "engine_exit_code": 1},
+                "bad_exit": {"schema": "terrain-flight-observation-v1",
+                             "status": "observation_complete_requires_position_review", "engine_exit_code": 1},
+                "unknown": {"schema": "future-flight-schema", "status": "complete", "engine_exit_code": 0},
+                "malformed": "{",
+            }.items():
+                flight = root / name
+                copy = flight / "capture/game_dir_copy"; copy.mkdir(parents=True)
+                (copy / "world.dat").write_text("preserved investigation")
+                (flight / "flight.json").write_text(receipt if isinstance(receipt, str) else json.dumps(receipt))
+                retained.append(copy)
+            with patch.object(retention, "_live_process_references", return_value=False):
+                result = retention.retire_completed_fixtures(root)
+            self.assertEqual([str(game)], result["removed_workspaces"])
+            self.assertEqual({str(p) for p in retained}, set(result["retained_workspaces"]))
+            for copy in retained:
+                self.assertEqual("preserved investigation", (copy / "world.dat").read_text())
+            self.assertTrue((completed / "flight.json").exists())
+
+    def test_nested_completed_flight_does_not_override_incomplete_parent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); retention.ensure_marker(root)
+            (root / "flight.json").write_text(json.dumps({
+                "schema": "terrain-flight-observation-v1", "status": "starting"}))
+            flight = root / "nested"
+            copy = flight / "game_dir_copy"; copy.mkdir(parents=True)
+            (flight / "flight.json").write_text(json.dumps({
+                "schema": "terrain-flight-observation-v1",
+                "status": "observation_complete_requires_position_review", "engine_exit_code": 0}))
+            with patch.object(retention, "_live_process_references", return_value=False):
+                result = retention.retire_completed_fixtures(root)
+            self.assertEqual([], result["removed_workspaces"])
+            self.assertEqual([str(copy)], result["retained_workspaces"])
+
     def test_unknown_or_external_fixtures_are_never_removed(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary); source = base / "source"; source.mkdir()

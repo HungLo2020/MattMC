@@ -4,20 +4,10 @@ use super::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_static_model_cache_clear() -> i32 {
-    let Ok(mut cache) = static_model_cache().lock() else {
+    let Ok(mut cache) = meshing_cache().write() else {
         return ERR_INVALID_ARGUMENT;
     };
     cache.clear();
-    drop(cache);
-    let Ok(mut selectors) = native_model_selectors().lock() else {
-        return ERR_INVALID_ARGUMENT;
-    };
-    selectors.clear();
-    drop(selectors);
-    let Ok(mut states) = native_meshing_states().lock() else {
-        return ERR_INVALID_ARGUMENT;
-    };
-    states.clear();
     OK
 }
 
@@ -52,13 +42,13 @@ pub unsafe extern "C" fn mattmc_sodium_static_model_cache_register(
         .to_vec()
     };
 
-    let Ok(mut cache) = static_model_cache().lock() else {
+    let Ok(mut owner) = meshing_cache().write() else {
         return ERR_INVALID_ARGUMENT;
     };
-    let Ok(index) = ensure_table_slot(&mut cache, model_id) else {
+    let Ok(index) = ensure_table_slot(&mut owner.models, model_id) else {
         return ERR_INVALID_ARGUMENT;
     };
-    cache[index] = Some(quads);
+    owner.models[index] = Some(quads);
     OK
 }
 
@@ -99,13 +89,13 @@ pub unsafe extern "C" fn mattmc_sodium_native_model_selector_register(
         .map(|entry| entry.weight)
         .sum();
 
-    let Ok(mut selectors) = native_model_selectors().lock() else {
+    let Ok(mut owner) = meshing_cache().write() else {
         return ERR_INVALID_ARGUMENT;
     };
-    let Ok(index) = ensure_table_slot(&mut selectors, selector_id) else {
+    let Ok(index) = ensure_table_slot(&mut owner.selectors, selector_id) else {
         return ERR_INVALID_ARGUMENT;
     };
-    selectors[index] = Some(NativeModelSelector {
+    owner.selectors[index] = Some(NativeModelSelector {
         kind,
         entries,
         total_weight,
@@ -156,13 +146,13 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
         return ERR_INVALID_ARGUMENT;
     }
 
-    let Ok(mut states) = native_meshing_states().lock() else {
+    let Ok(mut owner) = meshing_cache().write() else {
         return ERR_INVALID_ARGUMENT;
     };
-    let Ok(index) = ensure_table_slot(&mut states, state_id) else {
+    let Ok(index) = ensure_table_slot(&mut owner.states, state_id) else {
         return ERR_INVALID_ARGUMENT;
     };
-    states[index] = Some(NativeMeshingState {
+    owner.states[index] = Some(NativeMeshingState {
         selector_id,
         flags,
         material_bits,
@@ -263,13 +253,13 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register_view(
     let Some(state) = state_from_registry(registry, state_id, render, control) else {
         return ERR_INVALID_ARGUMENT;
     };
-    let Ok(mut states) = native_meshing_states().lock() else {
+    let Ok(mut owner) = meshing_cache().write() else {
         return ERR_INVALID_ARGUMENT;
     };
-    let Ok(index) = ensure_table_slot(&mut states, state_id) else {
+    let Ok(index) = ensure_table_slot(&mut owner.states, state_id) else {
         return ERR_INVALID_ARGUMENT;
     };
-    states[index] = Some(state);
+    owner.states[index] = Some(state);
     OK
 }
 
@@ -285,10 +275,10 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_snapshot(state_id: i
     if ints.is_null() || floats.is_null() {
         return ERR_NULL_POINTER;
     }
-    let Ok(states) = native_meshing_states().lock() else {
+    let Ok(owner) = meshing_cache().read() else {
         return ERR_INVALID_ARGUMENT;
     };
-    let Some(s) = state_by_id(&states, state_id) else {
+    let Some(s) = state_by_id(&owner.states, state_id) else {
         return ERR_INVALID_ARGUMENT;
     };
     let values = [s.selector_id, s.flags, s.material_bits, s.pass_id, s.block_emission, s.render_type, s.block_id, s.fluid_material_bits,

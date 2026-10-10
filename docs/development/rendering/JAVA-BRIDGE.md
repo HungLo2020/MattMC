@@ -515,8 +515,10 @@ Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/
 Rust fills the state-ID halo directly. The local
 [bulk terrain-light boundary](RUST-TERRAIN-LIGHTING.md) borrows 54 CPU generation
 leases plus eight-byte contextual records to write the mesher light span directly;
-Java retains contextual predicates/shade and model admission. These standalone
-CPU calls leave compact header4 and whole-frame ABI78 unchanged.
+Java retains contextual predicates/shade and model admission. Those standalone
+CPU calls leave compact header4 and whole-frame ABI78 unchanged. The
+later [native face policy](RUST-TERRAIN-CULLING.md) adds private compact header5
+for direct mesher admission; it does not change whole-frame ABI78.
 Unsupported/debug containers retain their original CPU compatibility
 path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.
 

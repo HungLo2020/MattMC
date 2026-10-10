@@ -8,6 +8,53 @@ fn native_cache_test_lock() -> MutexGuard<'static, ()> {
     LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
 }
 
+#[test]
+fn native_cache_parallel_readers_retain_complete_tables_until_clear() {
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let _test_guard = native_cache_test_lock();
+    unsafe { assert_eq!(mattmc_sodium_static_model_cache_clear(), OK); }
+    {
+        let mut cache = meshing_cache().write().unwrap();
+        cache.models.push(Some(vec![StaticModelQuadRecord::default()]));
+        cache.selectors.push(Some(NativeModelSelector::default()));
+        cache.states.push(Some(NativeMeshingState::default()));
+    }
+    std::thread::scope(|scope| {
+        let (ready, entered) = mpsc::channel();
+        let mut releases = Vec::new();
+        let mut workers = Vec::new();
+        for _ in 0..8 {
+            let ready = ready.clone();
+            let (release, wait) = mpsc::channel();
+            releases.push(release);
+            workers.push(scope.spawn(move || {
+                let cache = meshing_cache().read().unwrap();
+                assert!(model_by_id(&cache.models, 0).is_some());
+                assert!(selector_by_id(&cache.selectors, 0).is_some());
+                assert!(state_by_id(&cache.states, 0).is_some());
+                ready.send(()).unwrap();
+                wait.recv().unwrap();
+                // A queued reload cannot invalidate any of the borrowed tables.
+                assert!(model_by_id(&cache.models, 0).is_some());
+                assert!(selector_by_id(&cache.selectors, 0).is_some());
+                assert!(state_by_id(&cache.states, 0).is_some());
+            }));
+        }
+        for _ in 0..8 {
+            entered.recv_timeout(Duration::from_secs(5)).expect("concurrent build readers serialized");
+        }
+        assert!(matches!(meshing_cache().try_write(), Err(std::sync::TryLockError::WouldBlock)));
+        let clear = scope.spawn(|| unsafe { mattmc_sodium_static_model_cache_clear() });
+        for release in releases { release.send(()).unwrap(); }
+        for worker in workers { worker.join().unwrap(); }
+        assert_eq!(clear.join().unwrap(), OK);
+    });
+    let cache = meshing_cache().read().unwrap();
+    assert!(cache.models.is_empty() && cache.selectors.is_empty() && cache.states.is_empty());
+}
+
 struct CompactSnapshotStorage {
     active_indices: Vec<u16>,
     padded_state_ids: Vec<i32>,
@@ -658,6 +705,27 @@ fn update_buffer_ffi_rejects_bad_handles_counts_and_output_pointers() {
 }
 
 #[test]
+fn compact_ffi_rejects_native_policy_records_after_model_cache_reload() {
+    let _guard = native_cache_test_lock();
+    unsafe { assert_eq!(OK, mattmc_sodium_static_model_cache_clear()); }
+    let mut storage = CompactSnapshotStorage::new();
+    storage.set_center_state(3);
+    storage.flags[0] = NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL;
+    let header = storage.header(1);
+    let builders = BuilderHandles::new();
+    let mut counts = [0; 3];
+    assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+        append_compact(&builders, &header as *const _ as u64, &mut counts)
+    });
+    // Compatibility records preserve the prior missing-model behaviour.
+    storage.flags[0] = 0;
+    assert_eq!(OK, unsafe {
+        append_compact(&builders, &header as *const _ as u64, &mut counts)
+    });
+    assert_eq!([0, 0, 0], counts);
+}
+
+#[test]
 fn compact_ffi_rejects_malformed_snapshot_header() {
     let storage = CompactSnapshotStorage::new();
     let builders = BuilderHandles::new();
@@ -809,6 +877,27 @@ fn cleared_native_cache_ids_do_not_resolve_after_reload() {
             append_compact(&builders, &header as *const _ as u64, &mut counts)
         );
         assert_eq!([1, 0, 0], counts);
+
+        // Independent workers must emit the same bytes while sharing the
+        // read-only model/state/selector owner. Each worker owns its builders.
+        let expected = (*(builders.solid as *const NativeSectionMeshBuilder)).buffers[2].encoded.clone();
+        assert!(!expected.is_empty());
+        let start = std::sync::Barrier::new(8);
+        std::thread::scope(|scope| {
+            let mut workers = Vec::new();
+            for _ in 0..8 {
+                workers.push(scope.spawn(|| {
+                    let header = storage.header(1);
+                    let worker = BuilderHandles::new();
+                    let mut counts = [0; 3];
+                    start.wait();
+                    assert_eq!(OK, append_compact(&worker, &header as *const _ as u64, &mut counts));
+                    assert_eq!([1, 0, 0], counts);
+                    assert_eq!(expected, (*(worker.solid as *const NativeSectionMeshBuilder)).buffers[2].encoded);
+                }));
+            }
+            for worker in workers { worker.join().unwrap(); }
+        });
 
         assert_eq!(OK, mattmc_sodium_static_model_cache_clear());
         let reloaded_builders = BuilderHandles::new();

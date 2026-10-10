@@ -107,6 +107,15 @@ predicates/shade, biome blending, model admission and worker dispatch. Canonical
 inside Rust; stage and live formats remain separate. These CPU owners do not
 change GAL resources, completion or presentation.
 
+[Native terrain face policy](RUST-TERRAIN-CULLING.md) consumes canonical retained
+world IDs directly inside meshing. Rust owns the bounded immutable geometry and
+policy table; Java supplies cached intrinsic geometry and implementation identities
+once, while tags, hooks and unsupported providers keep compatibility callbacks.
+Rendering's model/state/selector tables share one cache with concurrent read
+guards for independent builders and exclusive registration/reload. This changes
+CPU ownership and synchronization, without exposing GPU resources across the
+boundary. The subsystem guide distinguishes verified builds from pending work.
+
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The
 indexed GUI input arrived with ABI 73; the current whole-frame ABI is 78.

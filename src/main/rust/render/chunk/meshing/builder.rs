@@ -632,8 +632,8 @@ pub(super) unsafe fn section_builder_append_static_model_records_encoded(
         record_address as *const StaticModelBlockRecord,
         record_count,
     );
-    let cache_guard = static_model_cache()
-        .lock()
+    let cache_guard = meshing_cache()
+        .read()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
     let mut total_committed = 0i32;
     let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
@@ -673,7 +673,7 @@ pub(super) unsafe fn section_builder_append_static_model_records_encoded(
             continue;
         }
 
-        let Some(model) = model_by_id(&cache_guard, record.model_id) else {
+        let Some(model) = model_by_id(&cache_guard.models, record.model_id) else {
             continue;
         };
 

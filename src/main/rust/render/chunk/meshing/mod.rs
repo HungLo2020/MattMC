@@ -7,7 +7,6 @@
 //! only; production must not grow new dependencies on them.
 
 use std::slice;
-use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use super::{index, translucent};
@@ -17,6 +16,7 @@ mod builder;
 mod cache;
 mod constants;
 mod culling;
+mod face_policy;
 mod ffi;
 mod fluid;
 mod format;

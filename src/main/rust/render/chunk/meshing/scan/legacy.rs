@@ -117,15 +117,12 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
     let profile_scan_substages = scan_substage_profile_enabled();
     let metadata_started = Instant::now();
     let cache_lookup_started = profile_start(profile_scan_substages);
-    let states_guard = native_meshing_states()
-        .lock()
+    let cache_guard = meshing_cache()
+        .read()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
-    let selectors_guard = native_model_selectors()
-        .lock()
-        .map_err(|_| ERR_INVALID_ARGUMENT)?;
-    let models_guard = static_model_cache()
-        .lock()
-        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let states_guard = &cache_guard.states;
+    let selectors_guard = &cache_guard.selectors;
+    let models_guard = &cache_guard.models;
     builder
         .profile
         .add_stage(PROFILE_MATERIAL_PASS, metadata_started);
@@ -346,7 +343,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
                     }
                     let culling_started = profile_start(profile_static_substages);
                     let scan_culling_started = profile_start(profile_scan_substages);
-                    if native_section_culls_quad(record, state, quad_record, &states_guard) {
+                    if native_section_culls_quad(record, state, quad_record, &states_guard)? {
                         builder
                             .profile
                             .add_optional_stage(PROFILE_STATIC_CULLING, culling_started);

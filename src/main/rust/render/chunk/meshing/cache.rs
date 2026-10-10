@@ -1,24 +1,30 @@
 use super::*;
 use crate::content::block::{BlockRegistry, FluidKind, OffsetType, StateFlags, StateId};
+use std::sync::{OnceLock, RwLock};
 
 pub(super) type StaticModelTable = Vec<Option<Vec<StaticModelQuadRecord>>>;
 pub(super) type NativeModelSelectorTable = Vec<Option<NativeModelSelector>>;
 pub(super) type NativeMeshingStateTable = Vec<Option<NativeMeshingState>>;
 
-static STATIC_MODEL_CACHE: OnceLock<Mutex<StaticModelTable>> = OnceLock::new();
-static NATIVE_MODEL_SELECTORS: OnceLock<Mutex<NativeModelSelectorTable>> = OnceLock::new();
-static NATIVE_MESHING_STATES: OnceLock<Mutex<NativeMeshingStateTable>> = OnceLock::new();
-
-pub(super) fn static_model_cache() -> &'static Mutex<StaticModelTable> {
-    STATIC_MODEL_CACHE.get_or_init(|| Mutex::new(Vec::new()))
+/// Builds borrow all three tables coherently without serializing other builds.
+/// Registration and reload are exclusive; no borrowed table outlives its guard.
+#[derive(Default)]
+pub(super) struct NativeMeshingCache {
+    pub(super) models: StaticModelTable,
+    pub(super) selectors: NativeModelSelectorTable,
+    pub(super) states: NativeMeshingStateTable,
+}
+impl NativeMeshingCache {
+    pub(super) fn clear(&mut self) {
+        self.models.clear();
+        self.selectors.clear();
+        self.states.clear();
+    }
 }
 
-pub(super) fn native_model_selectors() -> &'static Mutex<NativeModelSelectorTable> {
-    NATIVE_MODEL_SELECTORS.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-pub(super) fn native_meshing_states() -> &'static Mutex<NativeMeshingStateTable> {
-    NATIVE_MESHING_STATES.get_or_init(|| Mutex::new(Vec::new()))
+pub(super) fn meshing_cache() -> &'static RwLock<NativeMeshingCache> {
+    static CACHE: OnceLock<RwLock<NativeMeshingCache>> = OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(NativeMeshingCache::default()))
 }
 
 #[inline]

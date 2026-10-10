@@ -180,15 +180,12 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
     let profile_staging_substages = staging_substage_profile_enabled();
     let metadata_started = Instant::now();
     let cache_lookup_started = profile_start(profile_scan_substages);
-    let states_guard = native_meshing_states()
-        .lock()
+    let cache_guard = meshing_cache()
+        .read()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
-    let selectors_guard = native_model_selectors()
-        .lock()
-        .map_err(|_| ERR_INVALID_ARGUMENT)?;
-    let models_guard = static_model_cache()
-        .lock()
-        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let states_guard = &cache_guard.states;
+    let selectors_guard = &cache_guard.selectors;
+    let models_guard = &cache_guard.models;
     {
         let builder = targets[0].builder();
         builder
@@ -234,12 +231,20 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
                 .add_optional_stage(PROFILE_SCAN_RECORD_DECODING, decoding_started);
         }
         let Some(state) = state else {
+            if record_flags & NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL != 0 {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
             targets[0]
                 .builder()
                 .profile
                 .add_optional_stage(PROFILE_SCAN_ACTIVE_RECORD_ITERATION, iteration_started);
             continue;
         };
+        if record_flags & NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL != 0
+            && (state.block_id != state_id || !face_policy::state_admitted(state_id))
+        {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
         let flags = state.flags;
         if (flags & STATE_FLAG_AIR) != 0 {
             targets[0]
@@ -438,7 +443,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
 
                     let culling_started = profile_start(profile_static_substages);
                     let scan_culling_started = profile_start(profile_scan_substages);
-                    if native_section_culls_quad(&model_record, state, quad_record, &states_guard) {
+                    if native_section_culls_quad(&model_record, state, quad_record, &states_guard)? {
                         let builder = targets[0].builder();
                         builder
                             .profile

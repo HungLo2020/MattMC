@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-09; integrated b7297d06 atop81440bf19; RTX3080Ti; settled rotating view; 6,000 frames)
+# Rust vs Frozen Java speed (2026-10-10; native face-policy/shared-cache release30586383 tested atop1e060cb74; RTX3080Ti; rotating view; 6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,358.8 / 1,297.1 | 1,149.6 / 1,193.5 |
-| Vanilla + DH | 718.7 / 820.5 | 607.9 / 682.4 |
-| Shaders | 354.7 / 340.1 | 313.6 / 316.4 |
-| Shaders + DH | 259.2 / 258.7 | 227.1 / 227.2 |
-Receipt: validation/native-light-map-integrated-20261009/summary.json; all16 ABAB/exact6000 clean, VUID/error/orphan0; both manually reviewed diagnostic pairs/DH coverage pass; source/library/Frozen/prompt guards pass. Raw gate6/7: expected shutdown close misclassified; all7 retained logs pass corrected classifier; fresh affected transition passes, integrity/native/cleanup guards pass.
-Performance OPEN: medianFPS C/F vanilla1327.95/1171.55, DH769.6/645.15, shaders347.4/315.0, shaderDH258.95/227.15; p99ms vanilla3.277/3.097 FAIL, DH3.868/6.245, shaders4.590/6.411, shaderDH6.004/8.191 pass. Combined upstream+map changes; no isolated gain.
-Published sky1b9b10339/fog3adbe6d5d; Rust light maps/direct scalar consumers published971e0226: freshRust2467/3ignored + Java1829/2skipped pass, six JNI workers exactb7297d06. Freshb729 four ordinary profiles/12F3 reviews pass; weightedJava allocation0.823/2.398GB C/F, mapcopy-path0sampled/94.37MB; excludes Rust, no isolated gain. Pop-in, long memory, simulation and Rust-only executable remain open.
+| Vanilla | 1,333.0 / 1,389.6 | 1,174.8 / 1,120.5 |
+| Vanilla + DH | 867.5 / 698.1 | 620.3 / 727.6 |
+| Shaders | 351.2 / 340.0 | 318.5 / 317.3 |
+| Shaders + DH | 261.9 / 259.2 | 227.6 / 226.5 |
+Receipt: build/native-terrain-culling-migration/shared-cache/runtime-verification.json; all16 corrected ABAB/exact6000 clean, VUID/error/orphan0; all7 lifecycle and both manually reviewed settled diagnostic pairs/DH coverage pass; current/Frozen/native/protected-prompt guards and8 Current fingerprints pass. Original interrupted and env-mismatched retry batches remain rejected.
+Performance FAIL: vanilla p99ms3.407/3.284 C/F despite1361.3/1147.65 FPS. DH782.8/673.95 FPS,p99ms4.207/5.969; shaders345.6/317.9,p99ms5.498/6.030; combined260.55/227.05,p99ms5.753/7.424 pass. DH repeats vary substantially; no isolated cache gain or original outlier cause proved.
+Published sky1b9b10339/fog3adbe6d5d/lightmaps971e0226b. Native face policy consumes retained world IDs; cache readers overlap, reload remains exclusive. Rust2473pass/3ignored, Java1833tests/2skip/0fail, six JNI workers exactlibrary. Earlier2f profiles: Javaallocation0.818/2.401GB ordinary,1.707/4.453GB DH C/F; nativealloc excluded. Accepted new wait profile0/193contended meshing points vs62/238; all8workers,3F3views and actualDH verified;26 completed copies retired. No full Java removal, broad gameplay/temporal or long-memory acceptance.

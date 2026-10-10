@@ -104,6 +104,13 @@ For workspace retirement, only paths inside a marked invocation are candidates:
   ancestor nor its descendant. The manifest beside `run` remains after deletion.
 - Directories named `game_dir_*` or `region_validation_game_*` qualify by name;
   they do not require the canonical-fixture manifest.
+- When a candidate has an enclosing `flight.json` within the cleanup scope,
+  every such receipt must have schema `terrain-flight-observation-v1`, status
+  `observation_complete_requires_position_review` and integer `engine_exit_code`
+  zero. Starting, failed, malformed, unknown or symlinked flight receipts retain
+  their workspaces even during parent-wide cleanup. Completion still requires
+  separate F3/position review; a bounded client's expected exit 143 is not the
+  driver's exit code. Other verification invocations keep their existing rules.
 - Unknown canonical fixtures and symlinked fixture/run candidates remain.
   Cleanup also retains candidates when `/proc` is absent or a readable process
   command/working directory references them. This is best-effort process
