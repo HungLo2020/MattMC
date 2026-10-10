@@ -1,9 +1,14 @@
-//! Loaded-world biome owners feed retained sky fields directly.
+//! Loaded-world biome owners feed retained sky and fog fields directly.
 use crate::world::level::chunk::biomes::{Generation, Owner};
 use std::{collections::HashMap, sync::Arc};
 mod ffi;
 mod sampling;
 const CELLS: usize = 216;
+#[derive(Clone, Copy)]
+pub enum BiomeColor {
+    Sky = 0,
+    Fog = 1,
+}
 #[derive(Clone)]
 enum Chunk {
     Native(Arc<[Arc<Owner>]>),
@@ -15,30 +20,35 @@ struct Source {
     revision: u64,
     values: [u32; 64],
 }
+struct Sample {
+    position: [u64; 3],
+    color: [f64; 3],
+}
 struct Window {
     base: [i32; 3],
     revision: u64,
-    colors: [u32; CELLS],
+    colors: [[u32; CELLS]; 2],
     sources: Vec<Source>,
+    samples: [Option<Sample>; 2],
 }
-pub struct LiveSkyFields {
+pub struct LiveBiomeFields {
     epoch: u64,
     revision: u64,
     min_y: i32,
     max_y: i32,
     capacity: usize,
     range: Option<(i32, i32, i32)>,
-    colors: Arc<[u32]>,
-    fallback: u32,
+    colors: [Arc<[u32]>; 2],
+    fallback: [u32; 2],
     chunks: HashMap<(i32, i32), Chunk>,
     window: Option<Window>,
 }
-impl LiveSkyFields {
+impl LiveBiomeFields {
     pub fn new(
         epoch: u64,
         min_y: i32,
         height: usize,
-        colors: Arc<[u32]>,
+        colors: [Arc<[u32]>; 2],
         fallback_id: usize,
         capacity: usize,
     ) -> Option<Self> {
@@ -47,14 +57,15 @@ impl LiveSkyFields {
             || height == 0
             || height % 4 != 0
             || height > 4096
-            || colors.is_empty()
-            || colors.len() > 65535
+            || colors[0].is_empty()
+            || colors[0].len() > 65535
+            || colors[0].len() != colors[1].len()
             || capacity == 0
             || capacity > 65536
         {
             return None;
         }
-        let fallback = *colors.get(fallback_id)?;
+        let fallback = [*colors[0].get(fallback_id)?, *colors[1].get(fallback_id)?];
         let max_y = min_y.checked_add(height as i32 - 1)?;
         Some(Self {
             epoch,
@@ -97,7 +108,7 @@ impl LiveSkyFields {
             || owners.len() != (self.max_y - self.min_y + 1) as usize / 4
             || owners
                 .iter()
-                .any(|owner| !owner.is_valid() || owner.limit as usize != self.colors.len())
+                .any(|owner| !owner.is_valid() || owner.limit as usize != self.colors[0].len())
         {
             return false;
         }
@@ -143,17 +154,19 @@ impl LiveSkyFields {
     fn capture(&self, base: [i32; 3]) -> Option<Window> {
         let mut sources: Vec<Source> = Vec::with_capacity(27);
         let mut indices = HashMap::with_capacity(27);
-        let mut colors = [0u32; CELLS];
-        for (i, output) in colors.iter_mut().enumerate() {
+        let mut colors = [[0u32; CELLS]; 2];
+        for i in 0..CELLS {
             let x = base[0] - 2 + (i % 6) as i32;
             let y = base[1] - 2 + (i / 6 % 6) as i32;
             let z = base[2] - 2 + (i / 36) as i32;
             if !self.in_range(x >> 2, z >> 2) {
-                *output = self.fallback;
+                colors[0][i] = self.fallback[0];
+                colors[1][i] = self.fallback[1];
                 continue;
             }
             let Some(chunk) = self.chunks.get(&(x >> 2, z >> 2)) else {
-                *output = self.fallback;
+                colors[0][i] = self.fallback[0];
+                colors[1][i] = self.fallback[1];
                 continue;
             };
             let Chunk::Native(owners) = chunk else {
@@ -180,9 +193,10 @@ impl LiveSkyFields {
                 index
             };
             let local = ((y as usize & 3) << 4) | ((z as usize & 3) << 2) | (x as usize & 3);
-            *output = *self
-                .colors
-                .get(sources[source_index].values[local] as usize)?;
+            let id = sources[source_index].values[local] as usize;
+            for field in 0..2 {
+                colors[field][i] = *self.colors[field].get(id)?;
+            }
         }
         // Another single-palette alias can change a generation during capture.
         if sources
@@ -196,9 +210,18 @@ impl LiveSkyFields {
             revision: self.revision,
             colors,
             sources,
+            samples: [None, None],
         })
     }
     pub fn query(&mut self, epoch: u64, position: [f64; 3]) -> Option<[f64; 3]> {
+        self.query_color(epoch, position, BiomeColor::Sky)
+    }
+    pub fn query_color(
+        &mut self,
+        epoch: u64,
+        position: [f64; 3],
+        field: BiomeColor,
+    ) -> Option<[f64; 3]> {
         if epoch != self.epoch
             || position
                 .iter()
@@ -217,7 +240,22 @@ impl LiveSkyFields {
         if !valid {
             self.window = Some(self.capture(base)?);
         }
-        Some(sampling::sample(position, &self.window.as_ref()?.colors))
+        // Reuse only after checking every retained source's identity/revision.
+        // Java hook, weather and brightness callbacks still run on every call.
+        let window = self.window.as_mut()?;
+        let key = position.map(f64::to_bits);
+        let index = field as usize;
+        if let Some(sample) = &window.samples[index] {
+            if sample.position == key {
+                return Some(sample.color);
+            }
+        }
+        let color = sampling::sample(position, &window.colors[index]);
+        window.samples[index] = Some(Sample {
+            position: key,
+            color,
+        });
+        Some(color)
     }
 }
 
@@ -225,11 +263,98 @@ impl LiveSkyFields {
 mod tests {
     use super::*;
     #[test]
+    fn recorded_frozen_colors_cross_live_palette_index_and_both_consumers() {
+        use std::io::{Cursor, Read};
+        let mut raw = Vec::new();
+        flate2::read::GzDecoder::new(include_bytes!("frozen-sky-sampler.bin.gz").as_slice())
+            .read_to_end(&mut raw)
+            .unwrap();
+        fn u32_at(input: &mut Cursor<Vec<u8>>) -> u32 {
+            let mut bytes = [0; 4];
+            input.read_exact(&mut bytes).unwrap();
+            u32::from_be_bytes(bytes)
+        }
+        fn u64_at(input: &mut Cursor<Vec<u8>>) -> u64 {
+            let mut bytes = [0; 8];
+            input.read_exact(&mut bytes).unwrap();
+            u64::from_be_bytes(bytes)
+        }
+        let mut input = Cursor::new(raw);
+        assert_eq!(u32_at(&mut input), 0x534b5931);
+        assert_eq!(u32_at(&mut input), 256);
+        for _ in 0..256 {
+            let position: [f64; 3] = std::array::from_fn(|_| f64::from_bits(u64_at(&mut input)));
+            let colors: Arc<[u32]> = (0..CELLS).map(|_| u32_at(&mut input)).collect();
+            let expected: [u64; 3] = std::array::from_fn(|_| u64_at(&mut input));
+            let base = position.map(|v| v.floor() as i32);
+            let min_y = (base[1] - 2) & !3;
+            let sky: Arc<[u32]> = vec![0xa1234567; CELLS].into();
+            let mut world = LiveBiomeFields::new(7, min_y, 12, [sky, colors], 0, 16).unwrap();
+            let mut chunks: HashMap<(i32, i32), [[u32; 64]; 3]> = HashMap::new();
+            for id in 0..CELLS {
+                let x = base[0] - 2 + (id % 6) as i32;
+                let y = base[1] - 2 + (id / 6 % 6) as i32;
+                let z = base[2] - 2 + (id / 36) as i32;
+                let sections = chunks.entry((x >> 2, z >> 2)).or_insert([[0; 64]; 3]);
+                sections[((y - min_y) >> 2) as usize]
+                    [((y & 3) * 16 + (z & 3) * 4 + (x & 3)) as usize] = id as u32;
+            }
+            for (position, sections) in chunks {
+                let owners: Arc<[Arc<Owner>]> = sections
+                    .iter()
+                    .map(|values| {
+                        let words: Vec<u64> = values
+                            .chunks(8)
+                            .map(|row| {
+                                row.iter()
+                                    .enumerate()
+                                    .fold(0u64, |word, (i, &id)| word | u64::from(id) << (i * 8))
+                            })
+                            .collect();
+                        Arc::new(Owner::load(8, 8, &[], &words, CELLS as u32, 8).unwrap())
+                    })
+                    .collect::<Vec<_>>()
+                    .into();
+                assert!(world.replace(7, position, owners));
+            }
+            assert_eq!(
+                world
+                    .query_color(7, position, BiomeColor::Fog)
+                    .unwrap()
+                    .map(f64::to_bits),
+                expected
+            );
+            let captured = world.window.as_ref().unwrap().colors.as_ptr();
+            assert_eq!(
+                world.query(7, position).unwrap(),
+                [0x23 as f64 / 255., 0x45 as f64 / 255., 0x67 as f64 / 255.]
+            );
+            assert_eq!(world.window.as_ref().unwrap().colors.as_ptr(), captured);
+            // Alternating consumers must retain their own exact result; neither
+            // may return the other field's cached color.
+            for _ in 0..4 {
+                assert_eq!(
+                    world
+                        .query_color(7, position, BiomeColor::Fog)
+                        .unwrap()
+                        .map(f64::to_bits),
+                    expected
+                );
+                assert_eq!(
+                    world.query(7, position).unwrap(),
+                    [0x23 as f64 / 255., 0x45 as f64 / 255., 0x67 as f64 / 255.]
+                );
+            }
+        }
+        assert_eq!(input.position() as usize, input.get_ref().len());
+    }
+    #[test]
     fn world_consumer_reads_shared_biome_mutations_without_a_second_java_grid() {
         let colors: Arc<[u32]> = (0..512u32)
             .map(|i| i.wrapping_mul(0x010101) & 0xffffff)
             .collect();
-        let mut world = LiveSkyFields::new(7, -4, 8, colors, 0, 4).unwrap();
+        let mut world =
+            LiveBiomeFields::new(7, -4, 8, [Arc::clone(&colors), colors], 0, 4).unwrap();
         let owner = Arc::new(Owner::load(0, 0, &[1], &[], 512, 9).unwrap());
         let shared = owner.copy();
         for position in [(0, 0), (0, 1), (1, 0), (1, 1)] {
@@ -271,7 +396,8 @@ mod tests {
         let colors: Arc<[u32]> = (0..512u32)
             .map(|i| i.wrapping_mul(0x010101) & 0xffffff)
             .collect();
-        let mut world = LiveSkyFields::new(7, -4, 8, colors, 0, 4).unwrap();
+        let mut world =
+            LiveBiomeFields::new(7, -4, 8, [Arc::clone(&colors), colors], 0, 4).unwrap();
         let owner = Arc::new(Owner::load(0, 0, &[5], &[], 512, 9).unwrap());
         assert!(world.replace(
             7,
@@ -306,7 +432,15 @@ mod tests {
         };
         assert_eq!(read(&mut at), 0x56525731);
         assert_eq!(read(&mut at), 12288);
-        let mut world = LiveSkyFields::new(7, 0, 4, (0..512u32).collect(), 0, 1).unwrap();
+        let mut world = LiveBiomeFields::new(
+            7,
+            0,
+            4,
+            [(0..512u32).collect(), (0..512u32).collect()],
+            0,
+            1,
+        )
+        .unwrap();
         for _ in 0..12288 {
             let radius = read(&mut at);
             let center = [read(&mut at), read(&mut at)];
@@ -325,7 +459,7 @@ mod tests {
     #[test]
     fn terminal_clear_releases_residency_and_cached_generation_pins() {
         let colors: Arc<[u32]> = (0..512u32).collect();
-        let mut world = LiveSkyFields::new(9, 0, 4, colors, 0, 1).unwrap();
+        let mut world = LiveBiomeFields::new(9, 0, 4, [Arc::clone(&colors), colors], 0, 1).unwrap();
         let owner = Arc::new(Owner::load(0, 0, &[7], &[], 512, 9).unwrap());
         assert!(world.replace(9, (0, 0), vec![Arc::clone(&owner)].into()));
         assert!(world.query(9, [1.5; 3]).is_some());
@@ -344,7 +478,8 @@ mod tests {
         let colors: Arc<[u32]> = (0..512u32)
             .map(|i| i.wrapping_mul(0x010101) & 0xffffff)
             .collect();
-        let mut world = LiveSkyFields::new(9, -4, 8, colors, 0, 1).unwrap();
+        let mut world =
+            LiveBiomeFields::new(9, -4, 8, [Arc::clone(&colors), colors], 0, 1).unwrap();
         let bottom = Arc::new(Owner::load(0, 0, &[4], &[], 512, 9).unwrap());
         let top = Arc::new(Owner::load(0, 0, &[7], &[], 512, 9).unwrap());
         assert!(!world.replace(

@@ -1,13 +1,14 @@
 use super::*;
 use std::sync::Mutex;
 
-pub struct World(Mutex<LiveSkyFields>);
+pub struct World(Mutex<LiveBiomeFields>);
 
 /// # Safety
 /// Colors is a live aligned immutable span. Its contents are copied once.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_live_biome_world_create(
-    colors: *const u32,
+pub unsafe extern "C" fn mattmc_live_biome_world_create_colors(
+    sky: *const u32,
+    fog: *const u32,
     count: i32,
     min_y: i32,
     height: i32,
@@ -15,8 +16,10 @@ pub unsafe extern "C" fn mattmc_live_biome_world_create(
     capacity: i32,
     epoch: u64,
 ) -> *mut World {
-    if colors.is_null()
-        || colors as usize % 4 != 0
+    if sky.is_null()
+        || sky as usize % 4 != 0
+        || fog.is_null()
+        || fog as usize % 4 != 0
         || !(1..=65535).contains(&count)
         || height <= 0
         || capacity <= 0
@@ -24,8 +27,11 @@ pub unsafe extern "C" fn mattmc_live_biome_world_create(
     {
         return std::ptr::null_mut();
     }
-    let colors: Arc<[u32]> = std::slice::from_raw_parts(colors, count as usize).into();
-    LiveSkyFields::new(
+    let colors = [
+        Arc::from(std::slice::from_raw_parts(sky, count as usize)),
+        Arc::from(std::slice::from_raw_parts(fog, count as usize)),
+    ];
+    LiveBiomeFields::new(
         epoch,
         min_y,
         height as usize,
@@ -176,13 +182,39 @@ pub unsafe extern "C" fn mattmc_live_biome_world_sample(
     z: f64,
     output: *mut f64,
 ) -> i32 {
+    sample_color(world, epoch, x, y, z, output, BiomeColor::Sky)
+}
+
+/// # Safety
+/// Same CPU span contract as sky sampling; both fields share source captures.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_biome_world_sample_fog(
+    world: *const World,
+    epoch: u64,
+    x: f64,
+    y: f64,
+    z: f64,
+    output: *mut f64,
+) -> i32 {
+    sample_color(world, epoch, x, y, z, output, BiomeColor::Fog)
+}
+
+unsafe fn sample_color(
+    world: *const World,
+    epoch: u64,
+    x: f64,
+    y: f64,
+    z: f64,
+    output: *mut f64,
+    field: BiomeColor,
+) -> i32 {
     if output.is_null() || output as usize % 8 != 0 {
         return -1;
     }
     let Some(world) = world.as_ref() else {
         return -1;
     };
-    let Some(color) = world.0.lock().unwrap().query(epoch, [x, y, z]) else {
+    let Some(color) = world.0.lock().unwrap().query_color(epoch, [x, y, z], field) else {
         return -1;
     };
     std::ptr::copy_nonoverlapping(color.as_ptr(), output, 3);

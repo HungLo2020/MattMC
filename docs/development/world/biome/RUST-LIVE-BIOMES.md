@@ -1,4 +1,4 @@
-# Live biome ownership and sky sampling
+# Live biome ownership and color sampling
 
 The migration moves admitted canonical 4³ biome palettes and packed storage into
 Rust, together with a loaded-chunk index and its direct sky-color consumer.
@@ -6,8 +6,51 @@ Java retains scoped CPU views for ordinary biome reads. Chunk load, packet
 replacement, section-biome replacement, view-center changes and chunk unload update the
 native index. Rust retains typed section owners, resolves biome IDs against a
 world's immutable color table and reuses its cubic window while source
-generations remain current. The admitted native sky path avoids building
-Java's 216-color array; compatibility sampling can still use that Java grid.
+generations remain current. The admitted native path avoids Java's 216-color grid; compatibility
+sampling retains its original callbacks.
+
+The local fog extension reuses the same residency and generation capture for
+both color fields. Seven focused Rust checks and nine Java boundary checks
+pass, including 256 recorded Frozen color cases through live storage.
+A world-context fog-hook overload delegates existing hook
+implementations to their original method. Native fog admission requires the
+exact Sodium hook, client level, client cache and biome manager, with that
+manager's immutable source matching the level. Custom hooks and sources keep
+their original callbacks. Registries containing biome-effect subclasses also
+retain Java rather than capturing virtual color providers as constants.
+
+The subsequent local cache migration removes Java's camera/tick-only color
+memos. A regression reproduced a stale fog-hook result at an unchanged camera
+and tick. Rust retains one exact-position result per field only after validating
+the world revision and every captured owner/generation/revision. Replacing or
+mutating a biome source invalidates reuse; Java hook, brightness and weather
+callbacks execute on every call. The `29e3fd54` results below precede this change;
+Seven focused Rust and seven Java cache/boundary checks pass, including live
+source mutations, fractional movement within one window and per-call hook
+changes. Build `f449557e` passes all 1,818 Java tests (two skipped), and six
+native-enabled executors map that exact library. Current/Frozen source and
+protected-prompt guards pass. The full Rust suite also passes 2,456 checks (three ignored), and all seven
+lifecycle cases pass. Both newly captured vanilla/Iris+DH settled pairs were manually reviewed;
+DH coverage and VUID0 pass. All sixteen ABAB/6,000-frame runs are clean.
+Vanilla p99 still fails (3.394ms Current/3.322ms Frozen); the other three
+modes meet the measured FPS/tail floors. Repeat variance remains substantial,
+and no isolated speedup is established. Source/library/Frozen/prompt guards
+pass, and 25 verified generated copies were retired. All four ordinary
+CPU/allocation profiles validate process, source, library, movement and cleanup
+guards. All twelve actual F3 positions were reviewed; forward/return endpoints
+differ by at most 0.545 blocks between sides, crossing seven X chunk columns.
+Four additional generated copies were retired. Weighted Java allocation is
+0.951 GB Current versus 2.437 GB Frozen in eight seconds. Java sky/fog grid
+allocation samples are zero Current versus 208.67/12.58 MB Frozen. Current
+CPU sampling misses the native sky/fog methods in this window; zero samples
+do not establish absence of execution. Current JIT work is substantial, and
+Java allocation profiling excludes Rust. No isolated speedup or long-memory
+acceptance is established. Lighting-map copies still sample 89.13 MB Current,
+guiding the next world-state migration. Broad gameplay and temporal acceptance
+remain open. Profile receipt:
+`goal5/native-live-biome-fog-cache-flight-profile-20261009/profile-comparison.json`. Runtime receipt:
+`build/native-biome-fog-cache-migration/runtime-verification.json`. This finding is not a confirmed cause of
+the reported terrain pop-in or flickering.
 
 ## Boundaries to preserve
 
@@ -44,10 +87,10 @@ Java's 216-color array; compatibility sampling can still use that Java grid.
   a new epoch. This is not an explicit immediate disconnect/reset teardown.
 
 Java still orchestrates chunks, packets, generation and world ticks, and supplies
-the registry binding and immutable sky-color table. The native sky path is
+the registry binding and immutable sky/fog color tables. The native sky path is
 admitted through Sodium's hook for an exact `ClientLevel`; unsupported inputs
-retain Java sampling. Fog, terrain tint/blending and the later sky
-brightness/weather adjustments remain separate Java consumers.
+retain Java sampling. Canonical fog sampling now uses the same native index;
+terrain tint/blending and later brightness/weather adjustments remain Java consumers.
 
 ## Working and checking
 
@@ -60,6 +103,7 @@ and [`NativeBiomeWorld`](https://github.com/HungLo2020/MattMC/blob/master/src/ma
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::chunk::biomes
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::biome::live
 ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeLiveBiomeSectionTest' --tests '*NativeLiveBlockSectionTest'
+./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeBiomeFogTest' --tests '*NativeBiomeWorldTest'
 ./gradlew -PmattmcRustProfile=release test parityTest -x testRustNative
 python3 DevUtils/RunWiki.py check
 ```
@@ -82,6 +126,27 @@ These fixtures are supplemental CPU evidence, not runtime or throughput proof.
 The following suite, runtime and profile results are author reports. Their
 receipt files are not tracked at this source revision; this documentation review
 did not independently rerun them or inspect those artifacts.
+
+**Local fog build `29e3fd54`:** full Rust passes 2,456 checks (three ignored),
+and both Java tasks pass 1,816 tests (two skipped). Six native-enabled Java
+workers map that exact library. All seven lifecycle cases and both manually
+reviewed vanilla/Iris+DH settled pairs pass, including DH coverage and VUID0.
+All 16 ABAB/6,000-frame runs are clean; vanilla p99 fails (3.609ms Current,
+3.271ms Frozen). Median FPS exceeds Frozen in all four modes, with substantial
+repeat variance. Source/native/Frozen/protected-edit guards pass and 25
+verified generated copies were retired. No isolated speedup is established.
+All four ordinary profiles validate source/process/library/movement guards;
+all twelve F3 captures were reviewed and four generated copies retired.
+Native fog appears in the Current CPU profile; Java sky/fog-grid samples
+are zero. Weighted Java allocation is 0.955GB Current/2.443GB Frozen over
+eight seconds, excluding Rust allocation. Forward endpoints differ by
+0.526 blocks for CPU and match for allocation; returns can differ by
+0.526 blocks. These are diagnostic measurements, not an isolated speedup.
+Profile receipt: `goal5/native-live-biome-fog-flight-profile-20261009/profile-comparison.json`.
+Receipts: `build/native-biome-fog-migration/runtime-verification.json` and
+`validation/native-live-biome-fog-20261009/summary.json`.
+
+The following results describe the preceding sky-only milestone:
 
 The final range fix preserves Frozen's integer subtraction/absolute-value
 wrapping. Its independently recorded 12,288-case storage oracle reproduced the

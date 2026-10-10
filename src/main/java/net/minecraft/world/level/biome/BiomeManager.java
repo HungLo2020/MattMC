@@ -78,6 +78,11 @@ public class BiomeManager {
 		return this.getNoiseBiomeAtQuart(i, j, k);
 	}
 
+	/** Admit direct world consumers only when this immutable source is their world. */
+	public boolean usesNoiseBiomeSource(BiomeManager.NoiseBiomeSource source) {
+		return this.noiseBiomeSource == source;
+	}
+
 	public Holder<Biome> getNoiseBiomeAtQuart(int i, int j, int k) {
 		return this.noiseBiomeSource.getNoiseBiome(i, j, k);
 	}

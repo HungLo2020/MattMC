@@ -27,7 +27,7 @@ class NativeLiveBiomeSectionTest {
         registry = new MappedRegistry<>(Registries.BIOME, Lifecycle.stable());
         for (int i = 0; i < 512; i++) {
             var biome = new Biome.BiomeBuilder().hasPrecipitation(false).temperature(.5F).downfall(.5F)
-                .specialEffects(new BiomeSpecialEffects.Builder().fogColor(0).waterColor(0).waterFogColor(0).skyColor(i).build())
+                .specialEffects(new BiomeSpecialEffects.Builder().fogColor((i * 0x03050b) & 0xffffff).waterColor(0).waterFogColor(0).skyColor(i).build())
                 .mobSpawnSettings(MobSpawnSettings.EMPTY).generationSettings(BiomeGenerationSettings.EMPTY).build();
             Registry.register(registry, ResourceKey.create(Registries.BIOME, ResourceLocation.withDefaultNamespace("native_biome_test_" + i)), biome);
         }

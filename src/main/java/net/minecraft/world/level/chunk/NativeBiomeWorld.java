@@ -14,8 +14,8 @@ public final class NativeBiomeWorld {
     private static MethodHandle handle(String name, FunctionDescriptor descriptor) {
         return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_live_biome_world_" + name, descriptor);
     }
-    private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+    private static final MethodHandle CREATE = handle("create_colors", FunctionDescriptor.of(ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
         ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle REPLACE = handle("replace", FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -29,6 +29,9 @@ public final class NativeBiomeWorld {
     private static final MethodHandle RANGE = handle("range", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle SAMPLE = handle("sample", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_DOUBLE,
+        ValueLayout.JAVA_DOUBLE, ValueLayout.ADDRESS));
+    private static final MethodHandle SAMPLE_FOG = handle("sample_fog", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_DOUBLE,
         ValueLayout.JAVA_DOUBLE, ValueLayout.ADDRESS));
     private static final ThreadLocal<MemorySegment> RESULT = ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(24, 8));
@@ -45,7 +48,8 @@ public final class NativeBiomeWorld {
         int fallback = binding.id(factory.defaultBiome()); if (fallback < 0) return null;
         try (Arena call = Arena.ofConfined()) {
             var colors = call.allocateFrom(ValueLayout.JAVA_INT, binding.sky);
-            var pointer = (MemorySegment) CREATE.invokeExact(colors, binding.sky.length, minY >> 2,
+            var fog = call.allocateFrom(ValueLayout.JAVA_INT, binding.fog);
+            var pointer = (MemorySegment) CREATE.invokeExact(colors, fog, binding.sky.length, minY >> 2,
                 height >> 2, fallback, 65536, epoch);
             if (pointer.address() == 0) return null;
             MemorySegment scoped;
@@ -104,11 +108,14 @@ public final class NativeBiomeWorld {
         finally { Reference.reachabilityFence(this); }
     }
     @Nullable
-    public Vec3 sample(Vec3 position) {
+    public Vec3 sample(Vec3 position) { return sample(position, SAMPLE); }
+    @Nullable
+    public Vec3 sampleFog(Vec3 position) { return sample(position, SAMPLE_FOG); }
+    private Vec3 sample(Vec3 position, MethodHandle sampler) {
         if (!enabled) return null;
         var result = RESULT.get();
         try {
-            if ((int) SAMPLE.invokeExact(owner, epoch, position.x, position.y, position.z, result) != 0) return null;
+            if ((int) sampler.invokeExact(owner, epoch, position.x, position.y, position.z, result) != 0) return null;
             return new Vec3(result.getAtIndex(ValueLayout.JAVA_DOUBLE, 0), result.getAtIndex(ValueLayout.JAVA_DOUBLE, 1), result.getAtIndex(ValueLayout.JAVA_DOUBLE, 2));
         } catch (Throwable failure) { throw failure(failure); }
         finally { Reference.reachabilityFence(this); }

@@ -124,23 +124,17 @@ and nothing may depend on its iteration order. Derive per-asset facts once
 instance. On the Java side, resource texture bytes requested during frame
 extraction go through `TexturePayloadCache`, which resource reload clears.
 
-Java still memoizes raw biome sky and fog samples before later
-brightness/weather adjustments. Each `ClientLevel` stores four sky samples in
-a ring and one fog sample, keyed by exact quart-position coordinates,
-partial-tick bits and game time, without an explicit frame-id reset.
-On a sky-memo miss, Sodium's hook first asks the native loaded-biome index for
-an exact `ClientLevel`. Rust samples retained biome generations and reuses its
-216-color window while source revisions remain current. Native sampling can
-decline; the hook then uses Java's fast cubic sampler, and the outer caller
-retains its Gaussian fallback if no hook returns a result.
-
-The memo does not round positions or cache later weather/brightness adjustments.
-Fog sampling, those adjustments and custom hooks remain Java-owned. Keep the
-Java memo lifetime distinct from the native generation/revision checks; the
-live-biome migration does not replace both with one cache. See
-[`ClientLevel`](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L958-L1040),
-[`SodiumSkyColorHook`](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/sodium/fabric/SodiumSkyColorHook.java#L18-L35)
-and [live-biome constraints](../world/biome/RUST-LIVE-BIOMES.md#boundaries-to-preserve).
+The local live-biome migration moves canonical sky/fog sampling and result
+reuse into Rust. Each result is keyed by exact position and color field after
+validating world residency and every captured section generation/revision.
+Java dispatches hooks and applies brightness/weather on every call. Custom
+providers retain their original callbacks. The previous Java camera/tick memos
+could return stale hook results and are removed. See [live biome ownership](../world/biome/RUST-LIVE-BIOMES.md)
+for admission, source mutation and current verification scope. Runtime results
+for release `29e3fd54` precede the result-cache change.
+Native admission can decline; Sodium then uses the Java fast cubic sampler,
+and the outer caller retains its Gaussian fallback when no hook supplies a
+result. Keep native generation checks separate from custom callback lifetimes.
 
 Ordinary frames select camera-visible terrain layers in the Rust section graph.
 Solid and cutout layers preserve the graph's BFS visit order rather than

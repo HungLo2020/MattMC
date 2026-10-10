@@ -55,6 +55,10 @@ public class ClientChunkCache extends ChunkSource {
 		return this.nativeBiomes == null ? null : this.nativeBiomes.sample(position);
 	}
 
+	public net.minecraft.world.phys.Vec3 sampleNativeFog(net.minecraft.world.phys.Vec3 position) {
+		return this.nativeBiomes == null ? null : this.nativeBiomes.sampleFog(position);
+	}
+
 	private void publishNativeBiomes(LevelChunk chunk) {
 		if (this.nativeBiomes == null || this.readingBiomePacket) return;
 		var storage = this.storage;

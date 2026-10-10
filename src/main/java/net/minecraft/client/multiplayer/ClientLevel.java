@@ -949,67 +949,23 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		return h * 0.8F + 0.2F;
 	}
 
-	/**
-	 * One frame's sampled biome color. A frame samples sky and fog colors
-	 * several times at the same camera position (sky extraction, fog
-	 * parameters, shader environment); each sample reads hundreds of biome
-	 * cells. Equal quart position, partial tick and game time can only occur
-	 * within one frame, so a hit returns exactly the value a resample would.
-	 */
-	private record BiomeColorSample(double x, double y, double z, int partialTickBits, long gameTime, Vec3 color) {
-		boolean matches(Vec3 quart, float partialTick, long gameTime) {
-			return this.x == quart.x && this.y == quart.y && this.z == quart.z
-				&& this.partialTickBits == Float.floatToRawIntBits(partialTick) && this.gameTime == gameTime;
-		}
-	}
-
-	// A small ring: one frame's callers (fog, sky, frame background, shader
-	// environment) may each use a different partial tick or position; a
-	// single entry then missed every call.
-	private final BiomeColorSample[] skyColorSamples = new BiomeColorSample[4];
-	private int nextSkyColorSample;
-	private volatile BiomeColorSample lastFogColorSample;
-
-	/** Fog-color biome sample for {@code AirBasedFogEnvironment}, memoized like the sky sample. */
-	public Vec3 sampleFogColorBiomes(Vec3 quart, float partialTick, java.util.function.Supplier<Vec3> sampler) {
-		BiomeColorSample last = this.lastFogColorSample;
-		long gameTime = this.getGameTime();
-		if (last != null && last.matches(quart, partialTick, gameTime)) {
-			return last.color();
-		}
-		Vec3 color = sampler.get();
-		this.lastFogColorSample = new BiomeColorSample(quart.x, quart.y, quart.z, Float.floatToRawIntBits(partialTick), gameTime, color);
-		return color;
-	}
-
 	public int getSkyColor(Vec3 vec3, float f) {
 		float g = this.getTimeOfDay(f);
 		Vec3 vec32 = vec3.subtract(2.0, 2.0, 2.0).scale(0.25);
-		long gameTime = this.getGameTime();
+
+		// Allow hooks to provide custom sky color sampling
+		CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)this.getBiomeManager().getNoiseBiomeAtQuart(ix, jx, kx).value()).getSkyColor());
 		Vec3 vec33 = null;
-		for (BiomeColorSample sample : this.skyColorSamples) {
-			if (sample != null && sample.matches(vec32, f, gameTime)) {
-				vec33 = sample.color();
+		for (SkyColorHooks hook : HookRegistry.getSkyColorHooks()) {
+			vec33 = hook.sampleSkyColor(this, vec32, rgbFetcher);
+			if (vec33 != null) {
 				break;
 			}
 		}
-		if (vec33 == null) {
-			// Allow hooks to provide custom sky color sampling
-			CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)this.getBiomeManager().getNoiseBiomeAtQuart(ix, jx, kx).value()).getSkyColor());
-			for (SkyColorHooks hook : HookRegistry.getSkyColorHooks()) {
-				vec33 = hook.sampleSkyColor(this, vec32, rgbFetcher);
-				if (vec33 != null) {
-					break;
-				}
-			}
 
-			// Fall back to default implementation if no hook provided a result
-			if (vec33 == null) {
-				vec33 = CubicSampler.gaussianSampleVec3(vec32, rgbFetcher);
-			}
-			this.skyColorSamples[this.nextSkyColorSample] =
-				new BiomeColorSample(vec32.x, vec32.y, vec32.z, Float.floatToRawIntBits(f), gameTime, vec33);
-			this.nextSkyColorSample = (this.nextSkyColorSample + 1) % this.skyColorSamples.length;
+		// Fall back to default implementation if no hook provided a result
+		if (vec33 == null) {
+			vec33 = CubicSampler.gaussianSampleVec3(vec32, rgbFetcher);
 		}
 		float h = Mth.cos(g * (float) (Math.PI * 2)) * 2.0F + 0.5F;
 		h = Mth.clamp(h, 0.0F, 1.0F);

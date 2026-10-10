@@ -18,9 +18,9 @@ final class NativeLiveBiomeSection<T> {
     static final class Binding<T> {
         final List<T> values;
         final IdentityHashMap<T, Integer> ids = new IdentityHashMap<>();
-        final int[] sky;
-        Binding(List<T> values, int[] sky) {
-            this.values = List.copyOf(values); this.sky = sky;
+        final int[] sky, fog;
+        Binding(List<T> values, int[] sky, int[] fog) {
+            this.values = List.copyOf(values); this.sky = sky; this.fog = fog;
             for (int i = 0; i < values.size(); i++) ids.put(values.get(i), i);
         }
         int id(Object value) { return ids.getOrDefault(value, -1); }
@@ -31,14 +31,15 @@ final class NativeLiveBiomeSection<T> {
                 || !((net.minecraft.core.MappedRegistry<Biome>)registry).isFrozen()
                 || registry.size() < 9 || registry.size() > 65535) return;
         var values = new ArrayList<Holder<Biome>>(registry.size());
-        int[] sky = new int[registry.size()];
+        int[] sky = new int[registry.size()], fog = new int[registry.size()];
         for (int i = 0; i < sky.length; i++) {
             var holder = strategy.globalMap().byId(i);
             if (holder == null || !(holder instanceof Holder.Reference<Biome>)
-                    || strategy.globalMap().getId(holder) != i) return;
-            values.add(holder); sky[i] = holder.value().getSkyColor();
+                    || strategy.globalMap().getId(holder) != i
+                    || holder.value().getSpecialEffects().getClass() != net.minecraft.world.level.biome.BiomeSpecialEffects.class) return;
+            values.add(holder); sky[i] = holder.value().getSkyColor(); fog[i] = holder.value().getFogColor();
         }
-        BINDINGS.put(strategy, new Binding<>(values, sky));
+        BINDINGS.put(strategy, new Binding<>(values, sky, fog));
     }
     @SuppressWarnings("unchecked")
     static <T> Binding<T> binding(Strategy<T> strategy) { return (Binding<T>) BINDINGS.get(strategy); }
