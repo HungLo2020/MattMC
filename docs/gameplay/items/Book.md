@@ -8,6 +8,8 @@ Combine **three Paper and one Leather**, shapeless, to craft **one Book**. Ordin
 
 This page covers those verified routes rather than every structure chest or trade.
 
+A [Grindstone can recycle an unwanted Enchanted Book](EnchantedBook.md#recycling-unwanted-books) into a plain Book **only when no curses remain**. This removes all of its non-curse enchantments; it does not extract them into another book. [Book conversion after disenchantment][grindstone-book]
+
 ## Uses
 
 - Use a plain Book as an eligible target at an [Enchanting Table](../blocks/EnchantingTable.md) to produce an Enchanted Book from the table's offer pool.
@@ -32,3 +34,7 @@ Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No 
 - [Bookshelf recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/bookshelf.json)
 - [Table recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/enchanting_table.json)
 - [Table selection](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/inventory/EnchantmentMenu.java)
+
+The Grindstone recycling route was additionally source-reviewed on **2026-10-10** at `4246f4e7bfc1f3ab7862272ebba5f1f38aa16953`; no gameplay test was run.
+
+[grindstone-book]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/inventory/GrindstoneMenu.java#L180-L193

@@ -59,9 +59,11 @@ required tags rather than assuming upstream behavior.
 The October 9 depth review expanded [Farmland](../../gameplay/blocks/Farmland.md)
 and [Nether Wart](../../gameplay/blocks/NetherWart.md), then examined
 [Lever controls](../../gameplay/blocks/Lever.md) and
-[shared redstone power](../../gameplay/redstone/Redstone.md). The selected gaps
-were practical collection, environmental behavior, exact harvest rules and
-support-side power. Companion item pages keep acquisition summaries and link
+[shared redstone power](../../gameplay/redstone/Redstone.md), followed by
+[Grindstone edge cases](../../gameplay/blocks/Grindstone.md) and
+[enchanted-book use and recycling](../../gameplay/items/EnchantedBook.md).
+The selected gaps were practical collection, environmental behavior, exact
+harvest rules, support-side power and input/output consequences. Companion item pages keep acquisition summaries and link
 to those placed-behavior owners. The already detailed Button and Pressure Plate
 family tables did not need duplicate rewrites. These are bounded reviews of
 selected core articles, not an exhaustive audit of blocks, items, mobs or
