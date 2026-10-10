@@ -73,6 +73,12 @@ public abstract class VoxelShape {
 		return this.shape.isEmpty();
 	}
 
+	/** CPU export admission only; custom geometry/grid callbacks stay in Java. */
+	public final boolean hasCanonicalBoxGeometry() {
+		return (this.getClass() == ArrayVoxelShape.class || this.getClass() == CubeVoxelShape.class)
+			&& this.shape.getClass() == BitSetDiscreteVoxelShape.class;
+	}
+
 	public VoxelShape move(Vec3 vec3) {
 		return this.move(vec3.x, vec3.y, vec3.z);
 	}

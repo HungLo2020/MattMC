@@ -124,3 +124,16 @@ fn single_copies_share_network_palette_replacement_until_growth() {
     assert!(!copy.read_single(31809));
     assert!(!owner.read_single(4));
 }
+
+#[test]
+fn borrowed_scan_captures_single_palette_alias_once() {
+    let owner = single();
+    let alias = owner.copy();
+    owner.with_state_reader(|reader| {
+        assert_eq!(reader.get(0), 71);
+        assert!(alias.read_single(5));
+        assert_eq!(reader.get(4095), 71);
+        assert!(reader.all_states(|id| id == 71));
+    });
+    owner.with_state_reader(|reader| assert_eq!(reader.get(0), 5));
+}

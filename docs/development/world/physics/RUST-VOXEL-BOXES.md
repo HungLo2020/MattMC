@@ -142,3 +142,8 @@ single strictly interior rectangular cavities. It proves every word and emits
 the original one/six ordered boxes. Arbitrary occupancy keeps the established
 visitor; the Rust per-cell oracle verifies shortcuts and changed-cell rejection.
 Earlier timings above precede this shared optimization.
+
+The pending [DH height-field migration](../chunk/RUST-DH-HEIGHTMAPS.md) also
+admits exact built-in shape/grid classes for a one-time intrinsic geometry
+export. It does not transfer GPU state or replace contextual collision queries.
+Its CPU and runtime verification are recorded separately from the timings above.

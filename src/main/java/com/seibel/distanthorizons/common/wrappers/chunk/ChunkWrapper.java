@@ -62,6 +62,8 @@ public class ChunkWrapper implements IChunkWrapper
 	private int[][] solidHeightMap = null;
 	/** will be null if we are using MC heightmaps */
 	private int[][] lightBlockingHeightMap = null;
+	/** Rust owns admitted height fields; this is a read-only CPU lease. */
+	private net.minecraft.world.level.chunk.NativeDhHeightmaps nativeHeightMaps;
 	
 	
 	
@@ -186,6 +188,19 @@ public class ChunkWrapper implements IChunkWrapper
 	
 	public void createDhHeightMaps()
 	{
+		// Subclasses may override getBlockState or height metadata callbacks.
+		var nativeMaps = this.getClass() == ChunkWrapper.class
+			? net.minecraft.world.level.chunk.NativeDhHeightmaps.build(this.chunk) : null;
+		if (nativeMaps != null)
+		{
+			this.nativeHeightMaps = nativeMaps;
+			this.minNonEmptyHeight = nativeMaps.minHeight();
+			this.maxNonEmptyHeight = nativeMaps.maxHeight();
+			this.solidHeightMap = null;
+			this.lightBlockingHeightMap = null;
+			return;
+		}
+		this.nativeHeightMaps = null;
 		// re-calculate the min/max heights for consistency (during world gen these may be wrong)
 		this.minNonEmptyHeight = Integer.MIN_VALUE;
 		this.maxNonEmptyHeight = Integer.MAX_VALUE;
@@ -245,6 +260,7 @@ public class ChunkWrapper implements IChunkWrapper
 	public int getSolidHeightMapValue(int xRel, int zRel) 
 	{ 
 		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(xRel, zRel);
+		if (this.nativeHeightMaps != null) return this.nativeHeightMaps.solid(xRel, zRel);
 		
 		// will be null if we want to use MC heightmaps
 		if (this.solidHeightMap == null)
@@ -261,6 +277,7 @@ public class ChunkWrapper implements IChunkWrapper
 	public int getLightBlockingHeightMapValue(int xRel, int zRel) 
 	{
 		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(xRel, zRel);
+		if (this.nativeHeightMaps != null) return this.nativeHeightMaps.blocking(xRel, zRel);
 		
 		if (this.lightBlockingHeightMap == null)
 		{

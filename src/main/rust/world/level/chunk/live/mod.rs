@@ -84,7 +84,37 @@ pub struct Owner {
     limit: u32,
     global_bits: usize,
 }
+/// A borrowed scan under the storage mutation lock. No palette/word projection.
+pub(crate) struct StateReader<'a> {
+    generation: &'a Generation,
+    single: Option<u32>,
+}
+impl StateReader<'_> {
+    pub(crate) fn get(&self, index: usize) -> u32 {
+        self.single.unwrap_or_else(|| self.generation.state(index))
+    }
+    pub(crate) fn all_states(&self, mut admitted: impl FnMut(u32) -> bool) -> bool {
+        if let Some(state) = self.single {
+            return admitted(state);
+        }
+        if self.generation.global {
+            return (0..ENTRIES).all(|index| admitted(self.get(index)));
+        }
+        (0..self.generation.count.load(Ordering::Acquire) as usize)
+            .all(|id| admitted(self.generation.palette[id].load(Ordering::Acquire)))
+    }
+}
 impl Owner {
+    pub(crate) fn with_state_reader<R>(&self, read: impl FnOnce(StateReader<'_>) -> R) -> R {
+        let guard = self.state.lock().unwrap();
+        let generation = &guard.generation;
+        // Zero-width copies can share the palette across independent locks.
+        // Capture its single value once, rather than mixing two aliased updates.
+        read(StateReader {
+            generation,
+            single: (generation.bits == 0).then(|| generation.state(0)),
+        })
+    }
     pub(crate) fn load(
         bits: usize,
         requested: usize,

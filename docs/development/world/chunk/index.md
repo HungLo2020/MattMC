@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Rust DH height fields](RUST-DH-HEIGHTMAPS.md): direct live-section scans,
+  intrinsic collision policy, CPU leases and scoped runtime verification.
+
 - [Rust ordered palette values](RUST-PALETTE-DISTINCT.md): first-occurrence biome
   and block scans, callback compatibility and complete caller verification.
 - [Rust global palette loading](RUST-PALETTE-UNPACKING.md): saved-data repacking,
