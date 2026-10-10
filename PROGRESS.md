@@ -16,7 +16,7 @@
 - Java still binds atomic chunk references, supplies reference-CAS facts, projects ring reads, orchestrates relocation and delivers world/biome/hook callbacks. Malformed radii/custom inputs retain compatibility behavior.
 - General gameplay/simulation, platform/network/startup and remaining extraction still belong to Java; app/ is empty. This is not Java-removal completion.
 - Loaded-world sky/fog and DH columns now share one retained native biome binding; unchanged publication avoids Java pointer arrays and Rust owner-row reconstruction while checking primary generations.
-- Prioritize authoritative world-state producers and direct consumers together. Next: contextual DH render-column color conversion or neighborhood orchestration, guided by streaming samples; preserve callbacks, cached wrapper fields and compatibility escape.
+- Prioritize authoritative world-state producers and direct consumers together. Server chunk-task queue ownership is now native; next return to contextual DH colors/neighborhood orchestration. Preserve callbacks, cached wrapper fields and compatibility escape.
 
 ## Preceding shared-biome CPU checkpoint
 
@@ -46,6 +46,14 @@
 - Releaseee1676ec passes4 focused Rust/27 architecture checks and5 focused JNI controls. FullJava1755 ordinary/two skips plus159 parity,1914 reported/1912 executed across343 suites, zero failures/errors; six final workers map exact image. All39492 Current/38176 Frozen/native/prompt/inventory guards pass; Frozen HEAD unchanged.
 - No new runtime/FPS/long-memory claim;20 ABAB/exact6000 runs predeclared, not started. Receipts: build/native-dh-render-reduction/; guide: docs/development/rendering/RUST-DH-RENDER-COLUMNS.md. Initial fixture-include compilation error retained and corrected. Native scratch has no source/world pointers; Apache2.0 sort attribution/license bundled.
 
+## Current server scheduling CPU checkpoint
+
+- Rust owns complete server chunk-task priorities, insertion-ordered chunk membership, linked task lists, moves, release and pop. Java pending maps/lists and its slot allocator are removed; only callable pins, scalar transport facts and existing dispatch/future callbacks remain.
+- Actual untouched Frozen recorder pins5 classes and records37624 synthetic CPU operations. Final257 Rust world/27 architecture/132 bridge/4 cloud-policy and4 JNI controls pass, including failure prefixes, null/duplicate identity, reentry, reused arenas, concurrent readers through the real consecutive executor and65536-task output.
+- Final image6f0ea0b6: six alternating pairs, identical compiled driver, five15000-round warmups and15000 measured rounds give median249.94ms C/255.99ms F (2.4% lower) in supplemental CPU queue work. No server-tick, renderer/FPS, runtime or sustained-memory acceptance implied.
+- Initial vectors114.58ms C/32.88ms F (1500 rounds) rejected. Custom table497.49/294.41ms (15000 rounds) and compact top/count projections were removed. All failures/runs retained; native arenas, borrowed output, original writer exclusion, row/mode projections, field snapshots and inlined map helpers remain. Perf denied by kernel policy; no kernel changes.
+- Final combined d80687a4c tree passes fullJava1918 reported/two skips/zero failures/errors across344 suites;1916 executed. Six workers map exact6f0ea0b6. All39503 Current/38176 Frozen/native/prompt/fixture/class/inventory guards pass; Frozen HEAD unchanged. Receipts: build/native-chunk-tasks/; guide: docs/development/world/chunk-loading/RUST-CHUNK-TASKS.md. Existing NVIDIA mismatch does not prevent CPU migration.
+
 ## Prior accepted hardware evidence
 
 - Last measured image839ff128:2485 Rust pass/3ignored, Java1852reported/2skips; all7 lifecycle cases and2 reviewed original-resolution settled pairs pass, VUID0/DH28.84%; source/native/Frozen/prompt guards match.
@@ -64,7 +72,10 @@
 
 ## Sync and artifact integrity
 
-- Next renderer batch uses sync-and-push:21 intended paths; upstream already matchesd3c427a79, empty index, no conflict/stash needed. Final CPU gates pass; prepared for incremental publication.
+- Reducer batch5de23173a is published; remote master verified and worktree was clean before this server-queue batch. Server-queue publication follows sync-and-push and final CPU checks.
+- Integratedd80687a4c world-map gradient/capture fixes in place; all19 staged paths preserved exactly. Java suites rerun against the combined tree; six exact native workers verified. Native sources/image and measured queue workload unchanged.
+- Integrateddd966daea Frozen shader/DH corrections in place:19 pending paths byte/mode/symlink exact, empty index retained. No overlapping queue changes; combined CPU checks and Wiki validation pass.
+- Integratedc00b11c8b shader/DH-cloud fixes andd772753a0 ownership docs. Preserved18 local paths:16 byte/mode/symlink exact; two shared architecture/migration pages reconciled. Original empty index restored; final queue revisions follow this integration.
 - Latest publication instruction supersedes the earlier no-commit restriction. Combined batchd3c427a79 published and remote master verified with sync-and-push. Worktree clean; workflow stash retired and both old stashes preserved. No hardware performance acceptance implied.
 - Integrated368c10a87 documentation ontofc1d529db. Preserved150 pending paths:146 byte/mode/symlink exact, four overlapping docs reconciled; lighting conflict preserves historical #826 finding plus executable fix. Two additional rendering docs reflect that newer CPU scope. Original empty index restored; recovery: build/native-dh-chunk-hash/publish/.
 - Earlier requested600s work interval/sync preserved134 paths across5323a216f→fc1d529db, reconciled packed-word decoding/mutation stamps and DH retained LongList/preservation-policy tests. Earlier temporary stash retired; original two stashes retained. Failures/receipts: build/native-client-residency/sync/.

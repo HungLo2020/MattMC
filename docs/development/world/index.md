@@ -4,8 +4,8 @@
   rotations/reflections and parity checks.
 - [Chunk storage](chunk/index.md): ordered biome/block scans, palette loading,
   growth, histograms, save packing, native DH height fields and verification.
-- [Chunk loading](chunk-loading/index.md): native-owned player chunk-distance
-  fields for natural spawning and player tickets.
+- [Chunk loading](chunk-loading/index.md): client residency, server chunk-task
+  queues and native distance fields for player/loading/simulation tickets.
 - [World Lighting](lighting/index.md): skylight-source reconstruction, live light
   layers, canonical map snapshots and scalar sampling, Rust propagation, DH
   lighting/emitter ownership and scoped verification.

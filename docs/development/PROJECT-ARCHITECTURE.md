@@ -98,6 +98,7 @@ src/main/rust/
         │   └── skylight_sources/
         ├── chunk_distance/
         ├── client_residency/
+        ├── chunk_tasks/
         ├── color_map_color_util.rs
         └── levelgen/
             ├── synth/
@@ -322,6 +323,10 @@ compatibility section recounts; canonical recounts scan the live owner directly.
 [loading](world/chunk-loading/RUST-LOADING-DISTANCE.md) distance graphs and
 [POI village](world/chunk-loading/RUST-POI-DISTANCE.md) section distances;
 Java keeps player sets, tickets, POI records, holders and published level views.
+[Server chunk tasks](world/chunk-loading/RUST-CHUNK-TASKS.md) use
+`world/level/chunk_tasks/` for priority buckets, ordered chunk membership and
+task lists. Java temporarily pins callables and delivers dispatcher/future
+callbacks; it keeps no pending priority map or per-chunk task-list owner.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.

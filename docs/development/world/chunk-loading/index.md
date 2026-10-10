@@ -1,5 +1,7 @@
 # Chunk loading
 
+- [Rust server chunk tasks](RUST-CHUNK-TASKS.md): native priority/FIFO ownership,
+  callable boundaries, failure prefixes and actual Frozen queue replay.
 - [Rust client chunk residency](RUST-CLIENT-RESIDENCY.md): native window and empty
   membership policy, retained counter scans, callback boundaries and Frozen replay.
 - [Rust player chunk distances](RUST-PLAYER-DISTANCE.md): native-owned natural

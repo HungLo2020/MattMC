@@ -45,6 +45,11 @@ documentation review inspects source and adds no runtime verification.
 
 Follow the owner boundary relevant to the next change:
 
+- **Server scheduling:** [chunk-task queues](../world/chunk-loading/RUST-CHUNK-TASKS.md)
+  own priority buckets, ordered chunk membership, task lists and reprioritization
+  in Rust. Java temporarily pins callables and retains consecutive dispatch,
+  execution throttling, completion futures and level-change callbacks. Remaining
+  holders, simulation and task bodies still need migration.
 - **World storage and bulk producers:** [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md),
   [section counters](../world/chunk/RUST-SECTION-COUNTERS.md) and
   [generation-stage handoffs](../world/levelgen/RUST-STAGE-HANDOFF.md).

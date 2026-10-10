@@ -5,3 +5,4 @@ pub(crate) mod lighting;
 pub(crate) mod chunk_distance;
 pub(crate) mod chunk;
 pub(crate) mod client_residency;
+pub(crate) mod chunk_tasks;
