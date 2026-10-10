@@ -758,7 +758,7 @@ impl WorldPrimitiveFrontend {
         }
         for (_, resources) in std::mem::take(&mut self.mesh_resources) {
             self.deferred_mesh_resource_destroys
-                .push(resources.resource_set);
+                .extend(resources.resource_set);
         }
         for (_, resources) in std::mem::take(&mut self.source_mesh_resources) {
             self.deferred_mesh_resource_destroys

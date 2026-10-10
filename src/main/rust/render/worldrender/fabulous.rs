@@ -268,6 +268,12 @@ impl WorldPrimitiveFrontend {
                 self.ensure_mesh_resources(gal, batch.key)?;
             }
         }
+        // Fabulous binds every mesh through its own resource set.
+        if let Some(stream_buffer) = mesh_stream_buffer {
+            for batch in world_mesh_batches.iter().chain(hand_mesh_batches.iter().flatten()) {
+                self.ensure_mesh_resource_set(gal, batch.key, stream_buffer)?;
+            }
+        }
         // Fabulous is a separate explicit composition target, not a separate
         // terrain shader contract. Its builtin mesh pipelines use the same
         // Rust-owned copied vanilla lightmap as the normal terrain route.
@@ -628,7 +634,9 @@ impl WorldPrimitiveFrontend {
                 operations.push(CommandOp::BindResourceSet {
                     pipeline_layout: resources.pipeline_layout,
                     set_index: 0,
-                    set: resources.resource_set,
+                    set: resources.resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous mesh resource set missing")
+                    })?,
                     dynamic_offsets: mesh_stream_dynamic_offsets(
                         batch,
                         resources.vertex_offset,
@@ -711,7 +719,9 @@ impl WorldPrimitiveFrontend {
                                 operations.push(CommandOp::BindResourceSet {
                                     pipeline_layout: resources.pipeline_layout,
                                     set_index: 0,
-                                    set: resources.resource_set,
+                                    set: resources.resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous mesh resource set missing")
+                    })?,
                                     dynamic_offsets: mesh_stream_dynamic_offsets(
                                         batch,
                                         resources.vertex_offset,
@@ -792,7 +802,9 @@ impl WorldPrimitiveFrontend {
                             operations.push(CommandOp::BindResourceSet {
                                 pipeline_layout: resources.pipeline_layout,
                                 set_index: 0,
-                                set: resources.resource_set,
+                                set: resources.resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous mesh resource set missing")
+                    })?,
                                 dynamic_offsets: mesh_stream_dynamic_offsets(
                                     batch,
                                     resources.vertex_offset,

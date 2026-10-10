@@ -424,39 +424,28 @@ impl WorldPrimitiveFrontend {
         let asset = self.mesh_assets.get(&key.mesh_key).ok_or_else(|| {
             GalError::invalid_argument(format!("world mesh asset {} is missing", key.mesh_key))
         })?;
-        let section = asset
-            .sections
-            .get(key.section_index as usize)
-            .ok_or_else(|| GalError::invalid_argument("world mesh section is missing"))?;
-        let label = format!(
-            "world-mesh-{}-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
-            if key.g_buffer { "gbuffer" } else { "direct" },
-            key.stratum,
-            key.mesh_key,
-            key.mesh_generation,
-            key.section_index,
-            key.texture_id,
-            key.material_mode,
-            key.depth_policy,
-            key.cull_policy
-        );
-        let vertex_abi = mesh_vertex_abi_for_builtin(key);
-        let vertex_bytes = match vertex_abi {
-            MeshVertexAbi::Rich80 => asset.vertex_bytes.clone(),
-            MeshVertexAbi::DirectTerrain32 => compact_direct_terrain_vertices(&asset.vertex_bytes)?,
-        };
-        let index_bytes = asset.index_bytes.clone();
+        if asset.sections.get(key.section_index as usize).is_none() {
+            return Err(GalError::invalid_argument("world mesh section is missing"));
+        }
         let index_type = asset.index_type;
         let geometry_key = key.geometry_key();
-        let index_offset = section.index_offset;
-        let index_count = section.index_count;
-        self.ensure_mesh_geometry_resources(
-            gal,
-            geometry_key,
-            vertex_bytes,
-            index_bytes,
-            key.view_layering.is_some(),
-        )?;
+        // Several section/material keys share one mesh's geometry. Copy (or
+        // compact-convert) the whole vertex and index arrays only when that
+        // geometry is not resident yet, not once per key.
+        if !self.mesh_geometry_resources.contains_key(&geometry_key) {
+            let vertex_bytes = match mesh_vertex_abi_for_builtin(key) {
+                MeshVertexAbi::Rich80 => asset.vertex_bytes.clone(),
+                MeshVertexAbi::DirectTerrain32 => compact_direct_terrain_vertices(&asset.vertex_bytes)?,
+            };
+            let index_bytes = asset.index_bytes.clone();
+            self.ensure_mesh_geometry_resources(
+                gal,
+                geometry_key,
+                vertex_bytes,
+                index_bytes,
+                key.view_layering.is_some(),
+            )?;
+        }
         let geometry = self
             .mesh_geometry_resources
             .get(&geometry_key)
@@ -467,13 +456,9 @@ impl WorldPrimitiveFrontend {
         let vertex_stride = geometry.vertex_stride;
         let index_buffer = geometry.index_buffer;
         let geometry_index_offset = geometry.index_offset;
-        self.ensure_mesh_texture_resources(gal, key.texture_id, &label)?;
-        let texture_resources = self
-            .mesh_texture_resources
-            .get(&key.texture_id)
-            .ok_or_else(|| GalError::backend("world mesh texture resources missing"))?;
-        let texture_view = texture_resources.view;
-        let sampler = texture_resources.sampler;
+        if !self.mesh_texture_resources.contains_key(&key.texture_id) {
+            self.ensure_mesh_texture_resources(gal, key.texture_id, &mesh_resource_label(key))?;
+        }
         let mut pipeline_key = mesh_pipeline_key(key)?;
         pipeline_key.shader_resource_layout = shader_resource_layout;
         self.ensure_mesh_pipeline_resources(gal, pipeline_key.clone())?;
@@ -481,56 +466,77 @@ impl WorldPrimitiveFrontend {
             .mesh_pipeline_resources
             .get(&pipeline_key)
             .ok_or_else(|| GalError::backend("world mesh pipeline resources missing"))?;
-        let resource_layout = pipeline_resources.resource_layout;
-        let pipeline_layout = pipeline_resources.pipeline_layout;
-        let pipeline = pipeline_resources.pipeline;
-        let shadow_pipeline = pipeline_resources.shadow_pipeline;
-        let observation_buffer = pipeline_resources
-            .vertex_observation
-            .as_ref()
-            .map(|o| o.output);
-        let mut created = Vec::new();
-        let result = (|| -> GalResult<MeshResources> {
-            let stream_binding = self.ensure_mesh_instance_stream(gal, 1)?;
-            let resource_set = create_mesh_resource_set(
-                gal,
-                &label,
-                resource_layout,
-                vertex_buffer,
-                vertex_range,
-                stream_binding.buffer,
-                WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES,
-                texture_view,
-                sampler,
-                key.standard_item_foil,
-                observation_buffer,
-            )?;
-            created.push(resource_set);
-            let resources = MeshResources {
-                geometry_key,
-                vertex_buffer,
-                vertex_offset,
-                vertex_range,
-                vertex_stride,
-                index_buffer,
-                index_offset: geometry_index_offset,
-                index_type,
-                pipeline_layout,
-                pipeline,
-                shadow_pipeline,
-                resource_set,
-                page_resource_set: None,
-            };
-            let _ = (index_offset, index_count, index_type);
-            Ok(resources)
-        })();
-        if result.is_err() {
-            for handle in created.into_iter().rev() {
-                let _ = gal.retire(handle);
-            }
-        }
-        self.mesh_resources.insert(key, result?);
+        let resources = MeshResources {
+            geometry_key,
+            vertex_buffer,
+            vertex_offset,
+            vertex_range,
+            vertex_stride,
+            index_buffer,
+            index_offset: geometry_index_offset,
+            index_type,
+            pipeline_layout: pipeline_resources.pipeline_layout,
+            pipeline: pipeline_resources.pipeline,
+            shadow_pipeline: pipeline_resources.shadow_pipeline,
+            resource_set: None,
+            resource_layout: pipeline_resources.resource_layout,
+            observation_buffer: pipeline_resources
+                .vertex_observation
+                .as_ref()
+                .map(|observation| observation.output),
+            page_resource_set: None,
+        };
+        self.mesh_resources.insert(key, resources);
         Ok(())
+    }
+
+    /// The per-mesh resource set for a draw that does not use the shared page
+    /// binding (camera-ordered translucency, entities, items, Fabulous). It is
+    /// created on first use with the instance-stream buffer the caller records
+    /// dynamic offsets into, and lives as long as the mesh resources.
+    pub(in crate::render::worldrender) fn ensure_mesh_resource_set(
+        &mut self,
+        gal: &mut VulkanicGal,
+        key: MeshResourceKey,
+        stream_buffer: Handle,
+    ) -> GalResult<Handle> {
+        let resources = self
+            .mesh_resources
+            .get(&key)
+            .ok_or_else(|| GalError::backend("world mesh resources missing for resource set"))?;
+        if let Some(set) = resources.resource_set {
+            return Ok(set);
+        }
+        let (resource_layout, vertex_buffer, vertex_range, observation_buffer) = (
+            resources.resource_layout,
+            resources.vertex_buffer,
+            resources.vertex_range,
+            resources.observation_buffer,
+        );
+        let label = mesh_resource_label(key);
+        self.ensure_mesh_texture_resources(gal, key.texture_id, &label)?;
+        let texture_resources = self
+            .mesh_texture_resources
+            .get(&key.texture_id)
+            .ok_or_else(|| GalError::backend("world mesh texture resources missing"))?;
+        let (texture_view, sampler) = (texture_resources.view, texture_resources.sampler);
+        let set = create_mesh_resource_set(
+            gal,
+            &label,
+            resource_layout,
+            vertex_buffer,
+            vertex_range,
+            stream_buffer,
+            WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES,
+            texture_view,
+            sampler,
+            key.standard_item_foil,
+            observation_buffer,
+        )?;
+        if let Some(resources) = self.mesh_resources.get_mut(&key) {
+            resources.resource_set = Some(set);
+        }
+        Ok(set)
     }
 
     pub(crate) fn destroy_mesh_pipeline_resources(&mut self, gal: &mut VulkanicGal) {
@@ -542,4 +548,19 @@ impl WorldPrimitiveFrontend {
             }
         }
     }
+}
+
+fn mesh_resource_label(key: MeshResourceKey) -> String {
+    format!(
+        "world-mesh-{}-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+        if key.g_buffer { "gbuffer" } else { "direct" },
+        key.stratum,
+        key.mesh_key,
+        key.mesh_generation,
+        key.section_index,
+        key.texture_id,
+        key.material_mode,
+        key.depth_policy,
+        key.cull_policy
+    )
 }

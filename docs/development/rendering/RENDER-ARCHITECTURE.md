@@ -199,6 +199,14 @@ The shared mesh instance stream is bound into every mesh resource set, so
 growing it rebuilds them all. It grows to at least twice its previous capacity;
 growing to the exact requirement while terrain streamed caused ~30 ms frames.
 
+Ordinary opaque/cutout terrain draws through shared page resource sets.
+Per-mesh resource sets are created on first use
+(`ensure_mesh_resource_set`) only for draws outside that path, and a mesh's
+vertex/index bytes are copied or compacted only when its geometry is not yet
+resident. Creating both eagerly for every new section key dominated frame time
+while moving through new terrain; see
+[the session recordings](SESSION-RECORDING.md) for how this was measured.
+
 Distant Horizons builds its render list on the render thread without
 `LodQuadTree`'s lock while the tick thread can recenter the tree. The node
 iterator therefore skips root positions that left the tree after it captured

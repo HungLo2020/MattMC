@@ -1473,7 +1473,7 @@ impl WorldPrimitiveFrontend {
                             resources.shadow_pipeline,
                             resources.pipeline,
                             resources.pipeline_layout,
-                            resources.resource_set,
+                            Some(resources.resource_set),
                             None,
                             candidate.binding.map(|binding| binding.resource_set),
                         )
@@ -1571,6 +1571,16 @@ impl WorldPrimitiveFrontend {
                                 }),
                             )
                         } else {
+                            // Only draws outside the shared page binding need the
+                            // per-mesh set; create it on first use.
+                            let resource_set = match resource_set {
+                                Some(set) => set,
+                                None => self.ensure_mesh_resource_set(
+                                    gal,
+                                    batch.key,
+                                    mesh_stream_binding.buffer,
+                                )?,
+                            };
                             (
                                 resource_set,
                                 mesh_stream_dynamic_offsets_inline(

@@ -2059,74 +2059,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-world-primitives");
-		MemorySegment segmentArray = Struct.WORLD_LINE_SEGMENT_REQUEST.array(arena, worldSegments.size());
-		for (int i = 0; i < worldSegments.size(); i++) {
-			WorldLineSegmentRecord segment = worldSegments.get(i);
-			MemorySegment item = Abi.item(segmentArray, Struct.WORLD_LINE_SEGMENT_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(0), Struct.WORLD_LINE_SEGMENT_REQUEST.byteSize());
-			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 1, segment.stratum());
-			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 2, segment.style());
-			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 3, segment.depthPolicy());
-			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 4, segment.colorArgb());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(5), segment.lineWidth());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(6), segment.startX());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(7), segment.startY());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(8), segment.startZ());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(9), segment.endX());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(10), segment.endY());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(11), segment.endZ());
-			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 12, segment.viewportWidth());
-			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 13, segment.viewportHeight());
-		}
-		MemorySegment crackArray = Struct.WORLD_CRACK_QUAD_REQUEST.array(arena, worldCrackQuads.size());
-		for (int i = 0; i < worldCrackQuads.size(); i++) {
-			WorldCrackQuadRecord quad = worldCrackQuads.get(i);
-			MemorySegment item = Abi.item(crackArray, Struct.WORLD_CRACK_QUAD_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(0), Struct.WORLD_CRACK_QUAD_REQUEST.byteSize());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 1, quad.stratum());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 2, quad.stage());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 7, 0);
-			// The record constructor owns a validated immutable copy. This class is
-			// its enclosing nestmate, so read that copy directly during the
-			// synchronous FFI encode instead of allocating another defensive array.
-			float[] vertices = quad.vertices;
-			for (int field = 0; field < 12; field++) {
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(8 + field), vertices[field]);
-			}
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 20, quad.viewportWidth());
-			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 21, quad.viewportHeight());
-		}
-		MemorySegment borderArray = Struct.WORLD_BORDER_QUAD_REQUEST.array(arena, worldBorderQuads.size());
-		for (int i = 0; i < worldBorderQuads.size(); i++) {
-			WorldBorderQuadRecord quad = worldBorderQuads.get(i);
-			MemorySegment item = Abi.item(borderArray, Struct.WORLD_BORDER_QUAD_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(0), Struct.WORLD_BORDER_QUAD_REQUEST.byteSize());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 1, quad.stratum());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 2, quad.textureId());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 7, 0);
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(8), quad.borderSize());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(9), quad.distanceToBorder());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(10), quad.scrollU());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(11), quad.scrollV());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(12), quad.uvU());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(13), quad.uvV());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(14), quad.uvWidth());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(15), quad.uvHeight());
-			float[] vertices = quad.vertices;
-			for (int field = 0; field < 12; field++) {
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(16 + field), vertices[field]);
-			}
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 28, quad.viewportWidth());
-			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 29, quad.viewportHeight());
-		}
+		MemorySegment segmentArray = encodeWorldLineSegments(worldSegments);
+		MemorySegment crackArray = encodeWorldCrackQuads(worldCrackQuads);
+		MemorySegment borderArray = encodeWorldBorderQuads(worldBorderQuads);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-primitives");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-world-materials");
 		vertexModulatedMaterialScratch.clear();
@@ -2140,58 +2075,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				compactMaterialQuads.add(quad);
 			}
 		}
-		MemorySegment materialArray = Struct.WORLD_MATERIAL_QUAD_REQUEST.array(arena, vertexModulatedMaterialQuads.size());
-		for (int i = 0; i < vertexModulatedMaterialQuads.size(); i++) {
-			WorldMaterialQuadRecord quad = vertexModulatedMaterialQuads.get(i);
-			MemorySegment item = Abi.item(materialArray, Struct.WORLD_MATERIAL_QUAD_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_QUAD_REQUEST.offset(0), Struct.WORLD_MATERIAL_QUAD_REQUEST.byteSize());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 1, quad.stratum());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 2, quad.materialId());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 3, quad.textureId());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 4, quad.materialMode());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 5, quad.depthPolicy());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 6, quad.cullPolicy());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 7, quad.topology());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 8, quad.colorArgb());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 9, quad.winding());
-			// Write the copied semantic record directly. Avoid allocating temporary
-			// position/UV arrays for every visible quad during whole-frame packing.
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 10, quad.p0X());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 11, quad.p0Y());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 12, quad.p0Z());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 13, quad.p1X());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 14, quad.p1Y());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 15, quad.p1Z());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 16, quad.p2X());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 17, quad.p2Y());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 18, quad.p2Z());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 19, quad.p3X());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 20, quad.p3Y());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 21, quad.p3Z());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 22, quad.uv0U());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 23, quad.uv0V());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 24, quad.uv1U());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 25, quad.uv1V());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 26, quad.uv2U());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 27, quad.uv2V());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 28, quad.uv3U());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 29, quad.uv3V());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 30, quad.viewportWidth());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 31, quad.viewportHeight());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 32, quad.sourceProgram());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 33, quad.sourceColorArgb());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 34, quad.packedLight());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 35, quad.sourceUvSpace());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 36, quad.vertex0ColorArgb());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 37, quad.vertex1ColorArgb());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 38, quad.vertex2ColorArgb());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 39, quad.vertex3ColorArgb());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 40, quad.vertex0PackedLight());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 41, quad.vertex1PackedLight());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 42, quad.vertex2PackedLight());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 43, quad.vertex3PackedLight());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 44, quad.blockEntityId());
-		}
+		MemorySegment materialArray = encodeVertexModulatedMaterialQuads(vertexModulatedMaterialQuads);
 		materialTableScratch.clear();
 		ArrayList<WorldMaterialKeyRecord> materialTable = materialTableScratch;
 		ensureMaterialKeyBucketCapacity(compactMaterialQuads.size());
@@ -2246,63 +2130,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-materials");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-world-meshes");
 		MemorySegment meshInstanceArray = encodeWorldMeshInstances(worldMeshInstances, terrainFrameCamera);
-		MemorySegment firstPersonMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, firstPersonMeshInstances.size());
-		for (int i = 0; i < firstPersonMeshInstances.size(); i++) {
-			WorldMeshInstanceRecord instance = firstPersonMeshInstances.get(i);
-			if (instance.terrainPlacement() != null) throw new IllegalArgumentException("first-person meshes cannot carry terrain placement");
-			MemorySegment item = Abi.item(firstPersonMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, i);
-            if(instance.entityCulling()!=null)throw new IllegalArgumentException("first-person meshes cannot carry world entity culling");
-            encodeWorldMeshInstance(item,instance);
-
-		}
+		MemorySegment firstPersonMeshInstanceArray = encodeFirstPersonMeshInstances(firstPersonMeshInstances);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-meshes");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-world-text-and-lod");
-		MemorySegment worldTextQuadArray = Struct.WORLD_TEXT_QUAD_REQUEST.array(arena, worldTextQuads.size());
-		for (int i = 0; i < worldTextQuads.size(); i++) {
-			WorldTextQuadRecord quad = worldTextQuads.get(i);
-			MemorySegment item = Abi.item(worldTextQuadArray, Struct.WORLD_TEXT_QUAD_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(0), Struct.WORLD_TEXT_QUAD_REQUEST.byteSize());
-			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 1, quad.colored() ? 1 : 0);
-			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 2, quad.depthPolicy());
-			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 3, quad.packedLight());
-			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 4, quad.colorArgb());
-			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 5, 0);
-			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 6, quad.assetId());
-			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 7, quad.atlasGeneration());
-			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 8, quad.atlasRevision());
-			item.set(ValueLayout.JAVA_DOUBLE, Struct.WORLD_TEXT_QUAD_REQUEST.offset(9), quad.distanceToCameraSq());
-			float[] modelView = quad.modelViewMatrix;
-			float[] positions = quad.positions;
-			float[] uvs = quad.uvs;
-			MemorySegment.copy(modelView, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(10), 16);
-			MemorySegment.copy(positions, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(11), 12);
-			MemorySegment.copy(uvs, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(12), 8);
-			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 13, quad.blockEntityId());
-		}
+		MemorySegment worldTextQuadArray = encodeWorldTextQuads(worldTextQuads);
 		Objects.requireNonNull(worldLodFrameReference, "worldLodFrameReference");
 		boolean retainedLodFrame = worldLodFrameReference.id() != 0L;
 		MemorySegment lodInstanceArray = retainedLodFrame ? MemorySegment.NULL : encodeWorldLodInstances(worldLodInstances);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-world-text-and-lod");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-gui-streams");
-		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
-		for (int i = 0; i < guiSprites.size(); i++) {
-			GuiSpriteRecord sprite = guiSprites.get(i);
-			MemorySegment item = Abi.item(spriteArray, Struct.GUI_SPRITE_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.GUI_SPRITE_REQUEST.offset(0), Struct.GUI_SPRITE_REQUEST.byteSize());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 1, sprite.stratum());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 2, sprite.spriteId());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 3, sprite.selectedSlot());
-			item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_SPRITE_REQUEST.offset(4), sprite.progressFraction());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 5, sprite.fillDirection());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 6, sprite.colorArgb());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 7, sprite.x());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 8, sprite.y());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 9, sprite.width());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 10, sprite.height());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 11, sprite.guiWidth());
-			Struct.GUI_SPRITE_REQUEST.setInt(item, 12, sprite.guiHeight());
-			Struct.GUI_SPRITE_REQUEST.setLong(item, 13, sprite.sequence());
-		}
+		MemorySegment spriteArray = encodeGuiSprites(guiSprites);
 		MemorySegment affineQuadArray = encodeGuiAffineQuads(guiAffineQuads);
 		MemorySegment guiMeshBatchArray = encodeGuiMeshBatches(guiMeshBatches);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-gui-streams");
@@ -2320,32 +2157,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long projectionOffset = Struct.WHOLE_FRAME_SUBMIT.offset(10);
 		MemorySegment.copy(viewMatrix, 0, request, ValueLayout.JAVA_FLOAT, viewOffset, 16);
 		MemorySegment.copy(projectionMatrix, 0, request, ValueLayout.JAVA_FLOAT, projectionOffset, 16);
-		MemorySegment background = request.asSlice(
-			Struct.WHOLE_FRAME_SUBMIT.offset(11),
-			Struct.WORLD_BACKGROUND_REQUEST.byteSize()
-		);
-		background.set(ValueLayout.JAVA_INT, Struct.WORLD_BACKGROUND_REQUEST.offset(0), Struct.WORLD_BACKGROUND_REQUEST.byteSize());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 1, worldBackground.enabled() ? 1 : 0);
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 2, worldBackground.skyType());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 3, worldBackground.loadIntent());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 4, worldBackground.storeIntent());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 5, worldBackground.colorArgb());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 6, worldBackground.viewportWidth());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 7, worldBackground.viewportHeight());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 8, worldBackground.skyVisible() ? 1 : 0);
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 9, worldBackground.skySunriseOrSunset() ? 1 : 0);
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 10, worldBackground.skyDarkDisc() ? 1 : 0);
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 11, 0);
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 12, worldBackground.skySunAngle());
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 13, worldBackground.skyTimeOfDay());
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 14, worldBackground.skyRainBrightness());
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 15, worldBackground.skyStarBrightness());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 16, worldBackground.skySunriseAndSunsetColorArgb());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 17, worldBackground.skyMoonPhase());
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 18, worldBackground.skyEndFlashIntensity());
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 19, worldBackground.skyEndFlashXAngle());
-		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 20, worldBackground.skyEndFlashYAngle());
-		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 21, worldBackground.skyColorArgb());
+		writeWorldBackground(request, worldBackground);
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, segmentArray, worldSegments.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 13, crackArray, worldCrackQuads.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 14, borderArray, worldBorderQuads.size());
@@ -2356,20 +2168,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 19, spriteArray, guiSprites.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 20, affineQuadArray, guiAffineQuads.size());
 		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 21, negotiatedFeatures);
-		MemorySegment voxelVolume = request.asSlice(
-			Struct.WHOLE_FRAME_SUBMIT.offset(22),
-			Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize()
-		);
-		voxelVolume.set(ValueLayout.JAVA_INT, Struct.WORLD_VOXEL_VOLUME_FRAME.offset(0), Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize());
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 1, voxelVolumeFrame.enabled() ? 1 : 0);
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 2, 0);
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 3, 0);
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setLong(voxelVolume, 4, voxelVolumeFrame.worldGeneration());
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setLong(voxelVolume, 5, voxelVolumeFrame.resourceGeneration());
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 6, voxelVolumeFrame.cameraX());
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 7, voxelVolumeFrame.cameraY());
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 8, voxelVolumeFrame.cameraZ());
-		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 9, 0);
+		writeVoxelVolumeFrame(request, voxelVolumeFrame);
 		MemorySegment shaderEnvironment = request.asSlice(
 			Struct.WHOLE_FRAME_SUBMIT.offset(23),
 			Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize()
@@ -2393,24 +2192,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float[] lodDhFogParameters = worldLodRenderFrame.dhFogParameters;
 		MemorySegment.copy(lodDhFogParameters, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT,
 			Struct.WORLD_LOD_RENDER_FRAME.offset(18), lodDhFogParameters.length);
-		MemorySegment featureCoverage = request.asSlice(
-			Struct.WHOLE_FRAME_SUBMIT.offset(26),
-			Struct.WORLD_FEATURE_COVERAGE.byteSize()
-		);
-		featureCoverage.set(ValueLayout.JAVA_INT, Struct.WORLD_FEATURE_COVERAGE.offset(0), Struct.WORLD_FEATURE_COVERAGE.byteSize());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 1, worldFeatureCoverage.modelSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 2, worldFeatureCoverage.modelPartSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 3, worldFeatureCoverage.blockModelSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 4, worldFeatureCoverage.ordinaryBlockSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 5, worldFeatureCoverage.itemSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 6, worldFeatureCoverage.customGeometrySubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 7, worldFeatureCoverage.shadowSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 8, worldFeatureCoverage.flameSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 9, worldFeatureCoverage.nameTagSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 10, worldFeatureCoverage.textSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 11, worldFeatureCoverage.hitboxSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 12, worldFeatureCoverage.leashSubmits());
-		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 13, worldFeatureCoverage.particleGroupSubmits());
+		writeFeatureCoverage(request, worldFeatureCoverage);
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 27, worldTextQuadArray, worldTextQuads.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 28, guiMeshBatchArray, guiMeshBatches.size());
 		guiProjection.validateLayout(guiWidth, guiHeight);
@@ -2435,21 +2217,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		writeStaticTerrainSections(arena, request, staticTerrainSections, terrainFrameCamera);
 		writeModelRigPoses(arena, request, modelRigPoses == null ? ModelRigPoses.EMPTY : modelRigPoses);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-particles-and-orbs");
-		MemorySegment firstPerson = request.asSlice(
-			Struct.WHOLE_FRAME_SUBMIT.offset(29),
-			Struct.WORLD_FIRST_PERSON_FRAME.byteSize()
-		);
-		firstPerson.set(ValueLayout.JAVA_INT, Struct.WORLD_FIRST_PERSON_FRAME.offset(0), Struct.WORLD_FIRST_PERSON_FRAME.byteSize());
-		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 1, firstPersonFrame.enabled() ? 1 : 0);
-		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 2, firstPersonFrame.clearDepthBefore() ? 1 : 0);
-		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 3, firstPersonFrame.mainHandInstanceCount());
-		long firstPersonProjectionOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(4);
-		float[] firstPersonProjection = firstPersonFrame.projectionMatrix();
-		MemorySegment.copy(firstPersonProjection, 0, firstPerson, ValueLayout.JAVA_FLOAT, firstPersonProjectionOffset, 16);
-		long firstPersonModelViewOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(5);
-		float[] firstPersonModelView = firstPersonFrame.modelViewMatrix();
-		MemorySegment.copy(firstPersonModelView, 0, firstPerson, ValueLayout.JAVA_FLOAT, firstPersonModelViewOffset, 16);
-		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 6, firstPersonFrame.translucentHandMask());
+		writeFirstPersonFrame(request, firstPersonFrame);
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 30, firstPersonMeshInstanceArray, firstPersonMeshInstances.size());
 		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 31, guiBlurBeforeStratum);
 		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 32, guiBlurRadius);
@@ -2458,30 +2226,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		// PostChain objects never enter this request.
 		Abi.writeBytes(arena, request, Struct.WHOLE_FRAME_SUBMIT, 33,
 			postEffectId == null ? new byte[0] : postEffectId.getBytes(StandardCharsets.UTF_8));
-		long lodModelViewOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(5);
-		long lodProjectionOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(6);
-		long lodProjectionInverseOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(7);
-		float[] lodModelViewMatrix = worldLodRenderFrame.modelViewMatrix;
-		float[] lodProjectionMatrix = worldLodRenderFrame.projectionMatrix;
-		float[] lodProjectionInverseMatrix = worldLodRenderFrame.projectionInverseMatrix;
-		MemorySegment.copy(lodModelViewMatrix, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT, lodModelViewOffset, 16);
-		MemorySegment.copy(lodProjectionMatrix, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT, lodProjectionOffset, 16);
-		MemorySegment.copy(lodProjectionInverseMatrix, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT, lodProjectionInverseOffset, 16);
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 8, worldLodRenderFrame.clipDistance());
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 9, worldLodRenderFrame.microOffset());
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 10, worldLodRenderFrame.noiseIntensity());
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 11, worldLodRenderFrame.earthRadius());
-		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 12, worldLodRenderFrame.noiseSteps());
-		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 13, worldLodRenderFrame.noiseDropoff());
-		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 14, 0);
-		float[] lodCameraWorldPosition = worldLodRenderFrame.cameraWorldPosition;
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 15, lodCameraWorldPosition[0]);
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 16, lodCameraWorldPosition[1]);
-		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 17, lodCameraWorldPosition[2]);
-		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 19, worldLodRenderFrame.maxLevelHeight());
-		float[] lodSsaoParameters = worldLodRenderFrame.ssaoParameters();
-		MemorySegment.copy(lodSsaoParameters, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT,
-			Struct.WORLD_LOD_RENDER_FRAME.offset(20), lodSsaoParameters.length);
+		writeLodRenderFrameTail(lodRenderFrame, worldLodRenderFrame);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-lod-frame");
 		encodeShaderEnvironment(arena, shaderEnvironment, shaderEnvironmentFrame);
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
@@ -2537,6 +2282,328 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				frameArena.close();
 			}
 		}
+	}
+
+	/** Writes one fixed sub-record of the whole-frame request (kept out of submitWorldFrame for C2). */
+	private static void writeWorldBackground(MemorySegment request, WorldBackgroundRecord worldBackground) {
+		MemorySegment background = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(11),
+			Struct.WORLD_BACKGROUND_REQUEST.byteSize()
+		);
+		background.set(ValueLayout.JAVA_INT, Struct.WORLD_BACKGROUND_REQUEST.offset(0), Struct.WORLD_BACKGROUND_REQUEST.byteSize());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 1, worldBackground.enabled() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 2, worldBackground.skyType());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 3, worldBackground.loadIntent());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 4, worldBackground.storeIntent());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 5, worldBackground.colorArgb());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 6, worldBackground.viewportWidth());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 7, worldBackground.viewportHeight());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 8, worldBackground.skyVisible() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 9, worldBackground.skySunriseOrSunset() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 10, worldBackground.skyDarkDisc() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 11, 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 12, worldBackground.skySunAngle());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 13, worldBackground.skyTimeOfDay());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 14, worldBackground.skyRainBrightness());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 15, worldBackground.skyStarBrightness());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 16, worldBackground.skySunriseAndSunsetColorArgb());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 17, worldBackground.skyMoonPhase());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 18, worldBackground.skyEndFlashIntensity());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 19, worldBackground.skyEndFlashXAngle());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 20, worldBackground.skyEndFlashYAngle());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 21, worldBackground.skyColorArgb());
+	}
+
+	/** Writes one fixed sub-record of the whole-frame request (kept out of submitWorldFrame for C2). */
+	private static void writeVoxelVolumeFrame(MemorySegment request, WorldVoxelVolumeFrameRecord voxelVolumeFrame) {
+		MemorySegment voxelVolume = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(22),
+			Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize()
+		);
+		voxelVolume.set(ValueLayout.JAVA_INT, Struct.WORLD_VOXEL_VOLUME_FRAME.offset(0), Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 1, voxelVolumeFrame.enabled() ? 1 : 0);
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 2, 0);
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 3, 0);
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setLong(voxelVolume, 4, voxelVolumeFrame.worldGeneration());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setLong(voxelVolume, 5, voxelVolumeFrame.resourceGeneration());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 6, voxelVolumeFrame.cameraX());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 7, voxelVolumeFrame.cameraY());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 8, voxelVolumeFrame.cameraZ());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 9, 0);
+	}
+
+	/** Writes one fixed sub-record of the whole-frame request (kept out of submitWorldFrame for C2). */
+	private static void writeFeatureCoverage(MemorySegment request, WorldFeatureCoverageRecord worldFeatureCoverage) {
+		MemorySegment featureCoverage = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(26),
+			Struct.WORLD_FEATURE_COVERAGE.byteSize()
+		);
+		featureCoverage.set(ValueLayout.JAVA_INT, Struct.WORLD_FEATURE_COVERAGE.offset(0), Struct.WORLD_FEATURE_COVERAGE.byteSize());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 1, worldFeatureCoverage.modelSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 2, worldFeatureCoverage.modelPartSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 3, worldFeatureCoverage.blockModelSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 4, worldFeatureCoverage.ordinaryBlockSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 5, worldFeatureCoverage.itemSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 6, worldFeatureCoverage.customGeometrySubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 7, worldFeatureCoverage.shadowSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 8, worldFeatureCoverage.flameSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 9, worldFeatureCoverage.nameTagSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 10, worldFeatureCoverage.textSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 11, worldFeatureCoverage.hitboxSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 12, worldFeatureCoverage.leashSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 13, worldFeatureCoverage.particleGroupSubmits());
+	}
+
+	/** Writes one fixed sub-record of the whole-frame request (kept out of submitWorldFrame for C2). */
+	private static void writeFirstPersonFrame(MemorySegment request, WorldFirstPersonFrameRecord firstPersonFrame) {
+		MemorySegment firstPerson = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(29),
+			Struct.WORLD_FIRST_PERSON_FRAME.byteSize()
+		);
+		firstPerson.set(ValueLayout.JAVA_INT, Struct.WORLD_FIRST_PERSON_FRAME.offset(0), Struct.WORLD_FIRST_PERSON_FRAME.byteSize());
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 1, firstPersonFrame.enabled() ? 1 : 0);
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 2, firstPersonFrame.clearDepthBefore() ? 1 : 0);
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 3, firstPersonFrame.mainHandInstanceCount());
+		long firstPersonProjectionOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(4);
+		float[] firstPersonProjection = firstPersonFrame.projectionMatrix();
+		MemorySegment.copy(firstPersonProjection, 0, firstPerson, ValueLayout.JAVA_FLOAT, firstPersonProjectionOffset, 16);
+		long firstPersonModelViewOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(5);
+		float[] firstPersonModelView = firstPersonFrame.modelViewMatrix();
+		MemorySegment.copy(firstPersonModelView, 0, firstPerson, ValueLayout.JAVA_FLOAT, firstPersonModelViewOffset, 16);
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 6, firstPersonFrame.translucentHandMask());
+	}
+
+	/** Writes one fixed sub-record of the whole-frame request (kept out of submitWorldFrame for C2). */
+	private static void writeLodRenderFrameTail(MemorySegment lodRenderFrame, WorldLodRenderFrameRecord worldLodRenderFrame) {
+		long lodModelViewOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(5);
+		long lodProjectionOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(6);
+		long lodProjectionInverseOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(7);
+		float[] lodModelViewMatrix = worldLodRenderFrame.modelViewMatrix;
+		float[] lodProjectionMatrix = worldLodRenderFrame.projectionMatrix;
+		float[] lodProjectionInverseMatrix = worldLodRenderFrame.projectionInverseMatrix;
+		MemorySegment.copy(lodModelViewMatrix, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT, lodModelViewOffset, 16);
+		MemorySegment.copy(lodProjectionMatrix, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT, lodProjectionOffset, 16);
+		MemorySegment.copy(lodProjectionInverseMatrix, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT, lodProjectionInverseOffset, 16);
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 8, worldLodRenderFrame.clipDistance());
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 9, worldLodRenderFrame.microOffset());
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 10, worldLodRenderFrame.noiseIntensity());
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 11, worldLodRenderFrame.earthRadius());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 12, worldLodRenderFrame.noiseSteps());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 13, worldLodRenderFrame.noiseDropoff());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 14, 0);
+		float[] lodCameraWorldPosition = worldLodRenderFrame.cameraWorldPosition;
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 15, lodCameraWorldPosition[0]);
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 16, lodCameraWorldPosition[1]);
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 17, lodCameraWorldPosition[2]);
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 19, worldLodRenderFrame.maxLevelHeight());
+		float[] lodSsaoParameters = worldLodRenderFrame.ssaoParameters();
+		MemorySegment.copy(lodSsaoParameters, 0, lodRenderFrame, ValueLayout.JAVA_FLOAT,
+			Struct.WORLD_LOD_RENDER_FRAME.offset(20), lodSsaoParameters.length);
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeWorldLineSegments(List<WorldLineSegmentRecord> worldSegments) {
+		MemorySegment segmentArray = Struct.WORLD_LINE_SEGMENT_REQUEST.array(arena, worldSegments.size());
+		for (int i = 0; i < worldSegments.size(); i++) {
+			WorldLineSegmentRecord segment = worldSegments.get(i);
+			MemorySegment item = Abi.item(segmentArray, Struct.WORLD_LINE_SEGMENT_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(0), Struct.WORLD_LINE_SEGMENT_REQUEST.byteSize());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 1, segment.stratum());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 2, segment.style());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 3, segment.depthPolicy());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 4, segment.colorArgb());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(5), segment.lineWidth());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(6), segment.startX());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(7), segment.startY());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(8), segment.startZ());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(9), segment.endX());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(10), segment.endY());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(11), segment.endZ());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 12, segment.viewportWidth());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 13, segment.viewportHeight());
+		}
+		return segmentArray;
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeWorldCrackQuads(List<WorldCrackQuadRecord> worldCrackQuads) {
+		MemorySegment crackArray = Struct.WORLD_CRACK_QUAD_REQUEST.array(arena, worldCrackQuads.size());
+		for (int i = 0; i < worldCrackQuads.size(); i++) {
+			WorldCrackQuadRecord quad = worldCrackQuads.get(i);
+			MemorySegment item = Abi.item(crackArray, Struct.WORLD_CRACK_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(0), Struct.WORLD_CRACK_QUAD_REQUEST.byteSize());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 2, quad.stage());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 7, 0);
+			// The record constructor owns a validated immutable copy. This class is
+			// its enclosing nestmate, so read that copy directly during the
+			// synchronous FFI encode instead of allocating another defensive array.
+			float[] vertices = quad.vertices;
+			for (int field = 0; field < 12; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(8 + field), vertices[field]);
+			}
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 20, quad.viewportWidth());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 21, quad.viewportHeight());
+		}
+		return crackArray;
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeWorldBorderQuads(List<WorldBorderQuadRecord> worldBorderQuads) {
+		MemorySegment borderArray = Struct.WORLD_BORDER_QUAD_REQUEST.array(arena, worldBorderQuads.size());
+		for (int i = 0; i < worldBorderQuads.size(); i++) {
+			WorldBorderQuadRecord quad = worldBorderQuads.get(i);
+			MemorySegment item = Abi.item(borderArray, Struct.WORLD_BORDER_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(0), Struct.WORLD_BORDER_QUAD_REQUEST.byteSize());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 2, quad.textureId());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 7, 0);
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(8), quad.borderSize());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(9), quad.distanceToBorder());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(10), quad.scrollU());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(11), quad.scrollV());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(12), quad.uvU());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(13), quad.uvV());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(14), quad.uvWidth());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(15), quad.uvHeight());
+			float[] vertices = quad.vertices;
+			for (int field = 0; field < 12; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(16 + field), vertices[field]);
+			}
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 28, quad.viewportWidth());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 29, quad.viewportHeight());
+		}
+		return borderArray;
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeVertexModulatedMaterialQuads(List<WorldMaterialQuadRecord> vertexModulatedMaterialQuads) {
+		MemorySegment materialArray = Struct.WORLD_MATERIAL_QUAD_REQUEST.array(arena, vertexModulatedMaterialQuads.size());
+		for (int i = 0; i < vertexModulatedMaterialQuads.size(); i++) {
+			WorldMaterialQuadRecord quad = vertexModulatedMaterialQuads.get(i);
+			MemorySegment item = Abi.item(materialArray, Struct.WORLD_MATERIAL_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_QUAD_REQUEST.offset(0), Struct.WORLD_MATERIAL_QUAD_REQUEST.byteSize());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 2, quad.materialId());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 3, quad.textureId());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 4, quad.materialMode());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 5, quad.depthPolicy());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 6, quad.cullPolicy());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 7, quad.topology());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 8, quad.colorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 9, quad.winding());
+			// Write the copied semantic record directly. Avoid allocating temporary
+			// position/UV arrays for every visible quad during whole-frame packing.
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 10, quad.p0X());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 11, quad.p0Y());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 12, quad.p0Z());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 13, quad.p1X());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 14, quad.p1Y());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 15, quad.p1Z());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 16, quad.p2X());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 17, quad.p2Y());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 18, quad.p2Z());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 19, quad.p3X());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 20, quad.p3Y());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 21, quad.p3Z());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 22, quad.uv0U());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 23, quad.uv0V());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 24, quad.uv1U());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 25, quad.uv1V());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 26, quad.uv2U());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 27, quad.uv2V());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 28, quad.uv3U());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 29, quad.uv3V());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 30, quad.viewportWidth());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 31, quad.viewportHeight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 32, quad.sourceProgram());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 33, quad.sourceColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 34, quad.packedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 35, quad.sourceUvSpace());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 36, quad.vertex0ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 37, quad.vertex1ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 38, quad.vertex2ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 39, quad.vertex3ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 40, quad.vertex0PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 41, quad.vertex1PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 42, quad.vertex2PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 43, quad.vertex3PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 44, quad.blockEntityId());
+		}
+		return materialArray;
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeFirstPersonMeshInstances(List<WorldMeshInstanceRecord> firstPersonMeshInstances) {
+		MemorySegment firstPersonMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, firstPersonMeshInstances.size());
+		for (int i = 0; i < firstPersonMeshInstances.size(); i++) {
+			WorldMeshInstanceRecord instance = firstPersonMeshInstances.get(i);
+			if (instance.terrainPlacement() != null) throw new IllegalArgumentException("first-person meshes cannot carry terrain placement");
+			MemorySegment item = Abi.item(firstPersonMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, i);
+            if(instance.entityCulling()!=null)throw new IllegalArgumentException("first-person meshes cannot carry world entity culling");
+            encodeWorldMeshInstance(item,instance);
+
+		}
+		return firstPersonMeshInstanceArray;
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeWorldTextQuads(List<WorldTextQuadRecord> worldTextQuads) {
+		MemorySegment worldTextQuadArray = Struct.WORLD_TEXT_QUAD_REQUEST.array(arena, worldTextQuads.size());
+		for (int i = 0; i < worldTextQuads.size(); i++) {
+			WorldTextQuadRecord quad = worldTextQuads.get(i);
+			MemorySegment item = Abi.item(worldTextQuadArray, Struct.WORLD_TEXT_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(0), Struct.WORLD_TEXT_QUAD_REQUEST.byteSize());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 1, quad.colored() ? 1 : 0);
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 2, quad.depthPolicy());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 3, quad.packedLight());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 4, quad.colorArgb());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 5, 0);
+			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 6, quad.assetId());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 7, quad.atlasGeneration());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 8, quad.atlasRevision());
+			item.set(ValueLayout.JAVA_DOUBLE, Struct.WORLD_TEXT_QUAD_REQUEST.offset(9), quad.distanceToCameraSq());
+			float[] modelView = quad.modelViewMatrix;
+			float[] positions = quad.positions;
+			float[] uvs = quad.uvs;
+			MemorySegment.copy(modelView, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(10), 16);
+			MemorySegment.copy(positions, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(11), 12);
+			MemorySegment.copy(uvs, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(12), 8);
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 13, quad.blockEntityId());
+		}
+		return worldTextQuadArray;
+	}
+
+	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
+	private MemorySegment encodeGuiSprites(List<GuiSpriteRecord> guiSprites) {
+		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
+		for (int i = 0; i < guiSprites.size(); i++) {
+			GuiSpriteRecord sprite = guiSprites.get(i);
+			MemorySegment item = Abi.item(spriteArray, Struct.GUI_SPRITE_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.GUI_SPRITE_REQUEST.offset(0), Struct.GUI_SPRITE_REQUEST.byteSize());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 1, sprite.stratum());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 2, sprite.spriteId());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 3, sprite.selectedSlot());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_SPRITE_REQUEST.offset(4), sprite.progressFraction());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 5, sprite.fillDirection());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 6, sprite.colorArgb());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 7, sprite.x());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 8, sprite.y());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 9, sprite.width());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 10, sprite.height());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 11, sprite.guiWidth());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 12, sprite.guiHeight());
+			Struct.GUI_SPRITE_REQUEST.setLong(item, 13, sprite.sequence());
+		}
+		return spriteArray;
 	}
 
 	/**

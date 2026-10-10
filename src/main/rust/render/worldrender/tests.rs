@@ -3773,10 +3773,13 @@ fn mesh_raster_direction_separates_bindings_and_pipelines_but_shares_geometry() 
                 .unwrap();
             assert_eq!(desc.raster_y_direction, key.raster_y_direction);
         }
+        let stream = frontend.ensure_mesh_instance_stream(&mut gal, 1).unwrap().buffer;
+        let up_set = frontend.ensure_mesh_resource_set(&mut gal, keys[0], stream).unwrap();
+        let down_set = frontend.ensure_mesh_resource_set(&mut gal, keys[1], stream).unwrap();
         let up = &frontend.mesh_resources[&keys[0]];
         let down = &frontend.mesh_resources[&keys[1]];
         assert_ne!(up.pipeline, down.pipeline);
-        assert_ne!(up.resource_set, down.resource_set);
+        assert_ne!(up_set, down_set);
         assert_eq!(up.vertex_buffer, down.vertex_buffer);
         assert_eq!(up.index_buffer, down.index_buffer);
     }
@@ -13640,7 +13643,7 @@ fn world_mesh_groups_compatible_instances_into_one_instanced_draw() {
             .next()
             .unwrap()
             .resource_set
-            .kind()
+            .and_then(|set| set.kind())
     );
     assert_eq!(1, frontend.mesh_instance_stream_slots.len());
     assert_eq!(
@@ -17973,10 +17976,14 @@ fn verify_standard_foil_stream_bindings(mut gal: VulkanicGal) {
     for batch in &batches {
         frontend.ensure_mesh_resources(&mut gal, batch.key).unwrap();
     }
-    let ordinary_set = frontend.mesh_resources[&batches[0].key].resource_set;
-    let foil_resources = &frontend.mesh_resources[&batches[1].key];
-    let foil_set = foil_resources.resource_set;
-    let foil_pipeline = foil_resources.pipeline;
+    // Per-mesh sets are created on first use with the caller's stream buffer.
+    let ordinary_set = frontend
+        .ensure_mesh_resource_set(&mut gal, batches[0].key, stream.buffer)
+        .unwrap();
+    let foil_set = frontend
+        .ensure_mesh_resource_set(&mut gal, batches[1].key, stream.buffer)
+        .unwrap();
+    let foil_pipeline = frontend.mesh_resources[&batches[1].key].pipeline;
     let descriptor = gal.resource_set_descriptor_for_test(foil_set).unwrap();
     assert_eq!(descriptor.bindings.len(), 5);
     let foil_binding = &descriptor.bindings[4];
@@ -18001,7 +18008,7 @@ fn verify_standard_foil_stream_bindings(mut gal: VulkanicGal) {
     assert_eq!(pipeline.depth_compare, Some(CompareOp::Equal));
     assert!(!pipeline.depth_write);
     assert_eq!(pipeline.color_formats.len(), 1);
-    assert!(foil_resources.shadow_pipeline.is_none());
+    assert!(frontend.mesh_resources[&batches[1].key].shadow_pipeline.is_none());
     assert!(standard_item_foil_stream_range(u64::MAX, 1).is_err());
     assert!(standard_item_foil_stream_range(0, 0).is_err());
     assert!(standard_item_foil_stream_range(0, WORLD_MAX_MESH_INSTANCES + 1).is_err());
@@ -18023,7 +18030,9 @@ fn verify_standard_foil_stream_bindings(mut gal: VulkanicGal) {
     frontend
         .ensure_mesh_resources(&mut gal, batches[1].key)
         .unwrap();
-    let rebound_set = frontend.mesh_resources[&batches[1].key].resource_set;
+    let rebound_set = frontend
+        .ensure_mesh_resource_set(&mut gal, batches[1].key, replacement.buffer)
+        .unwrap();
     assert_eq!(
         gal.resource_set_descriptor_for_test(rebound_set)
             .unwrap()

@@ -483,7 +483,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * only duplicates memory and CPU work.
 	 */
 	private static boolean materialProvenancePublicationRequired() {
-		if (Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY)) {
+		if (EXACT_MATERIAL_TOPOLOGY) {
 			return true;
 		}
 		// A selected shader pack shades DH's reduced-color stream (Iris); the
@@ -518,12 +518,18 @@ public final class DistantHorizonsSemanticCollector {
 		// DH's greedy topology (Frozen), exactly as ordinary gameplay with a
 		// selected pack does here. The exact split is an explicit diagnostic
 		// build only; the selected-source harness flag must not change geometry.
-		return usesRustWholeFrameSemanticBuild() && Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY);
+		return usesRustWholeFrameSemanticBuild() && EXACT_MATERIAL_TOPOLOGY;
 	}
 
 	/** Opt-in exact-material DH topology for exact-atlas source diagnostics. */
 	public static final String EXACT_MATERIAL_TOPOLOGY_PROPERTY =
 		"mattmc.dev.rustGalDistantHorizons.exactMaterialTopology";
+	/**
+	 * Launch-time diagnostic switch, read once. {@link #usesExactMaterialTopologyBuild()}
+	 * runs per DH quad; a system-property lookup there cost a ConcurrentHashMap
+	 * read every call.
+	 */
+	private static final boolean EXACT_MATERIAL_TOPOLOGY = Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY);
 
 	/** Whether copied CPU geometry exists for this real DH quadtree section.
 	 * This is quadtree bookkeeping only: it stops DH from indefinitely queuing
