@@ -293,7 +293,7 @@ public final class RustGalGuiRawImageAssets {
 		Asset asset = resolve(source);
 		if (asset == null) return null;
 		long revision = 0xcbf29ce484222325L;
-		for (byte value : asset.pixels()) {
+		for (byte value : asset.pixels) {
 			revision ^= value & 0xffL;
 			revision *= 0x100000001b3L;
 		}
@@ -358,8 +358,8 @@ public final class RustGalGuiRawImageAssets {
 			|| (long) width * height > MAX_DECODED_PIXELS
 			|| pixels.length != Math.multiplyExact(Math.multiplyExact(width, height), 4)) return false;
 		Asset asset = linearClamp
-			? new Asset(assetId(source.toString()), source.toString(), width, height, pixels, 2, 2)
-			: new Asset(assetId(source.toString()), source.toString(), width, height, pixels);
+			? new Asset(assetId(source.toString()), source.toString(), width, height, pixels.clone(), 2, 2)
+			: new Asset(assetId(source.toString()), source.toString(), width, height, pixels.clone());
 		synchronized (LOCK) {
 			if (!cachePutLocked(CACHE, source, asset)) return false;
 		}
@@ -378,7 +378,7 @@ public final class RustGalGuiRawImageAssets {
 	/** Stages indexed map colors; Rust expands them after bounded image admission. */
 	public static boolean stageCpuMapColor8(ResourceLocation source, byte[] colors) {
 		if (source == null || colors == null || colors.length != 128 * 128) return false;
-		Asset asset = new Asset(assetId(source.toString()), source.toString(), 128, 128, colors, 0, 0, RAW_MAP_COLOR8);
+		Asset asset = new Asset(assetId(source.toString()), source.toString(), 128, 128, colors.clone(), 0, 0, RAW_MAP_COLOR8);
 		Asset previous;
 		synchronized (LOCK) {
 			previous = CACHE.get(source);
@@ -557,7 +557,8 @@ public final class RustGalGuiRawImageAssets {
 		// staged until its bounded pending-image transaction has succeeded, so a
 		// rejected update can be retried instead of being hidden by this fast path.
 		RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(
-			asset.assetId(), asset.format(), asset.width(), asset.height(), asset.pixels(), asset.samplingFilter(), asset.samplingAddress()
+			// The bridge record copies; pass the immutable backing array, not another clone.
+			asset.assetId(), asset.format(), asset.width(), asset.height(), asset.pixels, asset.samplingFilter(), asset.samplingAddress()
 		));
 		synchronized (LOCK) {
 			if (STAGED_ASSETS.size() >= MAX_SEMANTIC_IDENTITIES) {
@@ -617,7 +618,7 @@ public final class RustGalGuiRawImageAssets {
 		}
 		Asset asset = new Asset(
 			assetId("atlas:" + snapshot.atlasLocation()),
-			"atlas:" + snapshot.atlasLocation(), snapshot.width(), snapshot.height(), snapshot.pixels()
+			"atlas:" + snapshot.atlasLocation(), snapshot.width(), snapshot.height(), snapshot.pixels().clone()
 		);
 		synchronized (LOCK) {
 			if (!cachePutLocked(ATLAS_CACHE, snapshot.atlasLocation(), new AtlasAsset(snapshot.generation(), asset))) return null;
@@ -764,8 +765,14 @@ public final class RustGalGuiRawImageAssets {
 		Asset(long assetId, String identity, int width, int height, byte[] pixels) {
 			this(assetId, identity, width, height, pixels, 0, 0);
 		}
+		/**
+		 * Adopts {@code pixels} without copying: every caller passes a freshly
+		 * read array it never touches again, and the entry points that receive
+		 * caller-owned arrays copy them first. Hot dynamic textures (VoxelMap)
+		 * otherwise copied each update three times.
+		 */
 		Asset {
-			pixels = pixels.clone();
+			java.util.Objects.requireNonNull(pixels, "pixels");
 		}
 
 		/** Internal residency accounting without cloning the immutable payload. */

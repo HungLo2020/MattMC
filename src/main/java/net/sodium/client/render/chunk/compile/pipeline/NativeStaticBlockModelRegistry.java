@@ -108,7 +108,9 @@ public final class NativeStaticBlockModelRegistry {
     private static final int FLUID_SPRITE_LAVA_FLOW = 1 << 9;
 
     private static final Map<Integer, List<TextureAtlasSprite>> MODEL_SPRITES = new java.util.HashMap<>();
-    private static final Map<Integer, List<TextureAtlasSprite>> SELECTOR_SPRITES = new java.util.HashMap<>();
+    // Primitive keys: getSprites runs per block during meshing.
+    private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<List<TextureAtlasSprite>> SELECTOR_SPRITES =
+            new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>();
 
     private static int nextSelectorId;
     private static int nextModelId;

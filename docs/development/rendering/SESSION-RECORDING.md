@@ -41,8 +41,11 @@ without recorder changes.
 - **Java-bound:** slow frames with no native stage over 1 ms. The runTick phase
   tables and `client.jfr` show where the time went; `api.present.fps-limit` is
   the FPS limiter sleeping, not work.
-- **Stalls:** match slow frames' times to GC (`seconds.csv`) and to phases in
-  the slowest 1% of iterations.
+- **Stalls:** the summary's JFR lines give real stop-the-world pauses and ZGC
+  allocation stalls (threads blocked waiting for memory). The per-second "GC
+  cycle" figure is collector time, which is concurrent under ZGC, not a pause.
+  Match slow frames' times to those events and to phases in the slowest 1% of
+  iterations.
 
 ## Implementation and constraints
 

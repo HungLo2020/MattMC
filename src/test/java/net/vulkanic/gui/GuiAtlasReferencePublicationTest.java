@@ -104,8 +104,9 @@ class GuiAtlasReferencePublicationTest {
 
     @Test void typedSourcesKeepAtlasReferencesSeparateFromImmutablePixels() {
         var pixels = new byte[] {1, 2, 3, 4};
+        // Asset adopts its (freshly produced) pixel array; its accessor hands out copies.
         var raw = new GuiItemTextureSource.Raw(new RustGalGuiRawImageAssets.Asset(11, "raw", 1, 1, pixels));
-        pixels[0] = 99;
+        raw.asset().pixels()[0] = 99;
         assertEquals(11L, raw.assetId());
         assertArrayEquals(new byte[] {1, 2, 3, 4}, raw.asset().pixels());
         var declaration = reference(101, 7);

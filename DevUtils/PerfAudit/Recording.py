@@ -234,10 +234,11 @@ def summarize(directory: Path) -> str:
         heap = [_num(row, "heap_used_mb") for row in sampled]
         dropped = max(_num(row, "dropped_frames", 0) + _num(row, "dropped_ticks", 0) for row in seconds)
         lines += ["## JVM (per second, in world)" if in_world else "## JVM (per second, whole session)",
-                  f"- GC ms/s: {_stats(per_second_gc)}",
+                  f"- GC cycle ms/s (collector time; concurrent with ZGC, not pauses): {_stats(per_second_gc)}",
                   f"- client CPU % (all cores = 100): {_stats(cpu)}",
                   f"- heap used MB: {_stats(heap)}",
-                  f"- recorder dropped rows: {dropped:.0f}", ""]
+                  f"- recorder dropped rows: {dropped:.0f}"]
+        lines += _jfr_gc_lines(directory / "client.jfr") + [""]
 
     gpu = _read_csv(directory / "gpu.csv")
     if gpu:
@@ -262,6 +263,56 @@ def summarize(directory: Path) -> str:
     text = "\n".join(lines) + "\n"
     (directory / "summary.md").write_text(text, encoding="utf-8")
     return text
+
+
+def _jfr_tool() -> str | None:
+    """The `jfr` tool from JAVA_HOME, PATH or a Gradle-provisioned JDK."""
+    candidates = []
+    if os.environ.get("JAVA_HOME"):
+        candidates.append(Path(os.environ["JAVA_HOME"]) / "bin" / "jfr")
+    found = shutil.which("jfr")
+    if found:
+        candidates.append(Path(found))
+    candidates += sorted(Path.home().glob(".gradle/jdks/*/bin/jfr"), reverse=True)
+    return next((str(path) for path in candidates if path.is_file()), None)
+
+
+def _duration_ms(text: str) -> float:
+    value, _, unit = text.strip().partition(" ")
+    scale = {"ns": 1e-6, "us": 1e-3, "ms": 1.0, "s": 1000.0, "min": 60000.0}.get(unit.strip(), float("nan"))
+    try:
+        return float(value) * scale
+    except ValueError:
+        return float("nan")
+
+
+def _jfr_gc_lines(recording: Path) -> list[str]:
+    """Stop-the-world pauses and allocation stalls: the GC costs frames actually see."""
+    tool = _jfr_tool()
+    if not recording.is_file() or tool is None:
+        return ["- GC pauses/allocation stalls: unavailable (no client.jfr or jfr tool)"]
+    try:
+        output = subprocess.run([tool, "print", "--events", "jdk.GCPhasePause,jdk.ZAllocationStall", str(recording)],
+                                capture_output=True, text=True, timeout=300, check=False).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ["- GC pauses/allocation stalls: jfr tool failed"]
+    pauses: list[float] = []
+    stalls: list[float] = []
+    current = None
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("jdk.GCPhasePause"):
+            current = pauses
+        elif stripped.startswith("jdk.ZAllocationStall"):
+            current = stalls
+        elif stripped.startswith("duration =") and current is not None:
+            current.append(_duration_ms(stripped.split("=", 1)[1]))
+            current = None
+    def describe(values: list[float]) -> str:
+        values = [v for v in values if v == v]
+        return f"{len(values)}, total {sum(values):.1f} ms, max {max(values):.1f} ms" if values else "none"
+    return [f"- GC stop-the-world pauses (JFR): {describe(pauses)}",
+            f"- ZGC allocation stalls, threads blocked waiting for memory (JFR): {describe(stalls)}"]
 
 
 FRAME_BREAKDOWN = [

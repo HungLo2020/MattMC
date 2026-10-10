@@ -9,6 +9,7 @@ import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnQuad
 import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
@@ -72,7 +73,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	 * layouts remain unchanged; a later semantic material route can use these
 	 * intervals instead of assigning one arbitrary sprite to a mixed face.
 	 */
-	private final Map<Integer, List<SemanticMaterialSpan>> semanticMaterialSpansByDataPoint = new HashMap<>();
+	private final Int2ObjectOpenHashMap<List<SemanticMaterialSpan>> semanticMaterialSpansByDataPoint = new Int2ObjectOpenHashMap<>();
 	/**
 	 * Position provenance is deliberately separate from the semantic material
 	 * table. Weighted Minecraft models select parts from the block position, so
@@ -83,8 +84,8 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	/** Copied proof that a coarse column's horizontal contributors were identical. */
 	private final boolean[] semanticHorizontalUniformByColumn;
 	/** Bounded raw source footprints for heterogeneous reduced columns. */
-	private final Map<Integer, LongArrayList[]> semanticHorizontalContributorsByColumn = new HashMap<>();
-	private final Map<Integer, SemanticHorizontalContributor[]> semanticHorizontalContributorSpansByDataPoint = new HashMap<>();
+	private final Int2ObjectOpenHashMap<LongArrayList[]> semanticHorizontalContributorsByColumn = new Int2ObjectOpenHashMap<>();
+	private final Int2ObjectOpenHashMap<SemanticHorizontalContributor[]> semanticHorizontalContributorSpansByDataPoint = new Int2ObjectOpenHashMap<>();
 	private final List<SemanticMaterialIdentity> semanticMaterials = new ArrayList<>();
 	private final Map<SemanticMaterialIdentity, Integer> semanticMaterialIds = new HashMap<>();
 	

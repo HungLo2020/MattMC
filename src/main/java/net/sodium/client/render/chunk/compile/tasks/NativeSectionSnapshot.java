@@ -433,9 +433,12 @@ final class NativeSectionSnapshot implements AutoCloseable {
         return (y * PADDED_LENGTH + z) * PADDED_LENGTH + x;
     }
 
+    /** Direction.values() clones its array; this runs for every model block. */
+    private static final Direction[] CULL_DIRECTIONS = Direction.values();
+
     private int modelCullMask(LevelSlice slice, BlockState state, BlockPos position) {
         int mask = 0;
-        for (Direction direction : Direction.values()) {
+        for (Direction direction : CULL_DIRECTIONS) {
             if (!this.modelOcclusionCache.shouldDrawSide(state, slice, position, direction)) {
                 mask |= 1 << direction.get3DDataValue();
             }

@@ -166,16 +166,20 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         boolean modelState = blockState.getRenderShape() == RenderShape.MODEL;
                         boolean nativeModel = modelState && !forceJavaProducers && !forceJavaModels
                                 && NativeStaticBlockModelRegistry.hasNativeModel(blockState);
-                        StaticTerrainParityDiagnostics.recordSourceBlockVisit(
-                                sourceBlockClassification,
-                                String.valueOf(BuiltInRegistries.BLOCK.getKey(blockState.getBlock())),
-                                localY,
-                                modelState,
-                                nativeModel,
-                                !fluidState.isEmpty(),
-                                nativeFluidSupported && !useJavaFluid,
-                                builtInWater
-                        );
+                        // Null unless parity diagnostics are enabled; skip the per-block
+                        // identity string, which otherwise dominates meshing allocation.
+                        if (sourceBlockClassification != null) {
+                            StaticTerrainParityDiagnostics.recordSourceBlockVisit(
+                                    sourceBlockClassification,
+                                    String.valueOf(BuiltInRegistries.BLOCK.getKey(blockState.getBlock())),
+                                    localY,
+                                    modelState,
+                                    nativeModel,
+                                    !fluidState.isEmpty(),
+                                    nativeFluidSupported && !useJavaFluid,
+                                    builtInWater
+                            );
+                        }
 
                         if (!forceJavaProducers) {
                             nativeSectionSnapshot.appendBlock(localBlockIndex, slice, blockState, blockPos, localX,
@@ -188,8 +192,13 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                                         blockPos, modelOffset, fallbackStats);
                                 fallbackBlockCount++;
                             } else {
-                                for (var sprite : NativeStaticBlockModelRegistry.getSprites(blockState)) {
-                                    buffers.get(DefaultMaterials.forBlockState(blockState).pass).addSprite(sprite);
+                                // Indexed loop (random-access lists): no iterator per block.
+                                var sprites = NativeStaticBlockModelRegistry.getSprites(blockState);
+                                if (!sprites.isEmpty()) {
+                                    var spriteBuffers = buffers.get(DefaultMaterials.forBlockState(blockState).pass);
+                                    for (int spriteIndex = 0; spriteIndex < sprites.size(); spriteIndex++) {
+                                        spriteBuffers.addSprite(sprites.get(spriteIndex));
+                                    }
                                 }
                                 fallbackStats.recordNativeModelBlock();
                             }
