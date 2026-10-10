@@ -12,8 +12,10 @@ distinct states to model metadata; compatibility inputs retain scalar preparatio
 Snapshots are immutable rebuild state. [Live block sections](RUST-LIVE-SECTIONS.md)
 now own ordinary canonical mutation separately and produce captures directly in
 Rust. Compatibility containers still copy packed words and palette identities at
-capture. Scheduling, biome/light snapshots, chunk orchestration and remaining
-gameplay callbacks use Java. World-generation stage owners remain separate Rust
+capture. Java orchestrates scheduling, biome/light captures, chunks and remaining
+gameplay callbacks; admitted [biome containers](../biome/RUST-LIVE-BIOMES.md) and
+[light layers](../lighting/RUST-LIVE-LAYERS.md) retain separate native owners.
+World-generation stage owners remain separate Rust
 representations, with [native capture/adoption](../levelgen/RUST-STAGE-HANDOFF.md)
 for canonical NOISE/SURFACE/CARVERS transfers.
 

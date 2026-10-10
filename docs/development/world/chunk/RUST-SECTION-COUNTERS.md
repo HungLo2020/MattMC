@@ -44,8 +44,10 @@ is a temporary CPU bridge, not a second authority.
 counter owners. Rust samples counters while holding the storage mutation lock
 and copies isolated stage inputs; Java no longer builds three-counter input
 arrays. Stage result installation still returns three small counter values and
-publishes them after adopting the block owner. Compatibility serialization,
-biomes, chunk orchestration and broader world simulation remain migration work.
+publishes them after adopting the block owner. Admitted [live biome storage and
+sky sampling](../biome/RUST-LIVE-BIOMES.md) now have separate native owners.
+Compatibility serialization, chunk orchestration and broader world simulation
+remain migration work.
 
 Related tracking: [#776](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6089009016).
 

@@ -69,6 +69,19 @@ Recent focused reviews address concrete player decisions:
   and [enchanted-book use](../../gameplay/items/EnchantedBook.md) explain
   eligibility, input consumption and the result a player should expect
 
+- **Travel and recovery:** [Bed recovery](../../gameplay/blocks/Bed.md),
+  [map navigation](../../gameplay/items/Map.md#reading-and-navigating) and
+  [portal linking](../../gameplay/blocks/NetherPortals.md#destination-and-linking)
+  explain practical return-point, marker and height decisions
+- **Using resources and equipment:** [Furnace troubleshooting](../../gameplay/blocks/Furnace.md#unfinished-cooking-progress),
+  [Wheat yields](../../gameplay/blocks/Wheat.md#drops-and-uses) and
+  [armor wear](../../gameplay/mechanics/Armor.md#how-incoming-hits-wear-your-armor)
+  connect processing, harvest and durability rules to player choices
+- **Sharing food and effects:** [raw versus cooked fish care](../../gameplay/items/RawCod.md#animal-uses-raw-or-cooked),
+  [Fox food effects](../../gameplay/mobs/Fox.md#items-in-the-mouth) and
+  [lingering-cloud placement](../../gameplay/items/LingeringPotion.md#cloud-placement-and-depletion)
+  distinguish consumption effects, eligible recipients and shared depletion
+
 Companion item pages keep concise acquisition/use summaries and link to those
 owners. Already detailed Button, Pressure Plate, Stonecutter and Loom guides
 do not need duplicate rewrites solely to refresh a date. These are bounded

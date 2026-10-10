@@ -26,6 +26,8 @@ A newly hatched baby starts at age **−24,000 ticks**, about 20 minutes to adul
 
 Protect hatchlings on land: the checked Zombie and Skeleton target goals specifically include baby Turtles that are not in water. Water access helps with those particular target filters; it is not universal protection from hazards. [Baby selector][turtle] · [Zombie target][zombie-target] · [Skeleton target][skeleton-target]
 
+Also separate hatchlings from [Foxes](Fox.md#hunting-sleep-and-protection), [Ocelots](Ocelot.md#other-animals-and-creepers), untamed [Cats](Cat.md#other-mobs-persistence-and-drops), and wild [Wolves](Wolf.md#protection-behavior-and-drops). Their prey-selection goals also choose baby Turtles outside water; the untamed requirement applies to new prey selection for Cats and Wolves. Trust does not disable Fox or Ocelot hunting, although newly bred Foxes have the [missing-prey-goals caveat before reload](Fox.md#hunting-sleep-and-protection). [Baby/out-of-water filter][care-baby-filter] · [Fox targets and installation][care-fox-targets] [care-fox-install] · [Ocelot targets][care-ocelot] · [Cat targets][care-cat] · [Wolf targets][care-wolf] · [Untamed selection gate][care-untamed]
+
 ## Drops
 
 With mob loot enabled, an adult's death table gives **0–2 Seagrass**, with a randomized Looting bonus of up to one additional item per enchantment level. A death caused by lightning also supplies **one Bowl**. It does **not** supply a Turtle Scute. An eligible adult player-credit kill gives **1–3 experience**; babies do not give the ordinary death-table items or death experience. [Death table][turtle-loot] · [Looting][looting] · [Age and mob-loot gates][loot-gates] · [Experience amount][animal] · [Death processing][death]
@@ -46,6 +48,8 @@ With mob loot enabled, an adult's death table gives **0–2 Seagrass**, with a r
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `384aa3dfa1473af7753759569de95012d5bdc46f`. Checked loaded Beach candidates, the registered spawn predicate, food/goal dispatch, remembered home, egg caller chain, baby growth and the separate growth/death loot paths. Egg-block mechanics remain with the existing Animal Eggs owner. No in-game test was run. Timing assumes 20 ticks per second; data packs can change the listed tags, recipes, biome entries and loot.
+
+The added animal-predator separation guidance was source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19` against active target registration, baby/out-of-water selection, Cat/Wolf untamed acquisition, and Fox prey-goal initialization. This is not an in-game enclosure trial. [Server goal registration][care-goal-dispatch] · [Target selection][care-target-selection]
 
 [entities]: https://github.com/HungLo2020/MattMC/blob/384aa3dfa1473af7753759569de95012d5bdc46f/src/main/java/net/minecraft/world/entity/EntityType.java#L1449-L1456
 [turtle-goals]: https://github.com/HungLo2020/MattMC/blob/384aa3dfa1473af7753759569de95012d5bdc46f/src/main/java/net/minecraft/world/entity/animal/Turtle.java#L131-L160
@@ -87,3 +91,13 @@ Source-reviewed on **2026-10-02** at `384aa3dfa1473af7753759569de95012d5bdc46f`.
 [world-load]: https://github.com/HungLo2020/MattMC/blob/384aa3dfa1473af7753759569de95012d5bdc46f/src/main/java/net/minecraft/server/WorldLoader.java#L38-L51
 [registry-load]: https://github.com/HungLo2020/MattMC/blob/384aa3dfa1473af7753759569de95012d5bdc46f/src/main/java/net/minecraft/resources/RegistryDataLoader.java#L277-L334
 [spawn-choice]: https://github.com/HungLo2020/MattMC/blob/384aa3dfa1473af7753759569de95012d5bdc46f/src/main/java/net/minecraft/world/level/chunk/ChunkGenerator.java#L426-L450
+
+[care-baby-filter]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/Turtle.java#L74
+[care-fox-targets]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/Fox.java#L155-L162
+[care-fox-install]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/Fox.java#L322-L360
+[care-ocelot]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/Ocelot.java#L95-L106
+[care-cat]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/Cat.java#L96-L113
+[care-wolf]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/wolf/Wolf.java#L125-L146
+[care-untamed]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/ai/goal/target/NonTameRandomTargetGoal.java#L11-L24
+[care-goal-dispatch]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/Mob.java#L150-L153
+[care-target-selection]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/ai/goal/target/NearestAttackableTargetGoal.java#L34-L84

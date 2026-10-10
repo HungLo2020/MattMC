@@ -37,7 +37,11 @@ A Fox can pick up **one item** from a loose stack, leaving the rest behind. Grou
 
 To recover a non-food item, try dropping edible food nearby. On a successful replacement the Fox spits out its former item with a **40-game-tick pickup delay**, normally **2 seconds**. Wait before trying to collect it. This exchanges items in the world; there is no Fox inventory screen. [Spitting and pickup][fox]
 
+For a routine exchange, choose ordinary dropped [Sweet Berries](../items/SweetBerries.md) or [Glow Berries](../items/GlowBerries.md): their bundled food has no consumption status effects. The pickup and replacement conditions above still apply; berries **cannot dislodge food already in the mouth**. [Berry registration][care-berries] · [Ordinary food components][care-food-components] · [Default consumable][care-food-effects]
+
 Picked-up food can be consumed once the eating counter is **greater than 600 game ticks**, a little over **30 seconds**, provided the Fox is on the ground, awake, and has no attack target. The ground-pickup path resets that counter; directly gathered berries do not necessarily start a fresh 30-second wait. Food in the mouth follows item-consumption behavior, separately from berry feeding for love or growth. Ordinary food nutrition itself feeds players and does not heal a Fox. [Eating and pickup counter][fox] · [Consumption dispatch][consumable] · [Food listener][food-properties]
+
+A swallowed food's separate effects can still help or harm the Fox: [Pufferfish](../items/Pufferfish.md) applies [Poison](../effects/Poison.md), [Poisonous Potato](../items/PoisonousPotato.md) can apply Poison, and a [Golden Apple](../items/GoldenApple.md) can heal it through [Regeneration](../effects/Regeneration.md). These effects require the Fox to actually eat the item under the conditions above; merely carrying it is not enough. [Configured food effects][care-food-effects] · [Application to the eater][care-apply-effects] · [Effect susceptibility][care-effect-gates] · [Regeneration healing][care-regen]
 
 Spawn finalization also has a **20% chance** to give the Fox a carried item selected from Emerald, Egg, Rabbit's Foot, Rabbit Hide, Wheat, Leather, or Feather. These are occasional carried finds, not a fixed Fox death-loot table. [Spawn equipment][fox]
 
@@ -67,6 +71,8 @@ Adults can award **1–3 experience** with normal player kill credit and **doMob
 
 Source-reviewed at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7` on 2026-10-02 against active `src/main` code and bundled data. No in-game test was run. Spawn conditions, data packs, gamerules, and later builds can change the result.
 
+The additional mouth-food care guidance was source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19`, tracing the Fox's eating call through item consumption and status effects. Ordinary nutrition remains player-only; no in-game care trial was run. [Fox eating][care-eating] · [Stack dispatch][care-stack] · [Item dispatch][care-item] · [Consumption handler][care-consumption] · [Nutrition listener][care-nutrition]
+
 [fox]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/animal/Fox.java
 [entities]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/EntityType.java
 [attributes]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/ai/attributes/DefaultAttributes.java
@@ -95,3 +101,15 @@ Source-reviewed at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7` on 2026-10-02 agai
 [wolf]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/animal/wolf/Wolf.java
 [living]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/LivingEntity.java
 [fox-loot]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/loot_table/entities/fox.json
+
+[care-berries]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/Items.java#L2449-L2454
+[care-food-components]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/Item.java#L366-L372
+[care-food-effects]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/component/Consumables.java#L13-L68
+[care-apply-effects]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/consume_effects/ApplyStatusEffectsConsumeEffect.java#L31-L62
+[care-effect-gates]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/LivingEntity.java#L978-L1012
+[care-regen]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/effect/RegenerationMobEffect.java#L11-L24
+[care-eating]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/animal/Fox.java#L199-L244
+[care-stack]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/ItemStack.java#L399-L402
+[care-item]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/Item.java#L194-L197
+[care-consumption]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/item/component/Consumable.java#L77-L92
+[care-nutrition]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/food/FoodProperties.java#L40-L58

@@ -26,6 +26,8 @@ The target is clamped to the destination world border. The portal search uses a 
 
 If no suitable portal is found, the game tries to construct an ordinary Obsidian frame with a **2×3 portal interior** near the target. The fallback can replace terrain with Obsidian and air; construction can also fail. Arrival uses the entry position within the portal and the exit's orientation, then attempts a limited collision adjustment. That adjustment is skipped for entities wider or taller than four blocks and can return the original position if no free position is found. It does not check every nearby hazard. Record the actual exits, and protect both approaches before treating the route as safe. [Construction][nether-create] · [Arrival calculation][nether-arrival] · [Collision-adjustment limits][collision]
 
+**Height affects construction and linking differently.** The bundled Nether has a **Y=0–255 build range**, but automatic exit construction uses its **128-block logical height**, with a search ceiling of **Y=127** and room required for the frame. A high departure therefore does not guarantee a high generated Nether exit or a return to the same portal. Existing active portals above Y=127 can still be considered: lookup loads and checks portal records across the full build height, then checks the portal block state and applies the horizontal search radius, world border, and three-dimensional ranking above. Check travel in both directions after changing portal height. [Bundled heights][height-type] · [Construction ceiling][height-construction] · [Full-height lookup][height-search]
+
 ## Primordial Caves portal
 
 **Block ID:** `minecraft:primordial_caves_portal`. It also has `axis=x` or `axis=z`, defaults to `x`, has no solid collision, emits **light level 11**, and is not an ordinary Survival mining drop or piston-movable block. No Primordial Caves portal item is registered. [Properties][blocks] · [State][primordial-state] · [Item registry][items] · [Mining rule][mining] · [Piston rule][pistons]
@@ -71,6 +73,8 @@ Before ordinary processed travel, the server checks the proposed destination. Th
 Survival routes create these portal blocks through ignition, pod conversion, or destination generation. They do not award portable portal items. Operators with the relevant command permission can use block-placement commands for these registered block IDs; that is separate from Survival access and does not prove that an arbitrary unsupported or malformed placement will function. [Item registry][items] · [Block command permission][setblock]
 
 Source-reviewed on **2026-10-02** at `b823010659d7b5095ed021b1c99cf85627e2082a`. Checked creation, support, state, registry/item distinction, active entity/server teleport dispatch, bundled scale data, and server/preset wiring. No in-game portal construction, conversion, round trip, safe-arrival, or timing test was run. Data packs, game rules, saved worlds, and later source changes can alter results.
+
+Height guidance source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19`, including dimension/preset wiring and native POI storage boundaries. No in-game height-linking or round-trip test was run.
 
 Related: [End portals and gateways](EndPortals.md) · [Obsidian and Crying Obsidian](Obsidian.md) · [Dimensions](../dimensions/Dimensions.md) · [Blocks](Blocks.md)
 
@@ -119,3 +123,7 @@ Related: [End portals and gateways](EndPortals.md) · [Obsidian and Crying Obsid
 [nether-rule]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/level/GameRules.java#L230-L232
 [portal-spawn]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/level/block/NetherPortalBlock.java#L68-L89
 [primordial-all]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/level/block/PrimordialCavesPortalBlock.java
+
+[height-type]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/dimension_type/the_nether.json#L10-L13
+[height-construction]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/portal/PortalForcer.java#L41-L114
+[height-search]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/ai/village/poi/PoiManager.java#L214-L234

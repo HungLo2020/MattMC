@@ -1,16 +1,16 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`ee34f2ad`](https://github.com/HungLo2020/MattMC/commit/ee34f2ad99921848d8fc5d63da93eb6c583786c4):
-Rust now prepares admitted terrain light words directly from retained native
-generations and registry facts. Java retains contextual predicates/shade,
-model admission and compatibility paths. The combined author-recorded matrix,
-release `d9d1a9d6`, **fails performance acceptance on vanilla, shaders and DH
-p99**, despite higher average FPS in all four modes. Its settled diagnostic
-images use scalar lighting and do not establish bulk-path pixels. A separate
-JDK-corrected ordinary comparison leaves entry/travel performance open; its
-16.45-block movement does not establish sustained streaming or a flicker fix.
-See the [current evidence summary](#october-9-bulk-terrain-light-and-ordinary-gameplay-summary).
+[`1b9b1033`](https://github.com/HungLo2020/MattMC/commit/1b9b103398fd70d5b5152b93a1d0abc581fffc19):
+Rust now owns admitted live biome palettes and a loaded-client index whose sky
+consumer samples retained generations directly. Java retains lifecycle events,
+fog/tint consumers, weather adjustments and compatibility paths. The latest
+author-recorded comparison, release `bc2207fb`, **fails vanilla p99**
+(3.498 ms Current / 3.075 ms Frozen), while all median average-FPS floors pass.
+Final range-corrected release `c3aa5fed` has new suite/lifecycle/image checks,
+but no FPS repeat. Ordinary profiles remain bounded attribution evidence;
+entry, sustained streaming, temporal rendering and long-session memory
+acceptance remain open. See [live-biome evidence](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
@@ -20,7 +20,8 @@ selection and assembly, rig hierarchy composition, the DH ledger and ordinary
 payload publication, retained visibility frames and built-in cloud preparation,
 native authored item poses and GPU execution/resources.
 Separate native world owners now supply canonical live/rebuild state, section
-color fields and live light generations; the native terrain-light consumer
+color fields, live biome palettes and live light generations. The native sky
+consumer reads its retained loaded-biome index; the native terrain-light consumer
 prepares canonical mesher words from those generations. Java still orchestrates
 light storage maps and publication and supplies contextual light predicates and
 shade, with mutable-array, subclass/platform and diagnostic compatibility paths.
@@ -38,6 +39,13 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
+The current [live-biome ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6092342346)
+and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6092343227)
+retain these open acceptance boundaries. The independent validation-driver check
+initially hit a protected-sibling `PermissionError` under the default temporary
+root; a dedicated `TMPDIR` rerun passed 13 Python tests. This is tooling evidence,
+not a rerun of the reported Java/Rust suites or gameplay workloads.
+
 The [preceding performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6091091526),
 [GUI ownership review](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6091093270)
 and [live-light review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6091109625)
@@ -46,7 +54,7 @@ passed four Python ordinary-harness fixtures and skipped the JDK 25 agent
 fixture; it did not run clients or reproduce parity. Those results do not
 validate the later JDK-selection regression fixture at `ee34f2ad`.
 
-The current [terrain-light ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6091341618)
+The preceding [terrain-light ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6091341618)
 and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6091342527)
 retain the bounded native consumer and open performance/visual acceptance work.
 They add source/evidence review, not independent runtime tests or issue closure.
@@ -105,6 +113,35 @@ Those source checkpoints are
 and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806ddedd4fb3c3b4fbc44716).
 
 ## What changed
+
+### October 9 live biome ownership and sky sampling
+
+The `6a80b211` → `1b9b1033` interval adds admitted 4³ biome palette/storage
+owners, a retained client loaded-biome index and a direct raw sky-color consumer.
+Java still delivers chunk loads, packets, section-biome replacement, range
+changes and chunk unloads. Mutable section-array access transfers that chunk's
+index entry to compatibility; the trusted synchronous accessor returns the
+same array under a borrow contract. Fog, tint/blending, chunk orchestration and
+world simulation remain separate work. See the
+[owner guide](../world/biome/RUST-LIVE-BIOMES.md) for admission, alias/generation
+rules and the distinction between terminal native disablement and automatic
+world-owner reclamation. GAL ownership and whole-frame ABI 78 are unchanged.
+
+The validation driver's `--all-java-tests` now requests both `test` and
+`parityTest`; explicit filters retain the focused `test --tests` route.
+The [testing guide](../tooling/TESTING.md#java-test-tasks) describes the current
+split. The independent 13-test Python check validates driver construction and
+related harness behavior only. Recorded 1,600 palette operations, 256 sky
+sampler cases and 12,288 view-range cases are supplemental CPU fixtures.
+
+The author reports final release `c3aa5fed` passing 2,455 Rust checks (three
+ignored), 1,812 Java tests (two skipped), seven lifecycle cases and newly
+reviewed settled vanilla/Iris+DH pairs. Its arithmetic fix was not followed by
+another FPS matrix; `bc2207fb` performance and ordinary profiles retain their
+earlier identity. Runtime receipts are not tracked with this source, and this
+documentation review did not run clients, Java/Rust suites, captures or profiles
+or independently inspect those receipts. Earlier checkpoints below retain their
+original scope.
 
 ### October 9 bulk terrain-light preparation
 

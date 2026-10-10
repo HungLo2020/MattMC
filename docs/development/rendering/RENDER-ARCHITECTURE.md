@@ -87,7 +87,10 @@ Current chunk CPU inputs have separate world owners: [live block sections](../wo
 own canonical storage/mutation, [section-local counters](../world/chunk/RUST-SECTION-COUNTERS.md)
 fuse eligible writes and recount directly, [immutable rebuild snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md)
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
-share resolver lattice samples within a capture. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
+share resolver lattice samples within a capture. [Live biome owners](../world/biome/RUST-LIVE-BIOMES.md)
+retain admitted palettes and the loaded-client index used by direct raw sky
+sampling. Java still delivers chunk/packet/range events and retains fog and
+terrain-tint consumers. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
 own canonical lazy defaults and allocated nibble generations, including native
 propagation handoffs. The [terrain-light consumer](RUST-TERRAIN-LIGHTING.md)
 borrows these generations and prepares mesher words directly. Java retains
@@ -121,19 +124,23 @@ and nothing may depend on its iteration order. Derive per-asset facts once
 instance. On the Java side, resource texture bytes requested during frame
 extraction go through `TexturePayloadCache`, which resource reload clears.
 
-Java also memoizes the raw biome sky and fog samples before their later
+Java still memoizes raw biome sky and fog samples before later
 brightness/weather adjustments. Each `ClientLevel` stores four sky samples in
 a ring and one fog sample, keyed by exact quart-position coordinates,
-partial-tick bits and game time;
-a miss still uses the hooks and Gaussian fallback. These are key-based memos,
-with no explicit frame-id reset. Keep hook/biome changes in mind when changing
-their lifetime; this does not transfer semantic color ownership to Rust.
-See [`ClientLevel`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L952-L1004)
-and [`AirBasedFogEnvironment`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/minecraft/client/renderer/fog/environment/AirBasedFogEnvironment.java#L20-L41).
+partial-tick bits and game time, without an explicit frame-id reset.
+On a sky-memo miss, Sodium's hook first asks the native loaded-biome index for
+an exact `ClientLevel`. Rust samples retained biome generations and reuses its
+216-color window while source revisions remain current. Native sampling can
+decline; the hook then uses Java's fast cubic sampler, and the outer caller
+retains its Gaussian fallback if no hook returns a result.
 
-The [four-entry sky memo](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L952-L1013)
-retains alternate callers' exact keys; it does not round positions or cache
-later weather/brightness adjustments.
+The memo does not round positions or cache later weather/brightness adjustments.
+Fog sampling, those adjustments and custom hooks remain Java-owned. Keep the
+Java memo lifetime distinct from the native generation/revision checks; the
+live-biome migration does not replace both with one cache. See
+[`ClientLevel`](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/client/multiplayer/ClientLevel.java#L958-L1040),
+[`SodiumSkyColorHook`](https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/sodium/fabric/SodiumSkyColorHook.java#L18-L35)
+and [live-biome constraints](../world/biome/RUST-LIVE-BIOMES.md#boundaries-to-preserve).
 
 Ordinary frames select camera-visible terrain layers in the Rust section graph.
 Solid and cutout layers preserve the graph's BFS visit order rather than

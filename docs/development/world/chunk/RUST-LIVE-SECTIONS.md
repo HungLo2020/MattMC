@@ -14,8 +14,9 @@ is its transitional CPU bridge. This covers fresh containers, valid saved/networ
 imports, generated-section installation and independent nonzero-width copies.
 Zero-width copies retain the shared single-value behavior described below.
 Section [block/fluid counters](RUST-SECTION-COUNTERS.md) now also have native
-owners and fuse with canonical writes. Biomes, chunk orchestration and
-scheduling still use Java.
+owners and fuse with canonical writes. Admitted [live biome palettes and sky
+sampling](../biome/RUST-LIVE-BIOMES.md) have separate Rust owners. Java retains
+chunk orchestration, scheduling and compatibility paths.
 
 ## Consumers and remaining work
 
