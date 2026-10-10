@@ -64,6 +64,14 @@ public final class GameplaySessionRecorder {
 	private static final long[] stackStarts = new long[MAX_PHASE_DEPTH];
 	private static final long[] stackChildNanos = new long[MAX_PHASE_DEPTH];
 	private static int depth;
+	// Vanilla profiler sections ("mc:<name>") use their own stack: they are not
+	// guaranteed to nest with GraphicsFrameBenchmark phases. Their exclusive
+	// times overlap benchmark-phase times and are read as a separate breakdown.
+	private static final int[] profilerIds = new int[MAX_PHASE_DEPTH];
+	private static final long[] profilerStarts = new long[MAX_PHASE_DEPTH];
+	private static final long[] profilerChildNanos = new long[MAX_PHASE_DEPTH];
+	private static int profilerDepth;
+	private static final Map<String, String> PROFILER_NAMES = new HashMap<>();
 	private static long[] phaseNanos = new long[256];
 	private static int[] touched = new int[256];
 	private static int touchedCount;
@@ -99,6 +107,7 @@ public final class GameplaySessionRecorder {
 		tickStart = now;
 		tickOpen = true;
 		depth = 0;
+		profilerDepth = 0;
 	}
 
 	static void endTick(long tickNanos) {
@@ -150,6 +159,46 @@ public final class GameplaySessionRecorder {
 		phaseNanos[id] += Math.max(0L, inclusive - stackChildNanos[depth]);
 		if (depth > 0) stackChildNanos[depth - 1] += inclusive;
 	}
+
+	static void profilerPush(String name) {
+		if (Thread.currentThread() != renderThread || !tickOpen) return;
+		if (profilerDepth >= MAX_PHASE_DEPTH) {
+			profilerDepth++;
+			return;
+		}
+		profilerIds[profilerDepth] = phaseId(PROFILER_NAMES.computeIfAbsent(name, key -> "mc:" + key));
+		profilerStarts[profilerDepth] = System.nanoTime();
+		profilerChildNanos[profilerDepth] = 0L;
+		profilerDepth++;
+	}
+
+	static void profilerPop() {
+		if (Thread.currentThread() != renderThread || !tickOpen || profilerDepth == 0) return;
+		profilerDepth--;
+		if (profilerDepth >= MAX_PHASE_DEPTH) return;
+		long inclusive = Math.max(0L, System.nanoTime() - profilerStarts[profilerDepth]);
+		int id = profilerIds[profilerDepth];
+		if (phaseNanos[id] == 0L) {
+			if (touchedCount == touched.length) touched = Arrays.copyOf(touched, touched.length * 2);
+			touched[touchedCount++] = id;
+		}
+		phaseNanos[id] += Math.max(0L, inclusive - profilerChildNanos[profilerDepth]);
+		if (profilerDepth > 0) profilerChildNanos[profilerDepth - 1] += inclusive;
+	}
+
+	/** Forwards the client's vanilla profiler sections into the recorder while recording. */
+	public static final net.minecraft.util.profiling.ProfilerFiller PROFILER = new net.minecraft.util.profiling.ProfilerFiller() {
+		@Override public void startTick() {}
+		@Override public void endTick() {}
+		@Override public void push(String string) { profilerPush(string); }
+		@Override public void push(java.util.function.Supplier<String> supplier) { profilerPush(supplier.get()); }
+		@Override public void pop() { profilerPop(); }
+		@Override public void popPush(String string) { profilerPop(); profilerPush(string); }
+		@Override public void popPush(java.util.function.Supplier<String> supplier) { profilerPop(); profilerPush(supplier.get()); }
+		@Override public void markForCharting(net.minecraft.util.profiling.metrics.MetricCategory metricCategory) {}
+		@Override public void incrementCounter(String string, int i) {}
+		@Override public void incrementCounter(java.util.function.Supplier<String> supplier, int i) {}
+	};
 
 	private static int phaseId(String name) {
 		Integer id = PHASE_IDS.get(name);

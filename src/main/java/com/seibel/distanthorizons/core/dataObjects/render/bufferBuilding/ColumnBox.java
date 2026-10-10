@@ -500,13 +500,24 @@ public class ColumnBox
 		return new SemanticFaceMaterial(fallbackMaterialId, fallbackVariantState, fallbackVariantPosition);
 	}
 
-	private static void addVerticalFaces(
+	static void addVerticalFaces(
 		LodQuadBuilder builder, EDhDirection direction, short x, short yMin, short z,
 		short horizontalWidth, short ySize, int color, byte irisBlockMaterialId, byte skyLight,
 		byte blockLight, int fallbackMaterialId, byte fallbackVariantState,
 		long fallbackVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> spans
 	)
 	{
+		if (spans.isEmpty())
+		{
+			// Legacy (Frozen) geometry: one face, no segment list. Matches the
+			// splitter, which emits nothing for an empty face.
+			if (ySize <= 0) return;
+			builder.addQuadAdj(
+				direction, x, yMin, z, horizontalWidth, ySize, color, irisBlockMaterialId, skyLight, blockLight,
+				fallbackMaterialId, fallbackVariantState, fallbackVariantPosition
+			);
+			return;
+		}
 		for (SemanticFaceSegment segment : semanticVerticalFaceSegments(
 			yMin, ySize, fallbackMaterialId, fallbackVariantState, fallbackVariantPosition, spans
 		))

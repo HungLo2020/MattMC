@@ -1469,6 +1469,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
+		// Session recordings time vanilla profiler sections when no real profiler is active.
+		if (net.minecraft.client.dev.GameplaySessionRecorder.ENABLED && !bl && singleTickProfiler == null
+			&& !this.metricsRecorder.isRecording() && !net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+			return net.minecraft.client.dev.GameplaySessionRecorder.PROFILER;
+		}
 		if (!bl) {
 			this.fpsPieProfiler.disable();
 			// Don't return InactiveProfiler if custom profiling is active

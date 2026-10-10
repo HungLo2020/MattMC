@@ -38,6 +38,14 @@ class ScriptedLookSetupTest(unittest.TestCase):
             self.assertIn("pauseOnLostFocus:false", options)
             self.assertEqual((source / "options.txt").read_text(), "enableVsync:true\npauseOnLostFocus:true\n")
 
+    def test_edit_config_keeps_separators_and_quotes(self) -> None:
+        toml = 'a = 1\n\t\tthreadRunTimeRatio = "1.0"\n'
+        self.assertIn('threadRunTimeRatio = "0.5"', harness.edit_config(toml, "threadRunTimeRatio", "0.5"))
+        props = "Hide Minimap:false\nZoom Level:2\n"
+        self.assertIn("Hide Minimap:true", harness.edit_config(props, "Hide Minimap", "true"))
+        with self.assertRaises(SystemExit):
+            harness.edit_config(props, "Missing", "1")
+
     def test_missing_world_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / "run"

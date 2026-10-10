@@ -137,3 +137,22 @@ fn borrowed_scan_captures_single_palette_alias_once() {
     });
     owner.with_state_reader(|reader| assert_eq!(reader.get(0), 5));
 }
+#[test]
+fn capture_matches_per_index_decode_at_every_width() {
+    let mut rng = 0x9e37_79b9_7f4a_7c15u64;
+    for distinct in [1u32, 2, 5, 16, 17, 40, 100, 300, 2000] {
+        let owner = single();
+        for _ in 0..6000 {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            let index = (rng >> 20) as usize % ENTRIES;
+            owner.write(index, (rng >> 40) as u32 % distinct).unwrap();
+        }
+        let captured = owner.capture();
+        let s = owner.state.lock().unwrap();
+        for (i, value) in captured.iter().enumerate() {
+            assert_eq!(*value, s.generation.state(i) as u16, "distinct={distinct} index={i}");
+        }
+    }
+}

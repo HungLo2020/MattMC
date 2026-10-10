@@ -65,6 +65,9 @@ public final class ScriptedCameraSweep {
 			minecraft.stop();
 			return;
 		}
+		// The sweep stands in for mouse movement: without input the vanilla AFK
+		// throttle caps the client at 30 FPS after 60 s.
+		minecraft.getFramerateLimitTracker().onInputReceived();
 		float yaw = baseYaw + yawOffset(elapsed);
 		float pitch = pitch(elapsed);
 		// Set current and previous rotation so the frame renders exactly this pose.

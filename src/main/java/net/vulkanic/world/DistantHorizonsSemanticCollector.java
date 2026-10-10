@@ -482,6 +482,23 @@ public final class DistantHorizonsSemanticCollector {
 	 * stream, so retaining and expanding an exact-atlas representation there
 	 * only duplicates memory and CPU work.
 	 */
+	/**
+	 * Whether DH render-data building must keep exact per-block semantic
+	 * materials (spans, variants, horizontal contributors, material-split faces
+	 * and merges). Only exact-material topology and exact-atlas capture consume
+	 * them, through {@link #materialProvenancePublicationRequired()}; ordinary
+	 * play publishes packed vertices only, so keeping them there just blocked
+	 * same-color merges, split faces and cost ~1.4x Frozen's loader CPU.
+	 * Launch-time properties only, so a section never flips mid-session.
+	 */
+	public static boolean semanticMaterialPreservationRequired() {
+		return EXACT_MATERIAL_TOPOLOGY || exactAtlasCoverageRequested() || Boolean.getBoolean(FORCE_SEMANTIC_PRESERVATION_PROPERTY);
+	}
+
+	/** Dev A/B switch: restores the previous always-preserve DH build without enabling capture. */
+	public static final String FORCE_SEMANTIC_PRESERVATION_PROPERTY =
+		"mattmc.dev.rustGalDistantHorizons.forceSemanticPreservation";
+
 	private static boolean materialProvenancePublicationRequired() {
 		if (EXACT_MATERIAL_TOPOLOGY) {
 			return true;
@@ -518,7 +535,8 @@ public final class DistantHorizonsSemanticCollector {
 		// DH's greedy topology (Frozen), exactly as ordinary gameplay with a
 		// selected pack does here. The exact split is an explicit diagnostic
 		// build only; the selected-source harness flag must not change geometry.
-		return usesRustWholeFrameSemanticBuild() && EXACT_MATERIAL_TOPOLOGY;
+		// Flag first: this runs per DH quad and the route check reads config.
+		return EXACT_MATERIAL_TOPOLOGY && usesRustWholeFrameSemanticBuild();
 	}
 
 	/** Opt-in exact-material DH topology for exact-atlas source diagnostics. */

@@ -136,9 +136,37 @@ public final class BufferQuad
 	 */
 	private static int threeDimensionalCompare(short a0, short a1, short a2, short b0, short b1, short b2)
 	{
-		long a = (long) a0 << 48 | (long) a1 << 32 | (long) a2 << 16;
-		long b = (long) b0 << 48 | (long) b1 << 32 | (long) b2 << 16;
-		return Long.compare(a, b);
+		return Long.compare(threeDimensionalKey(a0, a1, a2), threeDimensionalKey(b0, b1, b2));
+	}
+	private static long threeDimensionalKey(short a0, short a1, short a2)
+	{
+		return (long) a0 << 48 | (long) a1 << 32 | (long) a2 << 16;
+	}
+	
+	/**
+	 * The value {@link #compare} orders by: {@code compare(a, b)} has the sign
+	 * of {@code Long.compare(a.mergeSortKey(d), b.mergeSortKey(d))} for quads
+	 * in the same direction. Its low 16 bits are always zero.
+	 */
+	long mergeSortKey(BufferMergeDirectionEnum compareDirection)
+	{
+		if (compareDirection == BufferMergeDirectionEnum.EastWest)
+		{
+			switch (this.direction.axis)
+			{
+				case X: return threeDimensionalKey(this.x, this.y, this.z);
+				case Y: return threeDimensionalKey(this.y, this.z, this.x);
+				case Z: return threeDimensionalKey(this.z, this.y, this.x);
+				default: throw new IllegalArgumentException("Invalid Axis enum: [" + this.direction.axis + "].");
+			}
+		}
+		switch (this.direction.axis)
+		{
+			case X: return threeDimensionalKey(this.x, this.z, this.y);
+			case Y: return threeDimensionalKey(this.y, this.x, this.z);
+			case Z: return threeDimensionalKey(this.z, this.x, this.y);
+			default: throw new IllegalArgumentException("Invalid Axis enum: [" + this.direction.axis + "].");
+		}
 	}
 	
 	

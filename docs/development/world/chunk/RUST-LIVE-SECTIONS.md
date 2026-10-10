@@ -20,7 +20,9 @@ chunk orchestration, scheduling and compatibility paths.
 
 ## Consumers and remaining work
 
-Rebuild captures decode directly from the live owner in Rust. Light propagation
+Rebuild captures decode directly from the live owner in Rust, reading each packed
+word and the palette once ([`Generation::unpack`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/live/mod.rs));
+a test checks it against the per-index decode at every palette width. Light propagation
 receives its existing packed section payload directly from that owner. Heightmap
 and skylight scans export a coherent native word/ID pair into reusable native
 scratch; they avoid constructing Java palettes/arrays for the handoff. Their

@@ -42,6 +42,9 @@ public final class RustGalGuiRawImageAssets {
 	private static final int MAX_STAGED_CUBEMAP_ASSETS = 4096;
 	private static final Object LOCK = new Object();
 	private static final Map<ResourceLocation, Asset> CACHE = new HashMap<>();
+	// Candidates the resource manager lacked; dynamic sources such as map/<id>
+	// resolve every frame. Cleared with CACHE on resource reload.
+	private static final Set<ResourceLocation> MISSING_RESOURCES = new HashSet<>();
 	private static final Map<ResourceLocation, Asset> EARLY_VANILLA_CACHE = new HashMap<>();
 	private static final Map<ResourceLocation, AtlasAsset> ATLAS_CACHE = new HashMap<>();
 	private static final Map<ResourceLocation, Asset> CUBEMAP_CACHE = new HashMap<>();
@@ -166,6 +169,7 @@ public final class RustGalGuiRawImageAssets {
 		RustGalGuiRenderer.invalidateTextAtlasMetadata();
 		synchronized (LOCK) {
 			CACHE.clear();
+			MISSING_RESOURCES.clear();
 			// The early cache exists only for the pre-reload loading overlay. It
 			// must not survive a resource-pack reload or it can shadow the newly
 			// selected pack's image for the same semantic identity.
@@ -207,9 +211,14 @@ public final class RustGalGuiRawImageAssets {
 				if (cached != null) {
 					return cached;
 				}
+				if (MISSING_RESOURCES.contains(candidate)) continue;
 			}
 			Optional<Resource> resource = Minecraft.getInstance().getResourceManager().getResource(candidate);
 			if (resource.isEmpty()) {
+				synchronized (LOCK) {
+					if (MISSING_RESOURCES.size() >= MAX_CACHED_ASSET_ENTRIES) MISSING_RESOURCES.clear();
+					MISSING_RESOURCES.add(candidate);
+				}
 				continue;
 			}
 			Asset decoded = decode(candidate, resource.get(), MAX_DECODED_PIXELS);

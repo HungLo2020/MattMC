@@ -354,6 +354,41 @@ public class LodQuadBuilder
 		//LOGGER.trace("Merged "+mergeCount+"/"+preQuadsCount+"("+(mergeCount / (double) preQuadsCount)+") quads");
 	}
 	
+	/** Lists up to this size sort by primitive key, the index in the key's free low 16 bits. */
+	private static final int PRIMITIVE_MERGE_SORT_LIMIT = 1 << 16;
+	
+	/**
+	 * Exactly {@code quads.sort((a, b) -> a.compare(b, mergeDirection))}: that
+	 * stable sort orders by {@link BufferQuad#mergeSortKey} and then by original
+	 * index, which is the order of the distinct {@code key | index} values.
+	 * Sorting those primitives avoids a comparator call per comparison.
+	 */
+	static void sortForMerge(ArrayList<BufferQuad> quads, BufferMergeDirectionEnum mergeDirection)
+	{
+		int size = quads.size();
+		if (size <= 1) return;
+		EDhDirection direction = quads.get(0).direction;
+		long[] keys = size <= PRIMITIVE_MERGE_SORT_LIMIT ? new long[size] : null;
+		for (int index = 0; keys != null && index < size; index++)
+		{
+			BufferQuad quad = quads.get(index);
+			// Mixed directions are rejected by compare(); let it throw as before.
+			if (quad.direction != direction) keys = null;
+			else keys[index] = quad.mergeSortKey(mergeDirection) | index;
+		}
+		if (keys == null)
+		{
+			quads.sort((objOne, objTwo) -> objOne.compare(objTwo, mergeDirection));
+			return;
+		}
+		Arrays.sort(keys);
+		BufferQuad[] original = quads.toArray(new BufferQuad[0]);
+		for (int index = 0; index < size; index++)
+		{
+			quads.set(index, original[(int) (keys[index] & 0xFFFFL)]);
+		}
+	}
+	
 	/** Merges all of this builder's quads for the given directionIndex (up, down, left, etc.) in the given direction */
 	private static long mergeQuadsInternal(ArrayList<BufferQuad>[] list, int directionIndex, BufferMergeDirectionEnum mergeDirection)
 	{
@@ -362,8 +397,9 @@ public class LodQuadBuilder
 			return 0;
 		}
 		
-		list[directionIndex].sort((objOne, objTwo) -> objOne.compare(objTwo, mergeDirection));
+		sortForMerge(list[directionIndex], mergeDirection);
 		
+		boolean exactMaterialTopology = DistantHorizonsSemanticCollector.usesExactMaterialTopologyBuild();
 		long mergeCount = 0;
 		ListIterator<BufferQuad> iter = list[directionIndex].listIterator();
 		BufferQuad currentQuad = iter.next();
@@ -372,7 +408,7 @@ public class LodQuadBuilder
 			BufferQuad nextQuad = iter.next();
 			
 			if (canMergeSemanticMaterials(
-				DistantHorizonsSemanticCollector.usesExactMaterialTopologyBuild(),
+				exactMaterialTopology,
 				currentQuad.semanticMaterialId,
 				currentQuad.semanticVariantState,
 				currentQuad.semanticVariantPosition,

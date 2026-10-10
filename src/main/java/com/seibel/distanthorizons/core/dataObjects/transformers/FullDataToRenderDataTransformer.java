@@ -103,6 +103,8 @@ public class FullDataToRenderDataTransformer
 		columnSource.markNotEmpty();
 		int baseX = DhSectionPos.getMinCornerBlockX(pos);
 		int baseZ = DhSectionPos.getMinCornerBlockZ(pos);
+		boolean preserveSemanticMaterials =
+			net.vulkanic.world.DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired();
 		
 		for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
 		{
@@ -115,7 +117,7 @@ public class FullDataToRenderDataTransformer
 						levelWrapper, fullDataSource, columnSource, x, z,
 						// bitshift is to account for LODs with a detail level greater than 0 so the block pos is correct
 						baseX + BitShiftUtil.pow(x,dataDetail), baseZ + BitShiftUtil.pow(z,dataDetail), 
-						columnArrayView, dataColumn);
+						columnArrayView, dataColumn, preserveSemanticMaterials);
 			}
 		}
 		
@@ -132,6 +134,23 @@ public class FullDataToRenderDataTransformer
 			ColumnArrayView columnArrayView, 
 			LongArrayList fullDataColumn)
 	{
+		updateOrReplaceRenderDataViewColumnWithFullDataColumn(levelWrapper, fullDataSource, columnSource,
+			renderSourceX, renderSourceZ, blockX, blockZ, columnArrayView, fullDataColumn,
+			net.vulkanic.world.DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired());
+	}
+
+	/**
+	 * As above. {@code preserveSemanticMaterials} false builds exactly the
+	 * legacy (Frozen) column: same-color neighbors merge regardless of block
+	 * identity and no semantic sidecars are computed.
+	 */
+	public static void updateOrReplaceRenderDataViewColumnWithFullDataColumn(
+			IClientLevelWrapper levelWrapper,
+			FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+			int blockX, int blockZ,
+			ColumnArrayView columnArrayView, 
+			LongArrayList fullDataColumn, boolean preserveSemanticMaterials)
+	{
 		columnSource.clearSemanticMaterialsForColumn(renderSourceX, renderSourceZ);
 		// we can't do anything if the full data is missing or empty
 		if (fullDataColumn == null 
@@ -146,7 +165,7 @@ public class FullDataToRenderDataTransformer
 			// Directly use the arrayView since it fits.
 			setRenderColumnView(
 				levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
-				blockX, blockZ, columnArrayView, fullDataColumn, true, null, null, null
+				blockX, blockZ, columnArrayView, fullDataColumn, preserveSemanticMaterials, null, null, null
 			);
 		}
 		else
@@ -163,7 +182,7 @@ public class FullDataToRenderDataTransformer
 				long[] expandedVariantPositions = new long[fullDataLength];
 				setRenderColumnView(
 					levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
-					blockX, blockZ, newColumnArrayView, fullDataColumn, true, expandedSemanticMaterials,
+					blockX, blockZ, newColumnArrayView, fullDataColumn, preserveSemanticMaterials, expandedSemanticMaterials,
 					expandedVariantStates, expandedVariantPositions
 				);
 				
@@ -172,7 +191,7 @@ public class FullDataToRenderDataTransformer
 						newColumnArrayView, expandedSemanticMaterials,
 						columnArrayView, reducedSemanticMaterials
 				);
-				for (int index = 0; index < columnArrayView.verticalSize(); index++)
+				for (int index = 0; preserveSemanticMaterials && index < columnArrayView.verticalSize(); index++)
 				{
 					List<ColumnRenderSource.SemanticMaterialSpan> spans = reducedSemanticMaterialSpans(
 						newColumnArrayView,
@@ -207,6 +226,10 @@ public class FullDataToRenderDataTransformer
 			{
 				ARRAY_LIST_POOL.returnCheckout(checkout);
 			}
+		}
+		if (!preserveSemanticMaterials)
+		{
+			return;
 		}
 		boolean horizontalUniform = fullDataSource.getDataDetailLevel() == 0
 			|| fullDataSource.hasSemanticHorizontalUniformity(renderSourceX, renderSourceZ);

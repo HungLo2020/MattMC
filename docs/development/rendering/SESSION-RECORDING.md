@@ -58,13 +58,24 @@ particular resource. System PSI and reclaim figures describe the whole machine. 
 requires Linux `/proc/pressure/cpu`; raw PSI fields are microsecond deltas, with
 percentages derived in the summary.
 
+Vary one setting per run with `--option key:value` (copied `options.txt`) or
+`--config 'relative/file:key=value'` (copied configs), for example
+`--config 'config/voxelmap.properties:Hide Minimap=true'` or
+`--config 'config/DistantHorizons.toml:numberOfThreads=2'`. The sweep reports
+input every frame and the copy forces `inactivityFpsLimit:"minimized"`: an
+unattended client otherwise drops to 30 FPS after 60 s (vanilla AFK throttle),
+which made early harness runs report a third of their real frame rate.
+External load on the machine changes FPS between identical runs by up to 2x;
+compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
+"everything else" CPU (`cpu.csv` system minus client) alongside FPS.
+
 ## What is recorded
 
 | File | Contents |
 | --- | --- |
 | `summary.md` | Device, settings, FPS, frame-interval percentiles, per-stage breakdown, slowest frames, slowest loop phases, GC, GPU and CPU use |
 | `frames.csv` | Buffered presented Rust frames: Java acquire/submit/present timestamps plus every field of the native whole-frame result and profile (Vulkan acquire/present/wait times, present mode, GPU timestamps, draw counts) |
-| `ticks.csv`, `phases.csv` | Buffered `Minecraft.runTick` samples: start, start-to-start interval, duration and exclusive time per instrumented phase (`id:ns;…`) |
+| `ticks.csv`, `phases.csv` | Buffered `Minecraft.runTick` samples: start, start-to-start interval, duration and exclusive time per instrumented phase (`id:ns;…`). Phases named `mc:<section>` are the client's vanilla profiler sections (entities, block entities, particles, VoxelMap tick…), timed on their own stack; they overlap the other phases |
 | `seconds.csv` | Once a second: GC, heap, JVM CPU, JIT time, FPS counter, VSync, FPS limit, render distance, window size, current screen |
 | `client.jfr` | Java Flight Recorder profile of the client JVM (`settings=profile`) |
 | `gpu.csv`, `cpu.csv` | Once a second: `nvidia-smi` utilization/clocks/power, system CPU, iowait and client process CPU |

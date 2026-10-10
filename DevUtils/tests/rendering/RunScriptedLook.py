@@ -35,6 +35,9 @@ FORCED_OPTIONS = {
     "enableVsync": "false",
     "pauseOnLostFocus": "false",
     "fullscreen": "false",
+    # The sweep also reports input each frame; this keeps the AFK throttle
+    # (30 FPS after 60 s idle) out of the run even if that hook regresses.
+    "inactivityFpsLimit": '"minimized"',
 }
 COPIED_ENTRIES = ("options.txt", "config", "voxelmap", "resourcepacks")
 WORLD_NAME = "ScriptedLook"
@@ -56,6 +59,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="also record a flat `perf` CPU profile starting this many seconds after entering the world")
     parser.add_argument("--perf-seconds", type=float, default=30.0)
     parser.add_argument("--jvm-arg", action="append", default=[], help="extra client JVM argument, written --jvm-arg=-Dname=value (repeatable)")
+    parser.add_argument("--option", action="append", default=[],
+                        help="override an options.txt entry in the copy, e.g. --option renderDistance:8 (repeatable)")
+    parser.add_argument("--config", action="append", default=[],
+                        help="override a key in a copied config file, e.g. "
+                             "--config 'config/voxelmap.properties:Hide Minimap=true' (repeatable)")
     parser.add_argument("--keep-game-dir", action="store_true", help="keep the copied game directory afterwards")
     parser.add_argument("--timeout", type=float, default=900.0, help="seconds to wait for the client in total")
     return parser.parse_args(argv)
@@ -74,6 +82,41 @@ def patch_options(text: str, forced: dict[str, str]) -> str:
             out.append(line)
     out += [f"{key}:{value}" for key, value in forced.items() if key not in seen]
     return "\n".join(out) + "\n"
+
+
+def edit_config(text: str, key: str, value: str) -> str:
+    """Replaces the value of `key` in a `key = value` (TOML) or `key:value` /
+    `key=value` (properties) line, keeping the file's own separator."""
+    import re
+    pattern = re.compile(r"^(\s*" + re.escape(key) + r"\s*)([:=])(\s*)(.*)$")
+    out, found = [], False
+    for line in text.splitlines():
+        match = pattern.match(line)
+        if match and not found:
+            current = match.group(4)
+            quoted = current.startswith('"') and current.endswith('"') and not value.startswith('"')
+            out.append(match.group(1) + match.group(2) + match.group(3) + (f'"{value}"' if quoted else value))
+            found = True
+        else:
+            out.append(line)
+    if not found:
+        raise SystemExit(f"ERROR: key {key!r} not found")
+    return "\n".join(out) + "\n"
+
+
+def apply_overrides(game: Path, options: list[str], configs: list[str]) -> None:
+    forced = {}
+    for item in options:
+        key, _, value = item.partition(":")
+        forced[key] = value
+    if forced:
+        path = game / "options.txt"
+        path.write_text(patch_options(path.read_text(encoding="utf-8"), forced), encoding="utf-8")
+    for item in configs:
+        relative, _, assignment = item.partition(":")
+        key, _, value = assignment.partition("=")
+        path = game / relative
+        path.write_text(edit_config(path.read_text(encoding="utf-8"), key.strip(), value.strip()), encoding="utf-8")
 
 
 def prepare_game_dir(source: Path, world: str, game: Path) -> None:
@@ -141,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     out = Recording.new_recording_dir(REPO, args.label)
     game = out / "game"
     prepare_game_dir(args.source_run.resolve(), args.world, game)
+    apply_overrides(game, args.option, args.config)
     environment = os.environ.copy()
     # Symbol-bearing release library (same code, readable by perf); Gradle keys
     # its native build on these, so keep them identical between runs.
@@ -151,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         "harness": "scripted-look-v1", "world": args.world, "seconds": args.seconds,
         "yaw": [args.yaw_amplitude, args.yaw_period], "pitch": [args.pitch_amplitude, args.pitch_period],
         "window": [args.width, args.height], "forced_options": FORCED_OPTIONS,
+        "option_overrides": args.option, "config_overrides": args.config,
         "git_head": subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
         "git_dirty": bool(subprocess.run(["git", "-C", str(REPO), "status", "--porcelain"], capture_output=True, text=True).stdout.strip()),
         "memory_before": Recording.memory_snapshot(),

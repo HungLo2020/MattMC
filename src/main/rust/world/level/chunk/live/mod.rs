@@ -55,6 +55,28 @@ impl Generation {
             self.palette[id].load(Ordering::Acquire)
         }
     }
+    /// Every entry's state, decoding each packed word once. Equivalent to
+    /// `state(i)` for every index; only the owner (under its lock) writes.
+    fn unpack(&self) -> Box<[u16; ENTRIES]> {
+        let mut out = vec![0u16; ENTRIES].into_boxed_slice();
+        let bits = self.bits;
+        let per = 64 / bits;
+        let mask = (1u64 << bits) - 1;
+        let palette: Vec<u16> = if self.global {
+            Vec::new()
+        } else {
+            self.palette.iter().map(|p| p.load(Ordering::Acquire) as u16).collect()
+        };
+        for (chunk, word) in out.chunks_mut(per).zip(self.words.iter()) {
+            let mut value = word.load(Ordering::Acquire);
+            for slot in chunk {
+                let id = (value & mask) as usize;
+                *slot = if self.global { id as u16 } else { palette[id] };
+                value >>= bits;
+            }
+        }
+        out.try_into().expect("ENTRIES-sized snapshot")
+    }
     fn set(&self, index: usize, id: u32) {
         if self.bits == 0 {
             return;
@@ -419,6 +441,6 @@ impl Owner {
         if s.generation.bits == 0 {
             return Box::new([s.generation.state(0) as u16; ENTRIES]);
         }
-        Box::new(std::array::from_fn(|i| s.generation.state(i) as u16))
+        s.generation.unpack()
     }
 }

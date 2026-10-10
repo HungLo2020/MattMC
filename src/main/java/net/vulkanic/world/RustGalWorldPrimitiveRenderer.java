@@ -19195,8 +19195,20 @@ float[] transform = new float[16];
 	}
 
 	private static int[] textureIds(VulkanicGalBridge.WorldMeshAssetRecord asset) {
-		return asset.sections().stream().mapToInt(VulkanicGalBridge.WorldMeshSectionRecord::textureId)
-			.filter(textureId -> textureId != 0).distinct().toArray();
+		// Distinct nonzero ids in first-seen order; a section has only a few.
+		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = asset.sections();
+		int[] ids = new int[sections.size()];
+		int count = 0;
+		next:
+		for (int index = 0; index < sections.size(); index++) {
+			int textureId = sections.get(index).textureId();
+			if (textureId == 0) continue;
+			for (int seen = 0; seen < count; seen++) {
+				if (ids[seen] == textureId) continue next;
+			}
+			ids[count++] = textureId;
+		}
+		return Arrays.copyOf(ids, count);
 	}
 
 	/** Resolve a collected payload only if it is still the exact registered and accepted object. */

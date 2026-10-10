@@ -475,6 +475,24 @@ table must survive replacement. The focused
 covers column boundaries, heights and repeated clearing; it does not establish
 gameplay FPS or Frozen visual parity.
 
+This provenance is built only when something publishes it:
+`DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired()` is
+true for exact-material topology and exact-atlas capture/observation, and false
+in ordinary play. When false,
+[`FullDataToRenderDataTransformer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java)
+merges same-color neighbors as Frozen does and computes no spans or
+contributors, and `ColumnBox` emits one quad per vertical face. Always
+preserving it blocked those merges and split faces by material, costing about
+1.4× Frozen's DH loader CPU per LOD and starving the render thread. For A/B
+runs, `-Dmattmc.dev.rustGalDistantHorizons.forceSemanticPreservation=true`
+restores the always-preserve build.
+
+DH's greedy merge sorts each face list by
+[`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java):
+primitive `key | index` values in the same stable order as Frozen's comparator
+sort, which it still uses for lists over 65,536 quads. Unlike Frozen,
+`ColumnBox` treats leaves as transparent, so leafy LODs emit more faces.
+
 The three-axis debug crosshair starts in camera space, unlike ordinary world
 lines. Its Java producer in
 [`RustGalWorldPrimitiveRenderer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java)

@@ -152,8 +152,12 @@ public final class RustGalWholeFrameTerrainSource {
 			this.resetForResourceReload();
 			this.observedResourceReloadEpoch = resourceReloadEpoch;
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.tracker-events");
 		this.applyChunkTrackerEvents();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.tracker-events");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.drain-builds");
 		this.drainCompletedBuilds();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.drain-builds");
 
 		net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
 		boolean spectatorInSolidBlock = minecraft.player != null && minecraft.player.isSpectator()
@@ -162,11 +166,17 @@ public final class RustGalWholeFrameTerrainSource {
 		// Ordinary frames take their terrain from the graph's Rust selection;
 		// diagnostic and receipt frames keep the Java visible list.
 		boolean rustSelection = RustGalTerrainRenderer.wholeFrameTerrainSelectionEligible();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.select-visible");
 		this.selectVisible(frustum, terrainSelectionDistance, useOcclusionCulling, !rustSelection);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.select-visible");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.schedule-builds");
 		this.scheduleBuilds(camera);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.schedule-builds");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
 			"world.static-terrain.completed-builds-consumed", this.completedBuildsConsumedThisFrame);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.cache-cleanup");
 		this.sectionCache.cleanup();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.cache-cleanup");
 		this.updateDrainedState();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.source-select");
 
