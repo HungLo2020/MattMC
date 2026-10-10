@@ -28,6 +28,49 @@ terrain and DH owners provide starting points; their remaining Java consumers
 and orchestration are still unfinished. Preserve world/save behavior and bounded
 generation/reload handling, and verify realistic workloads against Frozen.
 
+Use the [Goal 5 rendering checkpoint](../rendering/GOAL-5-STATUS.md) for
+current source ownership through
+[`1b9b1033`](https://github.com/HungLo2020/MattMC/commit/1b9b103398fd70d5b5152b93a1d0abc581fffc19),
+and [live-biome verification](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
+for the latest author-recorded comparison and final range-fix checks. Those
+checks have different release identities; performance, ordinary gameplay,
+temporal parity and long-session memory acceptance remain open. This
+documentation review adds no runtime verification.
+
+Follow the owner boundary relevant to the next change:
+
+- **World storage and bulk producers:** [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md),
+  [section counters](../world/chunk/RUST-SECTION-COUNTERS.md) and
+  [generation-stage handoffs](../world/levelgen/RUST-STAGE-HANDOFF.md).
+  Live packed storage and generation-stage storage are separate native owners.
+  Java chunk orchestration, compatibility serialization and remaining bulk
+  producers still need migration.
+- **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),
+  [section color fields](../world/biome/RUST-SECTION-COLORS.md),
+  [live light layers](../world/lighting/RUST-LIVE-LAYERS.md) and the
+  [bulk terrain-light consumer](../rendering/RUST-TERRAIN-LIGHTING.md).
+  Java still supplies model admission, contextual light predicates/shade and
+  biome/custom tint samples; unsupported and diagnostic inputs retain
+  compatibility paths.
+- **Live biomes and sky:** the [admitted palette owner and direct raw sky consumer](../world/biome/RUST-LIVE-BIOMES.md)
+  are native. Java retains chunk lifecycle events, fog, terrain tint/blending
+  and later sky brightness/weather adjustments. Preserve the guide's missing
+  chunk, mutable-container, view-range and world-lifetime boundaries.
+- **Per-frame scene and entity work:** [DH visibility frames](../rendering/RETAINED-SCENE.md#native-dh-visibility-frame-ownership),
+  [built-in DH clouds](../rendering/RUST-DH-CLOUDS.md) and
+  [item-layer poses](../rendering/RUST-ITEM-LAYERS.md) have native owners for admitted paths.
+  Remaining retained mesh payloads, entity preparation, Java animation and
+  contextual inputs still need work with their direct consumers.
+
+The cumulative checkpoints below preserve their original wording and individual
+source/workload scopes, including the live-biome checkpoint. Words such as
+“current” and “next” inside that narrative refer to the recorded slice, not a
+new acceptance result or a replacement for the priority above. Follow the
+current evidence routes above when comparing releases.
+
+<details markdown="1">
+<summary>Cumulative recorded checkpoints (original slice scopes)</summary>
+
 The first local implementation is the [DH frame transaction](../rendering/RETAINED-SCENE.md#native-dh-visibility-frame-ownership),
 which keeps Rust-selected segments in native immutable frame storage. All seven lifecycle cases and the reviewed vanilla/Iris+DH image pairs pass
 locally. Four-mode comparisons completed with sixteen clean runs but still fail vanilla/DH
@@ -129,6 +172,8 @@ that earlier color slice did not migrate authoritative loaded-world storage or
 establish an isolated FPS gain. The later live-section owner now handles
 canonical storage/mutation. Continue moving remaining bulk producers and
 consumers while preserving snapshot timing, contextual rules and reload handling.
+
+</details>
 
 ## Phase 1: one block registry from Java (implemented)
 
