@@ -322,7 +322,7 @@ def failed_rust_tests(output: str) -> list[str]:
 def rust_tests(out: Path, env: dict[str, str], threads: int) -> dict:
     manifest = str(REPO / "src" / "main" / "rust" / "Cargo.toml")
     env = {**env, "ALSOFT_DRIVERS": "null"}
-    command = ["cargo", "test", "--manifest-path", manifest, "--locked", "--lib", "--", f"--test-threads={threads}"]
+    command = ["cargo", "test", "--manifest-path", manifest, "--locked", "--profile", "suite", "--lib", "--", f"--test-threads={threads}"]
     code = run_logged(command, out / "rust-tests.log", env, 3600)
     text = (out / "rust-tests.log").read_text(errors="replace")
     summary = re.findall(r"test result: .*", text)
@@ -331,7 +331,7 @@ def rust_tests(out: Path, env: dict[str, str], threads: int) -> dict:
     if code != 0 and failures:
         # Native Vulkan/OpenAL/EGL tests share process-global driver state;
         # re-run the failures serially to tell a race from a real failure.
-        rerun = ["cargo", "test", "--manifest-path", manifest, "--locked", "--lib", "--",
+        rerun = ["cargo", "test", "--manifest-path", manifest, "--locked", "--profile", "suite", "--lib", "--",
                  "--test-threads=1", "--exact", *failures]
         rerun_code = run_logged(rerun, out / "rust-tests-rerun.log", env, 1800)
         rerun_text = (out / "rust-tests-rerun.log").read_text(errors="replace")

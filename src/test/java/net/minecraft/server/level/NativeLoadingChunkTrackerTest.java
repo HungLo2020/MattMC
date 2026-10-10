@@ -1,9 +1,9 @@
 package net.minecraft.server.level;
 
+import org.junit.jupiter.api.Tag;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.SharedConstants;
@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Exact parity of the native-owned loading tracker with the pinned original.
  * Each tracker drives its own DistanceManager whose holder scheduling copies
  * ChunkMap's, attached to its own real TicketStorage driven identically. */
+@Tag("parity")
 class NativeLoadingChunkTrackerTest {
     static TicketType[] TYPES;
 
@@ -75,15 +76,20 @@ class NativeLoadingChunkTrackerTest {
             this.toDrop.clear();
         }
 
-        String state(long[] probes) {
-            StringBuilder state = new StringBuilder();
-            for (long probe : probes) {
-                ChunkHolder holder = this.holders.get(probe);
-                state.append(probe).append(':').append(holder == null ? "-" : holder.getTicketLevel()).append(this.toDrop.contains(probe) ? "d" : "")
-                    .append(this.pendingUnloads.containsKey(probe) ? "p" : "").append(';');
-            }
+        /** Per probe: holder ticket level (or -1), drop and pending-unload bits; then the sorted future positions.
+         * Compact numeric state keeps the exhaustive histories from building a large string per step. */
+        long[] state(long[] probes) {
             long[] futures = this.chunksToUpdateFutures.stream().mapToLong(holder -> holder.getPos().toLong()).sorted().toArray();
-            return state.append(Arrays.toString(futures)).toString();
+            long[] state = new long[probes.length + 1 + futures.length];
+            for (int i = 0; i < probes.length; i++) {
+                long probe = probes[i];
+                ChunkHolder holder = this.holders.get(probe);
+                state[i] = (long)(holder == null ? -1 : holder.getTicketLevel()) << 2
+                    | (this.toDrop.contains(probe) ? 2 : 0) | (this.pendingUnloads.containsKey(probe) ? 1 : 0);
+            }
+            state[probes.length] = futures.length;
+            System.arraycopy(futures, 0, state, probes.length + 1, futures.length);
+            return state;
         }
     }
 
@@ -149,7 +155,7 @@ class NativeLoadingChunkTrackerTest {
 
         void compare(long[] probes, String context) {
             assertEquals(this.original.changes, this.candidate.changes, () -> context + " setLevel transcript");
-            assertEquals(this.originalManager.state(probes), this.nativeManager.state(probes), () -> context + " holder state");
+            assertArrayEquals(this.originalManager.state(probes), this.nativeManager.state(probes), () -> context + " holder state");
             for (long probe : probes) {
                 assertEquals(this.original.level(probe), this.candidate.level(probe), () -> context + " level " + probe);
             }

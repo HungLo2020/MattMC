@@ -1,5 +1,6 @@
 package net.minecraft.world.phys.shapes;
 
+import org.junit.jupiter.api.Tag;
 import static org.junit.jupiter.api.Assertions.*;
 import it.unimi.dsi.fastutil.doubles.AbstractDoubleList;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -15,6 +16,7 @@ import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+@Tag("parity")
 class NativeVoxelRaycastTest {
     record Ray(Vec3 start, Vec3 end) {}
     @BeforeAll static void bootstrap() { NativeVoxelBoxesTest.bootstrap(); }

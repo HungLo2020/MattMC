@@ -1,5 +1,6 @@
 package net.minecraft.world.level.chunk.storage;
 
+import org.junit.jupiter.api.Tag;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.nio.file.Files;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("parity")
 class NativeChunkSectionsTest {
     static RegistryAccess registries;
     static PalettedContainerFactory factory;

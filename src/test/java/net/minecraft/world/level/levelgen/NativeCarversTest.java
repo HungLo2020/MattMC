@@ -1,5 +1,6 @@
 package net.minecraft.world.level.levelgen;
 
+import org.junit.jupiter.api.Tag;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.core.Holder;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code carveChunk} both ways. Sections (network and saved forms, counters),
  * heightmaps, post-processing marks, later aquifer reads, the carving mask and
  * the aquifer's schedule flag must match. */
+@Tag("parity")
 class NativeCarversTest {
     @BeforeAll static void load() {
         NativeNoiseFillTest.load();

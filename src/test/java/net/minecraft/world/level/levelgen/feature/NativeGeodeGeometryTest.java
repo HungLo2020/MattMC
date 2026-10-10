@@ -12,6 +12,7 @@ import net.minecraft.world.level.levelgen.feature.configurations.GeodeConfigurat
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("parity")
 class NativeGeodeGeometryTest {
     @BeforeAll static void bootstrap(){
         SharedConstants.tryDetectVersion();Bootstrap.bootStrap();

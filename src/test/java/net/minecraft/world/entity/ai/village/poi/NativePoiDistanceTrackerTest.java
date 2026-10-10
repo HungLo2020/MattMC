@@ -1,5 +1,6 @@
 package net.minecraft.world.entity.ai.village.poi;
 
+import org.junit.jupiter.api.Tag;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Exact parity of the native-owned POI section distance tracker with the pinned
  * original, both driven through PoiManager's notification protocol: every
  * setDirty/onSectionLoad passes the section's current village-centre state. */
+@Tag("parity")
 class NativePoiDistanceTrackerTest {
     @BeforeAll static void bootstrap() { SharedConstants.tryDetectVersion(); Bootstrap.bootStrap(); }
 

@@ -6,6 +6,8 @@ Run through `python3 DevUtils/RunWiki.py check` to use the wiki environment.
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor
 from functools import lru_cache
 from html.parser import HTMLParser
 from pathlib import Path
@@ -37,9 +39,36 @@ class PageLinks(HTMLParser):
     handle_startendtag = handle_starttag
 
 
+_WORKER_CONFIG = None
+
+
+def _render_links(page: Path, config) -> tuple[list[tuple[str, bool]], set[str]]:
+    import markdown
+
+    rendered = markdown.markdown(
+        page.read_text(encoding="utf-8-sig"),
+        extensions=config.markdown_extensions,
+        extension_configs=config.mdx_configs,
+    )
+    result = PageLinks()
+    result.feed(rendered)
+    return result.links, result.ids
+
+
+def _init_worker() -> None:
+    global _WORKER_CONFIG
+    from mkdocs.config import load_config
+
+    _WORKER_CONFIG = load_config(config_file=str(ROOT / "mkdocs.yml"))
+
+
+def _render_in_worker(page: Path) -> tuple[list[tuple[str, bool]], set[str]]:
+    return _render_links(page, _WORKER_CONFIG)
+
+
 def main() -> int:
     try:
-        import markdown
+        import markdown  # noqa: F401
         from mkdocs.config import load_config
     except ImportError:
         print("Use python3 DevUtils/RunWiki.py check to prepare the wiki dependencies.")
@@ -52,15 +81,13 @@ def main() -> int:
     if not agents.is_symlink() or agents.readlink() != Path("README.md"):
         errors.append("AGENTS.md must be a relative symlink to README.md")
 
+    rendered: dict[Path, tuple[list[tuple[str, bool]], set[str]]] = {}
+
     @lru_cache(maxsize=None)
     def parse(page: Path) -> PageLinks:
-        rendered = markdown.markdown(
-            page.read_text(encoding="utf-8-sig"),
-            extensions=config.markdown_extensions,
-            extension_configs=config.mdx_configs,
-        )
+        links, ids = rendered[page] if page in rendered else _render_links(page, config)
         result = PageLinks()
-        result.feed(rendered)
+        result.links, result.ids = links, ids
         return result
 
     def display(path: Path) -> str:
@@ -70,6 +97,12 @@ def main() -> int:
         errors.append("README.md must contain the Agents section")
 
     pages = sorted(p for p in docs.rglob("*") if p.is_file() and p.suffix.lower() == ".md")
+    # Rendering dominates the check; pages are independent, so render them in
+    # parallel. Each worker loads the same mkdocs configuration.
+    workers = max(1, min(os.cpu_count() or 1, 16))
+    if workers > 1 and len(pages) > 50:
+        with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
+            rendered.update(zip(pages, pool.map(_render_in_worker, pages, chunksize=32)))
     directories = {docs}
     for page in pages:
         directories.update(p for p in page.parents if p.is_relative_to(docs))

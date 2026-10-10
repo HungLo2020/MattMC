@@ -1,5 +1,6 @@
 package net.minecraft.world.level.levelgen;
 
+import org.junit.jupiter.api.Tag;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Exact parity of the SURFACE stage on Rust-owned storage with the same stage
  * writing Java sections: section palettes, storage, network and saved forms,
  * counters, both heightmaps and post-processing marks. */
+@Tag("parity")
 class NativeSurfaceChunkTest {
     @BeforeAll static void load() {
         NativeNoiseFillTest.load();

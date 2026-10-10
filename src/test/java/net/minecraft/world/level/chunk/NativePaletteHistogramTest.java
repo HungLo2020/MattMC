@@ -1,5 +1,6 @@
 package net.minecraft.world.level.chunk;
 
+import org.junit.jupiter.api.Tag;
 import static org.junit.jupiter.api.Assertions.*;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import java.util.concurrent.*;
 
+@Tag("parity")
 class NativePaletteHistogramTest {
     record Occurrence(Object value, int count) {}
 

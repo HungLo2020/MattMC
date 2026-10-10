@@ -511,7 +511,20 @@ tasks.register('testRustNative', Exec) {
     group = 'verification'
     description = 'Runs Rust unit tests for src/main/rust.'
 
+    // A stamp written only after cargo succeeds lets Gradle skip an unchanged
+    // passing suite (~5 min serial) on every later Test task. Inputs cover the
+    // crate plus the repository files its tests read (resources, shader pack,
+    // DevUtils fixtures). Use --rerun-tasks or `--rerun` to force a rerun,
+    // e.g. after a GPU driver change.
     inputs.files(rustSourceFiles)
+    inputs.files(fileTree(rustSourceDir) { exclude 'target/**' }).withPropertyName('mattmcRustTestData')
+    inputs.dir('src/main/resources').withPropertyName('mattmcRustTestResources')
+    inputs.dir('DevUtils/tests/rendering/fixtures').withPropertyName('mattmcRustTestFixtures')
+    def testStamp = layout.buildDirectory.file('rust/testRustNative.stamp')
+    outputs.file(testStamp)
+    doLast {
+        testStamp.get().asFile.text = "passed ${new Date()}\n"
+    }
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
     // CI/release builders are often headless. The Rust audio tests need an
@@ -522,7 +535,7 @@ tasks.register('testRustNative', Exec) {
     // The Rust suite includes native OpenAL/EGL/Vulkan tests with process-global
     // driver state. Keep the full launch/check gate, but run the native test
     // binary serially so those subsystems cannot race each other.
-    commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked', '--', '--test-threads=1'
+    commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked', '--profile', 'suite', '--', '--test-threads=1'
     doFirst {
         configureRustBuildPython(delegate)
     }
@@ -1548,9 +1561,23 @@ tasks.register('clientDistZip', Zip) {
 
 // ===== TESTING CONFIGURATION =====
 
+// Large Frozen-vs-Rust parity workloads carry @Tag("parity"). Plain `test`
+// skips them so ordinary runs stay quick; `parityTest` runs them in parallel
+// JVMs and `check` runs both. An explicit --tests filter selects tagged classes
+// too, so per-slice commands such as `test --tests '*NativeHeightmapTest'` work.
+def explicitTestFilter = gradle.startParameter.taskRequests.any { request ->
+    request.args.any { it == '--tests' || it.startsWith('--tests=') }
+}
+// Each fork is a 2 GB JVM. Override with -PmattmcTestForks=N.
+def javaTestForks = (findProperty('mattmcTestForks')
+    ?: Math.max(1, Math.min(3, Runtime.runtime.availableProcessors().intdiv(4)))).toString().toInteger()
+
 // Configure JUnit 5 test platform for standard tests
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        if (!explicitTestFilter) excludeTags 'parity'
+    }
+    maxParallelForks = javaTestForks
     
     // Configure test output
     testLogging {
@@ -1584,6 +1611,29 @@ test {
     exclude '**/*PerformanceTest.class'
     exclude '**/*Benchmark.class'
 }
+
+tasks.register('parityTest', Test) {
+    group = 'verification'
+    description = 'Runs the large @Tag("parity") Frozen-vs-Rust parity workloads in parallel JVMs.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'parity' }
+    maxParallelForks = javaTestForks
+    maxHeapSize = "2g"
+    systemProperty 'net.bytebuddy.experimental', 'true'
+    testLogging {
+        events "failed"
+        exceptionFormat "full"
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nParity Test Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+}
+tasks.named('check') { dependsOn 'parityTest' }
 
 // Separate task for performance tests
 tasks.register('performanceTest', Test) {

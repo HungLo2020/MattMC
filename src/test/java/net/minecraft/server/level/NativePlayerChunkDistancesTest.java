@@ -1,5 +1,6 @@
 package net.minecraft.server.level;
 
+import org.junit.jupiter.api.Tag;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Exact parity of the native-owned player distance fields with the pinned
  * original Java trackers, driven through DistanceManager's add/remove protocol. */
+@Tag("parity")
 class NativePlayerChunkDistancesTest {
     static final int SPAWN = 8;
     static final int TICKETS = 32;

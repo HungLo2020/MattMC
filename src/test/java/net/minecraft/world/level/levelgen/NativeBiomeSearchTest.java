@@ -1,5 +1,6 @@
 package net.minecraft.world.level.levelgen;
 
+import org.junit.jupiter.api.Tag;
 import com.mojang.datafixers.util.Pair;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("parity")
 class NativeBiomeSearchTest {
     @BeforeAll static void load() {
         NativeNoiseFillTest.load();
@@ -138,8 +140,11 @@ class NativeBiomeSearchTest {
             int minY = world.settings().value().noiseSettings().minY(), maxY = minY + world.settings().value().noiseSettings().height() - 1;
             for (int round = 0; round < 12; round++) {
                 int x = random.nextInt(40_000) - 20_000, z = random.nextInt(40_000) - 20_000, y = random.nextInt(maxY - minY) + minY;
-                int step = new int[]{8, 32, 64}[random.nextInt(3)];
+                int drawnStep = new int[]{8, 32, 64}[random.nextInt(3)];
                 int radius = new int[]{0, 64, 512, 2048}[random.nextInt(4)];
+                // At most 64 rings: a 2048 radius at step 8 is ~12M Java climate samples
+                // per unmatched search without exercising any further search logic.
+                int step = Math.max(drawnStep, radius / 64);
                 int verticalStep = new int[]{8, 64}[random.nextInt(2)];
                 var accepted = new HashSet<>(biomeSet(world, random));
                 if (accepted.isEmpty()) accepted.add(world.source().possibleBiomes().iterator().next());

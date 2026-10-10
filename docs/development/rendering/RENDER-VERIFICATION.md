@@ -41,13 +41,16 @@ The [validation driver](#one-command-validation) combines the common rendering
 checks with the limits below. The individual test commands are:
 
 ```sh
-(cd src/main/rust && cargo test --locked --lib -- --test-threads=4)          # Rust, including boundary tests
+(cd src/main/rust && cargo test --locked --profile suite --lib -- --test-threads=4)  # Rust, including boundary tests
 ./gradlew -PmattmcRustProfile=release test -x testRustNative       # Java
+./gradlew -PmattmcRustProfile=release parityTest -x testRustNative # large Java parity workloads
 ```
 
-Plain `./gradlew test` first reruns the whole Rust suite serially
-(`testRustNative`, `--test-threads=1`) in Gradle's own target directory.
-The implementation author reports about 5½ minutes for that serial test step.
+See [Running tests quickly](../tooling/TESTING.md) for the `suite` profile,
+the `test`/`parityTest` split and fork settings.
+Plain `./gradlew test` first runs the whole Rust suite serially
+(`testRustNative`, `--test-threads=1`, `suite` profile) in Gradle's own target
+directory, then skips it while its inputs are unchanged.
 Use `-x testRustNative` after separately completing the intended Rust checks;
 the driver's `--lib` command is narrower than Gradle's unfiltered Cargo command. `-PmattmcRustProfile=release` makes the Java tests load the release
 library the clients use, instead of building a debug one. Parallel Rust runs
@@ -91,7 +94,7 @@ orchestrates a bounded set of tests and workloads:
    to change the filters; `--all-java-tests` removes those filters while keeping
    the Gradle task's own exclusions. `--skip java-tests` still runs
    `buildRustNative` and `classes` with the release profile.
-2. `cargo test --locked --lib` runs with four threads by default and
+2. `cargo test --locked --profile suite --lib` runs with four threads by default and
    `ALSOFT_DRIVERS=null`; this is not a `--release` test command. Named failures
    parsed from libtest output are rerun serially and rerun successes are labeled
    flaky. The Rust checks, followed by the wiki check, run in a background

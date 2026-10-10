@@ -1,5 +1,6 @@
 package net.minecraft.world.level.lighting;
 
+import org.junit.jupiter.api.Tag;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import static net.minecraft.world.level.lighting.LightPropagationFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("parity")
 class NativeLightPropagationTest {
     @BeforeAll static void load() {
         LightTerrainFixtures.load();

@@ -1,5 +1,6 @@
 package net.minecraft.world.level.levelgen;
 
+import org.junit.jupiter.api.Tag;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Exact parity of the native NOISE fill with doFill's Java loop, through the
  * production fillFromNoise path, for every vanilla noise setting. */
+@Tag("parity")
 class NativeNoiseFillTest {
     static net.minecraft.server.packs.resources.MultiPackResourceManager resources;
     static RegistryAccess.Frozen registries;

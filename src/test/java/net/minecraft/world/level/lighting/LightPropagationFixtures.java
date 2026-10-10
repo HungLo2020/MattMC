@@ -2,7 +2,6 @@ package net.minecraft.world.level.lighting;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -163,7 +162,7 @@ final class LightPropagationFixtures {
 
         int run() {
             // Layers published before the pass must never change during it (copy-on-write).
-            var published = new java.util.IdentityHashMap<DataLayer, String>();
+            var published = new java.util.IdentityHashMap<DataLayer, Object>();
             for (LightLayer layer : LightLayer.values()) {
                 if (this.engine.getLayerListener(layer) instanceof LightEngine<?, ?> light) {
                     for (DataLayer data : light.storage.visibleSectionData.map.values()) published.put(data, describe(data));
@@ -331,11 +330,13 @@ final class LightPropagationFixtures {
         }
     }
 
-    /** A layer's observable state: absent, lazy with its default, or its bytes. */
-    static String describe(@Nullable DataLayer layer) {
+    /** A layer's observable state: absent, lazy with its default, or its bytes.
+     * Compared by value; byte content uses ByteBuffer equality instead of a
+     * multi-kilobyte string per section and pass. */
+    static Object describe(@Nullable DataLayer layer) {
         if (layer == null) return "null";
         if (layer.isDefinitelyHomogenous()) return "lazy" + layer.get(0, 0, 0);
-        return Arrays.toString(layer.copy().getData());
+        return java.nio.ByteBuffer.wrap(layer.copy().getData());
     }
 
     /** Differences between two engines' complete light storage, or empty. */

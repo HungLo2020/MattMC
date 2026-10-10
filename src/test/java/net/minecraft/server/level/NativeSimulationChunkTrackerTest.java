@@ -1,5 +1,6 @@
 package net.minecraft.server.level;
 
+import org.junit.jupiter.api.Tag;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Exact parity of the native-owned simulation tracker with the pinned original,
  * each attached to its own real TicketStorage driven by identical operations. */
+@Tag("parity")
 class NativeSimulationChunkTrackerTest {
     // Ticket types are registry entries; initialize them only after bootstrap.
     static TicketType[] TYPES;
