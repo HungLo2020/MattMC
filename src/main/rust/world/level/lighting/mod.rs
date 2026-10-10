@@ -4,3 +4,5 @@ pub(crate) mod priority_queue;
 pub(crate) mod propagation;
 pub(crate) mod layers;
 pub(crate) mod maps;
+
+pub(crate) mod dh;

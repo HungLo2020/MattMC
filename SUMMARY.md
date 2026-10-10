@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-10; DH height-field release574b68f0 atopaf6921cf5; RTX3080Ti; rotating view; 6,000 frames)
+# Rust vs Frozen Java speed (2026-10-10; DH lighting/emitter candidate3f00217d atopdb49d8816; RTX3080Ti; rotating view; 6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,391.9 / 1,352.9 | 1,177.6 / 1,181.2 |
-| Vanilla + DH | 730.2 / 710.9 | 611.4 / 594.0 |
-| Shaders | 342.0 / 339.1 | 317.3 / 317.6 |
-| Shaders + DH | 258.9 / 247.7 | 227.6 / 221.4 |
-Receipt: build/native-dh-heightmap-migration/performance.json; all16 production ABAB/exact6000 clean; VUID/error/orphan0; source/native/Frozen/protected-prompt guards and8 Current fingerprints pass.
-Performance PASS for this batch: medianFPS C/F1372.4/1179.4 vanilla,720.6/602.7 DH,340.6/317.5 shaders,253.3/224.5 combined; medianp99ms3.125/3.176,5.471/6.706,4.417/6.141,5.795/7.754 respectively. Repeats vary; no isolated producer gain or broad/long-session acceptance.
-Published sky1b9b10339/fog3adbe6d5d/lightmaps971e0226b/face-policy+cacheaf6921cf5. DH height owner directly reads native blocks/counters, uses frozen-verified geometry/policy and read-only CPU leases:31,532 states/16 saved chunks/five JNI checks; Rust2479pass/3ignored, Java1838tests/2skip/0fail. Reviewed settled vanilla/Iris+DH pairs pass, VUID0; six original lifecycle cases plus clean strict different-world rerun. Original closed-channel teardown failure retained; race unresolved. Actual travel admission verified; weighted Java heightmaps7.34/74.45MB C/F, total1.50/4.31GB; short RSS4.36GiB; no full Java removal, broad/temporal or long-memory acceptance.
+| Vanilla | 1,420.3 / 1,391.7 | 1,185.4 / 1,142.3 |
+| Vanilla + DH | 763.2 / 722.8 / 835.0 / 736.0 | 792.5 / 696.8 / 651.8 / 833.4 |
+| Shaders | 341.6 / 349.7 | 315.5 / 312.9 |
+| Shaders + DH | 255.0 / 254.7 | 215.3 / 224.5 |
+Receipt: build/native-dh-lighting-migration/performance.json; all20 ABAB/exact6000 clean, all source/native/Frozen/protected-prompt guards and10 Current fingerprints pass. Two repeats/side/mode; DH has four, with no discarded runs.
+Measured floors PASS: medianFPS C/F1406.0/1163.85 vanilla,749.6/744.65 DH,345.65/314.2 shaders,254.85/219.9 combined; medianp99ms3.117/3.454,4.142/5.161,4.856/6.320,6.127/9.685. Initial DH two-repeat FPS miss0.22% retained; predeclared extension includes all4. Narrow DH margin/repeat variance; no isolated gain or broad acceptance.
+Published sky1b9b10339/fog3adbe6d5d/lightmaps971e0226b/face-policy+cacheaf6921cf5/DH heightsdb49d8816. Whole native DH lighting/emitter owner ready for final review:20 Frozen cases/60 passes plus cold neighborhoods, five JNI checks, Rust2483pass/3ignored, Java1843tests/2skip/0fail; all7 lifecycle and reviewed settled vanilla/Iris+DH pairs pass, VUID0, DH28.806%. Actual moving admission/all6 matching F3 endpoints verified; weightedJava1.108/4.448GB C/F excludes native allocation; legacyqueues36.70/34.60MB remain. ShortCurrentRSS4.05GiB only. Earlier teardown race, broad/temporal parity, long-memory behavior and complete Java removal remain open.

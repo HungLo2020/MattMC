@@ -6,6 +6,8 @@ renderer’s [bulk terrain-light consumer](../../rendering/RUST-TERRAIN-LIGHTING
 borrows retained generations; Java still owns light-engine orchestration and
 contextual rendering callbacks.
 
+- [Rust DH lighting pass](RUST-DH-LIGHTING.md): whole native producer and
+  direct CPU light consumers, Frozen corpus and scoped runtime verification.
 - [Rust skylight-source reconstruction](RUST-SKYLIGHT-SOURCES.md): packed scans,
   exact occlusion tables, ownership and focused acceptance checks.
 - [Rust light-map publication](RUST-LIGHT-MAPS.md): shared 64-shard snapshots,

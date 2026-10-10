@@ -72,6 +72,7 @@ public final class NativeDhHeightmaps {
             Arrays.fill(scratch.owners, null);
         }
     }
+    MemorySegment stageOwner() { return view; }
     public int minHeight() { return read(0); }
     public int maxHeight() { return read(1); }
     public int solid(int x, int z) { checkColumn(x, z); return read(2 + x * 16 + z); }

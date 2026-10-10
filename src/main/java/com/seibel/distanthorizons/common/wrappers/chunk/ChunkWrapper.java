@@ -64,6 +64,8 @@ public class ChunkWrapper implements IChunkWrapper
 	private int[][] lightBlockingHeightMap = null;
 	/** Rust owns admitted height fields; this is a read-only CPU lease. */
 	private net.minecraft.world.level.chunk.NativeDhHeightmaps nativeHeightMaps;
+	private net.minecraft.world.level.chunk.NativeDhLighting.Field nativeLighting;
+	private net.minecraft.world.level.chunk.NativeDhSources nativeSources;
 	
 	
 	
@@ -447,6 +449,54 @@ public class ChunkWrapper implements IChunkWrapper
 	// lighting //
 	//==========//
 	
+	/** Canonical native inputs only; externally injected storage/cache stays compatible. */
+	public net.minecraft.world.level.chunk.NativeDhLighting.ChunkInput nativeDhLightingInput()
+	{
+		if (this.getClass() != ChunkWrapper.class || this.nativeHeightMaps == null
+			|| this.blockLightStorage != null || this.skyLightStorage != null) return null;
+		// Hashing/beacons expose the original mutable list before lighting. Admit
+		// that cache only while it still matches its immutable native owner.
+		if (this.blockLightPosList != null)
+		{
+			var sources = this.nativeSources;
+			if (sources == null || this.blockLightPosList.size() != sources.count()) return null;
+			for (int i = 0; i < sources.count(); i++)
+			{
+				var pos = this.blockLightPosList.get(i);
+				if (pos == null || pos.getClass() != DhBlockPos.class) return null;
+				int index = sources.index(i);
+				if (pos.getX() != this.chunkPos.getX() * 16 + (index & 15)
+					|| pos.getY() != sources.minY() + index / 256
+					|| pos.getZ() != this.chunkPos.getZ() * 16 + ((index / 16) & 15)) return null;
+			}
+		}
+		return new net.minecraft.world.level.chunk.NativeDhLighting.ChunkInput(this.chunk, this.nativeHeightMaps, this.nativeLighting, this.nativeSources);
+	}
+	public void adoptNativeDhLighting(net.minecraft.world.level.chunk.NativeDhLighting.Field field)
+	{
+		if (this.nativeDhLightingInput() == null || field.minY() != this.getInclusiveMinBuildHeight()
+			|| field.maxY() != this.getExclusiveMaxBuildHeight()) throw new IllegalStateException("Incompatible DH light owner");
+		this.nativeLighting = field;
+	}
+	/** A public mutable-storage operation detaches to the original Java authority. */
+	private void detachNativeDhLighting()
+	{
+		var field = this.nativeLighting;
+		if (field == null) return;
+		this.getWorldBlockLightPosList(); // Preserve the first native emitter enumeration.
+		var block = ChunkLightStorage.createBlockLightStorage(this);
+		var sky = ChunkLightStorage.createSkyLightStorage(this);
+		for (int y = field.minY(); y < field.maxY(); y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++)
+		{
+			int b = field.light(x, y, z, false), s = field.light(x, y, z, true);
+			if (b != 0) block.set(x, y, z, b);
+			if (s != 0) sky.set(x, y, z, s);
+		}
+		this.blockLightStorage = block;
+		this.skyLightStorage = sky;
+		this.nativeLighting = null;
+	}
+
 	@Override 
 	public void setIsDhSkyLightCorrect(boolean isDhLightCorrect) { this.isDhSkyLightCorrect = isDhLightCorrect; }
 	@Override 
@@ -462,7 +512,8 @@ public class ChunkWrapper implements IChunkWrapper
 	public int getDhBlockLight(int relX, int y, int relZ)
 	{
 		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(relX, y, relZ);
-		return this.getBlockLightStorage().get(relX, y, relZ);
+		var nativeField = this.nativeLighting;
+		return nativeField != null ? nativeField.light(relX & 15, y, relZ & 15, false) : this.getBlockLightStorage().get(relX, y, relZ);
 	}
 	@Override
 	public void setDhBlockLight(int relX, int y, int relZ, int lightValue)
@@ -473,13 +524,14 @@ public class ChunkWrapper implements IChunkWrapper
 	
 	private ChunkLightStorage getBlockLightStorage()
 	{
+		this.detachNativeDhLighting();
 		if (this.blockLightStorage == null)
 		{
 			this.blockLightStorage = ChunkLightStorage.createBlockLightStorage(this);
 		}
 		return this.blockLightStorage;
 	}
-	public void setBlockLightStorage(ChunkLightStorage lightStorage) { this.blockLightStorage = lightStorage; }
+	public void setBlockLightStorage(ChunkLightStorage lightStorage) { this.detachNativeDhLighting(); this.blockLightStorage = lightStorage; }
 	@Override
 	public void clearDhBlockLighting() { this.getBlockLightStorage().clear(); }
 	
@@ -488,7 +540,8 @@ public class ChunkWrapper implements IChunkWrapper
 	public int getDhSkyLight(int relX, int y, int relZ)
 	{
 		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(relX, y, relZ);
-		return this.getSkyLightStorage().get(relX, y, relZ);
+		var nativeField = this.nativeLighting;
+		return nativeField != null ? nativeField.light(relX & 15, y, relZ & 15, true) : this.getSkyLightStorage().get(relX, y, relZ);
 	}
 	@Override
 	public void setDhSkyLight(int relX, int y, int relZ, int lightValue)
@@ -501,13 +554,14 @@ public class ChunkWrapper implements IChunkWrapper
 	
 	private ChunkLightStorage getSkyLightStorage()
 	{
+		this.detachNativeDhLighting();
 		if (this.skyLightStorage == null)
 		{
 			this.skyLightStorage = ChunkLightStorage.createSkyLightStorage(this);
 		}
 		return this.skyLightStorage;
 	}
-	public void setSkyLightStorage(ChunkLightStorage lightStorage) { this.skyLightStorage = lightStorage; }
+	public void setSkyLightStorage(ChunkLightStorage lightStorage) { this.detachNativeDhLighting(); this.skyLightStorage = lightStorage; }
 	
 	
 	/** 
@@ -521,8 +575,25 @@ public class ChunkWrapper implements IChunkWrapper
 		if (this.blockLightPosList == null)
 		{
 			this.blockLightPosList = new ArrayList<>();
+			if (this.getClass() == ChunkWrapper.class && this.nativeSources == null)
+			{
+				var field = this.nativeLighting;
+				this.nativeSources = field != null ? field.retainSources()
+					: net.minecraft.world.level.chunk.NativeDhSources.build(this.chunk);
+			}
+			var sources = this.nativeSources;
+			if (sources != null)
+			{
+				for (int i = 0; i < sources.count(); i++)
+				{
+					int index = sources.index(i);
+					this.blockLightPosList.add(new DhBlockPos(this.chunkPos.getX() * 16 + (index & 15),
+						sources.minY() + index / 256, this.chunkPos.getZ() * 16 + ((index / 16) & 15)));
+				}
+				return this.blockLightPosList;
+			}
 			
-			
+
 			this.chunk.findBlockLightSources((blockPos, blockState) ->
 			{
 				DhBlockPos pos = new DhBlockPos(blockPos.getX(), blockPos.getY(), blockPos.getZ());
