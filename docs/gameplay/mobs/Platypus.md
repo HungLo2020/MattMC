@@ -77,7 +77,7 @@ The bucket-transfer description includes the correction for [issue #782](https:/
 [placements]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/SpawnPlacements.java
 [biomes]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/biome
 [capture]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Bucketable.java#L71-L88
-[release]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/minecraft/world/item/MobBucketItem.java
+[release]: https://github.com/HungLo2020/MattMC/blob/14c9d66a4164100dfefdabaa2283500c47d16e50/src/main/java/net/minecraft/world/item/MobBucketItem.java
 [persistence]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L359-L367
 [food]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L57-L94
 [fish]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/fishes.json

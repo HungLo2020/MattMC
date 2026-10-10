@@ -76,12 +76,12 @@ These tests are not an in-game chunk-unload, server-restart, taming, breeding, e
 [biomes]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/biome
 [tameables]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/kangaroo_tameables.json
 [interactions]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L217-L274
-[saving]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
+[saving]: https://github.com/HungLo2020/MattMC/blob/8e6cf6ec6e15ad0648511db22027baad62818501/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
 [defaults]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L348-L360
 [follow]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L913-L916
 [follow-goal]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/ai/TameableAIFollowOwner.java#L20-L34
 [passenger]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L116-L119
-[inventory]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
+[inventory]: https://github.com/HungLo2020/MattMC/blob/8e6cf6ec6e15ad0648511db22027baad62818501/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
 [menu]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L300-L314
 [equipment]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L767-L818
 [sync]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L820-L827
@@ -97,6 +97,6 @@ These tests are not an in-game chunk-unload, server-restart, taming, breeding, e
 [water-combat]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/ai/KangarooAIMelee.java#L29-L71
 [loot]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/entities
 [items]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/Items.java#L1756-L1759
-[drops]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
+[drops]: https://github.com/HungLo2020/MattMC/blob/8e6cf6ec6e15ad0648511db22027baad62818501/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
 
-[persistence-tests]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/test/misc/net/alexsmobs/entity/EntityKangarooInventoryTest.java
+[persistence-tests]: https://github.com/HungLo2020/MattMC/blob/8e6cf6ec6e15ad0648511db22027baad62818501/src/test/misc/net/alexsmobs/entity/EntityKangarooInventoryTest.java

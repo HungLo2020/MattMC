@@ -35,10 +35,10 @@ For a hanging light, keep the vertical space below the Ambersol clear. A light-b
 
 Harvesting configuration source-reviewed on 2026-10-02. The bundled tags require a stone-tier-or-better pickaxe, and the loot table specifies one Ambersol. In-game Survival breaking and rendered light-column cleanup still need verification.
 
-- [Block registration](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/minecraft/world/level/block/Blocks.java)
-- [Column creation](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/alexscaves/server/block/AmbersolBlock.java)
-- [Invisible light behavior](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/alexscaves/server/block/AmbersolLightBlock.java)
-- [Block drops](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/resources/data/minecraft/loot_table/blocks/ambersol.json)
-- [Creative inventory](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
-- [Mining tool tags](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json)
-- [Required tool tier](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/resources/data/minecraft/tags/block/needs_stone_tool.json)
+- [Block registration](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/java/net/minecraft/world/level/block/Blocks.java)
+- [Column creation](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/java/net/alexscaves/server/block/AmbersolBlock.java)
+- [Invisible light behavior](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/java/net/alexscaves/server/block/AmbersolLightBlock.java)
+- [Block drops](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/resources/data/minecraft/loot_table/blocks/ambersol.json)
+- [Creative inventory](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
+- [Mining tool tags](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json)
+- [Required tool tier](https://github.com/HungLo2020/MattMC/blob/ac7dece5bec1557f2f073e83f1978f72f9e53e7b/src/main/resources/data/minecraft/tags/block/needs_stone_tool.json)

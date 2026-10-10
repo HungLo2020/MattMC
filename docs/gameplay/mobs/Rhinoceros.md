@@ -71,7 +71,7 @@ Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No 
 
 The potion interaction section was updated with the source correction for [issue #783](https://github.com/HungLo2020/MattMC/issues/783) on 2026-10-02. Focused automated interaction tests were added; a live gameplay round trip is still needed before treating that issue's acceptance checks as complete.
 
-- [Corrected potion interaction](https://github.com/HungLo2020/MattMC/blob/fix/issue-783-rhino-water/src/main/java/net/alexsmobs/entity/EntityRhinoceros.java#L420-L475)
+- [Corrected potion interaction](https://github.com/HungLo2020/MattMC/blob/63ba7a2deeeab97b1f1f5572f434f0b66d4cdda1/src/main/java/net/alexsmobs/entity/EntityRhinoceros.java#L420-L475)
 - [Baseline stats, trust, food, and active animation damage](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityRhinoceros.java)
 - [Trust-food tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/rhinoceros_foodstuffs.json)
 - [Breeding-food tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/rhinoceros_breedables.json)

@@ -39,13 +39,13 @@ Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2
 The transfer section includes the correction for [issue #782](https://github.com/HungLo2020/MattMC/issues/782) on `fix/issue-782-platypus-bucket`. Focused automated item-codec and bucket-dispatch tests are provided. A live placement and dedicated-server synchronization check is still needed.
 
 [registration]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/Items.java#L1523-L1527
-[platypus-data]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/alexsmobs/entity/EntityPlatypus.java
+[platypus-data]: https://github.com/HungLo2020/MattMC/blob/14c9d66a4164100dfefdabaa2283500c47d16e50/src/main/java/net/alexsmobs/entity/EntityPlatypus.java
 [interaction]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L144-L166
 [capture]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Bucketable.java#L71-L88
 [creative]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1454
 [use]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/BucketItem.java#L72-L93
-[release]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/minecraft/world/item/MobBucketItem.java
+[release]: https://github.com/HungLo2020/MattMC/blob/14c9d66a4164100dfefdabaa2283500c47d16e50/src/main/java/net/minecraft/world/item/MobBucketItem.java
 [persistence]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L359-L367
-[shared-data]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/minecraft/world/entity/animal/Bucketable.java
+[shared-data]: https://github.com/HungLo2020/MattMC/blob/14c9d66a4164100dfefdabaa2283500c47d16e50/src/main/java/net/minecraft/world/entity/animal/Bucketable.java
 [name]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L109-L124
 [world-data]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L325-L341
