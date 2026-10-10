@@ -5,7 +5,8 @@ Frozen. The settled benchmark hides VoxelMap and its optional camera motion
 rotates at a fixed point. Readiness losses can discard partial timing windows.
 Those results do not establish startup, streaming, or visible-minimap performance.
 The [driver at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/DevUtils/tests/rendering/RunOrdinaryPerformance.py)
-records a separate `ordinary-gameplay-v1` protocol. A `complete` result means
+records a separate `ordinary-gameplay-v1` protocol. To diagnose a session you
+play by hand instead, see [Recording a hand-played session](SESSION-RECORDING.md). A `complete` result means
 the requested observation finished and passed its state/health checks; the
 driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 

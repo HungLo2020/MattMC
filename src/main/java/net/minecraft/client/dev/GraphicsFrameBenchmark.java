@@ -381,6 +381,7 @@ public final class GraphicsFrameBenchmark {
 
 	public static void beginFrame(Minecraft minecraft) {
 		beginFrameCalls++;
+		if (GameplaySessionRecorder.ENABLED) GameplaySessionRecorder.beginTick();
 		if (!ENABLED) {
 			lastFrameLifecycle = "begin-disabled";
 			return;
@@ -541,6 +542,7 @@ public final class GraphicsFrameBenchmark {
 
 	public static void endFrame(Minecraft minecraft, long frameNanos) {
 		endFrameCalls++;
+		if (GameplaySessionRecorder.ENABLED) GameplaySessionRecorder.endTick(frameNanos);
 		if (!ENABLED || !frameActive) {
 			endFrameInactiveReturns++;
 			lastFrameLifecycle = !ENABLED ? "end-disabled" : "end-inactive";
@@ -702,6 +704,7 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	public static void beginPhase(String name) {
+		if (GameplaySessionRecorder.ENABLED) GameplaySessionRecorder.beginPhase(name);
 		if (!ENABLED || !frameActive) {
 			return;
 		}
@@ -717,6 +720,7 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	public static void endPhase(String name) {
+		if (GameplaySessionRecorder.ENABLED) GameplaySessionRecorder.endPhase();
 		if (!ENABLED || !frameActive || PHASE_STACK.isEmpty()) {
 			return;
 		}

@@ -1503,6 +1503,10 @@ public final class RustGalFrameCoordinator {
 		if (wholeFrameResult != null) {
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.post-submit-metrics");
 			recordWholeFrameMetrics(wholeFrameResult);
+			if (net.minecraft.client.dev.GameplaySessionRecorder.ENABLED) {
+				net.minecraft.client.dev.GameplaySessionRecorder.recordFrame(executeStarted, acquireStarted, acquireEnded,
+					submitStarted, submitEnded, presentStarted, presentEnded, frameId, submissionId, wholeFrameResult);
+			}
 			GraphicsFrameBenchmark.recordRustWholeFrameTimeline(
 				correlationId,
 				frameId,

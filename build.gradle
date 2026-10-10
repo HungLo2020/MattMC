@@ -994,7 +994,15 @@ tasks.register('runClient', JavaExec) {
     if (extraRunArgs) {
         args(extraRunArgs.trim().split(/\s+/) as List)
     }
-    
+    // `python3 DevUtils/RunDev.py --record`: per-frame session recording and a
+    // JFR profile of the client JVM only, written into this directory.
+    def recordDir = providers.gradleProperty('mattmcRecordDir').getOrNull()
+    if (recordDir) {
+        def recordPath = file(recordDir).absolutePath
+        jvmArgs "-Dmattmc.dev.recordDir=${recordPath}",
+            "-XX:StartFlightRecording=filename=${recordPath}/client.jfr,settings=profile,dumponexit=true"
+    }
+
     doFirst {
         workingDir.mkdirs()
         file("${runGameDir}/resourcepacks").mkdirs()

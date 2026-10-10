@@ -31,7 +31,10 @@ From the current repository root:
 ```sh
 python3 DevUtils/RunDev.py          # Current, release native profile
 python3 DevUtils/RunDev.py --frozen # Frozen Java/OpenGL checkout
+python3 DevUtils/RunDev.py --record # Current, recording a hand-played session
 ```
+
+`--record` is described in [Recording a hand-played session](../rendering/SESSION-RECORDING.md).
 
 [The launcher at `87046367`](https://github.com/HungLo2020/MattMC/blob/87046367cdf0a4a427f10066a9010dd6d39fd422/DevUtils/RunDev.py)
 finds the Current root relative to its own script, then starts Gradle with the

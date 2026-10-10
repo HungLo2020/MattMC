@@ -520,8 +520,14 @@ fn select_graphics_device(
     surface: Option<vk::SurfaceKHR>,
 ) -> GalResult<(vk::PhysicalDevice, u32)> {
     let mut best = None;
+    // One line per windowed device selection, so a recording or log shows
+    // which GPU rendered and why (e.g. a discrete GPU that cannot present).
+    let mut candidates = Vec::new();
     for physical_device in physical_devices {
         let properties = unsafe { instance.get_physical_device_properties(*physical_device) };
+        let name = unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
         let queue_families =
             unsafe { instance.get_physical_device_queue_family_properties(*physical_device) };
         let Some((queue_family_index, _)) =
@@ -543,6 +549,7 @@ fn select_graphics_device(
                 }
             })
         else {
+            candidates.push((*physical_device, name, properties.device_type, false, -1));
             continue;
         };
         let score = match properties.device_type {
@@ -551,12 +558,33 @@ fn select_graphics_device(
             vk::PhysicalDeviceType::CPU => 1,
             _ => 0,
         };
+        candidates.push((*physical_device, name, properties.device_type, true, score));
         if best
             .map(|(_, _, best_score)| score > best_score)
             .unwrap_or(true)
         {
             best = Some((*physical_device, queue_family_index as u32, score));
         }
+    }
+    if surface.is_some() {
+        let selected = best.map(|(device, _, _)| device);
+        let listed: Vec<String> = candidates
+            .iter()
+            .map(|(device, name, kind, usable, score)| {
+                let kind = match *kind {
+                    vk::PhysicalDeviceType::DISCRETE_GPU => "discrete",
+                    vk::PhysicalDeviceType::INTEGRATED_GPU => "integrated",
+                    vk::PhysicalDeviceType::VIRTUAL_GPU => "virtual",
+                    vk::PhysicalDeviceType::CPU => "cpu",
+                    _ => "other",
+                };
+                format!(
+                    "[{name} type={kind} graphics_present={usable} score={score}{}]",
+                    if Some(*device) == selected { " SELECTED" } else { "" }
+                )
+            })
+            .collect();
+        eprintln!("MattMC Vulkan device selection: {}", listed.join(" "));
     }
     best.map(|(device, queue, _)| (device, queue))
         .ok_or_else(|| {

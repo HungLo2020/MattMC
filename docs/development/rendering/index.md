@@ -25,6 +25,8 @@ each module there has a short README with its own file map.
   comparisons, real-config sessions and A/B performance checks.
 - [Ordinary gameplay performance](GAMEPLAY-PERFORMANCE.md): visible minimap,
   continuous frame timing and actual travel alongside settled renderer tests.
+- [Recording a hand-played session](SESSION-RECORDING.md): `RunDev.py --record`
+  per-frame timings, JFR and GPU/CPU samples while you play.
 - [Capture storage and recovery](ARTIFACT-STORAGE.md): reclaim reproducible
   caches and restore losslessly archived historical capture data.
 - [Shader terrain profiling](SHADER-TERRAIN-PROFILING.md): compare moving shader

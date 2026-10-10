@@ -154,6 +154,16 @@ def parse_args() -> argparse.Namespace:
         "--frozen-repo",
         help="launch Frozen from this path instead of the configured java_perf_repo",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="record a hand-played Current session (per-frame timings, JFR, GPU/CPU samples) "
+             "under artifacts/recordings/ and summarize it on exit",
+    )
+    parser.add_argument(
+        "--record-label",
+        help="short label appended to the recording directory name",
+    )
     return parser.parse_args()
 
 
@@ -177,11 +187,33 @@ def main() -> int:
     else:
         environment.setdefault("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS", "true")
         command = [*gradle, "-PmattmcRustProfile=release", "runClient"]
+    if args.record:
+        if use_frozen:
+            raise SystemExit("ERROR: --record records Current only; Frozen has no per-frame recorder.")
+        return run_recorded(root, command, environment, args.record_label)
     return subprocess.run(
         command,
         cwd=root,
         env=environment,
     ).returncode
+
+
+def run_recorded(root: Path, command: list[str], environment: dict[str, str], label: str | None) -> int:
+    sys.path.insert(0, str(script_dir() / "PerfAudit"))
+    import Recording
+
+    directory = Recording.new_recording_dir(root, label)
+    print(f"Recording this session to {directory}", flush=True)
+    samplers = Recording.Samplers(directory)
+    samplers.start()
+    try:
+        code = Recording.run_with_console(
+            [*command, f"-PmattmcRecordDir={directory}"], root, environment, directory / "console.log")
+    finally:
+        samplers.stop()
+    print(Recording.summarize(directory), end="", flush=True)
+    print(f"Recording saved to {directory}", flush=True)
+    return code
 
 
 if __name__ == "__main__":
