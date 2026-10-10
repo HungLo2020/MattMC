@@ -11,8 +11,10 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all 19 paths, including three rendering guides, from promoted cutoff `d772753a04a59bbda16a28f7b589e02e95b8462f`. The clean local fast-forward keeps the shader-transition/cloud-policy implementation intact; publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
+- Latest non-wiki default-branch snapshot integrated: `2003b118dfac30ca501dc135b9de0e2d7e2567fb`; older citations retain their reviewed source scope.
+- Latest synchronization preserves three incoming commits and all 41 paths, including eight guides/indexes and the new source-authored chunk-task owner, from promoted cutoff `5e566e87e967a476db373c5611f6d9cc19b969a9`. Clean fast-forward and combined validated publication retain the source fixes, queues and author reports. Repository instructions/workflows were unchanged.
+- Previous non-wiki default-branch snapshot integrated: `c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all 19 paths, including three rendering guides, from promoted cutoff `d772753a04a59bbda16a28f7b589e02e95b8462f`. The clean local fast-forward keeps the shader-transition/cloud-policy implementation intact; publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `5de23173ae5b61fb17887589d4dff69a6b17fc77`; older citations retain their reviewed source scope.
 - Previous source synchronization preserves two incoming commits and all 167 paths, including 24 wiki documents, from promoted cutoff `368c10a87fe9eba5f2e5e51cbb29518c4cc21f57`. The clean local fast-forward preserves incoming terrain/residency/DH owners and their author records; remote publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `fc1d529db2cc6ec80a4ad7a86b15007c17d0e097`; older citations retain their reviewed source scope.
@@ -3085,3 +3087,12 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Expanded timed-toggle/screenshot instructions with direct Apply semantics, eligible-frame timing, stop ordering, rounded names and file verification. Added practical transition acceptance checks and preserved the current hardware blocker and historical runtime reports. No game, Java/Rust or capture checks were rerun; strict documentation build, independent review and guarded terminal publication are required.
 
 - Linked the verified [#747 shader-transition/cleanup review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741) and [#745 cloud-policy review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578). Both remain open; the discarded translucent-data cleanup discrepancy is source-inspected, with no measured memory-growth or permanent-leak claim. No separate issue or runtime test result was added.
+
+
+## Batch 385: Shader follow-ups, map clipping and native task queues
+
+- Reconciled the prior shader-transition cleanup finding with the new explicit translucent-data close and broader staged-active-source rebuild trigger. Documented water-only DH culling and native cloud settings projected through Java producers, replacing the prior instance flag/filter. Kept historical review references and runtime acceptance separate.
+- Qualified invisible four-corner gradient handling and expanded timed world-map/disable controls, screenshot eligibility and direct-screen semantics. Added map clipping/transition checks without claiming a new live GUI regression result.
+- Attributed the native chunk-task owner’s Frozen CPU histories, full Java counts and six-pair synthetic timing to the author, preserving Java dispatcher/future/callable ownership and the lack of server/FPS/streaming acceptance. Preserved the source-owned guide and its navigation. No Java/Rust/client/benchmark suites were rerun; strict docs validation, independent review and guarded terminal deployment precede completion.
+
+The batch links the verified [#747 cleanup/transition](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102687083), [#745 cloud/leaf](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102688591), [#772 GUI/control](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6102691041) and [#776 task-queue](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6102692740) reviews. Independent oracle decoding checks 37,624 recorded operations and exact EOF, not a Java/native test rerun. All four issues remain open.

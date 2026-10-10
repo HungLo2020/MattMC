@@ -78,7 +78,7 @@ variation with external load. Those observations are not renderer speedups.
 Compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
 "everything else" CPU (`cpu.csv` system minus client) alongside FPS.
 
-Timed actions added at [`c00b11c8`](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
+Timed actions, extended through [`2003b118`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
 take seconds since the sweep starts on the first eligible in-world frame:
 `--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersAt=25` enables the selected
 pack. The default `enableShadersVia=toggle` uses the enable/reload API;
@@ -86,9 +86,13 @@ pack. The default `enableShadersVia=toggle` uses the enable/reload API;
 shader-pack screen's Apply logic, including its optional second apply after an
 option reset. It calls that logic directly; it does not open or click the UI.
 `--jvm-arg=-Dmattmc.dev.scriptedCamera.disableShadersAt=75` turns shaders off
-again through the same toggle API. `...openWorldMapAt=30` opens VoxelMap's world
-map (the M key); while it stays open the camera and other actions pause, but
-screenshots and the scheduled stop still run.
+again through the enable/reload API with `false`.
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.openWorldMapAt=30` directly opens
+VoxelMap's world-map screen; it does not synthesize an M-key event. While any
+screen remains open after the sweep starts, camera movement and other timed
+actions wait, but due screenshots and the scheduled stop continue. Opening the
+map returns before the same frame's screenshot; a due shot is handled on a later
+frame. A screen already open before the sweep starts does not start its clock.
 The enable attempt is marked before application; a thrown failure does not
 turn this into an automatic retry loop. Start with `--config 'config/iris.properties:enableShaders=false'` and a valid
 selected pack available in the copied game. The scripted driver copies config,
@@ -182,3 +186,7 @@ The summary can be generated from incomplete or missing CSV inputs. Its existenc
 is not proof of a complete recording or a passing performance gate. The two
 summary fixtures exercise synthetic CSV aggregation and missing inputs; they do
 not establish live recorder throughput, shutdown reliability or JFR capture.
+
+The [map-control source review](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6102691041)
+separates the timed UI entry and empty-gradient repair from unverified live
+map/toggle acceptance.

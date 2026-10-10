@@ -50,7 +50,7 @@ Related tracking: [#777](https://github.com/HungLo2020/MattMC/issues/777#issueco
 
 ## Shader-pack cloud directives
 
-The [policy added at `c00b11c8`](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/rust/render/shaderpack/properties/clouds.rs)
+The [current policy at `2003b118`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/rust/render/shaderpack/properties/clouds.rs)
 reads the active source generation's preprocessed `shaders.properties` with its
 option and environment defines. `dhClouds=off` suppresses DH clouds; when no
 recognized DH directive is set, `clouds=off` also suppresses them. Explicit
@@ -60,25 +60,33 @@ is set. Missing or unresolvable properties retain the
 default of allowing DH clouds; this is a bounded parser, not a guarantee of
 all Java Properties syntax or unknown-value behavior.
 
-Clouds follow Frozen's Iris rules, and vanilla and DH clouds never suppress
-each other. After each accepted source update, `RustGalFrameCoordinator` reads
+The previous special suppression of vanilla clouds merely because DH cloud
+groups exist is removed; each producer uses its own effective setting. After each accepted source update, `RustGalFrameCoordinator` reads
 the policy through `mattmc_vulkanic_gal_shader_pack_cloud_settings`:
 
 - `clouds=off|fast|fancy` overrides the vanilla cloud option in
   `Options.getCloudsType` (render distance 4 or more), as Iris does.
 - `GenericObjectRenderer` skips the `Clouds` group before submission when the
-  policy suppresses DH clouds, as Iris cancels that DH event. This replaces
+  accepted policy suppresses DH clouds, after the existing pre-render/event
+  callbacks and before origin/box submission. This replaces
   the `c00b11c8` instance flag bit and admission filter.
 - `LevelRenderer` no longer hides vanilla clouds while DH cloud groups exist.
 
-Three new Rust policy fixtures inspect supported directives, explicit override,
+Four Rust policy fixtures now inspect supported directives, explicit override,
 recognized duplicate ordering, conditional `DISTANT_HORIZONS` and missing
-properties. They do not execute a live shader toggle, cloud image comparison or
+properties, plus vanilla override encoding and packed settings. They do not
+execute a live shader toggle, Java option/event integration, cloud image comparison or
 asynchronous teardown. This documentation review inspected their source and
 reran no Rust/Java or client workloads; the preceding hardware blocker remains
 in the [current evidence checkpoint](GOAL-5-STATUS.md). The
 [#745 source review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578)
-keeps broader DH visual/transition acceptance open.
+records the earlier flag/filter design; the current getter/producer path
+supersedes that implementation while broader DH visual/transition acceptance
+remains open. Cached settings are read after source acceptance; source staging
+and settings refresh are not claimed to be an atomic transition. The
+[current policy review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102688591)
+records the replacement implementation. The separate [group-ID admission gap](https://github.com/HungLo2020/MattMC/issues/820)
+remains open; this policy change does not repair it.
 
 ## Verification
 

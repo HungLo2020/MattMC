@@ -159,12 +159,17 @@ clean immutable snapshots. See [raw-image generations](JAVA-BRIDGE.md#raw-gui-im
 and the [ordinary gameplay protocol](GAMEPLAY-PERFORMANCE.md); reducing this
 traffic does not establish end-to-end performance acceptance.
 
-Any GUI element the Rust route cannot draw fails the frame on purpose (no Java
-fallback), which ends in Minecraft's emergency save and crash. Producers must
-therefore return no elements, not an unsupported marker, for geometry that is
-merely invisible: [`RustGalGuiRenderer.tryEnqueueFourColoredRectangle`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
-returns an empty list for off-screen, zero-area or fully scissored rectangles,
-such as the world map's world-border lines when the border is off screen.
+The four-corner GUI gradient path distinguishes unsupported input from an
+empty draw. At [`d80687a4`](https://github.com/HungLo2020/MattMC/commit/d80687a4c09360ad56603cf2877a20cc0283acc6),
+[`tryEnqueueFourColoredRectangle`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
+returns an empty list for degenerate/off-viewport bounds or an invalid/empty
+viewport-clipped scissor. Unsupported texture/pipeline/pose/input still returns
+null and follows the existing unsupported-GUI rejection path. Partially visible
+vertices remain intact for Rust clipping; this method does not itself calculate
+the rectangle/scissor intersection. The author identifies VoxelMap's off-screen
+world-border gradient as the former crash trigger. No new dedicated GUI fixture
+or independently inspected map capture accompanies this change; verify the
+[map and transition scenarios](RENDER-VERIFICATION.md#mid-world-shader-enable-check).
 
 Selected-source frames carry thousands of mesh instances (mostly off-camera
 shadow candidates), and several passes look each one up every frame. Keep
@@ -214,23 +219,24 @@ and [`frame/static_terrain.rs`](https://github.com/HungLo2020/MattMC/blob/54611c
 A caster whose newer generation has not crossed yet keeps casting with the
 acknowledged one. Java keeps no active-instance state for casters.
 
-At [`c00b11c8`](https://github.com/HungLo2020/MattMC/commit/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4),
-turning shaders on after a shaders-off world requests a full terrain semantic
-rebuild once Rust accepts the selected pack source. The coordinator resends
-retained world assets and increments the terrain-source rebuild epoch. At the
+The initial `c00b11c8` shader-enable repair is extended by
+[`dd966dae`](https://github.com/HungLo2020/MattMC/commit/dd966daea37ea3636e3a09d6f6a43c8f7d99bb88).
+Every staged source whose old or new state is shader-active requests a full
+terrain semantic rebuild after successful native source acceptance. The
+coordinator resends retained world assets only on inactive-to-active transition,
+and separately increments the terrain-source rebuild epoch. Pending requests
+can coalesce before acceptance; there is no one-to-one rebuild guarantee for
+every intermediate staged setting. At the
 next source enqueue, the terrain source shuts down the old worker pool,
 destroys completed old work, retires published layers, clears built/visible
 geometry and block-entity lists, replaces the workers and reloads the existing
 graph **while retaining its loaded columns**. Previously built geometry is
 marked dirty and rebuilt through normal selection; accepted empty sections
-need no remesh. Like Frozen's Iris, which calls `allChanged()` for every new
-pipeline, the rebuild now follows every staged source while shaders were or
-become active (enabling, disabling, pack or option changes); the asset resend
-remains limited to the inactive-to-active transition. Ordinary resource reload retains its
-separate replacement behavior. This repairs the route that
+need no remesh. Ordinary resource reload retains its separate replacement
+behavior. This repairs the route that
 previously called `LevelRenderer.allChanged()`, a no-op for this terrain source.
 It is not a synchronous promise that all replacement meshes are ready when the
-shader setting changes. See the [source transition](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java).
+shader setting changes. See the [source transition](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java).
 
 The selected-source coverage check examines regular mesh instances, selected
 static terrain and shadow casters for missing retained source semantics. While
@@ -246,7 +252,10 @@ Discarded completed builds now close `output.translucentData` before
 `output.destroy()`, as normal draining does: dynamic translucent data can own
 native plane/BSP resources that the build-output destroy does not free.
 [The #747 review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
-keeps repeated-toggle/resource acceptance open.
+recorded the earlier missing close. That exact source discrepancy is now
+repaired; repeated-toggle/resource acceptance remains open, without a new
+targeted lifecycle fixture or measured memory result. The [follow-up review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102687083)
+records this source repair without closing the broader acceptance gate.
 
 Ordinary whole frames use a native FIFO worker by default. The queued bridge
 decodes/copies Java records and acquires native terrain/DH owners on the calling
@@ -577,11 +586,14 @@ primitive `key | index` values preserve the existing signed comparator order
 and stable ties through the original index for lists of at most 65,536 quads.
 Larger lists retain the comparator sort; mixed directions also fall back to its
 existing validation. The exact-topology decision is read once per merge pass.
-The pre-existing `ColumnBox` leaf transparency policy still differs from the
-Frozen behavior described by the author, so removing exact provenance does not
-establish identical complete LOD geometry. This is face/occlusion policy:
-fully opaque leaf colors still belong to the opaque draw layer, as described
-below.
+The earlier `fc1d529d` review retained a `ColumnBox` leaf transparency deviation.
+The later `dd966dae` repair makes that face-culling helper classify **water only**
+as material-forced transparent, removing its special leaves classification.
+Alpha below 255 can still make a column transparent when transparency is enabled.
+This is separate
+from draw-layer alpha: fully opaque leaf colors still use the opaque layer.
+The source change does not establish identical complete LOD geometry or a new
+reviewed foliage image.
 
 The incoming author note reports about 1.4× Frozen's DH loader CPU per LOD for
 the previous preservation work and attributes render-thread starvation to it.

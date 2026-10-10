@@ -1,13 +1,21 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`c00b11c8`](https://github.com/HungLo2020/MattMC/commit/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4).
-The latest change repairs the shaders-off-to-on terrain rebuild request, skips
-unadmittable offscreen preparation and applies active-pack DH cloud directives.
-[Timed recording controls](SESSION-RECORDING.md) support inspecting that
-transition; this source review supplies no new GPU, lifecycle or image result.
-The previously recorded driver/library mismatch remains unresolved by this
-commit's documentation CI. See the [transition acceptance checks](RENDER-VERIFICATION.md#mid-world-shader-enable-check).
+[`2003b118`](https://github.com/HungLo2020/MattMC/commit/2003b118dfac30ca501dc135b9de0e2d7e2567fb).
+The rendering follow-ups repair the discarded translucent-data close path,
+rebuild terrain after all relevant staged shader-source transitions, restore
+water-only DH transparent-material culling and move cloud decisions to the
+accepted native getter plus Java producers. Invisible VoxelMap gradient bounds
+now return an empty draw rather than an unsupported marker; timed map-opening
+controls support investigation. These are source repairs, not independently
+rerun transition or GUI acceptance. See [current verification](RENDER-VERIFICATION.md#mid-world-shader-enable-check).
+
+The latest CPU slice moves [server chunk-task queue ownership](../world/chunk-loading/RUST-CHUNK-TASKS.md)
+into Rust while Java retains callable references, dispatcher/futures and task
+bodies. The author reports 37,624 Frozen CPU operations and four Java/native controls,
+plus 1,918 Java tests reported/two skipped (1,916 executed). A six-pair synthetic
+queue comparison is 2.4% lower in elapsed time, not a server-tick, streaming or
+FPS gain. No new hardware acceptance or driver recovery is established.
 
 At the preceding `5de23173` checkpoint, retained terrain selection, client residency, shared chunk/biome inputs and DH
 producer policies had native CPU owners. That slice moves complete
@@ -75,10 +83,16 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The latest [shader-transition review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
+The preceding [shader-transition review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
 and [DH cloud-policy review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578)
-cover `c00b11c8`, retaining the discarded translucent-owner cleanup concern and
-missing runtime acceptance. Neither issue is closed.
+cover `c00b11c8`. The subsequent source explicitly closes discarded translucent
+data and replaces the former cloud flag/filter design. Those earlier findings
+remain historical; repeated-transition and runtime acceptance remain open. The
+[current follow-ups](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102687083),
+[cloud-policy review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102688591),
+[GUI review](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6102691041) and
+[chunk-task review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6102692740)
+record these bounded changes; all four issues remain open.
 
 The preceding [world/residency review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6101725598),
 [DH producer/reduction review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6101728595)

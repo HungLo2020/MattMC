@@ -1,9 +1,9 @@
 # Rust server chunk-task scheduling
 
-[`world/level/chunk_tasks/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk_tasks)
+[`world/level/chunk_tasks/`](https://github.com/HungLo2020/MattMC/tree/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/rust/world/level/chunk_tasks)
 owns all priority buckets, ordered chunk membership, task-token lists, moves,
 release and pop. The ordinary
-[`ChunkTaskPriorityQueue`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/ChunkTaskPriorityQueue.java)
+[`ChunkTaskPriorityQueue`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/java/net/minecraft/server/level/ChunkTaskPriorityQueue.java)
 uses that owner directly. Its Java priority maps and per-chunk pending lists are
 removed. Rust also assigns reusable callable slots from the primary task arena.
 The temporary Java adapter keeps callable references in those rows;
@@ -12,6 +12,14 @@ it does not rebuild the native queue from Java state.
 `ChunkTaskDispatcher` still owns its consecutive executor, future completion,
 level-change callbacks and execution throttling. General simulation, holders and
 task bodies remain Java. This is a queue migration, not a completed server port.
+
+Source ownership and fixture definitions were reviewed at
+[`2003b118`](https://github.com/HungLo2020/MattMC/commit/2003b118dfac30ca501dc135b9de0e2d7e2567fb).
+The release counts and timing results below are implementation-author reports;
+this documentation review did not rerun Java/Rust suites, Frozen histories,
+benchmarks or servers. They do not establish current hardware or whole-game
+acceptance; [the rendering checkpoint](../../rendering/GOAL-5-STATUS.md) preserves
+that separate boundary.
 
 ## Preserve the dispatch contract
 
@@ -59,17 +67,20 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-[`GenerateFrozenChunkTasksOracle.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenChunkTasksOracle.java)
+[`GenerateFrozenChunkTasksOracle.java`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/DevUtils/tests/world/chunk/GenerateFrozenChunkTasksOracle.java)
 executes the actual untouched Frozen queue and records 37,624 operations in eight
 synthetic CPU histories. Five compiled-class pins accompany exact popped task
 IDs, work/top projections, pending counts and exception classes. The recorder
-does not copy the expected algorithm. Replaying these histories does not prove
+does not copy the expected algorithm. The generator checks those Frozen class
+hashes; the Java replay reads recorded names/hash shapes and compares queue
+answers, rather than launching or rehashing live Frozen classes. Replaying
+these histories does not prove
 server ticks, chunk generation, streaming performance or whole-game parity.
 
 The 2026-10-10 CPU checkpoint passes 257 Rust world checks, 27 architecture
 checks and four focused Java controls. The full Java suites report 1,918 tests,
-two skips and zero failures/errors across 344 suites; six workers map the exact
-release image. The latter exercise actual Frozen
+two skips (1,916 executed) and zero failures/errors across 344 suites; six workers map the exact
+release image. The four focused Java controls exercise recorded Frozen
 histories, callback reentry, concurrent readers through the consecutive executor,
 80 reuse rounds and a 65,536-task output batch. Native rows retire before the
 next publication; this is bounded reuse evidence, not sustained-memory acceptance.
@@ -89,7 +100,7 @@ and inlined map helpers remain. ELF inspection confirms the map helpers are
 inlined; kernel policy denied `perf`, without configuration changes.
 
 After compiling test classes, supply isolated runtime classpath files to
-[`VerifyRustChunkTasks.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/server/VerifyRustChunkTasks.py):
+[`VerifyRustChunkTasks.py`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/DevUtils/tests/server/VerifyRustChunkTasks.py):
 
 ```sh
 python3 DevUtils/tests/server/VerifyRustChunkTasks.py \
@@ -105,3 +116,9 @@ its protocol records order, warmup, driver/native pins, commands and checksums
 before timing. The output directory must not already exist. A short warmup is
 not steady-state evidence. Check real server workloads separately before
 accepting overall performance.
+
+The [independent source and fixture review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6102692740)
+decoded the committed oracle: eight histories of 4,703 operations, 46 levels,
+five class-hash pins and 553 recorded `ArrayIndexOutOfBoundsException` outcomes,
+ending exactly at EOF. This checks the fixture contents; it does not rerun the
+Java/native controls or establish server tick, streaming or FPS performance.

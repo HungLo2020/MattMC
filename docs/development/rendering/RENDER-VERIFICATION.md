@@ -53,25 +53,38 @@ Do not weaken log-health checks or count a software-device run as hardware parit
 
 ### Mid-world shader-enable check
 
-The [`c00b11c8` transition](RENDER-ARCHITECTURE.md) replaces terrain workers and
+The [current staged-source transition](RENDER-ARCHITECTURE.md) replaces terrain workers and
 published meshes after the source is accepted, then waits for rebuilt semantic
 inputs before offscreen preparation. Use [timed recording actions](SESSION-RECORDING.md)
-to retain before/after images for both enable/reload and screen-Apply logic.
+to retain before/after images for enable/reload, screen-Apply, disable and active
+pack/option updates.
 Verify source acceptance, rebuild completion and actual selected-route frames;
 a requested toggle or sweep-complete marker alone does not establish them.
-Check discarded completed builds and cancelled workers for native translucent
-sort-owner retirement; replacing a pool alone is not a resource-release proof.
+The discarded-build path now explicitly closes translucent data before freeing
+output buffers. Verify repeated transitions, exceptions and native sort-owner
+retirement; the exact source repair is not a complete lifecycle/resource proof.
 Inspect terrain, leaves, shadow casters and DH clouds before, during and after
 the transition, and preserve fallback/admission errors rather than counting a
 fallback image as selected-pack parity.
 
 For cloud policy, cover `dhClouds=off`, the `clouds=off` fallback and explicit
 `dhClouds=on`, including conditional pack defines and a temporarily unarmed
-source route. The new parser fixtures are source-level controls; the commit
-adds no dedicated worker-rebuild lifecycle or timed-action screenshot fixture.
+source route. Also check vanilla `off`/`fast`/`fancy` overrides at the render-distance
+boundary and independent DH clouds: the native getter and Java producer now
+replace the former instance-flag filter. The four parser fixtures do not execute
+that complete Java integration. No dedicated worker-rebuild lifecycle or timed-action
+screenshot fixture was added.
 This review did not run clients or inspect new captures. Its successful wiki
 build cannot resolve the [hardware-driver blocker](#check-the-hardware-driver-before-runtime-captures)
 or extend earlier runtime passes to this source.
+
+For VoxelMap, use the full `openWorldMapAt` argument in the recording guide and
+inspect saved images while the map stays open. Cover off-viewport and degenerate
+world-border gradients, empty/negative scissors, partial viewport clipping and
+ordinary visible gradients. Unsupported pipeline/texture/pose inputs must still
+reject; an empty visible region should not become an unsupported marker. The
+source repair adds no dedicated GUI regression fixture and is not a new live
+M-key/crash reproduction by this review.
 
 ## 1. Tests
 
