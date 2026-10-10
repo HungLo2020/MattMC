@@ -16,7 +16,7 @@ Each map-producing entry starts with an Empty Map and runs a bounded structure s
 
 ## Using a treasure map
 
-Hold a working map while travelling in the dimension where it was created, normally the Overworld. It tracks the player's position and updates terrain while held. A distant player uses an off-map marker; moving toward the mapped area brings the position onto the map. Bring your marker toward the red X, then search the ground there.
+Hold a working map while travelling in the dimension where it was created, normally the Overworld. It tracks the player's position and updates terrain while held. A distant player uses an off-map marker; moving toward the mapped area brings the position onto the map. Bring your marker toward the red X, then search the ground there. See [Map: reading and navigating](../items/Map.md#reading-and-navigating) for north-up orientation and which way to travel from an edge marker.
 
 The bundled map scale covers **256×256 blocks**, with two blocks per terrain pixel. The X identifies an **X/Z location**, not a chest depth, doorway, or safe place to teleport. The lookup does not inspect the contents of the chest. Multiple maps can point to the same treasure, including one another player already opened or removed.
 
