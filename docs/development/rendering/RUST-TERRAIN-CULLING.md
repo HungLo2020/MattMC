@@ -11,8 +11,13 @@ Implementation:
 [`face_policy/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/chunk/meshing/face_policy),
 [`NativeTerrainCulling`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeTerrainCulling.java)
 and [`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java).
-This is the current implementation. Scoped lifecycle and settled checks pass;
-broad gameplay and performance acceptance remain open.
+Source ownership was reviewed at
+[`bffd0eef8`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574).
+The measurements below preserve the implementation author's reports for their
+named releases; this documentation review did not rerun Rust/Java suites or
+clients. Broad gameplay and performance acceptance remain open. The
+[scoped ownership review on #747](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6096975122)
+records source boundaries without closing the renderer acceptance work.
 
 ## Ownership and admission
 
@@ -23,9 +28,12 @@ the existing native block owner. Java reads a readonly CPU admission byte per
 state; it does not receive native culling results or rebuild a native decision.
 There are no GPU handles, alternate presenters or backend resources here.
 
-A bulk check admits the existing 18³ world-ID grid once per section. Canonical
-model records then carry a native-policy flag; the Rust mesher reads their
-semantic state IDs directly. Compatibility records retain their Java masks.
+Admission first requires the exact canonical slice and platform provider. A
+bulk check validates that every ID in the existing 18³ grid has canonical shape
+metadata; it does not require every neighbor's skip implementation to be native.
+Each own state is then checked separately for supported policy. Admitted model
+records carry a native-policy flag; the Rust mesher reads their semantic state
+IDs directly. Compatibility records retain their original Java masks.
 The Java occlusion cache is allocated only when those callbacks are needed.
 Private compact snapshot version **5** adds this flag; whole-frame ABI remains
 unchanged. A stale header or invalid controlled native record is rejected.
@@ -47,9 +55,10 @@ Preserve these constraints:
 
 The owner is bounded to 65,534 states, 1,024 unique shapes, 8,192 boxes and a
 1,024² comparison table; geometry construction also bounds comparison work.
-There is one table, not a cache per world, frame or section. Unsupported geometry
-retains compatibility callbacks. Automatic Java staging reclamation and these
-limits do not establish total host/GPU memory acceptance.
+There is one table, not a cache per world, frame or section. Java declines
+exports above its geometry limits, retaining compatibility callbacks; a rejected
+native installation is an error, not a silent fallback. Automatic Java staging
+reclamation and these limits do not establish total host/GPU memory acceptance.
 
 ## Concurrent model-cache reads
 
@@ -57,9 +66,12 @@ Model quads, selectors and rendering state now share one Rust cache owner.
 Compact, replay and static-model scans borrow a read guard for their entire
 scan; independent builders can read concurrently. Registration and cache clear
 take the exclusive write guard. Reload clears all three tables together, and
-borrowed references never outlive their guard. The C ABI and Java lifecycle
-admission are unchanged. Read-only builds no longer hold the three former
-exclusive mutexes. The prior DH travel profile found 62 contended cache samples
+borrowed references never outlive their guard. This lock contract does not make
+Java's generation check and a later native scan one atomic transaction. The C
+ABI and Java lifecycle admission are unchanged. Read-only builds no longer hold the three former
+exclusive mutexes.
+
+The author's prior DH travel profile reports 62 contended cache samples
 among 238 native meshing samples across eight workers. This supports the change;
 it does not identify the cause of the earlier DH timing outlier. The accepted
 replacement profile on `30586383` observes zero contended-lock points among 193
@@ -74,9 +86,12 @@ under the migration verification directory below.
 
 ## Verification
 
-The actual unchanged Frozen corpus records 787,992 production decisions across
-31,809 states, 21,007 shape identities and all 21,316 unique geometry pairs.
-The candidate matches every admitted decision and preserves tag/hook callbacks.
+The committed Frozen recorder and fixtures cover 787,992 sampled production
+queries across 31,809 states and 21,007 original shape identities, deduplicated
+into 146 geometry rows and all 21,316 ordered geometry pairs. The Rust raw-policy
+test expects 756,437 native decisions and 31,555 callback cases. That query-level
+split is not the stricter whole-own-state gameplay admission described above.
+The author reports matching admitted decisions and preserved tag/hook callbacks.
 The real Java export/C ABI tests also compare every admitted recorded query.
 A compact-builder regression compares glass/glass with glass/air without Java
 masks or solid/skip hints, then rejects the stale snapshot after cache reload.
@@ -132,8 +147,10 @@ python3 DevUtils/RunWiki.py check
 
 Use
 [`GenerateFrozenFacePolicyOracle.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/meshing/GenerateFrozenFacePolicyOracle.java)
-with Frozen's compiled runtime classpath. It guards the actual reference class
-hashes. Losslessly gzip the recorded stream with `mtime=0`; never regenerate
+with Frozen's compiled runtime classpath. The recorder checks the expected
+`BlockOcclusionCache` class hash and records the `BlockState` and `Shapes`
+hashes; it does not itself check expected values for those two additional
+classes. Losslessly gzip the recorded stream with `mtime=0`; never regenerate
 expectations from Current. The bootstrap corpus does not certify loaded-world
 hooks/tags, pixels, streaming or temporal terrain correctness.
 

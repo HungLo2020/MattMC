@@ -91,6 +91,21 @@ fixtures and mocked process discovery, without clients or Java/Rust runtime
 suites. The closure covers the demonstrated two-pass defect, not live-process
 race freedom or safe cleanup of every filesystem state.
 
+**Flight workspace guard:** the [repair at `af6921cf`](https://github.com/HungLo2020/MattMC/blob/af6921cf5379cdb6010259d77d0b39b41b4fa549/DevUtils/Common/artifact_retention.py#L410-L481)
+checks enclosing flight receipts before workspace deletion, including when an
+old invocation's parent is considered for retirement. The author reports that
+an earlier parent-wide pass deleted an interrupted allocation world's copy.
+Its logs, images, raw profile and interruption receipt were retained; that is
+not recovery of the copied world. The author reports thirteen retention tests
+and 43 combined retention/flight tests after the repair.
+
+The independent review at `bffd0eef` executed only the two new synthetic cases:
+completed and unfinished sibling flights, and a completed nested flight inside
+an incomplete outer flight. Both passed with process discovery mocked inactive.
+This verifies those decisions, not actual cleanup history, live-process races,
+all malformed filesystem states or recovery of deleted data. No client,
+Java/Rust suite or original cleanup receipt was inspected in those checks.
+
 Keep required sources outside retirement-managed outputs. Source existence is
 still only a bounded eligibility check, not proof of recoverability or a backup.
 Explicit `.keep` protects parent retirement; ordinary eligible workspace
@@ -110,7 +125,10 @@ For workspace retirement, only paths inside a marked invocation are candidates:
   zero. Starting, failed, malformed, unknown or symlinked flight receipts retain
   their workspaces even during parent-wide cleanup. Completion still requires
   separate F3/position review; a bounded client's expected exit 143 is not the
-  driver's exit code. Other verification invocations keep their existing rules.
+  capture engine's exit code. A missing enclosing receipt is not detected as an
+  unfinished flight; ordinary workspace rules still apply. The guard checks
+  receipt fields, not F3 images, parity, profile acceptance or source hashes.
+  Other verification invocations keep their existing rules.
 - Unknown canonical fixtures and symlinked fixture/run candidates remain.
   Cleanup also retains candidates when `/proc` is absent or a readable process
   command/working directory references them. This is best-effort process

@@ -150,6 +150,58 @@ visual/lifecycle checks.
 
 ## Recorded evidence and limits
 
+### DH producer profiles
+
+The [record at `bffd0eef`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/PROGRESS.md)
+reports paired eight-second DH allocation flights for lighting/emitter release
+`3f00217d`. These use the terrain-flight observation protocol, not the separate
+three-window ordinary comparison above. All six original-resolution F3 endpoints
+were reportedly reviewed and match, crossing seven X chunk columns. Source,
+native library, Frozen, protected prompt, prepared save, movement, terminal and
+owned-process guards pass. Native lighting-field publication appears in DH
+worker stacks, and opaque/translucent/water submissions are positive in both
+travel videos. This documentation review inspected committed reports and source,
+not their unbundled runtime/profile artifacts; no clients or Java/Rust suites
+were rerun here.
+
+Weighted Java allocation is **1.108 GB Current / 4.448 GB Frozen**. Legacy Java
+light queues still sample 36.70/34.60 MB; the earlier height-field Current run
+sampled 128.97 MB. Native allocation is excluded, subsets overlap, and sparse
+sample weights do not measure exact total allocation or isolate throughput.
+Current's 4.05 GiB short-window peak RSS is not a long-session memory bound.
+Actual producer admission is stronger evidence than merely finding a native
+implementation, but these observations do not establish temporal pixel parity.
+See [lighting ownership](../world/lighting/RUST-DH-LIGHTING.md).
+
+A separate guarded eight-second Current CPU flight reports 394 native-lighting
+samples and 44 emitter-producer samples. Java voxel-column construction remains
+at 1,566 samples, including biome reads (694) and block reads (221), among
+13,011 total; subsets overlap. Its three F3 endpoints were reviewed, with
+positive DH submissions and 0.545-block return drift. There is no paired Frozen
+CPU run. Use this to choose further ownership work, not to claim an isolated
+speedup. Receipt: `build/native-dh-lighting-migration/current-cpu-travel-review.json`.
+The [latest settled timing matrix](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary)
+meets all measured floors but retains the initial DH miss, four-repeat extension
+and narrow DH margin. Neither that matrix nor these flights establishes entry,
+sustained streaming, first shader world frame or absence of pop-in/flicker.
+
+The preceding [height-field release](../world/chunk/RUST-DH-HEIGHTMAPS.md)
+`574b68f0` reports matching paired DH travel and native height production:
+weighted Java heightmaps 7.34/74.45 MB, total 1.50/4.31 GB Current/Frozen, and
+short Current peak RSS 4.36 GiB. These are separate measurements. Earlier
+face-policy-only `2f8255f4` profiles report 0.818/2.401 GB ordinary and
+1.707/4.453 GB with DH. Shared-cache release `30586383` later reports zero
+contended points among 193 meshing samples versus 62/238 before, across eight
+workers. Interrupted originals stay rejected; only the explicitly accepted
+replacement profiles count. See [cache/profile provenance](RUST-TERRAIN-CULLING.md#concurrent-model-cache-reads).
+No cross-release comparison isolates a single change's FPS effect.
+
+Before retiring profile worlds, follow [flight retention](ARTIFACT-STORAGE.md#verification-driver-retention).
+Recognized completion and capture-engine exit zero allow workspace retirement
+without certifying F3 position review; incomplete enclosing receipts retain the
+copy. The author reports that an earlier interrupted allocation world was
+already deleted; retained logs/images/profile data do not recover that world.
+
 ### Integrated light-map profiles
 
 The [record at `971e0226`](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L60-L65)
@@ -183,7 +235,7 @@ Short RSS windows do not prove long-session memory bounds. Receipt:
 `goal5/native-light-map-integrated-flight-profile-v2-20261009/profile-comparison.json`.
 
 The [integrated settled matrix](GOAL-5-STATUS.md#october-9-integrated-light-map-and-scalar-summary)
-still fails vanilla p99 (3.277 ms Current / 3.097 ms Frozen), although its
+fails vanilla p99 for that historical release (3.277 ms Current / 3.097 ms Frozen), although its
 median average-FPS floors pass in all modes. Clean profiles and diagnostic
 settled images do not establish entry, sustained streaming, bulk-input pixel
 parity, absence of pop-in/flicker or broad visual acceptance.

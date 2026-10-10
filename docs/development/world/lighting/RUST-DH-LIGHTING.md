@@ -1,17 +1,15 @@
 # Rust DH lighting pass
 
 Rust owns the admitted whole DH lighting pass and its immutable CPU outputs.
-The release `3f00217d` cache owner passes five JNI checks;
-full Rust passes 2,483 tests (3 ignored), and full Java passes 1,843 tests
-(2 skipped, no failures/errors) across 330 suites. Two observed JNI workers
-map that release. All seven lifecycle scenarios and both manually reviewed
-settled vanilla/Iris+DH pairs pass with zero validation messages; the DH
-extension covers 28.81% of pixels. Moving producer admission is observed in
-paired eight-second DH travel profiles, with all six F3 positions reviewed
-and matching. The twenty clean production timing runs meet the measured
-FPS/p99 floors.
-Broad gameplay and long-session resource acceptance remain open. This evidence
-belongs to the lighting release; earlier height-field results are separate.
+Java retains exact-input admission, wrapper publication, correctness flags,
+error handling and compatibility lighting. Broad gameplay and long-session
+resource acceptance remain open.
+
+Source ownership was reviewed at
+[`bffd0eef8`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574).
+The verification below preserves the implementation author's reports for
+release `3f00217d`; this documentation review did not rerun Rust/Java suites or
+clients. Earlier height-field results remain separate.
 
 The pass borrows authoritative live block owners and retained
 [DH height fields](../chunk/RUST-DH-HEIGHTMAPS.md). Rust takes section-local
@@ -25,6 +23,7 @@ read CPU leases directly. Rust/GAL GPU ownership and presentation are unchanged.
 
 Implementation: [native pass](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/lighting/dh),
 [CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhLighting.java),
+[emitter bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhSources.java),
 [producer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/generation/DhLightingEngine.java),
 [direct consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/common/wrappers/chunk/ChunkWrapper.java).
 
@@ -51,9 +50,36 @@ Implementation: [native pass](https://github.com/HungLo2020/MattMC/tree/master/s
   capacity follows actual work, with an explicit monotonic-update bound. Release
   pass snapshots and queues after the call; keep no global queue cache.
 
+## Source-review boundary (2026-10-10)
+
+A source-predicted stale-counter case still needs an executable regression.
+Canonical direct palette writes can leave a section's `hasOnlyAir` counter
+stale; the existing [counter test](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/test/java/net/minecraft/world/level/chunk/NativeSectionCountersTest.java#L42-L54)
+preserves that distinction. Legacy DH block reads reach
+[`ProtoChunk.getBlockState`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/world/level/chunk/ProtoChunk.java#L97-L104),
+which returns air for a stale-empty section. The native pass
+[snapshots raw states](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/rust/world/level/lighting/dh/mod.rs#L183-L211)
+without a section-counter input, so an emitter introduced through the palette
+can be seen differently. Exercise an otherwise empty canonical chunk with a
+raw palette emitter write through both lighting paths. This review did not run
+that case or observe a gameplay failure. Height-field stale-counter coverage
+does not establish lighting parity for it. The
+[follow-up on #777](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
+records the source-only case and required verification.
+
 ## Verify
 
-Use JDK 25 and the standard release profile:
+The author reports five JNI checks passing for the `3f00217d` cache owner;
+full Rust passes 2,483 tests (3 ignored), and full Java passes 1,843 tests
+(2 skipped, no failures/errors) across 330 suites. Two observed JNI workers
+map that release. All seven lifecycle scenarios and both manually reviewed
+settled vanilla/Iris+DH pairs pass with zero validation messages; the DH
+extension covers 28.81% of pixels. Moving producer admission is reported in
+paired eight-second DH travel profiles, with all six F3 positions reviewed
+and matching. The twenty clean production timing runs meet the measured
+FPS/p99 floors, including the expanded DH repeat set described below.
+
+To rerun focused CPU checks, use JDK 25 and the standard release profile:
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::lighting::dh::

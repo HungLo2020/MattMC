@@ -68,6 +68,8 @@ or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe ch
 | DH column generations, leases or publication/visibility bookkeeping | `dh_collector/`; keep Java wire handling in `bridge/dh_collector.rs` |
 | Built-in DH cloud motion, placement and culling policy | `clouds/`; see [cloud preparation](RUST-DH-CLOUDS.md) |
 | Authored item-layer transforms and world/hand pose composition | `items/`; see [item preparation](RUST-ITEM-LAYERS.md) |
+| Canonical terrain face policy over retained block IDs | `chunk/meshing/face_policy/`; see [terrain culling](RUST-TERRAIN-CULLING.md) |
+| DH height fields, emitter enumeration or CPU light propagation | `world/level/chunk/dh_heightmaps/` or `world/level/lighting/dh/`; these are world CPU owners, outside `render/` |
 | A new Java entry point or wire record | `bridge/` (see [Java Bridge](JAVA-BRIDGE.md)) |
 | A new GPU capability, resource type or command | `vulkanic/` (see [VulkanicGAL](VULKANIC-GAL.md)) |
 
@@ -114,7 +116,20 @@ once, while tags, hooks and unsupported providers keep compatibility callbacks.
 Rendering's model/state/selector tables share one cache with concurrent read
 guards for independent builders and exclusive registration/reload. This changes
 CPU ownership and synchronization, without exposing GPU resources across the
-boundary. The subsystem guide distinguishes verified builds from pending work.
+boundary. Admission requires the exact canonical slice/platform and a canonical
+18³ shape grid, then checks the own state's supported policy. Compatibility
+records keep their original Java masks. Private compact snapshot version 5
+carries the native-policy flag; whole-frame ABI 78 is unchanged. The subsystem
+guide keeps source behavior separate from release-specific reported checks.
+
+Admitted DH world preparation now has native [height-field](../world/chunk/RUST-DH-HEIGHTMAPS.md)
+and [lighting/emitter](../world/lighting/RUST-DH-LIGHTING.md) owners. They borrow
+live section storage and publish immutable CPU views read by chunk wrappers;
+Java retains admission, wrapper publication, mutable compatibility views and
+fallback callbacks. These owners neither replace the DH render-column ledger
+nor complete Java voxel-column construction, hashing, quadtree inputs or material
+preparation. Preserve section-local snapshot timing and existing caller exclusion;
+no whole-world transaction or total memory acceptance is implied.
 
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The

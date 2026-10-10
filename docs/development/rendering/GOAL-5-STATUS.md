@@ -1,22 +1,28 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`971e0226`](https://github.com/HungLo2020/MattMC/commit/971e0226b5c45b6fb3b2699e6bdb92be27021261):
-Rust owns canonical light-map snapshots, sky-column metadata and direct scalar
-block/sky sampling, in addition to the admitted live biome and fog owners.
-Java retains light-engine orchestration, publication scheduling, contextual
-callbacks and compatibility paths. The latest author-recorded matrix, integrated
-release `b7297d06`, **fails vanilla p99** (3.277 ms Current / 3.097 ms Frozen),
-while all median average-FPS floors pass. The initial lifecycle gate was 6/7;
-all seven retained logs pass the corrected strict shutdown classifier, and one
-fresh affected transition passes. This is not seven fresh lifecycle runs.
-Ordinary profiles remain bounded attribution evidence; entry, sustained
-streaming, temporal rendering and long-session memory acceptance remain open.
-See [the measured workload](#october-9-integrated-light-map-and-scalar-summary)
-and [light-map ownership](../world/lighting/RUST-LIGHT-MAPS.md).
-Source inspection and author reports do not establish broad visual/temporal
-parity, complete scene migration, long-run resource bounds or resolution of the
-independent native crash.
+[`bffd0eef`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574):
+canonical terrain face policy, shared meshing caches, DH height fields and the
+admitted DH lighting/emitter pass now have Rust owners. Java retains orchestration,
+contextual callbacks, custom/mutable compatibility paths and general gameplay.
+The latest author-recorded release, `3f00217d`, meets the settled four-mode
+median FPS/p99 floors across twenty clean runs. Its DH FPS advantage is only
+about **0.66%** after a predeclared extension to four repeats per side; the
+initial two-repeat **0.22% miss remains recorded**. No isolated migration gain
+or broad performance acceptance follows. The final lighting release reports
+seven passing lifecycle cases; the preceding height-field release's original
+failure and separate strict retry remain distinct, with that teardown race
+unresolved. See [the current matrix](#october-10-dh-lighting-and-emitter-summary)
+and [the ownership contract](../world/lighting/RUST-DH-LIGHTING.md).
+
+Java/Rust suites, lifecycle runs, captures and profiles below are author reports.
+This review inspected committed source and reports, not the unbundled runtime
+receipts, and did not rerun those workloads. Independent verification at this
+source pin passed only the two new synthetic flight-retention fixtures. Entry,
+sustained streaming, broad visual/temporal parity, long-session memory, complete
+scene migration and the independent native crash remain open. A
+[source-predicted DH stale-counter discrepancy](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
+also needs an executable regression; no gameplay failure was observed here.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
@@ -31,6 +37,11 @@ on mutation. Exact canonical scalar consumers read the retained typed owners;
 Java still schedules publication, maintains sparse `DataLayer` identity pins,
 and supplies contextual light predicates and shade, with mutable-array,
 subclass/platform and diagnostic compatibility paths.
+Canonical terrain face decisions consume retained world IDs; read-only meshing
+workers share a coherent model/state/selector owner while registration/reload
+remain exclusive. DH height and lighting producers read existing native owners
+and publish immutable CPU leases. These paths do not transfer quadtree ownership
+or eliminate Java compatibility callbacks.
 Raw GUI image publication retains unchanged native images while Java supplies
 semantic identities and changed CPU snapshots. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
@@ -45,7 +56,14 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [light-map ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6094520281)
+The current [terrain ownership review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6096975122),
+[DH ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
+and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6096978223)
+retain the current source scope and author-only runtime provenance. The two
+independent synthetic retention checks add tooling evidence only; they do not
+rerun the Java/Rust suites or establish new runtime acceptance.
+
+The preceding [light-map ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6094520281)
 and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6094520995)
 retain the ownership, lifecycle and performance limits at `971e0226`. Independent
 verification passed four runtime-log classifier and thirteen validation-driver
@@ -134,6 +152,32 @@ Those source checkpoints are
 and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806ddedd4fb3c3b4fbc44716).
 
 ## What changed
+
+### October 10 terrain face policy and DH producers
+
+The [face-policy/cache milestone](https://github.com/HungLo2020/MattMC/commit/af6921cf5379cdb6010259d77d0b39b41b4fa549)
+moves canonical face decisions into Rust over retained world state, with a
+bounded intrinsic geometry catalog and coherent shared meshing-cache reads.
+Java keeps tag/hook and custom-provider callbacks. The private compact header
+changes; whole-frame ABI and GAL ownership do not. See
+[terrain contracts and fixture limits](RUST-TERRAIN-CULLING.md).
+
+The [height-field milestone](https://github.com/HungLo2020/MattMC/commit/db49d8816972aa9e208967f638ed631f767c68cb)
+scans live block/counter owners and exposes immutable DH CPU fields. The later
+[lighting/emitter milestone](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574)
+owns initial emitter enumeration, section snapshots, both priority queues and
+compact lighting fields, including the normal pre-hash emitter-cache path.
+Section-local locking does not create a whole-world transaction. Public mutation
+and custom wrappers retain compatibility behavior; a mutable light operation
+detaches native authority. See [height fields](../world/chunk/RUST-DH-HEIGHTMAPS.md)
+and [lighting constraints](../world/lighting/RUST-DH-LIGHTING.md).
+
+The same interval adds an enclosing `flight.json` guard to workspace retirement.
+Two independently executed synthetic fixtures preserve unfinished siblings and
+an incomplete outer flight while allowing a completed sibling to retire.
+They use temporary directories and mocked process discovery, not actual clients
+or the author's cleanup receipts. Missing flight receipts still follow the
+ordinary retirement rules; see [retention scope](ARTIFACT-STORAGE.md#verification-driver-retention).
 
 ### October 9 light-map snapshots and direct scalar sampling
 
@@ -521,6 +565,107 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 10 DH lighting and emitter summary
+
+The [summary at `bffd0eef`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/SUMMARY.md)
+and [working record](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/PROGRESS.md)
+report release `3f00217d` on RTX 3080 Ti with a settled rotating view and exactly
+6,000 measured frames per run. Vanilla, shaders and shaders+DH use two ABAB
+repeats per side; DH uses four. These are author reports, not an independent
+inspection of the unbundled `build/native-dh-lighting-migration/` receipts.
+
+| Mode | Recorded Current FPS | Recorded Frozen FPS | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- |
+| Vanilla | 1,420.3 / 1,391.7 | 1,185.4 / 1,142.3 | 3.117 / 3.454 |
+| Vanilla + DH | 763.2 / 722.8 / 835.0 / 736.0 | 792.5 / 696.8 / 651.8 / 833.4 | 4.142 / 5.161 |
+| Shaders | 341.6 / 349.7 | 315.5 / 312.9 | 4.856 / 6.320 |
+| Shaders + DH | 255.0 / 254.7 | 215.3 / 224.5 | 6.127 / 9.685 |
+
+**This batch meets the measured floors.** Median average FPS Current/Frozen is
+1,406.0/1,163.85 vanilla, 749.6/744.65 DH, 345.65/314.2 shaders and 254.85/219.9
+combined. All twenty timing rows and ten Current native fingerprints reportedly
+pass, with source/native/Frozen/protected-prompt guards intact. The initial DH
+pair missed its FPS floor at 743.0/744.65, about 0.22%. Two further repeats per
+side were declared before running and all four are included, with no discarded
+runs. The resulting DH margin is about 0.66%; repeat variance and combined
+changes prevent an isolated lighting/cache speedup claim. Receipt: `performance.json`.
+
+The author reports 2,483 Rust passes/three ignored, 1,843 Java tests/two skips/no
+failures or errors, five JNI checks and two observed JNI workers mapped to the
+exact release. The Frozen corpus covers 20 cases/60 passes, with two additional
+cold neighborhoods for JNI handoff. All seven replacement lifecycle scenarios
+and both manually reviewed settled vanilla/Iris+DH pairs pass, with zero VUIDs
+and 28.806% DH coverage. These newer seven cases do not resolve the preceding
+height-field teardown race. The initial compact-only variant declined normal
+pre-hash emitter caches; its deliberately stopped runtime stays superseded and
+excluded from final acceptance. A Rust module documentation sentence changed
+after verification with executable source/native artifact reported unchanged.
+
+Paired eight-second DH allocation flights reportedly show native lighting-field
+publication, positive opaque/translucent/water submissions and all six matching
+reviewed F3 endpoints. Weighted Java allocation is 1.108/4.448 GB Current/Frozen;
+legacy Java queues remain at 36.70/34.60 MB. Native allocation is excluded,
+subsets overlap, and short Current RSS of 4.05 GiB is not a long-session bound.
+A separate Current-only CPU flight guides remaining producer work without a
+paired Frozen CPU comparison. See [profile scope](GAMEPLAY-PERFORMANCE.md#dh-producer-profiles).
+Settled images and bounded travel do not establish first-frame, temporal,
+sustained-streaming or broad gameplay acceptance.
+
+#### October 10 DH height-field summary
+
+The [preceding record at `db49d881`](https://github.com/HungLo2020/MattMC/blob/db49d8816972aa9e208967f638ed631f767c68cb/SUMMARY.md)
+reports release `574b68f0`, sixteen clean ABAB runs and these median floors:
+
+| Mode | Median average FPS, Current / Frozen | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- |
+| Vanilla | 1,372.4 / 1,179.4 | 3.125 / 3.176 |
+| Vanilla + DH | 720.55 / 602.7 | 5.471 / 6.706 |
+| Shaders | 340.55 / 317.45 | 4.417 / 6.141 |
+| Shaders + DH | 253.3 / 224.5 | 5.795 / 7.754 |
+
+Every mode meets this batch's measured floors. The author reports 2,479 Rust
+passes/three ignored, 1,838 Java tests/two skips, five JNI checks, three observed
+exact-library JNI workers and reviewed settled vanilla/Iris+DH pairs. Only six
+original lifecycle cases pass: different-world teardown emitted one
+closed-channel INFO line with two classifier matches. The original strict
+failure remains; a separate correct same-source strict retry passes without a
+classifier change. Keep this sequence distinct from the later lighting release's
+seven scenarios. The race remains unresolved.
+
+Paired DH flights report Java heightmap allocation of 7.34/74.45 MB and total
+weighted Java allocation of 1.50/4.31 GB Current/Frozen, excluding native
+allocations. Short Current peak RSS is 4.36 GiB. These are bounded attribution
+results, not an isolated producer gain or long-session bound. Receipts:
+`build/native-dh-heightmap-migration/{correctness-combined,performance,allocation-combined}.json`.
+See [height-field fixtures and runtime scope](../world/chunk/RUST-DH-HEIGHTMAPS.md).
+
+#### October 10 terrain face-policy and shared-cache summary
+
+The [earlier record at `af6921cf`](https://github.com/HungLo2020/MattMC/blob/af6921cf5379cdb6010259d77d0b39b41b4fa549/SUMMARY.md)
+reports release `30586383` with 2,473 Rust passes/three ignored, 1,833 Java
+tests/two skips, six exact-library JNI workers, seven lifecycle cases and
+reviewed settled vanilla/Iris+DH pairs. Its encompassing validation driver was
+interrupted during FPS measurement; a first timing retry omitted the production
+capture environment. Both batches remain rejected. Sixteen corrected separate
+ABAB runs complete cleanly at exactly 6,000 frames each:
+
+| Mode | Median average FPS, Current / Frozen | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- |
+| Vanilla | 1,361.3 / 1,147.65 | 3.407 / 3.284 |
+| Vanilla + DH | 782.8 / 673.95 | 4.207 / 5.969 |
+| Shaders | 345.6 / 317.9 | 5.498 / 6.030 |
+| Shaders + DH | 260.55 / 227.05 | 5.753 / 7.424 |
+
+**This batch fails vanilla p99.** The other modes meet their floors, with large
+DH repeat variation. The accepted shared-cache profile reports zero contended
+points among 193 native meshing samples across eight workers, compared with
+62/238 before; it neither isolates FPS gain nor explains the prior DH outlier.
+The face-policy-only `2f8255f4` matrix remains a separate historical failure:
+vanilla p99 and DH FPS/p99 miss, including median DH FPS 630.5/795.85. Later
+passing batches do not erase those failures. See
+[terrain verification](RUST-TERRAIN-CULLING.md#verification) for original,
+interrupted and corrected receipt locations and scope.
 
 #### October 9 integrated light-map and scalar summary
 

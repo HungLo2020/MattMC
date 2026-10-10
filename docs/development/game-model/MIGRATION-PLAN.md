@@ -13,7 +13,9 @@
 Each phase is a normal migration slice: parity tests against Java, a
 production-path benchmark, and docs.
 
-## Current priority (2026-10-09)
+<a id="current-priority-2026-10-09"></a>
+
+## Current priority (2026-10-10)
 
 The linked guides distinguish current source ownership from author-recorded
 acceptance checkpoints. Their historical suite/image/performance results do not
@@ -36,7 +38,10 @@ different release identities; the
 [earlier verification](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
 also preserves the sky-only and range-fix checkpoints. Performance, ordinary
 gameplay, temporal parity and long-session memory acceptance remain open.
-This documentation review adds no runtime verification.
+The later terrain face-policy/shared-cache, DH height-field and DH lighting
+checkpoints have distinct release identities and workload results; follow their
+linked guides rather than carrying an earlier pass or failure forward. This
+documentation review inspects source and adds no runtime verification.
 
 Follow the owner boundary relevant to the next change:
 
@@ -52,7 +57,11 @@ Follow the owner boundary relevant to the next change:
   [bulk terrain-light consumer](../rendering/RUST-TERRAIN-LIGHTING.md).
   Java still supplies model admission, contextual light predicates/shade and
   biome/custom tint samples; unsupported and diagnostic inputs retain
-  compatibility paths.
+  compatibility paths. [Canonical face policy](../rendering/RUST-TERRAIN-CULLING.md)
+  now consumes retained world IDs directly in Rust. Java exports intrinsic face
+  geometry once and keeps contextual/tag/hook callbacks. The shared model,
+  selector and state cache permits concurrent builder reads while registration
+  and reload remain exclusive.
 - **Light publication and scalar reads:** [canonical light maps](../world/lighting/RUST-LIGHT-MAPS.md)
   retain section entries, typed layer owners and sky column metadata in Rust.
   Snapshots share 64-shard roots, and exact canonical block/sky scalar consumers
@@ -62,6 +71,19 @@ Follow the owner boundary relevant to the next change:
   timing: retain the original layer references, then lease their generations when
   the terrain-light consumer runs. This source ownership does not extend the
   linked guide's recorded verification to later revisions.
+- **DH world preparation:** [height fields](../world/chunk/RUST-DH-HEIGHTMAPS.md)
+  scan live blocks/counters and publish immutable CPU leases. The
+  [lighting and emitter owners](../world/lighting/RUST-DH-LIGHTING.md) perform
+  admitted whole passes and serve direct chunk light reads. Java retains strict
+  admission, wrapper publication, flags, public mutable projections and fallback
+  behavior. These owners do not migrate all DH generation or rendering. Remaining
+  voxel-column construction, biome/block lookup and full-data hashing are
+  candidates for a coupled producer/consumer migration; the recorded unpaired
+  CPU profile helps prioritize that work but cannot prove a throughput gain.
+  Preserve cached-source timing, mutable-storage detachment and section-local
+  exclusion rather than assuming a transactional neighborhood. The
+  [source-predicted stale-counter lighting case](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
+  needs a focused parity regression; it is not a runtime-observed failure.
 - **Live biomes and colors:** the [admitted palette owner and direct raw sky/fog consumers](../world/biome/RUST-LIVE-BIOMES.md)
   are native. Rust reuses exact-position colors only after validating the world
   revision and retained source generations. Java retains chunk lifecycle events,
@@ -263,6 +285,10 @@ The remaining registry-definition migration below is unfinished.
   emitted light and canonical fluid-state associations originate in native rules.
   Family configuration and state policy do not migrate world callbacks, ticking
   or entity queries; sound definitions do not migrate Java sound policy or resource caches.
+  The admitted [collision catalog](../world/chunk/RUST-DH-HEIGHTMAPS.md) and
+  [terrain face policy](../rendering/RUST-TERRAIN-CULLING.md) consume cached
+  intrinsic geometry with native block facts. Java still produces that geometry
+  and retains contextual/custom shape and callback behavior.
 
 ## Phase 3: behavior and components by family
 

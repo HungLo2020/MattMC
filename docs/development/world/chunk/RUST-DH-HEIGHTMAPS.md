@@ -3,9 +3,15 @@
 Admitted `ChunkWrapper` instances use a Rust-owned pair
 of height fields. Rust scans the existing live block and section-counter owners;
 Java does not construct dense block inputs, computed masks or two mirrored
-`int[16][16]` maps. Getters read an immutable CPU lease. Runtime admission,
-settled parity and the timing batch below are verified; broad gameplay and
+`int[16][16]` maps. Getters read an immutable CPU lease. Broad gameplay and
 long-session resource behavior remain open.
+
+Source ownership was reviewed at
+[`bffd0eef8`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574).
+The verification below preserves the implementation author's reports for the
+height-field release; this documentation review did not rerun Rust/Java suites
+or clients. Later [DH lighting results](../lighting/RUST-DH-LIGHTING.md) belong
+to their own release and do not replace the height-field evidence.
 
 Implementation:
 [height-field owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/dh_heightmaps),
@@ -61,7 +67,7 @@ from actual production wrappers, not a copied heightmap algorithm.
 The deterministic gzip fixture records 31,809 states, 31,532 cached states,
 323 collision geometries and 16 saved chunks across four dimensions/two seeds.
 Raw SHA-256: `a760bba8f0114ca2728c6d3dcaa70266346dea30fb84b1f8f9b8fb410a315afd`.
-Initial five Rust checks pass: cached solidity/opacity, all saved field pairs,
+The author's recorded initial five Rust checks pass: cached solidity/opacity, all saved field pairs,
 stale-empty counters, minimum-row behavior, malformed/contextual rejection and
 retained output lifetime. Five actual JNI tests pass on release `574b68f0`: all 31,532 cached states,
 16 saved chunks, direct DH getters, rebuild/retained-view behavior, original

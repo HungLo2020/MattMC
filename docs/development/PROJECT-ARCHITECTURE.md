@@ -20,6 +20,7 @@ src/main/rust/
 ├── compat/
 ├── content/
 │   ├── block/
+│   │   ├── collision/
 │   │   ├── definitions/
 │   │   └── family/
 │   ├── fluid/
@@ -77,11 +78,14 @@ src/main/rust/
         │   └── search/
         ├── chunk/
         │   ├── biomes/
+        │   ├── counters/
+        │   ├── dh_heightmaps/
         │   ├── live/
         │   ├── palette/
         │   ├── snapshot/
         │   └── stage_transfer.rs
         ├── lighting/
+        │   ├── dh/
         │   ├── layers/
         │   ├── maps/
         │   ├── priority_queue/
@@ -163,6 +167,20 @@ immutable color tables, chunk/packet/range events, compatibility sky/fog samplin
 terrain tint/blending, brightness/weather adjustments, contextual light, model
 admission and entity callbacks, and orchestrates chunks and generation stages.
 These owners do not complete the world migration.
+
+Admitted [DH height fields](world/chunk/RUST-DH-HEIGHTMAPS.md) in
+`world/level/chunk/dh_heightmaps/` scan live block owners and section counters
+using the bounded intrinsic collision catalog in `content/block/collision/`.
+Java's chunk wrappers borrow independent immutable CPU results instead of
+constructing two mirrored height arrays. The [DH lighting pass](world/lighting/RUST-DH-LIGHTING.md)
+in `world/level/lighting/dh/` owns section-local snapshots, sky seeding,
+priority queues, packed block/sky fields and shared emitter indices. Direct
+wrapper getters borrow those fields. Java retains exact-input admission,
+wrapper publication, correctness flags, mutable emitter-list projections and
+compatibility lighting. A mutable light operation detaches to Java storage;
+section-local locks do not make a whole chunk or neighborhood transactional.
+These world CPU producers are separate from DH render-column collection,
+GPU resources and ordinary light-engine publication below.
 
 [Canonical terrain face policy](rendering/RUST-TERRAIN-CULLING.md) now runs in
 Rust meshing over retained world IDs, using one bounded intrinsic geometry table
@@ -254,6 +272,11 @@ own state sound selection and model offsets. [Block-family configuration](game-m
 provides shared block sets, wood types and registered family parameters.
 [State policy](game-model/STATE-POLICY.md) computes tick/light-shape eligibility
 and leaf/entity markers into shared immutable columns.
+The [intrinsic collision catalog](world/chunk/RUST-DH-HEIGHTMAPS.md)
+retains admitted cached box geometry exported by Java once; Rust derives DH
+solidity and opacity using that geometry and existing block-registry facts.
+Dynamic/custom shape providers and incompatible policies keep Java callbacks.
+The catalog does not migrate shape construction or contextual collision queries.
 Playback resources stay in `audio/`, with Java retaining sound policy and
 resource lookup/cache callbacks. Block-family configuration and state policy do
 not migrate world callbacks, scheduling or entity queries. General gameplay remains Java.
@@ -277,7 +300,7 @@ Rendering systems belong here. This includes backend-independent render code, na
 Important current subdirectories:
 
 - `render/chunk/`: native chunk-rendering infrastructure, render lists, occlusion, translucent sorting, index generation, and rebuild triggers.
-- `render/chunk/meshing/`: native chunk mesher implementation, including section scanning, static models, fluids, lighting/AO, tinting, culling, packing, assembly, FFI records, and diagnostics.
+- `render/chunk/meshing/`: native chunk mesher implementation, including section scanning, static models, fluids, lighting/AO, tinting, culling, packing, assembly, FFI records, and diagnostics. Its [canonical face-policy owner](rendering/RUST-TERRAIN-CULLING.md) consumes retained world IDs; models, selectors and meshing states share one cache with concurrent read guards and exclusive registration/reload.
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
 - `render/dh_collector/`: the Distant Horizons column ledger: generations, column payloads, publication, retirement, owner leases, the prepared frame's visible segments and route receipts ([rendering architecture](rendering/RENDER-ARCHITECTURE.md)). Its Java exports are `render/bridge/dh_collector.rs`. Java still supplies the DH quadtree candidates, material provenance and frame parameters; native ledger ownership does not move those producers into Rust.

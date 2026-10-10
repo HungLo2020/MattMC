@@ -71,6 +71,34 @@ resolved and two stale atlas/shield expectations corrected at `7f256b53`.
 Do not classify a new mocking failure as an accepted baseline automatically;
 check the effective JVM, Byte Buddy configuration and actual failure.
 
+### Terrain and DH source and fixture boundaries
+
+The [terrain face-policy corpus](RUST-TERRAIN-CULLING.md#verification),
+[DH height-field corpus](../world/chunk/RUST-DH-HEIGHTMAPS.md#verification) and
+[DH lighting corpus](../world/lighting/RUST-DH-LIGHTING.md#verify) use generators
+against the untouched Frozen runtime. The face recorder checks the
+`BlockOcclusionCache` class hash and records `BlockState`/`Shapes` hashes; the
+height and lighting recorders check their three and seven declared class
+identities respectively. Do not regenerate expected answers from Current or
+a copied policy algorithm.
+The recorded fixtures cover 787,992 face decisions, 31,532 cached height-policy
+states/16 saved chunks, and 20 lighting cases/60 passes plus two cold JNI
+neighborhoods respectively. Fixture definitions are inspectable; reported
+Java/Rust results and live admission remain separate evidence. The
+[stale-counter source review](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
+identifies a raw-palette emitter write whose stale-empty section may read as air
+through legacy DH but remain visible to native lighting. That case was not run;
+height-field stale-counter fixtures do not certify lighting behavior for it.
+
+Retain custom wrapper/hook and public-mutation compatibility checks, old CPU
+lease lifetime checks, and registration/reload exclusion for shared cache readers.
+Section-local snapshots do not prove a coherent concurrently changing whole
+world. A CPU oracle match does not prove that gameplay selected the native path;
+correlate exact-library worker mappings with actual producer stacks, reviewed
+F3 movement and submitted DH work. Settled captures do not certify first-frame
+or transient rendering. The current and preceding release identities are
+[recorded separately](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary).
+
 ### Light-map source and fixture boundaries
 
 The [map fixtures](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/src/test/java/net/minecraft/world/level/lighting/NativeLightMapTest.java)
@@ -95,7 +123,33 @@ reports; it did not execute the Java/Rust fixtures.
 
 ### One-command validation
 
-The [light-map milestone](../world/lighting/RUST-LIGHT-MAPS.md) adds retained
+The latest [DH lighting/emitter record at `bffd0eef`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/PROGRESS.md)
+reports release `3f00217d`: 2,483 Rust passes/three ignored, 1,843 Java tests/two
+skips, five JNI checks, two observed exact-library JNI workers, seven lifecycle
+cases and reviewed settled vanilla/Iris+DH pairs. Twenty clean 6,000-frame timing
+runs meet all median FPS/p99 floors. DH required a predeclared extension from
+two to four repeats per side; keep all runs and the initial 0.22% FPS miss.
+The final approximately 0.66% DH margin and substantial repeat variation do not
+establish an isolated speedup. See [the matrix and receipt scope](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary).
+
+Do not merge lifecycle evidence across releases. Height-field `574b68f0` has six
+passing original cases and a separately passing strict same-source retry of the
+different-world transition; its original closed-channel failure remains and
+the classifier was unchanged. Lighting's seven replacement scenarios do not
+resolve that earlier teardown race. Likewise, face/cache `30586383` retains
+its interrupted enclosing validation and misconfigured first timing retry even
+though a corrected sixteen-run batch completed. That batch still failed vanilla
+p99. Report completed stages and rejected batches individually.
+
+At this source pin, independent verification executed only the two new
+flight-retention Python fixtures, using synthetic directories and mocked
+process discovery. The author reports thirteen retention tests and 43 combined
+retention/flight tests. Neither scope reruns the clients, lifecycle logs,
+Java/Rust suites, captures or performance workloads. Review the
+[retirement rules](ARTIFACT-STORAGE.md#verification-driver-retention) before
+running a driver; passing or failed comparisons may retire copied worlds.
+
+The preceding [light-map milestone](../world/lighting/RUST-LIGHT-MAPS.md) adds retained
 canonical map snapshots and direct scalar block/sky consumers. The
 [author's integrated record](https://github.com/HungLo2020/MattMC/blob/971e0226b5c45b6fb3b2699e6bdb92be27021261/PROGRESS.md#L60-L65)
 reports release `b7297d06` passing a fresh Rust suite (2,467 passes/three ignored)
