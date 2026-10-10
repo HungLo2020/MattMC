@@ -195,6 +195,7 @@ impl SectionGraph {
     /// in-flight builds are stale. `cancel_in_flight` when the worker pool was
     /// replaced (its cancelled jobs deliver nothing).
     pub fn reload_resources(&mut self, cancel_in_flight: bool) {
+        self.terrain_frames.invalidate();
         if cancel_in_flight {
             self.source.in_flight.clear();
             self.source.stale_in_flight.clear();

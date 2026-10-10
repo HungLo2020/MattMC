@@ -27,6 +27,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -70,6 +71,7 @@ public class FullDataSourceV2
 	
 	
 	public final FullDataPointIdMap mapping;
+	private net.minecraft.world.level.chunk.NativeDhColumns nativeOriginalColumns;
 	
 	
 	public long lastModifiedUnixDateTime;
@@ -92,7 +94,7 @@ public class FullDataSourceV2
 	 * stored x/z, y <br>
 	 * The y data should be sorted from top to bottom
 	 */
-	public final LongArrayList[] dataPoints;
+	public final LongList[] dataPoints;
 	/**
 	 * Conservative proof that a downsampled column's horizontal footprint had
 	 * one identical semantic source column. This is metadata only; it never
@@ -105,18 +107,21 @@ public class FullDataSourceV2
 	 * These are gameplay data only; the renderer must resolve identities and
 	 * geometry from them rather than treating one reduced sprite as authoritative.
 	 */
-	private final java.util.Map<Integer, LongArrayList[]> semanticHorizontalContributors = new java.util.HashMap<>();
+	private final java.util.Map<Integer, LongList[]> semanticHorizontalContributors = new java.util.HashMap<>();
 	private static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS = 1024;
 	/** Hard bound for each copied contributor column in the semantic sidecar. */
 	public static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS = 256;
 
-	private static LongArrayList[] remapHorizontalContributors(
-		LongArrayList[] sourceContributors, int[] remappedIds)
+	private static LongList[] remapHorizontalContributors(
+		LongList[] sourceContributors, int[] remappedIds)
 	{
 		if (sourceContributors == null || sourceContributors.length != 4) return null;
+		LongList[] nativeSnapshot = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(
+			sourceContributors, remappedIds, MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
+		if (nativeSnapshot != null) return nativeSnapshot;
 		LongArrayList[] copied = new LongArrayList[4];
 		for (int index = 0; index < copied.length; index++) {
-			LongArrayList source = sourceContributors[index];
+			LongList source = sourceContributors[index];
 			if (source == null) continue;
 			LongArrayList column = new LongArrayList(
 				Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS));
@@ -161,7 +166,7 @@ public class FullDataSourceV2
 		// Note: this logic only works if the data point data is the same between both versions
 		byte[] columnGenerationSteps = new byte[WIDTH * WIDTH];
 		byte[] columnWorldCompressionMode = new byte[WIDTH * WIDTH];
-		LongArrayList[] dataPoints = new LongArrayList[WIDTH * WIDTH];
+		LongList[] dataPoints = new LongList[WIDTH * WIDTH];
 		for (int x = 0; x < WIDTH; x++)
 		{
 			for (int z = 0; z < WIDTH; z++)
@@ -170,7 +175,7 @@ public class FullDataSourceV2
 				if (legacyDataColumn != null && legacyDataColumn.length != 0)
 				{
 					int index = relativePosToIndex(x, z);
-					LongArrayList newDataColumn = new LongArrayList(legacyDataColumn);
+					LongList newDataColumn = new LongArrayList(legacyDataColumn);
 					
 					
 					// convert the data point format
@@ -216,6 +221,23 @@ public class FullDataSourceV2
 		return fullDataSource;
 	}
 	
+	/** Adopt retained CPU columns without constructing Java point arrays. */
+	public static FullDataSourceV2 createNative(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		var mapping = FullDataPointIdMap.fromNative(columns);
+		var source = new FullDataSourceV2(columns.position(), mapping, null, null, null, false);
+		source.nativeOriginalColumns = columns;
+		source.applyToParent = true;
+		for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++)
+		{
+			int index = relativePosToIndex(x + columns.offsetX(), z + columns.offsetZ());
+			source.dataPoints[index] = columns.column(x, z);
+			source.columnGenerationSteps.set(index, EDhApiWorldGenerationStep.LIGHT.value);
+			source.columnWorldCompressionMode.set(index, (byte)columns.compression());
+		}
+		return source;
+	}
+
 	public static FullDataSourceV2 createEmpty(long pos)
 	{
 		return new FullDataSourceV2(
@@ -228,16 +250,16 @@ public class FullDataSourceV2
 				true);
 	}
 	
-	public static FullDataSourceV2 createWithData(long pos, FullDataPointIdMap mapping, LongArrayList[] data, byte[] columnGenerationStep, byte[] columnWorldCompressionMode)
+	public static FullDataSourceV2 createWithData(long pos, FullDataPointIdMap mapping, LongList[] data, byte[] columnGenerationStep, byte[] columnWorldCompressionMode)
 	{ return new FullDataSourceV2(pos, mapping, data, columnGenerationStep, columnWorldCompressionMode, false); }
 	
 	private FullDataSourceV2(
 			long pos,
-			FullDataPointIdMap mapping, @Nullable LongArrayList[] data,
+			FullDataPointIdMap mapping, @Nullable LongList[] data,
 			byte @Nullable [] columnGenerationSteps, byte @Nullable [] columnWorldCompressionMode,
 			boolean empty)
 	{
-		super(ARRAY_LIST_POOL, 2, 0, WIDTH * WIDTH);
+		super(ARRAY_LIST_POOL, 2, 0, 0);
 		
 		LodUtil.assertTrue(data == null || data.length == WIDTH * WIDTH);
 		
@@ -249,14 +271,14 @@ public class FullDataSourceV2
 		
 		
 		// pooled data arrays
-		this.dataPoints = new LongArrayList[WIDTH * WIDTH];
+		this.dataPoints = new LongList[WIDTH * WIDTH];
 		this.semanticHorizontalUniform = new boolean[WIDTH * WIDTH];
 		boolean blockResolution = DhSectionPos.getDetailLevel(pos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
 		for (int i = 0; i < WIDTH * WIDTH; i++)
 		{
 			// size defaulting to 0 since we don't know how many datapoints
 			// will be in this column yet
-			this.dataPoints[i] = this.pooledArraysCheckout.getLongArray(i, 0);
+			this.dataPoints[i] = net.minecraft.world.level.chunk.NativeDhColumnList.empty();
 			this.semanticHorizontalUniform[i] = blockResolution;
 		}
 		
@@ -298,7 +320,7 @@ public class FullDataSourceV2
 	// getters //
 	//=========//
 	
-	public LongArrayList getColumnAtRelPos(int relX, int relZ) throws IndexOutOfBoundsException 
+	public LongList getColumnAtRelPos(int relX, int relZ) throws IndexOutOfBoundsException
 	{ return this.dataPoints[relativePosToIndex(relX, relZ)]; }
 
 	/** Returns only a copied-data proof; callers must still validate material identity. */
@@ -308,7 +330,7 @@ public class FullDataSourceV2
 	/** Returns a defensive copy of the bounded source footprint, or null when unavailable. */
 	public LongArrayList[] getSemanticHorizontalContributors(int relX, int relZ)
 	{
-		LongArrayList[] contributors = this.semanticHorizontalContributors.get(relativePosToIndex(relX, relZ));
+		LongList[] contributors = this.semanticHorizontalContributors.get(relativePosToIndex(relX, relZ));
 		if (contributors == null) return null;
 		LongArrayList[] copy = new LongArrayList[contributors.length];
 		for (int i = 0; i < contributors.length; i++)
@@ -319,13 +341,28 @@ public class FullDataSourceV2
 		return copy;
 	}
 
+	/** Retained immutable CPU views for internal consumers; legacy inputs return defensive copies. */
+	public LongList[] getRetainedSemanticHorizontalContributors(int relX, int relZ)
+	{
+		LongList[] columns = this.semanticHorizontalContributors.get(relativePosToIndex(relX, relZ));
+		return net.minecraft.world.level.chunk.NativeDhContributors.isSnapshot(columns)
+			? columns.clone() : this.getSemanticHorizontalContributors(relX, relZ);
+	}
+
 	/** Rehydrates a bounded contributor footprint from the DTO semantic sidecar. */
-	public void setSemanticHorizontalContributors(int relX, int relZ, LongArrayList[] contributors)
+	public void setSemanticHorizontalContributors(int relX, int relZ, LongList[] contributors)
 	{
 		int index = relativePosToIndex(relX, relZ);
 		if (contributors == null || contributors.length != 4)
 		{
 			this.semanticHorizontalContributors.remove(index);
+			return;
+		}
+		LongList[] nativeSnapshot = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(
+			contributors, null, MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
+		if (nativeSnapshot != null)
+		{
+			this.semanticHorizontalContributors.put(index, nativeSnapshot);
 			return;
 		}
 		LongArrayList[] copy = new LongArrayList[4];
@@ -338,7 +375,7 @@ public class FullDataSourceV2
 	{ this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)] = uniform; }
 	
 	@Nullable
-	public LongArrayList tryGetColumnAtRelPos(int relX, int relZ)
+	public LongList tryGetColumnAtRelPos(int relX, int relZ)
 	{
 		int index = tryGetRelativePosToIndex(relX, relZ);
 		if (index == -1)
@@ -377,7 +414,7 @@ public class FullDataSourceV2
 		DhLodPos relativePos = requestedPos.getDhSectionRelativePositionForDetailLevel(requestDetailLevel);
 		
 		// get the data column
-		LongArrayList dataColumn = this.getColumnAtRelPos(relativePos.x, relativePos.z);
+		LongList dataColumn = this.getColumnAtRelPos(relativePos.x, relativePos.z);
 		if (dataColumn == null)
 		{
 			return FullDataPointUtil.EMPTY_DATA_POINT;
@@ -502,17 +539,24 @@ public class FullDataSourceV2
 			boolean cullHiddenBlocks = (worldCompressionMode != EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
 			if (cullHiddenBlocks)
 			{
+				try (var nativePolicy = net.minecraft.world.level.chunk.NativeDhMaterials.create(this.mapping))
+				{
+				if (this.getClass() != FullDataSourceV2.class
+					|| !net.minecraft.world.level.chunk.NativeDhOcclusionPass.tryCull(nativePolicy, this.dataPoints))
+				{
 				for (int x = 0; x < WIDTH; x++)
 				{
 					for (int z = 0; z < WIDTH; z++)
 					{
-						LongArrayList dataColumn = this.getColumnAtRelPos(x, z);
+						LongList dataColumn = this.getColumnAtRelPos(x, z);
 						if (dataColumn != null
 							&& dataColumn.size() > 1)
 						{
-							FullDataOcclusionCuller.cullHiddenDatapointsInColumn(this, x, z);
+							FullDataOcclusionCuller.cullHiddenDatapointsInColumn(this, x, z, nativePolicy);
 						}
 					}
+				}
+				}
 				}
 			}
 			
@@ -534,13 +578,36 @@ public class FullDataSourceV2
 		
 		// copy over everything from the input data source into this one
 		// provided there is data to copy and the world generation step is the same or more complete
+		if (!RUN_DATA_ORDER_VALIDATION && this.getClass() == FullDataSourceV2.class
+			&& inputDataSource.getClass() == FullDataSourceV2.class)
+		{
+			var nativeMerge = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.prepare(
+				this.dataPoints, inputDataSource.dataPoints, this.columnGenerationSteps, this.columnWorldCompressionMode, inputDataSource.columnGenerationSteps,
+				inputDataSource.columnWorldCompressionMode, inputDataSource.semanticHorizontalUniform,
+				this.semanticHorizontalContributors, inputDataSource.semanticHorizontalContributors, remappedIds);
+			if (nativeMerge != null)
+			{
+				nativeMerge.commit(this.dataPoints);
+				for (int index = 0; index < WIDTH * WIDTH; index++) if (nativeMerge.updated(index))
+				{
+					this.columnGenerationSteps.set(index, nativeMerge.generation(index));
+					this.columnWorldCompressionMode.set(index, nativeMerge.compression(index));
+					this.semanticHorizontalUniform[index] = nativeMerge.uniform(index);
+					this.semanticHorizontalContributors.remove(index);
+					LongList[] footprint = nativeMerge.contributors(index);
+					if (footprint != null) this.semanticHorizontalContributors.put(index, footprint);
+					this.isEmpty = false;
+				}
+				return nativeMerge.changed();
+			}
+		}
 		boolean dataChanged = false;
 		for (int x = 0; x < WIDTH; x++)
 		{
 			for (int z = 0; z < WIDTH; z++)
 			{
 				int index = relativePosToIndex(x, z);
-				LongArrayList inputDataArray = inputDataSource.dataPoints[index];
+				LongList inputDataArray = inputDataSource.dataPoints[index];
 				if (inputDataArray == null)
 				{
 					continue;
@@ -634,7 +701,7 @@ public class FullDataSourceV2
 				if (!this.semanticHorizontalUniform[index]
 					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
 				{
-					LongArrayList[] contributors = remapHorizontalContributors(
+					LongList[] contributors = remapHorizontalContributors(
 						inputDataSource.semanticHorizontalContributors.get(index), remappedIds);
 					if (contributors != null) this.semanticHorizontalContributors.put(index, contributors);
 				}
@@ -668,106 +735,137 @@ public class FullDataSourceV2
 		// merge the input's data points
 		// into this data source's
 		boolean dataChanged = false;
-		for (int x = 0; x < WIDTH; x += 2)
+		try (var nativeMaterials = net.minecraft.world.level.chunk.NativeDhMaterials.create(inputDataSource.mapping))
 		{
-			for (int z = 0; z < WIDTH; z += 2)
+			boolean[] previousFootprints = new boolean[1024];
+			for (int x = 0; x < WIDTH / 2; x++) for (int z = 0; z < WIDTH / 2; z++)
+				previousFootprints[x * 32 + z] = this.semanticHorizontalContributors.containsKey(
+					relativePosToIndex(x + recipientOffsetX, z + recipientOffsetZ));
+			var nativeParent = RUN_DATA_ORDER_VALIDATION || inputDataSource.columnWorldCompressionMode.size() != WIDTH * WIDTH
+				|| inputDataSource.columnGenerationSteps.size() != WIDTH * WIDTH ? null
+				: net.minecraft.world.level.chunk.NativeDhParentColumns.build(nativeMaterials, inputDataSource.dataPoints, remappedIds,
+					inputDataSource.columnWorldCompressionMode.elements(), inputDataSource.semanticHorizontalUniform,
+					previousFootprints, this.semanticHorizontalContributors.size(), inputDataSource.columnGenerationSteps.elements());
+			for (int x = 0; x < WIDTH; x += 2)
 			{
-				int recipientX = (x / 2) + recipientOffsetX;
-				int recipientZ = (z / 2) + recipientOffsetZ;
-				int recipientIndex = relativePosToIndex(recipientX, recipientZ);
-				
-				
-				// world gen //
-				byte inputGenStep = determineMinWorldGenStepForTwoByTwoColumn(inputDataSource.columnGenerationSteps, x, z);
-				this.columnGenerationSteps.set(recipientIndex, inputGenStep);
-				
-				
-				// world compression //
-				byte worldCompressionMode = determineHighestWorldCompressionForTwoByTwoColumn(inputDataSource.columnWorldCompressionMode, x, z);
-				this.columnWorldCompressionMode.set(recipientIndex, worldCompressionMode);
-				
-				
-				
-				// data points //
-				LongArrayList mergedInputDataArray = mergeInputTwoByTwoDataColumn(inputDataSource, x, z);
-				int targetIndex = recipientIndex;
-				this.semanticHorizontalUniform[targetIndex] = semanticallyUniformTwoByTwo(
-					inputDataSource, x, z, remappedIds
-				);
-				this.semanticHorizontalContributors.remove(targetIndex);
-				if (!this.semanticHorizontalUniform[targetIndex]
-					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
+				for (int z = 0; z < WIDTH; z += 2)
 				{
-					LongArrayList[] contributors = new LongArrayList[4];
-					int contributor = 0;
-					for (int dx = 0; dx < 2; dx++)
+					int recipientX = (x / 2) + recipientOffsetX;
+					int recipientZ = (z / 2) + recipientOffsetZ;
+					int recipientIndex = relativePosToIndex(recipientX, recipientZ);
+
+
+					// world gen //
+					byte inputGenStep = nativeParent == null
+						? determineMinWorldGenStepForTwoByTwoColumn(inputDataSource.columnGenerationSteps, x, z)
+						: nativeParent.generationStep(x / 2, z / 2);
+					this.columnGenerationSteps.set(recipientIndex, inputGenStep);
+
+
+					// world compression //
+					byte worldCompressionMode = nativeParent == null
+						? determineHighestWorldCompressionForTwoByTwoColumn(inputDataSource.columnWorldCompressionMode, x, z)
+						: nativeParent.compressionMode(x / 2, z / 2);
+					this.columnWorldCompressionMode.set(recipientIndex, worldCompressionMode);
+
+
+
+					// data points //
+					LongList mergedInputDataArray = nativeParent == null
+						? mergeInputTwoByTwoDataColumn(inputDataSource, x, z, nativeMaterials)
+						: nativeParent.column(x / 2, z / 2);
+					int targetIndex = recipientIndex;
+					this.semanticHorizontalUniform[targetIndex] = nativeParent == null
+						? semanticallyUniformTwoByTwo(inputDataSource, x, z, remappedIds)
+						: nativeParent.isUniform(x / 2, z / 2);
+					this.semanticHorizontalContributors.remove(targetIndex);
+					if (!this.semanticHorizontalUniform[targetIndex]
+						&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
 					{
-						for (int dz = 0; dz < 2; dz++)
+						LongList[] contributors = nativeParent == null ? null : nativeParent.contributors(x / 2, z / 2);
+						if (nativeParent == null)
 						{
-							LongArrayList source = inputDataSource.dataPoints[relativePosToIndex(x + dx, z + dz)];
-							if (source == null)
-							{
-								contributors[contributor++] = null;
-								continue;
-							}
-							LongArrayList copied = new LongArrayList(source.subList(0,
-								Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
-							for (int point = 0; point < copied.size(); point++)
-							{
-								copied.set(point, FullDataPointUtil.remap(remappedIds, copied.getLong(point)));
-							}
-							contributors[contributor++] = copied;
+							LongList[] inputs = new LongList[4];
+							for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++)
+								inputs[dx * 2 + dz] = inputDataSource.dataPoints[relativePosToIndex(x + dx, z + dz)];
+							contributors = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(
+								inputs, remappedIds, MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
 						}
+						if (contributors == null)
+						{
+							contributors = new LongArrayList[4];
+							int contributor = 0;
+							for (int dx = 0; dx < 2; dx++)
+							{
+								for (int dz = 0; dz < 2; dz++)
+								{
+									LongList source = inputDataSource.dataPoints[relativePosToIndex(x + dx, z + dz)];
+									if (source == null)
+									{
+										contributors[contributor++] = null;
+										continue;
+									}
+									LongArrayList copied = new LongArrayList(source.subList(0,
+										Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
+									for (int point = 0; point < copied.size(); point++)
+									{
+										copied.set(point, FullDataPointUtil.remap(remappedIds, copied.getLong(point)));
+									}
+									contributors[contributor++] = copied;
+								}
+							}
+						}
+						this.semanticHorizontalContributors.put(targetIndex, contributors);
 					}
-					this.semanticHorizontalContributors.put(targetIndex, contributors);
-				}
-				
-				// check if the data changed
-				if (this.dataPoints[recipientIndex] == null)
-				{
-					// no data was present previously
-					dataChanged = true;
-				}
-				else if (this.dataPoints[recipientIndex].size() != mergedInputDataArray.size())
-				{
-					// data is present, but the size is different
-					dataChanged = true;
-				}
-				
-				int oldDataHash = 0;
-				if (!dataChanged)
-				{
-					// some old data existed with the same length,
-					// we'll have to compare the caches
-					oldDataHash = this.dataPoints[recipientIndex].hashCode();
-				}
-				
-				
-				this.dataPoints[recipientIndex] = mergedInputDataArray;
-				this.remapDataColumn(recipientIndex, remappedIds);
-				
-				if (RUN_DATA_ORDER_VALIDATION)
-				{
-					throwIfDataColumnInWrongOrder(inputDataSource.pos, this.dataPoints[recipientIndex]);
-				}
-				
-				
-				
-				if (!dataChanged)
-				{
-					// check if the identical length data column hashes are the same
-					// hashes need to be compared after the ID's have been remapped otherwise the ID's won't match even if the data is the same
-					if (oldDataHash != this.dataPoints[recipientIndex].hashCode())
+
+					// check if the data changed
+					if (this.dataPoints[recipientIndex] == null)
 					{
-						// the hashes are different, something was changed
+						// no data was present previously
 						dataChanged = true;
 					}
+					else if (this.dataPoints[recipientIndex].size() != mergedInputDataArray.size())
+					{
+						// data is present, but the size is different
+						dataChanged = true;
+					}
+
+					int oldDataHash = 0;
+					if (!dataChanged)
+					{
+						// some old data existed with the same length,
+						// we'll have to compare the caches
+						oldDataHash = this.dataPoints[recipientIndex].hashCode();
+					}
+
+
+					this.dataPoints[recipientIndex] = mergedInputDataArray;
+					if (nativeParent == null) this.remapDataColumn(recipientIndex, remappedIds);
+
+					if (RUN_DATA_ORDER_VALIDATION)
+					{
+						throwIfDataColumnInWrongOrder(inputDataSource.pos, this.dataPoints[recipientIndex]);
+					}
+
+
+
+					if (!dataChanged)
+					{
+						// check if the identical length data column hashes are the same
+						// hashes need to be compared after the ID's have been remapped otherwise the ID's won't match even if the data is the same
+						if (oldDataHash != this.dataPoints[recipientIndex].hashCode())
+						{
+							// the hashes are different, something was changed
+							dataChanged = true;
+						}
+					}
+
+					this.isEmpty = false;
 				}
-				
-				this.isEmpty = false;
 			}
+
+
 		}
-		
 		return dataChanged;
 	}
 	/** 
@@ -808,16 +906,23 @@ public class FullDataSourceV2
 		}
 		return minWorldGenStepValue;
 	}
-	private static LongArrayList mergeInputTwoByTwoDataColumn(FullDataSourceV2 inputDataSource, int x, int z)
+	private static LongList mergeInputTwoByTwoDataColumn(FullDataSourceV2 inputDataSource, int x, int z)
 	{
-		LongArrayList newColumnList = new LongArrayList();
+		try (var nativeMaterials = net.minecraft.world.level.chunk.NativeDhMaterials.create(inputDataSource.mapping))
+		{
+			return mergeInputTwoByTwoDataColumn(inputDataSource, x, z, nativeMaterials);
+		}
+	}
+	private static LongList mergeInputTwoByTwoDataColumn(FullDataSourceV2 inputDataSource, int x, int z,
+			net.minecraft.world.level.chunk.NativeDhMaterials nativeMaterials)
+	{
 		
 		
 		//=========================//
 		// get the 4 input columns //
 		//=========================//
 		
-		LongArrayList[] inputColumns = new LongArrayList[4];
+		LongList[] inputColumns = new LongList[4];
 		int colIndex = 0;
 		for (int inputX = x; inputX < x + 2; inputX++)
 		{
@@ -834,6 +939,11 @@ public class FullDataSourceV2
 		
 		
 		
+		var nativeColumn = net.minecraft.world.level.chunk.NativeDhColumnList.tryReduce(
+			nativeMaterials, inputColumns);
+		if (nativeColumn != null) return nativeColumn;
+		LongList newColumnList = new LongArrayList();
+
 		//========================================//
 		// find all y levels where changes happen //
 		//========================================//
@@ -929,7 +1039,7 @@ public class FullDataSourceV2
 				}
 				
 				
-				LongArrayList column = inputColumns[i];
+				LongList column = inputColumns[i];
 				if (column == null)
 				{
 					continue;
@@ -1048,7 +1158,7 @@ public class FullDataSourceV2
 			|| !source.semanticHorizontalUniform[referenceIndex]) {
 			return false;
 		}
-		LongArrayList reference = source.dataPoints[referenceIndex];
+		LongList reference = source.dataPoints[referenceIndex];
 		for (int dx = 0; dx < 2; dx++) {
 			for (int dz = 0; dz < 2; dz++) {
 				int index = relativePosToIndex(x + dx, z + dz);
@@ -1064,7 +1174,7 @@ public class FullDataSourceV2
 	}
 
 	private static boolean semanticDataColumnEquals(
-		LongArrayList left, LongArrayList right, int[] remappedIds
+		LongList left, LongList right, int[] remappedIds
 	) {
 		if (left == null || right == null) return left == right;
 		if (left.size() != right.size()) return false;
@@ -1091,7 +1201,12 @@ public class FullDataSourceV2
 	 */
 	private void remapDataColumn(int dataPointIndex, int[] remappedIds)
 	{
-		LongArrayList dataColumn = this.dataPoints[dataPointIndex];
+		LongList dataColumn = this.dataPoints[dataPointIndex];
+		if (dataColumn instanceof net.minecraft.world.level.chunk.NativeDhColumnList nativeColumn)
+		{
+			nativeColumn.remapIds(remappedIds);
+			return;
+		}
 		for (int i = 0; i < dataColumn.size(); i++)
 		{
 			dataColumn.set(i, FullDataPointUtil.remap(remappedIds, dataColumn.getLong(i)));
@@ -1270,7 +1385,7 @@ public class FullDataSourceV2
 				if (!this.semanticHorizontalUniform[recipientIndex]
 					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
 				{
-					LongArrayList[] contributors = remapHorizontalContributors(
+					LongList[] contributors = remapHorizontalContributors(
 						inputDataSource.semanticHorizontalContributors.get(inputIndex), remappedIds);
 					if (contributors != null) this.semanticHorizontalContributors.put(recipientIndex, contributors);
 				}
@@ -1300,7 +1415,7 @@ public class FullDataSourceV2
 				
 				if (downSampleColumn)
 				{
-					LongArrayList inputDataArray = inputDataSource.dataPoints[inputIndex];
+					LongList inputDataArray = inputDataSource.dataPoints[inputIndex];
 					this.dataPoints[recipientIndex] = inputDataArray;
 					this.remapDataColumn(recipientIndex, remappedIds);
 					
@@ -1345,7 +1460,7 @@ public class FullDataSourceV2
 					continue;
 				}
 				
-				LongArrayList dataColumn = this.getColumnAtRelPos(relX, relZ);
+				LongList dataColumn = this.getColumnAtRelPos(relX, relZ);
 				dataColumn.clear();
 				dataColumn.add(FullDataPointUtil.EMPTY_DATA_POINT);
 			}
@@ -1397,7 +1512,7 @@ public class FullDataSourceV2
 	 * 
 	 * @see FullDataSourceV2#dataPoints
 	 */
-	public static void throwIfDataColumnInWrongOrder(long pos, LongArrayList dataArray) throws IllegalStateException
+	public static void throwIfDataColumnInWrongOrder(long pos, LongList dataArray) throws IllegalStateException
 	{
 		if (dataArray.size() < 2)
 		{
@@ -1420,7 +1535,7 @@ public class FullDataSourceV2
 	 * Ensures the given data column is in the correct Y order, specifically
 	 * top-to-bottom.
 	 */
-	private static void ensureDataColumnOrder(LongArrayList dataColumn)
+	private static void ensureDataColumnOrder(LongList dataColumn)
 	{
 		if (dataColumn.size() < 2)
 		{
@@ -1457,7 +1572,7 @@ public class FullDataSourceV2
 	
 	public byte getDataDetailLevel() { return (byte) (DhSectionPos.getDetailLevel(this.pos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL); }
 	
-	public void setSingleColumn(LongArrayList longArray, int relX, int relZ, EDhApiWorldGenerationStep worldGenStep, EDhApiWorldCompressionMode worldCompressionMode)
+	public void setSingleColumn(LongList longArray, int relX, int relZ, EDhApiWorldGenerationStep worldGenStep, EDhApiWorldCompressionMode worldCompressionMode)
 	{
 		int index = relativePosToIndex(relX, relZ);
 		this.dataPoints[index] = longArray;
@@ -1507,7 +1622,7 @@ public class FullDataSourceV2
 				LodDataBuilder.validateOrThrowApiDataColumn(columnDataPoints);
 			}
 			
-			LongArrayList packedDataPoints = LodDataBuilder.convertApiDataPointListToPackedLongArray(columnDataPoints, this, 0, true);
+			LongList packedDataPoints = LodDataBuilder.convertApiDataPointListToPackedLongArray(columnDataPoints, this, 0, true);
 			
 			// TODO there should be an "unknown" compression and generation step, or be defined via the datapoints
 			this.setSingleColumn(packedDataPoints, relX, relZ, EDhApiWorldGenerationStep.SURFACE, EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
@@ -1523,7 +1638,7 @@ public class FullDataSourceV2
 	@Override 
 	public List<DhApiTerrainDataPoint> getApiDataPointColumn(int relX, int relZ) throws IndexOutOfBoundsException
 	{
-		LongArrayList dataColumn = this.getColumnAtRelPos(relX, relZ);
+		LongList dataColumn = this.getColumnAtRelPos(relX, relZ);
 		
 		ArrayList<DhApiTerrainDataPoint> apiList = new ArrayList<>();
 		for (int i = 0; i < dataColumn.size(); i++)
@@ -1567,12 +1682,37 @@ public class FullDataSourceV2
 	}
 	private void generateHashCode()
 	{
+		var nativeColumns = this.nativeOriginalColumns;
+		if (nativeColumns != null && this.hasOriginalNativeColumns(nativeColumns))
+		{
+			this.cachedHashCode = nativeColumns.sourceHash();
+			return;
+		}
+		this.nativeOriginalColumns = null;
 		int result = DhSectionPos.hashCode(this.pos);
 		result = 31 * result + Arrays.deepHashCode(this.dataPoints);
 		result = 17 * result + this.columnGenerationSteps.hashCode();
 		result = 43 * result + this.columnWorldCompressionMode.hashCode();
 		
 		this.cachedHashCode = result;
+	}
+	/** Public arrays/list mutations must never reuse the immutable native hash. */
+	private boolean hasOriginalNativeColumns(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		if (this.pos != columns.position() || this.columnGenerationSteps.size() != WIDTH * WIDTH
+			|| this.columnWorldCompressionMode.size() != WIDTH * WIDTH) return false;
+		int ox = columns.offsetX(), oz = columns.offsetZ();
+		for (int x = 0; x < WIDTH; x++) for (int z = 0; z < WIDTH; z++)
+		{
+			int index = relativePosToIndex(x, z); var list = this.dataPoints[index];
+			boolean occupied = x >= ox && x < ox + 16 && z >= oz && z < oz + 16;
+			if (occupied ? !columns.ownsOriginalColumn(list, x - ox, z - oz)
+                : list == null || (list.getClass() != LongArrayList.class
+                    && list.getClass() != net.minecraft.world.level.chunk.NativeDhColumnList.class) || !list.isEmpty()) return false;
+			if (this.columnGenerationSteps.getByte(index) != (occupied ? EDhApiWorldGenerationStep.LIGHT.value : 0)
+				|| this.columnWorldCompressionMode.getByte(index) != (occupied ? (byte)columns.compression() : 0)) return false;
+		}
+		return true;
 	}
 	
 	@Override 

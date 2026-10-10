@@ -12,6 +12,7 @@ import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.ZeroBitStorage;
 import net.minecraft.world.level.biome.Biome;
+import org.jetbrains.annotations.Nullable;
 
 /** Authoritative native biome storage; Java retains scoped CPU views only. */
 final class NativeLiveBiomeSection<T> {
@@ -19,6 +20,7 @@ final class NativeLiveBiomeSection<T> {
         final List<T> values;
         final IdentityHashMap<T, Integer> ids = new IdentityHashMap<>();
         final int[] sky, fog;
+        @Nullable volatile NativeDhChunkHash.Domain dhHashDomain;
         Binding(List<T> values, int[] sky, int[] fog) {
             this.values = List.copyOf(values); this.sky = sky; this.fog = fog;
             for (int i = 0; i < values.size(); i++) ids.put(values.get(i), i);

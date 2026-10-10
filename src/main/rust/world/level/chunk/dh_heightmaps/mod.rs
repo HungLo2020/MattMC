@@ -1,7 +1,9 @@
 //! Rust-owned DH height fields, scanning existing live sections directly.
 //! This is world CPU policy; it borrows no renderer or external GPU state.
-use super::{counters, live};
+use super::{counters, live, inputs::{Chunk, Sections}};
 use crate::content::block::collision::Catalog;
+use std::sync::{Arc, Mutex, OnceLock};
+mod cache;
 
 /// Read-only compatibility CPU view. Owner lifetime is independent of inputs.
 #[repr(C)]
@@ -24,10 +26,14 @@ pub(crate) fn build(
     {
         return None;
     }
-    let empty: Vec<_> = sections
-        .iter()
-        .map(|(_, counts)| counts.values()[0] == 0)
-        .collect();
+    let sections = Sections::Pairs(sections);
+    let empty = empty_mask(sections);
+    build_with_empty(sections, min_y, catalog, &empty)
+}
+fn build_with_empty(
+    sections: Sections<'_>, min_y: i32,
+    catalog: &Catalog, empty: &[bool],
+) -> Option<Box<Heightmaps>> {
     let bottom = empty.iter().position(|&e| !e).unwrap_or(0);
     let top = empty.iter().rposition(|&e| !e).unwrap_or(0);
     let min = min_y + bottom as i32 * 16;
@@ -43,7 +49,7 @@ pub(crate) fn build(
         if empty[section] {
             continue;
         }
-        sections[section].0.with_state_reader(|reader| {
+        sections.block(section).with_state_reader(|reader| {
             // Decline any contextual state in an accessed section. No partial
             // result escapes; the caller can still execute original callbacks.
             if !reader.all_states(|id| catalog.dh(id).is_some()) {
@@ -85,6 +91,21 @@ pub(crate) fn build(
     }
     Some(result)
 }
+fn empty_mask(sections: Sections<'_>) -> Vec<bool> {
+    (0..sections.len()).map(|s| sections.counter(s).unwrap().values()[0] == 0).collect()
+}
+fn cached(sections: Sections<'_>, min_y: i32) -> *mut Heightmaps {
+    let Some(catalog) = crate::content::block::collision::installed() else { return std::ptr::null_mut(); };
+    static CACHE: OnceLock<Mutex<cache::Cache<'static>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(cache::Cache::new(catalog)));
+    cache::build_sections(sections, min_y, cache).map_or(std::ptr::null_mut(), |fields| Arc::into_raw(fields).cast_mut())
+}
+/// Shared chunk bindings are pinned through the call; no section array transport.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_heightmaps_from_chunk(owner: *const Chunk) -> *mut Heightmaps {
+    if owner.is_null() || owner as usize % std::mem::align_of::<Chunk>() != 0 { return std::ptr::null_mut(); }
+    cached(Sections::Retained(&*owner), (*owner).min_y)
+}
 /// Borrow [live owner, counter owner] pointer pairs. Each owner is pinned for
 /// the call; owners/counters retain their normal mutation/exclusion rules.
 #[no_mangle]
@@ -99,9 +120,6 @@ pub unsafe extern "C" fn mattmc_dh_heightmaps_create(
     {
         return std::ptr::null_mut();
     }
-    let Some(catalog) = crate::content::block::collision::installed() else {
-        return std::ptr::null_mut();
-    };
     let pairs = std::slice::from_raw_parts(pairs, count as usize * 2);
     let mut sections = Vec::with_capacity(count as usize);
     for pair in pairs.chunks_exact(2) {
@@ -117,13 +135,13 @@ pub unsafe extern "C" fn mattmc_dh_heightmaps_create(
             &*(pair[1] as *const counters::Owner),
         ));
     }
-    build(&sections, min_y, catalog).map_or(std::ptr::null_mut(), Box::into_raw)
+    cached(Sections::Pairs(&sections), min_y)
 }
 /// Release exactly once after CPU views and calls finish.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_heightmaps_release(owner: *mut Heightmaps) {
     if !owner.is_null() {
-        drop(Box::from_raw(owner));
+        drop(Arc::from_raw(owner));
     }
 }
 #[cfg(test)]

@@ -328,6 +328,8 @@ pub struct FfiTerrainSelectionView {
     pub layer_probes: u64,
     pub layer_submissions: u64,
     pub fingerprint: u64,
+    pub frame_owner: u64,
+    pub frame_id: u64,
 }
 
 /// Applies published mesh rows; `clear` first drops every row.
@@ -402,6 +404,9 @@ pub unsafe extern "C" fn mattmc_sodium_section_graph_select_terrain(
     graph.last_visits = visits;
     graph.terrain = terrain;
     let terrain = &graph.terrain;
+    let Some(frame_id) = graph.terrain_frames.publish(terrain, params.camera) else {
+        return ERR_INVALID_ARGUMENT;
+    };
     std::ptr::write_unaligned(
         out,
         FfiTerrainSelectionView {
@@ -415,6 +420,8 @@ pub unsafe extern "C" fn mattmc_sodium_section_graph_select_terrain(
             layer_probes: terrain.receipts.layer_probes,
             layer_submissions: terrain.receipts.layer_submissions,
             fingerprint: terrain.receipts.fingerprint,
+            frame_owner: graph.terrain_frames.id,
+            frame_id,
         },
     );
     OK

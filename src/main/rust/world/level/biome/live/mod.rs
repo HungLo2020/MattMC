@@ -1,5 +1,6 @@
 //! Loaded-world biome owners feed retained sky and fog fields directly.
 use crate::world::level::chunk::biomes::{Generation, Owner};
+use crate::world::level::chunk::inputs::Biomes;
 use std::{collections::HashMap, sync::Arc};
 mod ffi;
 mod sampling;
@@ -12,6 +13,7 @@ pub enum BiomeColor {
 #[derive(Clone)]
 enum Chunk {
     Native(Arc<[Arc<Owner>]>),
+    Retained(Arc<Biomes>),
     Compatibility,
 }
 struct Source {
@@ -117,6 +119,20 @@ impl LiveBiomeFields {
         self.window = None;
         true
     }
+    /// The producer's immutable binding is shared with column consumers. A
+    /// repeated publication can retain its valid window: source mutation is
+    /// independently detected through every owner's generation/revision.
+    pub(crate) fn replace_inputs(&mut self,epoch:u64,position:(i32,i32),inputs:Arc<Biomes>) -> bool {
+        if !self.admissible(epoch,position)
+            || inputs.len()!=(self.max_y-self.min_y+1) as usize/4
+            || inputs.iter().any(|owner|!owner.is_valid() || owner.limit as usize!=self.colors[0].len()) {
+            return false;
+        }
+        if self.chunks.get(&position).is_some_and(|old|matches!(old,Chunk::Retained(old) if Arc::ptr_eq(old,&inputs))) {
+            return true;
+        }
+        self.chunks.insert(position,Chunk::Retained(inputs));self.revision+=1;self.window=None;true
+    }
     pub fn compatibility(&mut self, epoch: u64, position: (i32, i32)) -> bool {
         if !self.admissible(epoch, position) {
             return false;
@@ -169,11 +185,12 @@ impl LiveBiomeFields {
                 colors[1][i] = self.fallback[1];
                 continue;
             };
-            let Chunk::Native(owners) = chunk else {
-                return None;
-            };
             let y = y.clamp(self.min_y, self.max_y) - self.min_y;
-            let owner = &owners[y as usize / 4];
+            let owner = match chunk {
+                Chunk::Native(owners) => &owners[y as usize / 4],
+                Chunk::Retained(inputs) => inputs.owner(y as usize / 4),
+                Chunk::Compatibility => return None,
+            };
             if !owner.is_valid() {
                 return None;
             }
@@ -315,7 +332,10 @@ mod tests {
                     })
                     .collect::<Vec<_>>()
                     .into();
-                assert!(world.replace(7, position, owners));
+                let pointers=owners.iter().map(|o|Arc::as_ptr(o) as usize).collect::<Vec<_>>();
+                let input=unsafe {crate::world::level::chunk::inputs::mattmc_chunk_biome_inputs_create(pointers.as_ptr(),pointers.len() as i32)};
+                assert!(!input.is_null());
+                assert!(world.replace_inputs(7,position,unsafe {Arc::from_raw(input)}));
             }
             assert_eq!(
                 world
@@ -496,5 +516,31 @@ mod tests {
         assert!(world.query(9, [f64::INFINITY, 0., 0.]).is_none());
         assert!(world.remove(9, (0, 0)));
         assert_eq!(world.query(9, [0.0, 0., 0.]), Some([0.0; 3]));
+    }
+    #[test]
+    fn retained_republication_reuses_window_but_alias_growth_and_replacement_invalidate_it() {
+        use crate::world::level::chunk::inputs;
+        let colors:Arc<[u32]>=(0..512u32).map(|v|v*0x03050b&0xffffff).collect();
+        let mut world=LiveBiomeFields::new(7,0,4,[colors.clone(),colors],0,1).unwrap();
+        let owner=Arc::new(Owner::load(0,0,&[7],&[],512,9).unwrap());
+        let alias=owner.copy();let weak=Arc::downgrade(&owner);
+        let pointers=[Arc::as_ptr(&owner) as usize];
+        let raw=unsafe {inputs::mattmc_chunk_biome_inputs_create(pointers.as_ptr(),1)};
+        let input=unsafe {Arc::from_raw(raw)};
+        assert!(world.replace_inputs(7,(0,0),input.clone()));
+        let first=world.query(7,[1.5;3]).unwrap();
+        let revision=world.revision;let capture=world.window.as_ref().unwrap().colors.as_ptr();
+        for _ in 0..8 {assert!(world.replace_inputs(7,(0,0),input.clone()));}
+        assert_eq!(world.revision,revision);assert_eq!(world.window.as_ref().unwrap().colors.as_ptr(),capture);
+        assert!(alias.read_single(9));
+        assert!(world.replace_inputs(7,(0,0),input.clone()));
+        let second=world.query(7,[1.5;3]).unwrap();assert_ne!(first,second);
+        for row in 0..64 {owner.write(row,(row+20) as u32).unwrap();}
+        assert!(world.replace_inputs(7,(0,0),input.clone()));assert_ne!(second,world.query(7,[1.5;3]).unwrap());
+        drop(input);drop(owner);assert!(weak.upgrade().is_some());
+        assert!(!world.replace_inputs(8,(0,0),match world.chunks.get(&(0,0)).unwrap() {Chunk::Retained(i)=>i.clone(),_=>unreachable!()}));
+        assert_eq!(world.revision,revision);
+        assert!(world.compatibility(7,(0,0)));assert!(world.query(7,[1.5;3]).is_none());assert!(weak.upgrade().is_none());
+        assert!(world.clear(7));assert_eq!(world.query(7,[1.5;3]),Some([0.;3]));
     }
 }

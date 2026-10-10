@@ -18,6 +18,11 @@ owners and fuse with canonical writes. Admitted [live biome palettes and sky
 sampling](../biome/RUST-LIVE-BIOMES.md) have separate Rust owners. Java retains
 chunk orchestration, scheduling and compatibility paths.
 
+The local [DH chunk-input migration](RUST-DH-CHUNK-INPUTS.md) also makes primary
+live owners reference counted, including stage adoption. Chunk consumers retain
+the mutable owner across palette growth; generation views keep their independent
+leases. CPU verification and runtime limits are recorded in that guide.
+
 ## Consumers and remaining work
 
 Rebuild captures decode directly from the live owner in Rust. Under the owner
@@ -69,6 +74,26 @@ improvement. A native executable and complete Java removal remain unfinished.
   original Java representation once and transfers ownership back. Invalid writes
   preserve the original palette-admission-before-index-error behavior. Counting
   callbacks continue to resolve the current palette after a callback mutates it.
+
+## Local consumer invalidation (in progress)
+
+Authoritative generations now also own saturating mutation revisions for
+[bounded height-field reuse](RUST-DH-HEIGHTMAPS.md#local-bounded-field-reuse-in-progress).
+Every packed write, palette append and shared single-value replacement changes
+that revision; growth supplies a different weak generation identity. Read stamps
+sample under the mutation lock and include the actual shared zero-width value.
+Weak stamps keep allocation identity unique without retaining section contents.
+A saturated revision disables reuse, preserving correctness instead of wrapping.
+
+This is native world-state policy, with no new Java mirror or GPU handle.
+Consumers retain their existing exclusion rules; revisions do not establish a
+whole-world transaction. Focused alias/growth/in-place/invalid-write/saturation
+controls pass in the227-test Rust world suite. Releaseb1611469 also passes the
+full Java task:1,737 ordinary tests (two skipped) and134 parity tests, including
+seven live-storage Java controls. Six observed full-task workers map the exact
+image and all source/native/Frozen/prompt guards match. These CPU checks do not
+accept runtime or performance; assess the additional write bookkeeping in
+realistic workloads. Historical results below do not accept this source.
 
 ## Verification
 

@@ -4386,8 +4386,9 @@ public final class RustGalTerrainRenderer {
 			currentFrameVisibleLayerSubmissions.set(selection.layerSubmissions());
 			currentFrameVisibleFingerprint.set(selection.fingerprint());
 		}
-		RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSelection(selection.sections(), selection.sectionCount(),
-			selection.casters(), selection.casterCount(), cameraX, cameraY, cameraZ);
+		RustGalWorldPrimitiveRenderer.enqueueNativeStaticTerrainSelection(
+            new VulkanicGalBridge.StaticTerrainFrameReference(selection.frameOwner(), selection.frameId(),
+                selection.sectionCount(), selection.casterCount()), cameraX, cameraY, cameraZ);
 		if (selection.layerProbes() > 0) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.setup", 1L);
 			for (int layerPass = 0; layerPass < 3; layerPass++) {

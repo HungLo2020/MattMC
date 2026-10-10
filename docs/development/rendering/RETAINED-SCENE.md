@@ -108,7 +108,11 @@ Static chunk sections whose meshes are resident are drawn by
 Since ABI 70, visible section layers and casters cross the Java bridge as compact
 entries (see [Java Bridge](JAVA-BRIDGE.md)). Ordinary frames now form them in
 [`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/rust/render/chunk/terrain_selection.rs);
-Java copies the native records into its frame/request storage. At the
+the legacy path copies native records into Java frame/request storage. The local
+ABI79 implementation instead retains an immutable native selection and supplies
+opaque CPU owner/frame identities directly to decode; see
+[native terrain selection frames](JAVA-BRIDGE.md#native-terrain-selection-frames).
+Its final runtime/performance verification is pending. At the
 [`20e157ca` checkpoint](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection.rs),
 solid/cutout layers preserve graph visit order while translucent layers remain
 back to front; this supersedes the earlier key-order equality report. The section

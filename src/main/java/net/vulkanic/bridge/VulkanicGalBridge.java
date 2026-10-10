@@ -122,7 +122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 78;
+	public static final int ABI_VERSION = 79;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -2213,7 +2213,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (worldDistantHorizonsGenericBoxes instanceof PackedDhGenericBoxes packed) {
 			packed.writeInstances(arena, request);
 		}
-		writeStaticTerrainShadowCasters(arena, request, staticTerrainShadowCasters, terrainFrameCamera);
+        writeStaticTerrainFrameReference(request, staticTerrainSections, staticTerrainShadowCasters, terrainFrameCamera);
+        writeStaticTerrainShadowCasters(arena, request, staticTerrainShadowCasters, terrainFrameCamera);
 		writeStaticTerrainSections(arena, request, staticTerrainSections, terrainFrameCamera);
 		writeModelRigPoses(arena, request, modelRigPoses == null ? ModelRigPoses.EMPTY : modelRigPoses);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.pack-particles-and-orbs");
@@ -6724,13 +6725,33 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * expands resident casters into shadow-only instances with the frame's
 	 * terrain camera; no per-caster Java record is built.
 	 */
-	public record StaticTerrainShadowCasters(MemorySegment packed, int count) {
+    /** Opaque immutable CPU selection, never a native address or GPU handle. */
+    public record StaticTerrainFrameReference(long owner, long id, int sectionCount, int casterCount) {
+        public static final StaticTerrainFrameReference EMPTY = new StaticTerrainFrameReference(0, 0, 0, 0);
+        public StaticTerrainFrameReference {
+            if (owner < 0 || id < 0 || (owner == 0) != (id == 0)
+                    || sectionCount < 0 || casterCount < 0 || (long)sectionCount + casterCount > 65536
+                    || owner == 0 && (sectionCount != 0 || casterCount != 0)) {
+                throw new IllegalArgumentException("invalid native terrain frame reference");
+            }
+        }
+    }
+
+	public record StaticTerrainShadowCasters(MemorySegment packed, int count, StaticTerrainFrameReference nativeReference) {
+        public StaticTerrainShadowCasters(MemorySegment packed, int count) {
+            this(packed, count, StaticTerrainFrameReference.EMPTY);
+        }
+        public static StaticTerrainShadowCasters nativeFrame(StaticTerrainFrameReference reference) {
+            return new StaticTerrainShadowCasters(EMPTY.packed(), reference.casterCount(), reference);
+        }
 		public static final StaticTerrainShadowCasters EMPTY =
 			new StaticTerrainShadowCasters(MemorySegment.ofArray(new byte[0]), 0);
 
 		public StaticTerrainShadowCasters {
 			Objects.requireNonNull(packed, "packed");
-			if (count < 0 || packed.byteSize() < count * Struct.STATIC_TERRAIN_SHADOW_CASTER.byteSize()) {
+			Objects.requireNonNull(nativeReference, "nativeReference");
+            if (nativeReference.owner() != 0 ? count != nativeReference.casterCount() || packed.byteSize() != 0
+                    : count < 0 || packed.byteSize() < count * Struct.STATIC_TERRAIN_SHADOW_CASTER.byteSize()) {
 				throw new IllegalArgumentException("static terrain shadow casters are not bounded");
 			}
 		}
@@ -6750,10 +6771,23 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		packed.set(ValueLayout.JAVA_INT_UNALIGNED, base + layout.offset(3), depthPolicy);
 	}
 
+    private static void writeStaticTerrainFrameReference(MemorySegment request, StaticTerrainSections sections,
+            StaticTerrainShadowCasters casters, TerrainFrameCamera camera) {
+        if (!sections.nativeReference().equals(casters.nativeReference())) {
+            throw new IllegalArgumentException("terrain sections and casters must share the same native frame");
+        }
+        StaticTerrainFrameReference reference = sections.nativeReference();
+        if (reference.owner() != 0 && camera == null) {
+            throw new IllegalArgumentException("native terrain frame requires its camera");
+        }
+        request.set(ValueLayout.JAVA_LONG, Struct.WHOLE_FRAME_SUBMIT.offset(56), reference.owner());
+        request.set(ValueLayout.JAVA_LONG, Struct.WHOLE_FRAME_SUBMIT.offset(57), reference.id());
+    }
+
 	private static void writeStaticTerrainShadowCasters(
 		Arena arena, MemorySegment request, StaticTerrainShadowCasters casters, TerrainFrameCamera camera
 	) {
-		int count = casters.count();
+		int count = casters.nativeReference().owner() != 0 ? 0 : casters.count();
 		if (count != 0 && camera == null) {
 			throw new IllegalStateException("static terrain shadow casters require the frame terrain camera");
 		}
@@ -6776,13 +6810,21 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * with the frame's terrain camera and draws the generation it acknowledged
 	 * for the key; no per-section Java instance record is built.
 	 */
-	public record StaticTerrainSections(MemorySegment packed, int count) {
+	public record StaticTerrainSections(MemorySegment packed, int count, StaticTerrainFrameReference nativeReference) {
+        public StaticTerrainSections(MemorySegment packed, int count) {
+            this(packed, count, StaticTerrainFrameReference.EMPTY);
+        }
+        public static StaticTerrainSections nativeFrame(StaticTerrainFrameReference reference) {
+            return new StaticTerrainSections(EMPTY.packed(), reference.sectionCount(), reference);
+        }
 		public static final StaticTerrainSections EMPTY =
 			new StaticTerrainSections(MemorySegment.ofArray(new byte[0]), 0);
 
 		public StaticTerrainSections {
 			Objects.requireNonNull(packed, "packed");
-			if (count < 0 || packed.byteSize() < count * Struct.STATIC_TERRAIN_SECTION.byteSize()) {
+			Objects.requireNonNull(nativeReference, "nativeReference");
+            if (nativeReference.owner() != 0 ? count != nativeReference.sectionCount() || packed.byteSize() != 0
+                    : count < 0 || packed.byteSize() < count * Struct.STATIC_TERRAIN_SECTION.byteSize()) {
 				throw new IllegalArgumentException("static terrain sections are not bounded");
 			}
 		}
@@ -6807,7 +6849,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	private static void writeStaticTerrainSections(
 		Arena arena, MemorySegment request, StaticTerrainSections sections, TerrainFrameCamera camera
 	) {
-		int count = sections.count();
+		int count = sections.nativeReference().owner() != 0 ? 0 : sections.count();
 		if (count != 0 && camera == null) {
 			throw new IllegalStateException("static terrain sections require the frame terrain camera");
 		}

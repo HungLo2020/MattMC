@@ -1,5 +1,26 @@
 # Chunk storage
 
+- [Rust DH change hashes](RUST-DH-CHANGE-HASH.md): retained-input sampling,
+  cached field semantics, mutable emitter boundaries and actual Frozen replay.
+
+- [Retained Rust DH chunk inputs](RUST-DH-CHUNK-INPUTS.md): shared authoritative
+  block/counter/biome bindings and direct height/emitter/lighting/column consumers.
+
+- [Rust DH material maps](RUST-DH-MATERIAL-MAPS.md): ordered native identity/index
+  ownership, bulk remapping, duplicate/import policy and compatibility bindings.
+
+- [Rust DH source updates](RUST-DH-SOURCE-UPDATES.md): complete same-detail merge
+  policy, direct recipient publication, borrowed inputs and compatibility gates.
+
+- [Rust DH contributor transport](RUST-DH-CONTRIBUTORS.md): immutable footprint
+  production, direct retained consumers and public copy compatibility.
+
+- [Rust DH full-data columns](RUST-DH-FULL-DATA.md): retained native recipient
+  points, parent reduction/metadata, direct bulk consumers and compatibility constraints.
+
+- [Rust DH columns](RUST-DH-COLUMNS.md): whole chunk-to-column producer, retained
+  material IDs, CPU views, mutation compatibility and verification in progress.
+
 - [Rust DH height fields](RUST-DH-HEIGHTMAPS.md): direct live-section scans,
   intrinsic collision policy, CPU leases and scoped runtime verification.
 

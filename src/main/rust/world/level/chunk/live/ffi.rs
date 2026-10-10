@@ -31,20 +31,20 @@ pub unsafe extern "C" fn mattmc_live_section_create(
         limit as u32,
         global_bits as usize,
     )
-    .map_or(std::ptr::null_mut(), |v| Box::into_raw(Box::new(v)))
+    .map_or(std::ptr::null_mut(), |v| Arc::into_raw(Arc::new(v)).cast_mut())
 }
 /// Release exactly one create/copy owner after all calls finish. Views have separate leases.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_live_section_release(owner: *mut Owner) {
     if !owner.is_null() {
-        drop(Box::from_raw(owner));
+        drop(Arc::from_raw(owner));
     }
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_live_section_copy(owner: *const Owner) -> *mut Owner {
     owner
         .as_ref()
-        .map_or(std::ptr::null_mut(), |o| Box::into_raw(Box::new(o.copy())))
+        .map_or(std::ptr::null_mut(), |o| Arc::into_raw(Arc::new(o.copy())).cast_mut())
 }
 /// Writes [bits, requested, global, word count, word pointer, palette pointer,
 /// count pointer, lease pointer] into 48 bytes. Lease pins a complete generation.

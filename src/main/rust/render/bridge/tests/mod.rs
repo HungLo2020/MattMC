@@ -1287,7 +1287,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
         texture.field_offsets[15]
     );
-    assert_eq!(56, whole_frame.field_count);
+    assert_eq!(58, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
         whole_frame.field_offsets[45]
@@ -1331,6 +1331,8 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         (53, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_id)),
         (54, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_lifecycle)),
         (55, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_count)),
+        (56, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_terrain_frame_owner)),
+        (57, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_terrain_frame_id)),
     ] { assert_eq!(offset as u32, whole_frame.field_offsets[field]); }
     assert_eq!(size_of::<FfiDhGenericGroupBox>(), 56);
     assert_eq!(size_of::<FfiDhGenericGroupInstance>(), 88);
@@ -2311,6 +2313,8 @@ fn whole_frame_request(
         world_lod_frame_id: 0,
         world_lod_frame_lifecycle: 0,
         world_lod_frame_count: 0,
+        world_terrain_frame_owner: 0,
+        world_terrain_frame_id: 0,
         world_model_rig_poses: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
@@ -6759,4 +6763,54 @@ fn native_world_item_decode_copies_pose_and_rejects_conflicting_inputs() {
     assert_eq!(copied.transform[12..],[1.5,2.,2.5,1.]);
     let mut inline=mesh_instance();inline.native_item_parent_normal[0]=-0.;
     assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&inline,false)}.is_err());
+}
+
+#[test]
+fn whole_frame_native_terrain_acquires_shared_arrays_and_rejects_mixed_expired_or_wrong_camera_inputs() {
+    use crate::render::chunk::{terrain_frames, terrain_selection::TerrainSelection};
+    use std::sync::Arc;
+    let owner = terrain_frames::TerrainFrames::new();
+    let camera = [150.5, 100.0, 530.5];
+    let mut input = TerrainSelection::default();
+    for key in [9, 4] {
+        input.sections.push(FfiStaticTerrainSection { mesh_key: key, mesh_generation: 11,
+            origin: [16, 64, -32], depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            flags: 0, reserved: 0 });
+    }
+    input.casters.push(FfiStaticTerrainShadowCaster { mesh_key: 13, mesh_generation: 17,
+        origin: [-16, 32, 16], depth_policy: WORLD_DEPTH_POLICY_TEST_NO_WRITE });
+    let id = owner.publish(&input, camera).unwrap();
+    let published = terrain_frames::resolve(owner.id, id, camera).unwrap();
+    let mut inline = whole_frame_request(&[], &[]);
+    inline.static_terrain_camera = camera;
+    inline.world_static_terrain_sections = FfiSlice { ptr: input.sections.as_ptr(), count: input.sections.len() as u64 };
+    inline.world_static_terrain_shadow_casters = FfiSlice { ptr: input.casters.as_ptr(), count: input.casters.len() as u64 };
+    let (_, _, old, _) = unsafe { decode_whole_frame_submit(&inline, test_vulkan_capabilities()) }.unwrap();
+    let mut native = whole_frame_request(&[], &[]);
+    native.static_terrain_camera = camera;
+    native.world_terrain_frame_owner = owner.id;
+    native.world_terrain_frame_id = id;
+    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&native, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(frame.static_terrain_sections, old.static_terrain_sections);
+    assert_eq!(frame.static_terrain_shadow_casters, old.static_terrain_shadow_casters);
+    assert!(Arc::ptr_eq(&frame.static_terrain_sections.sections, &published.0.sections));
+    assert!(Arc::ptr_eq(&frame.static_terrain_shadow_casters.casters, &published.1.casters));
+    input.sections[0].mesh_key = 77;
+    assert_eq!(frame.static_terrain_sections.sections[0].mesh_key, 9);
+    for change in 0..4 {
+        let mut bad = native;
+        match change {
+            0 => bad.world_static_terrain_sections = FfiSlice { ptr: std::ptr::null(), count: 1 },
+            1 => bad.world_static_terrain_shadow_casters = FfiSlice { ptr: std::ptr::null(), count: 1 },
+            2 => bad.world_terrain_frame_owner = 0,
+            _ => bad.static_terrain_camera[0] += 1.0,
+        }
+        let error = unsafe { decode_whole_frame_submit(&bad, test_vulkan_capabilities()) }.unwrap_err();
+        assert!(format!("{error}").contains("terrain frame"));
+    }
+    owner.invalidate();
+    assert!(unsafe { decode_whole_frame_submit(&native, test_vulkan_capabilities()) }.is_err());
+    drop(owner);
+    assert_eq!(frame.static_terrain_sections.sections[0].mesh_key, 9);
+    assert_eq!(frame.static_terrain_shadow_casters.casters[0].mesh_generation, 17);
 }

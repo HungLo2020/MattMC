@@ -24,13 +24,15 @@ public final class NativeDhLighting {
     private static final MethodHandle RELEASE = handle("mattmc_dh_lighting_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle VIEW = handle("mattmc_dh_light_field_view", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle FIELD_RELEASE = handle("mattmc_dh_light_field_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle SECTION_META = handle("mattmc_dh_light_section_meta", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
     public record ChunkInput(ChunkAccess chunk, NativeDhHeightmaps heights, @Nullable Field previous, @Nullable NativeDhSources sources) {}
     private static final class Scratch {
         final Arena arena = Arena.ofAuto();
-        final MemorySegment descriptors=arena.allocate(9*48,8), owners=arena.allocate(9*256*8,8), order=arena.allocate(9,1), metadata=arena.allocate(10*8,8);
+        final MemorySegment descriptors=arena.allocate(9*48,8), order=arena.allocate(9,1), metadata=arena.allocate(10*8,8);
         final ChunkInput[] inputs=new ChunkInput[9];
         final ChunkWrapper[] wrappers=new ChunkWrapper[9];
-        final NativeLiveBlockSection[] pins=new NativeLiveBlockSection[9*256];
+        final NativeDhChunkInputs[] sectionInputs=new NativeDhChunkInputs[9];
     }
     private static final ThreadLocal<Scratch> SCRATCH=ThreadLocal.withInitial(Scratch::new);
     /** -1 declines without writes; normal output is a Frozen-compatible work count. */
@@ -55,22 +57,20 @@ public final class NativeDhLighting {
             for(int slot=0;slot<9;slot++) {
                 var wrapper=scratch.wrappers[slot];if(wrapper==null)continue;
                 var input=wrapper.nativeDhLightingInput();if(input==null)return -1;scratch.inputs[count]=input;
-                var sections=input.chunk().getSectionsForRead();if(sections.length<1||sections.length>256)return -1;
+                var sections=input.chunk().nativeDhSections();if(sections==null)return -1;
+                scratch.sectionInputs[count]=sections;
                 long row=count*48L;scratch.descriptors.set(ValueLayout.JAVA_INT,row,slot);
-                scratch.descriptors.set(ValueLayout.JAVA_INT,row+4,input.chunk().getMinY());
-                scratch.descriptors.set(ValueLayout.JAVA_INT,row+8,sections.length);scratch.descriptors.set(ValueLayout.JAVA_INT,row+12,0);
-                var pointers=scratch.owners.asSlice(count*256L*8,sections.length*8L);
-                for(int s=0;s<sections.length;s++) {
-                    var section=sections[s];if(section==null)return -1;var owner=section.nativeGenerationInput();if(owner==null)return -1;
-                    scratch.pins[count*256+s]=owner;
+                scratch.descriptors.set(ValueLayout.JAVA_INT,row+4,sections.minY());
+                scratch.descriptors.set(ValueLayout.JAVA_INT,row+8,sections.size());scratch.descriptors.set(ValueLayout.JAVA_INT,row+12,1);
+                for(int s=0;s<sections.size();s++) {
+                    var owner=sections.block(s);
                     // Public wrapper replacements can alter opacity/emission even for air.
                     for(int p=0,n=owner.paletteSize();p<n;p++) {
                         var state=owner.paletteValue(p);var cached=BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.get(state);
                         if(cached!=null&&(cached.getClass()!=BlockStateWrapper.class||cached.blockState!=state))return -1;
                     }
-                    pointers.setAtIndex(ValueLayout.ADDRESS,s,owner.stageOwner());
                 }
-                scratch.descriptors.set(ValueLayout.ADDRESS,row+16,pointers);
+                scratch.descriptors.set(ValueLayout.ADDRESS,row+16,sections.stageOwner());
                 scratch.descriptors.set(ValueLayout.ADDRESS,row+24,input.heights().stageOwner());
                 scratch.descriptors.set(ValueLayout.ADDRESS,row+32,input.previous()==null?MemorySegment.NULL:input.previous().owner);
                 scratch.descriptors.set(ValueLayout.ADDRESS,row+40,input.sources()==null?MemorySegment.NULL:input.sources().stageOwner());
@@ -91,8 +91,8 @@ public final class NativeDhLighting {
         } catch(RuntimeException|Error e) {throw e;}
         catch(Throwable e) {throw new IllegalStateException("Cannot run native DH lighting",e);}
         finally {
-            Reference.reachabilityFence(scratch.inputs);Reference.reachabilityFence(scratch.pins);
-            Arrays.fill(scratch.inputs,null);Arrays.fill(scratch.wrappers,null);Arrays.fill(scratch.pins,null);
+            Reference.reachabilityFence(scratch.inputs);Reference.reachabilityFence(scratch.sectionInputs);
+            Arrays.fill(scratch.inputs,null);Arrays.fill(scratch.wrappers,null);Arrays.fill(scratch.sectionInputs,null);
             if(batch.address()!=0)releaseBatch(batch);
         }
     }
@@ -141,6 +141,33 @@ public final class NativeDhLighting {
             } finally {Reference.reachabilityFence(this);}
         }
         public int sourceCount(){return(int)(sources.byteSize()/4);}
+        /** Transfer exact retained policy state when a public mutation escapes. */
+        public com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage copyToMutableStorage(boolean sky) {
+            var storage = sky
+                ? com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage.createSkyLightStorage(minY(),maxY())
+                : com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage.createBlockLightStorage(minY(),maxY());
+            try (Arena scratch = Arena.ofConfined()) {
+                var metadata = scratch.allocate(17 * 2, 2);
+                for (int section = 0; section < sections; section++) {
+                    int result = (int)SECTION_META.invokeExact(owner,section,sky ? 1 : 0,metadata);
+                    if (result == 0) continue;
+                    if (result != 1) throw new IllegalStateException("Invalid DH light section policy");
+                    if (storage.lightSections == null) storage.lightSections = new com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage.LightSection[sections];
+                    var target = new com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage.LightSection(0);
+                    for (int level = 0; level < 16; level++) target.counts[level] = metadata.getAtIndex(ValueLayout.JAVA_SHORT,level);
+                    target.constantValue = (byte)metadata.getAtIndex(ValueLayout.JAVA_SHORT,16);
+                    if (target.constantValue < 0) {
+                        target.data = new long[256];
+                        for (int y = 0; y < 16; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++)
+                            target.data[(z << 4) | x] |= (long)light(x,minY + section * 16 + y,z,sky) << (y << 2);
+                    }
+                    storage.lightSections[section] = target;
+                }
+                return storage;
+            } catch (RuntimeException | Error e) { throw e; }
+            catch (Throwable e) { throw new IllegalStateException("Cannot transfer DH light policy",e); }
+            finally { Reference.reachabilityFence(this); }
+        }
         public int sourceIndex(int index) {
             try{return sources.getAtIndex(ValueLayout.JAVA_INT,index);}finally{Reference.reachabilityFence(this);}
         }

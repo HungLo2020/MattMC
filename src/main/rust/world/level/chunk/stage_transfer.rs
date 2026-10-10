@@ -41,7 +41,7 @@ pub(crate) unsafe fn write_result(
     };
     unsafe {
         (*output).counts = [section.non_empty, section.ticking, section.fluid];
-        (*output).owner = Box::into_raw(Box::new(owner));
+        (*output).owner = std::sync::Arc::into_raw(std::sync::Arc::new(owner)).cast_mut();
     }
     1
 }
@@ -67,7 +67,7 @@ mod tests {
             };
             assert_eq!(unsafe { write_result(&section, 31809, 15, &mut result) }, 1);
             assert_eq!(result.counts, [4095, 73, 155]);
-            let owner = unsafe { Box::from_raw(result.owner) };
+            let owner = unsafe { std::sync::Arc::from_raw(result.owner) };
             let (_, bits, palette, words) = owner.stage_snapshot(31809, 15).unwrap();
             assert_eq!(bits, section.storage_bits());
             assert_eq!(palette, expected_palette);

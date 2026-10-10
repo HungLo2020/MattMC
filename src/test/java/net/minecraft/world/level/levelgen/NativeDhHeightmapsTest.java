@@ -137,4 +137,66 @@ class NativeDhHeightmapsTest {
             for(var task:tasks)task.get();
         }
     }
+    private static long ownerAddress(NativeDhHeightmaps fields) throws Exception {
+        var owner = NativeDhHeightmaps.class.getDeclaredMethod("stageOwner"); owner.setAccessible(true);
+        return ((java.lang.foreign.MemorySegment) owner.invoke(fields)).address();
+    }
+    private static Object chunkInputs(ChunkAccess chunk) throws Exception {
+        var method = ChunkAccess.class.getDeclaredMethod("nativeDhSections"); method.setAccessible(true);
+        return method.invoke(chunk);
+    }
+    private static long chunkInputAddress(Object inputs) throws Exception {
+        var method = inputs.getClass().getDeclaredMethod("stageOwner"); method.setAccessible(true);
+        return ((java.lang.foreign.MemorySegment)method.invoke(inputs)).address();
+    }
+    @Test void retainedChunkBindingsObserveGrowthRawEmittersAndEscapedSectionReplacement() throws Exception {
+        var source = HeightmapFixtures.chunk("empty", 0, 16, 0);
+        var escapes = new java.util.concurrent.atomic.AtomicInteger();
+        source.setNativeSectionArrayEscapeListener(() -> {
+            assertFalse(Thread.holdsLock(source), "Admission must not execute escape callbacks under a new chunk monitor");
+            escapes.incrementAndGet();
+        });
+        var first = NativeDhHeightmaps.build(source); assertNotNull(first);
+        assertTrue(escapes.get() > 0);
+        var original = chunkInputs(source); assertNotNull(original);
+        long address = chunkInputAddress(original);
+        assertEquals(address, chunkInputAddress(chunkInputs(source)), "Bindings are reused without rebuilding pointer tables");
+        // A direct palette edit deliberately leaves section counters stale-empty.
+        source.getSection(0).getStates().getAndSet(0, 15, 0, Blocks.GLOWSTONE.defaultBlockState());
+        var raw = NativeDhSources.build(source); assertNotNull(raw); assertEquals(1, raw.count());
+        assertEquals(15 * 256, raw.index(0));
+        assertEquals(0, NativeDhHeightmaps.build(source).solid(0, 0), "Stale-empty counters mask block reads, not emitters");
+        source.getSection(0).recalcBlockCounts();
+        var changed = NativeDhHeightmaps.build(source); assertNotNull(changed); assertEquals(15, changed.solid(0, 0));
+        assertEquals(address, chunkInputAddress(chunkInputs(source)), "Generation growth preserves the primary input owner");
+        assertEquals(0, first.solid(0, 0));
+        source.getSections()[0] = new LevelChunkSection(new PalettedContainer<>(Blocks.STONE.defaultBlockState(),
+            Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY)), null);
+        var replaced = NativeDhHeightmaps.build(source); assertNotNull(replaced); assertEquals(15, replaced.solid(0, 0));
+        assertNotEquals(address, chunkInputAddress(chunkInputs(source)), "Escaped arrays are revalidated before publication");
+        assertEquals(1, raw.count(), "Emitter outputs retain their original independent enumeration");
+        assertEquals(address, chunkInputAddress(original), "Old admitted bindings stay live for retained users");
+        java.lang.ref.Reference.reachabilityFence(original);
+    }
+    @Test void repeatedOrdinaryWrapperPreparationReusesNativeFieldsAndWritesInvalidateThem() throws Exception {
+        var source = HeightmapFixtures.chunk("solid", -64, 32, 0);
+        var first = NativeDhHeightmaps.build(source); assertNotNull(first);
+        var second = NativeDhHeightmaps.build(source); assertNotNull(second);
+        assertEquals(ownerAddress(first), ownerAddress(second), "Independent CPU leases share one immutable field allocation");
+        var one = new ChunkWrapper(source, level); var two = new ChunkWrapper(source, level);
+        var field = ChunkWrapper.class.getDeclaredField("nativeHeightMaps"); field.setAccessible(true);
+        assertEquals(ownerAddress(first), ownerAddress((NativeDhHeightmaps) field.get(one)));
+        assertEquals(ownerAddress(first), ownerAddress((NativeDhHeightmaps) field.get(two)), "Actual ordinary constructor consumes Rust reuse");
+        assertEquals(-33, first.solid(0, 0));
+        source.getSection(1).setBlockState(0, 15, 0, Blocks.AIR.defaultBlockState());
+        var changed = NativeDhHeightmaps.build(source); assertNotNull(changed);
+        assertNotEquals(ownerAddress(first), ownerAddress(changed)); assertEquals(-34, changed.solid(0, 0)); assertEquals(-33, first.solid(0, 0));
+        one.createDhHeightMaps(); assertEquals(ownerAddress(changed), ownerAddress((NativeDhHeightmaps) field.get(one)));
+        // Cached native results never bypass public wrapper compatibility admission.
+        var stone = Blocks.STONE.defaultBlockState();
+        var prior = BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(stone, BlockStateWrapper.AIR);
+        try { assertNull(NativeDhHeightmaps.build(source)); }
+        finally { if (prior == null) BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.remove(stone); else BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(stone, prior); }
+    }
+
 }

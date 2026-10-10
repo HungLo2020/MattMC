@@ -132,7 +132,8 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v76 appends immutable CPU item poses for direct GUI consumption.
 /// v77 adds direct native world/hand item poses and parent normal semantics.
 /// v78 adds a retained identity manifest to incremental raw GUI image updates.
-pub const FFI_ABI_VERSION: u32 = 78;
+/// v79 appends a bounded native CPU terrain-selection reference.
+pub const FFI_ABI_VERSION: u32 = 79;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

@@ -47,9 +47,41 @@ exact measurement window and cleanup checks pass. Receipt:
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** the current whole-frame ABI is **78**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **79**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
+
+## Native terrain selection frames
+
+The local ABI79 migration appends CPU owner/frame identities to whole-frame
+request fields56/57. Ordinary terrain selection publishes validated immutable
+scene arrays in Rust; Java passes identities and the exact terrain camera rather
+than copying selection records into pending and request buffers. The decoder
+acquires shared array ownership before queueing. Inline terrain/caster records
+and a native reference are mutually exclusive; unknown, evicted, closed-owner
+or camera-mismatched references reject without dereferencing inline data.
+
+Each graph retains at most three selections. Resource reload invalidates
+unresolved references without reusing frame IDs; acquired arrays survive reload,
+eviction and graph closure. Legacy/diagnostic selection still uses record
+encoding. Mesh generation admission, resource ownership, passes and presentation
+remain in the existing renderer/GAL path. The private graph selection view grows
+from80 to96 bytes, so Java and the native library must be rebuilt together.
+
+This implementation has no final runtime acceptance. Initial lifecycle launches
+failed before world entry during an unattended NVIDIA update: installed libraries
+595.99.02 disagree with the loaded595.91.07 kernel module, only llvmpipe is
+enumerated and X11 reports DRI3 BadDrawable. The owned invocation was stopped,
+with failure logs and copied worlds retained. Restore the driver and repeat
+hardware lifecycle/parity/profile/timing checks. Further DH storage changes
+require their own final source/library checks. The earlier ABI79 CPU checkpoint: FullRust2,489pass
+(three ignored) and Java1,854tests (two skipped) pass; six observed Java workers
+map release7cf545b2. Actual populated graph and encoding JNI checks pass.
+Previous release839ff128 tests,
+images and timing results do not verify ABI79. Focused checks:
+`cargo test ... terrain_frames`, `cargo test ... whole_frame_native_terrain`,
+and the terrain-frame JNI/encoding tests. Final release runtime/performance
+receipts are required before claiming this handoff improves frame time.
 
 ## Raw GUI image generations
 
@@ -171,7 +203,7 @@ proxy root: both structural extraction and the posed fallback remain empty
 ABI 72 appends retained DH generic-group instances as whole-frame field 51 and
 the double camera origin as field 52. Group boxes use struct 116 (56 bytes:
 double min/max bounds, color and material); struct 117 uses the 88-byte layout
-introduced in ABI 75 and retained in the current ABI 78:
+introduced in ABI 75 and retained in the current ABI 79:
 group id/generation, double origin, packed light, SSAO flag and six shading
 multipliers, CPU cloud owner and pose generation. Native cloud instances set
 flag bit 1 and carry zero origin lanes; ordinary API instances carry zero native

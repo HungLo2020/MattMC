@@ -11,6 +11,7 @@ import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.ArrayList;
@@ -84,7 +85,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	/** Copied proof that a coarse column's horizontal contributors were identical. */
 	private final boolean[] semanticHorizontalUniformByColumn;
 	/** Bounded raw source footprints for heterogeneous reduced columns. */
-	private final Int2ObjectOpenHashMap<LongArrayList[]> semanticHorizontalContributorsByColumn = new Int2ObjectOpenHashMap<>();
+	private final Int2ObjectOpenHashMap<LongList[]> semanticHorizontalContributorsByColumn = new Int2ObjectOpenHashMap<>();
 	private final Int2ObjectOpenHashMap<SemanticHorizontalContributor[]> semanticHorizontalContributorSpansByDataPoint = new Int2ObjectOpenHashMap<>();
 	private final List<SemanticMaterialIdentity> semanticMaterials = new ArrayList<>();
 	private final Map<SemanticMaterialIdentity, Integer> semanticMaterialIds = new HashMap<>();
@@ -174,12 +175,18 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 		this.semanticHorizontalUniformByColumn[columnIndex(posX, posZ)] = uniform;
 	}
 
-	public void setSemanticHorizontalContributors(int posX, int posZ, LongArrayList[] contributors)
+	public void setSemanticHorizontalContributors(int posX, int posZ, LongList[] contributors)
 	{
 		int index = columnIndex(posX, posZ);
 		if (contributors == null || contributors.length != 4)
 		{
 			this.semanticHorizontalContributorsByColumn.remove(index);
+			return;
+		}
+		LongList[] nativeSnapshot = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(contributors, null, Integer.MAX_VALUE);
+		if (nativeSnapshot != null)
+		{
+			this.semanticHorizontalContributorsByColumn.put(index, nativeSnapshot);
 			return;
 		}
 		LongArrayList[] copy = new LongArrayList[4];
@@ -192,7 +199,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 
 	public LongArrayList[] getSemanticHorizontalContributors(int posX, int posZ)
 	{
-		LongArrayList[] contributors = this.semanticHorizontalContributorsByColumn.get(columnIndex(posX, posZ));
+		LongList[] contributors = this.semanticHorizontalContributorsByColumn.get(columnIndex(posX, posZ));
 		if (contributors == null) return null;
 		LongArrayList[] copy = new LongArrayList[4];
 		for (int i = 0; i < 4; i++)
@@ -200,6 +207,14 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 			copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i]);
 		}
 		return copy;
+	}
+
+	/** Immutable CPU readers survive source replacement; compatibility lists are copied. */
+	public LongList[] getRetainedSemanticHorizontalContributors(int posX, int posZ)
+	{
+		LongList[] columns = this.semanticHorizontalContributorsByColumn.get(columnIndex(posX, posZ));
+		return net.minecraft.world.level.chunk.NativeDhContributors.isSnapshot(columns)
+			? columns.clone() : this.getSemanticHorizontalContributors(posX, posZ);
 	}
 
 	public void setSemanticHorizontalContributorSpans(int posX, int posZ, int verticalIndex,

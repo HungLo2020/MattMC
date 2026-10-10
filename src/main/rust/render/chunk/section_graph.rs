@@ -231,6 +231,7 @@ pub struct SectionGraph {
     /// The latest camera selection's visits and the terrain built from them.
     pub(super) last_visits: Vec<VisitedSection>,
     pub(super) terrain: super::terrain_selection::TerrainSelection,
+    pub(super) terrain_frames: std::sync::Arc<super::terrain_frames::TerrainFrames>,
     /// Build, block-entity and visit bookkeeping (see `source`).
     pub(super) source: source::SourceState,
     nodes: Vec<SectionNode>,
@@ -253,6 +254,7 @@ impl SectionGraph {
             meshes: HashMap::default(),
             last_visits: Vec::new(),
             terrain: Default::default(),
+            terrain_frames: super::terrain_frames::TerrainFrames::new(),
             source: Default::default(),
             nodes: Vec::new(),
             free: Vec::new(),

@@ -98,6 +98,9 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_lod_frame_id: u64,
     pub world_lod_frame_lifecycle: i64,
     pub world_lod_frame_count: u64,
+    /// ABI v79: bounded immutable CPU terrain selection; excludes inline records.
+    pub world_terrain_frame_owner: u64,
+    pub world_terrain_frame_id: u64,
 }
 
 #[repr(C)]

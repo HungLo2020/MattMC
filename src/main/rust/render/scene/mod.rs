@@ -11,6 +11,7 @@ pub mod mesh;
 pub mod overlays;
 pub mod strata;
 pub mod textures;
+pub mod terrain;
 pub mod voxel_source;
 
 /// Maximum viewport axis admitted by semantic frame and GUI submissions.

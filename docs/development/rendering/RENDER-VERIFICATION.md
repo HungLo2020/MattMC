@@ -33,6 +33,24 @@ exact marked-root `.tmp/<run-id>/game_dir_<run-id>` path. Fresh metadata,
 isolated cwd and stable Java process/start identity remain mandatory;
 external paths, wrong-run siblings and symlink escapes are rejected.
 
+### Check the hardware driver before runtime captures
+
+On NVIDIA Linux machines, check `nvidia-smi` and
+`cat /sys/module/nvidia/version` before hardware comparisons. An unattended
+package update can replace NVIDIA user libraries while the running kernel
+module keeps its old version. `nvidia-smi` then reports a driver/library
+mismatch; Vulkan may enumerate only llvmpipe. Restore the matched driver
+(normally by rebooting after the update) before measuring hardware rendering.
+Record the GPU and driver version for both Current and Frozen. Earlier results
+from a different driver do not isolate a later code change.
+
+The 2026-10-10 ABI79 lifecycle invocation encountered this condition before
+world entry, followed by X11 DRI3 `BadDrawable` and stalled native teardown.
+It was interrupted and its failures/world copies retained; it provides no
+runtime acceptance. Receipts:
+`build/native-terrain-frame-migration/{gpu-driver-mismatch,driver-mismatch-interruption,bad-drawable-failure}.json`.
+Do not weaken log-health checks or count a software-device run as hardware parity.
+
 ## 1. Tests
 
 Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.

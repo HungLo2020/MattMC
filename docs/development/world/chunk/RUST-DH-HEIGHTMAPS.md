@@ -33,10 +33,12 @@ and [DH consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java
   worlds and incompatible state policy retain the original Java path. A
   mismatched entry in DH's public wrapper cache also retains that path. Subclass
   callbacks are not replaced by sampled answers.
-- Inputs are borrowed and pinned only for the native call. Each result owns its
+- The local [shared chunk-input owner](RUST-DH-CHUNK-INPUTS.md) retains mutable
+  block/counter bindings; scans borrow that one pinned owner. Each result owns its
   values independently; an automatic arena releases it once after CPU readers
   finish. Rebuilding a wrapper replaces its lease without mutating retained
-  older results. There is no global chunk cache or GPU handle.
+  older results. There is no owning global chunk cache or GPU handle. The local
+  reuse work below retains only immutable fields and weak generation identities.
 - `recreateHeightmaps=false` still uses Minecraft's existing heightmaps. Getter
   bounds checks and the original compatibility callback sequence remain.
 
@@ -45,15 +47,62 @@ highest nonempty section and does **not** evaluate the minimum row. An entirely
 empty chunk reports maximum `minY + 16`. Preserve these details; changing
 suspected Frozen behavior requires the user's decision.
 
+## Local bounded field reuse (in progress)
+
+The latest local source reuses immutable fields inside Rust when authoritative
+storage and the sampled empty-section mask are unchanged. This follows the
+Current-only travel profile's repeated chunk-wrapper preparation/native height
+scans (288 of11,881 ticks); it is a candidate optimization, not a measured gain.
+The ordinary Java bridge still runs its public-wrapper and custom-reader
+admission checks on every call. Consumers keep the existing read-only lease and
+2,056-byte layout; independent leases may now share one field allocation.
+
+- [Live storage](RUST-LIVE-SECTIONS.md) owns mutation revisions. Packed writes,
+  palette additions and shared single-value reads invalidate reuse. Growth
+  changes generation identity. A saturated revision declines reuse permanently.
+- Keys contain weak generation identity, revision, the actual shared single value
+  when relevant, minY and sampled emptiness. They neither retain chunks/sections
+  nor use reusable raw addresses as identity. Stale-empty counters still mask
+  raw values, including contextual states, exactly as the existing producer does.
+- Use the same empty mask for the key and scan; independent resampling could
+  cache a result under the wrong mask after counter ABA. Recheck inputs before
+  storing a missed result. This preserves section-local reads and existing
+  exclusion; it does not make a concurrently mutable chunk transactional.
+- The cache holds at most64 field pairs (131,584 field bytes, plus bounded keys
+  and allocation overhead). Entries are pruned on insertion when generation
+  leases expire. Eviction releases only the cache lease; outside readers remain
+  valid. Scans run outside the cache mutex, allowing independent requests.
+
+Releaseb1611469 passes all eight focused Rust height checks and227 Rust world
+tests, including16 actual Frozen saved field pairs, alias/writes/masks/contextual
+rejection, weak lifetime, bounded eviction and eight parallel readers. Six actual
+height JNI controls pass, including all31,532 cached Frozen state cases and proof
+that two ordinary chunk-wrapper constructors share the same immutable allocation.
+A subsequent block write creates new fields; retained old values remain stable.
+Public wrapper overrides still decline before cache reuse.
+
+Full final-source Java verification passes1,737 ordinary tests (two skipped) and
+134 parity tests, including seven live-storage Java controls. Six observed
+full-task workers map the exact native image; all39,443 Current/38,176 Frozen,
+native-library and protected-prompt pins match. Receipts:
+`build/native-dh-height-reuse/`.
+Later source does not inherit the historical runtime acceptance below. Check
+both reuse benefit and mutation bookkeeping cost in fresh equivalent gameplay,
+then run hardware correctness, all predeclared timings and sustained memory
+checks after [driver restoration](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+
 ## Verification
 
 Use JDK 25 and the normal release configuration:
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml -- --test-threads=4
-CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests 'net.minecraft.world.level.levelgen.NativeDhHeightmapsTest'
+CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ./gradlew -PmattmcRustProfile=release parityTest -x testRustNative --tests 'net.minecraft.world.level.levelgen.NativeDhHeightmapsTest'
 python3 DevUtils/RunWiki.py check
 ```
+
+The following runtime measurements are historical and belong to the original
+height-field release. The local reuse source above requires fresh acceptance.
 
 The actual Frozen recorder is
 [`GenerateFrozenDhHeightmapOracle.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhHeightmapOracle.java).

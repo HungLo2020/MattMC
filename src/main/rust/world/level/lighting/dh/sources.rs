@@ -10,11 +10,15 @@ pub(crate) fn build(
     min_y: i32,
     emission: impl Fn(u32) -> Option<u8>,
 ) -> Option<Box<Sources>> {
+    build_sections(Sections::Blocks(owners, None), min_y, emission)
+}
+fn build_sections(owners: Sections<'_>, min_y: i32, emission: impl Fn(u32) -> Option<u8>) -> Option<Box<Sources>> {
     if !(1..=256).contains(&owners.len()) || min_y % 16 != 0 || min_y.unsigned_abs() > 1_000_000 {
         return None;
     }
     let mut positions = Vec::new();
-    for (section, owner) in owners.iter().enumerate() {
+    for section in 0..owners.len() {
+        let owner = owners.block(section);
         owner.with_state_reader(|reader| {
             if !reader.all_states(|id| emission(id).is_some_and(|e| e <= 15)) {
                 return None;
@@ -31,6 +35,18 @@ pub(crate) fn build(
         min_y,
         positions: positions.into(),
     }))
+}
+/// Retained chunk input owns all live bindings; only pin this one CPU owner.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_sources_from_chunk(owner: *const crate::world::level::chunk::inputs::Chunk) -> *mut Sources {
+    if owner.is_null() || owner as usize % std::mem::align_of::<crate::world::level::chunk::inputs::Chunk>() != 0 { return std::ptr::null_mut(); }
+    let Some(registry) = crate::content::block::installed() else { return std::ptr::null_mut(); };
+    let emission = |id: u32| {
+        if id as usize >= registry.state_count() { return None; }
+        let state = crate::content::block::StateId(id as u16);
+        (!registry.flags(state).contains(crate::content::block::StateFlags::CUSTOM)).then(|| registry.emission(state))
+    };
+    build_sections(Sections::Retained(&*owner), (*owner).min_y, emission).map_or(std::ptr::null_mut(), Box::into_raw)
 }
 /// Owner pointers are aligned, valid and pinned until return; no Java callbacks.
 #[no_mangle]

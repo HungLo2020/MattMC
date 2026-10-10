@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicU32, AtomicU64, Ordering},
-    Arc, Mutex,
+    Arc, Mutex, Weak,
 };
 mod ffi;
 #[cfg(test)]
@@ -15,6 +15,7 @@ struct Generation {
     requested: usize,
     global: bool,
     count: AtomicU32,
+    revision: AtomicU64,
     palette: Box<[AtomicU32]>,
     words: Box<[AtomicU64]>,
 }
@@ -35,6 +36,7 @@ impl Generation {
             requested,
             global,
             count: AtomicU32::new(palette.len() as u32),
+            revision: AtomicU64::new(0),
             palette: ids.into_boxed_slice(),
             words: words.iter().map(|v| AtomicU64::new(*v)).collect(),
         }
@@ -77,6 +79,11 @@ impl Generation {
         }
         out.try_into().expect("ENTRIES-sized snapshot")
     }
+    fn changed(&self) {
+        // Saturation permanently declines cached reuse rather than allowing ABA.
+        self.revision.fetch_update(Ordering::Release, Ordering::Relaxed,
+            |value| Some(value.saturating_add(1))).unwrap();
+    }
     fn set(&self, index: usize, id: u32) {
         if self.bits == 0 {
             return;
@@ -89,11 +96,13 @@ impl Generation {
             (word.load(Ordering::Relaxed) & !mask) | ((id as u64) << shift),
             Ordering::Release,
         );
+        self.changed();
     }
     fn append(&self, state: u32) -> u32 {
         let count = self.count.load(Ordering::Relaxed) as usize;
         self.palette[count].store(state, Ordering::Release);
         self.count.store((count + 1) as u32, Ordering::Release);
+        self.changed();
         count as u32
     }
 }
@@ -105,6 +114,20 @@ pub struct Owner {
     state: Mutex<State>,
     limit: u32,
     global_bits: usize,
+}
+/// Weak identity of immutable storage configuration plus its mutation version.
+/// Weak pointers prevent allocation-address reuse without retaining section data.
+pub(crate) struct ReadStamp {
+    generation: Weak<Generation>,
+    revision: u64,
+    single: Option<u32>,
+}
+impl ReadStamp {
+    pub(crate) fn matches(&self, other: &Self) -> bool {
+        Weak::ptr_eq(&self.generation, &other.generation)
+            && self.revision == other.revision && self.single == other.single
+    }
+    pub(crate) fn alive(&self) -> bool { self.generation.strong_count() != 0 }
 }
 /// A borrowed scan under the storage mutation lock. No palette/word projection.
 pub(crate) struct StateReader<'a> {
@@ -127,6 +150,16 @@ impl StateReader<'_> {
     }
 }
 impl Owner {
+    pub(crate) fn read_stamp(&self) -> Option<ReadStamp> {
+        let guard = self.state.lock().unwrap();
+        let g = &guard.generation;
+        let revision = g.revision.load(Ordering::Acquire);
+        if revision == u64::MAX { return None; }
+        Some(ReadStamp { generation: Arc::downgrade(g), revision,
+            // Zero-width copies can mutate through independent owner locks.
+            // Their actual single value, not a possibly delayed revision, is decisive.
+            single: (g.bits == 0).then(|| g.state(0)) })
+    }
     pub(crate) fn with_state_reader<R>(&self, read: impl FnOnce(StateReader<'_>) -> R) -> R {
         let guard = self.state.lock().unwrap();
         let generation = &guard.generation;
@@ -199,7 +232,7 @@ impl Owner {
             global_bits,
         })
     }
-    fn copy(&self) -> Self {
+    pub(super) fn copy(&self) -> Self {
         let guard = self.state.lock().unwrap();
         let g = &guard.generation;
         // SingleValuePalette.copy returns itself. A zero-width network read
@@ -281,7 +314,7 @@ impl Owner {
         Some((kind, bits, palette, words, counts.values()))
     }
     // One fused write, including palette admission, first-use growth and packed mutation.
-    fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {
+    pub(super) fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {
         if index >= ENTRIES || value >= self.limit {
             return None;
         }
@@ -425,7 +458,7 @@ impl Owner {
         counts.set(values);
         true
     }
-    fn read_single(&self, value: u32) -> bool {
+    pub(super) fn read_single(&self, value: u32) -> bool {
         if value >= self.limit {
             return false;
         }
@@ -434,6 +467,7 @@ impl Owner {
             return false;
         }
         s.generation.palette[0].store(value, Ordering::Release);
+        s.generation.changed();
         true
     }
     fn capture(&self) -> Box<[u16; ENTRIES]> {

@@ -418,6 +418,27 @@ public class ChunkWrapper implements IChunkWrapper
 	
 	public ChunkAccess getChunk() { return this.chunk; }
 	
+	@Override
+	public int getBlockBiomeHashCode()
+	{
+		long nativeHash = this.getClass() == ChunkWrapper.class
+			? net.minecraft.world.level.chunk.NativeDhChunkHash.hash(this.wrappedLevel, this, this.nativeHeightMaps) : 0;
+		return nativeHash >>> 32 == 1 ? (int) nativeHash : IChunkWrapper.super.getBlockBiomeHashCode();
+	}
+
+	/** Preserve the first enumeration at the hash's original emitter boundary. */
+	public synchronized net.minecraft.world.level.chunk.NativeDhSources nativeDhHashSources()
+	{
+		if (this.getClass() != ChunkWrapper.class || this.blockLightPosList != null) return null;
+		if (this.nativeSources == null)
+		{
+			var field = this.nativeLighting;
+			this.nativeSources = field != null ? field.retainSources()
+				: net.minecraft.world.level.chunk.NativeDhSources.build(this.chunk);
+		}
+		return this.nativeSources;
+	}
+
 	public void trySetStatus(ChunkStatus status) { trySetStatus(this.getChunk(), status); }
 	/** does nothing if the chunk object doesn't support setting it's status */
 	public static void trySetStatus(ChunkAccess chunk, ChunkStatus status)
@@ -484,14 +505,8 @@ public class ChunkWrapper implements IChunkWrapper
 		var field = this.nativeLighting;
 		if (field == null) return;
 		this.getWorldBlockLightPosList(); // Preserve the first native emitter enumeration.
-		var block = ChunkLightStorage.createBlockLightStorage(this);
-		var sky = ChunkLightStorage.createSkyLightStorage(this);
-		for (int y = field.minY(); y < field.maxY(); y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++)
-		{
-			int b = field.light(x, y, z, false), s = field.light(x, y, z, true);
-			if (b != 0) block.set(x, y, z, b);
-			if (s != 0) sky.set(x, y, z, s);
-		}
+		var block = field.copyToMutableStorage(false);
+		var sky = field.copyToMutableStorage(true);
 		this.blockLightStorage = block;
 		this.skyLightStorage = sky;
 		this.nativeLighting = null;

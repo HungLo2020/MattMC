@@ -156,3 +156,19 @@ fn capture_matches_per_index_decode_at_every_width() {
         }
     }
 }
+
+#[test]
+fn read_stamps_cover_alias_replacement_growth_writes_and_saturation_without_pinning_data() {
+    let owner = single(); let alias = owner.copy();
+    let initial = owner.read_stamp().unwrap(); assert!(initial.matches(&alias.read_stamp().unwrap()));
+    assert!(alias.read_single(2)); assert!(!initial.matches(&owner.read_stamp().unwrap()));
+    let shared = owner.read_stamp().unwrap(); owner.write(0, 3).unwrap();
+    assert!(!shared.matches(&owner.read_stamp().unwrap())); assert!(shared.matches(&alias.read_stamp().unwrap()));
+    let grown = owner.read_stamp().unwrap(); owner.write(1, 3).unwrap();
+    assert!(!grown.matches(&owner.read_stamp().unwrap()));
+    let before_invalid = owner.read_stamp().unwrap(); assert!(owner.write(4096, 3).is_none());
+    assert!(before_invalid.matches(&owner.read_stamp().unwrap()));
+    { let state = owner.state.lock().unwrap(); state.generation.revision.store(u64::MAX, Ordering::Release); }
+    assert!(owner.read_stamp().is_none()); owner.write(2, 3).unwrap(); assert!(owner.read_stamp().is_none());
+    drop(owner); drop(alias); assert!(!initial.alive());
+}

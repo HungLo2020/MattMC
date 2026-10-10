@@ -31,8 +31,8 @@ final class RustSectionGraph implements AutoCloseable {
 	/** {@code FfiSectionMeshes}: x, y, z, flags, keys[3], generations[3]. */
 	/** {@code FfiTerrainSelectionParams}: camera[3] f64, depth policies[3], layer ordinals[3], shadow, max shadow, receipts, reserved. */
 	private static final long SELECTION_PARAMS_BYTES = 64;
-	/** {@code FfiTerrainSelectionView}: ten 8-byte fields. */
-	private static final long SELECTION_VIEW_BYTES = 80;
+	/** {@code FfiTerrainSelectionView}: twelve 8-byte fields. */
+	private static final long SELECTION_VIEW_BYTES = 96;
 	/** {@code SelectedLayer}: section key, layer, reserved. */
 	static final long SELECTED_LAYER_BYTES = 16;
 
@@ -325,7 +325,8 @@ final class RustSectionGraph implements AutoCloseable {
 	 */
 	record TerrainSelection(MemorySegment sections, MemorySegment sectionLayers, int sectionCount,
 			MemorySegment casters, int casterCount, MemorySegment animated, int animatedCount,
-			long layerProbes, long layerSubmissions, long fingerprint) {
+			long layerProbes, long layerSubmissions, long fingerprint,
+            long frameOwner, long frameId) {
 		long sectionKey(int index) {
 			return this.sectionLayers.get(ValueLayout.JAVA_LONG, index * SELECTED_LAYER_BYTES);
 		}
@@ -383,7 +384,9 @@ final class RustSectionGraph implements AutoCloseable {
 			animatedCount,
 			view.get(ValueLayout.JAVA_LONG, 56),
 			view.get(ValueLayout.JAVA_LONG, 64),
-			view.get(ValueLayout.JAVA_LONG, 72));
+			view.get(ValueLayout.JAVA_LONG, 72),
+            view.get(ValueLayout.JAVA_LONG, 80),
+            view.get(ValueLayout.JAVA_LONG, 88));
 	}
 
 	int visitX(int index) {

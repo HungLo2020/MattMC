@@ -16,7 +16,9 @@ The pass borrows authoritative live block owners and retained
 snapshots, enumerates emitters, seeds sky light and runs both priority queues.
 Uniform output sections retain encoded constants; varying sections own 2,048
 packed bytes per channel. Java borrows those exact tables and bytes.
-Java supplies bounded owner references and neighbor order; it does not build
+The local [shared chunk-input migration](../chunk/RUST-DH-CHUNK-INPUTS.md)
+retains section bindings in Rust and passes one CPU owner per neighbor; initial
+admission and public-wrapper checks remain Java. Java supplies neighbor order; it does not build
 dense block/policy arrays or execute per-cell boundary calls. Outputs own their
 light values and cached emitter positions independently. Chunk light getters
 read CPU leases directly. Rust/GAL GPU ownership and presentation are unchanged.
@@ -50,25 +52,39 @@ Implementation: [native pass](https://github.com/HungLo2020/MattMC/tree/master/s
   capacity follows actual work, with an explicit monotonic-update bound. Release
   pass snapshots and queues after the call; keep no global queue cache.
 
-## Source-review boundary (2026-10-10)
+<a id="source-review-boundary-2026-10-10"></a>
 
-A source-predicted stale-counter case still needs an executable regression.
-Canonical direct palette writes can leave a section's `hasOnlyAir` counter
-stale; the existing [counter test](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/test/java/net/minecraft/world/level/chunk/NativeSectionCountersTest.java#L42-L54)
-preserves that distinction. Legacy DH block reads reach
-[`ProtoChunk.getBlockState`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/world/level/chunk/ProtoChunk.java#L97-L104),
-which returns air for a stale-empty section. The native pass
-[snapshots raw states](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/rust/world/level/lighting/dh/mod.rs#L183-L211)
-without a section-counter input, so an emitter introduced through the palette
-can be seen differently. Exercise an otherwise empty canonical chunk with a
-raw palette emitter write through both lighting paths. This review did not run
-that case or observe a gameplay failure. Height-field stale-counter coverage
-does not establish lighting parity for it. The
-[follow-up on #777](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
-records the source-only case; [dedicated #826](https://github.com/HungLo2020/MattMC/issues/826)
-tracks the executable regression and closure checks. The later `fc1d529d`
-render-data provenance/merge changes do not change this lighting admission or
-counter contract and do not resolve the case.
+## Stale-counter compatibility (2026-10-10)
+
+The source-only concern at `bffd0eef8` now has an actual Frozen CPU recorder
+and executable regression: three cases, nine passes, every cell and exact
+work counts. Direct palette writes can leave `hasOnlyAir` stale. Native lighting
+borrows section counters and returns air for stale-empty block reads, while
+emitter enumeration deliberately retains raw palette positions. The original
+[source review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
+and [dedicated #826](https://github.com/HungLo2020/MattMC/issues/826)
+remain historical review references, not evidence of a gameplay failure. The
+upstream `fc1d529d` provenance/merge change did not resolve that case; the
+subsequent retained-counter implementation and actual Frozen oracle do.
+
+Repeated clear/edit passes exposed another compatibility requirement: Frozen
+light-section level counters survive value clears and affect later constant
+conversion. Native fields now retain that bounded policy state alongside
+compact values. An initial development JNI run reproduced a work-count mismatch
+(12,289 versus 8,199); the retained-counter implementation passes the focused
+Rust regression and replacement JNI checks. Frozen behavior is unchanged.
+A further actual Frozen mutable-escape probe found later work counts diverging
+(8,198 versus 12,289) after Java reconstructed a native field. The corrected
+handoff copies retained section allocation, constant and signed-counter policy
+with the values. Its three-case/ten-pass oracle pins eight Frozen classes;
+all 30 production JNI passes match in release `839ff128`. Full Rust/Java checks
+pass; the final seven lifecycle cases and both reviewed settled pairs pass.
+Later travel admission and timing results belong to the
+[column milestone](../chunk/RUST-DH-COLUMNS.md). They do not accept the newer
+retained-input implementation, whose hardware and long-session verification
+remain pending. The earlier release's results
+below remain separate.
+
 
 ## Verify
 

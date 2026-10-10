@@ -8,4 +8,5 @@ pub mod render_list;
 pub mod section_graph;
 pub mod section_graph_ffi;
 pub mod terrain_selection;
+pub(crate) mod terrain_frames;
 pub mod translucent;

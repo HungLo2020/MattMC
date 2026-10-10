@@ -13,6 +13,7 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
@@ -449,7 +450,7 @@ public class DhLightingEngine
 		{
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
 			{
-				LongArrayList dataPoints = dataSource.getColumnAtRelPos(x, z);
+				LongList dataPoints = dataSource.getColumnAtRelPos(x, z);
 				if (dataPoints != null && !dataPoints.isEmpty())
 				{
 					// iterate through the data points in this column top-down
@@ -516,7 +517,7 @@ public class DhLightingEngine
 		// note that this alternate logic assumes the 
 		// data point above is being lit from the top.
 		// this is a fine assumption for water and oceans.
-		for (LongArrayList list : dataSource.dataPoints)
+		for (LongList list : dataSource.dataPoints)
 		{
 			if (list != null)
 			{
@@ -600,7 +601,7 @@ public class DhLightingEngine
 			// check if the adjacent position is within the bounds of this data source...
 			if (adjacentX >= 0 && adjacentX < FullDataSourceV2.WIDTH && adjacentZ >= 0 && adjacentZ < FullDataSourceV2.WIDTH)
 			{
-				LongArrayList adjacentDataPoints = chunk.getColumnAtRelPos(adjacentX, adjacentZ);
+				LongList adjacentDataPoints = chunk.getColumnAtRelPos(adjacentX, adjacentZ);
 				// ...and also check to make sure we have some data points
 				// (potentially transparent ones) to propagate through in the adjacent column.
 				if (adjacentDataPoints != null)

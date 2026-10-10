@@ -524,6 +524,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final StaticTerrainBlock PENDING_SHADOW_CASTERS = new StaticTerrainBlock(false);
 	/** Camera-visible static terrain of the compact path, in draw order. */
 	private static final StaticTerrainBlock PENDING_TERRAIN_SECTIONS = new StaticTerrainBlock(true);
+    private static VulkanicGalBridge.StaticTerrainFrameReference pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
 
 	/** Reusable producer-side caster arrays; copied exactly once per consumed frame. */
 	/** Compact static-terrain section layers: identity, origin, policy and flags per entry. */
@@ -1583,6 +1584,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				pendingModelRigPoseCount = 0;
 				PENDING_SHADOW_CASTERS.clear();
 				PENDING_TERRAIN_SECTIONS.clear();
+            pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
 				ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
 				PENDING_MESH_PRODUCERS.clear();
 				pendingStaticTerrainCamera = null;
@@ -2262,6 +2264,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingModelRigPoseCount = 0;
 			PENDING_SHADOW_CASTERS.clear();
 			PENDING_TERRAIN_SECTIONS.clear();
+            pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
 			PENDING_MESH_PRODUCERS.clear();
 			pendingStaticTerrainCamera = null;
 			PENDING_BLOCK_MODEL_MESH_KEYS.clear();
@@ -3265,6 +3268,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				pendingModelRigPoseCount = 0;
 				PENDING_SHADOW_CASTERS.clear();
 				PENDING_TERRAIN_SECTIONS.clear();
+            pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
 			PENDING_MESH_PRODUCERS.clear();
 				PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
 				pendingFirstPersonFrame = false;
@@ -3298,6 +3302,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingModelRigPoseCount = 0;
 			PENDING_SHADOW_CASTERS.clear();
 			PENDING_TERRAIN_SECTIONS.clear();
+            pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
 			PENDING_MESH_PRODUCERS.clear();
 			PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
 			pendingFirstPersonFrame = false;
@@ -11161,7 +11166,10 @@ float[] transform = new float[16];
 				|| Double.compare(frameCamera.z(), cameraZ) != 0) {
 				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
 			}
-			PENDING_SHADOW_CASTERS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, null, count);
+			if (pendingNativeTerrainFrame.owner() != 0) {
+                throw new IllegalStateException("copied terrain excludes a native terrain selection");
+            }
+            PENDING_SHADOW_CASTERS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, null, count);
 		}
 	}
 
@@ -11190,7 +11198,10 @@ float[] transform = new float[16];
 			// The compact stream owns this frame's terrain; retained records of
 			// the per-record path must not replay alongside it.
 			ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
-			PENDING_TERRAIN_SECTIONS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, flags, count);
+			if (pendingNativeTerrainFrame.owner() != 0) {
+                throw new IllegalStateException("copied terrain excludes a native terrain selection");
+            }
+            PENDING_TERRAIN_SECTIONS.append(meshKeys, meshGenerations, sectionOrigins, depthPolicies, flags, count);
 		}
 	}
 
@@ -11199,6 +11210,23 @@ float[] transform = new float[16];
 	 * layers and off-camera shadow casters, already packed in the native
 	 * record layouts and placed with the seeded frame camera.
 	 */
+    public static void enqueueNativeStaticTerrainSelection(VulkanicGalBridge.StaticTerrainFrameReference reference,
+            double cameraX, double cameraY, double cameraZ) {
+        synchronized (LOCK) {
+            var camera = pendingStaticTerrainCamera;
+            if (camera == null || Double.compare(camera.x(), cameraX) != 0
+                    || Double.compare(camera.y(), cameraY) != 0 || Double.compare(camera.z(), cameraZ) != 0) {
+                throw new IllegalStateException("native terrain camera was not seeded for this frame");
+            }
+            if (reference.owner() == 0 || pendingNativeTerrainFrame.owner() != 0
+                    || PENDING_TERRAIN_SECTIONS.count() != 0 || PENDING_SHADOW_CASTERS.count() != 0) {
+                throw new IllegalStateException("native terrain selection excludes other compact terrain streams");
+            }
+            ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
+            pendingNativeTerrainFrame = reference;
+        }
+    }
+
 	public static void enqueueStaticTerrainSelection(MemorySegment sections, int sectionCount,
 			MemorySegment casters, int casterCount, double cameraX, double cameraY, double cameraZ) {
 		synchronized (LOCK) {
@@ -11210,7 +11238,10 @@ float[] transform = new float[16];
 				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
 			}
 			ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
-			PENDING_TERRAIN_SECTIONS.appendPacked(sections, sectionCount);
+			if (pendingNativeTerrainFrame.owner() != 0) {
+                throw new IllegalStateException("copied terrain excludes a native terrain selection");
+            }
+            PENDING_TERRAIN_SECTIONS.appendPacked(sections, sectionCount);
 			PENDING_SHADOW_CASTERS.appendPacked(casters, casterCount);
 		}
 	}
@@ -18583,10 +18614,14 @@ float[] transform = new float[16];
 			// loading frame) they are dropped exactly like retained-section replay.
 			VulkanicGalBridge.StaticTerrainShadowCasters shadowCasters = pendingStaticTerrainCamera == null
 				? VulkanicGalBridge.StaticTerrainShadowCasters.EMPTY
-				: PENDING_SHADOW_CASTERS.casters();
+				: pendingNativeTerrainFrame.owner() != 0
+                    ? VulkanicGalBridge.StaticTerrainShadowCasters.nativeFrame(pendingNativeTerrainFrame)
+                    : PENDING_SHADOW_CASTERS.casters();
 			VulkanicGalBridge.StaticTerrainSections terrainSections = pendingStaticTerrainCamera == null
 				? VulkanicGalBridge.StaticTerrainSections.EMPTY
-				: PENDING_TERRAIN_SECTIONS.sections();
+				: pendingNativeTerrainFrame.owner() != 0
+                    ? VulkanicGalBridge.StaticTerrainSections.nativeFrame(pendingNativeTerrainFrame)
+                    : PENDING_TERRAIN_SECTIONS.sections();
 			if ((long) shadowCasters.count() + terrainSections.count() > MAX_RUST_WORLD_MESH_INSTANCES
 				- admittedMeshInstances.size() - orbInstances.size()) {
 				throw new IllegalStateException("combined mesh/static-terrain frame capacity exceeded");
@@ -18636,6 +18671,7 @@ float[] transform = new float[16];
 					pendingModelRigPoseCount = 0;
 					PENDING_SHADOW_CASTERS.clear();
 					PENDING_TERRAIN_SECTIONS.clear();
+            pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
 					PENDING_MESH_PRODUCERS.clear();
 					pendingStaticTerrainCamera = null;
 					PENDING_FIRST_PERSON_MESH_INSTANCES.clear();

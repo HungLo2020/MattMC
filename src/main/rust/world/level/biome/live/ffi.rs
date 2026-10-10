@@ -98,6 +98,18 @@ pub unsafe extern "C" fn mattmc_live_biome_world_replace(
 }
 
 /// # Safety
+/// Live world and an Arc-backed chunk biome input, pinned through this call.
+/// World and column consumers share the same immutable binding allocation.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_biome_world_replace_inputs(world:*const World,epoch:u64,x:i32,z:i32,
+    inputs:*const Biomes) -> i32 {
+    let Some(world)=world.as_ref() else {return -1;};
+    if inputs.is_null() || inputs as usize%std::mem::align_of::<Biomes>()!=0 {return -1;}
+    Arc::increment_strong_count(inputs);
+    if world.0.lock().unwrap().replace_inputs(epoch,(x,z),Arc::from_raw(inputs)) {0} else {-1}
+}
+
+/// # Safety
 /// Live world. Mark a loaded compatibility chunk so queries decline rather
 /// than treating unsupported biome data as a missing chunk.
 #[no_mangle]

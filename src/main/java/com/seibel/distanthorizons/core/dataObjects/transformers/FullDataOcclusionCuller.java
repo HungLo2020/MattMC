@@ -3,6 +3,7 @@ package com.seibel.distanthorizons.core.dataObjects.transformers;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 
@@ -22,11 +23,19 @@ public class FullDataOcclusionCuller
 			int relX, int relZ
 	)
 	{
-		LongArrayList centerColumn = dataSource.getColumnAtRelPos(relX, relZ);
-		LongArrayList posXColumn = dataSource.tryGetColumnAtRelPos(relX + 1, relZ);
-		LongArrayList negXColumn = dataSource.tryGetColumnAtRelPos(relX - 1, relZ);
-		LongArrayList posZColumn = dataSource.tryGetColumnAtRelPos(relX, relZ + 1);
-		LongArrayList negZColumn = dataSource.tryGetColumnAtRelPos(relX, relZ - 1);
+		try (var nativePolicy = net.minecraft.world.level.chunk.NativeDhMaterials.create(dataSource.mapping))
+		{
+			cullHiddenDatapointsInColumn(dataSource, relX, relZ, nativePolicy);
+		}
+	}
+	public static void cullHiddenDatapointsInColumn(FullDataSourceV2 dataSource, int relX, int relZ,
+			net.minecraft.world.level.chunk.NativeDhMaterials nativePolicy)
+	{
+		LongList centerColumn = dataSource.getColumnAtRelPos(relX, relZ);
+		LongList posXColumn = dataSource.tryGetColumnAtRelPos(relX + 1, relZ);
+		LongList negXColumn = dataSource.tryGetColumnAtRelPos(relX - 1, relZ);
+		LongList posZColumn = dataSource.tryGetColumnAtRelPos(relX, relZ + 1);
+		LongList negZColumn = dataSource.tryGetColumnAtRelPos(relX, relZ - 1);
 		
 		if (posXColumn == null || posXColumn.size() == 0
 			|| negXColumn == null || negXColumn.size() == 0
@@ -38,6 +47,8 @@ public class FullDataOcclusionCuller
 			// to air/void
 			return;
 		}
+		if (centerColumn instanceof net.minecraft.world.level.chunk.NativeDhColumnList nativeColumn
+			&& nativeColumn.tryCull(nativePolicy, posXColumn, negXColumn, posZColumn, negZColumn)) return;
 		
 		
 		int centerIndex = centerColumn.size() - 1;
@@ -143,7 +154,7 @@ public class FullDataOcclusionCuller
 	 point to use in the loop, AND a boolean indicating whether or not the
 	 centerPoint is covered;	both are packed into the same int, and returned.
 	 */
-	private static int checkOcclusion(@NotNull FullDataSourceV2 source, long centerPoint, @NotNull LongArrayList adjacentColumn, int adjacentIndex)
+	private static int checkOcclusion(@NotNull FullDataSourceV2 source, long centerPoint, @NotNull LongList adjacentColumn, int adjacentIndex)
 	{
 		// check if this point is adjacent to an empty column
 		// if so it will always be shown

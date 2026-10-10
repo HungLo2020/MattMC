@@ -264,7 +264,7 @@ impl WorldPrimitiveFrontend {
         let material_ids = self.source_terrain_material_ids_active();
         let sections = std::mem::take(&mut frame.static_terrain_sections);
         let mut leftover_sections = Vec::new();
-        for section in &sections.sections {
+        for section in sections.sections.iter() {
             let placement = TerrainSectionPlacement { origin: section.origin, camera: sections.camera };
             let entry = if section.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS == 0 {
                 self.scene_terrain_entry(section.mesh_key, placement, None, material_ids)?
@@ -285,7 +285,7 @@ impl WorldPrimitiveFrontend {
         }
         let casters = std::mem::take(&mut frame.static_terrain_shadow_casters);
         let mut leftover_casters = Vec::new();
-        for caster in &casters.casters {
+        for caster in casters.casters.iter() {
             let placement = TerrainSectionPlacement { origin: caster.origin, camera: casters.camera };
             match self.scene_terrain_entry(caster.mesh_key, placement, Some(0x7f), material_ids)? {
                 Some(entry) => {
@@ -298,12 +298,12 @@ impl WorldPrimitiveFrontend {
         let resident = |mesh_key: u64| self.static_terrain_resident_generation(mesh_key);
         expand_static_terrain_sections(
             frame,
-            &StaticTerrainSections { camera: sections.camera, sections: leftover_sections },
+            &StaticTerrainSections { camera: sections.camera, sections: leftover_sections.into() },
             resident,
         )?;
         expand_static_terrain_shadow_casters(
             frame,
-            &StaticTerrainShadowCasters { camera: casters.camera, casters: leftover_casters },
+            &StaticTerrainShadowCasters { camera: casters.camera, casters: leftover_casters.into() },
             resident,
         )?;
         Ok(scene)

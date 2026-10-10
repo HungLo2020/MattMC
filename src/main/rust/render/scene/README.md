@@ -8,6 +8,8 @@ Data and wire vocabulary only (GAL value types like `IndexType` allowed).
 
 Modules: strata, material (modes, ids, depth policy, sources), textures,
 mesh (assets, instance flags, cull/winding/topology), lod (including immutable
-selected-column references shared by the DH collector and frame owner), background,
+selected-column references shared by the DH collector and frame owner),
+terrain (immutable camera layers and shadow casters shared by native selection
+and frame consumers), background,
 overlays (line style, world border), voxel_source, and the semantic viewport
 bound.

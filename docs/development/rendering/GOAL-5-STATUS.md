@@ -1,6 +1,6 @@
 # Goal 5 rendering checkpoint
 
-**Goal 5 remains incomplete.** The current source review reaches
+**Goal 5 remains incomplete.** The historical documentation source review reaches
 [`fc1d529d`](https://github.com/HungLo2020/MattMC/commit/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097):
 packed-word section capture, cached GUI resource misses, conditional DH semantic
 spans and merge changes reduce selected preparation work; the scripted recorder
@@ -27,7 +27,15 @@ recordings; the two flight-retention checks belong to the preceding review.
 Entry, sustained streaming, broad visual/temporal parity, long-session memory,
 complete scene migration and the independent native crash remain open. A
 [source-predicted DH stale-counter discrepancy](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
-also needs an executable regression; no gameplay failure was observed here.
+was unresolved at that review. The later retained-counter implementation now
+replays actual Frozen lighting passes, including mutable escape; those CPU
+regressions do not establish new gameplay or performance acceptance. Further
+[retained chunk inputs](../world/chunk/RUST-DH-CHUNK-INPUTS.md),
+[client residency](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md),
+[shared biome inputs](../world/biome/RUST-LIVE-BIOMES.md) and
+[DH change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md) move additional CPU
+producer ownership. Their current verification scope is recorded in those
+subsystem guides; the earlier timing matrices do not accept their release.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary

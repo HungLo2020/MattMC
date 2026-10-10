@@ -46,10 +46,11 @@ pub unsafe extern "C" fn mattmc_dh_lighting_build(
     };
     let descriptors = std::slice::from_raw_parts(inputs, count as usize);
     let mut owners = Vec::with_capacity(count as usize);
+    let mut counts = Vec::with_capacity(count as usize);
     for input in descriptors {
         if !(0..9).contains(&input.slot)
             || !(1..=256).contains(&input.count)
-            || input.reserved != 0
+            || !(0..=1).contains(&input.reserved)
             || !aligned(input.owners)
             || !aligned(input.heights)
             || (!input.previous.is_null() && !aligned(input.previous))
@@ -57,23 +58,42 @@ pub unsafe extern "C" fn mattmc_dh_lighting_build(
         {
             return std::ptr::null_mut();
         }
-        let pointers = std::slice::from_raw_parts(input.owners, input.count as usize);
-        if pointers.iter().any(|&p| !aligned(p as *const live::Owner)) {
+        if input.reserved == 1 {
+            let chunk = &*(input.owners as *const crate::world::level::chunk::inputs::Chunk);
+            if chunk.min_y != input.min_y || Sections::Retained(chunk).len() != input.count as usize {
+                return std::ptr::null_mut();
+            }
+            owners.push(Vec::new()); counts.push(Vec::new());
+            continue;
+        }
+        let pointers = std::slice::from_raw_parts(input.owners, input.count as usize * 2);
+        if pointers.chunks_exact(2).any(|p| {
+            !aligned(p[0] as *const live::Owner) || !aligned(p[1] as *const counters::Owner)
+        }) {
             return std::ptr::null_mut();
         }
         owners.push(
             pointers
-                .iter()
-                .map(|&p| &*(p as *const live::Owner))
+                .chunks_exact(2)
+                .map(|p| &*(p[0] as *const live::Owner))
+                .collect::<Vec<_>>(),
+        );
+        counts.push(
+            pointers
+                .chunks_exact(2)
+                .map(|p| &*(p[1] as *const counters::Owner))
                 .collect::<Vec<_>>(),
         );
     }
     let inputs = descriptors
         .iter()
         .zip(&owners)
-        .map(|(i, owners)| Input {
+        .zip(&counts)
+        .map(|((i, owners), counts)| Input {
             slot: i.slot as usize,
-            sections: owners,
+            sections: if i.reserved == 1 {
+                Sections::Retained(&*(i.owners as *const crate::world::level::chunk::inputs::Chunk))
+            } else { Sections::Blocks(owners, Some(counts)) },
             heights: &*i.heights,
             min_y: i.min_y,
             previous: i.previous.as_ref(),
@@ -155,6 +175,32 @@ pub unsafe extern "C" fn mattmc_dh_light_field_release(field: *mut Field) {
     }
 }
 
+/// Mutable CPU compatibility handoff: retained counts followed by constant.
+/// Zero means the original section was never allocated; one means copied.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_light_section_meta(
+    field: *const Field,
+    section: i32,
+    sky: i32,
+    out: *mut i16,
+) -> i32 {
+    if !aligned(field) || !aligned(out) || section < 0 || !(0..=1).contains(&sky) {
+        return -1;
+    }
+    let f = &*field;
+    let metadata = if sky == 1 { &f.sky_meta } else { &f.block_meta };
+    let Some(entry) = metadata.get(section as usize) else {
+        return -1;
+    };
+    let Some(meta) = entry else {
+        return 0;
+    };
+    let output = std::slice::from_raw_parts_mut(out, 17);
+    output[..16].copy_from_slice(&meta.counts);
+    output[16] = i16::from(meta.constant);
+    1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,6 +233,46 @@ mod tests {
             assert_eq!(*(view[2] as *const i32), 0);
             assert_eq!(*(view[5] as *const i32), -16);
             assert_eq!((*field).expand(), cells);
+            let mut metadata = [0i16; 17];
+            assert_eq!(
+                mattmc_dh_light_section_meta(field, 0, 0, metadata.as_mut_ptr()),
+                1
+            );
+            assert_eq!(metadata[0], 4095);
+            assert_eq!(metadata[7], 1);
+            assert_eq!(metadata[16], -1);
+            assert_eq!(
+                mattmc_dh_light_section_meta(field, 0, 1, metadata.as_mut_ptr()),
+                1
+            );
+            assert_eq!(metadata[15], 4096);
+            assert_eq!(metadata[16], 15);
+            assert_eq!(
+                mattmc_dh_light_section_meta(field, -1, 1, metadata.as_mut_ptr()),
+                -1
+            );
+            assert_eq!(
+                mattmc_dh_light_section_meta(field, 1, 1, metadata.as_mut_ptr()),
+                -1
+            );
+            assert_eq!(
+                mattmc_dh_light_section_meta(field, 0, 2, metadata.as_mut_ptr()),
+                -1
+            );
+            assert_eq!(
+                mattmc_dh_light_section_meta(field, 0, 1, std::ptr::null_mut()),
+                -1
+            );
+            let empty = Field::new(-64, &[0; 4096], Arc::from([]));
+            metadata.fill(123);
+            assert_eq!(
+                mattmc_dh_light_section_meta(&empty, 0, 0, metadata.as_mut_ptr()),
+                0
+            );
+            assert_eq!(
+                metadata, [123; 17],
+                "Never-allocated policy leaves output untouched"
+            );
             let sources = sources::mattmc_dh_light_field_sources(field);
             mattmc_dh_light_field_release(field);
             let mut source_view = [0usize; 3];

@@ -3,7 +3,6 @@ package net.minecraft.world.level.chunk;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.Reference;
-import java.util.Arrays;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.NativeBlockRegistry;
 import org.jetbrains.annotations.Nullable;
@@ -13,13 +12,12 @@ public final class NativeDhSources {
     private static MethodHandle handle(String name,FunctionDescriptor signature) {
         return NativeLibraryLoader.downcallHandle("mattmc_rust",name,signature);
     }
-    private static final MethodHandle BUILD=handle("mattmc_dh_sources_build",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
+    private static final MethodHandle BUILD=handle("mattmc_dh_sources_from_chunk",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle FROM_FIELD=handle("mattmc_dh_light_field_sources",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle VIEW=handle("mattmc_dh_sources_view",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE=handle("mattmc_dh_sources_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final class Scratch {
-        final Arena arena=Arena.ofAuto();final MemorySegment owners=arena.allocate(256*8,8),metadata=arena.allocate(3*8,8);
-        final NativeLiveBlockSection[] pins=new NativeLiveBlockSection[256];
+        final Arena arena=Arena.ofAuto();final MemorySegment metadata=arena.allocate(3*8,8);
     }
     private static final ThreadLocal<Scratch> SCRATCH=ThreadLocal.withInitial(Scratch::new);
     private final MemorySegment owner,positions;
@@ -39,16 +37,12 @@ public final class NativeDhSources {
         if(chunk instanceof LevelChunk level && level.getLevel().isDebug())return null;
         if(!NativeBlockRegistry.ready())return null;
         int min=chunk.getMinY(),height=chunk.getHeight();if(min%16!=0||Math.abs((long)min)>1_000_000||height<16||height>4096||height%16!=0)return null;
-        var sections=chunk.getSectionsForRead();if(sections.length!=height/16)return null;var scratch=SCRATCH.get();
+        var inputs=chunk.nativeDhSections();if(inputs==null)return null;var scratch=SCRATCH.get();
         try {
-            for(int i=0;i<sections.length;i++) {
-                var section=sections[i];if(section==null)return null;var owner=section.nativeGenerationInput();if(owner==null)return null;
-                scratch.pins[i]=owner;scratch.owners.setAtIndex(ValueLayout.ADDRESS,i,owner.stageOwner());
-            }
-            var pointer=(MemorySegment)BUILD.invokeExact(scratch.owners,sections.length,min);
+            var pointer=(MemorySegment)BUILD.invokeExact(inputs.stageOwner());
             return pointer.address()==0?null:new NativeDhSources(pointer,scratch.metadata);
         }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException("Cannot enumerate native emitters",e);}
-        finally{Reference.reachabilityFence(scratch.pins);Reference.reachabilityFence(sections);Arrays.fill(scratch.pins,null);}
+        finally{Reference.reachabilityFence(inputs);}
     }
     static NativeDhSources fromField(NativeDhLighting.Field field) {
         try {

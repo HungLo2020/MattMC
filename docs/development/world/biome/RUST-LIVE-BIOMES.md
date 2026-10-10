@@ -9,7 +9,14 @@ world's immutable color table and reuses its cubic window while source
 generations remain current. The admitted native path avoids Java's 216-color grid; compatibility
 sampling retains its original callbacks.
 
-All suite, runtime and profile outcomes reported below are committed author
+The local [retained input migration](../chunk/RUST-DH-CHUNK-INPUTS.md) now shares
+one immutable biome binding between this index and DH column inputs. Publication
+passes that owner directly; it does not allocate another Java section-owner array,
+pointer buffer or native owner-row collection. Identity validation remains on each
+admission. Unchanged binding publication retains the color window; every query
+still checks primary-owner generation/revision before reusing a result.
+
+Historical suite, runtime and profile outcomes reported below are committed author
 records. Their external receipts were not independently inspected or rerun by
 this documentation review.
 
@@ -94,6 +101,15 @@ those changes have not been remeasured by this documentation review.
   immediately clears residency/cache pins instead of retaining them until GC.
   Normal world-owner reclamation uses an automatic FFM arena; a new world gets
   a new epoch. This is not an explicit immediate disconnect/reset teardown.
+- Biome inputs are admitted independently of block/counter inputs. Unsupported
+  block storage must not disable otherwise canonical native sky/fog sampling.
+  Registry binding identity is checked before later rows are inspected. A loaded
+  unsupported biome row remains compatibility, rather than becoming an absent
+  chunk; canonical shape/capacity rejection still disables and clears the index.
+- Shared bindings retain mutable primary owners, not a previous generation.
+  Alias writes/growth and container replacement must invalidate results even if
+  the input collection itself is unchanged. Public section-array escape keeps
+  the existing permanent compatibility rule for world-color sampling.
 
 Java still orchestrates chunks, packets, generation and world ticks, and supplies
 the registry binding and immutable sky/fog color tables. The native sky path is
@@ -107,6 +123,7 @@ Storage: [`chunk/biomes/`](https://github.com/HungLo2020/MattMC/tree/master/src/
 Direct consumer: [`biome/live/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/biome/live).
 Transitional bridges: [`NativeLiveBiomeSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeLiveBiomeSection.java)
 and [`NativeBiomeWorld`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeBiomeWorld.java).
+Shared producer: [`NativeBiomeChunkInputs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeBiomeChunkInputs.java).
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::chunk::biomes
@@ -129,6 +146,18 @@ using Frozen's full runtime classpath and JDK25, then compress with
 decisions, guarded by its class SHA. Preserve Java integer wrapping rather than
 widening its subtraction/absolute-value semantics.
 These fixtures are supplemental CPU evidence, not runtime or throughput proof.
+
+The latest local input receipts are under `build/native-biome-inputs/`.
+Release70cbb053 passes all 250 Rust world checks, including the 256 recorded
+Frozen color cases through live input bindings and both consumers. All29 focused
+Java controls pass, covering shared bindings, primary-owner growth/replacement,
+independent block admission, mutable escape, malformed heights and custom getter
+order. FullJava reports1,905 tests/two skips/zero failures or errors across341
+suites; six full-task workers map the exact native image. All39,474 Current and
+38,176 Frozen source pins, native and protected-prompt guards match. These are
+CPU checks; hardware/runtime/performance and long-memory remain pending. The
+historical measurements below do not verify this implementation. Additional
+shared leases and obsolete Java cache bindings require sustained memory checks.
 
 ## October 9 verification
 

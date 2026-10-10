@@ -138,4 +138,62 @@ class NativeDhLightingTest {
         }
     }
 
+    @Test void rawPaletteEmittersWithStaleEmptyCountersMatchActualFrozenAcrossEdits() throws Exception {
+        try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(getClass().getResourceAsStream("/world/lighting/frozen-dh-stale-counters.bin.gz"))))) {
+            assertEquals(0x44485331,in.readInt());assertEquals(6,in.readInt());
+            for(int i=0;i<6;i++){in.readUTF();assertEquals(64,in.readUTF().length());}
+            assertEquals(3,in.readInt());
+            for(int test=0;test<3;test++) {
+                assertEquals(test,in.readInt());var source=HeightmapFixtures.chunk("empty",-64,32,0);
+                source.getSection(0).getStates().set(1,4,2,test==1?Blocks.STONE.defaultBlockState():Blocks.GLOWSTONE.defaultBlockState());
+                if(test==2)source.getSection(0).recalcBlockCounts();
+                assertEquals(in.readBoolean(),source.getSection(0).hasOnlyAir());
+                var wrapper=new ChunkWrapper(source,level);var nearby=new ArrayList<IChunkWrapper>();nearby.add(wrapper);
+                assertEquals(in.readInt(),wrapper.getWorldBlockLightPosList().size());assertEquals(3,in.readInt());
+                for(int phase=0;phase<3;phase++) {
+                    if(phase==1)source.getSection(0).getStates().set(1,4,2,Blocks.AIR.defaultBlockState());
+                    if(phase==2)source.getSection(0).getStates().set(1,4,2,Blocks.GLOWSTONE.defaultBlockState());
+                    assertEquals(in.readInt(),NativeDhLighting.tryLight(wrapper,nearby,15,true,true),"Frozen stale-counter work");
+                    assertNotNull(wrapper.nativeDhLightingInput().previous(),"Actual admission");
+                    for(int y=-64;y<-32;y++)for(int z=0;z<16;z++)for(int x=0;x<16;x++) {
+                        int packed=in.readUnsignedByte();assertEquals(packed&15,wrapper.getDhBlockLight(x,y,z));assertEquals(packed>>4,wrapper.getDhSkyLight(x,y,z));
+                    }
+                }
+            }
+            assertEquals(-1,in.read());
+        }
+    }
+    @Test void mutableEscapeRetainsFrozenCountersAcrossRepeatedClearAndPaletteEdits() throws Exception {
+        try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(NativeDhLightingTest.class.getResourceAsStream("/world/lighting/frozen-dh-mutable-escape.bin.gz"))))) {
+            assertEquals(0x44484531,in.readInt());assertEquals(8,in.readInt());
+            for(int i=0;i<8;i++){in.readUTF();assertEquals(64,in.readUTF().length());}
+            assertEquals(3,in.readInt());
+            for(int test=0;test<3;test++) {
+                assertEquals(test,in.readInt());var source=HeightmapFixtures.chunk("empty",-64,32,0);
+                source.getSection(0).getStates().set(1,4,2,test==1?Blocks.STONE.defaultBlockState():Blocks.GLOWSTONE.defaultBlockState());
+                if(test==2)source.getSection(0).recalcBlockCounts();
+                assertEquals(in.readBoolean(),source.getSection(0).hasOnlyAir());
+                var wrapper=new ChunkWrapper(source,level);var nearby=new ArrayList<IChunkWrapper>();nearby.add(wrapper);
+                assertEquals(in.readInt(),wrapper.getWorldBlockLightPosList().size());assertEquals(10,in.readInt());
+                NativeDhLighting.Field retained=null;int retainedValue=0;
+                for(int phase=0;phase<10;phase++) {
+                    boolean escape=in.readBoolean();assertEquals(phase==2,escape);
+                    if(escape)wrapper.setDhBlockLight(0,-64,0,wrapper.getDhBlockLight(0,-64,0));
+                    if(phase%2==1)source.getSection(0).getStates().set(1,4,2,Blocks.AIR.defaultBlockState());
+                    else if(phase>0)source.getSection(0).getStates().set(1,4,2,Blocks.GLOWSTONE.defaultBlockState());
+                    assertEquals(in.readInt(),(int)light.invoke(DhLightingEngine.INSTANCE,wrapper,nearby,15,true,true),"Frozen mutable-escape work case "+test+" phase "+phase);
+                    if(phase<2) {
+                        assertNotNull(wrapper.nativeDhLightingInput().previous(),"Actual native admission before escape");
+                        if(phase==0){retained=wrapper.nativeDhLightingInput().previous();retainedValue=retained.light(2,-60,2,false);}
+                    } else assertNull(wrapper.nativeDhLightingInput(),"Public storage remains Java-owned after escape");
+                    assertEquals(retainedValue,retained.light(2,-60,2,false),"Retained native field remains immutable");
+                    for(int y=-64;y<-32;y++)for(int z=0;z<16;z++)for(int x=0;x<16;x++) {
+                        int packed=in.readUnsignedByte();assertEquals(packed&15,wrapper.getDhBlockLight(x,y,z));assertEquals(packed>>4,wrapper.getDhSkyLight(x,y,z));
+                    }
+                }
+            }
+            assertEquals(-1,in.read());
+        }
+    }
+
 }

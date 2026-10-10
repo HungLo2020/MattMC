@@ -145,7 +145,7 @@ fn actual_frozen_all_saved_lights_and_work_counts_across_three_passes() {
             let inputs = (0..count)
                 .map(|i| Input {
                     slot: slots[i],
-                    sections: &refs[i],
+                    sections: Sections::Blocks(&refs[i], None),
                     heights: &heights[i],
                     min_y: mins[i],
                     previous: Some(&fields[i]),
@@ -202,7 +202,7 @@ fn rejects_invalid_admission_without_touching_published_lights() {
     let retained = old.clone();
     let i = Input {
         slot: 4,
-        sections: &sections,
+        sections: Sections::Blocks(&sections, None),
         heights: &heights,
         min_y: 0,
         previous: Some(&old),
@@ -237,4 +237,98 @@ fn published_uniform_sections_are_constants_and_dense_sections_are_packed() {
     assert_eq!(dense.level(1, 0, 0, false), 9);
     assert_eq!(dense.level(2, 0, 0, true), 7);
     assert!(Arc::ptr_eq(&dense.sources, &dense.clone().sources));
+}
+
+#[test]
+fn actual_frozen_stale_empty_counter_reads_differ_from_raw_emitter_enumeration() {
+    let mut bytes = Vec::new();
+    flate2::read::GzDecoder::new(
+        include_bytes!(
+            "../../../../../../test/resources/world/lighting/frozen-dh-stale-counters.bin.gz"
+        )
+        .as_slice(),
+    )
+    .read_to_end(&mut bytes)
+    .unwrap();
+    let mut r = Reader(&bytes);
+    assert_eq!(r.int(), 0x44485331);
+    assert_eq!(r.int(), 6);
+    for _ in 0..6 {
+        r.text();
+        assert_eq!(r.text().len(), 64);
+    }
+    assert_eq!(r.int(), 3);
+    let fixture = crate::world::level::chunk::dh_heightmaps::fixture::load();
+    for case in 0..3 {
+        assert_eq!(r.int(), case);
+        let empty = r.byte() != 0;
+        assert_eq!(empty, case != 2);
+        let source_count = r.int();
+        let counts = [
+            counters::Owner::new(if empty { 0 } else { 1 }),
+            counters::Owner::new(0),
+        ];
+        let source = sources::Sources {
+            min_y: -64,
+            positions: if source_count == 0 {
+                Arc::from([])
+            } else {
+                Arc::from([1057])
+            },
+        };
+        let mut ids = vec![0; 4096];
+        ids[1057] = if case == 1 { 1 } else { 7667 };
+        let initial = [live(&ids), live(&vec![0; 4096])];
+        let heights = crate::world::level::chunk::dh_heightmaps::build(
+            &initial.iter().zip(&counts).collect::<Vec<_>>(),
+            -64,
+            &fixture.catalog,
+        )
+        .unwrap();
+        let mut previous = None;
+        assert_eq!(r.int(), 3);
+        for phase in 0..3 {
+            if phase == 1 {
+                ids[1057] = 0;
+            }
+            if phase == 2 {
+                ids[1057] = 7667;
+            }
+            let owners = [live(&ids), live(&vec![0; 4096])];
+            let sections = owners.iter().collect::<Vec<_>>();
+            let count_refs = counts.iter().collect::<Vec<_>>();
+            let input = Input {
+                slot: 4,
+                min_y: -64,
+                sections: Sections::Blocks(&sections, Some(&count_refs)),
+                heights: &heights,
+                previous: previous.as_ref(),
+                cached_sources: Some(&source),
+            };
+            let result = build(
+                &[input],
+                &[4],
+                &fixture.catalog,
+                |id| Some(if id == 7667 { 15 } else { 0 }),
+                15,
+                true,
+                true,
+            )
+            .unwrap();
+            assert_eq!(
+                result.iterations,
+                r.int() as usize,
+                "case {case} phase {phase} work"
+            );
+            let field = result.fields.into_iter().next().unwrap().1;
+            assert_eq!(
+                field.expand().as_slice(),
+                r.bytes(8192).as_ref(),
+                "case {case} phase {phase} all cells"
+            );
+            assert_eq!(field.sources.len(), source_count as usize);
+            previous = Some(field);
+        }
+    }
+    assert!(r.0.is_empty());
 }

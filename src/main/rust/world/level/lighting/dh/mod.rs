@@ -2,12 +2,12 @@
 //! Immutable light fields and cached source positions stay Rust owned.
 //! Java borrows the CPU fields directly; unsupported inputs retain original callbacks.
 use crate::content::block::collision::Catalog;
-use crate::world::level::chunk::{dh_heightmaps::Heightmaps, live};
+use crate::world::level::chunk::{counters, dh_heightmaps::Heightmaps, live, inputs::Sections};
 use std::sync::Arc;
 
 pub(crate) struct Input<'a> {
     pub(crate) slot: usize,
-    pub(crate) sections: &'a [&'a live::Owner],
+    pub(crate) sections: Sections<'a>,
     pub(crate) heights: &'a Heightmaps,
     pub(crate) min_y: i32,
     pub(crate) previous: Option<&'a Field>,
@@ -58,18 +58,23 @@ pub(crate) struct Field {
     pub(crate) min_y: i32,
     block: Layer,
     sky: Layer,
+    block_meta: Box<[Option<SectionMeta>]>,
+    sky_meta: Box<[Option<SectionMeta>]>,
     pub(crate) sources: Arc<[u32]>,
 }
 impl Field {
-    fn new(min_y: i32, cells: &[u8], sources: Arc<[u32]>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn new(min_y: i32, cells: &[u8], sources: Arc<[u32]>) -> Self {
         Self {
             min_y,
             block: Layer::from_cells(cells, 0),
             sky: Layer::from_cells(cells, 4),
+            block_meta: SectionMeta::initial(cells, 0),
+            sky_meta: SectionMeta::initial(cells, 4),
             sources,
         }
     }
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.block.offsets.len() * 4096
     }
     fn expand(&self) -> Vec<u8> {
@@ -77,7 +82,6 @@ impl Field {
             .map(|i| self.block.get(i) | (self.sky.get(i) << 4))
             .collect()
     }
-    #[cfg(test)]
     pub(crate) fn level(&self, x: usize, y: i32, z: usize, sky: bool) -> u8 {
         if y < self.min_y {
             return 0;
@@ -103,7 +107,46 @@ struct Chunk {
     max: i32,
     states: Vec<u32>,
     lights: Vec<u8>,
+    block_meta: Box<[Option<SectionMeta>]>,
+    sky_meta: Box<[Option<SectionMeta>]>,
     sources: Arc<[u32]>,
+}
+/// Frozen's section counters survive clear and drive constant conversion.
+/// Retain this small policy state independently of compact value storage.
+#[derive(Clone, Debug, PartialEq)]
+struct SectionMeta {
+    counts: [i16; 16],
+    constant: i8,
+}
+impl SectionMeta {
+    fn zero() -> Self {
+        let mut counts = [0; 16];
+        counts[0] = 4096;
+        Self {
+            counts,
+            constant: 0,
+        }
+    }
+    #[cfg(test)]
+    fn initial(cells: &[u8], shift: u8) -> Box<[Option<Self>]> {
+        cells
+            .chunks_exact(4096)
+            .map(|s| {
+                if s.iter().all(|&v| (v >> shift) & 15 == 0) {
+                    return None;
+                }
+                let mut counts = [0; 16];
+                for &v in s {
+                    counts[((v >> shift) & 15) as usize] += 1;
+                }
+                let constant = counts
+                    .iter()
+                    .position(|&c| c == 4096)
+                    .map_or(-1, |v| v as i8);
+                Some(Self { counts, constant })
+            })
+            .collect()
+    }
 }
 struct Queue {
     levels: [Vec<u32>; 16],
@@ -138,9 +181,30 @@ impl Queue {
     }
 }
 fn set(chunk: &mut Chunk, index: usize, light: u8, sky: bool) {
-    if let Some(byte) = chunk.lights.get_mut(index) {
-        let shift = if sky { 4 } else { 0 };
-        *byte = (*byte & !(15 << shift)) | light << shift;
+    if index >= chunk.lights.len() {
+        return;
+    }
+    let shift = if sky { 4 } else { 0 };
+    let meta = if sky {
+        &mut chunk.sky_meta
+    } else {
+        &mut chunk.block_meta
+    };
+    let meta = meta[index / 4096].get_or_insert_with(SectionMeta::zero);
+    let old = (chunk.lights[index] >> shift) & 15;
+    if meta.constant >= 0 && old == light {
+        return;
+    }
+    meta.constant = -1;
+    meta.counts[old as usize] = meta.counts[old as usize].wrapping_sub(1);
+    meta.counts[light as usize] = meta.counts[light as usize].wrapping_add(1);
+    chunk.lights[index] = (chunk.lights[index] & !(15 << shift)) | light << shift;
+    if meta.counts[light as usize] == 4096 {
+        meta.constant = light as i8;
+        let start = index / 4096 * 4096;
+        for byte in &mut chunk.lights[start..start + 4096] {
+            *byte = (*byte & !(15 << shift)) | light << shift;
+        }
     }
 }
 /// Section-local snapshots are taken in Rust under the existing storage locks.
@@ -173,6 +237,7 @@ pub(crate) fn build(
             || slots[input.slot].is_some()
             || input.min_y != min_y
             || input.sections.len() != sections
+            || !input.sections.valid_counts()
             || input.heights.min < min_y
             || input.heights.min >= min_y + height as i32
             || input.heights.max <= input.heights.min
@@ -181,7 +246,8 @@ pub(crate) fn build(
             return None;
         }
         let mut states = Vec::with_capacity(size);
-        for owner in input.sections {
+        for section in 0..sections {
+            let owner = input.sections.block(section);
             owner.with_state_reader(|reader| {
                 if !reader.all_states(|id| {
                     catalog.dh(id).is_some() && emission(id).is_some_and(|e| e <= 15)
@@ -213,7 +279,22 @@ pub(crate) fn build(
         if sources.iter().any(|&i| i as usize >= size) {
             return None;
         }
+        // Source enumeration intentionally sees raw palettes. Block reads,
+        // however, preserve ChunkAccess's stale hasOnlyAir counter semantics.
+        for section in 0..sections {
+            if input.sections.counter(section).is_some_and(|c| c.values()[0] == 0) {
+                states[section * 4096..(section + 1) * 4096].fill(0);
+            }
+        }
         let lights = previous.map_or_else(|| vec![0; size], Field::expand);
+        let block_meta = previous.map_or_else(
+            || vec![None; sections].into_boxed_slice(),
+            |p| p.block_meta.clone(),
+        );
+        let sky_meta = previous.map_or_else(
+            || vec![None; sections].into_boxed_slice(),
+            |p| p.sky_meta.clone(),
+        );
         slots[input.slot] = Some(chunks.len());
         chunks.push(Chunk {
             slot: input.slot,
@@ -221,6 +302,8 @@ pub(crate) fn build(
             max: input.heights.max - min_y,
             states,
             lights,
+            block_meta,
+            sky_meta,
             sources,
         });
     }
@@ -284,6 +367,14 @@ pub(crate) fn build(
         for byte in chunks[center].lights.iter_mut() {
             *byte &= if is_sky { 15 } else { 240 };
         }
+        let meta = if is_sky {
+            &mut chunks[center].sky_meta
+        } else {
+            &mut chunks[center].block_meta
+        };
+        for m in meta.iter_mut().flatten() {
+            m.constant = 0;
+        }
         for level in (0..=15).rev() {
             while let Some((x, y, z)) = queue.pop(level) {
                 iterations += 1;
@@ -328,7 +419,17 @@ pub(crate) fn build(
     Some(Result {
         fields: chunks
             .into_iter()
-            .map(|c| (c.slot, Field::new(min_y, &c.lights, c.sources)))
+            .map(|c| {
+                let field = Field {
+                    min_y,
+                    block: Layer::from_cells(&c.lights, 0),
+                    sky: Layer::from_cells(&c.lights, 4),
+                    block_meta: c.block_meta,
+                    sky_meta: c.sky_meta,
+                    sources: c.sources,
+                };
+                (c.slot, field)
+            })
             .collect(),
         iterations,
     })

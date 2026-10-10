@@ -18,8 +18,8 @@ public final class NativeBiomeWorld {
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
         ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-    private static final MethodHandle REPLACE = handle("replace", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle REPLACE = handle("replace_inputs", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MethodHandle COMPATIBILITY = handle("compatibility", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle REMOVE = handle("remove", FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -67,28 +67,20 @@ public final class NativeBiomeWorld {
     public void replace(LevelChunk chunk) {
         if (!enabled) return;
         int x = chunk.getPos().x, z = chunk.getPos().z;
-        LevelChunkSection[] sections = chunk.getSectionsForRead();
-        var pins = new NativeLiveBiomeSection<?>[sections.length];
-        boolean compatible = chunk.getClass() == LevelChunk.class && !chunk.hasEscapedSectionArray();
-        for (int i = 0; compatible && i < sections.length; i++) {
-            if (sections[i] == null) { compatible = false; break; }
-            var biomes = sections[i].getBiomes();
-            if (biomes == null || sections[i].getClass() != LevelChunkSection.class || biomes.getClass() != PalettedContainer.class) { compatible = false; break; }
-            pins[i] = ((PalettedContainer<?>)biomes).nativeLiveBiomes();
-            compatible = pins[i] != null && pins[i].binding == binding;
+        chunk.getSectionsForRead(); // Preserve custom/escaped getter dispatch before admission.
+        NativeBiomeChunkInputs inputs = null;
+        if (chunk.getClass() == LevelChunk.class && !chunk.hasEscapedSectionArray()) {
+            try { inputs = chunk.nativeBiomeSections(binding); }
+            catch (NativeBiomeChunkInputs.CaptureFailure rejected) { disable(); return; }
         }
-        try (Arena call = Arena.ofConfined()) {
-            int status;
-            if (!compatible) status = (int) COMPATIBILITY.invokeExact(owner, epoch, x, z);
-            else {
-                var pointers = call.allocate(sections.length * 8L, 8);
-                for (int i = 0; i < pins.length; i++) pointers.setAtIndex(ValueLayout.ADDRESS, i, pins[i].owner);
-                status = (int) REPLACE.invokeExact(owner, epoch, x, z, pointers, pins.length);
-            }
-            if (status != 0) disable(); // A bounded index failure must not masquerade as missing terrain.
+        try {
+            int status = inputs == null ? (int)COMPATIBILITY.invokeExact(owner, epoch, x, z)
+                : (int)REPLACE.invokeExact(owner, epoch, x, z, inputs.stageOwner());
+            if (status != 0) disable(); // Bounded admission failure must not masquerade as missing terrain.
         } catch (Throwable failure) { throw failure(failure); }
-        finally { Reference.reachabilityFence(pins); Reference.reachabilityFence(this); }
+        finally { Reference.reachabilityFence(inputs); Reference.reachabilityFence(this); }
     }
+
     private void disable() {
         enabled = false;
         try {

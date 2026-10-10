@@ -168,17 +168,97 @@ terrain tint/blending, brightness/weather adjustments, contextual light, model
 admission and entity callbacks, and orchestrates chunks and generation stages.
 These owners do not complete the world migration.
 
+The local [shared biome input](world/chunk/RUST-DH-CHUNK-INPUTS.md) binds primary
+biome owners once for both the loaded-world index and DH columns. Unchanged
+publication retains that collection without rebuilding Java pointer arrays or
+Rust owner rows. Biome admission remains independent of block/counter admission;
+registry identity, mutable escape and custom getter order retain their contracts.
+
 Admitted [DH height fields](world/chunk/RUST-DH-HEIGHTMAPS.md) in
 `world/level/chunk/dh_heightmaps/` scan live block owners and section counters
 using the bounded intrinsic collision catalog in `content/block/collision/`.
 Java's chunk wrappers borrow independent immutable CPU results instead of
-constructing two mirrored height arrays. The [DH lighting pass](world/lighting/RUST-DH-LIGHTING.md)
+constructing two mirrored height arrays. The latest local source also owns native
+mutation revisions and bounded immutable field reuse: weak generation identities
+avoid retaining chunks, old CPU readers survive replacement/eviction, and scans
+run outside the cache lock. Releaseb1611469 passes227 Rust world tests and1,871
+Java tests (two skipped); six full-task workers map the image and all source/
+native/Frozen/prompt guards match. Runtime, performance and sustained memory
+acceptance remain pending. The [DH lighting pass](world/lighting/RUST-DH-LIGHTING.md)
 in `world/level/lighting/dh/` owns section-local snapshots, sky seeding,
 priority queues, packed block/sky fields and shared emitter indices. Direct
 wrapper getters borrow those fields. Java retains exact-input admission,
 wrapper publication, correctness flags, mutable emitter-list projections and
 compatibility lighting. A mutable light operation detaches to Java storage;
 section-local locks do not make a whole chunk or neighborhood transactional.
+The in-progress [DH column producer](world/chunk/RUST-DH-COLUMNS.md) borrows
+block, biome, counter, height and light owners to construct immutable points,
+material IDs and source hashes in Rust. Java publishes direct `LongList` CPU
+views and resolves unique compatibility identities once. Mutable recipients,
+merge orchestration, DTOs and contextual event hooks remain transitional Java;
+first mutation detaches a column or mapping. Final CPU suites, seven lifecycle
+cases and both reviewed settled pairs pass for this slice. Actual travel producer
+admission and paired allocation checks pass. All20 rotating timings are clean,
+but vanilla p99 and DH median FPS miss Frozen; both shader modes pass. Mutable lighting escapes preserve
+retained counter/constant policy alongside values. Those checks belong to release839ff128.
+The later local [DH full-data migration](world/chunk/RUST-DH-FULL-DATA.md)
+keeps recipient point vectors, bulk copy/remapping, complete occlusion and parent
+reduction in Rust. A whole parent quadrant now retains one native point owner
+for direct Java consumers; writes detach into independent native vectors.
+The [contributor transport](world/chunk/RUST-DH-CONTRIBUTORS.md) also owns
+immutable footprint capture, clipping and signed ID remapping. The ordinary
+transformer and render source retain its CPU readers directly; public defensive
+exports remain. The quadrant producer owns uniformity, ordered footprint
+admission, signed generation/compression metadata and remapped list hashes.
+Detached mutable readers release their old producer and arena references;
+other immutable readers remain valid. The latest local source additionally
+runs the complete Frozen-ordered64×64 occlusion pass in one native call, consuming
+existing owners and publishing updated extents/hashes without point export.
+Custom sources/lists, aliases and unsupported inputs keep original sequencing.
+The [same-detail source update](world/chunk/RUST-DH-SOURCE-UPDATES.md) now also
+owns signed-generation eligibility, remapping, wrapped hashes/change flags
+and ordered footprints. Publication reuses recipient vector capacity directly;
+Java no longer repeats per-column clear/copy/remap/hash calls. Borrowed source
+leases end at successful publication; immutable footprint readers retain their
+independent batch. Compatibility routes preserve aliases, custom callbacks and
+exception mutation prefixes. Releaseefeca492 passes234 Rust world checks and
+1,880 Java tests (two skipped), including actual Frozen metadata/reduction/
+ordered-pass/same-detail updates and ordinary recipient controls. Six full-task
+workers map that image and all source/native/Frozen/prompt guards pass. Java update orchestration, material-map mutation, metadata
+storage, persistence and contextual transformation policy remain. Full Rust
+hardware graphics, gameplay, performance and sustained memory acceptance await
+driver restoration; prior839ff128 runtime/timing results do not verify this source.
+
+The subsequent local [DH material-map migration](world/chunk/RUST-DH-MATERIAL-MAPS.md)
+keeps ordered serial identities, deduplication/import indexes, whole-map remapping
+and wrapped hash policy in Rust. Java retains compatibility wrapper bindings;
+read-only producer maps keep their original readers, and their Java identity index
+stays empty. Custom callbacks and persistence remain transitional. The actual
+Frozen map corpus and ordinary producer/recipient controls pass on releasec57a1a17;
+237 Rust world tests and1,883 Java tests (two skipped) pass;35 column/material
+controls, six exact full-task workers and source/native/Frozen/prompt guards pass.
+Hardware/gameplay,
+performance and sustained memory acceptance remain open.
+
+The latest material identities additionally retain registered block-state facts
+beside their serial keys. Native occlusion and parent policy consumes those Rust
+entries directly, removing the admitted Java state-ID array and wrapper scan.
+Policy outputs own independent facts and borrow the map only during creation;
+custom inputs retain compatibility admission. All20 focused Rust/238 world checks
+and full Java1,884 tests (two skipped) pass on release21991771. Four material-map
+JNI controls,36 column/material controls, six exact full-task workers and all
+source/native/Frozen/prompt guards pass. Hardware/performance and sustained
+memory remain unverified.
+See the [direct intrinsic consumer](world/chunk/RUST-DH-MATERIAL-MAPS.md#direct-intrinsic-material-consumer-local-work-in-progress).
+
+The local ABI79 [native terrain-frame handoff](rendering/JAVA-BRIDGE.md#native-terrain-selection-frames)
+retains camera layers/casters as immutable scene arrays. Java passes CPU frame
+identities and the decoder acquires ownership before queueing; ordinary terrain
+avoids pending/request record copies. Three frames per graph are retained;
+reload/closure invalidate unresolved references, while acquired data survives.
+Full CPU suites and actual JNI checks pass on7cf545b2; runtime/performance
+acceptance is pending. Legacy/diagnostic encoding remains.
+
 These world CPU producers are separate from DH render-column collection,
 GPU resources and ordinary light-engine publication below.
 
@@ -379,3 +459,19 @@ Rust `render/vulkanic/backends/` is intentionally private. The architecture test
 The same tests (`render/vulkanic/architecture_boundary.rs`) enforce the renderer layering: which render layer may depend on which, and that only the bridge creates GALs. See [Render Architecture](rendering/RENDER-ARCHITECTURE.md) for the rules and where new rendering code belongs.
 
 Java package names may still appear in Java source and Java tests. The Rust tree should use subsystem ownership instead of Java-style package paths.
+
+Local in-progress [DH chunk-input ownership](world/chunk/RUST-DH-CHUNK-INPUTS.md)
+retains mutable block/counter/biome owners once and directly serves height,
+emitter, lighting and column consumers.
+[Client residency](world/chunk-loading/RUST-CLIENT-RESIDENCY.md) now uses those
+counter owners for callback-bounded empty scans and moves logical slots, counts,
+center and empty membership into Rust. Java still binds chunk objects, supplies
+reference-CAS facts, projects ring reads, orchestrates relocation, and delivers
+compatibility callbacks. Exact Frozen CPU replay is supplemental evidence;
+hardware/performance and long-memory acceptance remain pending.
+
+The local [DH change-hash producer](world/chunk/RUST-DH-CHANGE-HASH.md) owns
+sampling and wrapped identity/hash policy over retained block/biome/counter
+owners and cached height/emitter fields. Java admits contextual compatibility
+identities and preserves the mutable emitter callback boundary. This is a world
+CPU subsystem and introduces no renderer resource or presenter ownership.

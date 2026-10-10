@@ -18,6 +18,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrappe
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -111,7 +112,7 @@ public class FullDataToRenderDataTransformer
 			for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
 			{
 				ColumnArrayView columnArrayView = columnSource.getVerticalDataPointView(x, z);
-				LongArrayList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
+				LongList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
 				
 				updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 						levelWrapper, fullDataSource, columnSource, x, z,
@@ -126,13 +127,13 @@ public class FullDataToRenderDataTransformer
 		return columnSource;
 	}
 	
-	/** Updates the given {@link ColumnArrayView} to match the incoming Full data {@link LongArrayList} */
+	/** Updates the given {@link ColumnArrayView} to match the incoming Full data {@link LongList} */
 	public static void updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 			IClientLevelWrapper levelWrapper,
 			FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 			int blockX, int blockZ,
 			ColumnArrayView columnArrayView, 
-			LongArrayList fullDataColumn)
+			LongList fullDataColumn)
 	{
 		updateOrReplaceRenderDataViewColumnWithFullDataColumn(levelWrapper, fullDataSource, columnSource,
 			renderSourceX, renderSourceZ, blockX, blockZ, columnArrayView, fullDataColumn,
@@ -149,7 +150,7 @@ public class FullDataToRenderDataTransformer
 			FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 			int blockX, int blockZ,
 			ColumnArrayView columnArrayView, 
-			LongArrayList fullDataColumn, boolean preserveSemanticMaterials)
+			LongList fullDataColumn, boolean preserveSemanticMaterials)
 	{
 		columnSource.clearSemanticMaterialsForColumn(renderSourceX, renderSourceZ);
 		// we can't do anything if the full data is missing or empty
@@ -171,7 +172,7 @@ public class FullDataToRenderDataTransformer
 		else
 		{
 			PhantomArrayListCheckout checkout = ARRAY_LIST_POOL.checkoutArrays(0, 0, 1);
-			LongArrayList dataArrayList = checkout.getLongArray(0, fullDataLength);
+			LongList dataArrayList = checkout.getLongArray(0, fullDataLength);
 			
 			try
 			{
@@ -233,11 +234,8 @@ public class FullDataToRenderDataTransformer
 		}
 		boolean horizontalUniform = fullDataSource.getDataDetailLevel() == 0
 			|| fullDataSource.hasSemanticHorizontalUniformity(renderSourceX, renderSourceZ);
-		columnSource.setSemanticHorizontalContributors(
-			renderSourceX, renderSourceZ,
-			fullDataSource.getSemanticHorizontalContributors(renderSourceX, renderSourceZ)
-		);
-		LongArrayList[] horizontalContributors = fullDataSource.getSemanticHorizontalContributors(renderSourceX, renderSourceZ);
+		LongList[] horizontalContributors = fullDataSource.getRetainedSemanticHorizontalContributors(renderSourceX, renderSourceZ);
+		columnSource.setSemanticHorizontalContributors(renderSourceX, renderSourceZ, horizontalContributors);
 		for (int index = 0; index < columnArrayView.verticalSize(); index++) {
 			columnSource.setSemanticHorizontalUniformity(
 				renderSourceX, renderSourceZ, index, horizontalUniform
@@ -256,7 +254,7 @@ public class FullDataToRenderDataTransformer
 
 	private static ColumnRenderSource.SemanticHorizontalContributor[] resolveHorizontalContributorSpans(
 		FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource,
-		LongArrayList[] contributors, int blockX, int blockZ, byte dataDetail, long reducedData
+		LongList[] contributors, int blockX, int blockZ, byte dataDetail, long reducedData
 	)
 	{
 		if (contributors.length != 4 || !RenderDataPointUtil.doesDataPointExist(reducedData)) return null;
@@ -264,7 +262,7 @@ public class FullDataToRenderDataTransformer
 		ColumnRenderSource.SemanticHorizontalContributor[] result =
 			new ColumnRenderSource.SemanticHorizontalContributor[4];
 		for (int contributorIndex = 0; contributorIndex < 4; contributorIndex++) {
-			LongArrayList column = contributors[contributorIndex];
+			LongList column = contributors[contributorIndex];
 			if (column == null || column.isEmpty()) continue;
 			int childX = blockX + (contributorIndex / 2) * childWidth;
 			int childZ = blockZ + (contributorIndex % 2) * childWidth;
@@ -401,7 +399,7 @@ public class FullDataToRenderDataTransformer
 			IClientLevelWrapper levelWrapper, FullDataSourceV2 fullDataSource,
 			ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 			int blockX, int blockZ,
-			ColumnArrayView renderColumnData, LongArrayList fullColumnData,
+			ColumnArrayView renderColumnData, LongList fullColumnData,
 			boolean preserveSemanticMaterials, int[] semanticMaterialScratch,
 			byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch)
 	{

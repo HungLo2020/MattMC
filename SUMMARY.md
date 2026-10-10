@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-10; DH lighting/emitter candidate3f00217d atopdb49d8816; RTX3080Ti; rotating view; 6,000 frames)
+# Rust vs Frozen Java speed (2026-10-10; last measured DH columns/lighting handoff, release839ff128; later terrain/full-data changes unmeasured; RTX3080Ti; rotating view; 6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,420.3 / 1,391.7 | 1,185.4 / 1,142.3 |
-| Vanilla + DH | 763.2 / 722.8 / 835.0 / 736.0 | 792.5 / 696.8 / 651.8 / 833.4 |
-| Shaders | 341.6 / 349.7 | 315.5 / 312.9 |
-| Shaders + DH | 255.0 / 254.7 | 215.3 / 224.5 |
-Author-recorded receipt: build/native-dh-lighting-migration/performance.json; all20 ABAB/exact6000 clean, all source/native/Frozen/protected-prompt guards and10 Current fingerprints pass. Two repeats/side/mode; DH has four, with no discarded runs.
-Measured floors PASS: medianFPS C/F1406.0/1163.85 vanilla,749.6/744.65 DH,345.65/314.2 shaders,254.85/219.9 combined; medianp99ms3.117/3.454,4.142/5.161,4.856/6.320,6.127/9.685. Initial DH two-repeat FPS miss0.22% retained; predeclared extension includes all4. Narrow DH margin/repeat variance; no isolated gain or broad acceptance.
-Published sky1b9b10339/fog3adbe6d5d/lightmaps971e0226b/face-policy+cacheaf6921cf5/DH heightsdb49d8816. Whole native DH lighting/emitter owner committed at bffd0eef8; author reports: 20 Frozen cases/60 passes plus cold neighborhoods, five JNI checks, Rust2483pass/3ignored, Java1843tests/2skip/0fail; all7 lifecycle and reviewed settled vanilla/Iris+DH pairs pass, VUID0, DH28.806%. Actual moving admission/all6 matching F3 endpoints verified; weightedJava1.108/4.448GB C/F excludes native allocation; legacyqueues36.70/34.60MB remain. ShortCurrentRSS4.05GiB only. Earlier teardown race, broad/temporal parity, long-memory behavior and complete Java removal remain open.
+| Vanilla | 1,376.1 / 1,287.5 | 1,142.8 / 1,164.3 |
+| Vanilla + DH | 745.4 / 721.2 / 723.4 / 728.3 | 693.4 / 806.3 / 632.5 / 774.0 |
+| Shaders | 340.5 / 354.1 | 315.3 / 317.4 |
+| Shaders + DH | 254.8 / 253.5 | 226.1 / 224.0 |
+Receipt: build/native-dh-column-migration/performance.json; all20 predeclared ABAB/exact6000 runs clean, source/native/Frozen/protected-prompt guards and10 Current fingerprints pass. DH has four repeats/side; others two. All runs retained.
+Performance acceptance FAIL: medianFPS C/F1331.80/1153.55 vanilla,725.85/733.70 DH,347.30/316.35 shaders,254.15/225.05 combined; medianp99ms3.421/3.110,4.865/5.321,4.967/5.979,6.811/8.034. Vanilla p99 and DH FPS miss; both shader modes pass. No isolated speedup or broad acceptance claim.
+Release628cfd97: retained world/DH producers and native terrain handoff now include client residency, shared biome inputs and the complete DH change-hash algorithm. RustCPU542pass; focusedJava31pass; fullJava1909reported/two skips/zero failures/errors, six exact workers and39481 Current/38176 Frozen/native/prompt guards match. Actual Frozen600-operation residency and96-case hash replay pass. Java still binds objects/orchestrates callbacks and owns general simulation/startup. Integrated368c10a87 documentation; tested batch prepared for authorized incremental master publication. FullRust/hardware/runtime/FPS/long-memory await matched NVIDIA driver; new leases/overhead unmeasured. Earlier839ff128 weightedJava0.828/4.226GB C/F excludes native; shortCurrentRSS4.684GiB only. Broad/temporal parity and Java removal remain open.

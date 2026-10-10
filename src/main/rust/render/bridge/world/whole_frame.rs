@@ -1214,12 +1214,24 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             ],
         )?;
     }
-    let static_terrain_shadow_casters =
-        decode_static_terrain_shadow_casters(&request, mesh_instances.len())?;
-    let static_terrain_sections = decode_static_terrain_sections(
-        &request,
-        mesh_instances.len() + static_terrain_shadow_casters.casters.len(),
-    )?;
+    let (static_terrain_sections, static_terrain_shadow_casters) =
+        if request.world_terrain_frame_owner != 0 || request.world_terrain_frame_id != 0 {
+            if request.world_static_terrain_sections.count != 0 || request.world_static_terrain_shadow_casters.count != 0 {
+                return Err(GalError::invalid_argument("native terrain frame excludes inline terrain records"));
+            }
+            let (sections, casters) = crate::render::chunk::terrain_frames::resolve(
+                request.world_terrain_frame_owner, request.world_terrain_frame_id, request.static_terrain_camera)
+                .ok_or_else(|| GalError::invalid_argument("unknown, expired or camera-mismatched native terrain frame"))?;
+            if sections.sections.len().saturating_add(casters.casters.len())
+                > FFI_MAX_BATCH_ITEMS.saturating_sub(mesh_instances.len()) {
+                return Err(GalError::invalid_argument("combined mesh/native-terrain frame bound exceeded"));
+            }
+            (sections, casters)
+        } else {
+            let casters = decode_static_terrain_shadow_casters(&request, mesh_instances.len())?;
+            let sections = decode_static_terrain_sections(&request, mesh_instances.len() + casters.casters.len())?;
+            (sections, casters)
+        };
     let raw_text_quads = read_slice(request.world_text_quads, true, "world text quads")?;
     if raw_text_quads.len() > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
@@ -1504,7 +1516,7 @@ fn decode_static_terrain_sections(
             flags: section.flags,
         });
     }
-    Ok(crate::render::worldrender::StaticTerrainSections { camera, sections })
+    Ok(crate::render::worldrender::StaticTerrainSections { camera, sections: sections.into() })
 }
 
 fn decode_static_terrain_shadow_casters(
@@ -1556,5 +1568,5 @@ fn decode_static_terrain_shadow_casters(
             depth_policy: caster.depth_policy,
         });
     }
-    Ok(crate::render::worldrender::StaticTerrainShadowCasters { camera, casters })
+    Ok(crate::render::worldrender::StaticTerrainShadowCasters { camera, casters: casters.into() })
 }

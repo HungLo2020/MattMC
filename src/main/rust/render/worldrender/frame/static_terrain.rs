@@ -22,7 +22,9 @@ impl WorldPrimitiveFrontend {
     pub(crate) fn admit_static_terrain(&self, frame: &mut WorldPrimitiveFrame, keep_compact: bool) -> GalResult<()> {
         // Java's section-map order shifts as terrain streams; key order keeps
         // identical caster sets identical for the cached batch plans.
-        frame.static_terrain_shadow_casters.casters.sort_unstable_by_key(|caster| caster.mesh_key);
+        if frame.static_terrain_shadow_casters.casters.windows(2).any(|pair| pair[0].mesh_key > pair[1].mesh_key) {
+            Arc::make_mut(&mut frame.static_terrain_shadow_casters.casters).sort_unstable_by_key(|caster| caster.mesh_key);
+        }
         if keep_compact {
             return Ok(());
         }
@@ -73,7 +75,7 @@ pub(in crate::render::worldrender) fn expand_static_terrain_sections(
         return Ok(());
     }
     let mut expanded = Vec::with_capacity(sections.sections.len() + frame.mesh_instances.len());
-    for section in &sections.sections {
+    for section in sections.sections.iter() {
         let Some(mesh_generation) = resident_generation(section.mesh_key) else {
             continue;
         };
@@ -120,7 +122,7 @@ pub(in crate::render::worldrender) fn expand_static_terrain_shadow_casters(
         return Ok(());
     }
     frame.mesh_instances.reserve(casters.casters.len());
-    for caster in &casters.casters {
+    for caster in casters.casters.iter() {
         let Some(mesh_generation) = resident_generation(caster.mesh_key) else {
             continue;
         };
@@ -179,7 +181,7 @@ mod tests {
                 section(21, [96, 64, -3008], 0),
                 section(22, [0, 0, 0], 0),
                 section(23, [112, 48, -2992], WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS),
-            ],
+            ].into(),
         };
         // Key 22 has never crossed; key 23 still draws its previous generation.
         expand_static_terrain_sections(&mut frame, &sections, |key| match key {
@@ -216,7 +218,7 @@ mod tests {
         };
         let casters = StaticTerrainShadowCasters {
             camera,
-            casters: vec![caster(11, [96, -32, -3008]), caster(12, [0, 0, 0]), caster(13, [112, -16, -2992])],
+            casters: vec![caster(11, [96, -32, -3008]), caster(12, [0, 0, 0]), caster(13, [112, -16, -2992])].into(),
         };
         // Key 12 has never crossed; key 13 still holds its previous generation.
         expand_static_terrain_shadow_casters(&mut frame, &casters, |key| match key {

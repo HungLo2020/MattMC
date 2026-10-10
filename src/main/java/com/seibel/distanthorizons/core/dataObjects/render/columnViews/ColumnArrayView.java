@@ -4,13 +4,14 @@ package com.seibel.distanthorizons.core.dataObjects.render.columnViews;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 
 import java.util.Arrays;
 import java.util.ConcurrentModificationException;
 
 public final class ColumnArrayView implements IColumnDataView
 {
-	public final LongArrayList data;
+	public final LongList data;
 	
 	/** 
 	 * How many data points are currently being represented by this view. <br>
@@ -36,7 +37,7 @@ public final class ColumnArrayView implements IColumnDataView
 	//=============//
 	
 	/** @throws IllegalArgumentException if the offset is greater than the data's size */
-	public ColumnArrayView(LongArrayList data, int size, int offset, int verticalSize) throws IllegalArgumentException
+	public ColumnArrayView(LongList data, int size, int offset, int verticalSize) throws IllegalArgumentException
 	{
 		this.data = data;
 		this.size = size;
@@ -84,7 +85,10 @@ public final class ColumnArrayView implements IColumnDataView
 	public ColumnArrayView subView(int dataIndexStart, int dataCount)
 	{ return new ColumnArrayView(data, dataCount * verticalSize, offset + dataIndexStart * verticalSize, verticalSize); }
 	
-	public void fill(long value) { Arrays.fill(data.elements(), offset, offset + size, value); }
+	public void fill(long value) {
+		if (data instanceof LongArrayList array) Arrays.fill(array.elements(), offset, offset + size, value);
+		else for (int i = 0; i < size; i++) data.set(offset + i, value);
+	}
 	
 	public void copyFrom(IColumnDataView source) { copyFrom(source, 0); }
 	public void copyFrom(IColumnDataView source, int outputDataIndexOffset)
@@ -97,24 +101,33 @@ public final class ColumnArrayView implements IColumnDataView
 		{
 			throw new IllegalArgumentException("dataIndexStart + source.dataCount() must be <= self.dataCount() to copy");
 		}
+		else if (!(data instanceof LongArrayList))
+		{
+			for (int column = 0; column < source.dataCount(); column++)
+			{
+				var input = source.subView(column, 1);
+				int start = offset + (outputDataIndexOffset + column) * verticalSize;
+				for (int y = 0; y < verticalSize; y++) data.set(start + y, y < input.verticalSize() ? input.get(y) : 0);
+			}
+		}
 		else if (source.verticalSize() != verticalSize)
 		{
 			for (int i = 0; i < source.dataCount(); i++)
 			{
 				int outputOffset = offset + outputDataIndexOffset * verticalSize + i * verticalSize;
-				source.subView(i, 1).copyTo(data.elements(), outputOffset, source.verticalSize());
-				Arrays.fill(data.elements(), outputOffset + source.verticalSize(),
+				source.subView(i, 1).copyTo(((LongArrayList)data).elements(), outputOffset, source.verticalSize());
+				Arrays.fill(((LongArrayList)data).elements(), outputOffset + source.verticalSize(),
 						outputOffset + verticalSize, 0);
 			}
 		}
 		else
 		{
-			source.copyTo(data.elements(), offset + outputDataIndexOffset * verticalSize, source.size());
+			source.copyTo(((LongArrayList)data).elements(), offset + outputDataIndexOffset * verticalSize, source.size());
 		}
 	}
 	
 	@Override
-	public void copyTo(long[] target, int offset, int size) { System.arraycopy(data.elements(), this.offset, target, offset, size); }
+	public void copyTo(long[] target, int offset, int size) { data.getElements(this.offset, target, offset, size); }
 	
 	public boolean mergeWith(ColumnArrayView source, boolean override)
 	{
@@ -199,7 +212,7 @@ public final class ColumnArrayView implements IColumnDataView
 	
 	
 	public int getDataHash() { return arrayHash(this.data, this.offset, this.size); }
-	private static int arrayHash(LongArrayList a, int offset, int length)
+	private static int arrayHash(LongList a, int offset, int length)
 	{
 		if (a == null)
 		{

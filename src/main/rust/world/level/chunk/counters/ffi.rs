@@ -1,14 +1,15 @@
 use super::Owner;
+use std::sync::Arc;
 /// Returned CPU owner is eight-byte aligned. Caller adopts and releases it once.
 #[no_mangle]
 pub extern "C" fn mattmc_section_counters_create(packed: u64) -> *mut Owner {
-    Box::into_raw(Box::new(Owner::new(packed)))
+    Arc::into_raw(Arc::new(Owner::new(packed))).cast_mut()
 }
 /// Release only after all calls and CPU reads have finished.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_counters_release(owner: *mut Owner) {
     if !owner.is_null() {
-        drop(Box::from_raw(owner));
+        drop(Arc::from_raw(owner));
     }
 }
 /// All owner arguments are live, aligned pointers from create; never retained.

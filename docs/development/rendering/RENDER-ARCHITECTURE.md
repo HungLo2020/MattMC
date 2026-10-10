@@ -493,8 +493,12 @@ identity; material interning, variant writes, reduced spans and horizontal
 contributors are skipped. Empty spans let `ColumnBox` emit one quad per
 nonempty vertical face instead of constructing material segments. This removes
 specific provenance work, not all sidecar allocation: dense column arrays,
-overflow scratch and packet sidecar arrays remain. Java still owns render-data
+overflow scratch and packet sidecar arrays remain. At that checkpoint Java still owns render-data
 conversion, face construction, greedy merging and semantic packet construction.
+The subsequent [contributor migration](../world/chunk/RUST-DH-CONTRIBUTORS.md)
+retains bounded point footprints, clipping and ID remapping in Rust instead of
+exporting Java point arrays; disabled preservation still skips that work. Java
+continues to own the render-column conversion, faces, merges and final packets.
 Exact-topology merge restrictions require both the exact flag and the Rust
 geometry route. Use separate launches for A/B switches: the exact flag is
 latched at class initialization; live reads of the other flags do not establish

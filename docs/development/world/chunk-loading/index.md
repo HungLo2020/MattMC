@@ -1,5 +1,7 @@
 # Chunk loading
 
+- [Rust client chunk residency](RUST-CLIENT-RESIDENCY.md): native window and empty
+  membership policy, retained counter scans, callback boundaries and Frozen replay.
 - [Rust player chunk distances](RUST-PLAYER-DISTANCE.md): native-owned natural
   spawn and player-ticket distance graphs, replay contracts and verification.
 - [Rust simulation distance](RUST-SIMULATION-DISTANCE.md): native-owned simulation
@@ -8,4 +10,3 @@
   graph, holder replay and failure contracts, and verification.
 - [Rust POI village distance](RUST-POI-DISTANCE.md): native-owned section
   distances to village centres, tag-reload resync and verification.
-

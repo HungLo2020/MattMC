@@ -652,41 +652,7 @@ impl WorldPrimitiveFrame {
     }
 }
 
-/// One copied off-camera static-terrain section layer: resident mesh
-/// identity, integer section origin and the layer's depth policy.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct StaticTerrainShadowCaster {
-    pub mesh_key: u64,
-    pub mesh_generation: u64,
-    pub origin: [i32; 3],
-    pub depth_policy: u32,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct StaticTerrainShadowCasters {
-    /// Full-precision terrain camera shared by every caster placement.
-    pub camera: [f64; 3],
-    pub casters: Vec<StaticTerrainShadowCaster>,
-}
-
-/// One camera-visible static-terrain section layer: copied mesh identity,
-/// integer section origin, the layer's depth policy and camera-sort flag.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct StaticTerrainSection {
-    pub mesh_key: u64,
-    pub depth_policy: u32,
-    pub origin: [i32; 3],
-    /// `WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS` or zero.
-    pub flags: u32,
-}
-
-/// The frame's camera-visible static terrain, in draw order.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct StaticTerrainSections {
-    /// Full-precision terrain camera shared by every section placement.
-    pub camera: [f64; 3],
-    pub sections: Vec<StaticTerrainSection>,
-}
+pub use crate::render::scene::terrain::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct WorldDistantHorizonsGenericBoxRequest {

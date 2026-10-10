@@ -24,6 +24,7 @@ import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataOutputStre
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -221,7 +222,7 @@ public class FullDataSourceV2DTO
 		// clear any old data so we can start fresh
 		for (int i = 0; i < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; i++)
 		{
-			@NotNull LongArrayList array = dataSource.dataPoints[i];
+			@NotNull LongList array = dataSource.dataPoints[i];
 			array.clear();
 			array.add(FullDataPointUtil.EMPTY_DATA_POINT);
 		}
@@ -315,7 +316,7 @@ public class FullDataSourceV2DTO
 	//=================//
 	
 	private static void readBlobToDataSourceDataArrayV1(
-			ByteArrayList inputCompressedDataByteArray, LongArrayList[] outputDataLongArray, 
+			ByteArrayList inputCompressedDataByteArray, LongList[] outputDataLongArray,
 			EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
@@ -331,7 +332,7 @@ public class FullDataSourceV2DTO
 					throw new DataCorruptedException("Read DataSource Blob data at index [" + xz + "], column length [" + dataColumnLength + "] should be greater than zero.");
 				}
 				
-				LongArrayList dataColumn = outputDataLongArray[xz];
+				LongList dataColumn = outputDataLongArray[xz];
 				ListUtil.clearAndSetSize(dataColumn, dataColumnLength);
 				
 				// read column data (will be skipped if no data was present)
@@ -349,7 +350,7 @@ public class FullDataSourceV2DTO
 	}
 	
 	private static void writeDataSourceDataArrayToBlobV2(
-			LongArrayList[] inputDataArray, ByteArrayList outputByteArray,
+			LongList[] inputDataArray, ByteArrayList outputByteArray,
 			@Nullable EDhDirection direction, EDhApiDataCompressionMode compressionModeEnum) throws IOException
 	{
 		int minX, maxX, minZ, maxZ;
@@ -382,7 +383,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x,z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray[index];
 					int size = (col != null) ? col.size() : 0;
 					VarintUtil.writeVarint(compressedOut, size);
 				}
@@ -397,7 +398,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray[index];
 					int size = col != null ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -428,7 +429,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray[index];
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -446,7 +447,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray[index];
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -472,7 +473,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray[index];
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -491,7 +492,7 @@ public class FullDataSourceV2DTO
 	}
 	private static void readBlobToDataSourceDataArrayV2(
 			ByteArrayList inputCompressedDataByteArray,
-			LongArrayList[] outputDataLongArray,
+			LongList[] outputDataLongArray,
 			@Nullable EDhDirection direction, EDhApiDataCompressionMode compressionModeEnum)
 			throws IOException, DataCorruptedException
 	{
@@ -534,7 +535,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray[index];
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -550,7 +551,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray[index];
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -568,7 +569,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray[index];
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -591,7 +592,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray[index];
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -621,7 +622,7 @@ public class FullDataSourceV2DTO
 					for (int z = minZ; z < maxZ; z++)
 					{
 						int index = FullDataSourceV2.relativePosToIndex(x, z);
-						LongArrayList col = outputDataLongArray[index];
+						LongList col = outputDataLongArray[index];
 						
 						for (int i = 0; i < col.size(); i++)
 						{
@@ -708,10 +709,10 @@ public class FullDataSourceV2DTO
 	) throws IOException {
 		try (DhDataOutputStream out = DhDataOutputStream.create(compressionMode, output)) {
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
-				LongArrayList[] contributors = dataSource.getSemanticHorizontalContributors(x, z);
+				LongList[] contributors = dataSource.getSemanticHorizontalContributors(x, z);
 				out.writeBoolean(contributors != null);
 				if (contributors == null) continue;
-				for (LongArrayList column : contributors) {
+				for (LongList column : contributors) {
 					int size = column == null ? -1 : Math.min(column.size(), FullDataSourceV2.MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
 					out.writeShort(size);
 					if (column != null) for (int i = 0; i < size; i++) out.writeLong(column.getLong(i));
@@ -726,13 +727,13 @@ public class FullDataSourceV2DTO
 		try (DhDataInputStream in = DhDataInputStream.create(input, compressionMode)) {
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
 				if (!in.readBoolean()) continue;
-				LongArrayList[] contributors = new LongArrayList[4];
+				LongList[] contributors = new LongList[4];
 				for (int i = 0; i < 4; i++) {
 					int size = in.readShort();
 					if (size < 0) continue;
 					if (size > FullDataSourceV2.MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)
 						throw new DataCorruptedException("Semantic contributor column exceeds bound: " + size);
-					LongArrayList column = new LongArrayList(size);
+					LongList column = new LongArrayList(size);
 					for (int point = 0; point < size; point++) column.add(in.readLong());
 					contributors[i] = column;
 				}

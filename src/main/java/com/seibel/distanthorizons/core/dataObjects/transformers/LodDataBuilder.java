@@ -25,6 +25,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +36,12 @@ public class LodDataBuilder
 	private static final IBlockStateWrapper AIR = WRAPPER_FACTORY.getAirBlockStateWrapper();
 	
 	private static boolean getTopErrorLogged = false;
+	private static boolean hasChunkProcessingSubscribers()
+	{
+		var handlers = ApiEventInjector.INSTANCE.getAll(DhApiChunkProcessingEvent.class);
+		for (int index = 0; index < handlers.size(); index++) if (handlers.get(index) != null) return true;
+		return false;
+	}
 	
 	
 	
@@ -46,6 +53,17 @@ public class LodDataBuilder
 	{
 		// only block lighting is needed here, sky lighting is populated at the data source stage
 		LodUtil.assertTrue(chunkWrapper.isDhBlockLightingCorrect(), "Provided chunk's DH Block lighting hasn't been baked.");
+		// Native policy can bypass voxel callbacks only for the stock factory and
+		// when no chunk-processing subscriber can override the semantic inputs.
+		if (WRAPPER_FACTORY == com.seibel.distanthorizons.common.wrappers.WrapperFactory.INSTANCE
+			&& chunkWrapper.getClass() == com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper.class
+			&& !hasChunkProcessingSubscribers())
+		{
+			var columns = net.minecraft.world.level.chunk.NativeDhColumns.build(levelWrapper,
+				(com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper)chunkWrapper,
+				Config.Common.LodBuilding.worldCompression.get().value);
+			if (columns != null && !hasChunkProcessingSubscribers()) return FullDataSourceV2.createNative(columns);
+		}
 		
 		int chunkPosX = chunkWrapper.getChunkPos().getX();
 		int chunkPosZ = chunkWrapper.getChunkPos().getZ();
@@ -120,7 +138,7 @@ public class LodDataBuilder
 					int columnZ = relBlockZ + chunkOffsetZ;
 					
 					// Get column data
-					LongArrayList longs = dataSource.getColumnAtRelPos(columnX, columnZ);
+					LongList longs = dataSource.getColumnAtRelPos(columnX, columnZ);
 					if (longs == null)
 					{
 						longs = new LongArrayList(dataCapacity);
