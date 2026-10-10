@@ -44,6 +44,8 @@ Put the Comparator's rear directly against a supported container such as a [Ches
 
 For a nonempty container, the calculation is 1 plus the rounded-down value of 14 times its average fullness. For example, a container with every slot half filled with ordinary 64-stack items gives 8. A normal double Chest is read as a combined container.
 
+A [Crafter uses a different 0–9 reading](Crafter.md#comparator-signal): it counts slots that are disabled or nonempty, rather than stack fullness. Do not apply the storage-container formula to that block.
+
 **Chest access matters in this implementation.** The Chest reading uses the container-access check: a redstone-conducting block above the lid, or a sitting Cat that blocks access, can make the reading 0 even when items remain inside. Keep the test Chest unobstructed. Container-content changes notify nearby Comparators; they do not require a block-state change of the kind an Observer watches.
 
 A Comparator can also read a supported analog-output block through **one redstone-conducting block** directly behind it, provided the initial rear signal is below 15. This is a conditional path, not permission to read through any wall or number of blocks. Use direct adjacency for a first storage detector.

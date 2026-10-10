@@ -72,6 +72,33 @@ This is an **untested, source-based setup**:
 
 Each successful activation consumes **one Oak Log** and produces **four Oak Planks**. A larger input stack supplies later activations. A Hopper can later feed that single enabled slot, but it does not create the repeated redstone activations itself. [Oak Planks recipe][planks] · [Accepted Oak logs][oak-logs] · [Craft and trigger logic][crafter]
 
+## Advancement troubleshooting
+
+Crafting another Crafter in this block can produce the item without completing
+**Crafters Crafting Crafters**. The bundled advancement has a source-predicted
+recipe-ID mismatch at `bffd0eef`: it asks for `minecraft:crafter`, while the
+bundled recipe loads as `minecraft:crafting/crafter`. The trigger requires the
+same recipe key, so the inspected resources do not satisfy that condition.
+The loader keeps the `crafting/` part of the recipe path; it does not flatten it
+to the output item's ID. [Advancement condition][crafter-advancement-current] ·
+[Recipe][crafter-recipe-current] · [Recipe loading][recipe-load-current] ·
+[Path-to-ID conversion][recipe-path-current] · [Exact-key condition][recipe-trigger-current]
+
+There is also a separate output-route condition: the nearby-player trigger runs
+only when an output stack is **ejected into the world**. An output fully accepted
+by the container in front does not reach that call. Eligible players are searched
+in a **17×17×17-block box centered on the Crafter**, not within a 17-block radius.
+Even ejecting the result while nearby does not resolve the bundled recipe-ID
+mismatch, so this is not a verified workaround. [Output and trigger path][crafter-trigger-current]
+
+This limitation concerns advancement completion, not whether the valid recipe
+produces a Crafter. It is also separate from MattMC's intentionally inactive
+recipe-unlocking rewards. See [Advancements and statistics](../mechanics/AdvancementsAndStatistics.md#rewards-and-notifications)
+for that distinction. This focused source review has **no in-game reproduction**;
+data-pack overrides or later fixes can change the criterion or recipe ID.
+[Issue #825](https://github.com/HungLo2020/MattMC/issues/825) tracks the shared
+recipe-key mismatch, including the bundled decorated-pot and armor-trim goals.
+
 ## Related pages
 
 - [Crafter item](../items/Crafter.md), [Crafting Table](CraftingTable.md)
@@ -114,3 +141,10 @@ Source-reviewed at `fb7d6979fb8d9773cfe05f084c6085f35feb885c` on 2026-10-02 agai
 [craft-recipe]: https://github.com/HungLo2020/MattMC/blob/fb7d6979fb8d9773cfe05f084c6085f35feb885c/src/main/java/net/minecraft/world/item/crafting/CraftingRecipe.java
 [planks]: https://github.com/HungLo2020/MattMC/blob/fb7d6979fb8d9773cfe05f084c6085f35feb885c/src/main/resources/data/minecraft/recipe/crafting/oak_planks.json
 [oak-logs]: https://github.com/HungLo2020/MattMC/blob/fb7d6979fb8d9773cfe05f084c6085f35feb885c/src/main/resources/data/minecraft/tags/item/oak_logs.json
+
+[crafter-advancement-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/resources/data/minecraft/advancement/adventure/crafters_crafting_crafters.json#L1-L10
+[crafter-recipe-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/resources/data/minecraft/recipe/crafting/crafter.json
+[recipe-load-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/world/item/crafting/RecipeManager.java#L60-L83
+[recipe-path-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/resources/FileToIdConverter.java#L23-L33
+[recipe-trigger-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/advancements/critereon/RecipeCraftedTrigger.java#L45-L52
+[crafter-trigger-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/world/level/block/CrafterBlock.java#L187-L223

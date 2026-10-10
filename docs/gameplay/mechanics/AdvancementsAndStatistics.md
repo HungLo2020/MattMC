@@ -24,6 +24,22 @@ When an advancement changes from incomplete to complete, the server grants its c
 
 A quiet chat does not mean an advancement failed. Chat announcements require both the advancement's announcement setting and the **announceAdvancements** game rule, which defaults to true. That rule controls the chat broadcast, not completion or rewards. The on-screen toast is separate: it depends on the advancement's display/toast settings and a qualifying completion update; the initial reset/load update does not replay completion toasts. Check the Advancements screen when a notification is absent. [Chat rule][announcement-rule] · [Completion and announcement order][advance-award] · [Toast conditions][advance-update-client]
 
+### Crafting goals that stay incomplete
+
+The bundled Crafter, decorated-pot and armor-trim recipe goals have a
+**source-predicted recipe-key mismatch** in the reviewed build: their criteria
+use old flat recipe IDs, while active recipes retain `crafting/` or `smithing/`
+in their IDs. Successfully making the intended item therefore does not by
+itself establish that these goals can complete. [Issue #825](https://github.com/HungLo2020/MattMC/issues/825)
+records the four affected advancements and their exact criteria. This is a
+source/data finding, with no in-game award reproduction in this review;
+data-pack overrides or later repairs can change the outcome.
+
+See [Crafter advancement troubleshooting](../blocks/Crafter.md#advancement-troubleshooting)
+for its separate output-route and nearby-player conditions. The mismatch is
+separate from notification settings and intentionally inactive recipe-unlocking
+rewards; changing those does not repair the bundled criterion.
+
 ### Extra rewards in Skyblock
 
 An advancement completion can also grant extra loot when **the dimension you are currently in uses the Skyblock generator** and that advancement has a matching Skyblock reward table. Generated items are offered to your inventory; an uninserted result is dropped for you. This is conditional, so do not expect a bonus for every advancement. The [Flint and Steel guide](../items/FlintAndSteel.md#loot-and-creative-access) owns the worked Obsidian-acquisition example and its possible rewards. [Completion hook][advance-award] · [Generator, table and delivery conditions][skyblock-reward]
