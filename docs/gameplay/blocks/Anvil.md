@@ -34,6 +34,8 @@ Anvils fall when the block below is air, fire-tagged, liquid, or replaceable. Do
 
 A falling anvil damages eligible living entities in its impact area; Creative and Spectator players are excluded. For recorded fall distance `d`, the base damage is **2 × ceil(d − 1)** points, with a minimum of 0 and a cap of **40 points (20 hearts)**, before the victim's damage handling. Distances that do not produce a positive amount do not cause the anvil's impact-wear roll. [Damage settings][block] · [Impact calculation][impact]
 
+A helmet can reduce the incoming impact, but eligible head equipment can receive **two separate wear requests** from the same hit. See [head protection against falling impacts](../mechanics/Armor.md#head-protection-against-falling-impacts) for the early head-slot reduction, later armor wear and a worked example.
+
 A damaging fall also has a **5% + 5% × ceil(d − 1)** chance to advance the anvil's wear stage, reaching certainty for sufficiently long falls. This roll does not require a victim to be present. If it destroys an already Damaged Anvil, that falling anvil does not drop an item. Creative's protection from menu-use wear does not disable falling wear. [Impact wear and destruction][impact]
 
 ## Related pages
@@ -45,6 +47,8 @@ A damaging fall also has a **5% + 5% × ceil(d − 1)** chance to advance the an
 - [Blocks](Blocks.md)
 
 ## Sources and verification
+
+The head-equipment pointer was added from the [Armor guide's 2026-10-10 source review](../mechanics/Armor.md#sources-and-verification); the block rules below retain their earlier verification scope.
 
 Source-reviewed on **2026-10-01** at commit `b81c01943c9f3254e713c365a1dd633392929cb2`. No in-game tests were run. Recipes, mining tags, and loot can change with data packs. Natural structure placement was not reviewed.
 
