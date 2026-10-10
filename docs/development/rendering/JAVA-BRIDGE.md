@@ -395,6 +395,12 @@ for route gating, protection, bounds and the remaining Java producers.
 - Record names extend shared families (GUI, world, material) rather than naming
   individual producers (no `Hotbar`, `BossBar`, ...).
 
+Presenter-admission fixtures in `context.rs` share a test mutex because they
+exercise one process-wide reservation. Run them together when changing teardown:
+`cargo test --manifest-path src/main/rust/Cargo.toml --lib render::bridge::context::tests`.
+They check cross-registry rejection, rejected-owner drop and admission after
+release; they do not replace a real window/presentation lifecycle run.
+
 ## Verifying an ABI change
 
 Run from the repository root; the subshell leaves the Gradle command there.

@@ -22,6 +22,7 @@ public final class NativeDhIdMap {
     private static final MethodHandle HASH = handle("hash", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
     private static final MethodHandle INDEXED = handle("indexed", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle TINT = handle("bind_tint", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private final MemorySegment owner;
     public NativeDhIdMap() {
         MemorySegment pointer = MemorySegment.NULL;
@@ -47,6 +48,8 @@ public final class NativeDhIdMap {
             int result = (int) ADD.invokeExact(owner, b, biome.length(), s, state.length(), stateId, mode);
             if (result == -2) throw new OutOfMemoryError("DH identity storage");
             if (result < 0) throw new IllegalStateException("Invalid DH identity input");
+            var tint = ((BiomeWrapper)pair.biome).nativeTintIdentity();
+            if (tint != null && (int)TINT.invokeExact(owner, result, tint.stageOwner()) != 1) throw new IllegalStateException("Invalid DH tint binding");
             return result;
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(pair); Reference.reachabilityFence(this); }

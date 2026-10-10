@@ -9,7 +9,7 @@ impl Key {
     }
 }
 #[derive(Clone)]
-struct Entry { key: Arc<Key>, state_id: u32 }
+struct Entry { key: Arc<Key>, state_id: u32, tint: Option<Arc<super::tint::Identity>> }
 impl std::ops::Deref for Entry { type Target = Key; fn deref(&self) -> &Key { &self.key } }
 pub struct Map {
     entries: Vec<Entry>,
@@ -21,6 +21,7 @@ impl Default for Map {
     fn default() -> Self { Self { entries: Vec::new(), indexed: Vec::new(), lookup: HashMap::new(), list_hash: 1 } }
 }
 impl Map {
+    pub(super) fn tint_biome(&self, index: usize) -> Option<&Arc<super::tint::Identity>> { self.entries.get(index)?.tint.as_ref() }
     fn new() -> Self { Self::default() }
     pub(super) fn state_ids(&self) -> impl ExactSizeIterator<Item = u32> + '_ { self.entries.iter().map(|entry| entry.state_id) }
     fn add(&mut self, entry: Entry, mode: i32) -> Result<i32, ()> {
@@ -62,7 +63,7 @@ pub unsafe extern "C" fn mattmc_dh_id_map_add(owner: *mut Map, biome: *const u16
     state: *const u16, state_len: i32, state_id: u32, mode: i32) -> i32 {
     if owner.is_null() || !(0..=2).contains(&mode) { return -1; }
     let (Some(biome), Some(state)) = (text(biome, biome_len), text(state, state_len)) else { return -2; };
-    (*owner).add(Entry { key: Arc::new(Key { biome, state }), state_id }, mode).unwrap_or(-2)
+    (*owner).add(Entry { key: Arc::new(Key { biome, state }), state_id, tint: None }, mode).unwrap_or(-2)
 }
 /// Returns the completed input prefix, including on allocation failure. Java
 /// publishes those bindings before reporting the failure; no stale ID escapes.
@@ -93,3 +94,11 @@ pub unsafe extern "C" fn mattmc_dh_id_map_indexed(owner: *const Map, index: i32)
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_id_map_release(owner: *mut Map) { if !owner.is_null() { drop(Box::from_raw(owner)); } }
 #[cfg(test)] mod tests;
+
+/// Retain an immutable CPU identity lease, not a borrowed Java/native address.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_id_map_bind_tint(owner:*mut Map,index:i32,biome:*const super::tint::Biome)->i32 {
+    let (Some(owner),Some(biome))=(owner.as_mut(),biome.as_ref()) else{return 0;};
+    let Some(entry)=owner.entries.get_mut(index as usize) else{return 0;};
+    if entry.tint.is_none() {entry.tint=Some(biome.0.clone());}1
+}

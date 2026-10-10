@@ -482,3 +482,8 @@ Actual Frozen3,616-case synthetic CPU replay is supplemental. Releaseee1676ec
 passes four focused Rust checks,27 architecture checks, five focused Java controls
 and full1,914 reported Java tests (two skips, zero failures/errors). Hardware,
 realistic performance and long-memory verification remain pending.
+- **World color inputs:** [cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md)
+  move cached color storage and whole-neighborhood sampling into Rust over existing
+  point/material owners. Resolver callbacks remain Java. All six scoped CPU
+  scenarios match Frozen checksums and measure at or below Frozen elapsed time;
+  full Rust/Java suites pass. This is not whole-game acceptance.

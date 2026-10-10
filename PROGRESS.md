@@ -14,9 +14,10 @@
 - Rust owns rendering/GAL/presentation, native terrain assembly/visibility, block/biome sections, counters, light fields, biome color windows, DH points/material maps/reduction and retained chunk inputs.
 - Client residency now owns logical slot publication, count, center, position fingerprint and empty membership. Normal empty scans directly read retained native counters and stop at each callback.
 - Java still binds atomic chunk references, supplies reference-CAS facts, projects ring reads, orchestrates relocation and delivers world/biome/hook callbacks. Malformed radii/custom inputs retain compatibility behavior.
-- General gameplay/simulation, platform/network/startup and remaining extraction still belong to Java; app/ is empty. This is not Java-removal completion.
+- General gameplay/simulation, platform/network/startup and remaining extraction still belong to Java; src/main/rust/app/mod.rs is empty. This is not Java-removal completion.
 - Loaded-world sky/fog and DH columns now share one retained native biome binding; unchanged publication avoids Java pointer arrays and Rust owner-row reconstruction while checking primary generations.
-- Prioritize authoritative world-state producers and direct consumers together. Server chunk-task queue ownership is now native; next return to contextual DH colors/neighborhood orchestration. Preserve callbacks, cached wrapper fields and compatibility escape.
+- Prioritize authoritative world-state producers and direct consumers together. Server queues and cached DH neighborhoods are now native; next move authoritative full-data source/index ownership and direct consumers together, removing repeated Java span staging. Preserve callbacks, cached wrapper fields and compatibility escape.
+- DH tint candidate007ebaef matches288 Frozen windows/480 mutable-key operations; fullRust2547pass/3ignored,263 world/27 architecture and5 Java controls pass. All six CPU scenarios pass scoped comparison: C/F ratios .968/.980/.707/.644/.645/.906 for r0d6/r1d6/r2d6/r3d6/r3d7/r3d8, six alternating pairs each. Default27.10/42.09ms for50000 calls; no FPS claim. FullJava1923reported/two skips/zero failures across345 suites (1921executed) passes; six workers map exact image. Rejected adapters/ineffective cleanup are retained; cleanup removed. Guide: docs/development/world/biome/RUST-DH-TINT.md; receipts: build/native-dh-tint/.
 
 ## Preceding shared-biome CPU checkpoint
 
@@ -64,15 +65,16 @@
 
 ## Hardware and remaining verification
 
-- NVIDIA mismatch persists: loaded kernel595.91.07 versus installed595.99.02/NVML595.99. Unattended update installed newer user space; no reboot/driver/display/package change made here.
+- User reboot restored matching NVIDIA kernel/libraries595.99.02. NVML works; validated60-frame Xlib Vulkan probe selects RTX3080Ti and exits0 with no reported errors. This clears the driver blocker; MattMC runtime/FPS remain unverified on this driver.
 - Vulkan validation launches previously enumerated llvmpipe and failed X11 DRI3 BadDrawable before entry. Preserve those failures; do not repeat known software launches as hardware proof. CPU migration continues; goal remains active.
-- After driver restoration, test both sides on the same restored driver: fullRust,7 lifecycle cases, equivalent original captures,20 clean timing runs, real streaming profiles and sustained host/GPU memory.
+- Now test both sides on the same restored driver: fullRust,7 lifecycle cases, equivalent original captures,20 clean timing runs, real streaming profiles and sustained host/GPU memory.
 - Earlier software fullRust attempt2353pass/138fail/3ignored included GUI green210/209 and graphics-lock cascades; retained, not claimed passed. Earlier strict height-world teardown rejection/closed-channel race remains unresolved.
 - Broad gameplay, first shader world frame, temporal pop-in/flicker, sustained streaming and long-memory remain unproved. Prior16.45-block travel/outlier receipt is not sustained-streaming acceptance.
 
 ## Sync and artifact integrity
 
-- Reducer batch5de23173a is published; remote master verified and worktree was clean before this server-queue batch. Server-queue publication follows sync-and-push and final CPU checks.
+- Tint batch verified on493da75c6 with exact source/native/Frozen/fixture/prompt guards; no upstream movement at final fetch. Both original stashes remain. Publication targets master.
+- Server-queue batch2003b118d is published after final CPU checks; actual remote master verified, clean worktree, own workflow stash retired and both original stashes preserved. Reducer batch5de23173a was already published.
 - Integratedd80687a4c world-map gradient/capture fixes in place; all19 staged paths preserved exactly. Java suites rerun against the combined tree; six exact native workers verified. Native sources/image and measured queue workload unchanged.
 - Integrateddd966daea Frozen shader/DH corrections in place:19 pending paths byte/mode/symlink exact, empty index retained. No overlapping queue changes; combined CPU checks and Wiki validation pass.
 - Integratedc00b11c8b shader/DH-cloud fixes andd772753a0 ownership docs. Preserved18 local paths:16 byte/mode/symlink exact; two shared architecture/migration pages reconciled. Original empty index restored; final queue revisions follow this integration.

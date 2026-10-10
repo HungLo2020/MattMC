@@ -1,5 +1,5 @@
 use super::*;
-fn key(b: &str, s: &str) -> Entry { Entry { key: Arc::new(Key { biome: b.encode_utf16().collect(), state: s.encode_utf16().collect() }), state_id: u32::MAX } }
+fn key(b: &str, s: &str) -> Entry { Entry { key: Arc::new(Key { biome: b.encode_utf16().collect(), state: s.encode_utf16().collect() }), state_id: u32::MAX, tint: None } }
 #[test]
 fn duplicates_import_lookup_and_self_merge_keep_order_and_signed_hashes() {
     let (a, b) = (key("minecraft:plains", "minecraft:air"), key("Aa", "BB"));

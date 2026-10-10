@@ -1,5 +1,8 @@
 # Biomes
 
+- [DH cached tint neighborhoods](RUST-DH-TINT.md): native canonical cache storage,
+  borrowed full-data sampling and preserved resolver boundaries.
+
 - [Climate lookup](RUST-CLIMATE.md): native biome selection, compatibility constraints,
   and the independent Java comparison.
 - [Biome fill](RUST-BIOME-FILL.md): the Rust-owned BIOMES stage (climate sampling,

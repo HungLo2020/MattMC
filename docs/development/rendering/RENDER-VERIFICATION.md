@@ -51,6 +51,16 @@ runtime acceptance. Receipts:
 `build/native-terrain-frame-migration/{gpu-driver-mismatch,driver-mismatch-interruption,bad-drawable-failure}.json`.
 Do not weaken log-health checks or count a software-device run as hardware parity.
 
+After the user's 2026-10-10 reboot, direct checks report matching NVIDIA
+kernel/libraries `595.99.02`, working NVML and the RTX3080Ti in Vulkan. An Xlib
+`vkcube --gpu_number 0 --validate --suppress_popups --c 60` probe exits zero
+with no reported validation errors. The subsequent full Rust suite passes
+2,547 tests, with three intentionally ignored, after fixing concurrent
+[presenter-admission fixtures](JAVA-BRIDGE.md#rules-the-boundary-tests-enforce).
+Receipts are `build/native-dh-tint/{driver-restored.json,rust-full-final.log}`.
+This clears the driver blocker and verifies those tests; MattMC world entry,
+lifecycle, image comparisons, FPS and sustained-memory gates still need running.
+
 ### Mid-world shader-enable check
 
 The [current staged-source transition](RENDER-ARCHITECTURE.md) replaces terrain workers and

@@ -327,6 +327,11 @@ Java keeps player sets, tickets, POI records, holders and published level views.
 `world/level/chunk_tasks/` for priority buckets, ordered chunk membership and
 task lists. Java temporarily pins callables and delivers dispatcher/future
 callbacks; it keeps no pending priority map or per-chunk task-list owner.
+[Cached DH tint neighborhoods](world/biome/RUST-DH-TINT.md) read native full-data
+columns and material identity leases. Rust owns color storage and sampling;
+Java retains resolver callbacks and projects primary cell handles/generations.
+Six scoped CPU scenarios match Frozen checksums and preserve/improve measured
+elapsed time; realistic renderer/server acceptance remains separate.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.

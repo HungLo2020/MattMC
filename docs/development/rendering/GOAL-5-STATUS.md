@@ -15,7 +15,7 @@ into Rust while Java retains callable references, dispatcher/futures and task
 bodies. The author reports 37,624 Frozen CPU operations and four Java/native controls,
 plus 1,918 Java tests reported/two skipped (1,916 executed). A six-pair synthetic
 queue comparison is 2.4% lower in elapsed time, not a server-tick, streaming or
-FPS gain. No new hardware acceptance or driver recovery is established.
+FPS gain. That CPU checkpoint established no hardware acceptance or driver recovery.
 
 At the preceding `5de23173` checkpoint, retained terrain selection, client residency, shared chunk/biome inputs and DH
 producer policies had native CPU owners. That slice moves complete
@@ -23,12 +23,15 @@ compact [DH render-column reduction](RUST-DH-RENDER-COLUMNS.md) into Rust.
 Java still performs contextual color callbacks, face construction, greedy
 merging, final packets and substantial world/application orchestration.
 
-**New hardware acceptance is blocked in the author's environment.** The
+**The earlier driver blocker is cleared; new MattMC hardware acceptance remains pending.** The
 [committed record](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/PROGRESS.md)
 reports mismatched NVIDIA kernel/user libraries, an ABI 79 invocation that
 failed before world entry with X11 `BadDrawable`, and interrupted teardown.
-The latest CPU checks do not replace those failed or unstarted runtime gates.
-See [driver preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+The user's subsequent reboot restored matching NVIDIA libraries/kernel and a
+validated standalone Vulkan presentation probe. The full Rust suite also
+passes after serializing its presenter-admission fixtures. These checks do not
+replace the failed or unstarted MattMC runtime gates. See
+[driver preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 
 The latest measured image is the older `839ff128`: twenty author-recorded
 settled runs still fail vanilla p99 and DH median FPS. Earlier `3f00217d`
@@ -655,13 +658,14 @@ overlap and do not isolate priority-queue cost or demonstrate a migration gain.
 These measurements precede the newer retained inputs, residency, shared biome
 bindings, change hashes and complete reduction.
 
-The newer hardware work is blocked by the reported kernel 595.91.07 versus
+The earlier hardware work was blocked by the reported kernel 595.91.07 versus
 installed 595.99.02/NVML 595.99 mismatch. An earlier software-device full Rust
 attempt reported 2,353 passes, 138 failures and three ignored, including GUI
 and graphics-lock cascades; it is not a full-suite pass. The ABI 79 lifecycle
 attempt failed before entry and was interrupted. Twenty newer timing runs are
-predeclared **but not started**. After the environment is restored, the author
-still requires matched-driver suites, seven lifecycle cases, original captures,
+predeclared **but not started**. The driver is now restored, as recorded in the
+[subsequent preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+Acceptance still requires matched-driver suites, seven lifecycle cases, original captures,
 all declared timing runs, streaming profiles and sustained host/GPU memory.
 
 #### October 10 capture, minimap and DH cost report

@@ -67,6 +67,16 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	public final BlockState blockState;
 	/** technically final, but since it requires a method call to generate it can't be marked as such */
 	private String serialString;
+    private volatile net.minecraft.world.level.chunk.NativeDhTintCache nativeTintCache;
+    public net.minecraft.world.level.chunk.NativeDhTintCache nativeTintCache() {
+        if (getClass() != BlockStateWrapper.class || serialString == null || serialString.length() > 65536) return null;
+        var cached = nativeTintCache;
+        if (cached != null) return cached;
+        synchronized (this) {
+            if (nativeTintCache == null) nativeTintCache = new net.minecraft.world.level.chunk.NativeDhTintCache(serialString);
+            return nativeTintCache;
+        }
+    }
 	private final int hashCode;
 	/** Should be between {@link LodUtil#BLOCK_FULLY_OPAQUE} and {@link LodUtil#BLOCK_FULLY_OPAQUE} */
 	private final int opacity;

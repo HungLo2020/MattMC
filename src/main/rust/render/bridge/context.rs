@@ -598,20 +598,33 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
 #[cfg(test)]
 mod tests {
     use crate::render::bridge::context::*;
+    // Both fixtures exercise the same process-wide admission flag.
+    static PRESENTER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn windowed_presenter_reservation_is_exclusive_and_releasable() {
+        let _guard = PRESENTER_TEST_LOCK.lock().expect("presenter test lock");
         let mut registry = BridgeRegistry::default();
         assert!(reserve_windowed_presenter(&mut registry).is_ok());
         let second =
             reserve_windowed_presenter(&mut registry).expect_err("second presenter admitted");
         assert_eq!(second.code, StatusCode::InvalidArgument);
+        let mut other = BridgeRegistry::default();
+        let second = reserve_windowed_presenter(&mut other)
+            .expect_err("second registry presenter admitted");
+        assert_eq!(second.code, StatusCode::InvalidArgument);
+        assert!(!other.windowed_presenter_active);
+        drop(other);
+        // Dropping a rejected registry must not release the live reservation.
+        let mut other = BridgeRegistry::default();
+        assert!(reserve_windowed_presenter(&mut other).is_err());
         release_windowed_presenter(&mut registry);
-        assert!(reserve_windowed_presenter(&mut registry).is_ok());
+        assert!(reserve_windowed_presenter(&mut other).is_ok());
     }
 
     #[test]
     fn registry_drop_releases_presenter_admission() {
+        let _guard = PRESENTER_TEST_LOCK.lock().expect("presenter test lock");
         {
             let mut registry = BridgeRegistry::default();
             reserve_windowed_presenter(&mut registry).expect("first presenter reservation");
