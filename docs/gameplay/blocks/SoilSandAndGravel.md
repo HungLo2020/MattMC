@@ -2,6 +2,41 @@
 
 **Soil provides stable ground; Sand, Red Sand, and Gravel fall when their support becomes unsuitable.** Grass Block and Mycelium can spread to ordinary Dirt, while Coarse Dirt, Rooted Dirt, and Podzol keep their distinct surfaces until a relevant conversion changes them. Suspicious Sand and Gravel need a Brush rather than ordinary mining to recover their archaeology contents. This guide covers those twelve registered terrain blocks. [Soil registrations][soil-reg] · [Rooted Dirt][rooted-reg] · [Mycelium][mycelium-reg] · [Path][path-reg] · [Sand and Gravel registrations][sand-reg]
 
+## Finding and replenishing materials
+
+### Podzol from natural ground or large Spruce trees
+
+In the bundled Normal Overworld, search **Old Growth Pine Taiga or Old Growth Spruce Taiga** for naturally generated Podzol. Both have conditional Podzol and Coarse Dirt surface rules, so the forest floor is not uniformly Podzol. [Old-growth taiga exploration](../biomes/TaigaAndSnowyBiomes.md#old-growth-pine-taiga) covers the broader biome search. [Normal preset][current-normal-preset] · [Bundled Overworld surfaces][current-taiga-surface]
+
+**Bamboo Jungle** also has a bamboo-generation route that can replace eligible ground with Podzol. This is a possible addition during that feature's placement, not a promise of Podzol beneath every bamboo stem. [Bamboo Jungle](../biomes/JunglesAndSwamps.md#bamboo_jungle) · [Biome feature entry][current-bamboo-biome] · [Placed bamboo feature][current-bamboo-placed] · [Podzol configuration][current-bamboo-config] · [Ground replacement callback][current-bamboo-feature]
+
+To make more Podzol near a base, plant **four Spruce Saplings in a matching 2 × 2 square at the same height** and leave room for the large tree. Both large-tree choices, Mega Spruce and Mega Pine, include the Podzol ground decorator; the single-Spruce configuration has no such decorator. See [sapling ground, stages, and Bone Meal](SaplingsAndAzaleas.md#ground-stages-and-bone-meal) for advancing the tree, and [space and failure](SaplingsAndAzaleas.md#space-failure-and-recovery) before spending more Bone Meal on an obstructed planting. [Spruce feature choices][current-spruce-grower] · [Square check and feature lookup][current-tree-lookup] · [Mega Spruce][current-mega-spruce] · [Mega Pine][current-mega-pine] · [Single Spruce][current-single-spruce]
+
+A successful large-tree placement runs the decorator on nearby columns, replacing eligible **dirt-tag ground**, including ordinary Dirt and Grass Blocks. It does not convert an arbitrary stone floor, and its searches and random outer patches do not produce a fixed harvest count. Clear the old tree from the next planting’s growth space, refill excavated ground with Dirt, and replant the Spruce square to repeat the conversion. **Use Silk Touch for the Podzol harvest**; ordinary mining returns Dirt. [Decorator dispatch][current-tree-decorators] · [Ground searches][current-podzol-decorator] · [Eligibility predicate][current-dirt-predicate] · [Dirt tag][current-dirt-tag] · [Podzol loot][current-podzol-loot]
+
+### Rooted Dirt from natural roots or planted Azalea
+
+Look for Rooted Dirt beneath **naturally generated Azalea trees associated with Lush Caves**. The Lush Caves biome includes the rooted-Azalea feature; its placed filters select a suitable starting position, then the root-system generator searches upward for a tree site. Only after the tree placement succeeds does it attempt the connecting Rooted Dirt and Hanging Roots. Rooted Dirt replaces blocks in the azalea-root-replaceable tag, so this is not a guaranteed solid column or a fixed number of collectible blocks. [Lush Caves](../biomes/CaveBiomes.md#lush-caves) · [Biome entry][current-lush-biome] · [Placement filters][current-roots-placed] · [Root-system configuration][current-roots-config] · [Tree and root placement][current-roots-feature] · [Replaceable blocks][current-root-tag]
+
+For a repeatable local source, **plant Azalea or Flowering Azalea on Dirt and use Bone Meal to grow its tree**. Both shrubs select the same tree configuration, which forces the **one ground block directly below the original shrub** to Rooted Dirt. This planted-tree route does not require a Lush Caves biome and does not generate the long natural root system. Growth still needs a successful Bone Meal roll and enough tree space; [Azalea growth](SaplingsAndAzaleas.md#azalea-and-flowering-azalea) owns those conditions. [Both shrub callbacks][current-azalea-blocks] · [Bone Meal growth][current-azalea-growth] · [Azalea grower][current-azalea-grower] · [Tree feature lookup][current-tree-lookup] · [Tree configuration][current-azalea-config] · [Ground position][current-bending-ground] · [Forced replacement][current-force-ground]
+
+Mine that Rooted Dirt normally, replace the harvested ground with Dirt, and plant another shrub after clearing space for the next tree. Silk Touch is unnecessary for this harvest. [Tree Leaves](TreeLeaves.md#leaf-families-and-drops) explains how leaves can supply more saplings and shrubs; their drops are rolls, so a single tree does not promise all the plants for the next cycle. Bone Meal on an **existing Rooted Dirt block** instead follows the [Hanging Roots route](#rooted-dirt-and-hanging-roots) and does not multiply Rooted Dirt. [Rooted Dirt loot][current-rooted-loot] · [Rooted Dirt Bone Meal callback][current-rooted-bonemeal] · [Spruce leaf loot][current-spruce-leaf-loot] · [Azalea leaf loot][current-azalea-leaf-loot] · [Flowering Azalea leaf loot][current-flowering-leaf-loot]
+
+For replenishing the starting soil itself, follow the existing [continuing soil-supply route](MudAndMudBricks.md#making-a-continuing-supply).
+
+### Optional Wandering Trader supplies
+
+A [Wandering Trader](../mobs/WanderingTrader.md#trading) can offer these materials as items. Each row is **one trade's base Emerald cost and item output**, followed by the selected offer's maximum uses. The trader chooses offers randomly from its pools; a visit does not guarantee any particular row. Buying Podzol as an item avoids the initial Silk Touch harvest, but mining it after placement still follows the Podzol loot rule. [Podzol offer][current-podzol-trade] · [Other material offers][current-soil-trades] · [Quantity and cost fields][current-trade-fields] · [Live pool selection][current-trader-selection] · [Random offer selection][current-offer-random]
+
+| Material received | Base price | Items per trade | Maximum uses of that offer |
+| --- | ---: | ---: | ---: |
+| Podzol | 3 Emeralds | 3 Podzol | 6 |
+| Rooted Dirt | 1 Emerald | 2 Rooted Dirt | 5 |
+| Sand | 1 Emerald | 8 Sand | 8 |
+| Red Sand | 1 Emerald | 4 Red Sand | 6 |
+
+Use the trader guide for [stock exhaustion](../mobs/WanderingTrader.md#stock-does-not-restock); these optional purchases are separate from naturally finding or growing the blocks.
+
 ## Mining and moving terrain
 
 All twelve blocks are in the **shovel-mineable tag**, and none of their checked registrations requires a correct tool for ordinary drops. An unbroken shovel speeds collection; hand mining still reaches the ordinary loot rules. Silk Touch and Fortune can change the selected loot without imposing a higher material tier. The table describes normal player mining with block drops enabled. [Mining tag][shovel-tag] · [Shovel speed rule][tool] · [Player harvest gate][player] · [Registrations][soil-reg] · [Rooted Dirt][rooted-reg] · [Mycelium][mycelium-reg] · [Dirt Path][path-reg] · [Falling terrain][sand-reg]
@@ -106,6 +141,10 @@ Related: [Blocks](Blocks.md) · [Mining](../mechanics/Mining.md) · [Farmland](F
 
 ## Sources and verification
 
+Acquisition routes added and source-reviewed on **2026-10-10** at `f86206767dadde696adfed4e04c5ee97cd0d0885`. The review followed the loaded surface and biome/feature routes, planted-tree callbacks, native block definitions, mining loot, and active trader offer selection. The older review below is retained for the existing placed-block mechanics. No world-generation survey, tree-growth, trading, or resource-yield gameplay test was run. World presets, data packs, and previously generated terrain can change availability; these routes do not promise a location or harvest count. [Native Podzol definition][current-native-podzol] · [Native Rooted Dirt definition][current-native-rooted] · [Block registration bridge][current-block-bridge]
+
+Natural routes were traced through the loaded world-generation registries and their active placement paths. Surface rules reach the native compiler/evaluator; biome features pass through the placed-feature filters before the configured generator. [Loaded registries][current-registry-loader] · [Surface caller][current-surface-caller] · [Surface dispatch][current-surface-dispatch] · [Native surface compiler][current-surface-bridge] · [Native surface evaluator][current-surface-native] · [Biome decoration dispatch][current-biome-dispatch] · [Placed feature dispatch][current-placed-dispatch] · [Configured feature dispatch][current-feature-dispatch]
+
 Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. No in-game mining, spread-timing, falling, conversion, or archaeology test was run. The guide covers checked placed-block behavior and selected recipes; it does not inventory all world-generation locations, trades, or structure loot. Game rules and data packs can change drops and recipes.
 
 [soil-reg]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/Blocks.java#L127-L134
@@ -168,3 +207,52 @@ Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`.
 [cancel-fall]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/item/FallingBlockEntity.java#L311-L313
 [brush-use]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/BrushItem.java#L68-L98
 [brush-finish]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/entity/BrushableBlockEntity.java#L117-L145
+
+[current-normal-preset]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/world_preset/normal.json#L3-L13
+[current-registry-loader]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/resources/RegistryDataLoader.java#L96-L110
+[current-surface-caller]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/NoiseBasedChunkGenerator.java#L230-L267
+[current-surface-bridge]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/NativeSurface.java#L58-L96
+[current-placed-dispatch]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/placement/PlacedFeature.java#L35-L60
+[current-taiga-surface]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/noise_settings/overworld.json#L1664-L1711
+[current-bamboo-biome]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/biome/bamboo_jungle.json
+[current-bamboo-placed]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/placed_feature/bamboo.json
+[current-bamboo-config]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/configured_feature/bamboo_some_podzol.json
+[current-bamboo-feature]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/BambooFeature.java#L30-L56
+[current-tree-lookup]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/grower/TreeGrower.java#L127-L193
+[current-rooted-bonemeal]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/RootedDirtBlock.java
+[current-spruce-grower]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/grower/TreeGrower.java#L37-L46
+[current-mega-spruce]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/configured_feature/mega_spruce.json
+[current-mega-pine]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/configured_feature/mega_pine.json
+[current-single-spruce]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/configured_feature/spruce.json
+[current-tree-decorators]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/TreeFeature.java#L155-L168
+[current-podzol-decorator]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/treedecorators/AlterGroundDecorator.java#L25-L70
+[current-dirt-predicate]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/Feature.java#L197-L203
+[current-dirt-tag]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/tags/block/dirt.json
+[current-podzol-loot]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/loot_table/blocks/podzol.json
+[current-lush-biome]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/biome/lush_caves.json
+[current-roots-placed]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/placed_feature/rooted_azalea_tree.json
+[current-roots-config]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/configured_feature/rooted_azalea_tree.json
+[current-roots-feature]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/RootSystemFeature.java#L20-L145
+[current-root-tag]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/tags/block/azalea_root_replaceable.json
+[current-azalea-blocks]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/Blocks.java#L4516-L4525
+[current-azalea-growth]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/AzaleaBlock.java#L37-L54
+[current-azalea-grower]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/grower/TreeGrower.java#L57-L57
+[current-azalea-config]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/configured_feature/azalea_tree.json
+[current-bending-ground]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/trunkplacers/BendingTrunkPlacer.java#L45-L58
+[current-force-ground]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/trunkplacers/TrunkPlacer.java#L60-L75
+[current-rooted-loot]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/loot_table/blocks/rooted_dirt.json
+[current-spruce-leaf-loot]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/loot_table/blocks/spruce_leaves.json
+[current-azalea-leaf-loot]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/loot_table/blocks/azalea_leaves.json
+[current-flowering-leaf-loot]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/loot_table/blocks/flowering_azalea_leaves.json
+[current-podzol-trade]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L728-L747
+[current-soil-trades]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L811-L827
+[current-trade-fields]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L1430-L1478
+[current-trader-selection]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/WanderingTrader.java#L133-L140
+[current-offer-random]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/AbstractVillager.java#L222-L233
+[current-native-podzol]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/rust/content/block/definitions/catalog.rs#L29-L32
+[current-native-rooted]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/rust/content/block/definitions/catalog.rs#L1168-L1168
+[current-block-bridge]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/block/Blocks.java#L4997-L5003
+[current-surface-dispatch]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/SurfaceSystem.java#L66-L110
+[current-surface-native]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/rust/world/level/levelgen/surface/evaluator.rs
+[current-biome-dispatch]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/chunk/ChunkGenerator.java#L353-L380
+[current-feature-dispatch]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/feature/ConfiguredFeature.java#L17-L26
