@@ -86,7 +86,9 @@ pack. The default `enableShadersVia=toggle` uses the enable/reload API;
 shader-pack screen's Apply logic, including its optional second apply after an
 option reset. It calls that logic directly; it does not open or click the UI.
 `--jvm-arg=-Dmattmc.dev.scriptedCamera.disableShadersAt=75` turns shaders off
-again through the same toggle API.
+again through the same toggle API. `...openWorldMapAt=30` opens VoxelMap's world
+map (the M key); while it stays open the camera and other actions pause, but
+screenshots and the scheduled stop still run.
 The enable attempt is marked before application; a thrown failure does not
 turn this into an automatic retry loop. Start with `--config 'config/iris.properties:enableShaders=false'` and a valid
 selected pack available in the copied game. The scripted driver copies config,
@@ -99,8 +101,9 @@ stop check runs first.
 `screenshots/scripted-20s.png` and `scripted-45s.png` in the copied game directory;
 add `--keep-game-dir` to retain them and `--yaw-amplitude 0 --pitch-amplitude 0`
 for a still camera. Times are sorted and at most one due screenshot is requested
-per eligible frame. A screen, missing player or missing world skips action
-processing; elapsed time continues after the sweep has started. Names round
+per eligible frame. A missing player or world skips action processing; an open
+screen skips all but screenshots and the stop. Elapsed time continues after the
+sweep has started. Names round
 the configured seconds, so use distinct rounded values. Check the screenshot
 callback/log and resulting files: requesting a capture is not proof of saved
 pixels, exact wall-clock timing or a successful shader transition. These actions

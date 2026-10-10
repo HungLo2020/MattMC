@@ -159,6 +159,13 @@ clean immutable snapshots. See [raw-image generations](JAVA-BRIDGE.md#raw-gui-im
 and the [ordinary gameplay protocol](GAMEPLAY-PERFORMANCE.md); reducing this
 traffic does not establish end-to-end performance acceptance.
 
+Any GUI element the Rust route cannot draw fails the frame on purpose (no Java
+fallback), which ends in Minecraft's emergency save and crash. Producers must
+therefore return no elements, not an unsupported marker, for geometry that is
+merely invisible: [`RustGalGuiRenderer.tryEnqueueFourColoredRectangle`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
+returns an empty list for off-screen, zero-area or fully scissored rectangles,
+such as the world map's world-border lines when the border is off screen.
+
 Selected-source frames carry thousands of mesh instances (mostly off-camera
 shadow candidates), and several passes look each one up every frame. Keep
 those lookups hashed: `mesh_assets` is a `MeshAssetMap` keyed through

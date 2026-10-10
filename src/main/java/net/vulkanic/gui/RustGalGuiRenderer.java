@@ -508,23 +508,25 @@ public final class RustGalGuiRenderer {
 		// intact so Rust performs the same viewport clipping, but clamp the copied
 		// batch metadata to the actual frame.  Reject only a rectangle with no
 		// visible intersection; treating that as unsupported would make a selected
-		// Vulkan frame lose otherwise valid GUI work.
+		// Vulkan frame lose otherwise valid GUI work. An invisible rectangle (for
+		// example the world map's off-screen world border) draws nothing, as in
+		// vanilla: return no elements rather than an unsupported marker.
 		if (left >= right || top >= bottom || right <= 0 || bottom <= 0
-			|| left >= guiWidth || top >= guiHeight) return null;
+			|| left >= guiWidth || top >= guiHeight) return List.of();
 		int clippedLeft = Math.max(0, left);
 		int clippedTop = Math.max(0, top);
 		int clippedRight = Math.min(guiWidth, right);
 		int clippedBottom = Math.min(guiHeight, bottom);
-		if (clippedLeft >= clippedRight || clippedTop >= clippedBottom) return null;
+		if (clippedLeft >= clippedRight || clippedTop >= clippedBottom) return List.of();
 		ScreenRectangle scissor = rectangle.scissorArea();
 		int scissorLeft = 0, scissorTop = 0, scissorRight = guiWidth, scissorBottom = guiHeight;
 		if (scissor != null) {
-			if (scissor.width() < 0 || scissor.height() < 0) return null;
+			if (scissor.width() < 0 || scissor.height() < 0) return List.of();
 			scissorLeft = Math.max(0, scissor.left());
 			scissorTop = Math.max(0, scissor.top());
 			scissorRight = (int)Math.min((long)guiWidth, (long)scissor.left() + scissor.width());
 			scissorBottom = (int)Math.min((long)guiHeight, (long)scissor.top() + scissor.height());
-			if (scissorLeft >= scissorRight || scissorTop >= scissorBottom) return null;
+			if (scissorLeft >= scissorRight || scissorTop >= scissorBottom) return List.of();
 		}
 		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = List.of(
 			new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {x0, y0, 0}, new float[] {0, 0}, new float[] {0, 0}, rectangle.color00(), 0x007F0000),
