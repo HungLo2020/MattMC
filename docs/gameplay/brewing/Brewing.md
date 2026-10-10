@@ -44,7 +44,7 @@ These transformations change the bottle form while retaining the registered poti
 | Drinkable potion | Gunpowder | Splash potion of the same type |
 | Splash potion | [Dragon's Breath](../items/DragonsBreath.md) | Lingering potion of the same type |
 
-Splash potions are thrown. For effect potions, the splash applies effects to nearby susceptible entities, with distance reducing duration or instant-effect strength. Throwing an effect-bearing lingering potion creates an area-effect cloud. Water and effect-free bases have different impact handling, so a Lingering Water Bottle should not be treated as an effect cloud.
+Splash potions are thrown. For effect potions, the splash applies effects to nearby susceptible entities, with distance reducing duration or instant-effect strength. Throwing an effect-bearing lingering potion creates an area-effect cloud. Water and effect-free bases have different impact handling, so a Lingering Water Bottle should not be treated as an effect cloud. See [Lingering Potion: cloud placement and depletion](../items/LingeringPotion.md#cloud-placement-and-depletion) for where recipients need to stand and how a crowd uses up the shared cloud.
 
 The same potion-content recipes also accept the splash and lingering containers. For example, Splash Water + Nether Wart makes Splash Awkward. There is no registered reverse conversion from lingering to splash or from splash to drinkable in the checked list.
 

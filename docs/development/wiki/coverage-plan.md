@@ -2939,3 +2939,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Replaced 20 mutable fix-branch source URLs across Dry Midlands, Ambersol, Bucket of Platypus, Enderman, Kangaroo, Platypus and Rhinoceros with their original immutable fix commits. Every other byte of the seven articles is preserved, including dates, headings, behavior and runtime-verification limits.
 - Verified all six fix commits as second parents of the corresponding merged histories and ancestors of `f86206767dadde696adfed4e04c5ee97cd0d0885`; all 17 unique cited objects and line ranges exist. Historical Ambersol Java evidence remains at its original commit because later native migration changed where those settings live. No fresh gameplay repair or test execution is claimed.
 - Preserved monthly and checkpoint history. Full strict documentation build, focused href-only rendering checks and independent source/history/payload-tree validation precede guarded publication and exact-head terminal deployment.
+
+## Batch 367: Practical lingering-cloud placement
+
+- Expanded the existing Lingering Potion owner with shallow cloud geometry, horizontal reach, delayed checks and same-cloud reapplication. Explained shared radius consumption by successive recipients, including applications that do not replace an existing effect, and why configured duration does not guarantee a fixed lifetime or number of doses.
+- Added one Brewing route to that practical guidance, retaining the Water/custom-effect gates and canonical effect owners for strength, duration and refresh rules. Existing headings and historical source evidence are preserved.
+- Traced active item/impact/recipient/effect-update code at `f86206767dadde696adfed4e04c5ee97cd0d0885`. No gameplay placement, crowd, lifetime or dose-count test was run. Full strict documentation build and independent source/history/rendered-reference/exact-tree checks precede guarded publication and terminal deployment.
