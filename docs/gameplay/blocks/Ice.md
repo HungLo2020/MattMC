@@ -26,6 +26,8 @@ Both recipes are shapeless, though nine inputs fill the whole 3 × 3 grid. Start
 
 Natural examples in the normal Overworld include **Packed Ice spikes in Ice Spikes** and **Packed/Blue Ice iceberg features in Frozen Ocean**. The registered spike feature places Packed Ice; each iceberg's configured state supplies its ice type. These are source-verified acquisition examples, not exhaustive location or yield charts. [Normal preset and biome selection][normal-preset] [biome-parameters][] [overworld-biomes][] · [Ice Spikes route][spikes-biome] [placed-feature-ice-spike][] [configured-feature-ice-spike][] [spike-worldgen] · [Frozen Ocean routes][frozen-ocean] [placed-feature-iceberg-packed][] [configured-feature-iceberg-packed][] [placed-feature-iceberg-blue][] [configured-feature-iceberg-blue][] [iceberg-worldgen] · [Feature dispatch][features] [biome-generation][] [placed-feature][]
 
+A **Wandering Trader may sell Packed Ice or Blue Ice** among its randomly selected [special goods](../mobs/WanderingTrader.md#special-goods). That guide lists their prices and use limits; neither ice offer is guaranteed and [sold-out offers do not restock](../mobs/WanderingTrader.md#stock-does-not-restock). Buying supplies the item without a Silk Touch harvest, but recovering it after placement still follows the harvesting rule above. [Ice listings and pool size][trader-ice] · [Active trader selection][trader-selection]
+
 Blue Ice also participates in the verified [basalt-making interaction](BlackstoneAndBasalt.md#making-basalt-with-lava); that guide owns the required layout and conditions.
 
 ## Ordinary Ice: melting and breaking
@@ -76,6 +78,8 @@ Melting can advance neighboring Frosted Ice too. A separate Frosted-Ice neighbor
 
 Source-reviewed at `e87cde38c872d30ae86139bbee181937603af769` on 2026-10-02. Registered classes/properties, item absence, recipes, loot, light calculations, active weather/random/scheduled dispatch, natural-feature routes and Frost Walker's effect path were checked. No gameplay harvesting, melting, freezing or vehicle-speed test was run.
 
+The Wandering Trader acquisition pointer was added on **2026-10-10** after checking the active offer pool, selection, sale constructor and retained stock at `f86206767dadde696adfed4e04c5ee97cd0d0885`. Earlier environment, collection and natural-feature evidence remains pinned above. No in-game trading test was run.
+
 [blocks]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Blocks.java
 [items]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/Items.java
 [ice]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/IceBlock.java
@@ -125,3 +129,5 @@ Source-reviewed at `e87cde38c872d30ae86139bbee181937603af769` on 2026-10-02. Reg
 [enchant]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/enchantment/Enchantment.java
 [enchant-effects]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/enchantment/effects/EnchantmentLocationBasedEffect.java
 [replace-disk]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/enchantment/effects/ReplaceDisk.java
+[trader-ice]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L728-L749
+[trader-selection]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/WanderingTrader.java#L133-L141
