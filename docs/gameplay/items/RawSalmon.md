@@ -12,6 +12,10 @@ Eating one serving supplies **2 hunger points** (one hunger icon) and **0.4 satu
 
 Cooking **one Raw Salmon into one [Cooked Salmon](CookedSalmon.md)** raises those values to **6 hunger points and 9.6 saturation**. Use a furnace for **200 ticks**, a smoker for **100 ticks**, or a campfire for **600 ticks**: 10, 5 or 30 seconds respectively at 20 ticks per second while processing. The cooked-item page and [cooking guide](../smelting/Smelting.md) cover the device details. [Cooked food value][cooked-food] · [Furnace recipe][smelt] · [Smoker recipe][smoke] · [Campfire recipe][campfire]
 
+## Animal uses
+
+**Keep some Raw Salmon for [Cats](../mobs/Cat.md#taming-and-care) and [Ocelots](../mobs/Ocelot.md#building-trust): cooking makes it unusable for either animal.** Their bundled food tags accept only Raw Cod and Raw Salmon. Cook the rest for better player food or more healing per serving for a tame [Wolf](../mobs/Wolf.md#healing-and-food). [Dolphins](../mobs/Dolphin.md#feeding-and-finding-structures) and [Grizzly Bears](../mobs/GrizzlyBear.md#taming-and-care) still accept cooked salmon. See the shared [raw-versus-cooked animal-use comparison](RawCod.md#animal-uses-raw-or-cooked) for feeding priorities and the difference between taming, trust, breeding, and guidance. [Cat food][animal-cat-food] · [Ocelot food][animal-ocelot-food] · [Wolf healing][animal-wolf] · [Wolf food][animal-wolf-food] · [Fish tag][animal-fishes]
+
 ## Behavior
 
 The bundled food uses the default consumable with **no special consumption effect**. [Food component binding][component] · [Default consumable][default]
@@ -21,6 +25,8 @@ Hold use for **32 game ticks** (1.6 seconds at 20 ticks per second). Ordinary Su
 ## Notes
 
 Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. Checked the active item/food/consumable path and the acquisition routes described here. These are source-defined rules, not in-game eating, loot or cooking tests. Loaded recipes, loot and item components can change the results.
+
+The animal-use section was separately source-reviewed on **2026-10-10** at `f86206767dadde696adfed4e04c5ee97cd0d0885`; active food tags and interaction paths were checked. No in-game animal-feeding test was run. The linked [shared comparison](RawCod.md#animal-uses-raw-or-cooked) carries the detailed animal-use sources; the earlier acquisition, eating and cooking review remains unchanged.
 
 Related: [Food reference](FoodReference.md) · [Hunger](../mechanics/Hunger.md) · [Smelting and cooking](../smelting/Smelting.md) · [Items](Items.md)
 
@@ -44,3 +50,9 @@ Related: [Food reference](FoodReference.md) · [Hunger](../mechanics/Hunger.md) 
 [creative]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/GameType.java#L62-L76
 [consume]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L1076-L1079
 [infinite]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/player/Player.java#L1212-L1215
+
+[animal-cat-food]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/tags/item/cat_food.json
+[animal-ocelot-food]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/tags/item/ocelot_food.json
+[animal-wolf]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/animal/wolf/Wolf.java#L454-L512
+[animal-wolf-food]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/tags/item/wolf_food.json
+[animal-fishes]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/tags/item/fishes.json
