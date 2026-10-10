@@ -433,7 +433,15 @@ scenario on a crashed audit row or a recognized exception, Rust panic or GAL
 callers discard. A logged dependency violation fails the gate; other
 validation failures are reported, not failed. Results go to
 `artifacts/graphics-captures/lifecycle-gate/<label>/summary.json`
-(`--artifact-root` overrides it). The combined validation driver's broader
+(`--artifact-root` overrides it). Lifecycle and FPS checks share the exact
+ordered shutdown rule: only the server INFO `ClosedChannelException` disconnect
+after the render-thread INFO `Stopping!` marker is counted separately, as
+`shutdown-disconnects` in the lifecycle report. Earlier disconnects, stack
+traces, other exceptions, panics and dependency failures still reject the run.
+Test the classifier with
+`python3 -m unittest discover -s DevUtils/tests/rendering -p 'test_runtime_log_health.py'`;
+preserve historical failed receipts and use
+a fresh label to rerun the affected transition. The combined validation driver's broader
 client cleanup is described [above](#one-command-validation); do not confuse
 it with ownership-scoped termination of one capture process group.
 

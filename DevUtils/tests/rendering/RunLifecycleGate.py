@@ -28,6 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from runtime_log_health import separate_shutdown_disconnects
+
 REPO = Path(__file__).resolve().parents[3]
 
 SCENARIOS = (
@@ -79,6 +81,7 @@ def capture_command(artifact_root: Path, scenario: str, shaders: bool, dh: bool,
 def scan_logs(artifact_root: Path) -> dict[str, int]:
     patterns = {**FAILURE_PATTERNS, **REPORT_PATTERNS}
     counts = {name: 0 for name in patterns}
+    counts["shutdown-disconnects"] = 0
     # Large client logs are kept gzipped; scan both forms.
     for log in artifact_root.glob("**/current-rust-*/capture/run-01/capture/runClient_*.log*"):
         if log.suffix == ".gz":
@@ -87,6 +90,8 @@ def scan_logs(artifact_root: Path) -> dict[str, int]:
             text = log.read_text(errors="replace")
         else:
             continue
+        text, shutdown_disconnects = separate_shutdown_disconnects(text)
+        counts["shutdown-disconnects"] += shutdown_disconnects
         for name, pattern in patterns.items():
             counts[name] += len(pattern.findall(text))
     return counts

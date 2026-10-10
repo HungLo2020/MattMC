@@ -23,7 +23,8 @@ complete bulk-path visual parity and performance acceptance remain open.
   One mutable position follows Frozen's synchronous light-cache convention.
 - The immutable native registry owns emission, light blocking and solid-render
   facts. Java predicate and shade callbacks remain migration work. World light
-  publication still follows its original map copy-on-write transaction.
+  publication still follows its original copy-on-write transaction through
+  [Rust canonical map snapshots](../world/lighting/RUST-LIGHT-MAPS.md).
 
 ## Compatibility and lifetime
 

@@ -48,6 +48,12 @@ public class DataLayer {
     @Nullable
     NativeLightLayer nativeLightLayer() { return this.nativeLayer; }
 
+    /** Caller-retained CPU owner for the Rust light map; never retain this raw address in Java. */
+    public java.lang.foreign.MemorySegment nativeLightOwnerForMap() {
+        return getClass() == DataLayer.class && this.nativeLayer != null
+            ? this.nativeLayer.ownerForNativeCall() : java.lang.foreign.MemorySegment.NULL;
+    }
+
     /** A read-only CPU generation lease; the returned segment owns its lifetime. */
     @Nullable
     public java.lang.foreign.MemorySegment nativeLightView() {
@@ -157,6 +163,7 @@ public class DataLayer {
             this.nativeLayer.materialize();
             this.defaultValue = this.nativeLayer.view().rawDefault();
             this.data = this.nativeLayer.view().bytes().toArray(java.lang.foreign.ValueLayout.JAVA_BYTE);
+            this.nativeLayer.invalidate();
             this.nativeLayer = null;
             return this.data;
         }

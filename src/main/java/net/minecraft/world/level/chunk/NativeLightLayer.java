@@ -27,6 +27,7 @@ final class NativeLightLayer {
         "mattmc_light_sky_owned", FunctionDescriptor.of(ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS), Linker.Option.critical(true));
+    private static final MethodHandle INVALIDATE = handle("invalidate", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE_VIEW = handle("view_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 
@@ -109,6 +110,11 @@ final class NativeLightLayer {
             throw new IllegalArgumentException("Invalid sky source spans");
         try { updateView((int) SKY_OWNED.invokeExact(owner, MemorySegment.ofArray(columns), bottom, minX, minZ,
                 MemorySegment.ofArray(entries), MemorySegment.ofArray(output), changedView)); }
+        catch (Throwable failure) { throw rethrow(failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
+    void invalidate() {
+        try { INVALIDATE.invokeExact(owner); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }

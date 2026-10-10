@@ -1,10 +1,10 @@
-# Rust vs Frozen Java speed (2026-10-09; releasef449557e;RTX3080Ti;settled rotating view;6,000 frames)
+# Rust vs Frozen Java speed (2026-10-09; integrated b7297d06 atop81440bf19; RTX3080Ti; settled rotating view; 6,000 frames)
 | Mode | Rust/Vulkan candidate | Frozen Java/OpenGL |
 | --- | --- | --- |
-| Vanilla | 1,390.1 / 1,059.3 | 1,178.1 / 1,140.1 |
-| Vanilla + DH | 730.9 / 709.5 | 600.6 / 722.3 |
-| Shaders | 349.3 / 341.1 | 319.0 / 316.4 |
-| Shaders + DH | 255.1 / 255.8 | 228.0 / 225.7 |
-Receipt:`validation/native-live-biome-fog-cache-20261009/summary.json`:all16 ABAB/exact6000 clean,VUID/exception/orphan0;7lifecycle and manually reviewed vanilla/Iris+DH diagnostic pairs/DHcoverage pass;current/Frozen/native/prompt integrity passes;25copies retired.
-Performance OPEN:medianFPS exceeds Frozen in all4 modes;p99 Current/Frozen vanilla3.394/3.322ms,DH5.235/6.405,shaders4.773/6.196,shaderDH6.810/8.602.Gate FAILS vanilla p99;large repeat variance,noisolated migrationgain.
-Native sky milestone1b9b10339 published.Fog+generation-validated Rust cache published3adbe6d5 (this measured release predates later recorder/allocation/lazy-mesh changes):f449 fullRust2456/3ignored,Java1818/2skip,6JNIworkers exactlibrary.Four ordinary profiles/12F3 reviews pass;weightedJava allocation0.951/2.437GB C/F excludes Rust;mapcopy89MB guides nextmigration.Light-map candidate14Rust tests/4096 actualJava-native Frozen operations passes;not production.Entry/pop-in,longmemory,worldsimulation and Rust-only app remainopen.
+| Vanilla | 1,358.8 / 1,297.1 | 1,149.6 / 1,193.5 |
+| Vanilla + DH | 718.7 / 820.5 | 607.9 / 682.4 |
+| Shaders | 354.7 / 340.1 | 313.6 / 316.4 |
+| Shaders + DH | 259.2 / 258.7 | 227.1 / 227.2 |
+Receipt: validation/native-light-map-integrated-20261009/summary.json; all16 ABAB/exact6000 clean, VUID/error/orphan0; both manually reviewed diagnostic pairs/DH coverage pass; source/library/Frozen/prompt guards pass. Raw gate6/7: expected shutdown close misclassified; all7 retained logs pass corrected classifier; fresh affected transition passes, integrity/native/cleanup guards pass.
+Performance OPEN: medianFPS C/F vanilla1327.95/1171.55, DH769.6/645.15, shaders347.4/315.0, shaderDH258.95/227.15; p99ms vanilla3.277/3.097 FAIL, DH3.868/6.245, shaders4.590/6.411, shaderDH6.004/8.191 pass. Combined upstream+map changes; no isolated gain.
+Published sky1b9b10339/fog3adbe6d5d; local Rust light maps/direct scalar consumers: freshRust2467/3ignored + Java1829/2skipped pass, six JNI workers exactb7297d06. Freshb729 four ordinary profiles/12F3 reviews pass; weightedJava allocation0.823/2.398GB C/F, mapcopy-path0sampled/94.37MB; excludes Rust, no isolated gain. Pop-in, long memory, simulation and Rust-only executable remain open.

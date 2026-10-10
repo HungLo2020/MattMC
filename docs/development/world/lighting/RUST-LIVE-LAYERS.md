@@ -13,14 +13,18 @@ repetition run in Rust. This subsystem has no rendering or GPU dependencies.
 passes a pinned CPU owner to propagation. Rust takes an independent snapshot
 without a Java byte-array projection. This still copies native bytes into a
 pass-local snapshot; it is not zero-copy propagation. Results export ordered section keys and
-affected sections only. After Java performs the existing map copy-on-write,
+affected sections only. After Java schedules the existing first-write
+layer copy-on-write through the storage owner,
 Rust installs each result directly into its target owner. Sky seeding and first
 row repetition also keep canonical light bytes native. Client packet application uses
 `DataLayer.copyOf` for its already independent import: Rust copies the packet
 payload directly instead of first allocating a Java clone. The public array
 constructor retains its existing alias contract.
 
-Java still owns light-engine orchestration, map publication and callbacks.
+Java still owns light-engine orchestration and callbacks. Canonical
+[map publication](RUST-LIGHT-MAPS.md) now has a separate Rust owner; caller-supplied
+Java maps retain compatibility ownership. That migration has its own verification
+status and does not inherit the historical runtime results below.
 The [bulk terrain-light consumer](../../rendering/RUST-TERRAIN-LIGHTING.md)
 now borrows retained generations directly; its latest verification is recorded
 separately. Compatibility slices still use scalar CPU views. No whole-game

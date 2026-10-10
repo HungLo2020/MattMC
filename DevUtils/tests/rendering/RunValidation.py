@@ -43,6 +43,7 @@ REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "DevUtils" / "Common"))
 from artifact_retention import ensure_marker, retire_completed_fixtures, retire_old_invocations
 from RunLifecycleGate import SCENARIOS as LIFECYCLE_SCENARIOS
+from runtime_log_health import CLIENT_STOPPING, SHUTDOWN_DISCONNECT, separate_shutdown_disconnects
 FROZEN_REPO = REPO.parent / "MattMC_JavaPerfTesting" / "MattMC"
 GOAL5 = REPO / "artifacts" / "graphics-captures" / "goal5"
 DEFAULT_RUN_SOURCE = GOAL5 / "terrain-look-direction" / "cold-source" / "run"
@@ -73,10 +74,7 @@ PARITY_PAIRS = {
 }
 
 CLIENT_FAILURES = re.compile(r"Exception|panicked at")
-CLIENT_STOPPING = re.compile(r"^\[\d{2}:\d{2}:\d{2}\] \[Render thread/INFO\]: Stopping!$")
-SHUTDOWN_DISCONNECT = re.compile(
-    r"^\[\d{2}:\d{2}:\d{2}\] \[Server thread/INFO\]: \S+ lost connection: "
-    r"Internal Exception: java\.nio\.channels\.ClosedChannelException$")
+
 
 
 def log(message: str) -> None:
@@ -221,18 +219,9 @@ def read_client_health(run_dir: Path) -> dict:
         else:
             continue
         raw_exception_mentions += len(CLIENT_FAILURES.findall(text))
-        stopping = False
-        for line in text.splitlines():
-            if CLIENT_STOPPING.fullmatch(line):
-                stopping = True
-            # Minecraft.destroy closes the integrated connection after this
-            # marker. Only its exact INFO disconnect is expected; an earlier
-            # disconnect, stack trace or any other exception still rejects
-            # the run. The artifact must independently prove completion.
-            if stopping and SHUTDOWN_DISCONNECT.fullmatch(line):
-                shutdown_disconnects += 1
-            else:
-                exceptions += len(CLIENT_FAILURES.findall(line))
+        unexpected, expected = separate_shutdown_disconnects(text)
+        shutdown_disconnects += expected
+        exceptions += len(CLIENT_FAILURES.findall(unexpected))
         found = re.findall(r"failureCount=(\d+)", text)
         if found:
             terrain_failures = int(found[-1])

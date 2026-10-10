@@ -1,5 +1,5 @@
 //! Rust-owned live light generations and leased CPU reads. No rendering dependencies.
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
 const BYTES: usize = 2048;
@@ -65,7 +65,9 @@ impl View {
     }
 
     pub(crate) fn copy_bytes_into(&self, output: &mut [u8; BYTES]) -> bool {
-        let Some(bytes) = &self.generation.bytes else { return false; };
+        let Some(bytes) = &self.generation.bytes else {
+            return false;
+        };
         for (target, source) in output.iter_mut().zip(bytes.iter()) {
             *target = source.load(Ordering::Relaxed);
         }
@@ -78,18 +80,29 @@ impl View {
 }
 
 pub struct Layer {
+    valid: AtomicBool,
     generation: Mutex<Arc<Generation>>,
 }
 
 impl Layer {
+    /// Mutable Java array escape ends authority; old generation leases stay valid.
+    pub fn invalidate(&self) {
+        self.valid.store(false, Ordering::Release);
+    }
+    pub fn is_valid(&self) -> bool {
+        self.valid.load(Ordering::Acquire)
+    }
+
     pub fn new(default: i32) -> Self {
         Self {
+            valid: AtomicBool::new(true),
             generation: Mutex::new(Arc::new(Generation::lazy(default))),
         }
     }
 
     pub fn from_bytes(values: [u8; BYTES]) -> Self {
         Self {
+            valid: AtomicBool::new(true),
             generation: Mutex::new(Arc::new(Generation::allocated(0, values))),
         }
     }
@@ -126,6 +139,7 @@ impl Layer {
             None => Generation::lazy(generation.default),
         };
         Self {
+            valid: AtomicBool::new(true),
             generation: Mutex::new(Arc::new(copy)),
         }
     }
@@ -133,7 +147,9 @@ impl Layer {
     pub fn repeat_first(&self) -> Self {
         let view = self.view();
         let mut bytes = [0; BYTES];
-        if !view.copy_bytes_into(&mut bytes) { return Self::new(view.default_value()); }
+        if !view.copy_bytes_into(&mut bytes) {
+            return Self::new(view.default_value());
+        }
         for row in 1..16 {
             let (before, after) = bytes.split_at_mut(row * 128);
             after[..128].copy_from_slice(&before[..128]);

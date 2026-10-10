@@ -165,7 +165,7 @@ final class LightPropagationFixtures {
             var published = new java.util.IdentityHashMap<DataLayer, Object>();
             for (LightLayer layer : LightLayer.values()) {
                 if (this.engine.getLayerListener(layer) instanceof LightEngine<?, ?> light) {
-                    for (DataLayer data : light.storage.visibleSectionData.map.values()) published.put(data, describe(data));
+                    for (DataLayer data : light.storage.visibleSectionData.snapshotForVerification().values()) published.put(data, describe(data));
                 }
             }
             NativeLightPropagation.setEnabled(this.rust);
@@ -351,11 +351,15 @@ final class LightPropagationFixtures {
     }
 
     private static void compareStorage(LightLayer layer, LayerLightSectionStorage<?> a, LayerLightSectionStorage<?> b, List<String> out) {
-        compareMap(layer + " updating", a.updatingSectionData.map, b.updatingSectionData.map, out);
-        compareMap(layer + " visible", a.visibleSectionData.map, b.visibleSectionData.map, out);
-        for (long key : a.updatingSectionData.map.keySet()) {
-            boolean sharedA = a.updatingSectionData.map.get(key) == a.visibleSectionData.map.get(key);
-            boolean sharedB = b.updatingSectionData.map.get(key) == b.visibleSectionData.map.get(key);
+        var updatingA = a.updatingSectionData.snapshotForVerification();
+        var updatingB = b.updatingSectionData.snapshotForVerification();
+        var visibleA = a.visibleSectionData.snapshotForVerification();
+        var visibleB = b.visibleSectionData.snapshotForVerification();
+        compareMap(layer + " updating", updatingA, updatingB, out);
+        compareMap(layer + " visible", visibleA, visibleB, out);
+        for (long key : updatingA.keySet()) {
+            boolean sharedA = updatingA.get(key) == visibleA.get(key);
+            boolean sharedB = updatingB.get(key) == visibleB.get(key);
             if (sharedA != sharedB) out.add(layer + " sharing " + SectionPos.of(key));
         }
         compareMap(layer + " queued", a.queuedSections, b.queuedSections, out);
@@ -363,8 +367,8 @@ final class LightPropagationFixtures {
         if (!a.changedSections.equals(b.changedSections)) out.add(layer + " changed sections");
         if (!a.sectionsAffectedByLightUpdates.equals(b.sectionsAffectedByLightUpdates)) out.add(layer + " affected sections");
         if (a instanceof SkyLightSectionStorage sa && b instanceof SkyLightSectionStorage sb) {
-            if (!sa.updatingSectionData.topSections.equals(sb.updatingSectionData.topSections)
-                || sa.updatingSectionData.currentLowestY != sb.updatingSectionData.currentLowestY) out.add(layer + " top sections");
+            if (!sa.updatingSectionData.topsForVerification().equals(sb.updatingSectionData.topsForVerification())
+                || sa.updatingSectionData.lowestY() != sb.updatingSectionData.lowestY()) out.add(layer + " top sections");
         }
     }
 
@@ -383,9 +387,10 @@ final class LightPropagationFixtures {
         long sum = 0;
         for (LightLayer layer : LightLayer.values()) {
             if (!(engine.getLayerListener(layer) instanceof LightEngine<?, ?> light)) continue;
-            var keys = new ArrayList<>(light.storage.visibleSectionData.map.keySet());
+            var visible = light.storage.visibleSectionData.snapshotForVerification();
+            var keys = new ArrayList<>(visible.keySet());
             keys.sort(Long::compare);
-            for (long key : keys) sum = sum * 31 + describe(light.storage.visibleSectionData.map.get(key)).hashCode();
+            for (long key : keys) sum = sum * 31 + describe(visible.get(key)).hashCode();
         }
         return sum;
     }

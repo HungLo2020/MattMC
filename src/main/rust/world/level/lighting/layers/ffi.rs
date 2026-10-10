@@ -11,7 +11,9 @@ pub struct Projection {
 }
 
 impl Projection {
-    pub(crate) fn borrowed_view(&self) -> &View { &self._view }
+    pub(crate) fn borrowed_view(&self) -> &View {
+        &self._view
+    }
 }
 
 pub(crate) fn projection(layer: &Layer) -> *mut Projection {
@@ -32,11 +34,11 @@ pub unsafe extern "C" fn mattmc_light_layer_create(
     if view.is_null() {
         return std::ptr::null_mut();
     }
-    let layer = Box::new(Layer::new(default));
+    let layer = Arc::new(Layer::new(default));
     unsafe {
         *view = projection(&layer);
     }
-    Box::into_raw(layer)
+    Arc::into_raw(layer) as *mut Layer
 }
 
 #[no_mangle]
@@ -49,11 +51,11 @@ pub unsafe extern "C" fn mattmc_light_layer_import(
         return std::ptr::null_mut();
     }
     let values = unsafe { *(bytes.cast::<[u8; BYTES]>()) };
-    let layer = Box::new(Layer::from_bytes(values));
+    let layer = Arc::new(Layer::from_bytes(values));
     unsafe {
         *view = projection(&layer);
     }
-    Box::into_raw(layer)
+    Arc::into_raw(layer) as *mut Layer
 }
 
 #[no_mangle]
@@ -64,22 +66,26 @@ pub unsafe extern "C" fn mattmc_light_layer_copy(
     if layer.is_null() || view.is_null() {
         return std::ptr::null_mut();
     }
-    let copy = Box::new(unsafe { &*layer }.copy());
+    let copy = Arc::new(unsafe { &*layer }.copy());
     unsafe {
         *view = projection(&copy);
     }
-    Box::into_raw(copy)
+    Arc::into_raw(copy) as *mut Layer
 }
 
 /// # Safety
 /// Layer is live and caller-excluded; view addresses one writable lease pointer.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_light_layer_repeat(layer: *const Layer,
-    view: *mut *mut Projection) -> *mut Layer {
-    if layer.is_null() || view.is_null() { return std::ptr::null_mut(); }
-    let repeated = Box::new((&*layer).repeat_first());
+pub unsafe extern "C" fn mattmc_light_layer_repeat(
+    layer: *const Layer,
+    view: *mut *mut Projection,
+) -> *mut Layer {
+    if layer.is_null() || view.is_null() {
+        return std::ptr::null_mut();
+    }
+    let repeated = Arc::new((&*layer).repeat_first());
     *view = projection(&repeated);
-    Box::into_raw(repeated)
+    Arc::into_raw(repeated) as *mut Layer
 }
 
 #[no_mangle]
@@ -156,15 +162,28 @@ pub unsafe extern "C" fn mattmc_light_layer_install(
     let layer = unsafe { &*layer };
     let changed = layer.install_bytes(values);
     unsafe {
-        *view = if changed { projection(layer) } else { std::ptr::null_mut() };
+        *view = if changed {
+            projection(layer)
+        } else {
+            std::ptr::null_mut()
+        };
     }
     0
+}
+
+/// # Safety
+/// Layer is a live caller-retained CPU owner. Existing leases remain valid.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_layer_invalidate(layer: *const Layer) {
+    if let Some(layer) = layer.as_ref() {
+        layer.invalidate();
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_layer_release(layer: *mut Layer) {
     if !layer.is_null() {
-        drop(unsafe { Box::from_raw(layer) });
+        drop(unsafe { Arc::from_raw(layer) });
     }
 }
 
@@ -200,7 +219,10 @@ mod tests {
                 mattmc_light_layer_install(owner, values.as_ptr(), BYTES as u32, &mut view),
                 0
             );
-            assert!(view.is_null(), "allocated writes retain their existing projection");
+            assert!(
+                view.is_null(),
+                "allocated writes retain their existing projection"
+            );
             assert_eq!((*allocated).default, 15);
             assert_eq!((*allocated)._view.get(7), Ok(1));
             assert_eq!((*copy_view)._view.get(7), Ok(4));

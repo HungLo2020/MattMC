@@ -9,11 +9,18 @@ import net.minecraft.world.level.chunk.LightChunkGetter;
 
 public class BlockLightSectionStorage extends LayerLightSectionStorage<BlockLightSectionStorage.BlockDataLayerStorageMap> {
 	protected BlockLightSectionStorage(LightChunkGetter lightChunkGetter) {
-		super(LightLayer.BLOCK, lightChunkGetter, new BlockLightSectionStorage.BlockDataLayerStorageMap(new Long2ObjectOpenHashMap<>()));
+		super(LightLayer.BLOCK, lightChunkGetter, new BlockLightSectionStorage.BlockDataLayerStorageMap());
 	}
 
 	@Override
 	protected int getLightValue(long l) {
+        if (getClass() == BlockLightSectionStorage.class) {
+            var owner = this.visibleSectionData.nativeMap;
+            if (owner != null) {
+                long result = owner.sample(l, false, false, true);
+                if (result != 0) return (int)result;
+            }
+        }
 		long m = SectionPos.blockToSection(l);
 		DataLayer dataLayer = this.getDataLayer(m, false);
 		return dataLayer == null
@@ -22,12 +29,17 @@ public class BlockLightSectionStorage extends LayerLightSectionStorage<BlockLigh
 	}
 
 	protected static final class BlockDataLayerStorageMap extends DataLayerStorageMap<BlockLightSectionStorage.BlockDataLayerStorageMap> {
+		BlockDataLayerStorageMap() { super(new NativeLightingMap()); }
+        private BlockDataLayerStorageMap(NativeLightingMap owner) { super(owner); }
+
 		public BlockDataLayerStorageMap(Long2ObjectOpenHashMap<DataLayer> long2ObjectOpenHashMap) {
 			super(long2ObjectOpenHashMap);
 		}
 
 		public BlockLightSectionStorage.BlockDataLayerStorageMap copy() {
-			return new BlockLightSectionStorage.BlockDataLayerStorageMap(this.map.clone());
+			return nativeMap == null
+                ? new BlockLightSectionStorage.BlockDataLayerStorageMap(this.map.clone())
+                : new BlockLightSectionStorage.BlockDataLayerStorageMap(nativeMap.copy());
 		}
 	}
 }

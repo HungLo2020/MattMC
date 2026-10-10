@@ -10,8 +10,10 @@ package, for palette data). Ordinary block palettes and packed words now come
 directly from their [Rust live owner](../chunk/RUST-LIVE-SECTIONS.md), without
 reconstructing a Java palette or word array for the light handoff. Java still owns
 the remaining light orchestration: section statuses,
-`checkNode`, queued/retained layer maps, `markNewInconsistencies` and
-`swapSectionMap`. Canonical live light bytes now have a
+`checkNode`, queued layer entries, retained-column policy,
+`markNewInconsistencies` and publication scheduling through `swapSectionMap`.
+Canonical section maps and sky metadata now use
+[shared Rust snapshots](RUST-LIGHT-MAPS.md). Canonical live light bytes have a
 [Rust owner](RUST-LIVE-LAYERS.md); public mutable arrays and subclasses retain
 compatibility ownership.
 
@@ -28,8 +30,9 @@ compatibility ownership.
    Rust maps state IDs to light types in place. A section needing both
    snapshots makes two callback invocations.
 3. Rust writes levels into its own pass copies. Java receives ordered section
-   keys and performs the original map copy-on-write: the first write in a pass
-   copies the layer. Rust installs bytes directly into canonical target owners;
+   keys and schedules the original first-write copy-on-write transaction:
+   the first write in a pass copies the layer. Canonical maps retain their
+   Rust roots; caller-supplied Java maps keep their compatibility path. Rust installs bytes directly into canonical target owners;
    mutable-array targets use a bounded compatibility export. Java then adds
    `sectionsAffectedByLightUpdates` entries.
 4. Unsupported input or a failed section callback returns before propagation
