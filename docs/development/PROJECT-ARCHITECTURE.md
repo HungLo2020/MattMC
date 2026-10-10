@@ -73,8 +73,10 @@ src/main/rust/
         ├── biome/
         │   ├── climate/
         │   ├── color_fields/
+        │   ├── live/
         │   └── search/
         ├── chunk/
+        │   ├── biomes/
         │   ├── live/
         │   ├── palette/
         │   ├── snapshot/
@@ -150,9 +152,13 @@ and scan live storage for recounts; aliases retain independent counters.
 live in `chunk/snapshot/`, and `chunk/stage_transfer.rs` supports native
 [generation capture/adoption](world/levelgen/RUST-STAGE-HANDOFF.md).
 [Shared section color fields](world/biome/RUST-SECTION-COLORS.md) live in
-`world/level/biome/color_fields/`. Java still supplies biome/custom color samples,
-contextual light, model admission and entity callbacks, and orchestrates chunks
-and generation stages. These owners do not complete the world migration.
+`world/level/biome/color_fields/`. Admitted [live biome palettes](world/biome/RUST-LIVE-BIOMES.md)
+live in `world/level/chunk/biomes/`; `world/level/biome/live/` retains the client's
+loaded-biome index and samples raw sky colors directly from those owners.
+Java supplies registry bindings, chunk/packet/range events, fog and terrain-tint
+sampling, contextual light, model admission and entity callbacks, and
+orchestrates chunks and generation stages. These owners do not complete the
+world migration.
 
 Packed chunk storage also uses [palette histograms](world/chunk/RUST-PALETTE-HISTOGRAM.md)
 under `world/level/chunk/palette/histogram/` for general ordered counting and

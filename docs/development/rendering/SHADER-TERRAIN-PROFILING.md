@@ -5,12 +5,17 @@ Java OpenGL. Static captures, validation, RenderDoc and temporary timers are
 correctness or profiling evidence; they do not establish a throughput gain.
 See [render verification](RENDER-VERIFICATION.md#4-performance-ab) for the shared
 benchmark controls and [architecture](RENDER-ARCHITECTURE.md) for ownership rules.
-The [latest world/hand-input summary](GOAL-5-STATUS.md#october-9-native-world-and-hand-input-summary)
-records all median average-FPS floors passing in one ABAB window, but vanilla
-p99 still fails. Large Current vanilla and Frozen DH repeat variance prevents
-robust or isolated speedup claims. Later observer fixes have focused/held-clock
-verification, not another full performance matrix. All runtime figures remain
-author reports. The separate historical
+The [latest live-biome record](../world/biome/RUST-LIVE-BIOMES.md#october-9-verification)
+reports all median average-FPS floors passing for release `bc2207fb`, but vanilla
+p99 fails at 3.498 ms against Frozen's 3.075 ms. Release `c3aa5fed` subsequently
+fixes integer-range compatibility and has new suite/lifecycle/image checks,
+without an FPS repeat. Four ordinary profiles, 12 reviewed F3 images and 13
+native sky CPU samples give bounded attribution; weighted Java allocation
+excludes Rust and does not establish total memory savings or an isolated speedup.
+All runtime figures remain author reports. The earlier
+[world/hand-input summary](GOAL-5-STATUS.md#october-9-native-world-and-hand-input-summary)
+and subsequent observer-only checks retain their original workload/build scope.
+The separate historical
 [October 8 candidate record](GOAL-5-STATUS.md#october-8-recorded-candidate-summary)
 has no raw benchmark receipts available. The
 [October 6 author-recorded summary](GOAL-5-STATUS.md#october-6-speed-summary) and

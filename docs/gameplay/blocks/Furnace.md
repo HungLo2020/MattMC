@@ -45,6 +45,14 @@ Taking output as a player triggers the furnace's stored recipe/experience payout
 
 If processing stalls, check that the device accepts the recipe type, fuel is valid, and the output has room for the right result. A [Smoker](../items/Smoker.md) uses smoking recipes and a [Blast Furnace](../items/BlastFurnace.md) uses blasting recipes; neither accepts every furnace recipe merely because it cooks faster.
 
+### Unfinished cooking progress
+
+For the Furnace, Blast Furnace and Smoker, the progress arrow can retreat or reset when processing is interrupted:
+
+- **Flame out, fuel slot empty:** unfinished progress falls by **two cooking ticks per game tick**, down to zero. Refill before the flame expires to avoid losing progress. If input remains and the fuel slot instead contains a non-fuel item, such as an Empty Bucket left by Lava Bucket fuel, the unlit device resets progress immediately. [Burn, reset and cooling branches][progress-loop]
+- **Still lit, but unable to cook:** a full or incompatible output, or no usable input recipe, resets unfinished progress to zero. Clear the obstruction before relying on the current progress; already-burning fuel keeps counting down. [Processing loop][progress-loop] · [Recipe and output checks][progress-output]
+- **Changing the input:** replacing it with a different item or a stack with different components resets progress. Adding more of the same item with matching components preserves progress; the count alone is not the reset condition. [Input replacement][progress-input]
+
 ## Hopper automation
 
 [Hoppers](Hopper.md) use the Furnace's sided inventory rules:
@@ -58,6 +66,16 @@ If processing stalls, check that the device accepts the recipe type, fuel is val
 A Hopper below does not normally pull unburned Coal from the fuel slot. The inserted item must still pass that slot's validation, and the Furnace needs a valid recipe, fuel, and output space to process anything. Redstone-lock the appropriate Hoppers when you need to stop their own transfers.
 
 Automation source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2`: [sided slots and item checks](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java), [Hopper transfer handling](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java). No automated setup was tested in-game.
+
+### Collecting stored experience
+
+To collect accumulated recipe experience from an automated Furnace, Blast Furnace or Smoker:
+
+1. **Power the output Hopper directly below the device** to stop that Hopper pulling results. See [Hopper locking](Hopper.md#redstone-locking). [Power state][experience-lock] · [Enabled transfer check][experience-transfer]
+2. Allow at least one result to finish and remain in the device's output slot, with a valid recipe, fuel and output space. [Cooking conditions][progress-loop]
+3. **Take a result manually from the device's output slot**, then unlock the Hopper when ready to resume extraction. [Player result-slot payout][experience-slot]
+
+That manual take pays the device's accumulated recipe record, including earlier completed recipes whose output the Hopper removed, and clears the record. The reward is not limited to the item just taken: it depends on the stored recipe counts and their currently loaded XP values, with fractional totals rounded probabilistically. Taking items from the collection chest does not trigger this device's result-slot payout. [Stored counts and payout][experience-record] · [Hopper extraction][experience-extraction] · [Player result slot][experience-slot]
 
 ## Blast Furnace and Smoker
 
@@ -115,6 +133,8 @@ Expanded on **2026-10-02** against `60699a119c4728a7bcaf15196f3c839cfcfd69dc`. C
 
 ## Sources and verification
 
+The unfinished-progress and stored-experience guidance was source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19`. The review traced shared cooking/input-reset logic, recipe records, manual result-slot payout and Hopper locking/extraction. No in-game interruption, automation or experience test was run. Earlier sections retain their original source pins and verification scope.
+
 Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. This is not a gameplay test; data packs and later builds can change recipes and tags.
 
 - [Crafting recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/furnace.json)
@@ -126,6 +146,15 @@ Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Thi
 - [Default fuel values](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/entity/FuelValues.java)
 - [Smelting recipe type](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/entity/FurnaceBlockEntity.java)
 - [Player result-slot payout](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/inventory/FurnaceResultSlot.java)
+
+[progress-loop]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java#L143-L197
+[progress-output]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java#L210-L233
+[progress-input]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java#L310-L320
+[experience-slot]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/inventory/FurnaceResultSlot.java#L23-L49
+[experience-record]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java#L335-L386
+[experience-lock]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/HopperBlock.java#L119-L129
+[experience-transfer]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L97-L131
+[experience-extraction]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L246-L263
 
 [family-blast-block]: https://github.com/HungLo2020/MattMC/blob/60699a119c4728a7bcaf15196f3c839cfcfd69dc/src/main/java/net/minecraft/world/level/block/BlastFurnaceBlock.java
 [family-smoker-block]: https://github.com/HungLo2020/MattMC/blob/60699a119c4728a7bcaf15196f3c839cfcfd69dc/src/main/java/net/minecraft/world/level/block/SmokerBlock.java

@@ -11,8 +11,9 @@ Compatibility block palettes grow through `PalettedContainer.onResize()`. Rust c
 used source IDs and repacks 4,096 entries into the new storage. Java assigns
 object identities to the new palette and publishes the completed data. This
 covers normal 0→4→5→6→7→8→global growth and direct jumps from local to global.
-Biome resizing and custom compatibility paths retain their existing implementation.
-Canonical live block palettes grow inside their Rust owner.
+Compatibility biome resizing and custom paths retain their existing implementation.
+Canonical live block palettes and admitted [live biome palettes](../biome/RUST-LIVE-BIOMES.md)
+grow inside their separate Rust owners.
 
 The kernel is in
 [`palette/resize/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette/resize).

@@ -1,12 +1,13 @@
 # Live biome ownership and sky sampling
 
-The migration moves canonical 4³ biome palettes and packed storage into
+The migration moves admitted canonical 4³ biome palettes and packed storage into
 Rust, together with a loaded-chunk index and its direct sky-color consumer.
 Java retains scoped CPU views for ordinary biome reads. Chunk load, packet
-replacement, section replacement, view-center changes and unload update the
+replacement, section-biome replacement, view-center changes and chunk unload update the
 native index. Rust retains typed section owners, resolves biome IDs against a
 world's immutable color table and reuses its cubic window while source
-generations remain current. Java does not build a 216-color array each frame.
+generations remain current. The admitted native sky path avoids building
+Java's 216-color array; compatibility sampling can still use that Java grid.
 
 ## Boundaries to preserve
 
@@ -29,15 +30,24 @@ generations remain current. Java does not build a 216-color array each frame.
   out-of-range chunks. Sampling applies the current view range and height clamp;
   missing chunks use the world's Plains biome. A loaded compatibility chunk
   causes native sampling to decline. Do not confuse that with an absent chunk.
-- Section replacement listeners and packet batching preserve native identity
+- Biome-container replacement listeners and packet batching preserve native identity
   without rebuilding the index for every section in a packet. Mutable `getSections()` access permanently transfers that chunk index to
-  compatibility. Trusted synchronous readers use `getSectionsForRead()`; custom
+  compatibility. Trusted synchronous readers use `getSectionsForRead()`, which
+  returns the same array under a borrow contract, not an immutable copy; custom
   overrides retain their original dispatch. Test raw-array replacement, custom
   mutation and partial packets before broad acceptance.
 - The native index and cache have bounded residency and world epochs. These
   are CPU world data; no GAL resource, GPU handle or presentation owner changes.
   If bounded index admission fails, the bridge disables native sampling and
   immediately clears residency/cache pins instead of retaining them until GC.
+  Normal world-owner reclamation uses an automatic FFM arena; a new world gets
+  a new epoch. This is not an explicit immediate disconnect/reset teardown.
+
+Java still orchestrates chunks, packets, generation and world ticks, and supplies
+the registry binding and immutable sky-color table. The native sky path is
+admitted through Sodium's hook for an exact `ClientLevel`; unsupported inputs
+retain Java sampling. Fog, terrain tint/blending and the later sky
+brightness/weather adjustments remain separate Java consumers.
 
 ## Working and checking
 
@@ -68,6 +78,10 @@ widening its subtraction/absolute-value semantics.
 These fixtures are supplemental CPU evidence, not runtime or throughput proof.
 
 ## October 9 verification
+
+The following suite, runtime and profile results are author reports. Their
+receipt files are not tracked at this source revision; this documentation review
+did not independently rerun them or inspect those artifacts.
 
 The final range fix preserves Frozen's integer subtraction/absolute-value
 wrapping. Its independently recorded 12,288-case storage oracle reproduced the
