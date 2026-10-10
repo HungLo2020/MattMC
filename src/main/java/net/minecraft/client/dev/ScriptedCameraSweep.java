@@ -18,7 +18,8 @@ import net.minecraft.client.player.LocalPlayer;
  * <p>Optional timed actions (seconds since the sweep started):
  * {@code .enableShadersAt} turns shaders on mid-world, as the shader-pack
  * screen does, {@code .disableShadersAt} turns them off again, {@code .openWorldMapAt}
- * opens VoxelMap's world map (the M key), and {@code .screenshotsAt} (comma separated) saves
+ * opens VoxelMap's world map (the M key), {@code .crashAt} throws from the
+ * frame loop to exercise Minecraft's emergency save and crash, and {@code .screenshotsAt} (comma separated) saves
  * {@code screenshots/scripted-<seconds>s.png} into the game directory.
  */
 public final class ScriptedCameraSweep {
@@ -31,6 +32,7 @@ public final class ScriptedCameraSweep {
 	private static final double ENABLE_SHADERS_AT = doubleProperty("enableShadersAt", -1.0);
 	private static final double DISABLE_SHADERS_AT = doubleProperty("disableShadersAt", -1.0);
 	private static final double OPEN_WORLD_MAP_AT = doubleProperty("openWorldMapAt", -1.0);
+	private static final double CRASH_AT = doubleProperty("crashAt", -1.0);
 	/** {@code toggle} (keybind) or {@code screen} (the shader-pack screen's Apply). */
 	private static final String ENABLE_SHADERS_VIA = System.getProperty("mattmc.dev.scriptedCamera.enableShadersVia", "toggle");
 	private static final double[] SCREENSHOTS_AT = doubleListProperty("screenshotsAt");
@@ -143,6 +145,10 @@ public final class ScriptedCameraSweep {
 			} catch (java.io.IOException error) {
 				throw new java.io.UncheckedIOException(error);
 			}
+		}
+		if (CRASH_AT >= 0.0 && elapsed >= CRASH_AT) {
+			System.out.println("MattMC scripted camera forcing a client crash at " + elapsed + "s");
+			throw new IllegalStateException("MattMC scripted camera forced crash (crashAt)");
 		}
 		if (OPEN_WORLD_MAP_AT >= 0.0 && !worldMapOpened && elapsed >= OPEN_WORLD_MAP_AT) {
 			worldMapOpened = true;

@@ -22,21 +22,29 @@ final class NativeDhMutableColumn {
     private static final MethodHandle CULL = call("cull", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle REDUCE = call("reduce", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final ThreadLocal<MemorySegment> METADATA = ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(16, 8));
-    private final Arena arena = Arena.ofAuto();
+    private final Arena arena;
+    /** Keeps a grouped column's owner (and its single cleanup) reachable. */
+    private NativeDhColumnGroup group;
     private final MemorySegment owner;
     private MemorySegment points;
-    NativeDhMutableColumn(MemorySegment input, int count) {
+    NativeDhMutableColumn(MemorySegment input, int count) { this(input, count, null); }
+    /** {@code group} shares one arena with its owner's other columns (null: own arena). */
+    NativeDhMutableColumn(MemorySegment input, int count, NativeDhColumnGroup group) {
+        arena = group == null ? Arena.ofAuto() : group.arena;
         MemorySegment pointer = MemorySegment.NULL; boolean attached = false;
         try {
             pointer = (MemorySegment) CREATE.invokeExact(input, count);
             if (pointer.address() == 0) throw new OutOfMemoryError("Cannot allocate native DH column");
-            owner = pointer.reinterpret(1, arena, NativeDhMutableColumn::release); attached = true;
+            owner = group == null ? pointer.reinterpret(1, arena, NativeDhMutableColumn::release) : group.adopt(pointer);
+            attached = true;
+            this.group = group;
             refresh();
         } catch (RuntimeException | Error e) { if (!attached && pointer.address() != 0) release(pointer); throw e; }
         catch (Throwable e) { if (!attached && pointer.address() != 0) release(pointer); throw new IllegalStateException(e); }
     }
     /** Adopt an already produced Rust vector without copying its points again. */
     private NativeDhMutableColumn(MemorySegment pointer) {
+        arena = Arena.ofAuto();
         boolean attached = false;
         try {
             owner = pointer.reinterpret(1, arena, NativeDhMutableColumn::release); attached = true; refresh();
@@ -58,7 +66,7 @@ final class NativeDhMutableColumn {
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(policy); }
     }
-    private static void release(MemorySegment pointer) {
+    static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); } catch (Throwable e) { throw new IllegalStateException(e); }
     }
     private void refresh() throws Throwable {

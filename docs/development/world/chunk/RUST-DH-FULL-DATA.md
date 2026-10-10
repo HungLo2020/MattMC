@@ -85,6 +85,15 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
   The whole-quadrant path borrows bounded point descriptors and a semantic ID
   remap table; it exports no point values. Custom/oversized inputs or enabled
   developer order validation retain per-column compatibility sequencing.
+- A full-data source's own columns share one
+  [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java):
+  each mutable Rust vector registers only its pointer, and one cleanup frees
+  them all once the source and every column are unreachable (Frozen's pooled
+  arrays likewise live until their source closes). Do not give these columns a
+  per-column automatic arena: database loads create 4,096 per source, and the
+  resulting millions of GC cleanables made collections, including the crash
+  path's explicit `System.gc()`, take minutes. Columns created outside a
+  source keep their own arena.
 - Detached mutable columns release both their former producer reference and
   arena-backed point segment after copying; either could otherwise retain a
   whole producer. Pin the previous owner/span through the copy. Other readers

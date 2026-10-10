@@ -72,6 +72,9 @@ public class FullDataSourceV2
 	
 	public final FullDataPointIdMap mapping;
 	private net.minecraft.world.level.chunk.NativeDhColumns nativeOriginalColumns;
+	/** One arena for all of this source's mutable native columns (see NativeDhColumnGroup). */
+	private final net.minecraft.world.level.chunk.NativeDhColumnGroup nativeColumnGroup =
+		new net.minecraft.world.level.chunk.NativeDhColumnGroup();
 	
 	
 	public long lastModifiedUnixDateTime;
@@ -278,7 +281,7 @@ public class FullDataSourceV2
 		{
 			// size defaulting to 0 since we don't know how many datapoints
 			// will be in this column yet
-			this.dataPoints[i] = net.minecraft.world.level.chunk.NativeDhColumnList.empty();
+			this.dataPoints[i] = net.minecraft.world.level.chunk.NativeDhColumnList.empty(this.nativeColumnGroup);
 			this.semanticHorizontalUniform[i] = blockResolution;
 		}
 		

@@ -93,6 +93,9 @@ screen remains open after the sweep starts, camera movement and other timed
 actions wait, but due screenshots and the scheduled stop continue. Opening the
 map returns before the same frame's screenshot; a due shot is handled on a later
 frame. A screen already open before the sweep starts does not start its clock.
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.crashAt=45` throws from the frame loop
+into Minecraft's emergency save and crash, for timing how quickly a client
+failure writes its crash report and exits.
 The enable attempt is marked before application; a thrown failure does not
 turn this into an automatic retry loop. Start with `--config 'config/iris.properties:enableShaders=false'` and a valid
 selected pack available in the copied game. The scripted driver copies config,

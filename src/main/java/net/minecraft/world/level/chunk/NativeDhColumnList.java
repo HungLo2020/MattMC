@@ -16,11 +16,17 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     private NativeDhMutableColumn mutable;
     private boolean hashValid;
     private int hash;
+    /** Arena owner for a mutable copy (null: the copy gets its own arena). */
+    private transient NativeDhColumnGroup group;
     NativeDhColumnList(Object owner, MemorySegment points) { this.owner = owner; this.points = points; }
     NativeDhColumnList(Object owner, MemorySegment points, int hash) {
         this(owner, points); this.hash = hash; this.hashValid = true;
     }
     public static NativeDhColumnList empty() { return new NativeDhColumnList(null, MemorySegment.NULL); }
+    /** An empty column whose mutable storage shares {@code group}'s arena. */
+    public static NativeDhColumnList empty(NativeDhColumnGroup group) {
+        var view = empty(); view.group = group; return view;
+    }
     static NativeDhColumnList fromOwned(NativeDhMutableColumn column) {
         var view = empty(); view.mutable = column; return view;
     }
@@ -47,7 +53,7 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         if (mutable == null) {
             var previousOwner = owner;
             var previousPoints = points;
-            try { detach(new NativeDhMutableColumn(previousPoints, size())); }
+            try { detach(new NativeDhMutableColumn(previousPoints, size(), group)); }
             finally { Reference.reachabilityFence(previousOwner); Reference.reachabilityFence(previousPoints); Reference.reachabilityFence(this); }
         }
         return mutable;
@@ -71,7 +77,7 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     @Override public long removeLong(int index) { long old = getLong(index); write().remove(index, index + 1); return old; }
     @Override public void clear() {
         hashValid = false;
-        if (mutable == null) { if (points.byteSize() != 0) detach(new NativeDhMutableColumn(MemorySegment.NULL, 0)); }
+        if (mutable == null) { if (points.byteSize() != 0) detach(new NativeDhMutableColumn(MemorySegment.NULL, 0, group)); }
         else mutable.remove(0, size());
     }
     @Override public void removeElements(int from, int to) { Objects.checkFromToIndex(from, to, size()); if (from != to) write().remove(from, to); }
