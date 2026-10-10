@@ -77,8 +77,9 @@ recognized duplicate ordering, conditional `DISTANT_HORIZONS` and missing
 properties, plus vanilla override encoding and packed settings. They do not
 execute a live shader toggle, Java option/event integration, cloud image comparison or
 asynchronous teardown. This documentation review inspected their source and
-reran no Rust/Java or client workloads; the preceding hardware blocker remains
-in the [current evidence checkpoint](GOAL-5-STATUS.md). The
+reran no Rust/Java or client workloads. The author now reports driver recovery,
+but new MattMC runtime acceptance remains pending in the
+[current evidence checkpoint](GOAL-5-STATUS.md). The
 [#745 source review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578)
 records the earlier flag/filter design; the current getter/producer path
 supersedes that implementation while broader DH visual/transition acceptance

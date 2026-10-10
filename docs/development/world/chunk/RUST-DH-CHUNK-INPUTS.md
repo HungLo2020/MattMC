@@ -98,7 +98,7 @@ verification is required before accepting this image.
 This follows the retained chunk/neighborhood preparation observed in the earlier
 Current travel profile; it is not an isolated speedup claim. Measure initial
 binding cost, admission loops, allocation, GC/native retention and sustained
-streaming against Frozen after hardware restoration. Additional strong owner
+streaming against Frozen on the [reportedly restored driver](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures). Additional strong owner
 leases and per-chunk compatibility references need long-session memory checks.
 Java orchestration, general world simulation and the executable remain migration
 work. Historical renderer timings do not verify this release.

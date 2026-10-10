@@ -83,5 +83,6 @@ failures/errors across343 suites. Six final workers map the exact release. All
 protected prompt match; Frozen HEAD remains unchanged. Receipts:
 `build/native-dh-render-reduction/`. The initial fixture-include compilation
 rejection is retained; the corrected, formatted sources pass the final gates.
-GPU runtime, realistic Frozen comparisons and long-session memory remain pending
-a matched NVIDIA driver; older renderer timings do not accept this image.
+That checkpoint awaited a matched NVIDIA driver. The [subsequent reported preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+clears the driver blocker, but new GPU runtime, realistic Frozen comparisons
+and long-session memory remain pending; older timings do not accept this image.

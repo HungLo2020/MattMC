@@ -7,7 +7,8 @@ mutable recipient storage, parent reduction and direct bulk operations;
 [same-detail updates](RUST-DH-SOURCE-UPDATES.md) own their admitted CPU policies.
 Java publishes compatibility views and retains update orchestration, persistence
 and contextual hooks. [Compact render-column reduction](../../rendering/RUST-DH-RENDER-COLUMNS.md)
-is Rust-owned; contextual colors, faces, greedy merging and final render packets
+is Rust-owned, as are admitted [cached tint neighborhoods](../biome/RUST-DH-TINT.md).
+Contextual resolver callbacks, faces, greedy merging and final render packets
 remain Java. Complete Java removal and current runtime acceptance remain open.
 
 The producer borrows existing [block owners](RUST-LIVE-SECTIONS.md),

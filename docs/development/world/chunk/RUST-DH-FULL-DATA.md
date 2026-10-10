@@ -15,12 +15,13 @@ footprint admission/capture from source facts in the same call. It now also
 selects signed generation/compression metadata and computes parent list hashes
 while appending remapped points. Java stores the resulting bytes and reads seeded
 hashes; it does not repeat these policies per group. Java still owns source update
-orchestration, custom material-map callbacks, metadata storage, contextual colors,
+orchestration, custom material-map callbacks, metadata storage, contextual color callbacks,
 persistence and render geometry construction.
 Legacy or explicitly replaced Java lists remain compatibility inputs. The subsequent
 [render-column reducer](../../rendering/RUST-DH-RENDER-COLUMNS.md) owns compact
-reduction policy in Rust; contextual full-data colors and final render geometry
-remain Java.
+reduction policy in Rust. [Cached tint neighborhoods](../biome/RUST-DH-TINT.md)
+now use native colors and admitted sampling; resolver callbacks and final render
+geometry remain Java.
 
 The subsequent [material-map migration](RUST-DH-MATERIAL-MAPS.md) moves admitted
 ordered material identities/indexes, whole-map remapping and hash policy to Rust.

@@ -11,8 +11,10 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `2003b118dfac30ca501dc135b9de0e2d7e2567fb`; older citations retain their reviewed source scope.
-- Latest synchronization preserves three incoming commits and all 41 paths, including eight guides/indexes and the new source-authored chunk-task owner, from promoted cutoff `5e566e87e967a476db373c5611f6d9cc19b969a9`. Clean fast-forward and combined validated publication retain the source fixes, queues and author reports. Repository instructions/workflows were unchanged.
+- Latest non-wiki default-branch snapshot integrated: `85475b61defddd2da5e0d0a5f310093145a577d3`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 28 paths, including eight documents and the new source-authored DH tint owner, from promoted cutoff `493da75c6f1a7219261db74db1ead5f1b75a7e8e`. Clean fast-forward and combined validated publication preserve incoming source and author records; instructions/workflows are unchanged.
+- Previous non-wiki default-branch snapshot integrated: `2003b118dfac30ca501dc135b9de0e2d7e2567fb`; older citations retain their reviewed source scope.
+- Previous synchronization preserves three incoming commits and all 41 paths, including eight guides/indexes and the new source-authored chunk-task owner, from promoted cutoff `5e566e87e967a476db373c5611f6d9cc19b969a9`. Clean fast-forward and combined validated publication retain the source fixes, queues and author reports. Repository instructions/workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 19 paths, including three rendering guides, from promoted cutoff `d772753a04a59bbda16a28f7b589e02e95b8462f`. The clean local fast-forward keeps the shader-transition/cloud-policy implementation intact; publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `5de23173ae5b61fb17887589d4dff69a6b17fc77`; older citations retain their reviewed source scope.
@@ -3096,3 +3098,12 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Attributed the native chunk-task owner’s Frozen CPU histories, full Java counts and six-pair synthetic timing to the author, preserving Java dispatcher/future/callable ownership and the lack of server/FPS/streaming acceptance. Preserved the source-owned guide and its navigation. No Java/Rust/client/benchmark suites were rerun; strict docs validation, independent review and guarded terminal deployment precede completion.
 
 The batch links the verified [#747 cleanup/transition](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102687083), [#745 cloud/leaf](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102688591), [#772 GUI/control](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6102691041) and [#776 task-queue](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6102692740) reviews. Independent oracle decoding checks 37,624 recorded operations and exact EOF, not a Java/native test rerun. All four issues remain open.
+
+
+## Batch 386: Cached DH tint ownership and restored-driver evidence
+
+- Reconciled current CPU ownership with native cached tint neighborhoods over retained DH inputs, preserving Java resolver callbacks and compatibility traversal. Pinned the source-owned guide and qualified its Frozen fixture, classpath/native integrity and synthetic timing scope. No isolated FPS, full rendering or long-memory conclusion follows.
+- Updated current hardware wording to the author-reported reboot, matching NVIDIA driver and standalone Vulkan probe, while preserving earlier failures and the pending MattMC world-entry/lifecycle/image/timing gates. All raw runtime/suite results remain author reports; this review adds no Java/Rust/client rerun.
+- Preserved historical headings, monthly prefix and all prior coverage records. Full strict documentation checks, independent source/rendered-link review and docs-only guarded publication precede completion.
+
+Linked the verified [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103285146) and [#709 CPU/preflight review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103287294). Independent decoding inspected 288 neighborhoods/seven class pins/8,296 point entries and 480 key operations/32 histories with exact EOF; no suites were rerun. Detail-8 stock-radius timing uses the unsmoothed cache route. Both issues remain open.

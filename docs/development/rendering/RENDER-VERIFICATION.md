@@ -51,14 +51,17 @@ runtime acceptance. Receipts:
 `build/native-terrain-frame-migration/{gpu-driver-mismatch,driver-mismatch-interruption,bad-drawable-failure}.json`.
 Do not weaken log-health checks or count a software-device run as hardware parity.
 
-After the user's 2026-10-10 reboot, direct checks report matching NVIDIA
+The [author's subsequent preflight](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/PROGRESS.md)
+reports that the user's 2026-10-10 reboot restored matching NVIDIA
 kernel/libraries `595.99.02`, working NVML and the RTX3080Ti in Vulkan. An Xlib
 `vkcube --gpu_number 0 --validate --suppress_popups --c 60` probe exits zero
 with no reported validation errors. The subsequent full Rust suite passes
 2,547 tests, with three intentionally ignored, after fixing concurrent
 [presenter-admission fixtures](JAVA-BRIDGE.md#rules-the-boundary-tests-enforce).
 Receipts are `build/native-dh-tint/{driver-restored.json,rust-full-final.log}`.
-This clears the driver blocker and verifies those tests; MattMC world entry,
+This is the author’s driver/test evidence; this documentation review did not
+rerun the probe or suites or inspect those raw receipt files. The reported
+driver blocker is cleared, while MattMC world entry,
 lifecycle, image comparisons, FPS and sustained-memory gates still need running.
 
 ### Mid-world shader-enable check
@@ -85,7 +88,7 @@ replace the former instance-flag filter. The four parser fixtures do not execute
 that complete Java integration. No dedicated worker-rebuild lifecycle or timed-action
 screenshot fixture was added.
 This review did not run clients or inspect new captures. Its successful wiki
-build cannot resolve the [hardware-driver blocker](#check-the-hardware-driver-before-runtime-captures)
+build does not establish the [new-driver runtime acceptance](#check-the-hardware-driver-before-runtime-captures)
 or extend earlier runtime passes to this source.
 
 For VoxelMap, use the full `openWorldMapAt` argument in the recording guide and

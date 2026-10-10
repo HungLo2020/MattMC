@@ -81,10 +81,11 @@ The following is the implementation author’s recorded checkpoint, not a new
 verification run of the reviewed source. This implementation has no final runtime
 acceptance. Initial lifecycle launches
 failed before world entry during an unattended NVIDIA update: installed libraries
-595.99.02 disagree with the loaded595.91.07 kernel module, only llvmpipe is
-enumerated and X11 reports DRI3 BadDrawable. The owned invocation was stopped,
-with failure logs and copied worlds retained. Restore the driver and repeat
-hardware lifecycle/parity/profile/timing checks. Further DH storage changes
+595.99.02 disagreed with the loaded595.91.07 kernel module, only llvmpipe was
+enumerated and X11 reported DRI3 BadDrawable. The owned invocation was stopped,
+with failure logs and copied worlds retained. The [later reported preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+clears the driver blocker; repeat MattMC hardware lifecycle/parity/profile/timing
+checks on the restored driver. Further DH storage changes
 require their own final source/library checks. The earlier ABI79 CPU checkpoint: FullRust2,489pass
 (three ignored) and Java1,854tests (two skipped) pass; six observed Java workers
 map release7cf545b2. Actual populated graph and encoding JNI checks pass.

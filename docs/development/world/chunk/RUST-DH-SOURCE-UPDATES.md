@@ -83,7 +83,9 @@ pins, native and protected-prompt guards match. Controls cover the complete
 Frozen corpus, ordinary saved-source update and native footprint ownership,
 source-lease release, capacity reuse, reserve-failure view refresh, and exact
 compatibility exception/mutation prefixes. Receipts:
-`build/native-dh-same-detail/`. Hardware, full Rust graphics, realistic performance
-and sustained memory acceptance remain pending driver restoration. The earlier
+`build/native-dh-same-detail/`. That checkpoint awaited driver restoration;
+see the [later reported preflight](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+for recovery and full-suite results. New MattMC runtime, realistic performance
+and sustained-memory acceptance remain pending. The earlier
 recipient-update CPU/allocation profile motivates this migration; it does not
 measure this implementation's benefit or extra preparation/scratch cost.

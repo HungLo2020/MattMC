@@ -138,11 +138,15 @@ Admitted DH world preparation includes native [height fields](../world/chunk/RUS
 [change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md). The separate
 [render-column reduction](RUST-DH-RENDER-COLUMNS.md) consumes compact CPU storage.
 Java retains admission and wrapper bindings, update orchestration/public metadata,
-persistence, quadtree inputs, contextual colors/material resolution, faces,
+persistence, quadtree inputs, contextual color callbacks/material resolution, faces,
 greedy mesh assembly and final packets. These CPU owners are separate from the
 DH render-column ledger and GPU resources. Preserve section-local snapshot timing
 and caller exclusion; no whole-world transaction or runtime/performance acceptance
 is implied by the ownership change.
+
+[Cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md) now keep canonical
+colors and admitted cached sampling in Rust over existing column/material owners.
+Resolver-driven traversal and unsupported inputs keep Java callback semantics.
 
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The
@@ -577,8 +581,9 @@ a supported mid-session toggle or rebuild invalidation contract.
 The later [render-column reduction](RUST-DH-RENDER-COLUMNS.md) owns the complete
 compact reduction algorithm in Rust. Canonical Java views borrow existing heap
 storage for one bounded native call and direct destination publication; they do
-not construct or sort a second Java reducer graph. Contextual full-data color
-conversion, faces, greedy merging and final packet construction still remain.
+not construct or sort a second Java reducer graph. Contextual resolver callbacks,
+faces, greedy merging and final packet construction remain Java; the admitted
+[cached tint path](../world/biome/RUST-DH-TINT.md) now samples retained inputs in Rust.
 
 DH's greedy merge sorts each face list by
 [`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):

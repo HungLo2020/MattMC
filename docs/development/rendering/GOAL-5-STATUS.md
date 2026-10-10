@@ -1,8 +1,20 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`2003b118`](https://github.com/HungLo2020/MattMC/commit/2003b118dfac30ca501dc135b9de0e2d7e2567fb).
-The rendering follow-ups repair the discarded translucent-data close path,
+[`85475b61`](https://github.com/HungLo2020/MattMC/commit/85475b61defddd2da5e0d0a5f310093145a577d3).
+The latest CPU slice moves [cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md)
+into native cache storage and admitted sampling over retained columns/materials.
+Java keeps resolver callbacks, registry lookup and compatibility traversal. The
+author reports 288 Frozen neighborhoods, 480 mutable-key operations, 2,547 Rust
+passes/three ignored and 1,923 Java cases reported/two skipped (1,921 executed).
+Six synthetic radius/detail comparisons do not establish a MattMC FPS or
+streaming gain. These results were inspected as committed reports, not rerun. See
+the [ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103285146)
+and [CPU/preflight evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103287294);
+committed fixture decoding is separate from suite execution.
+
+At the preceding `2003b118` checkpoint,
+the rendering follow-ups repair the discarded translucent-data close path,
 rebuild terrain after all relevant staged shader-source transitions, restore
 water-only DH transparent-material culling and move cloud decisions to the
 accepted native getter plus Java producers. Invisible VoxelMap gradient bounds
@@ -10,7 +22,7 @@ now return an empty draw rather than an unsupported marker; timed map-opening
 controls support investigation. These are source repairs, not independently
 rerun transition or GUI acceptance. See [current verification](RENDER-VERIFICATION.md#mid-world-shader-enable-check).
 
-The latest CPU slice moves [server chunk-task queue ownership](../world/chunk-loading/RUST-CHUNK-TASKS.md)
+That preceding CPU slice moves [server chunk-task queue ownership](../world/chunk-loading/RUST-CHUNK-TASKS.md)
 into Rust while Java retains callable references, dispatcher/futures and task
 bodies. The author reports 37,624 Frozen CPU operations and four Java/native controls,
 plus 1,918 Java tests reported/two skipped (1,916 executed). A six-pair synthetic
@@ -27,9 +39,10 @@ merging, final packets and substantial world/application orchestration.
 [committed record](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/PROGRESS.md)
 reports mismatched NVIDIA kernel/user libraries, an ABI 79 invocation that
 failed before world entry with X11 `BadDrawable`, and interrupted teardown.
-The user's subsequent reboot restored matching NVIDIA libraries/kernel and a
-validated standalone Vulkan presentation probe. The full Rust suite also
-passes after serializing its presenter-admission fixtures. These checks do not
+The [subsequent author record](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/PROGRESS.md)
+reports that the user's reboot restored matching NVIDIA libraries/kernel and
+a standalone Vulkan presentation probe passed. It also reports the full Rust
+suite passing after serializing presenter-admission fixtures. These checks do not
 replace the failed or unstarted MattMC runtime gates. See
 [driver preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 

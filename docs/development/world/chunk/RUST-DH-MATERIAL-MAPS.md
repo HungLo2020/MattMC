@@ -112,5 +112,7 @@ binding reuse. Import/self-merge and custom detachment controls preserve exact
 slots, hashes and exception prefixes. Receipts:
 `build/native-dh-id-map/`. Original test syntax and recorder-bootstrap failures,
 and the initial actual Frozen self-merge exception, are retained separately.
-Hardware, full Rust graphics, realistic performance and sustained memory acceptance
-remain pending driver restoration. No isolated or whole-renderer speedup is claimed.
+That checkpoint awaited driver restoration for hardware/full Rust graphics and
+realistic performance/memory checks. The [later reported preflight](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+records driver recovery and full-suite results; new MattMC runtime/performance
+and sustained-memory acceptance remain pending. No isolated speedup is claimed.

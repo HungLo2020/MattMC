@@ -251,9 +251,11 @@ exception mutation prefixes. Releaseefeca492 passes234 Rust world checks and
 1,880 Java tests (two skipped), including actual Frozen metadata/reduction/
 ordered-pass/same-detail updates and ordinary recipient controls. Six full-task
 workers map that image and all source/native/Frozen/prompt guards pass. Java update orchestration, material-map mutation, metadata
-storage, persistence and contextual transformation policy remain. Full Rust
-hardware graphics, gameplay, performance and sustained memory acceptance await
-driver restoration; prior839ff128 runtime/timing results do not verify this source.
+storage, persistence and contextual transformation policy remain. At that checkpoint, full Rust
+hardware graphics, gameplay, performance and sustained memory acceptance awaited
+driver restoration. See the [later author-reported preflight](rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+for driver recovery and full-suite results; new MattMC runtime acceptance remains
+pending, and prior839ff128 timings do not verify this source.
 
 The subsequent local [DH material-map migration](world/chunk/RUST-DH-MATERIAL-MAPS.md)
 keeps ordered serial identities, deduplication/import indexes, whole-map remapping
@@ -330,8 +332,9 @@ callbacks; it keeps no pending priority map or per-chunk task-list owner.
 [Cached DH tint neighborhoods](world/biome/RUST-DH-TINT.md) read native full-data
 columns and material identity leases. Rust owns color storage and sampling;
 Java retains resolver callbacks and projects primary cell handles/generations.
-Six scoped CPU scenarios match Frozen checksums and preserve/improve measured
-elapsed time; realistic renderer/server acceptance remains separate.
+The author reports six synthetic CPU scenarios matching Frozen checksums with
+Current medians at or below Frozen; realistic renderer/server acceptance remains
+separate. See the owner’s source and timing limits.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.
@@ -421,7 +424,7 @@ Important current subdirectories:
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
 - `render/dh_collector/`: the Distant Horizons column ledger: generations, column payloads, publication, retirement, owner leases, the prepared frame's visible segments and route receipts ([rendering architecture](rendering/RENDER-ARCHITECTURE.md)). Its Java exports are `render/bridge/dh_collector.rs`. Java still supplies the DH quadtree candidates, material provenance and frame parameters; native ledger ownership does not move those producers into Rust.
-- `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual colors, faces and final packets still belong to Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
+- `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual resolver callbacks, faces and final packets still belong to Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
 - `render/clouds/`: built-in DH cloud motion, placement, culling and color-change history in CPU owners. Java retains texture/API boxes, world-color queries and callbacks; see [cloud preparation](rendering/RUST-DH-CLOUDS.md).
 - `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). This does not implement native item registries or gameplay.
 - `render/scene/`: wire and data vocabulary shared by Java and the renderers, including immutable native terrain selections consumed directly by frame decoding ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).

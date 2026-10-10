@@ -2,13 +2,19 @@
 
 The current implementation moves canonical DH block/biome tint-cache storage
 and cached neighborhood sampling into
-[`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/tint.rs).
+[`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/src/main/rust/world/level/chunk/dh_columns/tint.rs).
 The normal tint getter borrows existing native full-data column spans and the
 retained material map. It exports no point arrays and builds no second source.
 Resolver callbacks and client registry/holder lookup remain Java. Custom wrappers,
 nonempty Java columns, oversized spans and unsupported coordinates retain the
 original callback route. This is a CPU migration, not complete color rendering
 or server/client migration.
+
+Source reviewed at [`85475b61`](https://github.com/HungLo2020/MattMC/commit/85475b61defddd2da5e0d0a5f310093145a577d3).
+The execution counts and timings below, and the linked [hardware preflight](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures),
+are the author’s committed reports. This documentation review inspected implementation and test
+assertions; it did not rerun Java/Rust, benchmarks or clients, or inspect the
+untracked raw receipts.
 
 ## Constraints
 
@@ -44,6 +50,7 @@ or server/client migration.
   floor/modulo formula. Source containment uses the requested detail6 section.
 - Shared native colors retain Frozen's process-lifetime cache semantics; they
   store numeric colors and UTF16 identities, never Java worlds or GPU handles.
+  There is no world/reload key, so this is not a world-scoped eviction policy.
   World/reload resource behavior and realistic performance still need measurement.
 
 ## Verify
@@ -57,7 +64,7 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-[`GenerateFrozenDhTintOracle.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhTintOracle.java)
+[`GenerateFrozenDhTintOracle.java`](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/DevUtils/tests/world/chunk/GenerateFrozenDhTintOracle.java)
 records the actual untouched Frozen cached tint getter with seven compiled-class
 pins. Its 288 synthetic sparse CPU neighborhoods cover negative sections,
 boundaries, all stock radii, larger LODs, overlapping points, empty samples and
@@ -67,7 +74,7 @@ The initial attempt to seed through a resolver required a live client and failed
 its log/partial fixture are retained. The completed recorder seeds Frozen's cache
 directly and does not claim resolver or gameplay verification.
 
-Release `007ebaef` passes the full Rust suite: 2,547 passed, three intentionally
+The author reports that release `007ebaef` passes the full Rust suite: 2,547 passed, three intentionally
 ignored and zero failures. Five Java adapter controls match recorded Frozen
 answers, mutable keys, concurrent color publication, callback mutation and
 pin release after success/partial/oversized declines. Full Java verification
@@ -86,7 +93,8 @@ at the measured call count in every JVM; builds/tests stay outside timing.
 | 3 | 8 | 500,000 | 3.04 | 3.36 | 0.906 |
 
 These are median synthetic cached-tint elapsed times, not FPS or whole-game
-acceptance. Protocols, all runs and input guards are retained in
+acceptance. Detail 8 with stock radii takes the unsmoothed cached route; its row
+does not measure blended-neighborhood work. Protocols, all runs and input guards are retained in
 `build/native-dh-tint/matrix-int-hash-*` and `source-pins-final.json`.
 
 Rejected prototypes and their logs remain under `build/native-dh-tint/`.
@@ -101,11 +109,23 @@ driver ABI, old native-symbol, test compilation and parallel presenter-fixture
 failures are retained; each corrected run has its own log. Presenter fixtures
 now serialize their process-wide reservation and check cross-registry denial.
 
-[`GenerateFrozenDhTintKeyOracle.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhTintKeyOracle.java)
+[`GenerateFrozenDhTintKeyOracle.java`](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/DevUtils/tests/world/chunk/GenerateFrozenDhTintKeyOracle.java)
 adds 480 actual Frozen cache-key operations across 32 histories, including
 equal wrappers, hash collisions and changed serialized identities.
 Run the scoped CPU comparison with
-[`VerifyDhTint.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/biome/VerifyDhTint.py),
+[`VerifyDhTint.py`](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/DevUtils/tests/world/biome/VerifyDhTint.py),
 passing the JDK executable, isolated Frozen/current classpath files, native
 directory and a new output directory. Builds stay outside timing runs.
+The script reports ratios but imposes no performance pass/fail threshold. It
+hashes the native image and original compiled driver inputs, then rechecks the
+native image before each launch; those guards do not hash every Frozen/current
+classpath entry or independently establish its correspondence to source.
 No runtime, FPS, broad parity or sustained-memory acceptance follows.
+
+The [ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103285146)
+independently decoded the committed fixtures: 288 neighborhoods with seven
+class pins and 8,296 point entries, plus 480 key operations across 32 histories,
+both ending exactly at EOF. This is fixture inspection, not a test rerun. The
+[evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103287294)
+keeps synthetic timings and the author-reported driver probe separate from
+MattMC runtime acceptance; both issues remain open.

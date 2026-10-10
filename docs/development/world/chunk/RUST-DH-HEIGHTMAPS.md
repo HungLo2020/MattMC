@@ -93,7 +93,7 @@ native-library and protected-prompt pins match. Receipts:
 Later source does not inherit the historical runtime acceptance below. Check
 both reuse benefit and mutation bookkeeping cost in fresh equivalent gameplay,
 then run hardware correctness, all predeclared timings and sustained memory
-checks after [driver restoration](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+checks on the [reportedly restored driver](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 
 ## Verification
 

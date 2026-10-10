@@ -133,8 +133,9 @@ Follow the owner boundary relevant to the next change:
   workers map that image and source/native/Frozen/prompt guards pass. Gameplay,
   performance and sustained memory remain unverified. Update orchestration,
   material-map mutation, metadata storage and
-  transformation policy remain Java, and hardware
-  acceptance awaits driver restoration.
+  transformation policy remain Java. That checkpoint awaited driver restoration;
+  the [later reported preflight](../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+  clears the driver blocker while new MattMC runtime acceptance remains pending.
   Native live generations now also own saturating mutation revisions for bounded
   [height-field reuse](../world/chunk/RUST-DH-HEIGHTMAPS.md#local-bounded-field-reuse-in-progress).
   Weak keys keep only field values alive; actual ordinary constructor reuse and
@@ -484,6 +485,7 @@ and full1,914 reported Java tests (two skips, zero failures/errors). Hardware,
 realistic performance and long-memory verification remain pending.
 - **World color inputs:** [cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md)
   move cached color storage and whole-neighborhood sampling into Rust over existing
-  point/material owners. Resolver callbacks remain Java. All six scoped CPU
-  scenarios match Frozen checksums and measure at or below Frozen elapsed time;
-  full Rust/Java suites pass. This is not whole-game acceptance.
+  point/material owners. Resolver callbacks remain Java. The author reports six
+  synthetic CPU scenarios matching Frozen checksums with Current medians at or
+  below Frozen, and passing full Rust/Java suites. These reports were not rerun
+  in the documentation review and do not establish whole-game acceptance.

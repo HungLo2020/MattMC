@@ -82,7 +82,8 @@ Full Java reports1,755 ordinary tests (two skipped) and154 parity tests, zero
 failures/errors across342 suites. Six final workers map the exact release; all
 39,481 Current and38,176 Frozen source pins, native image and protected prompt
 match, with Frozen HEAD unchanged. Receipts: `build/native-dh-chunk-hash/`.
-Older renderer timings do not verify this image. Hardware/runtime/FPS and
-long-session memory remain pending driver restoration. Measure cold identity
+Older renderer timings do not verify this image. The [subsequent reported preflight](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+clears the earlier driver blocker; new runtime/FPS and long-session memory remain
+pending. Measure cold identity
 registration, repeated admission, concurrent worker throughput, allocation and
 real streaming against Frozen before claiming a performance gain.
