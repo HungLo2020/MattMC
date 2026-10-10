@@ -1,26 +1,31 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`bffd0eef`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574):
-canonical terrain face policy, shared meshing caches, DH height fields and the
-admitted DH lighting/emitter pass now have Rust owners. Java retains orchestration,
-contextual callbacks, custom/mutable compatibility paths and general gameplay.
-The latest author-recorded release, `3f00217d`, meets the settled four-mode
+[`fc1d529d`](https://github.com/HungLo2020/MattMC/commit/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097):
+packed-word section capture, cached GUI resource misses, conditional DH semantic
+spans and merge changes reduce selected preparation work; the scripted recorder
+adds controls and finer timing. Its [author-reported diagnostic comparison](#october-10-capture-minimap-and-dh-cost-report)
+finds lower sample counts, with FPS changes within run-to-run noise. It supplies
+no newer settled Frozen acceptance matrix.
+
+The preceding DH lighting release, `3f00217d`, meets the settled four-mode
 median FPS/p99 floors across twenty clean runs. Its DH FPS advantage is only
 about **0.66%** after a predeclared extension to four repeats per side; the
-initial two-repeat **0.22% miss remains recorded**. No isolated migration gain
-or broad performance acceptance follows. The final lighting release reports
-seven passing lifecycle cases; the preceding height-field release's original
-failure and separate strict retry remain distinct, with that teardown race
-unresolved. See [the current matrix](#october-10-dh-lighting-and-emitter-summary)
-and [the ownership contract](../world/lighting/RUST-DH-LIGHTING.md).
+initial two-repeat **0.22% miss remains recorded**. That result does not validate
+the later source changes or establish an isolated migration gain or broad
+performance acceptance. The lighting release reports seven passing lifecycle
+cases; the preceding height-field release's original failure and separate strict
+retry remain distinct, with that teardown race unresolved. See
+[that release's matrix](#october-10-dh-lighting-and-emitter-summary) and
+[the ownership contract](../world/lighting/RUST-DH-LIGHTING.md).
 
 Java/Rust suites, lifecycle runs, captures and profiles below are author reports.
 This review inspected committed source and reports, not the unbundled runtime
-receipts, and did not rerun those workloads. Independent verification at this
-source pin passed only the two new synthetic flight-retention fixtures. Entry,
-sustained streaming, broad visual/temporal parity, long-session memory, complete
-scene migration and the independent native crash remain open. A
+receipts, and did not rerun those workloads. Independent verification at
+`fc1d529d` passed five synthetic scripted-setup fixtures, not clients or live
+recordings; the two flight-retention checks belong to the preceding review.
+Entry, sustained streaming, broad visual/temporal parity, long-session memory,
+complete scene migration and the independent native crash remain open. A
 [source-predicted DH stale-counter discrepancy](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
 also needs an executable regression; no gameplay failure was observed here.
 
@@ -56,10 +61,14 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [terrain ownership review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6096975122),
+The [current performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6101175115)
+records the `fc1d529d` source and five-fixture check, keeping the author-only
+sample report separate from runtime acceptance.
+
+The preceding `bffd0eef` [terrain ownership review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6096975122),
 [DH ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
 and [performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6096978223)
-retain the current source scope and author-only runtime provenance. The two
+retain that source scope and author-only runtime provenance. The two
 independent synthetic retention checks add tooling evidence only; they do not
 rerun the Java/Rust suites or establish new runtime acceptance.
 
@@ -152,6 +161,17 @@ Those source checkpoints are
 and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806ddedd4fb3c3b4fbc44716).
 
 ## What changed
+
+### October 10 capture, minimap and DH cost follow-up
+
+`fc1d529d` changes [live-section capture](../world/chunk/RUST-LIVE-SECTIONS.md)
+to decode packed words in bulk and caches [GUI resource misses](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints).
+DH makes exact-material preservation conditional and changes merge ordering
+implementation; see [the architecture constraints](RENDER-ARCHITECTURE.md).
+The [scripted recorder](SESSION-RECORDING.md#unattended-look-around-runs) gains
+option/config overrides and AFK-throttle prevention, while `mc:` profiler timing
+overlaps the existing benchmark phases and must be read separately. These
+changes do not transfer additional gameplay or quadtree ownership to Rust.
 
 ### October 10 terrain face policy and DH producers
 
@@ -565,6 +585,20 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 10 capture, minimap and DH cost report
+
+The [commit report at `fc1d529d`](https://github.com/HungLo2020/MattMC/commit/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097)
+describes interleaved three-repeat A/B scripted harness runs: section capture,
+slice preparation and minimap resolution had **74%, 55% and 82% fewer
+render-thread samples**, respectively. DH merge's share of render-data build
+fell from 21% to 10%. **FPS changes remained within run-to-run noise.** These
+are author-reported diagnostic component observations, not independently
+inspected recordings, elapsed-time reductions or additive whole-frame gains.
+The Current-only harness is not the paired Frozen acceptance protocol. The
+commit does not provide a fresh complete Java/Rust, lifecycle, image or settled
+four-mode acceptance record; the `bffd0eef` results below retain their own
+earlier release identity and scope.
 
 #### October 10 DH lighting and emitter summary
 

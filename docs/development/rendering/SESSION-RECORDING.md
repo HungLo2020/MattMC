@@ -58,16 +58,29 @@ particular resource. System PSI and reclaim figures describe the whole machine. 
 requires Linux `/proc/pressure/cpu`; raw PSI fields are microsecond deltas, with
 percentages derived in the summary.
 
-Vary one setting per run with `--option key:value` (copied `options.txt`) or
-`--config 'relative/file:key=value'` (copied configs), for example
+Vary one setting per run with repeatable `--option key:value` (copied
+`options.txt`) or `--config 'relative/file:key=value'`, for example
 `--config 'config/voxelmap.properties:Hide Minimap=true'` or
-`--config 'config/DistantHorizons.toml:numberOfThreads=2'`. The sweep reports
-input every frame and the copy forces `inactivityFpsLimit:"minimized"`: an
-unattended client otherwise drops to 30 FPS after 60 s (vanilla AFK throttle),
-which made early harness runs report a third of their real frame rate.
-External load on the machine changes FPS between identical runs by up to 2x;
-compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
+`--config 'config/DistantHorizons.toml:numberOfThreads=2'`. Options apply after
+the forced defaults and can replace them. Config edits replace only the first
+matching key, retaining its separator and simple surrounding double quotes;
+they are not TOML-section-aware and reject a missing key. Use existing copied
+files and paths relative to the copied game directory, without `..`: the
+implementation does not enforce path confinement. `harness.json` retains the
+requested overrides so comparisons can identify the changed controls.
+
+The active sweep reports input each frame, and the default copy sets
+`inactivityFpsLimit:"minimized"`. With AFK limiting selected, the vanilla client
+otherwise caps at 30 FPS after 60 seconds idle. A minimized window still caps
+at 10 FPS, so keep it unminimized. The [author's harness notes at `fc1d529d`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/docs/development/rendering/SESSION-RECORDING.md)
+report early AFK-affected runs at a third of their actual rate and up to 2× FPS
+variation with external load. Those observations are not renderer speedups.
+Compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
 "everything else" CPU (`cpu.csv` system minus client) alongside FPS.
+
+Independent review at `fc1d529d` passed five synthetic scripted-setup fixtures,
+including config separators/quotes and missing-key rejection. They do not run
+the client or establish live AFK prevention, profiling correctness or performance.
 
 ## What is recorded
 
@@ -86,6 +99,15 @@ Frame/tick timing columns use nanoseconds relative to recording start or
 durations as named in their headers. External CPU/stall samplers use epoch
 seconds and their stated units. The frame columns follow the bridge records
 automatically, so new ABI fields appear without recorder changes.
+
+Read `mc:<section>` as a separate breakdown: time is exclusive within that
+profiler stack but overlaps the `GraphicsFrameBenchmark` phases. Do not sum
+the two families into total tick time. The recorder's vanilla-profiler adapter
+is selected only when the pie, single-tick, metrics and custom profilers are
+inactive; enabling one can remove the `mc:` observations. Nested
+`world.static-terrain.*` phases separately split tracker events, completed-build
+draining, visibility selection, scheduling and cache cleanup. A changed phase
+breakdown alone is not a reduction in total frame work.
 
 ## Reading a recording
 

@@ -65,7 +65,10 @@ raw palette emitter write through both lighting paths. This review did not run
 that case or observe a gameplay failure. Height-field stale-counter coverage
 does not establish lighting parity for it. The
 [follow-up on #777](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
-records the source-only case and required verification.
+records the source-only case; [dedicated #826](https://github.com/HungLo2020/MattMC/issues/826)
+tracks the executable regression and closure checks. The later `fc1d529d`
+render-data provenance/merge changes do not change this lighting admission or
+counter contract and do not resolve the case.
 
 ## Verify
 

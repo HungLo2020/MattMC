@@ -142,8 +142,9 @@ generation, so a record's presence proves it is current.
 
 The [DH column ledger](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 retains immutable packed payloads and publication/lease/route state in Rust.
-Java still walks the quadtree, supplies provenance and render parameters, and
-hands the selected native CPU frame reference to the renderer. Selected records
+Java still walks the quadtree, supplies requested exact-material provenance
+and render parameters, and hands the selected native CPU frame reference to
+the renderer. Selected records
 are copied back only for diagnostics/compatibility observers. Ordinary publication builds frontend
 assets from the ledger; exact-material provenance retains the Java publication
 path. Batched collection checks each walked container's generation before
@@ -151,6 +152,16 @@ publication/visibility admission. Container close retires only its lease, and
 a build finishing after section close releases its new container instead of
 installing it. These changes preserve CPU lifetime without moving the DH tree
 or all frame preparation into Rust.
+
+The October 10 [material-preservation policy](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+skips exact block provenance in ordinary play while retaining it for exact
+material topology, capture/legacy observation and the explicit forced A/B
+build. Java still converts full data to render columns, constructs faces,
+sorts/merges quads and builds semantic packets. Dense/scratch/packet sidecar
+arrays remain allocated. Exact-material publication has its own narrower gate;
+forced preservation alone enables neither publication nor exact topology.
+These CPU work reductions do not migrate those producers, change GPU ownership,
+or establish ordinary-play acceptance from diagnostic profiles.
 
 Reduced-color GPU columns now suballocate shared device vertex/index pages;
 packed-uniform pass owners also share geometry bindings per vertex page.
@@ -207,8 +218,8 @@ shared CPU lifetime without running the actual queued frame integration. The
 provides the separate production identity-resolution path.
 
 Legacy inline inputs and explicit capture readback remain supported. Java still
-walks the DH tree, prepares frame matrices/configuration and owns exact-material
-provenance. This DH slice does not migrate the entire producer. Later
+walks the DH tree, prepares frame matrices/configuration and owns any requested
+exact-material provenance. This DH slice does not migrate the entire producer. Later
 [live-section ownership](../world/chunk/RUST-LIVE-SECTIONS.md) is a separate
 loaded-world migration. GPU resources and presentation continue through the existing GAL.
 

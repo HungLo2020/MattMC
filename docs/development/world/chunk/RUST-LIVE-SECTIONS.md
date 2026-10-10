@@ -20,10 +20,13 @@ chunk orchestration, scheduling and compatibility paths.
 
 ## Consumers and remaining work
 
-Rebuild captures decode directly from the live owner in Rust, reading each packed
-word and the palette once ([`Generation::unpack`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/live/mod.rs));
-a test checks it against the per-index decode at every palette width. Light propagation
-receives its existing packed section payload directly from that owner. Heightmap
+Rebuild captures decode directly from the live owner in Rust. Under the owner
+lock, [`Generation::unpack`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/rust/world/level/chunk/live/mod.rs)
+reads each packed word once and snapshots the local palette once; global storage
+uses IDs directly. Zero-width capture still reads its shared single value once.
+This changes capture preparation, not immutable snapshot ownership or the live
+CPU-view contract. Light propagation receives its existing packed section
+payload directly from that owner. Heightmap
 and skylight scans export a coherent native word/ID pair into reusable native
 scratch; they avoid constructing Java palettes/arrays for the handoff. Their
 existing Rust kernels and publication rules remain unchanged.
@@ -84,6 +87,15 @@ state and 324 recorded sections. They cover malformed imports, aliases, padding,
 custom callbacks, copies, retained views, GC readers and rebuild/light exports.
 Real gameplay, lifecycle and Frozen comparisons are still required; source tests
 and fixture timing alone do not establish performance acceptance.
+
+The [`fc1d529d` packed-capture fixture](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/rust/world/level/chunk/live/tests.rs)
+compares all 4,096 outputs with per-index reads after 6,000 deterministic writes
+in each of nine requested cardinality scenarios (1, 2, 5, 16, 17, 40, 100, 300,
+2,000). Despite its name, it does not assert every selected width or inspect
+intermediate growth; these final cases do not cover zero-width or 8-bit storage.
+This review inspected the fixture rather than executing Rust. The
+[author's later diagnostic report](../../rendering/GOAL-5-STATUS.md#october-10-capture-minimap-and-dh-cost-report)
+does not replace a runtime acceptance run at the new source.
 
 The author reports that the preceding live-owner checkpoint, release `526af413`, passes 2,415 Rust tests (3 ignored), 113 focused Java
 tests and the full Java suite (1,746 passed, 2 skipped). All seven lifecycle cases

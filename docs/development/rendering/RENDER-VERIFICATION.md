@@ -96,8 +96,9 @@ Section-local snapshots do not prove a coherent concurrently changing whole
 world. A CPU oracle match does not prove that gameplay selected the native path;
 correlate exact-library worker mappings with actual producer stacks, reviewed
 F3 movement and submitted DH work. Settled captures do not certify first-frame
-or transient rendering. The current and preceding release identities are
-[recorded separately](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary).
+or transient rendering. The DH producer release identities are
+[recorded separately](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary);
+their results predate the later capture/minimap/DH cost changes.
 
 ### Light-map source and fixture boundaries
 
@@ -123,7 +124,15 @@ reports; it did not execute the Java/Rust fixtures.
 
 ### One-command validation
 
-The latest [DH lighting/emitter record at `bffd0eef`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/PROGRESS.md)
+The newer [`fc1d529d` diagnostic report](GOAL-5-STATUS.md#october-10-capture-minimap-and-dh-cost-report)
+reports component sample reductions with FPS changes within noise; it does not
+rerun this acceptance protocol. Independent review passed five synthetic
+scripted-setup fixtures, not the client, AFK behavior, live recorder, Java/Rust
+suites or Frozen comparisons. Keep this separate from the settled release
+evidence below and read [recorder phase overlap](SESSION-RECORDING.md#what-is-recorded)
+before interpreting the added timings.
+
+The preceding [DH lighting/emitter record at `bffd0eef`](https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/PROGRESS.md)
 reports release `3f00217d`: 2,483 Rust passes/three ignored, 1,843 Java tests/two
 skips, five JNI checks, two observed exact-library JNI workers, seven lifecycle
 cases and reviewed settled vanilla/Iris+DH pairs. Twenty clean 6,000-frame timing
@@ -141,7 +150,7 @@ its interrupted enclosing validation and misconfigured first timing retry even
 though a corrected sixteen-run batch completed. That batch still failed vanilla
 p99. Report completed stages and rejected batches individually.
 
-At this source pin, independent verification executed only the two new
+At that `bffd0eef` checkpoint, independent verification executed only the two new
 flight-retention Python fixtures, using synthetic directories and mocked
 process discovery. The author reports thirteen retention tests and 43 combined
 retention/flight tests. Neither scope reruns the clients, lifecycle logs,

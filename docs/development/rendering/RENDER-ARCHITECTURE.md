@@ -464,8 +464,8 @@ checking every staged generation was uploaded; earlier acknowledgements could
 only release published layers. This does not cover the omitted-layer staging
 case tracked by [#821](https://github.com/HungLo2020/MattMC/issues/821).
 
-Java DH preparation retains material and contributor provenance in
-[`ColumnRenderSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/ColumnRenderSource.java).
+Java DH preparation retains requested exact-material and contributor provenance
+in [`ColumnRenderSource`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/ColumnRenderSource.java).
 Replacing a column clears its dense sidecars and removes sparse entries by that
 column's contiguous vertical index range. Keep this work bounded by the column
 height: scanning section-wide maps for every column makes fresh section builds
@@ -475,23 +475,51 @@ table must survive replacement. The focused
 covers column boundaries, heights and repeated clearing; it does not establish
 gameplay FPS or Frozen visual parity.
 
-This provenance is built only when something publishes it:
-`DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired()` is
-true for exact-material topology and exact-atlas capture/observation, and false
-in ordinary play. When false,
-[`FullDataToRenderDataTransformer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java)
-merges same-color neighbors as Frozen does and computes no spans or
-contributors, and `ColumnBox` emits one quad per vertical face. Always
-preserving it blocked those merges and split faces by material, costing about
-1.4× Frozen's DH loader CPU per LOD and starving the render thread. For A/B
-runs, `-Dmattmc.dev.rustGalDistantHorizons.forceSemanticPreservation=true`
-restores the always-preserve build.
+At [`fc1d529d`](https://github.com/HungLo2020/MattMC/commit/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097),
+[`semanticMaterialPreservationRequired()`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java#L494-L550)
+is true for exact-material topology, exact-atlas capture/legacy observation, or
+`-Dmattmc.dev.rustGalDistantHorizons.forceSemanticPreservation=true`; ordinary
+play without those switches skips exact provenance. Preservation is broader
+than publication: capture/observation publishes exact-material provenance only
+when the shader-pack source is inactive, while the exact-topology flag requests
+it independently. The force switch restores the previous preservation work
+without enabling capture, exact-topology merging or provenance publication.
+Selected-source execution alone is not a preservation trigger.
+
+[`FullDataToRenderDataTransformer`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java#L106-L255)
+samples the preservation policy once per section build. With it disabled,
+same-color adjacent vertical entries can merge regardless of exact block
+identity; material interning, variant writes, reduced spans and horizontal
+contributors are skipped. Empty spans let `ColumnBox` emit one quad per
+nonempty vertical face instead of constructing material segments. This removes
+specific provenance work, not all sidecar allocation: dense column arrays,
+overflow scratch and packet sidecar arrays remain. Java still owns render-data
+conversion, face construction, greedy merging and semantic packet construction.
+Exact-topology merge restrictions require both the exact flag and the Rust
+geometry route. Use separate launches for A/B switches: the exact flag is
+latched at class initialization; live reads of the other flags do not establish
+a supported mid-session toggle or rebuild invalidation contract.
 
 DH's greedy merge sorts each face list by
-[`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java):
-primitive `key | index` values in the same stable order as Frozen's comparator
-sort, which it still uses for lists over 65,536 quads. Unlike Frozen,
-`ColumnBox` treats leaves as transparent, so leafy LODs emit more faces.
+[`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):
+primitive `key | index` values preserve the existing signed comparator order
+and stable ties through the original index for lists of at most 65,536 quads.
+Larger lists retain the comparator sort; mixed directions also fall back to its
+existing validation. The exact-topology decision is read once per merge pass.
+The pre-existing `ColumnBox` leaf transparency policy still differs from the
+Frozen behavior described by the author, so removing exact provenance does not
+establish identical complete LOD geometry. This is face/occlusion policy:
+fully opaque leaf colors still belong to the opaque draw layer, as described
+below.
+
+The incoming author note reports about 1.4× Frozen's DH loader CPU per LOD for
+the previous preservation work and attributes render-thread starvation to it.
+The same commit reports DH merge share of render-data build falling from
+21% to 10%, with FPS change within run-to-run noise. These author reports are
+not independently reproduced causal or throughput acceptance. Check
+[ordinary gameplay](GAMEPLAY-PERFORMANCE.md) and exact-atlas/forced diagnostic
+workloads separately; neither source review nor focused fixtures establish
+whole-route Frozen parity, live-toggle safety or long-session memory bounds.
 
 The three-axis debug crosshair starts in camera space, unlike ordinary world
 lines. Its Java producer in
@@ -528,9 +556,9 @@ The coordinator's flush calls `mattmc_vulkanic_gal_world_lod_collector_flush`
 ([`render/bridge/dh_collector.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/dh_collector.rs)).
 It selects the update, builds the frontend assets from the ledger's payloads,
 and applies them; Java then acknowledges the update under its collector lock.
-A failed apply releases the selection. Updates that carry exact material
-provenance (exact-atlas and source-execution diagnostics) still go through
-Java's packed `updateWorldLodAssets`, because the provenance needs Java's
+A failed apply releases the selection. Updates admitted for exact-material
+provenance publication under the policy above still go through Java's packed
+`updateWorldLodAssets`, because the provenance needs Java's
 model resolution. Native publication shares immutable payloads through `Arc`
 while selecting/in-flight tracking, but decodes packed bytes into owned frontend
 vertex vectors; diagnostic payload fetches also copy. It removes the ordinary
@@ -577,8 +605,8 @@ Java provenance sidecars stay coherent; source fixtures alone do not establish
 rollback for every failed mutation.
 
 [`DistantHorizonsSemanticCollector`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java)
-keeps the material provenance, the frame's render parameters and the capture
-diagnostics. It applies each ledger call's effects to its provenance maps.
+keeps requested exact-material provenance, the frame's render parameters and
+the capture diagnostics. It applies each ledger call's effects to its provenance maps.
 Diagnostics and probes read payload copies fetched from the ledger on demand.
 Packed vertex admission checks restricted material/normal bytes directly;
 unsigned 16-bit position/light fields need no Java vertex reconstruction.

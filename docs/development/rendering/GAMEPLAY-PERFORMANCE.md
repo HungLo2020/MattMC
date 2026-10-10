@@ -90,6 +90,18 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Image and DH allocation constraints
 
+The [raw-image resolver at `fc1d529d`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/net/vulkanic/gui/RustGalGuiRawImageAssets.java)
+remembers resource-manager misses, avoiding repeated file probes for dynamic
+minimap identities. It clears those misses on resource reload and clears the
+set before adding another entry when it already holds 4,096 entries. This is a
+bounded miss cache, not permanent suppression: explicit copied assets, atlas
+resolution and dynamic-image fallbacks remain separate; decode failures are not
+cached as misses. A missing file does not mean a dynamic texture is absent.
+The commit adds no dedicated miss-cache
+regression; check repeated misses, reload and live minimap updates when changing
+this path. See [the diagnostic report](GOAL-5-STATUS.md#october-10-capture-minimap-and-dh-cost-report)
+for its author-only sample reductions and unchanged FPS conclusion.
+
 VoxelMap publishes pixels when its dirty flag is consumed, with a cold-cache
 snapshot for a new texture identity. Clean frames reuse an immutable snapshot.
 The dirty flag is consumed atomically before copying, so a worker update during
@@ -180,9 +192,10 @@ at 1,566 samples, including biome reads (694) and block reads (221), among
 positive DH submissions and 0.545-block return drift. There is no paired Frozen
 CPU run. Use this to choose further ownership work, not to claim an isolated
 speedup. Receipt: `build/native-dh-lighting-migration/current-cpu-travel-review.json`.
-The [latest settled timing matrix](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary)
+The [settled timing matrix for that release](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary)
 meets all measured floors but retains the initial DH miss, four-repeat extension
-and narrow DH margin. Neither that matrix nor these flights establishes entry,
+and narrow DH margin. It predates the `fc1d529d` capture/minimap/DH changes and
+does not validate them. Neither that matrix nor these flights establishes entry,
 sustained streaming, first shader world frame or absence of pop-in/flicker.
 
 The preceding [height-field release](../world/chunk/RUST-DH-HEIGHTMAPS.md)
