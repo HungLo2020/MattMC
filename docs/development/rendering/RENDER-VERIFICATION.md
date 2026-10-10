@@ -51,6 +51,28 @@ runtime acceptance. Receipts:
 `build/native-terrain-frame-migration/{gpu-driver-mismatch,driver-mismatch-interruption,bad-drawable-failure}.json`.
 Do not weaken log-health checks or count a software-device run as hardware parity.
 
+### Mid-world shader-enable check
+
+The [`c00b11c8` transition](RENDER-ARCHITECTURE.md) replaces terrain workers and
+published meshes after the source is accepted, then waits for rebuilt semantic
+inputs before offscreen preparation. Use [timed recording actions](SESSION-RECORDING.md)
+to retain before/after images for both enable/reload and screen-Apply logic.
+Verify source acceptance, rebuild completion and actual selected-route frames;
+a requested toggle or sweep-complete marker alone does not establish them.
+Check discarded completed builds and cancelled workers for native translucent
+sort-owner retirement; replacing a pool alone is not a resource-release proof.
+Inspect terrain, leaves, shadow casters and DH clouds before, during and after
+the transition, and preserve fallback/admission errors rather than counting a
+fallback image as selected-pack parity.
+
+For cloud policy, cover `dhClouds=off`, the `clouds=off` fallback and explicit
+`dhClouds=on`, including conditional pack defines and a temporarily unarmed
+source route. The new parser fixtures are source-level controls; the commit
+adds no dedicated worker-rebuild lifecycle or timed-action screenshot fixture.
+This review did not run clients or inspect new captures. Its successful wiki
+build cannot resolve the [hardware-driver blocker](#check-the-hardware-driver-before-runtime-captures)
+or extend earlier runtime passes to this source.
+
 ## 1. Tests
 
 Run from the repository root; the subshell preserves the Rust directory configuration without changing the next command's working directory.

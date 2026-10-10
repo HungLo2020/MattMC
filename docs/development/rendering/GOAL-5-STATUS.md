@@ -1,9 +1,16 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`5de23173`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77).
-Retained terrain selection, client residency, shared chunk/biome inputs and DH
-producer policies now have native CPU owners. The latest slice moves complete
+[`c00b11c8`](https://github.com/HungLo2020/MattMC/commit/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4).
+The latest change repairs the shaders-off-to-on terrain rebuild request, skips
+unadmittable offscreen preparation and applies active-pack DH cloud directives.
+[Timed recording controls](SESSION-RECORDING.md) support inspecting that
+transition; this source review supplies no new GPU, lifecycle or image result.
+The previously recorded driver/library mismatch remains unresolved by this
+commit's documentation CI. See the [transition acceptance checks](RENDER-VERIFICATION.md#mid-world-shader-enable-check).
+
+At the preceding `5de23173` checkpoint, retained terrain selection, client residency, shared chunk/biome inputs and DH
+producer policies had native CPU owners. That slice moves complete
 compact [DH render-column reduction](RUST-DH-RENDER-COLUMNS.md) into Rust.
 Java still performs contextual color callbacks, face construction, greedy
 merging, final packets and substantial world/application orchestration.
@@ -68,7 +75,12 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The current [world/residency review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6101725598),
+The latest [shader-transition review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
+and [DH cloud-policy review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578)
+cover `c00b11c8`, retaining the discarded translucent-owner cleanup concern and
+missing runtime acceptance. Neither issue is closed.
+
+The preceding [world/residency review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6101725598),
 [DH producer/reduction review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6101728595)
 and [CPU/hardware evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6101730126)
 cover `5de23173` without closing those issues. They inspect source and fixture

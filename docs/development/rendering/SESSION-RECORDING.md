@@ -78,12 +78,31 @@ variation with external load. Those observations are not renderer speedups.
 Compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
 "everything else" CPU (`cpu.csv` system minus client) alongside FPS.
 
-Timed actions take seconds since the sweep started:
-`--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersAt=25` turns shaders on
-mid-world (`...enableShadersVia=screen` repeats the shader-pack screen's Apply),
-and `...screenshotsAt=20,45` saves `screenshots/scripted-<n>s.png`; add
-`--keep-game-dir` to keep them and `--yaw-amplitude 0 --pitch-amplitude 0` for
-a still camera. Start with `--config 'config/iris.properties:enableShaders=false'`.
+Timed actions added at [`c00b11c8`](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
+take seconds since the sweep starts on the first eligible in-world frame:
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersAt=25` enables the selected
+pack. The default `enableShadersVia=toggle` uses the enable/reload API;
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersVia=screen` follows the
+shader-pack screen's Apply logic, including its optional second apply after an
+option reset. It calls that logic directly; it does not open or click the UI.
+The enable attempt is marked before application; a thrown failure does not
+turn this into an automatic retry loop. Start with `--config 'config/iris.properties:enableShaders=false'` and a valid
+selected pack available in the copied game. The scripted driver copies config,
+not the original `shaderpacks` directory or per-pack option files; Gradle stages
+pack ZIPs from `build/shaderpacks`. Do not assume an original custom pack and its
+options were transferred. Keep the action times below the sweep duration, because the
+stop check runs first.
+
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.screenshotsAt=20,45` requests
+`screenshots/scripted-20s.png` and `scripted-45s.png` in the copied game directory;
+add `--keep-game-dir` to retain them and `--yaw-amplitude 0 --pitch-amplitude 0`
+for a still camera. Times are sorted and at most one due screenshot is requested
+per eligible frame. A screen, missing player or missing world skips action
+processing; elapsed time continues after the sweep has started. Names round
+the configured seconds, so use distinct rounded values. Check the screenshot
+callback/log and resulting files: requesting a capture is not proof of saved
+pixels, exact wall-clock timing or a successful shader transition. These actions
+add diagnostic controls, not a paired performance or image acceptance verdict.
 
 Independent review at `fc1d529d` passed five synthetic scripted-setup fixtures,
 including config separators/quotes and missing-key rejection. They do not run

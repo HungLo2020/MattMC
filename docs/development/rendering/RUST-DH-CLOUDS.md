@@ -1,6 +1,6 @@
 # Rust DH cloud preparation
 
-> Current ownership is source-inspected at [`64294324`](https://github.com/HungLo2020/MattMC/commit/642943247003d7d8d756a65180f0872b088c13f0).
+> Cloud-owner implementation was source-inspected at [`64294324`](https://github.com/HungLo2020/MattMC/commit/642943247003d7d8d756a65180f0872b088c13f0).
 > Runtime results below are author-recorded checkpoints; this documentation
 > review did not rerun suites or inspect the unbundled receipts, profiles or images.
 
@@ -30,7 +30,7 @@ ordinary semantic-origin path. Shading, light and cancellation remain ordered.
 ## Transfer and lifetime
 
 ABI 75 introduced the 88-byte retained DH group instance layout; the current
-whole-frame ABI is 78. Flag bit 1 selects a
+whole-frame ABI is 79. Flag bit 1 selects a
 CPU cloud owner address and an immutable pose generation; the three ordinary
 origin lanes must be zero. The native decoder resolves that generation and
 copies coordinates before constructing owned frame data. Ordinary API groups
@@ -50,14 +50,33 @@ Related tracking: [#777](https://github.com/HungLo2020/MattMC/issues/777#issueco
 
 ## Shader-pack cloud directives
 
-Iris cancels the "Clouds" group when the selected pack sets `dhClouds=off`, or
-leaves `dhClouds` unset and sets `clouds=off` (Complementary sets
-`dhClouds = off` inside `#ifdef DISTANT_HORIZONS`). Java marks that group's
-instance with flag bit 2;
-[`ShaderPackCloudPolicy`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/properties/clouds.rs)
-resolves the directives from the pack's `shaders.properties` with its option
-and environment defines, and frame admission drops marked boxes while a pack is
-selected. Vanilla clouds still follow `LevelRenderer`'s own rule.
+The [policy added at `c00b11c8`](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/rust/render/shaderpack/properties/clouds.rs)
+reads the active source generation's preprocessed `shaders.properties` with its
+option and environment defines. `dhClouds=off` suppresses DH clouds; when no
+recognized DH directive is set, `clouds=off` also suppresses them. Explicit
+`dhClouds=on` or `fancy` overrides that fallback and allows them. Recognized
+`clouds=fast`/`fancy` allow clouds only when no recognized `dhClouds` directive
+is set. Missing or unresolvable properties retain the
+default of allowing DH clouds; this is a bounded parser, not a guarantee of
+all Java Properties syntax or unknown-value behavior.
+
+Java marks admitted generic groups whose resource path is exactly `Clouds`
+with instance flag bit 2 (mask 4), on both native-cloud and ordinary group
+routes. Frame admission removes marked boxes when source execution is enabled
+and the active policy suppresses them, **before** checking whether the selected
+route is armed. Thus the rule also applies to a Rust fallback frame under that
+active source. It does not suppress all generic boxes or replace vanilla
+`LevelRenderer` cloud policy. Existing cloud-owner generation/lifetime and
+[#820](https://github.com/HungLo2020/MattMC/issues/820) admission limits are separate.
+
+Three new Rust policy fixtures inspect supported directives, explicit override,
+recognized duplicate ordering, conditional `DISTANT_HORIZONS` and missing
+properties. They do not execute a live shader toggle, cloud image comparison or
+asynchronous teardown. This documentation review inspected their source and
+reran no Rust/Java or client workloads; the preceding hardware blocker remains
+in the [current evidence checkpoint](GOAL-5-STATUS.md). The
+[#745 source review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578)
+keeps broader DH visual/transition acceptance open.
 
 ## Verification
 

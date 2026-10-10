@@ -207,17 +207,41 @@ and [`frame/static_terrain.rs`](https://github.com/HungLo2020/MattMC/blob/54611c
 A caster whose newer generation has not crossed yet keeps casting with the
 acknowledged one. Java keeps no active-instance state for casters.
 
-Turning shaders on mid-world behaves like Frozen's `allChanged()`. Terrain
-built with shaders off lacks the pack's block ids and retained source
-semantics, and the shader route rejects any frame showing such a mesh. Once
-Rust accepts the pack source,
-[`RustGalFrameCoordinator`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java)
-calls `RustGalTerrainRenderer.requestSourceSemanticRebuild()`: the terrain
-source retires every published layer, replaces its worker pool and rebuilds
-all sections, keeping the graph's loaded columns. `LevelRenderer.allChanged()`
-is a no-op on this route, so do not rely on it. While a visible mesh still
-lacks semantics, frames also skip the offscreen source-preparation
-submission, which cannot arm and corrupted the fallback frame.
+At [`c00b11c8`](https://github.com/HungLo2020/MattMC/commit/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4),
+turning shaders on after a shaders-off world requests a full terrain semantic
+rebuild once Rust accepts the selected pack source. The coordinator resends
+retained world assets and increments the terrain-source rebuild epoch. At the
+next source enqueue, the terrain source shuts down the old worker pool,
+destroys completed old work, retires published layers, clears built/visible
+geometry and block-entity lists, replaces the workers and reloads the existing
+graph **while retaining its loaded columns**. Previously built geometry is
+marked dirty and rebuilt through normal selection; accepted empty sections
+need no remesh. The pending rebuild is set on inactive-to-active source
+transition, not every active-pack change. Ordinary resource reload retains its
+separate replacement behavior. This repairs the route that
+previously called `LevelRenderer.allChanged()`, a no-op for this terrain source.
+It is not a synchronous promise that all replacement meshes are ready when the
+shader setting changes. See the [source transition](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java).
+
+The selected-source coverage check examines regular mesh instances, selected
+static terrain and shadow casters for missing retained source semantics. While
+such submitted work remains, it disarms the route and skips offscreen source
+preparation before creating the preparation target. It does not scan every
+uploaded asset or establish that the eventual fallback/image is correct. The
+commit describes missing leaves on the former preparation path, but supplies
+no new independently reviewed image or lifecycle result. Use the
+[mid-world transition checks](RENDER-VERIFICATION.md#mid-world-shader-enable-check)
+before accepting the changed image.
+
+A source-level lifetime gap remains in discarded completed builds:
+[`destroyCompletedBuilds()`](https://github.com/HungLo2020/MattMC/blob/c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4/src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java#L709-L720)
+calls `output.destroy()`, whereas normal draining first closes
+`output.translucentData`. Dynamic translucent data can own native plane/BSP
+resources, and the build-output destroy method only frees its index/vertex
+buffers. Do not infer complete sort-owner retirement from worker shutdown or
+layer retirement. This is an inspected cleanup-path discrepancy, not a measured
+runtime memory leak; [the #747 review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741)
+keeps repeated-toggle/resource acceptance open.
 
 Ordinary whole frames use a native FIFO worker by default. The queued bridge
 decodes/copies Java records and acquires native terrain/DH owners on the calling

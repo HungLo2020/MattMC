@@ -11,8 +11,10 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `5de23173ae5b61fb17887589d4dff69a6b17fc77`; older citations retain their reviewed source scope.
-- Latest source synchronization preserves two incoming commits and all 167 paths, including 24 wiki documents, from promoted cutoff `368c10a87fe9eba5f2e5e51cbb29518c4cc21f57`. The clean local fast-forward preserves incoming terrain/residency/DH owners and their author records; remote publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
+- Latest non-wiki default-branch snapshot integrated: `c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 19 paths, including three rendering guides, from promoted cutoff `d772753a04a59bbda16a28f7b589e02e95b8462f`. The clean local fast-forward keeps the shader-transition/cloud-policy implementation intact; publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
+- Previous non-wiki default-branch snapshot integrated: `5de23173ae5b61fb17887589d4dff69a6b17fc77`; older citations retain their reviewed source scope.
+- Previous source synchronization preserves two incoming commits and all 167 paths, including 24 wiki documents, from promoted cutoff `368c10a87fe9eba5f2e5e51cbb29518c4cc21f57`. The clean local fast-forward preserves incoming terrain/residency/DH owners and their author records; remote publication uses the combined validated documentation descendant. Repository instructions and deployment workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `fc1d529db2cc6ec80a4ad7a86b15007c17d0e097`; older citations retain their reviewed source scope.
 - Previous source synchronization preserves one incoming commit and all 21 paths, including three existing wiki guides, from promoted cutoff `5323a216f4cfd456255d111ceabc807ad691fdea`. Published history was recovered into a sparse checkout after workspace replacement, then fast-forwarded cleanly; no pending draft existed at the previous terminal batch. Fresh documentation validation applies to this recovered workspace. Repository instructions and workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `bffd0eef886a446a480cf62166da2eba448eb574`.
@@ -3074,3 +3076,12 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - All current Java/Rust, Frozen-oracle and runtime results are source-inspected author reports, not independent reruns. Historical reports, headings and monthly content remain preserved. Full strict build, independent source/history/rendered-reference review and docs-only tree checks precede guarded nonforce publication and terminal deployment.
 
 - Linked the verified [#826 repair review](https://github.com/HungLo2020/MattMC/issues/826#issuecomment-6101723839), [world/residency review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6101725598), [DH producer/reduction review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6101728595) and [CPU/hardware evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6101730126). All four issues remain open; this pass adds source/fixture review, not independently executed runtime evidence or tracker closure.
+
+
+## Batch 384: Shader transition and DH cloud-policy guidance
+
+- Reconciled shader-enable guidance with deferred terrain epoch rebuild, retirement of published layers, worker replacement and retained loaded columns. Qualified the submitted-mesh coverage gate and skipped offscreen preparation without treating the source fix as a new image/lifecycle pass.
+- Documented active-pack DH cloud suppression, explicit override, source-enabled fallback behavior and bounded parser fixtures while retaining cloud-owner lifetime and existing admission limits. Corrected the cloud guide's current whole-frame ABI to 79.
+- Expanded timed-toggle/screenshot instructions with direct Apply semantics, eligible-frame timing, stop ordering, rounded names and file verification. Added practical transition acceptance checks and preserved the current hardware blocker and historical runtime reports. No game, Java/Rust or capture checks were rerun; strict documentation build, independent review and guarded terminal publication are required.
+
+- Linked the verified [#747 shader-transition/cleanup review](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-6102231741) and [#745 cloud-policy review](https://github.com/HungLo2020/MattMC/issues/745#issuecomment-6102233578). Both remain open; the discarded translucent-data cleanup discrepancy is source-inspected, with no measured memory-growth or permanent-leak claim. No separate issue or runtime test result was added.
