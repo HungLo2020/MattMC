@@ -1,41 +1,40 @@
 # Goal 5 rendering checkpoint
 
-**Goal 5 remains incomplete.** The historical documentation source review reaches
-[`fc1d529d`](https://github.com/HungLo2020/MattMC/commit/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097):
-packed-word section capture, cached GUI resource misses, conditional DH semantic
-spans and merge changes reduce selected preparation work; the scripted recorder
-adds controls and finer timing. Its [author-reported diagnostic comparison](#october-10-capture-minimap-and-dh-cost-report)
-finds lower sample counts, with FPS changes within run-to-run noise. It supplies
-no newer settled Frozen acceptance matrix.
+**Goal 5 remains incomplete.** The current source review reaches
+[`5de23173`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77).
+Retained terrain selection, client residency, shared chunk/biome inputs and DH
+producer policies now have native CPU owners. The latest slice moves complete
+compact [DH render-column reduction](RUST-DH-RENDER-COLUMNS.md) into Rust.
+Java still performs contextual color callbacks, face construction, greedy
+merging, final packets and substantial world/application orchestration.
 
-The preceding DH lighting release, `3f00217d`, meets the settled four-mode
-median FPS/p99 floors across twenty clean runs. Its DH FPS advantage is only
-about **0.66%** after a predeclared extension to four repeats per side; the
-initial two-repeat **0.22% miss remains recorded**. That result does not validate
-the later source changes or establish an isolated migration gain or broad
-performance acceptance. The lighting release reports seven passing lifecycle
-cases; the preceding height-field release's original failure and separate strict
-retry remain distinct, with that teardown race unresolved. See
-[that release's matrix](#october-10-dh-lighting-and-emitter-summary) and
-[the ownership contract](../world/lighting/RUST-DH-LIGHTING.md).
+**New hardware acceptance is blocked in the author's environment.** The
+[committed record](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/PROGRESS.md)
+reports mismatched NVIDIA kernel/user libraries, an ABI 79 invocation that
+failed before world entry with X11 `BadDrawable`, and interrupted teardown.
+The latest CPU checks do not replace those failed or unstarted runtime gates.
+See [driver preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+
+The latest measured image is the older `839ff128`: twenty author-recorded
+settled runs still fail vanilla p99 and DH median FPS. Earlier `3f00217d`
+passed its own settled floors with a narrow DH margin; neither its pass nor
+`839ff128`'s measurements validate the subsequent retained-world/reduction
+image. [The release-separated evidence below](#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+preserves those boundaries and author-only execution provenance.
+
+The DH stale-counter discrepancy now has an actual Frozen CPU recorder and
+retained-counter/mutable-escape repairs. [The owner guide](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
+retains the original source-only finding and subsequent executable evidence;
+[the #826 repair review](https://github.com/HungLo2020/MattMC/issues/826#issuecomment-6101723839) still retains broader
+acceptance work. Do not describe the original raw-state mismatch as untouched,
+or infer current image/runtime acceptance from the bounded CPU repair.
 
 Java/Rust suites, lifecycle runs, captures and profiles below are author reports.
-This review inspected committed source and reports, not the unbundled runtime
-receipts, and did not rerun those workloads. Independent verification at
-`fc1d529d` passed five synthetic scripted-setup fixtures, not clients or live
-recordings; the two flight-retention checks belong to the preceding review.
-Entry, sustained streaming, broad visual/temporal parity, long-session memory,
-complete scene migration and the independent native crash remain open. A
-[source-predicted DH stale-counter discrepancy](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
-was unresolved at that review. The later retained-counter implementation now
-replays actual Frozen lighting passes, including mutable escape; those CPU
-regressions do not establish new gameplay or performance acceptance. Further
-[retained chunk inputs](../world/chunk/RUST-DH-CHUNK-INPUTS.md),
-[client residency](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md),
-[shared biome inputs](../world/biome/RUST-LIVE-BIOMES.md) and
-[DH change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md) move additional CPU
-producer ownership. Their current verification scope is recorded in those
-subsystem guides; the earlier timing matrices do not accept their release.
+This review inspected committed source and reports, not unbundled runtime
+receipts, and did not rerun those workloads. The five independent scripted-setup
+fixtures belong to `fc1d529d`; no new Java/Rust or client execution is claimed
+for this source reconciliation. Entry, sustained streaming, broad visual/temporal
+parity, long-session memory and complete scene migration remain open.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary
@@ -57,8 +56,8 @@ and publish immutable CPU leases. These paths do not transfer quadtree ownership
 or eliminate Java compatibility callbacks.
 Raw GUI image publication retains unchanged native images while Java supplies
 semantic identities and changed CPU snapshots. Java still supplies
-world/entity semantics and animation, meshing dispatch and inputs, full terrain
-asset/reload bookkeeping, DH quadtree/frustum candidates, frame parameters and
+world/entity semantics and animation, meshing dispatch and contextual inputs,
+terrain asset/reload orchestration, DH quadtree/frustum candidates, frame parameters and
 material-provenance diagnostics. Content definitions now have separate native
 owners; Java retains behavior factories, contextual callbacks and compatibility
 objects. Terrain staging and DH native publication retain copied/diagnostic
@@ -69,7 +68,13 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The [current performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6101175115)
+The current [world/residency review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6101725598),
+[DH producer/reduction review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6101728595)
+and [CPU/hardware evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6101730126)
+cover `5de23173` without closing those issues. They inspect source and fixture
+assertions; they add no independently executed Java/Rust or runtime results.
+
+The [preceding performance/evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6101175115)
 records the `fc1d529d` source and five-fixture check, keeping the author-only
 sample report separate from runtime acceptance.
 
@@ -593,6 +598,45 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 10 retained-world and DH reduction CPU checkpoint
+
+The [source record at `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/PROGRESS.md)
+separates the latest `ee1676ec` CPU release from the last measured `839ff128`.
+For reduction, the author reports 3,616 cases executed against six pinned
+untouched Frozen classes, 576 supplemental current semantic cases, four focused
+Rust controls, 27 architecture checks and five JNI controls. Full Java reports
+**1,914 tests, two skipped: 1,912 executed**, zero failures/errors across 343
+suites; six workers map the exact release. These are inspected author reports,
+not independently rerun suites or saved-world/rendering coverage. The initial
+fixture-include compilation failure is retained in the source record.
+
+The earlier `839ff128` author record reports 2,485 Rust passes/three ignored,
+1,852 Java reported/two skipped, seven lifecycle cases and two reviewed settled
+image pairs. Twenty predeclared 6,000-frame ABAB runs gave:
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Recorded gate |
+| --- | --- | --- | --- |
+| Vanilla | 1,331.80 / 1,153.55 | 3.421 / 3.110 | p99 fails |
+| Vanilla + DH | 725.85 / 733.70 | 4.865 / 5.321 | FPS fails |
+| Shaders | 347.30 / 316.35 | 4.967 / 5.979 | Passes this workload |
+| Shaders + DH | 254.15 / 225.05 | 6.811 / 8.034 | Passes this workload |
+
+DH includes four repeats per side, the other modes two. Weighted Java allocation
+of 0.828/4.226 GB excludes native allocation; a short Current RSS observation of
+4.684 GiB does not bound long-session memory. Inclusive producer sample counts
+overlap and do not isolate priority-queue cost or demonstrate a migration gain.
+These measurements precede the newer retained inputs, residency, shared biome
+bindings, change hashes and complete reduction.
+
+The newer hardware work is blocked by the reported kernel 595.91.07 versus
+installed 595.99.02/NVML 595.99 mismatch. An earlier software-device full Rust
+attempt reported 2,353 passes, 138 failures and three ignored, including GUI
+and graphics-lock cascades; it is not a full-suite pass. The ABI 79 lifecycle
+attempt failed before entry and was interrupted. Twenty newer timing runs are
+predeclared **but not started**. After the environment is restored, the author
+still requires matched-driver suites, seven lifecycle cases, original captures,
+all declared timing runs, streaming profiles and sustained host/GPU memory.
 
 #### October 10 capture, minimap and DH cost report
 

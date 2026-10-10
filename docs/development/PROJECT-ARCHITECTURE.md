@@ -44,7 +44,9 @@ src/main/rust/
 │   │   ├── occlusion.rs
 │   │   ├── render_data.rs
 │   │   ├── render_list.rs
+│   │   ├── terrain_frames.rs
 │   │   └── translucent.rs
+│   ├── dh_columns/
 │   ├── dh_collector/
 │   ├── scene/
 │   ├── shared/
@@ -79,10 +81,13 @@ src/main/rust/
         ├── chunk/
         │   ├── biomes/
         │   ├── counters/
+        │   ├── dh_columns/
+        │   ├── dh_hash/
         │   ├── dh_heightmaps/
         │   ├── live/
         │   ├── palette/
         │   ├── snapshot/
+        │   ├── inputs.rs
         │   └── stage_transfer.rs
         ├── lighting/
         │   ├── dh/
@@ -92,6 +97,7 @@ src/main/rust/
         │   ├── propagation/
         │   └── skylight_sources/
         ├── chunk_distance/
+        ├── client_residency/
         ├── color_map_color_util.rs
         └── levelgen/
             ├── synth/
@@ -168,11 +174,30 @@ terrain tint/blending, brightness/weather adjustments, contextual light, model
 admission and entity callbacks, and orchestrates chunks and generation stages.
 These owners do not complete the world migration.
 
-The local [shared biome input](world/chunk/RUST-DH-CHUNK-INPUTS.md) binds primary
-biome owners once for both the loaded-world index and DH columns. Unchanged
-publication retains that collection without rebuilding Java pointer arrays or
-Rust owner rows. Biome admission remains independent of block/counter admission;
-registry identity, mutable escape and custom getter order retain their contracts.
+[Shared chunk inputs](world/chunk/RUST-DH-CHUNK-INPUTS.md) in
+`world/level/chunk/inputs.rs` retain mutable block/counter owners, with an
+independently admitted biome collection shared by sky/fog and DH columns.
+Unchanged bindings avoid rebuilding pointer arrays and native owner rows;
+Java still validates section/container identities on each admission. These are
+bindings to live owners, not frozen chunk snapshots. Biome admission remains
+independent of block/counter admission; registry identity, mutable escape and
+custom getter order retain their contracts.
+
+[Client residency](world/chunk-loading/RUST-CLIENT-RESIDENCY.md) in
+`world/level/client_residency/` owns logical slots, counts, center, position
+fingerprints and empty membership, using retained counters for ordinary scans.
+Java retains atomic chunk references, reference-CAS facts, ring/range reads,
+radius relocation and callback delivery. This is partial client-world ownership.
+
+At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/mod.rs),
+DH world CPU ownership also includes columns, mutable full-data recipients,
+parent reduction, ordered occlusion, contributor snapshots, material-map
+identities/remapping, same-detail merges and change hashes. The separate
+`render/dh_columns/` owner reduces compact render columns. Java still supplies
+admission/wrapper bindings, update orchestration and public metadata, persistence,
+contextual colors/material resolution, faces, greedy mesh assembly and final
+packets. The following release-specific records describe successive checkpoints;
+they do not verify the combined source's runtime or performance.
 
 Admitted [DH height fields](world/chunk/RUST-DH-HEIGHTMAPS.md) in
 `world/level/chunk/dh_heightmaps/` scan live block owners and section counters
@@ -251,13 +276,15 @@ source/native/Frozen/prompt guards pass. Hardware/performance and sustained
 memory remain unverified.
 See the [direct intrinsic consumer](world/chunk/RUST-DH-MATERIAL-MAPS.md#direct-intrinsic-material-consumer-local-work-in-progress).
 
-The local ABI79 [native terrain-frame handoff](rendering/JAVA-BRIDGE.md#native-terrain-selection-frames)
-retains camera layers/casters as immutable scene arrays. Java passes CPU frame
-identities and the decoder acquires ownership before queueing; ordinary terrain
-avoids pending/request record copies. Three frames per graph are retained;
-reload/closure invalidate unresolved references, while acquired data survives.
-Full CPU suites and actual JNI checks pass on7cf545b2; runtime/performance
-acceptance is pending. Legacy/diagnostic encoding remains.
+The ABI 79 [native terrain-frame handoff](rendering/JAVA-BRIDGE.md#native-terrain-selection-frames)
+uses `render/chunk/terrain_frames.rs` to retain immutable camera-layer/caster
+arrays from the shared `render/scene/terrain.rs` vocabulary. Java passes CPU
+owner/frame identities and the exact camera; decoding acquires shared ownership
+before queueing, avoiding Java pending/request record copies. Each graph retains
+at most three selections for lookup; reload/closure invalidates unresolved
+references while acquired arrays survive. The author-recorded CPU/JNI checkpoint
+uses release `7cf545b2`; it does not establish current runtime/performance acceptance. Legacy/diagnostic
+encoding remains.
 
 These world CPU producers are separate from DH render-column collection,
 GPU resources and ordinary light-engine publication below.
@@ -379,7 +406,7 @@ Rendering systems belong here. This includes backend-independent render code, na
 
 Important current subdirectories:
 
-- `render/chunk/`: native chunk-rendering infrastructure, render lists, occlusion, translucent sorting, index generation, and rebuild triggers.
+- `render/chunk/`: native chunk-rendering infrastructure, render lists, occlusion, translucent sorting, index generation, rebuild triggers and bounded immutable terrain-selection frames.
 - `render/chunk/meshing/`: native chunk mesher implementation, including section scanning, static models, fluids, lighting/AO, tinting, culling, packing, assembly, FFI records, and diagnostics. Its [canonical face-policy owner](rendering/RUST-TERRAIN-CULLING.md) consumes retained world IDs; models, selectors and meshing states share one cache with concurrent read guards and exclusive registration/reload.
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
@@ -387,7 +414,7 @@ Important current subdirectories:
 - `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual colors, faces and final packets still belong to Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
 - `render/clouds/`: built-in DH cloud motion, placement, culling and color-change history in CPU owners. Java retains texture/API boxes, world-color queries and callbacks; see [cloud preparation](rendering/RUST-DH-CLOUDS.md).
 - `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). This does not implement native item registries or gameplay.
-- `render/scene/`: wire and data vocabulary shared by Java and the renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).
+- `render/scene/`: wire and data vocabulary shared by Java and the renderers, including immutable native terrain selections consumed directly by frame decoding ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).
 - `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
 - `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).
 - `render/worldrender/`: the world renderer ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/README.md)). `terrain/staging.rs` retains assembled vertices by mesh key and generation until asset acceptance or discard. `terrain/publication.rs` owns published section-layer identities and changed rows, synchronized directly into the Rust section graph. Java still registers/removes those identities, coordinates asset acceptance and resource-reload swaps, and supplies build/sort/atlas inputs. Ordinary opaque/cutout terrain uses shared page resource sets; per-mesh bindings are created only when needed outside that path, and section/material keys reuse resident geometry for the same mesh generation and vertex ABI. See [render resource preparation](rendering/RENDER-ARCHITECTURE.md), [terrain publication](rendering/JAVA-BRIDGE.md#terrain-publication-registry) and [terrain intake](rendering/JAVA-BRIDGE.md#terrain-layer-intake) for the ownership, copy and lifetime limits.

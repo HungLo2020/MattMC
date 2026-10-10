@@ -88,6 +88,18 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Current hardware evidence boundary
+
+At [source `5de23173`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77),
+new retained-world/DH producer and complete reduction checks are CPU evidence.
+The author's latest NVIDIA driver/library mismatch prevented hardware entry;
+software-device failures and interrupted teardown remain failed evidence.
+Do not reuse an older travel profile or settled image as acceptance of this
+newer source. The last measured `839ff128` still fails vanilla p99 and DH FPS,
+while newer declared timing runs have not started. See the
+[release-separated record](GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+and [hardware preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+
 ## Image and DH allocation constraints
 
 The [raw-image resolver at `fc1d529d`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/net/vulkanic/gui/RustGalGuiRawImageAssets.java)

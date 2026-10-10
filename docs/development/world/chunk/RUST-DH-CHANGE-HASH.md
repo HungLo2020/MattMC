@@ -7,6 +7,11 @@ cached [height fields](RUST-DH-HEIGHTMAPS.md) and native emitter positions.
 Java does not create sampled block/biome arrays or repeat the hash loops.
 This is CPU world policy; it does not change GPU ownership or presentation.
 
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
+
 Implementation: [producer](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/dh_hash),
 [compatibility admission](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhChunkHash.java)
 and [ordinary consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/common/wrappers/chunk/ChunkWrapper.java).

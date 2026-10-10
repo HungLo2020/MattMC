@@ -64,7 +64,8 @@ or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe ch
 | --- | --- |
 | A new kind of draw, pass or effect for the world | `worldrender/` (see its README) |
 | GUI drawing, item rendering or a GUI post effect | `guirender/` |
-| A wire constant or data type shared with Java | `scene/` |
+| A wire constant or shared immutable CPU scene type | `scene/` |
+| Terrain selection ownership and bounded frame lookup | `chunk/terrain_frames.rs`; shared arrays in `scene/terrain.rs` |
 | Shader-pack parsing or pass planning | `shaderpack/` |
 | DH column generations, leases or publication/visibility bookkeeping | `dh_collector/`; keep Java wire handling in `bridge/dh_collector.rs` |
 | Built-in DH cloud motion, placement and culling policy | `clouds/`; see [cloud preparation](RUST-DH-CLOUDS.md) |
@@ -92,7 +93,11 @@ fuse eligible writes and recount directly, [immutable rebuild snapshots](../worl
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
 share resolver lattice samples within a capture. [Live biome owners](../world/biome/RUST-LIVE-BIOMES.md)
 retain admitted palettes and the loaded-client index used by direct raw sky/fog
-sampling and generation-validated result reuse. Java still delivers
+sampling and generation-validated result reuse. Shared [chunk-input bindings](../world/chunk/RUST-DH-CHUNK-INPUTS.md)
+retain primary block/counter owners and a separately admitted biome collection;
+world-color sampling and DH columns share that collection without repeating its
+publication packing. [Client residency](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md)
+owns window bookkeeping and callback-bounded empty scans. Java still delivers
 chunk/packet/range events and retains hooks, terrain tint/blending and later
 brightness/weather adjustments. [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md)
 own canonical lazy defaults and allocated nibble generations, including native
@@ -120,21 +125,28 @@ CPU ownership and synchronization, without exposing GPU resources across the
 boundary. Admission requires the exact canonical slice/platform and a canonical
 18³ shape grid, then checks the own state's supported policy. Compatibility
 records keep their original Java masks. Private compact snapshot version 5
-carries the native-policy flag; whole-frame ABI 78 is unchanged. The subsystem
+carries the native-policy flag; that change left the then-current whole-frame
+ABI 78 unchanged. The current whole-frame ABI is 79. The subsystem
 guide keeps source behavior separate from release-specific reported checks.
 
-Admitted DH world preparation now has native [height-field](../world/chunk/RUST-DH-HEIGHTMAPS.md)
-and [lighting/emitter](../world/lighting/RUST-DH-LIGHTING.md) owners. They borrow
-live section storage and publish immutable CPU views read by chunk wrappers;
-Java retains admission, wrapper publication, mutable compatibility views and
-fallback callbacks. These owners neither replace the DH render-column ledger
-nor complete Java voxel-column construction, hashing, quadtree inputs or material
-preparation. Preserve section-local snapshot timing and existing caller exclusion;
-no whole-world transaction or total memory acceptance is implied.
+Admitted DH world preparation includes native [height fields](../world/chunk/RUST-DH-HEIGHTMAPS.md),
+[lighting/emitters](../world/lighting/RUST-DH-LIGHTING.md),
+[columns](../world/chunk/RUST-DH-COLUMNS.md),
+[full-data recipients and parent/occlusion policy](../world/chunk/RUST-DH-FULL-DATA.md),
+[material maps](../world/chunk/RUST-DH-MATERIAL-MAPS.md),
+[same-detail updates](../world/chunk/RUST-DH-SOURCE-UPDATES.md) and
+[change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md). The separate
+[render-column reduction](RUST-DH-RENDER-COLUMNS.md) consumes compact CPU storage.
+Java retains admission and wrapper bindings, update orchestration/public metadata,
+persistence, quadtree inputs, contextual colors/material resolution, faces,
+greedy mesh assembly and final packets. These CPU owners are separate from the
+DH render-column ledger and GPU resources. Preserve section-local snapshot timing
+and caller exclusion; no whole-world transaction or runtime/performance acceptance
+is implied by the ownership change.
 
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The
-indexed GUI input arrived with ABI 73; the current whole-frame ABI is 78.
+indexed GUI input arrived with ABI 73; the current whole-frame ABI is 79.
 Java retains map revisions, staging and contextual map production.
 
 Raw GUI images use a separate incremental publication contract at ABI 78:
@@ -180,9 +192,12 @@ independent performance result. The retained Java producer emits ascending
 section-key order (`SectionKeyOrder`) for ineligible diagnostic, fault, reload
 and readiness-receipt frames, because hash-map iteration order shifted as
 sections streamed and identical sets missed Rust's batch-plan cache.
-Camera layers and off-camera shadow casters cross as packed compact records
-(mesh key, generation, section origin, depth policy; camera layers also carry
-flags), rather than per-instance records. The
+At ABI 79, ordinary camera layers and off-camera shadow casters remain in
+immutable Rust scene arrays. Java passes an opaque CPU owner/frame reference
+and the exact terrain camera; caller-side decoding acquires those arrays before
+queueing. The [native frame contract](JAVA-BRIDGE.md#native-terrain-selection-frames)
+bounds unresolved history and rejects expired or mismatched references. Legacy
+compact encoding and the ineligible Java producer remain available. The
 frontend retains compact entries on the armed shader route. Described resident
 sections become scene entries; only entries that cannot use that path expand
 into ordinary instances. Frames leaving the shader route, vanilla and Fabulous
@@ -193,8 +208,9 @@ A caster whose newer generation has not crossed yet keeps casting with the
 acknowledged one. Java keeps no active-instance state for casters.
 
 Ordinary whole frames use a native FIFO worker by default. The queued bridge
-decodes and copies the request on the calling thread before Java releases its
-arena; the worker then acquires the swapchain image, prepares, submits and
+decodes/copies Java records and acquires native terrain/DH owners on the calling
+thread before Java releases its arena; the worker then acquires the swapchain
+image, prepares, submits and
 presents the owned frame. Mesh-asset updates and atlas ticks also decode before
 queuing and execute in FIFO order. Java keeps at most one frame queued ahead
 of the frame being prepared. Non-queued context-registry operations join all
@@ -298,11 +314,13 @@ rather than treated as a requirement to use the historical reference save.
 - Ordinary frames take their static terrain from the graph
   ([`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/terrain_selection.rs)):
   Java requests one sync from the Rust publication registry into the graph,
-  and Rust emits the compact camera layers (graph BFS visit order, translucent
-  back to front), shader shadow casters and the frame's animated sprite ids (each
-  once) in the frame records' native layout. Java copies these records without
-  rebuilding each section's record and does not read the visits. The layer
-  fingerprint receipt is computed only when terrain diagnostics are active.
+  and Rust selects camera layers (graph BFS visit order, translucent back to
+  front), shader shadow casters and the frame's animated sprite ids (each once).
+  It publishes immutable camera/caster arrays and returns CPU owner/frame
+  identities for the ordinary handoff. Java reads sprite/receipt views but does
+  not copy the camera/caster records into pending or request storage. Selection
+  still constructs native arrays; this is not allocation-free frame production.
+  The layer fingerprint receipt is computed only when terrain diagnostics are active.
   Diagnostic, fault, reload, explicit per-record and readiness-receipt frames
   keep the Java producer, which asks the search to copy its visits. The
   implementation author's earlier `313e7a8a` report compares byte-identical

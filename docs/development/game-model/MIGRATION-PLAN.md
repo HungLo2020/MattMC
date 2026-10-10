@@ -49,8 +49,17 @@ Follow the owner boundary relevant to the next change:
   [section counters](../world/chunk/RUST-SECTION-COUNTERS.md) and
   [generation-stage handoffs](../world/levelgen/RUST-STAGE-HANDOFF.md).
   Live packed storage and generation-stage storage are separate native owners.
+  [Retained chunk inputs](../world/chunk/RUST-DH-CHUNK-INPUTS.md) bind mutable
+  block/counter owners and an independently admitted shared biome collection;
+  consumers observe growth without keeping a stale generation snapshot. Java
+  still validates compatibility identities and container replacement.
   Java chunk orchestration, compatibility serialization and remaining bulk
   producers still need migration.
+- **Client residency:** [native window bookkeeping](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md)
+  owns logical slots, counts, center, position fingerprints and empty membership.
+  Ordinary empty scans read retained counters and stop before each Java callback.
+  Java keeps atomic chunk references, ring/range reads, radius relocation and
+  callback delivery; public empty-set escape transfers membership to Java.
 - **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),
   [section color fields](../world/biome/RUST-SECTION-COLORS.md),
   [live light layers](../world/lighting/RUST-LIVE-LAYERS.md) and the
@@ -71,7 +80,17 @@ Follow the owner boundary relevant to the next change:
   timing: retain the original layer references, then lease their generations when
   the terrain-light consumer runs. This source ownership does not extend the
   linked guide's recorded verification to later revisions.
-- **DH world preparation:** [height fields](../world/chunk/RUST-DH-HEIGHTMAPS.md)
+- **DH world preparation:** the current [retained-input](../world/chunk/RUST-DH-CHUNK-INPUTS.md),
+  [full-data](../world/chunk/RUST-DH-FULL-DATA.md),
+  [same-detail update](../world/chunk/RUST-DH-SOURCE-UPDATES.md),
+  [material-map](../world/chunk/RUST-DH-MATERIAL-MAPS.md),
+  [change-hash](../world/chunk/RUST-DH-CHANGE-HASH.md) and
+  [render-reduction](../rendering/RUST-DH-RENDER-COLUMNS.md) owners supersede
+  earlier Java column, merge, identity-map and hash loops. Java retains admission,
+  compatibility wrappers, orchestration/public metadata, persistence, contextual
+  colors/material resolution, faces, greedy mesh assembly and final packets.
+  The following release narrative records successive migration and verification
+  checkpoints, rather than one current acceptance result: [height fields](../world/chunk/RUST-DH-HEIGHTMAPS.md)
   scan live blocks/counters and publish immutable CPU leases. The
   [lighting and emitter owners](../world/lighting/RUST-DH-LIGHTING.md) perform
   admitted whole passes and serve direct chunk light reads. Java retains strict
@@ -157,8 +176,10 @@ Follow the owner boundary relevant to the next change:
   and JNI checks pass after preserving counter semantics. It is not a runtime
   gameplay acceptance result.
 - **Live biomes and colors:** the [admitted palette owner and direct raw sky/fog consumers](../world/biome/RUST-LIVE-BIOMES.md)
-  are native. Rust reuses exact-position colors only after validating the world
-  revision and retained source generations. Java retains chunk lifecycle events,
+  are native. The loaded-world index and DH columns share the same immutable
+  primary-owner binding; unchanged publication reuses it after identity checks.
+  Rust reuses exact-position colors only after validating the world revision
+  and retained source generations. Java retains chunk lifecycle events,
   compatibility sampling, terrain tint/blending and later brightness/weather
   adjustments; hooks still run on every call. Preserve custom-hook/source
   dispatch and the guide's missing-chunk, mutable-container, view-range and
@@ -169,9 +190,11 @@ Follow the owner boundary relevant to the next change:
   Native [mesh-resource preparation](../rendering/RENDER-ARCHITECTURE.md) now
   reuses resident geometry across section/material keys for the same mesh
   generation and vertex ABI, and creates per-mesh resource sets only when a draw needs them outside shared-page terrain binding.
-  The local [native terrain selection handoff](../rendering/JAVA-BRIDGE.md#native-terrain-selection-frames)
-  now retains immutable scene arrays and passes CPU identities directly to frame
-  decoding. Full CPU suites/JNI checks pass; runtime/performance remain pending.
+  The ABI 79 [native terrain selection handoff](../rendering/JAVA-BRIDGE.md#native-terrain-selection-frames)
+  retains immutable scene arrays and passes CPU owner/frame identities and the
+  exact camera to decoding. The decoder acquires ownership before queueing;
+  legacy/diagnostic record encoding remains. Its reported CPU/JNI checkpoint
+  does not verify runtime or performance of the combined source.
   Remaining retained mesh payloads, entity preparation, Java animation and
   contextual inputs still need work with their direct consumers.
 

@@ -6,12 +6,14 @@ Java does not construct dense block inputs, computed masks or two mirrored
 `int[16][16]` maps. Getters read an immutable CPU lease. Broad gameplay and
 long-session resource behavior remain open.
 
-Source ownership was reviewed at
-[`bffd0eef8`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574).
-The verification below preserves the implementation author's reports for the
-height-field release; this documentation review did not rerun Rust/Java suites
-or clients. Later [DH lighting results](../lighting/RUST-DH-LIGHTING.md) belong
-to their own release and do not replace the height-field evidence.
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
+
+The [earlier height-field review](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574)
+and the original height-field release reports below remain historical. Later
+[DH lighting results](../lighting/RUST-DH-LIGHTING.md) belong to their own release.
 
 Implementation:
 [height-field owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/dh_heightmaps),
@@ -33,12 +35,12 @@ and [DH consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java
   worlds and incompatible state policy retain the original Java path. A
   mismatched entry in DH's public wrapper cache also retains that path. Subclass
   callbacks are not replaced by sampled answers.
-- The local [shared chunk-input owner](RUST-DH-CHUNK-INPUTS.md) retains mutable
+- The [shared chunk-input owner](RUST-DH-CHUNK-INPUTS.md) retains mutable
   block/counter bindings; scans borrow that one pinned owner. Each result owns its
   values independently; an automatic arena releases it once after CPU readers
   finish. Rebuilding a wrapper replaces its lease without mutating retained
-  older results. There is no owning global chunk cache or GPU handle. The local
-  reuse work below retains only immutable fields and weak generation identities.
+  older results. There is no owning global chunk cache or GPU handle. The bounded
+  reuse implementation below retains only immutable fields and weak generation identities.
 - `recreateHeightmaps=false` still uses Minecraft's existing heightmaps. Getter
   bounds checks and the original compatibility callback sequence remain.
 
@@ -47,9 +49,11 @@ highest nonempty section and does **not** evaluate the minimum row. An entirely
 empty chunk reports maximum `minY + 16`. Preserve these details; changing
 suspected Frozen behavior requires the user's decision.
 
-## Local bounded field reuse (in progress)
+<a id="local-bounded-field-reuse-in-progress"></a>
 
-The latest local source reuses immutable fields inside Rust when authoritative
+## Bounded field reuse
+
+The current source reuses immutable fields inside Rust when authoritative
 storage and the sampled empty-section mask are unchanged. This follows the
 Current-only travel profile's repeated chunk-wrapper preparation/native height
 scans (288 of11,881 ticks); it is a candidate optimization, not a measured gain.
@@ -102,7 +106,7 @@ python3 DevUtils/RunWiki.py check
 ```
 
 The following runtime measurements are historical and belong to the original
-height-field release. The local reuse source above requires fresh acceptance.
+height-field release. The retained-input and reuse source above requires fresh acceptance.
 
 The actual Frozen recorder is
 [`GenerateFrozenDhHeightmapOracle.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhHeightmapOracle.java).

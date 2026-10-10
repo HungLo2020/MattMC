@@ -1,6 +1,7 @@
 # Rust client chunk residency
 
-The local migration routes supported client windows through
+At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/java/net/minecraft/client/multiplayer/ClientChunkCache.java),
+supported client windows route through
 [Rust residency policy](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/client_residency/mod.rs).
 Rust owns logical slot publication, counts, center, the diagnostic position
 fingerprint and empty-section membership. The
@@ -24,7 +25,9 @@ scans; it does not pack Java booleans or rebuild Rust section arrays.
 - Custom chunks/sections/worlds or height-accessor bindings use their original
   getters at the original row boundary. Admit bulk geometry only for exact client
   worlds with the original chunk/world height binding.
-  Unsupported radii retain the existing compatibility storage behavior.
+  Native creation admits radii 0 through 127; unsupported radii retain the
+  existing compatibility storage behavior. Moving the center alone does not
+  evict old physical slots; radius changes still relocate them in Java order.
 - `getLoadedEmptySections()` transfers the exact fastutil table once, including
   zero, capacity, collisions and iteration order. Later public mutation remains
   authoritative in that compatibility set; native empty membership is retired.
@@ -34,6 +37,10 @@ scans; it does not pack Java booleans or rebuild Rust section arrays.
   snapshots remain valid. Additional strong leases require sustained memory tests.
 
 ## Verification
+
+This documentation review inspected the pinned source and recorded tests; it did
+not run game, native or Java suites. The author-recorded CPU checkpoint below
+predates later combined-source changes and is not current runtime acceptance.
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml --locked --profile suite --lib world::
@@ -48,8 +55,14 @@ The checked-in CRS1 corpus contains 600 operations: physical slots, count, exact
 empty iteration, range/index results, callback order and exception prefixes.
 Its raw SHA256 is
 `e6a9c21a774ff315d699f53ed619e57679dc8af7a0fc5b25fdb3f0ad800148bd`.
-Fixture callbacks supply immutable coordinates and mutable empty facts; the
-recorder does not copy Frozen's residency algorithm. Regeneration requires the
+The [600-operation Java replay](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/test/java/net/minecraft/client/multiplayer/NativeClientResidencyParityTest.java)
+uses custom chunk, section and world classes. It checks actual `Storage` and
+outer radius transitions while section emptiness follows compatibility getters;
+it does not establish ordinary retained-counter admission. Separate
+[adapter controls](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/test/java/net/minecraft/world/level/chunk/NativeClientResidencyTest.java)
+exercise retained counters, callback mutation, mutable escape and exception
+prefixes. Fixture callbacks supply immutable coordinates and mutable empty facts;
+the recorder does not copy Frozen's residency algorithm. Regeneration requires the
 pinned **Frozen-only** classpath/class manifest and normal registry bootstrap.
 Current Java Vulkan is not an oracle.
 

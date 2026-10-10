@@ -1,6 +1,6 @@
 # Rust DH semantic contributor transport
 
-This local migration is **in progress**. Rust captures immutable four-column
+Rust captures immutable four-column
 footprints, clips source contributors and remaps their packed material IDs.
 Source updates and DTO loading retain direct CPU readers. With semantic
 preservation enabled, the full-data transformer obtains one footprint and the
@@ -16,6 +16,11 @@ and seeded hashes also belong to Rust; see [full-data columns](RUST-DH-FULL-DATA
 Java maintains metadata storage and
 resolves render material spans and contextual colors. This is world CPU data, with no
 GPU handles or renderer resource ownership in the bridge.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [native producer](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/contributors.rs),
 [CPU lease](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhContributors.java),
@@ -78,7 +83,7 @@ exports. An ordinary parent update proves its readers retain the quadrant owner,
 with no per-cell native capture. A resized public compression list preserves the
 original Java exception and successful update prefix. The actual transformer
 makes one retained-footprint read, zero array-export reads and shares its
-immutable readers when semantic preservation is enabled. The combined local
+immutable readers when semantic preservation is enabled. The combined integration
 test also checks that disabled preservation never reads or publishes a footprint.
 The initial integration rejection and test-scope reconciliation are retained
 under `build/native-client-residency/initial-combined-java-failure/`.

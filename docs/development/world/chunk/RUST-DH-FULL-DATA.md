@@ -1,6 +1,6 @@
 # Rust DH full-data columns
 
-This local migration is **in progress**. Mutable full-data columns use Rust
+Mutable full-data columns use Rust
 point vectors with direct CPU readers. Native producer columns detach on their
 first mutation into independent Rust storage. Bulk list copies and ID remapping
 consume existing point views; Java does not reconstruct another point array.
@@ -15,8 +15,8 @@ footprint admission/capture from source facts in the same call. It now also
 selects signed generation/compression metadata and computes parent list hashes
 while appending remapped points. Java stores the resulting bytes and reads seeded
 hashes; it does not repeat these policies per group. Java still owns source update
-orchestration, custom material-map mutation, metadata storage, contextual callbacks,
-persistence and render-data transformation.
+orchestration, custom material-map callbacks, metadata storage, contextual colors,
+persistence and render geometry construction.
 Legacy or explicitly replaced Java lists remain compatibility inputs. The subsequent
 [render-column reducer](../../rendering/RUST-DH-RENDER-COLUMNS.md) owns compact
 reduction policy in Rust; contextual full-data colors and final render geometry
@@ -33,12 +33,17 @@ admission into one Rust preparation/publication operation. Existing recipient
 vectors reuse their capacity; public metadata storage and orchestration remain
 Java. Its guide records the source-borrowing and failure-publication constraints.
 
-The subsequent local source also performs the complete 64×64 occlusion pass in
+The current source also performs the complete 64×64 occlusion pass in
 one Rust call over existing owners. It follows Frozen's x/z and neighbor order,
 so later centers observe earlier mutations. Java stages bounded owner/view
 descriptors and consumes updated extents/hashes without exporting point values.
 CPU checks for this newer pass are recorded below; hardware/gameplay and
 performance acceptance remain pending.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [point owner and occlusion](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/dh_columns),
 [CPU list](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnList.java)

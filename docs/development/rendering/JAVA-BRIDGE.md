@@ -53,22 +53,33 @@ exact measurement window and cleanup checks pass. Receipt:
 
 ## Native terrain selection frames
 
-The local ABI79 migration appends CPU owner/frame identities to whole-frame
-request fields56/57. Ordinary terrain selection publishes validated immutable
-scene arrays in Rust; Java passes identities and the exact terrain camera rather
+ABI 79 appends CPU owner/frame identities to whole-frame request fields 56/57.
+The [reviewed producer](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/render/chunk/terrain_frames.rs)
+validates selection records and constructs shared immutable CPU arrays.
+Java passes identities and the exact terrain camera rather
 than copying selection records into pending and request buffers. The decoder
 acquires shared array ownership before queueing. Inline terrain/caster records
 and a native reference are mutually exclusive; unknown, evicted, closed-owner
 or camera-mismatched references reject without dereferencing inline data.
 
-Each graph retains at most three selections. Resource reload invalidates
-unresolved references without reusing frame IDs; acquired arrays survive reload,
-eviction and graph closure. Legacy/diagnostic selection still uses record
-encoding. Mesh generation admission, resource ownership, passes and presentation
-remain in the existing renderer/GAL path. The private graph selection view grows
-from80 to96 bytes, so Java and the native library must be rebuilt together.
+Each graph retains at most three selections for later lookup. Owner/frame IDs
+are positive identities, never native addresses or GPU handles; zero means no
+native reference. Camera matching is bit-exact, including signed zero. The
+combined terrain/caster/mesh count is still bounded at 65,536. Resource reload
+invalidates unresolved references without reusing frame IDs; acquired arrays
+survive reload, eviction and graph closure. The three-entry history does not
+bound arrays already acquired by in-flight frames.
 
-This implementation has no final runtime acceptance. Initial lifecycle launches
+Legacy/diagnostic selection still uses record encoding. Native publication
+constructs its arrays and sorts casters, so removing Java copies does not imply
+allocation-free production. Mesh generation admission, resource ownership,
+passes and presentation remain in the existing renderer/GAL path. The private
+graph selection view grows from 80 to 96 bytes, so rebuild Java and the native
+library together.
+
+The following is the implementation author’s recorded checkpoint, not a new
+verification run of the reviewed source. This implementation has no final runtime
+acceptance. Initial lifecycle launches
 failed before world entry during an unattended NVIDIA update: installed libraries
 595.99.02 disagree with the loaded595.91.07 kernel module, only llvmpipe is
 enumerated and X11 reports DRI3 BadDrawable. The owned invocation was stopped,
@@ -116,8 +127,9 @@ for dirty publication, focused checks and remaining runtime evidence limits.
    note in `abi/version.rs`.
 5. Bound the new input: payload limits live in `abi/limits.rs`, and per-request
    input-byte bounds in the checked readers in `bridge/memory.rs`.
-6. Decode into renderer types in the matching module (`gui/`, `world/`, ...)
-   and keep it decode-and-copy only; rendering decisions belong to renderers.
+6. Decode into renderer types in the matching module (`gui/`, `world/`, ...).
+   Copy Java input or acquire owned native CPU scene data before queueing;
+   rendering decisions belong to renderers.
 
 Never rename an exported function or change its signature without the matching
 Java change: Java binds by name and fails at load if a symbol is missing.
@@ -147,15 +159,17 @@ large camera origins, exact double values and dirty storage.
 ABI 69 appends `world_static_terrain_shadow_casters` (struct 112, 32-byte
 records: mesh key, generation, section origin, depth policy) and the frame's
 `static_terrain_camera` to the whole-frame request (struct 53, fields 47–48).
-The camera is required whenever casters are present. The current producer packs
-caster records before request encoding; Rust validates them and sorts them by key. Eligible
+The camera is required whenever casters are present. The legacy compact producer
+packs caster records before request encoding; Rust validates them and sorts them by key. Eligible
 resident casters stay compact for the shader-route scene; other resident
 casters expand into shadow-only instances. Rebuild Java and native code together.
 
 ABI 70 appends `world_static_terrain_sections` (struct 113, 40-byte records:
 mesh key, newest copied generation, section origin, depth policy, flags) as
-field 49. Ordinary frames send every camera-visible section layer this way, in
+field 49. This legacy compact route sends every camera-visible section layer in
 draw order (translucent back to front); only the camera-sort flag is allowed.
+Ordinary ABI 79 selection uses the [native frame reference](#native-terrain-selection-frames)
+instead of copying these arrays through Java.
 Rust draws the generation it has acknowledged for each key, so the previous
 generation keeps drawing while a replacement uploads. Eligible sections stay
 compact for the [shader-route scene](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route).
@@ -272,16 +286,15 @@ state with a pipelined frame, so asking never joins it. They use standalone poin
   Java reports column/build events and requests a native sync from the
   [terrain publication registry](#terrain-publication-registry), replacing its
   earlier per-section mesh-row packing. After camera search, `select_terrain`
-  returns graph-owned
-  buffers for camera layers, optional off-camera shadow candidates and animated
-  section positions, plus producer counters. Camera/caster buffers use the same
-  ABI 70/69 layouts as the whole-frame request. Their views are valid only until
-  the next selection; Java copies them into packed pending storage, takes an
-  owned frame copy and copies that block into the request arena. Queued submission
-  then decodes/copies before the arena is released. This is a compact handoff,
-  not a retained borrow or zero-copy frame. See
-  [selection and lifetime](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustSectionGraph.java#L215-L282),
-  [packed frame storage](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L511-L591)
+  publishes an immutable native camera/caster frame and returns its CPU
+  owner/frame identities, along with graph-owned views and producer counters.
+  The borrowed views still expire at the next selection; Java consumes animated
+  sprite IDs and receipts synchronously. Ordinary submission passes the retained
+  frame identity, with no pending/request camera/caster copy. Decode must acquire
+  its arrays before eviction or reload; acquired data remains valid for queued
+  work. Legacy compact buffers retain their ABI 70/69 layouts and copy path.
+  See [native frame lifetime](#native-terrain-selection-frames), the
+  [current graph view](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/java/net/vulkanic/world/RustSectionGraph.java)
   and [selection scope](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
 
 ### Terrain publication registry
@@ -377,8 +390,8 @@ for route gating, protection, bounds and the remaining Java producers.
 
 - The bridge uses only the public GAL modules and is the only code that creates
   GALs (`VulkanicGal::create*`).
-- `gui/` and `world/` only decode and copy records; they never build GAL
-  resources or commands themselves.
+- `gui/` and `world/` decode/copy records or acquire native CPU scene owners;
+  they never build GAL resources or commands themselves.
 - Record names extend shared families (GUI, world, material) rather than naming
   individual producers (no `Hotbar`, `BossBar`, ...).
 
@@ -414,7 +427,7 @@ failure, and result alignment/capacity are checked before execution.
 
 Ordinary whole frames use the [queued route](#queued-frames) by default when
 both pipelining and queuing are enabled. Queued submissions decode/copy Java
-records and resolve native DH owners on the calling thread; they do not retain
+records and resolve native terrain/DH owners on the calling thread; they do not retain
 borrowed Java request memory after the call. `MATTMC_PIPELINED_FRAMES=0` or
 `-Dmattmc.rustGal.pipelinedFrames=false` disables both asynchronous routes.
 
@@ -535,12 +548,12 @@ caller-decode path; they do not require two live Java request arenas today.
 
 ## Chunk rebuild color ownership
 
-The separate compact meshing header is version4 (136 bytes), with a final CPU
-color-owner identity. Ordinary snapshots use Rust-owned shared fields and copied
+Color-owner transport was introduced in private compact meshing header 4
+(136 bytes), with a final CPU color-owner identity. Ordinary snapshots use Rust-owned shared fields and copied
 literal-provider rows; zero-owner literal tensors remain for compatibility
 fixtures. Sharing is per resolver within each section capture. That color
 transport left the then-current whole-frame ABI 74 unchanged; the current ABI
-is 77. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
+is 79. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
 for construction, sealing, lifetime and provider compatibility.
 
 Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
@@ -548,9 +561,10 @@ Rust fills the state-ID halo directly. The local
 [bulk terrain-light boundary](RUST-TERRAIN-LIGHTING.md) borrows 54 CPU generation
 leases plus eight-byte contextual records to write the mesher light span directly;
 Java retains contextual predicates/shade and model admission. Those standalone
-CPU calls leave compact header4 and whole-frame ABI78 unchanged. The
+CPU calls left compact header 4 and the then-current whole-frame ABI 78 unchanged. The
 later [native face policy](RUST-TERRAIN-CULLING.md) adds private compact header5
-for direct mesher admission; it does not change whole-frame ABI78.
+for direct mesher admission; it left whole-frame ABI 78 unchanged. ABI 79’s
+terrain-selection change is a separate contract.
 Unsupported/debug containers retain their original CPU compatibility
 path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.
 

@@ -1,12 +1,17 @@
 # Rust DH material maps
 
-This local migration is in progress. Rust now owns the ordered serial identities,
+Rust owns the ordered serial identities,
 lookup index, duplicate/import policy, material remapping and wrapped hash of
 admitted `FullDataPointIdMap` instances. Java keeps wrapper bindings for public
 getters and persistence callbacks; its compatibility `idMap` stays empty on the
 native path. Read-only producer maps keep their original binding readers without
 a second Java list. Ordinary map-to-map merge and append consume existing native owners
 in one call, without rebuilding strings or looking up every pair in Java.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [native map](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/id_map.rs),
 [CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhIdMap.java),
@@ -47,7 +52,9 @@ remain unfinished.
   Clearing/unloading releases bindings and owner leases through automatic arenas.
   Retained memory follows live maps; long-session acceptance is still required.
 
-## Direct intrinsic material consumer (local work in progress)
+<a id="direct-intrinsic-material-consumer-local-work-in-progress"></a>
+
+## Direct intrinsic material consumer
 
 Identity entries now also retain the registered block-state ID from each stock
 compatibility binding. Duplicate lookup keeps the selected original binding;

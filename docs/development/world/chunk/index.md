@@ -4,7 +4,8 @@
   cached field semantics, mutable emitter boundaries and actual Frozen replay.
 
 - [Retained Rust DH chunk inputs](RUST-DH-CHUNK-INPUTS.md): shared authoritative
-  block/counter/biome bindings and direct height/emitter/lighting/column consumers.
+  block/counter/biome bindings, direct height/emitter/lighting/column/hash consumers
+  and separate current runtime acceptance.
 
 - [Rust DH material maps](RUST-DH-MATERIAL-MAPS.md): ordered native identity/index
   ownership, bulk remapping, duplicate/import policy and compatibility bindings.
@@ -16,13 +17,13 @@
   production, direct retained consumers and public copy compatibility.
 
 - [Rust DH full-data columns](RUST-DH-FULL-DATA.md): retained native recipient
-  points, parent reduction/metadata, direct bulk consumers and compatibility constraints.
+  points, parent reduction/metadata, ordered whole-source occlusion and compatibility constraints.
 
 - [Rust DH columns](RUST-DH-COLUMNS.md): whole chunk-to-column producer, retained
-  material IDs, CPU views, mutation compatibility and verification in progress.
+  material IDs, CPU views, mutation compatibility and historical release evidence.
 
 - [Rust DH height fields](RUST-DH-HEIGHTMAPS.md): direct live-section scans,
-  intrinsic collision policy, CPU leases and scoped runtime verification.
+  intrinsic collision policy, bounded field reuse and release-scoped verification.
 
 - [Rust ordered palette values](RUST-PALETTE-DISTINCT.md): first-occurrence biome
   and block scans, callback compatibility and complete caller verification.

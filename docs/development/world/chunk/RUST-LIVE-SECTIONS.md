@@ -18,10 +18,15 @@ owners and fuse with canonical writes. Admitted [live biome palettes and sky
 sampling](../biome/RUST-LIVE-BIOMES.md) have separate Rust owners. Java retains
 chunk orchestration, scheduling and compatibility paths.
 
-The local [DH chunk-input migration](RUST-DH-CHUNK-INPUTS.md) also makes primary
-live owners reference counted, including stage adoption. Chunk consumers retain
-the mutable owner across palette growth; generation views keep their independent
-leases. CPU verification and runtime limits are recorded in that guide.
+At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/inputs.rs),
+[shared chunk inputs](RUST-DH-CHUNK-INPUTS.md) retain reference-counted primary
+block and counter owners, including owners produced by stage adoption. Consumers
+retain the mutable owner across palette growth; generation views keep independent
+leases. Java validates section/container identities before reusing a binding.
+These bindings are not frozen snapshots and add no copied block/word mirror.
+DH height, emitter, lighting, column and [change-hash](RUST-DH-CHANGE-HASH.md)
+consumers use them, as do [client-residency empty scans](../chunk-loading/RUST-CLIENT-RESIDENCY.md).
+CPU verification and runtime limits remain scoped to the linked guides.
 
 ## Consumers and remaining work
 
@@ -96,6 +101,10 @@ accept runtime or performance; assess the additional write bookkeeping in
 realistic workloads. Historical results below do not accept this source.
 
 ## Verification
+
+The pinned shared-owner source was inspected for this documentation update;
+no native, Java or game tests were rerun. The release-specific reports below
+remain historical evidence for their own source and workload.
 
 Use JDK25 and a consistently configured release library for Java/runtime checks:
 

@@ -9,12 +9,15 @@ world's immutable color table and reuses its cubic window while source
 generations remain current. The admitted native path avoids Java's 216-color grid; compatibility
 sampling retains its original callbacks.
 
-The local [retained input migration](../chunk/RUST-DH-CHUNK-INPUTS.md) now shares
-one immutable biome binding between this index and DH column inputs. Publication
-passes that owner directly; it does not allocate another Java section-owner array,
-pointer buffer or native owner-row collection. Identity validation remains on each
-admission. Unchanged binding publication retains the color window; every query
-still checks primary-owner generation/revision before reusing a result.
+At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/java/net/minecraft/world/level/chunk/NativeBiomeChunkInputs.java),
+the [retained input owner](../chunk/RUST-DH-CHUNK-INPUTS.md) shares one immutable
+biome binding between this index and DH column inputs. Unchanged bindings reuse
+the same collection after section/container and registry-identity checks;
+publication passes its native owner directly. Creating a changed binding still
+captures Java owner identities and native references. Reuse avoids repeating that
+packing, rather than removing all admission work or allocation. Unchanged binding
+publication retains the color window; every query still checks primary-owner
+generation/revision before reusing a result.
 
 Historical suite, runtime and profile outcomes reported below are committed author
 records. Their external receipts were not independently inspected or rerun by

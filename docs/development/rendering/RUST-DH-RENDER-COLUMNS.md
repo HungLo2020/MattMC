@@ -1,12 +1,17 @@
 # Rust DH render-column reduction
 
-The local migration moves complete compact render-column reduction into Rust.
+Rust owns the admitted complete compact render-column reduction.
 Ordinary `RenderDataPointUtil.mergeMultiData` calls borrow existing canonical
 column storage and publish directly into the destination; Java does not pack a
 point buffer, construct reducer nodes, sort links or repeat reduction policy.
 Full-data conversion still performs contextual block-color callbacks in Java;
 face construction, greedy merging and final packet construction also remain.
 This is backend-independent CPU render policy, with no GPU handles or presenter.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [native reduction](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/dh_columns),
 [storage admission](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/NativeDhRenderReduction.java)
@@ -29,8 +34,10 @@ and [ordinary consumer](https://github.com/HungLo2020/MattMC/blob/master/src/mai
   writes; invalid geometry declines without native partial publication, then
   the original Java path delivers its callbacks and exceptions. Existing caller
   exclusion is still required; this does not create a concurrent transaction.
-- Admit exact `ColumnArrayView`/`LongArrayList` storage and bounded extents only.
-  Custom views/lists, malformed extents and oversized input retain the original
+- Admit the final `ColumnArrayView` class backed by exact `LongArrayList`
+  storage and bounded extents. The bridge uses `instanceof ColumnArrayView`
+  and an exact-class check for its backing list. Custom `IColumnDataView`
+  implementations/lists, malformed extents and oversized input retain the original
   sequence. Ordinary zero-target output does not inspect the source. Semantic
   array validation remains before admission. Empty-view edge cases retain
   compatibility behavior rather than inventing a new write contract.
@@ -38,8 +45,8 @@ and [ordinary consumer](https://github.com/HungLo2020/MattMC/blob/master/src/mai
   capacity bounded to8,192 nodes,8,192 sort indices and4,096 output pairs.
   It contains numeric values only, retains no source pointer/world/Java object,
   and is reclaimed with that thread. Repeated normal calls reuse these vectors;
-  no global world or resource cache is added. Long-session memory still needs
-  runtime verification.
+  no global world or resource cache is added. These per-thread limits are not
+  a process-wide memory bound; long-session memory still needs verification.
 
 ## Verify
 

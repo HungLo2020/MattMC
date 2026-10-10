@@ -104,9 +104,13 @@ states/16 saved chunks, and 20 lighting cases/60 passes plus two cold JNI
 neighborhoods respectively. Fixture definitions are inspectable; reported
 Java/Rust results and live admission remain separate evidence. The
 [stale-counter source review](../world/lighting/RUST-DH-LIGHTING.md#source-review-boundary-2026-10-10)
-identifies a raw-palette emitter write whose stale-empty section may read as air
-through legacy DH but remain visible to native lighting. That case was not run;
-height-field stale-counter fixtures do not certify lighting behavior for it.
+originally identified a raw-palette emitter write whose stale-empty section
+could read as air through legacy DH while remaining visible to native lighting.
+The later retained-counter implementation now has actual Frozen stale-counter
+and mutable-escape recordings plus production JNI regressions. Preserve both
+the original finding and the later repair evidence; [#826](https://github.com/HungLo2020/MattMC/issues/826)
+still requires the broader current-image acceptance. Height-field fixtures alone
+were never lighting certification.
 
 Retain custom wrapper/hook and public-mutation compatibility checks, old CPU
 lease lifetime checks, and registration/reload exclusion for shared cache readers.
@@ -116,7 +120,13 @@ correlate exact-library worker mappings with actual producer stacks, reviewed
 F3 movement and submitted DH work. Settled captures do not certify first-frame
 or transient rendering. The DH producer release identities are
 [recorded separately](GOAL-5-STATUS.md#october-10-dh-lighting-and-emitter-summary);
-their results predate the later capture/minimap/DH cost changes.
+their results predate the later retained-world and complete reduction changes.
+The [current CPU checkpoint](GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+keeps the 3,616 Frozen reduction cases and 576 current semantic cases separate
+from unstarted hardware comparisons. Use the commands in the
+[reduction owner](RUST-DH-RENDER-COLUMNS.md#verify); CPU output/exception/sentinel
+parity does not certify contextual color callbacks, final face geometry, GPU
+images, streaming or long-session memory.
 
 ### Light-map source and fixture boundaries
 

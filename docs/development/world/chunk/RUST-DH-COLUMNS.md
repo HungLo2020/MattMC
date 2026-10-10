@@ -1,34 +1,30 @@
 # Rust DH column producer
 
-This migration is **in progress**. Rust owns the admitted chunk-to-DH column
-builder, material ID assignment and immutable CPU point storage. Java publishes
-compatibility views and still owns full-data update orchestration, serialization,
-contextual hooks and render-data transformation. The later local
-[full-data migration](RUST-DH-FULL-DATA.md) moves recipient storage, parent
-reduction and direct bulk operations into Rust; its final checks remain separate.
-The previous lighting release's runtime and timing results do not verify this
-implementation. The pre-handoff-fix build passed 2,485 Rust tests, 1,851 Java tests, all seven
-lifecycle cases and both reviewed settled image pairs. A subsequent actual
-Frozen mutable-lighting escape probe exposed a retained-counter mismatch; that
-handoff is now corrected. The final release (`839ff128`) passes 2,485 Rust
-tests (three ignored) and 1,852 Java tests (two skipped), including all 14 DH
-column/lighting JNI checks. Six observed workers map that release. All seven final lifecycle cases and both manually reviewed settled vanilla
-and shader+DH pairs pass, with VUID0 and DH visible-extension coverage28.84%.
-Source/native/Frozen/prompt fingerprints match. Paired allocation and Current CPU travel profiles pass all integrity/process
-guards, with all nine original F3 images reviewed and successful native source
-publication observed. All 20 predeclared timing runs are clean, but performance acceptance fails
-vanilla p99 and DH median FPS. Both shader modes pass.
+Rust owns the admitted chunk-to-DH column builder, material ID assignment and
+immutable CPU point storage. The [full-data owner](RUST-DH-FULL-DATA.md) also owns
+mutable recipient storage, parent reduction and direct bulk operations;
+[material maps](RUST-DH-MATERIAL-MAPS.md) and
+[same-detail updates](RUST-DH-SOURCE-UPDATES.md) own their admitted CPU policies.
+Java publishes compatibility views and retains update orchestration, persistence
+and contextual hooks. [Compact render-column reduction](../../rendering/RUST-DH-RENDER-COLUMNS.md)
+is Rust-owned; contextual colors, faces, greedy merging and final render packets
+remain Java. Complete Java removal and current runtime acceptance remain open.
 
 The producer borrows existing [block owners](RUST-LIVE-SECTIONS.md),
 [biome owners](../biome/RUST-LIVE-BIOMES.md),
 [height fields](RUST-DH-HEIGHTMAPS.md) and
 [lighting fields](../lighting/RUST-DH-LIGHTING.md). Rust captures sections under
-their existing locks. The local [shared input migration](RUST-DH-CHUNK-INPUTS.md)
+their existing locks. The [shared input owner](RUST-DH-CHUNK-INPUTS.md)
 passes a retained chunk owner rather than rebuilding Java block/counter/biome
 arrays and a pointer triplet buffer on every build. Java passes chunk metadata; it does
 not construct dense voxel inputs or output point arrays. Outputs retain no live
 chunk, light owner or world. A bounded compatibility table resolves each unique
 block/biome wrapper once; the native material IDs remain authoritative.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [whole producer](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/dh_columns),
 [CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhColumns.java),
@@ -65,6 +61,22 @@ Implementation: [whole producer](https://github.com/HungLo2020/MattMC/tree/maste
 
 ## Verify and diagnose
 
+Historical immutable-producer checkpoint, as reported by the implementation
+author:
+
+The previous lighting release's runtime and timing results do not verify this
+implementation. The pre-handoff-fix build passed 2,485 Rust tests, 1,851 Java tests, all seven
+lifecycle cases and both reviewed settled image pairs. A subsequent actual
+Frozen mutable-lighting escape probe exposed a retained-counter mismatch; that
+handoff is now corrected. The final release (`839ff128`) passes 2,485 Rust
+tests (three ignored) and 1,852 Java tests (two skipped), including all 14 DH
+column/lighting JNI checks. Six observed workers map that release. All seven final lifecycle cases and both manually reviewed settled vanilla
+and shader+DH pairs pass, with VUID0 and DH visible-extension coverage28.84%.
+Source/native/Frozen/prompt fingerprints match. Paired allocation and Current CPU travel profiles pass all integrity/process
+guards, with all nine original F3 images reviewed and successful native source
+publication observed. All 20 predeclared timing runs are clean, but performance acceptance fails
+vanilla p99 and DH median FPS. Both shader modes pass.
+
 From the repository root, with JDK 25:
 
 ```sh
@@ -100,7 +112,9 @@ pass. The old escape reconstructed values but lost retained policy counters
 (8,198 versus 12,289 work iterations in one later pass). The handoff now copies
 section allocation, constant and signed-counter state alongside values; retained
 native views remain immutable. All 30 actual Frozen passes now match through
-the production JNI bridge. Final lifecycle and settled pairs pass; ordinary
+the production-path JNI test: the first two passes per case assert native
+admission, then the remaining eight assert Java-owned storage after escape.
+Final lifecycle and settled pairs pass; ordinary
 travel profiles pass their bounded checks; performance misses below and
 long-session verification remain open.
 
@@ -112,6 +126,9 @@ an unintended compatibility path. Real travel profiles must separately prove
 producer admission and matching camera/world/settings before claiming a gain.
 
 ## Current travel evidence
+
+These are historical release `839ff128` measurements, retained as migration
+evidence. They do not verify the newer owners reviewed above.
 
 The guarded eight-second allocation pair uses the same prepared radius32 cached
 DH source, shaders off. All six original F3 endpoints exactly match across

@@ -1,6 +1,6 @@
 # Rust DH source updates
 
-This local migration is in progress. The same-detail recipient merge now runs
+The same-detail recipient merge runs
 through Rust preparation and publication over existing native point owners.
 Rust selects generation eligibility, remaps IDs, computes wrapped hashes and
 the global change flag, and admits/clips/remaps contributor footprints in x/z
@@ -12,6 +12,11 @@ Rust. Java orchestrates update/propagation flags,
 stores public generation/compression bytes and publishes compatibility readers.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
 [CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
@@ -62,15 +67,15 @@ python3 DevUtils/RunWiki.py check
 
 The [Frozen recorder](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhSameDetailOracle.java)
 checks Frozen's compiled source identity and invokes its actual private
-same-detail update. DHM1 covers all65,536 signed generation pairs and32 saved
-point-source cases, each with two updates. It records full points/metadata,
+same-detail update. DHM1 records 48 cases: 16 synthetic cases cover all 65,536
+signed generation pairs, and 32 use saved point sources. Each has two updates. It records full points/metadata,
 null columns, change flags and emptiness. Raw SHA256:
 `0d0b71c986010984edcb419edf0536d80577e6117e1c71b032fcecc6d9ad4b31`.
 This is supplemental CPU evidence, not gameplay or performance proof. Frozen
 does not implement Current's contributor sidecar: contributor controls compare
 Current's original route, separately from the actual Frozen base-state oracle.
 
-Local release `efeca492` passes all16 focused Rust column checks and234 Rust
+The author reports that release `efeca492` passes all16 focused Rust column checks and234 Rust
 world checks. Full Java reports1,880 tests (two skipped), zero failures/errors;
 32 DH controls include31 native consumers and one bootstrap regression. Six
 full-task workers map the exact release; all39,453 Current/38,176 Frozen source

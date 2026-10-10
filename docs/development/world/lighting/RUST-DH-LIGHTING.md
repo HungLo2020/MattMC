@@ -5,18 +5,21 @@ Java retains exact-input admission, wrapper publication, correctness flags,
 error handling and compatibility lighting. Broad gameplay and long-session
 resource acceptance remain open.
 
-Source ownership was reviewed at
-[`bffd0eef8`](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574).
-The verification below preserves the implementation author's reports for
-release `3f00217d`; this documentation review did not rerun Rust/Java suites or
-clients. Earlier height-field results remain separate.
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
+
+The [earlier lighting review](https://github.com/HungLo2020/MattMC/commit/bffd0eef886a446a480cf62166da2eba448eb574)
+and release `3f00217d` reports below remain historical; earlier height-field
+results are separate.
 
 The pass borrows authoritative live block owners and retained
 [DH height fields](../chunk/RUST-DH-HEIGHTMAPS.md). Rust takes section-local
 snapshots, enumerates emitters, seeds sky light and runs both priority queues.
 Uniform output sections retain encoded constants; varying sections own 2,048
 packed bytes per channel. Java borrows those exact tables and bytes.
-The local [shared chunk-input migration](../chunk/RUST-DH-CHUNK-INPUTS.md)
+The [shared chunk-input owner](../chunk/RUST-DH-CHUNK-INPUTS.md)
 retains section bindings in Rust and passes one CPU owner per neighbor; initial
 admission and public-wrapper checks remain Java. Java supplies neighbor order; it does not build
 dense block/policy arrays or execute per-cell boundary calls. Outputs own their
@@ -56,14 +59,22 @@ Implementation: [native pass](https://github.com/HungLo2020/MattMC/tree/master/s
 
 ## Stale-counter compatibility (2026-10-10)
 
-The source-only concern at `bffd0eef8` now has an actual Frozen CPU recorder
-and executable regression: three cases, nine passes, every cell and exact
+The source-only concern at `bffd0eef8` is superseded by counter-aware code, an
+actual [Frozen CPU recorder](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/DevUtils/tests/world/lighting/GenerateFrozenDhStaleCountersOracle.java)
+and [executable production-bridge regressions](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/test/java/net/minecraft/world/level/levelgen/NativeDhLightingTest.java): three cases, nine passes, every cell and exact
 work counts. Direct palette writes can leave `hasOnlyAir` stale. Native lighting
 borrows section counters and returns air for stale-empty block reads, while
 emitter enumeration deliberately retains raw palette positions. The original
 [source review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6096976812)
 and [dedicated #826](https://github.com/HungLo2020/MattMC/issues/826)
-remain historical review references, not evidence of a gameplay failure. The
+preserve the original concern; the [current repair review](https://github.com/HungLo2020/MattMC/issues/826#issuecomment-6101723839)
+records the executable repair and remaining acceptance work. The source/CPU
+repair is present: the stale-counter control asserts native admission, and the
+mutable-escape control checks exact cell values, work counts and retained-view
+immutability. #826 remains open for fresh producer-admission, lifecycle and
+manually reviewed comparison evidence on the current retained-input/ABI 79
+image. The reported driver mismatch blocks that runtime verification; neither
+older `839ff128` passes nor this source review closes the current acceptance gate. The
 upstream `fc1d529d` provenance/merge change did not resolve that case; the
 subsequent retained-counter implementation and actual Frozen oracle do.
 
@@ -77,8 +88,10 @@ A further actual Frozen mutable-escape probe found later work counts diverging
 (8,198 versus 12,289) after Java reconstructed a native field. The corrected
 handoff copies retained section allocation, constant and signed-counter policy
 with the values. Its three-case/ten-pass oracle pins eight Frozen classes;
-all 30 production JNI passes match in release `839ff128`. Full Rust/Java checks
-pass; the final seven lifecycle cases and both reviewed settled pairs pass.
+all 30 production-path passes in the JNI test match in release `839ff128`.
+The first two passes per case assert native admission; the remaining eight
+assert Java-owned public storage after the mutable escape. Retained native views
+stay immutable across both paths. Full Rust/Java checks pass; the final seven lifecycle cases and both reviewed settled pairs pass.
 Later travel admission and timing results belong to the
 [column milestone](../chunk/RUST-DH-COLUMNS.md). They do not accept the newer
 retained-input implementation, whose hardware and long-session verification

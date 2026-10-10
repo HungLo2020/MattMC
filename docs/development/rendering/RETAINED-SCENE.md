@@ -2,12 +2,13 @@
 
 **Status: shader-route retained terrain and the Rust visibility search are
 implemented in part; the full scene target remains open (October 2026).**
-ABI 70 carries compact terrain, and ordinary frames now select those compact
-camera layers and shadow candidates in the Rust section graph. Native
+ABI 70 introduced compact terrain. Ordinary frames now select camera layers
+and shadow candidates in the Rust section graph and, at ABI 79, pass immutable
+native selections through CPU owner/frame identities. Native
 publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups
 and ABI 74 visibility frames, retain CPU input data. These are their layout
 introduction versions; the [current whole-frame ABI](JAVA-BRIDGE.md#how-the-abi-stays-in-sync)
-is 78.
+is 79.
 Reduced-color DH geometry also uses shared GPU pages, with the separate
 ownership limits below. Diagnostic and
 other routes retain their documented producer and expansion paths. The phase list separates remaining targets
@@ -105,14 +106,18 @@ Static chunk sections whose meshes are resident are drawn by
   (`SourceTerrainDrawCoverage::without_scene`); the scene covers its own by
   construction (`scene_terrain` and `indexed_indirect_runs_*` tests).
 
-Since ABI 70, visible section layers and casters cross the Java bridge as compact
-entries (see [Java Bridge](JAVA-BRIDGE.md)). Ordinary frames now form them in
-[`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/313e7a8a82a34dc915c4924a78da77c720af2f7e/src/main/rust/render/chunk/terrain_selection.rs);
-the legacy path copies native records into Java frame/request storage. The local
-ABI79 implementation instead retains an immutable native selection and supplies
-opaque CPU owner/frame identities directly to decode; see
-[native terrain selection frames](JAVA-BRIDGE.md#native-terrain-selection-frames).
-Its final runtime/performance verification is pending. At the
+ABI 70 introduced compact visible-layer/caster entries (see [Java Bridge](JAVA-BRIDGE.md)).
+Ordinary frames form the selection in
+[`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/render/chunk/terrain_selection.rs)
+and publish immutable arrays through
+[`chunk/terrain_frames.rs`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/render/chunk/terrain_frames.rs).
+ABI 79 passes CPU owner/frame identities and the exact camera directly to decode;
+caller-side decoding acquires shared ownership before queueing. Legacy compact
+encoding retains Java frame/request copies. This is CPU input ownership, separate
+from persistent GPU meshes and the scene drawing path. See
+[native terrain selection frames](JAVA-BRIDGE.md#native-terrain-selection-frames)
+for expiry, reload, bounds and compatibility rules. Final runtime/performance
+verification is pending. At the
 [`20e157ca` checkpoint](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection.rs),
 solid/cutout layers preserve graph visit order while translucent layers remain
 back to front; this supersedes the earlier key-order equality report. The section
@@ -270,7 +275,9 @@ Each phase ends with Rust/Java tests passing and the full parity matrix
    *Status:* the search runs in Rust (`chunk/section_graph.rs`), and ordinary
    frames also select compact camera layers, shadow candidates and animated
    sections in `chunk/terrain_selection.rs`. Java skips its visible-list and
-   per-section record construction on that route. Rust now owns build request
+   per-section record construction on that route. ABI 79 also removes ordinary
+   camera/caster pending/request copies through retained CPU frame identities;
+   selection still constructs native arrays each frame. Rust now owns build request
    bookkeeping and entity-culling visit stamps; Java dispatches the listed
    requests, invokes native publication-to-graph sync and marks selected sprites.
    Shader-disabled frames also extract block entities from visited built sections plus global

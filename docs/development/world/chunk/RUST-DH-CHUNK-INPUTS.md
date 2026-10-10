@@ -1,13 +1,18 @@
 # Retained Rust DH chunk inputs
 
-Local migration in progress: height fields, emitter enumeration, the whole
-lighting pass and the column producer now consume one retained Rust chunk input
+Height fields, emitter enumeration, the whole lighting pass and the column
+producer consume one retained Rust chunk input
 owner. Java caches compatibility identities on `ChunkAccess` and admits current
 containers; it no longer rebuilds section pointer tables for each consumer.
 This is CPU world ownership, with no rendering/GPU handle or global chunk cache.
 
-The local [DH change-hash producer](RUST-DH-CHANGE-HASH.md) also reads these
+The [DH change-hash producer](RUST-DH-CHANGE-HASH.md) also reads these
 bindings directly, retaining cached height/emitter semantics and current counters.
+
+Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+implementation-author reports, and this review did not rerun suites or clients.
+See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [input owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/inputs.rs),
 [transitional binding](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhChunkInputs.java)
@@ -21,7 +26,7 @@ unchanged component; this input owner also admits canonical proto chunks.
   `Arc`. Retaining only a palette generation would hide later growth. Live
   creation, copies and stage-result adoption all use the same ownership protocol.
   Biome owners already use `Arc` and are attached only when columns need them.
-- The local biome extension uses a shared native collection of primary biome
+- The biome extension uses one native collection of primary biome
   owners. [Loaded-world sky/fog](../biome/RUST-LIVE-BIOMES.md) and column inputs
   retain that same allocation. Java caches compatibility identities once per
   binding change; color publication does not reconstruct pointer/owner arrays.
@@ -83,7 +88,7 @@ The newer shared biome-input checkpoint is release70cbb053, recorded under
 `build/native-biome-inputs/`. Its250 Rust world checks,29 focused Java controls
 and fullJava1,905 reported/two skips/zero failures or errors pass. Six full-task
 workers load that image and source/native/Frozen/protected-prompt guards match.
-Both sky/fog and columns retain the exact same native biome collection; unchanged
+Both sky/fog and columns retain the same native biome collection; unchanged
 publication reuses the color window while primary mutation/growth still
 invalidates it. See the [live-biome guide](../biome/RUST-LIVE-BIOMES.md) for
 admission boundaries and scoped verification. Obsolete Java binding caches can
