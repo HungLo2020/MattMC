@@ -2,6 +2,10 @@
 
 Pick the narrowest command that covers your change. Full-suite runs are for
 milestones and the [validation driver](../rendering/RENDER-VERIFICATION.md#one-command-validation).
+The task/profile behavior below is source-reviewed at
+[`f8620676`](https://github.com/HungLo2020/MattMC/commit/f86206767dadde696adfed4e04c5ee97cd0d0885); timing
+observations are the implementation author's reports, not independent results
+from this documentation review.
 
 | Goal | Command |
 | --- | --- |
@@ -10,19 +14,25 @@ milestones and the [validation driver](../rendering/RENDER-VERIFICATION.md#one-c
 | One Java class | `./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeHeightmapTest'` |
 | Ordinary Java suite | `./gradlew -PmattmcRustProfile=release test -x testRustNative` |
 | Large parity workloads | `./gradlew -PmattmcRustProfile=release parityTest -x testRustNative` |
-| Everything | `./gradlew -PmattmcRustProfile=release check` |
+| Both Java suites and Rust checks | `./gradlew -PmattmcRustProfile=release check` |
+
+Commands with `-x testRustNative` assume the intended Rust checks were completed
+separately. `check` runs the ordinary and tagged Java suites and their native
+check dependency; it does not run the separate `performanceTest` task or the
+client lifecycle, Frozen image and ordinary-gameplay protocols.
 
 ## Rust profiles
 
 - `dev` keeps this crate at `opt-level = 0` for fast incremental compiles.
   Third-party crates (including shaderc's C++) are optimized once.
 - `suite` inherits `dev`, keeping debug assertions and overflow checks, but
-  compiles this crate at `opt-level = 1`. CPU-heavy shader-pack and
-  world-render tests run 5–6× faster. It builds into `target/suite`, so
-  switching between `dev` and `suite` never invalidates either cache.
+  compiles this crate at `opt-level = 1`. The author reports 5–6× faster
+  CPU-heavy shader-pack and world-render tests in the measured workload.
+  It uses the `suite` subdirectory of the selected Cargo target directory;
+  switching profiles preserves their separate cached outputs.
   `testRustNative` and the validation driver use it.
 
-See [Cargo.toml](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/Cargo.toml).
+See [Cargo.toml](https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/rust/Cargo.toml).
 
 ## Java test tasks
 
@@ -30,9 +40,17 @@ See [Cargo.toml](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/
 - `parityTest` runs only the tagged classes, also in parallel JVMs.
 - `check` runs both.
 - An explicit `--tests` filter on `test` also selects tagged classes, so
-  per-slice commands in subsystem docs keep working.
+  per-slice commands in subsystem docs keep working. The existing
+  `*PerformanceTest`/`*Benchmark` class exclusions still apply to `test`.
 - `-PmattmcTestForks=N` sets the fork count (default: up to 3, one per four
-  cores). Each fork is a 2 GB JVM; lower it on a machine short of memory.
+  cores). Each fork has a maximum 2 GB Java heap; lower the fork count on a
+  machine short of memory.
+
+The validation driver's `--all-java-tests` removes its `--tests` patterns but
+still runs only `test`. With no explicit filter, the parity-tag exclusion takes
+effect, so that option does not include `parityTest`. Run the separate parity
+command above or `check` when both Java suites are required. Explicitly filtered
+runs can still select matching tagged classes.
 
 Tag a class `parity` when it runs a large Frozen-vs-Rust workload (roughly
 10 s or more). Keep fast parity checks untagged so ordinary runs still cover
@@ -41,12 +59,24 @@ each migrated system.
 `testRustNative`, which every Java test task depends on, writes
 `build/rust/testRustNative.stamp` after a passing run. Gradle skips it while
 the crate, `src/main/resources` and `DevUtils/tests/rendering/fixtures` are
-unchanged. Force a rerun with `--rerun-tasks` (for example after a GPU driver
-update).
+unchanged and the recorded output remains up to date. Reusing the stamp is not
+a fresh test run and does not verify changes outside the declared inputs.
+Force a rerun with `--rerun-tasks` (for example after a GPU driver update).
 
 ## Typical timings
 
-Measured on October 9, 2026 on a 12-core laptop (matt-alienwarem15r3), warm caches:
+The implementation author reports these October 9, 2026 measurements on a
+12-core laptop (matt-alienwarem15r3), with warm caches. The
+[publication record](https://github.com/HungLo2020/MattMC/commit/f86206767dadde696adfed4e04c5ee97cd0d0885)
+reports the combined-tree wiki and Rust suite passing (2,443 Rust passes),
+while its Java runs were still in progress at publication. The earlier timings
+below do not establish a complete Java pass for that combined tree. This review
+did not rerun the suites or inspect original timing receipts.
+
+The changes combine task splitting, parallel forks, compiler profiles and
+fixture work reductions, including the biome search ring cap. Treat the
+numbers as those measured configurations, not an isolated optimization or
+renderer/gameplay speedup:
 
 | Step | Before | After |
 | --- | --- | --- |

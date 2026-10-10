@@ -42,7 +42,7 @@ checks with the limits below. The individual test commands are:
 
 ```sh
 (cd src/main/rust && cargo test --locked --profile suite --lib -- --test-threads=4)  # Rust, including boundary tests
-./gradlew -PmattmcRustProfile=release test -x testRustNative       # Java
+./gradlew -PmattmcRustProfile=release test -x testRustNative       # ordinary Java (excludes tagged parity)
 ./gradlew -PmattmcRustProfile=release parityTest -x testRustNative # large Java parity workloads
 ```
 
@@ -50,7 +50,10 @@ See [Running tests quickly](../tooling/TESTING.md) for the `suite` profile,
 the `test`/`parityTest` split and fork settings.
 Plain `./gradlew test` first runs the whole Rust suite serially
 (`testRustNative`, `--test-threads=1`, `suite` profile) in Gradle's own target
-directory, then skips it while its inputs are unchanged.
+directory, then can reuse its passing stamp while declared inputs/output are
+unchanged. A reused stamp is not a fresh native test run; force a rerun after
+relevant driver/environment changes. An unfiltered `test` excludes large
+`@Tag("parity")` classes; run `parityTest` as well, or `check`, for both Java suites.
 Use `-x testRustNative` after separately completing the intended Rust checks;
 the driver's `--lib` command is narrower than Gradle's unfiltered Cargo command. `-PmattmcRustProfile=release` makes the Java tests load the release
 library the clients use, instead of building a debug one. Parallel Rust runs
@@ -68,12 +71,20 @@ check the effective JVM, Byte Buddy configuration and actual failure.
 
 ### One-command validation
 
-The latest complete [live-light matrix](GOAL-5-STATUS.md#october-9-live-light-and-ordinary-gameplay-summary)
-reports Java/Rust 1,800/2,436 tests passing, seven lifecycle cases and reviewed
-coast pairs, but an overall **performance FAIL**: vanilla misses FPS/p99 and DH
-misses p99. Both shader modes pass those floors in that workload. The later
-ABI 78 GUI/harness commit has no full replacement matrix; its short ordinary
-travel parity was not reproduced manually and visual captures timed out.
+The latest complete author-recorded
+[terrain-light matrix](GOAL-5-STATUS.md#october-9-bulk-terrain-light-and-ordinary-gameplay-summary),
+release `d9d1a9d6`, reports Java/Rust 1,807/2,443 tests (two Java skips and three
+Rust ignored), seven lifecycle cases and reviewed diagnostic compatibility
+pairs, but an overall **performance FAIL** on vanilla, shaders and DH p99.
+Those settled images use scalar diagnostic lighting; they do not prove
+bulk-path pixels. The separate ordinary comparison leaves entry/travel
+performance open and stops after about 16.45 blocks at terrain.
+The later [test/tooling commit](https://github.com/HungLo2020/MattMC/commit/f86206767dadde696adfed4e04c5ee97cd0d0885)
+changes suite selection, profiles and fixture work, with combined Java checks
+still in progress at publication. Its source changes and author-recorded
+wiki/Rust checks do not provide a newer complete runtime acceptance matrix.
+The earlier [live-light matrix](GOAL-5-STATUS.md#october-9-live-light-and-ordinary-gameplay-summary)
+retains its own source and workload scope.
 Earlier [item-input](GOAL-5-STATUS.md#october-9-native-world-and-hand-input-summary)
 and [generation-handoff](GOAL-5-STATUS.md#october-9-native-generation-handoff-summary)
 workflows retain their own historical results.
@@ -85,14 +96,18 @@ clients or Java/Rust suites or inspect their unbundled runtime artifacts.
 python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> [--perf]
 ```
 
-The [driver at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/DevUtils/tests/rendering/RunValidation.py)
+The [driver at `f8620676`](https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/DevUtils/tests/rendering/RunValidation.py)
 orchestrates a bounded set of tests and workloads:
 
 1. Java tests in `net.vulkanic.*`, `net.sodium.*`, `com.seibel.*` and
    `net.minecraft.client.dev.*` use `-PmattmcRustProfile=release` and skip
    Gradle's serial `testRustNative` dependency. Repeat `--java-test <pattern>`
-   to change the filters; `--all-java-tests` removes those filters while keeping
-   the Gradle task's own exclusions. `--skip java-tests` still runs
+   to change the filters; explicit filters can select matching parity-tagged
+   classes. `--all-java-tests` removes the filters but still invokes only
+   `test`: with no `--tests` argument, Gradle now excludes `@Tag("parity")`
+   classes, along with its existing performance/benchmark class exclusions.
+   The option does not run `parityTest`; run that task separately, or use
+   `check`, when both Java suites are required. `--skip java-tests` still runs
    `buildRustNative` and `classes` with the release profile.
 2. `cargo test --locked --profile suite --lib` runs with four threads by default and
    `ALSOFT_DRIVERS=null`; this is not a `--release` test command. Named failures

@@ -1,12 +1,12 @@
 # Lever
 
-Lever is a placeable redstone input registered as `minecraft:lever`. It stays on or off until toggled.
+The **Lever** item places a switch that holds its selected on/off state. Both the item and placed block use `minecraft:lever`. See the [canonical Lever block guide](../blocks/Lever.md) for support, output direction, and environmental interactions. [Item registration][items]
 
 ## Crafting and use
 
-Craft one with one Stick directly above one Cobblestone. Place it on a supported floor, wall, or ceiling face, then interact to operate it. Its signal while powered is 15.
+Craft **one Lever** with **one Stick directly above one Cobblestone**. The vertical recipe fits the inventory crafting grid and names Cobblestone specifically; other stone-crafting materials are not substitutions. Ordinary Survival breaking also returns one Lever, without Silk Touch or a required tool tier. [Recipe][recipe] · [Block loot][loot] · [Current physical properties][physics]
 
-The [canonical block guide](../blocks/Lever.md) covers support, timing, direction, and exceptional trigger behavior. The exact recipe names its ingredient; do not substitute a similarly named imported material without checking recipe data.
+Place it on a supported floor, wall, or ceiling face, then use the placed switch to toggle it. It supplies strength **15 while on**, with no automatic release timer. For a straightforward toggle, release Sneak; secondary use with an item in either hand can bypass the normal block interaction. [Placement][attachment] · [Switching][lever] · [Interaction handling][use]
 
 ## Related pages
 
@@ -16,8 +16,12 @@ The [canonical block guide](../blocks/Lever.md) covers support, timing, directio
 
 ## Sources and verification
 
-Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No circuit simulation or in-game timing test was run; feature flags can select different wire evaluators.
+Source-reviewed on **2026-10-09** at `4246f4e7bfc1f3ab7862272ebba5f1f38aa16953`. Item/block registration, recipe, loot, current native properties, and active placement/use paths were checked. No crafting, placement, or circuit gameplay test was run; the block guide owns the detailed mechanics.
 
-- [Recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/lever.json)
-- [Block behavior](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/LeverBlock.java)
-- [Block registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/Blocks.java)
+[items]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/item/Items.java#L1019
+[recipe]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/resources/data/minecraft/recipe/crafting/lever.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/resources/data/minecraft/loot_table/blocks/lever.json
+[physics]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/content/block/definitions/physics.rs#L337-L343
+[attachment]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/FaceAttachedHorizontalDirectionalBlock.java
+[lever]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/LeverBlock.java
+[use]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L340-L396

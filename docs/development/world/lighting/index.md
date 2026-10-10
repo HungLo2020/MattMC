@@ -1,9 +1,10 @@
 # World lighting
 
 World light-source data, live light storage and propagation are separate from
-rendering. Live layers also support independent client packet imports; native
-CPU ownership does not transfer light-engine orchestration or terrain-light
-preparation into the renderer.
+rendering. Live layers also support independent client packet imports. The
+renderer’s [bulk terrain-light consumer](../../rendering/RUST-TERRAIN-LIGHTING.md)
+borrows retained generations; Java still owns light-engine orchestration and
+contextual rendering callbacks.
 
 - [Rust skylight-source reconstruction](RUST-SKYLIGHT-SOURCES.md): packed scans,
   exact occlusion tables, ownership and focused acceptance checks.

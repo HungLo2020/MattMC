@@ -1,19 +1,23 @@
 # Bulk Rust terrain lighting
 
-Canonical chunk rebuilds now prepare their 18³ mesher light words in Rust.
+At [`ee34f2ad`](https://github.com/HungLo2020/MattMC/commit/ee34f2ad99921848d8fc5d63da93eb6c583786c4),
+admitted canonical chunk rebuilds prepare their 18³ mesher light words in Rust.
 The consumer borrows [live light generations](../world/lighting/RUST-LIVE-LAYERS.md)
-and reads native block-registry columns directly. Java supplies only contextual
-emissive/view/collision predicates and shade. It no longer projects scalar light
-values or packs the final words on this path. Lifecycle and settled compatibility checks pass locally; complete runtime parity
-and performance acceptance remain open.
+and reads native block-registry columns directly. Java supplies state IDs,
+retained CPU references and contextual emissive/view/collision predicates and
+shade. It no longer projects scalar light values or packs the final words on
+this path. Author-recorded lifecycle and settled compatibility checks pass;
+complete bulk-path visual parity and performance acceptance remain open.
 
 ## Working on the boundary
 
 - [`meshing/preparation/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/chunk/meshing/preparation)
   owns intrinsic lookup, halo light reads and exact packed-word preparation.
 - [`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java)
-  admits states before contextual extraction, retains the 54 CPU leases and
-  writes directly into the existing mesher output span. Model reload guards remain.
+  checks bulk eligibility before contextual extraction and passes 54 optional
+  CPU lease slots (27 sections, block then sky) to Rust, which writes directly
+  into the existing mesher output span. Java still admits each distinct state
+  to model metadata; model reload guards remain.
 - Contextual staging is eight bytes per cell, scoped to one rebuild (46,656 bytes).
   Rust borrows the flat span directly; it creates no second context collection.
   One mutable position follows Frozen's synchronous light-cache convention.
@@ -23,17 +27,33 @@ and performance acceptance remain open.
 
 ## Compatibility and lifetime
 
-Admission requires native state IDs, bounded slice padding, canonical native
-light generations and the unchanged built-in platform emission policy. Missing
-light types read zero. Mutable Java arrays, custom layers/states/platforms and
-appearance diagnostics retain the original scalar path. Decline occurs before
-contextual callbacks start; failed preparation does not replay callbacks.
+The [production gate](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java#L357-L430)
+requires a native state-ID halo, appearance diagnostics disabled and the exact
+built-in `FabricBlockAccess` class. [Slice admission](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/src/main/java/net/sodium/client/world/LevelSlice.java#L283-L309)
+requires the expected central section origin and both padded corners inside the
+slice. Every present light layer must be exactly `DataLayer` with a native view;
+a missing block/sky layer occupies a null slot and reads zero. Native state
+admission rejects missing registry data, out-of-range IDs and custom states.
+Mutable Java arrays, escaped arrays, custom layers/states/platforms and
+appearance diagnostics retain the original scalar path when these gates decline.
 
-A returned CPU segment retains its Rust generation independently of its
-`DataLayer` owner. The synchronous call fences all leases; Rust retains no input
-pointer. Fill, owner reclamation and map replacement cannot invalidate an
-already retained generation. This is CPU storage only; GAL and presentation
-ownership are unchanged.
+This eligibility decision precedes contextual callbacks. Once bulk extraction
+starts, model-ID mismatches, callback errors, invalid/expired leases and rejected
+preparation throw; they do not restart the scalar path or replay callbacks.
+The [Java bridge](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeTerrainLighting.java#L24-L61)
+checks span sizes and live 16-byte lease metadata. Rust validates the whole
+state/context span before writing output, including reserved context bits.
+Native pointer validity, alignment and disjoint writable output remain caller
+contracts; shape checks do not authenticate arbitrary pointers as CPU leases.
+
+A returned read-only CPU segment retains its Rust generation independently of
+its `DataLayer` owner through an automatic arena. The synchronous call fences
+all leases; Rust retains no input pointer. Fill, owner reclamation and map
+replacement cannot invalidate an already retained generation. A retained view
+is not an immutable light snapshot: allocated-generation writes remain visible,
+and existing caller exclusion and map copy-on-write still govern publication.
+Automatic reclamation does not establish long-session resource bounds. This
+is CPU storage only; GAL and presentation ownership are unchanged.
 
 Preserve raw lazy defaults before lightmap packing, including negative and
 out-of-range values. Packing can carry bits between light lanes. Keep the second
@@ -42,19 +62,31 @@ boosting, opaque read suppression and Java float-to-integer AO behavior.
 
 ## Verification
 
+The commands below describe focused checks. Results in this section are the
+implementation author's [committed terrain-light record](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/PROGRESS.md#L33-L55)
+and [release summary](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/SUMMARY.md), not independent runtime verification
+by this documentation review. This review inspected pinned source, fixture
+coverage and those records; it did not run clients, Java/Rust suites, captures
+or profiles, or inspect the unbundled runtime receipts. Earlier release
+`a25a1281`, integrated release `d9d1a9d6` and the JDK-corrected ordinary run
+are separate evidence windows; preserve their individual limits below.
+
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml render::chunk::meshing::preparation
 ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeTerrainLightingTest' --tests '*NativeLightLayerTest' --tests '*NativeBlockSectionSnapshotTest' --tests '*NativeSectionSnapshotTintTest' --tests '*NativeSectionColorsTest'
 python3 DevUtils/RunWiki.py check
 ```
 
-Four native checks pass: actual Frozen word outputs, all halo faces/edges/corners,
-missing dimensions and rejection without partial output. The 13,644-byte fixture
+Four native checks pass: actual Frozen word outputs, halo faces/edges/corners
+and missing dimensions, rejection without partial output, and Java-compatible
+float conversion with signed light defaults. The 13,644-byte fixture
 losslessly retains all 254,472 Frozen production outputs across 31,809 states and
 eight light/AO variants. Its oracle uses air neighbours and does not establish
 all contextual-world parity. The focused Java suite passes 27 checks, including the actual contextual producer
 and native boundary for every recorded output, retained views through GC/fill,
-expired leases, mutable-array compatibility and rejection. The initial test
+expired leases, mutable-array compatibility and rejection. These CPU fixtures
+do not exercise every production slice/platform gate or all contextual worlds;
+requesting GC is not proof of deterministic reclamation. The initial test
 compile used a removed Iris setter; the corrected CPU fixture supplies equivalent
 AO inputs through test-only reflection and restores them. The original failure
 is retained. Full Rust passes 2,440 cases (3 ignored). Full Java passes 1,803

@@ -60,9 +60,12 @@ limits throughput conclusions. See the item-layer guide for evidence scope.
 Local [live light storage](../world/lighting/RUST-LIVE-LAYERS.md) now owns
 generations, propagation/sky handoffs and independent client packet imports;
 full CPU/lifecycle checks and reviewed Frozen image pairs pass. Vanilla FPS/p99
-and DH p99 still miss performance floors. Paired streaming profiles pass their
-identity/movement checks; Java terrain-light preparation still samples about
-42 MB of allocations in eight seconds. No isolated speedup is established.
+and DH p99 still miss performance floors in that preceding storage release.
+Its paired streaming profiles pass their identity/movement checks and sample
+about 42 MB of Java terrain-light allocations in eight seconds. The later bulk
+consumer profile records no sampled `computeLightWord` allocations, but higher
+total Current allocation than that earlier sample. These separate diagnostic
+windows do not establish an isolated speedup.
 The [bulk terrain-light consumer](../rendering/RUST-TERRAIN-LIGHTING.md) now
 reads retained native layers directly. Next move retained scene mesh payloads
 and entity preparation. Cached item mesh generation restamps still clone Java
@@ -77,16 +80,18 @@ and direct background/model consumers alongside retained geometry. Preserve
 missing-chunk behavior, height clamping, mutable biome containers, world unload
 and resource reload; retaining a stale cache is not an ownership migration.
 
-The current coupled world-state batch is bulk terrain lighting preparation.
-Canonical retained light ownership and direct propagation result installation
-are now implemented locally. Java rebuild preparation still performs scalar
-layer reads and constructs 5,832 contextual light words. Move that consumer to
-bulk Rust preparation while preserving mutable array escape compatibility,
-lazy-layer state, dimension defaults and contextual block callbacks. Measure
-ordinary movement and chunk rebuilds. The local
-[bulk consumer](../rendering/RUST-TERRAIN-LIGHTING.md) is now wired, with native
-oracle/halo checks passing. Combined Rust and Java suites, all seven lifecycle cases and reviewed settled
-compatibility image pairs pass. All sixteen benchmark runs are clean, but
+The current coupled world-state batch has wired
+[bulk terrain lighting](../rendering/RUST-TERRAIN-LIGHTING.md): Rust reads
+retained light generations and immutable registry facts to prepare 5,832
+mesher words. Java still supplies contextual predicates/shade, model admission
+and rebuild orchestration. Mutable arrays, custom layers/states/platforms and
+appearance diagnostics retain scalar compatibility preparation. Preserve lazy
+defaults, missing light types, callback ordering and lease lifetime while
+measuring ordinary movement and rebuilds. The committed author record reports
+native oracle/halo checks, combined Rust and Java suites, all seven lifecycle
+cases and reviewed settled compatibility image pairs passing. The settled
+images use scalar diagnostic lighting and do not establish bulk-path pixels.
+All sixteen benchmark runs are clean, but
 vanilla, shaders and DH still miss the p99 floor. Separate visible-minimap ordinary
 observations complete; entry and travel p99 still trail Frozen. Movement reaches
 a terrain barrier after about 16.45 blocks, so sustained streaming remains
@@ -104,9 +109,11 @@ A concrete remaining producer is terrain rebuild preparation:
 [`ClonedChunkSection`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/world/cloned/ClonedChunkSection.java)
 retains native captures, `LevelSlice` reads their CPU views, and
 [`NativeSectionSnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeSectionSnapshot.java)
-receives the canonical 18³ state-ID halo in one Rust bulk call. Java still
-admits states to model metadata, computes contextual light words and supplies
-biome/custom tint samples; compatibility containers retain the Java state-grid path.
+receives the canonical 18³ state-ID halo in one Rust bulk call. Rust prepares
+light words for admitted native slices; Java still admits states to model
+metadata and supplies contextual light predicates/shade and biome/custom tint
+samples. Compatibility inputs retain scalar light preparation, and unsupported
+state containers retain the Java state-grid path.
 Historical ordinary-flight profiling identified repeated tint sampling as a
 substantial part of Java snapshot preparation (159/383 sampled snapshot CPU frames). The
 local [shared section color fields](../world/biome/RUST-SECTION-COLORS.md) slice

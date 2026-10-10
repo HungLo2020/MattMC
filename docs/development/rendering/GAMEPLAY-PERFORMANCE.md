@@ -4,7 +4,7 @@ Use this alongside the settled renderer benchmark when comparing Current with
 Frozen. The settled benchmark hides VoxelMap and its optional camera motion
 rotates at a fixed point. Readiness losses can discard partial timing windows.
 Those results do not establish startup, streaming, or visible-minimap performance.
-The [driver at `4246f4e7`](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/DevUtils/tests/rendering/RunOrdinaryPerformance.py)
+The [driver at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/DevUtils/tests/rendering/RunOrdinaryPerformance.py)
 records a separate `ordinary-gameplay-v1` protocol. A `complete` result means
 the requested observation finished and passed its state/health checks; the
 driver does not compare Current/Frozen FPS or p99 against acceptance floors.
@@ -114,16 +114,53 @@ python3 -m unittest discover -s DevUtils/tests/rendering -p test_ordinary_perfor
 
 The Java and Rust suites cover dynamic snapshot reuse/replacement/reload,
 native patch retention/rejected-update retry and packed DH bounds/allocation.
-The [Python fixtures](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/DevUtils/tests/rendering/test_ordinary_performance.py)
-cover output creation, long-stall accounting, gameplay/motion rejection and
-read-only source compatibility. Their frame-agent return-path/DH-call test
-requires a complete JDK 25 and otherwise skips; retain that skip explicitly.
+The [Python fixtures](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/DevUtils/tests/rendering/test_ordinary_performance.py)
+cover output creation, long-stall accounting, gameplay/motion rejection,
+read-only source compatibility and requested-JDK selection despite an inherited
+older Java. The launch regression resolves a real Java executable with the
+game VM flags but opens no game window; it requires POSIX and JDK 25. The
+frame-agent return-path/DH-call test requires a complete JDK 25. Retain either
+environment-dependent skip explicitly.
 These fixtures do not replace ordinary visible-map gameplay and normal
 visual/lifecycle checks.
 
 ## Recorded evidence and limits
 
-The [ABI 78 commit](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953)
+The [record at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/PROGRESS.md#L53-L55)
+reports a completed DH-on, shaders-off, visible-minimap comparison after fixing
+child `JAVA_HOME` and `PATH`. The first attempt failed before startup because
+the inherited older JVM rejected the game flags; that retained fixture has no
+usable timing or native-library mapping. Six JDK 25 harness checks are reported
+passing after the fix.
+
+The corrected workload uses the same copied world, 30-second entry/standing/travel
+windows and Current/Frozen/Frozen/Current order (two observations per side):
+
+| Phase | Median client-loop FPS, Current / Frozen | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- |
+| Playable entry | 535 / 555 | 6.740 / 5.904 |
+| Standing | 619 / 601 | 2.625 / 2.911 |
+| Forward movement | 634 / 623 | 3.000 / 2.904 |
+
+Entry and travel performance remain open. Current records 17 frames above
+50 ms across entry/travel repeats, versus two on Frozen across all phases.
+The author reports source/library/Frozen/original-world guards passing, no
+client exceptions or remaining owned clients, twelve reviewed HUD snapshots
+and four retired copies. Receipt:
+`goal5/native-terrain-light-ordinary-integrated-jdk-fixed-20261009/comparison.json`.
+The initial failed JVM fixture remains.
+
+Both versions have partially built entry terrain; the first Current image is
+less complete, but captures are not frame/time registered. Standing/travel
+terrain broadly agrees while minimap details differ. Forward movement covers
+about 16.45 blocks before a terrain barrier: completion does not establish
+sustained chunk streaming, bulk-path pixel parity or absence of pop-in/flicker.
+The all-frame observer and three screenshots per client add diagnostic overhead.
+Keep these ordinary observations separate from the
+[integrated settled matrix](GOAL-5-STATUS.md#october-9-bulk-terrain-light-and-ordinary-gameplay-summary)
+and the earlier bulk-execution/allocation profiles.
+
+The earlier [ABI 78 commit](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953)
 reports short shaders-off/DH-on travel runs near Frozen, but says that result
 was not reproduced in manual play and that visual parity captures still timed
 out. It claims no performance pass. The [live-light matrix](GOAL-5-STATUS.md#october-9-live-light-and-ordinary-gameplay-summary)

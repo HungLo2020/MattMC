@@ -56,12 +56,16 @@ required tags rather than assuming upstream behavior.
 
 ## Current focused work
 
-The October 9 depth review selected [Farmland](../../gameplay/blocks/Farmland.md)
-and [Nether Wart](../../gameplay/blocks/NetherWart.md) for practical expansion:
-collection/drop rules, hydration and protection, growth/replanting, and exact
-loot/Fortune behavior. Keep their companion item pages concise and linked to
-those owners. This is a bounded review of selected core articles, not an
-exhaustive audit of blocks, items, mobs or technical mechanics.
+The October 9 depth review expanded [Farmland](../../gameplay/blocks/Farmland.md)
+and [Nether Wart](../../gameplay/blocks/NetherWart.md), then examined
+[Lever controls](../../gameplay/blocks/Lever.md) and
+[shared redstone power](../../gameplay/redstone/Redstone.md). The selected gaps
+were practical collection, environmental behavior, exact harvest rules and
+support-side power. Companion item pages keep acquisition summaries and link
+to those placed-behavior owners. The already detailed Button and Pressure Plate
+family tables did not need duplicate rewrites. These are bounded reviews of
+selected core articles, not an exhaustive audit of blocks, items, mobs or
+technical mechanics.
 
 Continue by inspecting real missing answers in existing core articles and
 contradictory duplicate descriptions. Record the question and source needed

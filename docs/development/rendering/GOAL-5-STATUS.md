@@ -1,15 +1,16 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`4246f4e7`](https://github.com/HungLo2020/MattMC/commit/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953):
-canonical live light generations and propagation handoffs now have Rust owners;
-ABI 78 adds incremental raw GUI image updates, alongside packed DH admission
-and an ordinary-gameplay performance harness. The latest complete author-recorded
-matrix, release `31c8c8cc`, **fails performance acceptance on vanilla FPS/p99
-and DH p99**. It predates the GUI/harness commit and does not validate that newer
-source. The later short ordinary travel result was not reproduced in manual
-play, and its visual captures timed out. See the
-[current evidence summary](#october-9-live-light-and-ordinary-gameplay-summary).
+[`ee34f2ad`](https://github.com/HungLo2020/MattMC/commit/ee34f2ad99921848d8fc5d63da93eb6c583786c4):
+Rust now prepares admitted terrain light words directly from retained native
+generations and registry facts. Java retains contextual predicates/shade,
+model admission and compatibility paths. The combined author-recorded matrix,
+release `d9d1a9d6`, **fails performance acceptance on vanilla, shaders and DH
+p99**, despite higher average FPS in all four modes. Its settled diagnostic
+images use scalar lighting and do not establish bulk-path pixels. A separate
+JDK-corrected ordinary comparison leaves entry/travel performance open; its
+16.45-block movement does not establish sustained streaming or a flicker fix.
+See the [current evidence summary](#october-9-bulk-terrain-light-and-ordinary-gameplay-summary).
 Source inspection and author reports do not establish broad visual/temporal
 parity, complete scene migration, long-run resource bounds or resolution of the
 independent native crash.
@@ -19,8 +20,10 @@ selection and assembly, rig hierarchy composition, the DH ledger and ordinary
 payload publication, retained visibility frames and built-in cloud preparation,
 native authored item poses and GPU execution/resources.
 Separate native world owners now supply canonical live/rebuild state, section
-color fields and live light generations. Java still orchestrates light storage
-maps and publication, with mutable-array and subclass compatibility paths.
+color fields and live light generations; the native terrain-light consumer
+prepares canonical mesher words from those generations. Java still orchestrates
+light storage maps and publication and supplies contextual light predicates and
+shade, with mutable-array, subclass/platform and diagnostic compatibility paths.
 Raw GUI image publication retains unchanged native images while Java supplies
 semantic identities and changed CPU snapshots. Java still supplies
 world/entity semantics and animation, meshing dispatch and inputs, full terrain
@@ -35,12 +38,18 @@ server, at most one separately loaded Rust library, and no Java/JVM. See the
 [Project Architecture](../PROJECT-ARCHITECTURE.md),
 [Render Architecture](RENDER-ARCHITECTURE.md) and [Retained Scene](RETAINED-SCENE.md).
 
-The [current performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6091091526),
+The [preceding performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6091091526),
 [GUI ownership review](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6091093270)
 and [live-light review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6091109625)
-retain those open boundaries. The separate tracker check passed four Python
-ordinary-harness fixtures and skipped the JDK 25 agent fixture; it did not run
-clients or reproduce parity.
+retain their earlier source scopes. The separate tracker check at `4246f4e7`
+passed four Python ordinary-harness fixtures and skipped the JDK 25 agent
+fixture; it did not run clients or reproduce parity. Those results do not
+validate the later JDK-selection regression fixture at `ee34f2ad`.
+
+The current [terrain-light ownership review](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6091341618)
+and [performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6091342527)
+retain the bounded native consumer and open performance/visual acceptance work.
+They add source/evidence review, not independent runtime tests or issue closure.
 
 The [preceding item-input performance review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6088997781)
 keeps the failed tail-latency gate and measured/observer-only windows explicit.
@@ -97,11 +106,34 @@ and [`2fff1ef`](https://github.com/HungLo2020/MattMC/commit/2fff1ef19106350f806d
 
 ## What changed
 
+### October 9 bulk terrain-light preparation
+
+The `f7d5f7dd` → `ee34f2ad` interval adds the
+[native terrain-light consumer](RUST-TERRAIN-LIGHTING.md). For eligible slices,
+Java passes 54 optional CPU lease slots and 5,832 eight-byte contextual records;
+Rust reads native registry facts and retained halo light to write the existing
+mesher light span. Built-in platform/native-state/light admission precedes
+contextual extraction. Unsupported, mutable and diagnostic inputs keep scalar
+preparation; errors after bulk extraction begins throw without callback replay.
+Java still owns contextual predicates/shade, model admission, worker dispatch,
+light-engine orchestration and map publication. Leases survive owner reclamation
+and fill but do not turn mutable generations into immutable snapshots or prove
+long-session bounds. GAL ownership and whole-frame ABI 78 are unchanged.
+
+The [ordinary harness](GAMEPLAY-PERFORMANCE.md) now applies its selected JDK to
+the child game/Gradle environment as well as observer tools. The
+[native build task](../tooling/NATIVE-BUILDS.md) tracks release debug/strip
+settings, including restoration to defaults, with an isolated staging fixture.
+These source fixes and the author-recorded checks do not establish runtime
+acceptance. The review inspected pinned source and committed reports, without
+running clients, Java/Rust suites, captures or profiles or inspecting unbundled
+runtime receipts. Earlier checkpoints below retain their historical scope.
+
 ### October 9 live light and incremental GUI images
 
 The `ba8d4a93` → `4246f4e7` interval adds two bounded source changes:
 
-- [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md) move canonical lazy defaults and 2,048-byte generations into Rust. Propagation snapshots and result installation, sky seeding/repetition and independent client packet imports use native CPU owners. Java retains orchestration, map copy-on-write and compatibility arrays/callbacks; terrain light preparation still reads scalar views
+- [Live light layers](../world/lighting/RUST-LIVE-LAYERS.md) move canonical lazy defaults and 2,048-byte generations into Rust. Propagation snapshots and result installation, sky seeding/repetition and independent client packet imports use native CPU owners. Java retained orchestration, map copy-on-write and compatibility arrays/callbacks; terrain light preparation still read scalar views at this checkpoint
 - [Raw GUI images](JAVA-BRIDGE.md#raw-gui-image-generations) send changed payloads plus the complete live identity manifest at ABI 78. Java retains dirty publication and retry state; Rust validates the combined resident set before eviction or replacement. Clean VoxelMap frames reuse snapshots, packed DH admission avoids per-vertex Java decoding, and atlas replacement releases cached source-pack consumers before samplers
 
 The [ordinary gameplay harness](GAMEPLAY-PERFORMANCE.md) adds visible-minimap
@@ -128,8 +160,8 @@ frame view, and preserve offscreen rebuild marks without resetting camera
 readiness. These changes do not waive benchmark producer checks or establish
 broad visual acceptance. Light ownership was still a source-only draft at
 that checkpoint. The later [live-light implementation](../world/lighting/RUST-LIVE-LAYERS.md)
-migrates canonical propagation handoffs; bulk terrain-light preparation remains
-unfinished.
+migrates canonical propagation handoffs; bulk terrain-light preparation was
+unfinished at that checkpoint and is now covered by the later consumer above.
 
 ### October 9 native frame and world-input checkpoint
 
@@ -369,6 +401,52 @@ The [original-pack underground comparison](UNDERGROUND-SHADER-CHECKS.md) still f
 [Per-pass preparation measurements](RENDER-VERIFICATION.md#4-performance-ab) record reductions of about 18%, while [repeated-mesh batching measurements](SHADER-TERRAIN-PROFILING.md#repeated-mesh-plans) record reductions of 13–15%. Those historical repeated-mesh Current runs were about 34–35 FPS against Frozen about 304–308 FPS; varying readiness and live populations limit comparisons. No overall FPS improvement or broad performance acceptance is established.
 
 ### Latest author-recorded workloads
+
+#### October 9 bulk terrain-light and ordinary gameplay summary
+
+The [summary at `ee34f2ad`](https://github.com/HungLo2020/MattMC/blob/ee34f2ad99921848d8fc5d63da93eb6c583786c4/SUMMARY.md)
+records combined release `d9d1a9d6` on RTX 3080 Ti: settled rotating-view ABAB,
+two runs per side and mode, with exactly 6,000 measured frames each. These are
+committed author reports, not a rerun or raw-receipt review by this maintenance
+pass. They supersede the earlier local `a25a1281` and live-light `31c8c8cc`
+matrices as the latest combined recorded workload.
+
+| Mode | Recorded Current FPS, run 1 / run 2 | Recorded Frozen FPS, run 1 / run 2 | Median run p99, Current / Frozen (ms) |
+| --- | --- | --- | --- |
+| Vanilla | 1,053.6 / 1,473.1 | 1,160.8 / 1,155.7 | 3.216 / 3.072 |
+| Vanilla + DH | 748.0 / 565.6 | 612.6 / 673.1 | 6.839 / 5.749 |
+| Shaders | 337.5 / 335.4 | 317.3 / 316.9 | 6.137 / 5.979 |
+| Shaders + DH | 263.1 / 251.4 | 228.3 / 227.4 | 6.212 / 7.446 |
+
+**Performance FAIL:** vanilla, shaders and DH miss p99 floors. Average FPS
+exceeds Frozen in all four modes; large repeat variance prevents an isolated
+migration gain claim. The author reports 2,443 Rust tests (three ignored),
+1,807 Java tests (two skipped, no failures), all seven lifecycle cases, reviewed
+vanilla/Iris+DH diagnostic compatibility pairs with DH coverage, and sixteen
+clean exact-frame rows. VUID/exception/orphan counts are zero; source/native/
+Frozen/protected-edit integrity passes and 25 generated copies were retired.
+Receipt: `validation/native-terrain-light-integrated-20261009/summary.json`.
+Those settled images deliberately use scalar lighting, so they cannot validate
+the new bulk consumer's pixels or establish absence of flicker.
+
+Separate ordinary-input profiles record 17 samples in
+`mattmc_terrain_light_prepare`, establishing execution of the migrated consumer
+in that author's workload. Eight-second weighted Java allocation is 1.091 GB
+Current versus 2.448 GB Frozen, with no sampled Java `computeLightWord`
+allocations. Current's total rose from 0.934 GB in the preceding storage sample;
+overlapping categories and heavy JIT activity prevent a throughput or isolated
+gain claim. See the [terrain-light evidence](RUST-TERRAIN-LIGHTING.md#verification)
+for fixture, profile and pre-integration limits.
+
+The later [JDK-corrected ordinary comparison](GAMEPLAY-PERFORMANCE.md#recorded-evidence-and-limits)
+uses DH, a visible minimap, shaders off and 30-second entry/standing/travel
+windows in Current/Frozen/Frozen/Current order. Median client-loop FPS is
+535/555, 619/601 and 634/623; median p99 is 6.740/5.904, 2.625/2.911 and
+3.000/2.904 ms. Entry and travel performance remain open. Movement stops after
+about 16.45 blocks at terrain, and the twelve reviewed HUD images are not
+frame/time registered. This cannot establish sustained streaming, exact pixel
+parity or a pop-in/flicker fix. The initial failed JVM fixture remains separate;
+the corrected observations do not erase that failure or certify manual RunDev.
 
 #### October 9 live light and ordinary gameplay summary
 
