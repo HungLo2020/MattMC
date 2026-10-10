@@ -29,6 +29,12 @@ Holding longer does not build a Bow-style damage multiplier. A throw moves the T
 
 Only its owner can pick up a player-owned Trident through the normal touch path. A grounded Trident must finish its brief impact shake, and collection needs inventory room. Keep a slot available for a returning Trident too. [Owner check and returning pickup][thrown] · [Ground pickup][arrow]
 
+### Recover before despawning
+
+Recover a lodged Trident promptly if it has no Loyalty. While it remains embedded and is being ticked by the server, its ordinary despawn counter reaches **1,200 ticks**, about **one minute at 20 TPS**, then removes the projectile and its carried Trident. The counter advances during grounded processing, rather than measuring the time since the throw; starting to fall again resets it. [Grounded server processing][grounded-timer] · [Counter reset and despawn threshold][despawn-counter]
+
+**Loyalty suppresses this counter only when the Trident's normal pickup is allowed.** Creative-only and disallowed pickup modes do not get that exemption. The exemption does not prevent other causes of loss; the [Loyalty return conditions](#enchantment-choices-and-conditions) still apply. [Loyalty and pickup gate][loyalty-despawn]
+
 ### Riptide movement
 
 With **Riptide I–III**, the same 10-tick hold-and-release launches **you** in the aimed direction instead of creating a thrown Trident. You must be in **Water or rain**, both when beginning use and when releasing it. Ordinary melee still works when dry. Higher levels increase the launch strength; launching from the ground also lifts the player first. [Riptide use conditions][trident] · [Riptide levels][riptide]
@@ -65,6 +71,8 @@ MattMC keeps fully worn equipment as broken stacks. An already-broken Trident ca
 
 Source-reviewed on **2026-10-02** at `c1adfb58c73bd6918cde87943be31afef6a2ccf4`. No in-game loot, damage, pickup, return, weather, Riptide, or repair test was run. Counts and conditions describe the bundled definitions. These are selected verified loot routes, not a claim that every scripted equipment source has been cataloged. Data packs, custom components, attributes, and target behavior can change the result.
 
+Lodged-Trident despawning and its Loyalty exception were additionally source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19`. No in-game despawn or return test was run.
+
 [registration]: https://github.com/HungLo2020/MattMC/blob/c1adfb58c73bd6918cde87943be31afef6a2ccf4/src/main/java/net/minecraft/world/item/Items.java#L2360-L2370
 [trident]: https://github.com/HungLo2020/MattMC/blob/c1adfb58c73bd6918cde87943be31afef6a2ccf4/src/main/java/net/minecraft/world/item/TridentItem.java
 [drowned]: https://github.com/HungLo2020/MattMC/blob/c1adfb58c73bd6918cde87943be31afef6a2ccf4/src/main/java/net/minecraft/world/entity/monster/Drowned.java
@@ -97,3 +105,7 @@ Source-reviewed on **2026-10-02** at `c1adfb58c73bd6918cde87943be31afef6a2ccf4`.
 [durability-tag]: https://github.com/HungLo2020/MattMC/blob/c1adfb58c73bd6918cde87943be31afef6a2ccf4/src/main/resources/data/minecraft/tags/item/enchantable/durability.json
 [xp]: https://github.com/HungLo2020/MattMC/blob/c1adfb58c73bd6918cde87943be31afef6a2ccf4/src/main/java/net/minecraft/world/entity/ExperienceOrb.java
 [enchantment-helper]: https://github.com/HungLo2020/MattMC/blob/c1adfb58c73bd6918cde87943be31afef6a2ccf4/src/main/java/net/minecraft/world/item/enchantment/EnchantmentHelper.java
+
+[grounded-timer]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java#L190-L199
+[despawn-counter]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java#L301-L338
+[loyalty-despawn]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/ThrownTrident.java#L202-L208
