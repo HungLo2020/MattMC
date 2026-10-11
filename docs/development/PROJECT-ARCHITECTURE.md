@@ -202,7 +202,9 @@ they do not verify the combined source's runtime or performance.
 
 Ordinary [DH quad builds](rendering/RUST-DH-QUADS.md) now retain directional
 quad storage, opacity admission, premerging and greedy policy in Rust. Java
-retains face production and final packet encoding, with contextual callbacks;
+retains face production, contextual getter implementations and final collector
+transport. [Packet plans](rendering/RUST-DH-PACKETS.md) now own layer selection,
+callback admission/order, shading and vertex/companion encoding;
 subclass compatibility remains Java. This advances the reviewed checkpoint above.
 
 Admitted [DH height fields](world/chunk/RUST-DH-HEIGHTMAPS.md) in
@@ -444,7 +446,8 @@ Important current subdirectories:
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
 - `render/dh_collector/`: the Distant Horizons column ledger: generations, column payloads, publication, retirement, owner leases, the prepared frame's visible segments and route receipts ([rendering architecture](rendering/RENDER-ARCHITECTURE.md)). Its Java exports are `render/bridge/dh_collector.rs`. Java still supplies the DH quadtree candidates, material provenance and frame parameters; native ledger ownership does not move those producers into Rust.
-- `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual resolver callbacks, faces and final packets still belong to Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
+- `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual resolver callbacks and faces still belong to Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
+- `render/dh_quads/`: retained ordinary quad storage, greedy topology and scoped semantic packet plans. Rust selects layers, plans contextual callbacks and encodes vertex bytes and companions; Java supplies contextual scalars and final collector transport. See [quad builds](rendering/RUST-DH-QUADS.md) and [packets](rendering/RUST-DH-PACKETS.md).
 - `render/clouds/`: built-in DH cloud motion, placement, culling and color-change history in CPU owners. Java retains texture/API boxes, world-color queries and callbacks; see [cloud preparation](rendering/RUST-DH-CLOUDS.md).
 - `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). This does not implement native item registries or gameplay.
 - `render/scene/`: wire and data vocabulary shared by Java and the renderers, including immutable native terrain selections consumed directly by frame decoding ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).

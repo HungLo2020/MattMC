@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--rounds', type=int, default=300)
     parser.add_argument('--quads', type=int, default=2048)
     parser.add_argument('--seed', type=int, choices=(0, 1, 2), required=True)
-    parser.add_argument('--mode', choices=('topology', 'packets'), required=True)
+    parser.add_argument('--mode', choices=('topology', 'packets', 'grass-packets'), required=True)
     args = parser.parse_args()
     if not 2 <= args.pairs <= 50 or args.rounds < 1 or args.quads < 1:
         parser.error('positive rounds/quads and 2..50 pairs required')

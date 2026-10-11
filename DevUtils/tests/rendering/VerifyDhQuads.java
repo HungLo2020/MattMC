@@ -1,8 +1,11 @@
 import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.*;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.api.enums.config.EDhApiGrassSideRendering;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import java.io.*;
 import java.lang.reflect.*;
 import java.nio.*;
@@ -18,6 +21,14 @@ public final class VerifyDhQuads {
     private static Method snapshot,close,put,packedVertexBuffers;
     private static final Method[] packets = new Method[4];
     private static boolean encode;
+    private static boolean grass;
+    private static final IClientLevelWrapper LEVEL = (IClientLevelWrapper)Proxy.newProxyInstance(
+        IClientLevelWrapper.class.getClassLoader(),new Class<?>[]{IClientLevelWrapper.class},(p,m,a)->{
+            if(m.getName().equals("getDirtBlockColor"))return 0xff987654;
+            if(m.getReturnType()==boolean.class)return false;
+            if(m.getReturnType()==int.class)return 0;
+            return null;
+        });
     private static final Field[] legacy = new Field[2];
     private static void setup() throws Exception {
         var render = (IMinecraftRenderWrapper)Proxy.newProxyInstance(IMinecraftRenderWrapper.class.getClassLoader(),
@@ -104,7 +115,7 @@ public final class VerifyDhQuads {
     private static long run(short[][] values,int rounds) throws Exception {
         long sum=0;
         for(int i=0;i<rounds;i++){
-            var b=new LodQuadBuilder(true,null);for(var q:values)add(b,q);b.mergeQuads();
+            var b=new LodQuadBuilder(true,LEVEL);for(var q:values)add(b,q);b.mergeQuads();
             sum+=b.getCurrentOpaqueQuadsCount()*31L+b.getCurrentTransparentQuadsCount();
             if(encode)for(var method:packets){
                 Object result=method.invoke(b);
@@ -125,11 +136,15 @@ public final class VerifyDhQuads {
     public static void main(String[] args) throws Exception {
         setup();
         if(args[0].equals("record")){record(Path.of(args[1]));return;}
-        encode=args.length>5 && args[5].equals("packets");
+        encode=args.length>5 && (args[5].equals("packets") || args[5].equals("grass-packets"));
+        grass=args.length>5 && args[5].equals("grass-packets");
         boolean current=args[1].equals("current");if(current!=(nativeField!=null))throw new IllegalStateException("Wrong tree");
         Config.Client.Advanced.Graphics.Experimental.earthCurveRatio.setWithoutFiringEvents(0);
         Config.Client.Advanced.Debugging.showOverlappingQuadErrors.setWithoutFiringEvents(false);
+        Config.Client.Advanced.Debugging.debugRendering.setWithoutFiringEvents(EDhApiDebugRendering.OFF);
+        Config.Client.Advanced.Graphics.Quality.grassSideRendering.setWithoutFiringEvents(EDhApiGrassSideRendering.FADE_TO_DIRT);
         short[][] values=input(Integer.parseInt(args[2]),Integer.parseInt(args[3]));int rounds=Integer.parseInt(args[4]);
+        if(grass)for(var q:values)if(q[6]!=12)q[6]=13;
         for(int i=0;i<5;i++)run(values,rounds);
         long begin=System.nanoTime(),sum=run(values,rounds),elapsed=System.nanoTime()-begin;
         System.out.printf(Locale.ROOT,"RESULT tree=%s ns=%d checksum=%d quads=%d rounds=%d%n",args[1],elapsed,sum,values.length,rounds);

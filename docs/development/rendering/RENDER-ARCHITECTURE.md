@@ -141,8 +141,9 @@ Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
 generation/compression/uniformity and direct parent inputs. Java retains
 admission and wrapper/list identities, update orchestration,
 persistence, quadtree inputs, contextual color callbacks/material resolution,
-face production and final packets. Ordinary [quad builds](RUST-DH-QUADS.md)
-now retain quad lists and greedy topology in Rust; subclasses keep Java policy. These CPU owners are separate from the
+face production and final collector transport. Ordinary [quad builds](RUST-DH-QUADS.md)
+retain quad lists and greedy topology in Rust; [packet plans](RUST-DH-PACKETS.md)
+encode final vertices and companions. Subclasses keep Java policy. These CPU owners are separate from the
 DH render-column ledger and GPU resources. Preserve section-local snapshot timing
 and caller exclusion; no whole-world transaction or runtime/performance acceptance
 is implied by the ownership change.
@@ -589,9 +590,14 @@ The later [render-column reduction](RUST-DH-RENDER-COLUMNS.md) owns the complete
 compact reduction algorithm in Rust. Canonical Java views borrow existing heap
 storage for one bounded native call and direct destination publication; they do
 not construct or sort a second Java reducer graph. Contextual resolver callbacks,
-face production and final packet construction remain Java; ordinary quad
-storage/greedy policy is now [native](RUST-DH-QUADS.md). The admitted
+faces and contextual getter implementations remain Java; the admitted
 [cached tint path](../world/biome/RUST-DH-TINT.md) now samples retained inputs in Rust.
+
+Ordinary [quad builds](RUST-DH-QUADS.md) retain lists and merge topology in Rust.
+[Packet plans](RUST-DH-PACKETS.md) now select layers, determine ordered contextual
+callbacks and encode final vertices and semantic companions. Java supplies raw
+getter results and final transport arrays. Subclass compatibility retains the
+Java implementation; VulkanicGAL GPU ownership is unchanged.
 
 At the historical `fc1d529d` checkpoint, Java sorted each face list by
 [`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):

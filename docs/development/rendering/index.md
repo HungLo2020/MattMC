@@ -15,6 +15,8 @@ each module there has a short README with its own file map.
   water/material policy, borrowed storage and actual Frozen CPU replay.
 - [Rust DH quad builds](RUST-DH-QUADS.md): build-local quad storage, premerging,
   greedy topology, semantic outcomes and Frozen verification.
+- [Rust DH semantic packets](RUST-DH-PACKETS.md): native layer selection,
+  contextual callback plans, vertex packing and transport ownership.
 - [Native terrain face policy](RUST-TERRAIN-CULLING.md): direct retained-state
   culling, immutable geometry ownership and callback compatibility.
 - [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light

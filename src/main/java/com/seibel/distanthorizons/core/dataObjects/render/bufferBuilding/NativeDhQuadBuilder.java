@@ -92,6 +92,12 @@ final class NativeDhQuadBuilder implements AutoCloseable {
             finally { Reference.reachabilityFence(this); }
         }
     }
+    NativeDhPacketPlan packetPlan(int route, int grass) {
+        synchronized (lease) {
+            try { return NativeDhPacketPlan.create(pointer(), route, grass); }
+            finally { Reference.reachabilityFence(this); }
+        }
+    }
     /** Copy before contextual Java callbacks: reentrant mutation cannot invalidate these rows. */
     List<BufferQuad> snapshot(int layer, int direction) {
         synchronized (lease) {

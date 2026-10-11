@@ -1,9 +1,11 @@
 # Rust DH quad builds
 
-Source reviewed at [`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
+The prior quad-owner checkpoint was reviewed at [`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
 Suite totals, measured timings and untracked receipt descriptions below are
 implementation-author reports. This documentation review inspected source and
 fixture assertions; it ran no Java/Rust suites, client, GPU or benchmark checks.
+The later packet implementation and its new verification are documented in
+[Rust DH semantic packets](RUST-DH-PACKETS.md).
 
 Ordinary `LodQuadBuilder` instances retain their twelve directional quad lists
 in `render/dh_quads/`. Rust owns opacity/water admission, adjacent premerging,
@@ -11,15 +13,13 @@ stable sort order, both greedy passes, overlap flags and semantic merge
 outcomes. This is build-local CPU policy within the existing Rust library.
 VulkanicGAL retains all GPU ownership.
 
-Java still supplies faces and contextual color callbacks, interns source
-identities, and encodes final semantic packets. Packet construction copies
-native rows into independent Java byte arrays for all direction lists requested
-by that packet method before encoding callbacks. Each list copy is separately
-protected by the lease lock; the four packet methods are separate captures,
-not one atomic snapshot of every list in a builder. Temporary `BufferQuad`
-projections exist during encoding; no persistent Java quad mirror is kept.
-The native path requires `getClass() == LodQuadBuilder.class`; subclassed
-builders retain the existing Java compatibility implementation.
+Java still supplies faces and contextual color callbacks and interns source
+identities. [Rust packet plans](RUST-DH-PACKETS.md) now capture each selected
+layer under the native lease lock before callbacks and encode the final bytes.
+The four packet methods remain separate captures, not one atomic snapshot of
+all builder lists. Ordinary encoding no longer reconstructs Java `BufferQuad`
+projections. The native path requires `getClass() == LodQuadBuilder.class`;
+subclassed builders retain the Java compatibility implementation.
 
 Implementation: [Rust owner](https://github.com/HungLo2020/MattMC/tree/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/rust/render/dh_quads),
 [CPU lease](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilder.java)
@@ -55,11 +55,11 @@ Use JDK25 and the same native release for all Java runs:
 ```sh
 CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml --locked --profile suite --lib render::dh_quads::
 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release buildRustNative compileTestJava
-CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeDhQuadBuilderTest' --tests '*LodQuadBuilderLayerTest'
+CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeDhQuadBuilderTest' --tests '*NativeDhPacketPlanTest' --tests '*LodQuadBuilderLayerTest'
 python3 DevUtils/RunWiki.py check
 ```
 
-[VerifyDhQuads.java](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/DevUtils/tests/rendering/VerifyDhQuads.java)
+[VerifyDhQuads.java](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/VerifyDhQuads.java)
 records actual untouched Frozen add/premerge/greedy output and vertex bytes.
 The fixture embeds compiled-class hashes and512 synthetic CPU cases covering
 signed coordinates, ties, curvature, overlaps, transparency, large widths
@@ -72,12 +72,14 @@ The driver accepts `bench current|frozen SEED QUADS ROUNDS`, with five warmup
 rounds per JVM. Time creation, face admission, merging, count consumption and
 release together in isolated alternating pairs. Add `packets` after `ROUNDS`
 to include final packet production and byte consumption. Seeds0/1/2 select smooth,
-overlapping and scattered faces. Receipts belong in
+overlapping and scattered faces. `grass-packets` also substitutes grass for
+non-water faces and runs ordered dirt/shade callbacks with fading enabled.
+Receipts belong in
 `build/native-dh-quad-owner/`. CPU fixtures and timings do not establish gameplay
 FPS, visual parity or long-session memory acceptance.
 
-The [Python runner](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/DevUtils/tests/rendering/VerifyDhQuads.py)
-accepts `--mode topology|packets`, explicit JDK, compiled-driver, classpath-file,
+The [Python runner](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/VerifyDhQuads.py)
+accepts `--mode topology|packets|grass-packets`, explicit JDK, compiled-driver, classpath-file,
 native-directory and output paths; it pins driver/native bytes, checks result
 checksums, and rejects a Current median above Frozen. Do not overlap timed
 runs with compilation, tests, profiling or input hashing.
@@ -118,6 +120,9 @@ guards and protected prompt match; Frozen is unchanged. Wiki validation passes.
 
 
 ## Evidence limits
+
+The following review describes the prior `f8feb3ff` checkpoint. Additional
+packet replay and reentry controls are in the [packet guide](RUST-DH-PACKETS.md).
 
 The [Java controls](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/test/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilderTest.java)
 contain three test methods: the recorded 512-case Frozen corpus, 64 semantic

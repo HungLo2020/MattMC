@@ -520,18 +520,19 @@ public class LodQuadBuilder implements AutoCloseable
 	 * staging buffers: Rust owns the eventual GPU asset and the fixed-layout
 	 * bytes are the semantic boundary, not an OpenGL upload source.
 	 */
-	public SemanticVertexBufferBuild makeOpaqueRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(false, DEFAULT_DIRECTION_RENDER_ORDER), DEFAULT_DIRECTION_RENDER_ORDER, quad -> true); }
-	public SemanticVertexBufferBuild makeTransparentRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(true, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER), TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER, quad -> true); }
-	public SemanticVertexBufferBuild makeTransparentUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(true, TRANSPARENT_UP_DIRECTION_RENDER_ORDER), TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
-	public SemanticVertexBufferBuild makeTransparentWaterUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(true, TRANSPARENT_UP_DIRECTION_RENDER_ORDER), TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
+	public SemanticVertexBufferBuild makeOpaqueRustSemanticBuffers() { return makePacketBuild(0, opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER, quad -> true); }
+	public SemanticVertexBufferBuild makeTransparentRustSemanticBuffers() { return makePacketBuild(1, transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER, quad -> true); }
+	public SemanticVertexBufferBuild makeTransparentUpRustSemanticBuffers() { return makePacketBuild(2, transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
+	public SemanticVertexBufferBuild makeTransparentWaterUpRustSemanticBuffers() { return makePacketBuild(3, transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
 
-	/** Native rows are copied once for packet encoding; no persistent Java quad mirror. */
-	@SuppressWarnings("unchecked")
-	private List<BufferQuad>[] quadsForPacket(boolean transparent, int[] directions) {
-		if (nativeQuads == null) return transparent ? transparentQuads : opaqueQuads;
-		List<BufferQuad>[] result = (List<BufferQuad>[]) new List[6];
-		for (int direction : directions) result[direction] = nativeQuads.snapshot(transparent ? 1 : 0, direction);
-		return result;
+	private SemanticVertexBufferBuild makePacketBuild(int route, List<BufferQuad>[] compatibility, int[] directions, Predicate<BufferQuad> filter) {
+		if (nativeQuads == null) return makeSemanticVertexBufferBuild(compatibility, directions, filter);
+		int grass = debugRenderingMode != EDhApiDebugRendering.OFF || grassSideRenderingMode == EDhApiGrassSideRendering.AS_GRASS
+			? 0 : grassSideRenderingMode == EDhApiGrassSideRendering.AS_DIRT ? 1
+			: grassSideRenderingMode == EDhApiGrassSideRendering.FADE_TO_DIRT ? 2 : 3;
+		try (NativeDhPacketPlan plan = nativeQuads.packetPlan(route, grass)) {
+			return plan.build(clientLevelWrapper, MC_RENDER);
+		}
 	}
 
 	private SemanticVertexBufferBuild makeSemanticVertexBufferBuild(

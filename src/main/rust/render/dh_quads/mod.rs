@@ -1,6 +1,9 @@
 //! Build-local DH quad ownership and Frozen greedy topology. CPU facts only.
 mod ffi;
 #[cfg(test)]
+mod packet_tests;
+mod packets;
+#[cfg(test)]
 mod tests;
 
 /// Stable CPU projection; not a vertex/GPU ABI. Every byte is initialized.

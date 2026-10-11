@@ -1,3 +1,4 @@
+use super::packets::{self, Plan};
 use super::{Builder, Policy, Quad};
 use std::{
     panic::{catch_unwind, AssertUnwindSafe},
@@ -119,4 +120,120 @@ pub unsafe extern "C" fn mattmc_dh_quads_count(owner: *const Builder, field: i32
         8 => owner.premerges,
         _ => -1,
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_packet_plan(
+    owner: *const Builder,
+    route: i32,
+    grass: i32,
+    audit: i32,
+) -> *mut Plan {
+    catch_unwind(AssertUnwindSafe(|| {
+        owner
+            .as_ref()
+            .and_then(|owner| Plan::new(owner, route, grass, audit != 0))
+            .map(|plan| Box::into_raw(Box::new(plan)))
+            .unwrap_or(ptr::null_mut())
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_packet_release(plan: *mut Plan) {
+    if !plan.is_null() {
+        drop(Box::from_raw(plan));
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_packet_count(plan: *const Plan, field: i32) -> i32 {
+    let Some(plan) = plan.as_ref() else {
+        return -1;
+    };
+    let count = match field {
+        0 => plan.entries.len(),
+        1 => plan.events.len(),
+        2 => plan.callbacks,
+        _ => return -1,
+    };
+    i32::try_from(count).unwrap_or(-1)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_packet_events(
+    plan: *const Plan,
+    output: *mut u8,
+    count: i32,
+) -> i32 {
+    let Some(plan) = plan.as_ref() else {
+        return 0;
+    };
+    if count < 0 || count as usize != plan.events.len() || count > 0 && output.is_null() {
+        return 0;
+    }
+    if count > 0 {
+        ptr::copy_nonoverlapping(
+            plan.events.as_ptr().cast::<u8>(),
+            output,
+            plan.events.len() * 16,
+        );
+    }
+    1
+}
+fn aligned<T>(p: *const T) -> bool {
+    !p.is_null() && p as usize % std::mem::align_of::<T>() == 0
+}
+
+/// Disjoint caller-owned spans. Complete validation precedes all writes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_packet_encode(
+    plan: *const Plan,
+    offset: i32,
+    count: i32,
+    vertices: *mut u8,
+    identities: *mut i32,
+    variants: *mut u8,
+    positions: *mut i64,
+    colors: *const i32,
+    shades: *const f32,
+    callbacks: i32,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        let Some(plan) = plan.as_ref() else {
+            return 0;
+        };
+        if offset < 0
+            || count < 0
+            || callbacks < 0
+            || callbacks as usize != plan.callbacks
+            || offset as usize > plan.entries.len()
+            || count as usize > plan.entries.len() - offset as usize
+            || count > 0
+                && (vertices.is_null()
+                    || variants.is_null()
+                    || !aligned(identities)
+                    || !aligned(positions))
+            || callbacks > 0 && (!aligned(colors) || !aligned(shades))
+        {
+            return 0;
+        }
+        let (colors, shades) = if callbacks == 0 {
+            (&[][..], &[][..])
+        } else {
+            (
+                std::slice::from_raw_parts(colors, callbacks as usize),
+                std::slice::from_raw_parts(shades, callbacks as usize),
+            )
+        };
+        for (i, entry) in plan.entries[offset as usize..offset as usize + count as usize]
+            .iter()
+            .enumerate()
+        {
+            let bytes = packets::encode(entry, plan.transparency, colors, shades);
+            ptr::copy_nonoverlapping(bytes.as_ptr(), vertices.add(i * 64), 64);
+            ptr::write(identities.add(i), entry.quad.identity);
+            ptr::write(variants.add(i), entry.quad.variant);
+            ptr::write(positions.add(i), entry.quad.position);
+        }
+        1
+    }))
+    .unwrap_or(0)
 }

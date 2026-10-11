@@ -32,6 +32,7 @@ class NativeDhQuadBuilderTest {
                     }
                     if(merge){builder.mergeQuads();builder.mergeQuads();}
                     var owner=(NativeDhQuadBuilder)field.get(builder);assertNotNull(owner);
+                    var expectedPackets=new ByteArrayOutputStream[4];for(int i=0;i<4;i++)expectedPackets[i]=new ByteArrayOutputStream();
                     for(int layer=0;layer<2;layer++)for(int dir=0;dir<6;dir++){
                         var rows=owner.snapshot(layer,dir);assertEquals(in.readInt(),rows.size(),"case "+c+" layer "+layer+" dir "+dir);
                         for(var q:rows){
@@ -40,10 +41,14 @@ class NativeDhQuadBuilderTest {
                             assertEquals(in.readInt(),q.color);assertEquals(in.readByte(),q.irisBlockMaterialId);
                             assertEquals(in.readByte(),q.skyLight);assertEquals(in.readByte(),q.blockLight);
                             assertEquals(in.readByte(),q.direction.ordinal());assertEquals(in.readBoolean(),q.hasError);
-                            byte[] expected=in.readNBytes(64);var bytes=ByteBuffer.allocate(64).order(ByteOrder.nativeOrder());
+                            byte[] expected=in.readNBytes(64);
+                            int route=layer==0?0:dir!=1?1:q.irisBlockMaterialId==12?3:2;expectedPackets[route].write(expected);
+                            var bytes=ByteBuffer.allocate(64).order(ByteOrder.nativeOrder());
                             put.invoke(builder,bytes,q);assertArrayEquals(expected,bytes.array(),"Frozen vertices case "+c);
                         }
                     }
+                    var actual=new LodQuadBuilder.SemanticVertexBufferBuild[]{builder.makeOpaqueRustSemanticBuffers(),builder.makeTransparentRustSemanticBuffers(),builder.makeTransparentUpRustSemanticBuffers(),builder.makeTransparentWaterUpRustSemanticBuffers()};
+                    for(int route=0;route<4;route++) {var flattened=new ByteArrayOutputStream();for(byte[] bytes:actual[route].packedVertexBuffers())flattened.write(bytes);assertArrayEquals(expectedPackets[route].toByteArray(),flattened.toByteArray(),"native packets case "+c+" route "+route);}
                 }
             }
             assertEquals(-1,in.read());
