@@ -65,8 +65,8 @@ class NativeDhSameDetailMergeTest {
             for (int test = 0; test < 48; test++) {
                 String name = in.readUTF(); int[] remap = new int[in.readInt()]; for (int i = 0; i < remap.length; i++) remap[i] = in.readInt();
                 boolean empty = in.readBoolean(); var targetState = read(in); var inputState = read(in);
-                try (var target = source(targetState); var direct = source(targetState); var original = source(targetState); var input = source(inputState)) {
-                    target.isEmpty = direct.isEmpty = original.isEmpty = empty; forceOriginalRoute(original);
+                try (var target = source(targetState); var direct = source(targetState); var scoped = source(targetState); var original = source(targetState); var input = source(inputState)) {
+                    target.isEmpty = direct.isEmpty = scoped.isEmpty = original.isEmpty = empty; forceOriginalRoute(original);
                     LongList[] identities = target.columnReferences(), directIdentities = direct.columnReferences();
                     for (int pass = 0; pass < 2; pass++) {
                         boolean changed = in.readBoolean(), expectedEmpty = in.readBoolean(); var expected = read(in);
@@ -80,12 +80,11 @@ class NativeDhSameDetailMergeTest {
                             target.isEmpty = false;
                             if (identities[i] != null) assertSame(identities[i], target.getColumn(i));
                         }
-                        var retainedMerge = NativeDhSameDetailMerge.prepareSources(direct.nativeSource(),input.nativeSource(),
-                            direct.columnGenerationSteps,direct.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,
-                            new boolean[4096],Map.of(),Map.of(),remap);
+                        var retainedMerge = NativeDhSameDetailMerge.prepareOwned(direct.nativeSource(),input.nativeSource(),Map.of(),Map.of(),remap);
                         assertNotNull(retainedMerge,name + " retained admission"); assertEquals(changed,retainedMerge.changed());
                         retainedMerge.commit(direct.columnReferences(),direct.nativeSource());
-                        if (retainedMerge.publishMetadata(direct.columnGenerationSteps,direct.columnWorldCompressionMode,new boolean[4096])) direct.isEmpty = false;
+                        var publication=retainedMerge.publishMetadataWithHash(direct.nativeSource(),6);
+                        if (publication.updated()) direct.isEmpty = false;
                         assertEquals(0,retainedMerge.footprintActionCount(),"No contributor facts in Frozen corpus");
                         for(int i=0;i<4096;i++) if(directIdentities[i]!=null) assertSame(directIdentities[i],direct.getColumn(i),name + " retained identity " + i);
                         assertEquals(expectedEmpty,direct.isEmpty); check(expected,direct,name + " retained pass " + pass);
@@ -98,6 +97,12 @@ class NativeDhSameDetailMergeTest {
                         expectedHash=43*(17*(31*expectedHash+Arrays.deepHashCode(columns))+generations.hashCode())+compression.hashCode();
                         long retainedHash=direct.nativeSource().tryHash(6,direct.columnGenerationSteps,direct.columnWorldCompressionMode);
                         assertEquals(1,retainedHash>>>32,name + " retained hash admission"); assertEquals(expectedHash,(int)retainedHash,name + " saved Frozen state hash");
+                        assertEquals(retainedHash,publication.hash(),name + " fused publication matches saved Frozen hash");
+                        var scopedUpdate=NativeDhSameDetailMerge.updateOwnedWithoutFootprints(scoped.nativeSource(),input.nativeSource(),scoped.columnReferences(),remap,6);
+                        assertNotNull(scopedUpdate,name + " scoped native admission");assertEquals(changed,scopedUpdate.changed());
+                        if(scopedUpdate.metadataUpdated())scoped.isEmpty=false;
+                        assertEquals(expectedEmpty,scoped.isEmpty);check(expected,scoped,name + " scoped pass " + pass);
+                        assertEquals(retainedHash,scopedUpdate.hash(),name + " scoped saved Frozen hash");
                         assertEquals(changed, update(original, input, remap), name + " original route flag");
                         assertEquals(expectedEmpty, target.isEmpty); assertEquals(expectedEmpty, original.isEmpty);
                         check(expected, target, name + " native pass " + pass); check(expected, original, name + " original pass " + pass);
@@ -132,6 +137,33 @@ class NativeDhSameDetailMergeTest {
             }
             assertEquals(retainedPoints, retained[0], "Committed footprints release borrowed source leases and own independent points");
         } finally { setting.setWithoutFiringEvents(previous); }
+    }
+    @Test void publicUpdateHashesFinalPointsAndKeepsMetadataOnlyCachedHashPolicy() throws Exception {
+        var setting=Config.Common.LodBuilding.worldCompression;var previous=setting.get();
+        try {
+            for(var mode:EDhApiWorldCompressionMode.values()) {
+                setting.setWithoutFiringEvents(mode);
+                var columns=NativeDhColumnsTest.savedNativeColumns(1);assertNotNull(columns);
+                try(var input=FullDataSourceV2.createNative(columns);
+                    var target=FullDataSourceV2.createEmpty(columns.position());
+                    var original=FullDataSourceV2.createEmpty(columns.position())) {
+                    forceOriginalRoute(original);
+                    assertEquals(original.updateFromDataSource(input),target.updateFromDataSource(input),mode.toString());
+                    assertEquals(original.hashCode(),target.hashCode(),"Hash must describe the final, possibly culled points");
+                    long computed=target.nativeSource().tryHash(target.getPos(),target.columnGenerationSteps,target.columnWorldCompressionMode);
+                    assertEquals(1,computed>>>32);assertEquals((int)computed,target.hashCode());
+                    for(int i=0;i<4096;i++)assertEquals(original.getColumn(i),target.getColumn(i));
+                    if(mode==EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS) {
+                        int cached=target.hashCode();int index=columns.offsetX()*64+columns.offsetZ();
+                        input.columnWorldCompressionMode.set(index,(byte)-128);
+                        assertFalse(original.updateFromDataSource(input));assertFalse(target.updateFromDataSource(input));
+                        assertEquals(cached,target.hashCode(),"Metadata-only publication preserves Frozen's cached hash");
+                        assertEquals(original.hashCode(),target.hashCode());
+                        assertEquals((byte)-128,target.columnWorldCompressionMode.getByte(index));
+                    }
+                }
+            }
+        } finally {setting.setWithoutFiringEvents(previous);}
     }
     @Test void orderedFootprintAdmissionMatchesOriginalRouteAtCapacity() throws Exception {
         try (var input = FullDataSourceV2.createEmpty(6); var target = FullDataSourceV2.createEmpty(6); var original = FullDataSourceV2.createEmpty(6)) {

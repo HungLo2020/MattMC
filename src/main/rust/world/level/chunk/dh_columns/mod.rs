@@ -15,6 +15,7 @@ mod parent;
 mod contributors;
 mod tint;
 mod source;
+mod metadata;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

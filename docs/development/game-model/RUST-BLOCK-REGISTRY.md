@@ -16,7 +16,11 @@ identities, emitted light and canonical fluid associations. Java supplies
 behavior factories, remaining shapes, blocked light and world-dependent facts.
 [Sound and offset settings](BLOCK-SOUND-AND-OFFSETS.md) also originate in Rust.
 [`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
-exports those remaining facts once, lazily on the first `ready()` call.
+exports those remaining facts once, lazily on the first `ready()` call after
+Java bootstrap has completed. Early calls return false without initializing the
+one-time export: Java marks bootstrap started before all state caches exist.
+This prevents an early partial export or bootstrap exception from permanently
+disabling every registry-backed consumer.
 The current wire format is **9**: block/state/face counts, per-state face IDs
 and remaining flags, blocked-light values and the face truth table. Names,
 schemas, defaults, value indices, emission, fluid associations and offsets are
@@ -112,6 +116,14 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
 4. Gate the registry-backed route on `NativeBlockRegistry.ready()`. When it
    is false or Rust declines a view, retain that consumer's existing fallback
    (the explicit native record registration for meshing).
+
+A fresh-process lifecycle control, `NativeBlockRegistryReadinessTest`, queries
+readiness before bootstrap and then requires successful installation afterward.
+Run it with JDK25 and the native library built for the same worktree:
+
+```sh
+./gradlew -PmattmcRustProfile=release test -x testRustNative --tests net.minecraft.world.level.block.NativeBlockRegistryReadinessTest
+```
 
 ## Constraints
 

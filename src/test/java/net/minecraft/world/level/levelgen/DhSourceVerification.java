@@ -52,10 +52,11 @@ public final class DhSourceVerification {
             var columns=(Object[])field.get(input);
             var getter=FullDataSourceV2.class.getDeclaredMethod("getColumnAtRelPos",int.class,int.class);
             for(int x=0;x<64;x++)for(int z=0;z<64;z++)if(columns[x*64+z]==null)columns[x*64+z]=getter.invoke(input,x,z);
+            var generation=(it.unimi.dsi.fastutil.bytes.ByteList)FullDataSourceV2.class.getField("columnGenerationSteps").get(input);
             for(int x=0;x<64;x++)for(int z=0;z<64;z++) {
                 var list=(it.unimi.dsi.fastutil.longs.LongList)columns[x*64+z];
                 for(int j=3;j>=0;j--)list.add(FullDataPointUtil.encode(0,8,j*8,(byte)5,(byte)15));
-                input.columnGenerationSteps.set(x*64+z,EDhApiWorldGenerationStep.LIGHT.value);
+                generation.set(x*64+z,EDhApiWorldGenerationStep.LIGHT.value);
             }
             input.isEmpty=false;
             int rounds=Integer.parseInt(args[0]),warm=Integer.parseInt(args[1]);

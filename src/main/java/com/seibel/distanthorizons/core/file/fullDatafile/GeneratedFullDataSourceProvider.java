@@ -302,7 +302,7 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	public void clearRetrievalQueue() { this.worldGenQueueRef.set(null); }
 	
 	
-	public boolean isFullyGenerated(ByteArrayList columnGenerationSteps)
+	public boolean isFullyGenerated(it.unimi.dsi.fastutil.bytes.ByteList columnGenerationSteps)
 	{
 		return IntStream.range(0, columnGenerationSteps.size())
 				.noneMatch(i ->

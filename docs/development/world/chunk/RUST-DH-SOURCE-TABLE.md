@@ -105,8 +105,10 @@ read primary points and borrowed signed metadata directly, with a bounded
 keep their original hashing route. Preparation streams columns directly; absent contributor descriptors use one
 immutable default table rather than an allocation per merge. Source orchestration, byte storage,
 persistence codecs, contextual colors and geometry remain migration work.
-Parent and occlusion consumers retain their existing descriptor transport; they
-can move onto this same table without creating another point owner.
+The subsequent [source metadata migration](RUST-DH-SOURCE-METADATA.md) moves
+generation/compression/uniformity storage and direct parent transport into Rust.
+Its fresh verification is separate from the historical results below. Occlusion
+transport and source orchestration remain work.
 
 ## Verification
 
@@ -160,8 +162,10 @@ same-detail updates **fail** scoped performance parity: 1.439× Frozen. Primary
 hash reuse, exact copy proofs and fused traversal improve earlier candidates,
 but that gap still needs profiling and further migration. This intermediate
 ownership batch does not establish whole-game performance acceptance.
-Generation/compression storage, uniformity, orchestration, persistence and
-parent/occlusion transport remain work; move direct consumers with their owners.
+At that checkpoint, generation/compression storage, uniformity, orchestration,
+persistence and parent/occlusion transport remained work. The subsequent
+[metadata migration](RUST-DH-SOURCE-METADATA.md) records newer ownership and
+verification separately.
 
 Use [`VerifyDhSource.py`](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/DevUtils/tests/world/chunk/VerifyDhSource.py) with JDK25, the isolated
 Frozen/current classpath files, `--native-dir build/rust/native`, a fresh

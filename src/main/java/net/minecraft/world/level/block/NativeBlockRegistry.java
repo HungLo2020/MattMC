@@ -45,6 +45,10 @@ public final class NativeBlockRegistry {
     /** True once Rust holds a registry equal to Java's. Every state is then
      * a distinct {@code BlockState} whose ID equals its position. */
     public static boolean ready() {
+        // Bootstrap marks itself started before constructing every state/cache.
+        // An early query must not permanently initialize Holder with a partial
+        // export or a caught bootstrap exception.
+        if (net.minecraft.server.Bootstrap.bootstrapDuration.get() < 0) return false;
         return Holder.READY;
     }
 

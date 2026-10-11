@@ -12,9 +12,6 @@ import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pooling.AbstractPhantomArrayList;
-import com.seibel.distanthorizons.core.pooling.PhantomArrayListCheckout;
-import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
 import com.seibel.distanthorizons.core.pos.DhLodPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
@@ -25,7 +22,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import it.unimi.dsi.fastutil.bytes.ByteArrayList;
+import it.unimi.dsi.fastutil.bytes.ByteList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -43,8 +40,7 @@ import java.util.List;
  * @see FullDataSourceV1
  */
 public class FullDataSourceV2 
-		extends AbstractPhantomArrayList
-		implements IDhApiFullDataSource
+		implements IDhApiFullDataSource, AutoCloseable
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	/** useful for debugging, but can slow down update operations quite a bit due to being called so often. */
@@ -61,7 +57,6 @@ public class FullDataSourceV2
 	/** how many chunks wide this datasource is at detail level 0. */
 	public static final int NUMB_OF_CHUNKS_WIDE = WIDTH / LodUtil.CHUNK_WIDTH;
 	
-	public static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("FullDataV2");
 	
 	
 	
@@ -85,13 +80,13 @@ public class FullDataSourceV2
 	 *
 	 * @see EDhApiWorldGenerationStep
 	 */
-	public final ByteArrayList columnGenerationSteps;
+	public final ByteList columnGenerationSteps;
 	/** 
 	 * stores what world compression was used for each column.
 	 *
 	 * @see EDhApiWorldCompressionMode
 	 */
-	public final ByteArrayList columnWorldCompressionMode;
+	public final ByteList columnWorldCompressionMode;
 	
 	/** 
 	 * stored x/z, y <br>
@@ -99,13 +94,6 @@ public class FullDataSourceV2
 	 */
 	private final LongList[] dataPoints;
 	private final net.minecraft.world.level.chunk.NativeDhSource nativeSource;
-	/**
-	 * Conservative proof that a downsampled column's horizontal footprint had
-	 * one identical semantic source column. This is metadata only; it never
-	 * changes DH's legacy color/geometry reduction. A false value keeps exact
-	 * textured Rust admission unavailable rather than guessing a sprite.
-	 */
-	private final boolean[] semanticHorizontalUniform;
 	/**
 	 * Bounded raw contributor columns retained for heterogeneous 2x2 reductions.
 	 * These are gameplay data only; the renderer must resolve identities and
@@ -263,7 +251,6 @@ public class FullDataSourceV2
 			byte @Nullable [] columnGenerationSteps, byte @Nullable [] columnWorldCompressionMode,
 			boolean empty)
 	{
-		super(ARRAY_LIST_POOL, 2, 0, 0);
 		
 		LodUtil.assertTrue(data == null || data.length == WIDTH * WIDTH);
 		
@@ -274,18 +261,13 @@ public class FullDataSourceV2
 		this.isEmpty = empty;
 		
 		
-		// pooled data arrays
+		// Temporary Java identities over the retained Rust source table.
 		this.dataPoints = new LongList[WIDTH * WIDTH];
 		this.nativeSource = new net.minecraft.world.level.chunk.NativeDhSource(this.dataPoints, this.nativeColumnGroup);
-		this.semanticHorizontalUniform = new boolean[WIDTH * WIDTH];
-		boolean blockResolution = DhSectionPos.getDetailLevel(pos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
-		for (int i = 0; i < WIDTH * WIDTH; i++)
-		{
-			// size defaulting to 0 since we don't know how many datapoints
-			// will be in this column yet
-			this.semanticHorizontalUniform[i] = blockResolution;
-		}
-		
+        this.nativeSource.initializeUniform(DhSectionPos.getDetailLevel(pos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL);
+        this.columnGenerationSteps = this.nativeSource.generation();
+        this.columnWorldCompressionMode = this.nativeSource.compression();
+
 		// use incoming data if present
 		if (data != null)
 		{
@@ -295,27 +277,12 @@ public class FullDataSourceV2
 			}
 		}
 		
-		// pooled generation step array
-		this.columnGenerationSteps = this.pooledArraysCheckout.getByteArray(0, 0); // initial size is 0 so we can simply add the existing array if present
-		if (columnGenerationSteps != null)
-		{
-			this.columnGenerationSteps.addElements(0, columnGenerationSteps);
-		}
-		else
-		{
-			ListUtil.clearAndSetSize(this.columnGenerationSteps, WIDTH * WIDTH);
-		}
-		
-		// pooled column compression array
-		this.columnWorldCompressionMode = this.pooledArraysCheckout.getByteArray(1, 0);
-		if (columnWorldCompressionMode != null)
-		{
-			this.columnWorldCompressionMode.addElements(0, columnWorldCompressionMode);
-		}
-		else
-		{
-			ListUtil.clearAndSetSize(this.columnWorldCompressionMode, WIDTH * WIDTH);
-		}
+        if (columnGenerationSteps != null) {
+            this.columnGenerationSteps.clear(); this.columnGenerationSteps.addElements(0, columnGenerationSteps);
+        }
+        if (columnWorldCompressionMode != null) {
+            this.columnWorldCompressionMode.clear(); this.columnWorldCompressionMode.addElements(0, columnWorldCompressionMode);
+        }
 	}
 	
 	
@@ -325,7 +292,7 @@ public class FullDataSourceV2
 	//=========//
 	
     @Override public void close() {
-        try { super.close(); } finally { this.nativeSource.close(); }
+        this.nativeSource.close();
     }
     /** Stable compatibility list identity; point storage belongs to Rust. */
     public LongList getColumn(int index) { return this.nativeSource.getColumn(index); }
@@ -340,7 +307,7 @@ public class FullDataSourceV2
 
 	/** Returns only a copied-data proof; callers must still validate material identity. */
 	public boolean hasSemanticHorizontalUniformity(int relX, int relZ)
-	{ return this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)]; }
+	{ return this.nativeSource.uniform(relativePosToIndex(relX, relZ)); }
 
 	/** Returns a defensive copy of the bounded source footprint, or null when unavailable. */
 	public LongArrayList[] getSemanticHorizontalContributors(int relX, int relZ)
@@ -387,7 +354,7 @@ public class FullDataSourceV2
 	}
 
 	public void setSemanticHorizontalUniformity(int relX, int relZ, boolean uniform)
-	{ this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)] = uniform; }
+	{ this.nativeSource.uniform(relativePosToIndex(relX, relZ), uniform); }
 	
 	@Nullable
 	public LongList tryGetColumnAtRelPos(int relX, int relZ)
@@ -490,9 +457,11 @@ public class FullDataSourceV2
 		int[] remappedIds = this.mapping.mergeAndReturnRemappedEntityIds(inputDataSource.mapping);
 		
 		boolean dataChanged;
+		long preparedHash=0;
 		if (inputDetailLevel == thisDetailLevel)
 		{
-			dataChanged = this.updateFromSameDetailLevel(inputDataSource, remappedIds);
+			var update=this.updateSameDetailWithHash(inputDataSource, remappedIds);
+            dataChanged=update.changed();preparedHash=update.hash();
 			
 			// same detail level, propagate parent/children update flags from input
 			if (this.applyToParent != null || inputDataSource.applyToParent != null)
@@ -577,13 +546,17 @@ public class FullDataSourceV2
 			
 			
 			// update the hash code
-			this.generateHashCode();
+            if(!cullHiddenBlocks && (preparedHash>>>32)!=0)this.cachedHashCode=(int)preparedHash;
+            else this.generateHashCode();
 		}
 		
 		return dataChanged;
 	}
 	
 	private boolean updateFromSameDetailLevel(FullDataSourceV2 inputDataSource, int[] remappedIds)
+	{ return this.updateSameDetailWithHash(inputDataSource,remappedIds).changed(); }
+    private record SameDetailUpdate(boolean changed,long hash) {}
+    private SameDetailUpdate updateSameDetailWithHash(FullDataSourceV2 inputDataSource,int[] remappedIds)
 	{
 		// both data sources should have the same detail level
 		if (DhSectionPos.getDetailLevel(inputDataSource.pos) != DhSectionPos.getDetailLevel(this.pos))
@@ -596,27 +569,35 @@ public class FullDataSourceV2
 		if (!RUN_DATA_ORDER_VALIDATION && this.getClass() == FullDataSourceV2.class
 			&& inputDataSource.getClass() == FullDataSourceV2.class)
 		{
-			var nativeMerge = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.prepareSources(
-                this.nativeSource, inputDataSource.nativeSource, this.columnGenerationSteps, this.columnWorldCompressionMode,
-                inputDataSource.columnGenerationSteps, inputDataSource.columnWorldCompressionMode, inputDataSource.semanticHorizontalUniform,
-                this.semanticHorizontalContributors, inputDataSource.semanticHorizontalContributors, remappedIds);
+			if(this.semanticHorizontalContributors.isEmpty() && inputDataSource.semanticHorizontalContributors.isEmpty()) {
+                var update=net.minecraft.world.level.chunk.NativeDhSameDetailMerge.updateOwnedWithoutFootprints(
+                    this.nativeSource,inputDataSource.nativeSource,this.dataPoints,remappedIds,this.pos);
+                if(update!=null) {
+                    if(update.metadataUpdated())this.isEmpty=false;
+                    return new SameDetailUpdate(update.changed(),update.hash());
+                }
+            }
+			var nativeMerge = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.prepareOwned(
+                this.nativeSource,inputDataSource.nativeSource,this.semanticHorizontalContributors,
+                inputDataSource.semanticHorizontalContributors,remappedIds);
             if (nativeMerge == null) nativeMerge = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.prepare(
 				this.columnReferences(), inputDataSource.columnReferences(), this.columnGenerationSteps, this.columnWorldCompressionMode, inputDataSource.columnGenerationSteps,
-				inputDataSource.columnWorldCompressionMode, inputDataSource.semanticHorizontalUniform,
+				inputDataSource.columnWorldCompressionMode, inputDataSource.nativeSource.uniformSnapshot(),
 				this.semanticHorizontalContributors, inputDataSource.semanticHorizontalContributors, remappedIds);
 			if (nativeMerge != null)
 			{
                 boolean retained = false;
                 try {
 				nativeMerge.commit(this.dataPoints, this.nativeSource);
-				if (nativeMerge.publishMetadata(this.columnGenerationSteps,this.columnWorldCompressionMode,this.semanticHorizontalUniform)) this.isEmpty=false;
+                var publication=nativeMerge.publishMetadataWithHash(this.nativeSource,this.pos);
+                if (publication.updated()) this.isEmpty=false;
                 for(int action=0;action<nativeMerge.footprintActionCount();action++) {
                     int index=nativeMerge.footprintAction(action);
                     this.semanticHorizontalContributors.remove(index);
                     LongList[] footprint=nativeMerge.contributors(index);
                     if(footprint!=null){retained=true;this.semanticHorizontalContributors.put(index,footprint);}
                 }
-				return nativeMerge.changed();
+				return new SameDetailUpdate(nativeMerge.changed(),publication.hash());
                 } finally { if(!retained)nativeMerge.close(); }
 			}
 		}
@@ -715,9 +696,9 @@ public class FullDataSourceV2
 				this.columnGenerationSteps.set(index, inputGenState);
 				// always overwrite the compression mode since we're replacing this column
 				this.columnWorldCompressionMode.set(index, inputDataSource.columnWorldCompressionMode.getByte(index));
-				this.semanticHorizontalUniform[index] = inputDataSource.semanticHorizontalUniform[index];
+				this.nativeSource.uniform(index, inputDataSource.nativeSource.uniform(index));
 				this.semanticHorizontalContributors.remove(index);
-				if (!this.semanticHorizontalUniform[index]
+				if (!this.nativeSource.uniform(index)
 					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
 				{
 					LongList[] contributors = remapHorizontalContributors(
@@ -728,7 +709,7 @@ public class FullDataSourceV2
 			}
 		}
 		
-		return dataChanged;
+		return new SameDetailUpdate(dataChanged,0);
 	}
 	
 	private boolean updateFromOneBelowDetailLevel(FullDataSourceV2 inputDataSource, int[] remappedIds)
@@ -762,9 +743,8 @@ public class FullDataSourceV2
 					relativePosToIndex(x + recipientOffsetX, z + recipientOffsetZ));
 			var nativeParent = RUN_DATA_ORDER_VALIDATION || inputDataSource.columnWorldCompressionMode.size() != WIDTH * WIDTH
 				|| inputDataSource.columnGenerationSteps.size() != WIDTH * WIDTH ? null
-				: net.minecraft.world.level.chunk.NativeDhParentColumns.build(nativeMaterials, inputDataSource.columnReferences(), remappedIds,
-					inputDataSource.columnWorldCompressionMode.elements(), inputDataSource.semanticHorizontalUniform,
-					previousFootprints, this.semanticHorizontalContributors.size(), inputDataSource.columnGenerationSteps.elements());
+				: net.minecraft.world.level.chunk.NativeDhParentColumns.buildSource(nativeMaterials,inputDataSource.nativeSource,remappedIds,
+                    previousFootprints,this.semanticHorizontalContributors.size());
 			for (int x = 0; x < WIDTH; x += 2)
 			{
 				for (int z = 0; z < WIDTH; z += 2)
@@ -794,11 +774,11 @@ public class FullDataSourceV2
 						? mergeInputTwoByTwoDataColumn(inputDataSource, x, z, nativeMaterials)
 						: nativeParent.column(x / 2, z / 2);
 					int targetIndex = recipientIndex;
-					this.semanticHorizontalUniform[targetIndex] = nativeParent == null
+					this.nativeSource.uniform(targetIndex, nativeParent == null
 						? semanticallyUniformTwoByTwo(inputDataSource, x, z, remappedIds)
-						: nativeParent.isUniform(x / 2, z / 2);
+						: nativeParent.isUniform(x / 2, z / 2));
 					this.semanticHorizontalContributors.remove(targetIndex);
-					if (!this.semanticHorizontalUniform[targetIndex]
+					if (!this.nativeSource.uniform(targetIndex)
 						&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
 					{
 						LongList[] contributors = nativeParent == null ? null : nativeParent.contributors(x / 2, z / 2);
@@ -891,7 +871,7 @@ public class FullDataSourceV2
 	 * The minimum value is used because we don't want to accidentally record that
 	 * something was generated when it wasn't.
 	 */
-	private static byte determineMinWorldGenStepForTwoByTwoColumn(ByteArrayList columnGenerationSteps, int relX, int relZ)
+	private static byte determineMinWorldGenStepForTwoByTwoColumn(ByteList columnGenerationSteps, int relX, int relZ)
 	{
 		// TODO merge similar logic with determineHighestWorldCompressionForTwoByTwoColumn
 		byte minWorldGenStepValue = Byte.MAX_VALUE;
@@ -910,7 +890,7 @@ public class FullDataSourceV2
 	 * The minimum value is used because we don't want to accidentally record that
 	 * something was generated when it wasn't.
 	 */
-	private static byte determineHighestWorldCompressionForTwoByTwoColumn(ByteArrayList columnCompressionMode, int relX, int relZ)
+	private static byte determineHighestWorldCompressionForTwoByTwoColumn(ByteList columnCompressionMode, int relX, int relZ)
 	{
 		// TODO merge similar logic with determineMinWorldGenStepForTwoByTwoColumn
 		byte minWorldGenStepValue = Byte.MIN_VALUE;
@@ -1174,7 +1154,7 @@ public class FullDataSourceV2
 		int referenceIndex = relativePosToIndex(x, z);
 		if (source.columnWorldCompressionMode.getByte(referenceIndex)
 			!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
-			|| !source.semanticHorizontalUniform[referenceIndex]) {
+			|| !source.nativeSource.uniform(referenceIndex)) {
 			return false;
 		}
 		LongList reference = source.getColumn(referenceIndex);
@@ -1183,7 +1163,7 @@ public class FullDataSourceV2
 				int index = relativePosToIndex(x + dx, z + dz);
 				if (source.columnWorldCompressionMode.getByte(index)
 					!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
-					|| !source.semanticHorizontalUniform[index]
+					|| !source.nativeSource.uniform(index)
 					|| !semanticDataColumnEquals(reference, source.getColumn(index), remappedIds)) {
 					return false;
 				}
@@ -1396,12 +1376,11 @@ public class FullDataSourceV2
 				// recipient footprint is therefore the mapped input cell itself;
 				// requiring a second 2x2 input footprint incorrectly discarded
 				// uniform provenance at every detail-level boundary.
-				this.semanticHorizontalUniform[recipientIndex] =
-					inputDataSource.semanticHorizontalUniform[inputIndex]
+				this.nativeSource.uniform(recipientIndex, inputDataSource.nativeSource.uniform(inputIndex)
 						&& inputDataSource.columnWorldCompressionMode.getByte(inputIndex)
-							== EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value;
+							== EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value);
 				this.semanticHorizontalContributors.remove(recipientIndex);
-				if (!this.semanticHorizontalUniform[recipientIndex]
+				if (!this.nativeSource.uniform(recipientIndex)
 					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
 				{
 					LongList[] contributors = remapHorizontalContributors(
@@ -1597,8 +1576,8 @@ public class FullDataSourceV2
 		this.setColumn(index, longArray);
 		this.columnGenerationSteps.set(index, worldGenStep.value);
 		this.columnWorldCompressionMode.set(index, worldCompressionMode.value);
-		this.semanticHorizontalUniform[index] = DhSectionPos.getDetailLevel(this.pos)
-			== DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
+		this.nativeSource.uniform(index, DhSectionPos.getDetailLevel(this.pos)
+			== DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL);
 		this.semanticHorizontalContributors.remove(index);
 		
 		
@@ -1670,15 +1649,6 @@ public class FullDataSourceV2
 		
 		return apiList;
 	}
-	
-	
-	
-	//============//
-	// unit tests //
-	//============//
-	
-	public PhantomArrayListCheckout getPhantomArrayCheckoutForUnitTesting()
-	{ return this.pooledArraysCheckout; }
 	
 	
 	

@@ -3,14 +3,15 @@
 The subsequent [retained source table](RUST-DH-SOURCE-TABLE.md) owns the live
 column references in Rust and feeds cached tint directly. Rust retains point
 ownership while Java list identity survives writes; growth and detachment may
-change the backing storage. Source orchestration, metadata
-bytes and persistence remain transitional Java work. At
-[`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1),
-`FullDataSourceV2.close()` now closes that table in a `finally` path after its
-metadata-pool close. This releases table-owned leases; escaped readers retain
-their own leases and grouped allocations still have the separate GC lifetime
-described below. Source close is not a guarantee that every column allocation
-has been freed.
+change the backing storage. The [metadata owner](RUST-DH-SOURCE-METADATA.md)
+also owns generation/compression/uniformity planes and feeds parent reduction
+directly. Source orchestration and persistence remain transitional Java work.
+At [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1),
+`FullDataSourceV2.close()` closed the table in a `finally` path after its
+metadata-pool close. The metadata migration removes that pool registration;
+source close now releases the table directly. Escaped readers retain independent
+leases and grouped allocations still have the separate GC lifetime described
+below. Source close does not guarantee that every column allocation is freed.
 
 Mutable full-data columns use Rust
 point vectors with direct CPU readers. Native producer columns detach on their
@@ -27,7 +28,7 @@ footprint admission/capture from source facts in the same call. It now also
 selects signed generation/compression metadata and computes parent list hashes
 while appending remapped points. Java stores the resulting bytes and reads seeded
 hashes; it does not repeat these policies per group. Java still owns source update
-orchestration, custom material-map callbacks, metadata storage, contextual color callbacks,
+orchestration, custom material-map callbacks, temporary metadata identity views, contextual color callbacks,
 persistence and render geometry construction.
 Legacy or explicitly replaced Java lists remain compatibility inputs. The subsequent
 [render-column reducer](../../rendering/RUST-DH-RENDER-COLUMNS.md) owns compact
@@ -43,8 +44,8 @@ guide records duplicate/import and exception-prefix constraints and current chec
 The subsequent [same-detail source update](RUST-DH-SOURCE-UPDATES.md) moves
 generation eligibility, remapping, change detection and ordered footprint
 admission into one Rust preparation/publication operation. Existing recipient
-vectors reuse their capacity; public metadata storage and orchestration remain
-Java. Its guide records the source-borrowing and failure-publication constraints.
+vectors reuse their capacity; metadata storage is now native, while orchestration
+remains Java. Its guide records the source-borrowing and failure-publication constraints.
 
 The current source also performs the complete 64×64 occlusion pass in
 one Rust call over existing owners. It follows Frozen's x/z and neighbor order,

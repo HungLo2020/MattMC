@@ -22,6 +22,10 @@ fn copy_proofs_track_source_target_remap_and_replacement_without_trusting_hash_c
             let mut projection=vec![0u64;WIDTH*4];
             assert_eq!(mattmc_dh_same_detail_projection(&*merge,output.as_ptr(),detached.as_ptr(),projection.as_mut_ptr()),1);
             assert_eq!(projection[3]&8!=0,reuse);
+            projection.fill(77);
+            assert_eq!(mattmc_dh_same_detail_extent_projection(&*merge,output.as_ptr(),detached.as_ptr(),projection.as_mut_ptr()),if reuse {0} else {1});
+            if reuse {assert!(projection.iter().all(|&v|v==77));}
+            else {assert_eq!(&projection[..4],&[0,output[0] as u64,2,1]);assert!(projection[4..].iter().all(|&v|v==77));}
             assert_eq!((*recipient).hash(),hash((*recipient).points()));
             merge.changed
         };
@@ -62,6 +66,108 @@ fn copy_proofs_track_source_target_remap_and_replacement_without_trusting_hash_c
     }
 }
 struct Reader(Vec<u8>, usize);
+#[test]
+fn sparse_owned_commits_leave_exact_reuse_readers_untouched_and_publish_new_or_changed_extents() {
+    use super::super::{source::*,mutable::*};
+    unsafe {
+        let source=mattmc_dh_source_create();let target=mattmc_dh_source_create();
+        let input=mattmc_dh_column_create([0,0].as_ptr(),2);
+        let recipient=mattmc_dh_column_create([0].as_ptr(),1);
+        assert_eq!(mattmc_dh_source_set(source,7,2,input),1);
+        assert_eq!(mattmc_dh_source_set(target,7,2,recipient),1);
+        (*source).metadata.plane_mut(0)[7]=9;
+        let previous=vec![0u8;WIDTH];let ids=[0i32];
+        for (pass,expected_rows) in [(0,1),(1,0),(2,1)] {
+            if pass==2 {assert_eq!(mattmc_dh_column_add(input,2,0),1);}
+            let pointer=mattmc_dh_same_detail_owned(target,source,previous.as_ptr(),ptr::null(),0,ids.as_ptr(),1,0);
+            assert!(!pointer.is_null());let mut merge=Box::from_raw(pointer);
+            let mut views=vec![99usize;WIDTH*2];let mut detached=vec![99u8;WIDTH];let mut rows=vec![77u64;WIDTH*4];
+            let address=(*recipient).points().as_ptr();
+            assert_eq!(mattmc_dh_same_detail_commit_source_extents(&mut *merge,target,views.as_mut_ptr(),detached.as_mut_ptr()),1);
+            assert_eq!(mattmc_dh_same_detail_extent_projection(&*merge,views.as_ptr(),detached.as_ptr(),rows.as_mut_ptr()),expected_rows);
+            if expected_rows==0 {
+                assert_eq!((*recipient).points().as_ptr(),address);assert_eq!((*recipient).points(),[0,0]);
+                assert!(views.iter().all(|&v|v==0));assert!(rows.iter().all(|&v|v==77));
+            } else {assert_eq!(&rows[..4],&[7,(*recipient).points().as_ptr() as u64,(*recipient).points().len() as u64,1]);}
+            assert_eq!(mattmc_dh_same_detail_metadata_owned(&*merge,target),1);
+            assert_eq!((*target).metadata.plane(0)[7],9);
+            let mut tagged=99u64;
+            assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,0xff00_ffff_1234_5678,&mut tagged),1);
+            let mut expected=0i32;
+            assert_eq!(mattmc_dh_source_hash(target,0xff00_ffff_1234_5678,(*target).metadata.plane(0).as_ptr(),(*target).metadata.plane(1).as_ptr(),&mut expected),1);
+            assert_eq!(tagged,(1u64<<32)|expected as u32 as u64);
+        }
+        // A missing recipient acquires independent storage; Java adopts its
+        // projection after the native value commit, never a source point alias.
+        assert_eq!(mattmc_dh_source_set(target,7,0,ptr::null_mut()),1);
+        let mut merge=Box::from_raw(mattmc_dh_same_detail_owned(target,source,previous.as_ptr(),ptr::null(),0,ids.as_ptr(),1,0));
+        let mut views=vec![0usize;WIDTH*2];let mut detached=vec![0u8;WIDTH];
+        assert_eq!(mattmc_dh_same_detail_commit_source_extents(&mut *merge,target,views.as_mut_ptr(),detached.as_mut_ptr()),1);
+        assert_eq!(detached[7],0);assert_eq!(views[15],3);
+        let adopted=mattmc_dh_same_detail_take(&mut *merge,7);assert!(!adopted.is_null());
+        assert_ne!((*adopted).points().as_ptr(),(*input).points().as_ptr());
+        assert_eq!(mattmc_dh_source_set(target,7,2,adopted),1);
+        mattmc_dh_column_release(adopted);mattmc_dh_column_release(input);mattmc_dh_column_release(recipient);
+        mattmc_dh_source_release(source);mattmc_dh_source_release(target);
+    }
+}
+#[test]
+fn fused_hash_decline_finishes_metadata_and_invalid_output_leaves_planes_untouched() {
+    use super::super::{source::*,mutable::*};
+    unsafe {
+        let source=mattmc_dh_source_create();let target=mattmc_dh_source_create();
+        let input=mattmc_dh_column_create([0].as_ptr(),1);
+        assert_eq!(mattmc_dh_source_set(source,4095,2,input),1);
+        (*source).metadata.plane_mut(0)[4095]=9;
+        (*source).metadata.plane_mut(1)[4095]=-128;
+        (*source).metadata.plane_mut(2)[4095]=1;
+        let previous=vec![0u8;WIDTH];let ids=[0i32];
+        let mut merge=Box::from_raw(mattmc_dh_same_detail_owned(target,source,previous.as_ptr(),ptr::null(),0,ids.as_ptr(),1,0));
+        let mut views=vec![0usize;WIDTH*2];let mut detached=vec![0u8;WIDTH];
+        assert_eq!(mattmc_dh_same_detail_commit_source_extents(&mut *merge,target,views.as_mut_ptr(),detached.as_mut_ptr()),1);
+        assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,6,ptr::null_mut()),-1);
+        let aliased=(*target).metadata.plane_mut(0).as_mut_ptr().cast::<u64>();
+        assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,6,aliased),-1);
+        for plane in 0..3 {assert!((*target).metadata.plane(plane).iter().all(|&v|v==0));}
+        // An unsupported earlier cell prevents bounded hashing, but may not
+        // interrupt publication of the last admitted column's metadata.
+        assert_eq!(mattmc_dh_source_set(target,0,1,ptr::null_mut()),1);
+        let mut tagged=99u64;
+        assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,6,&mut tagged),1);
+        assert_eq!(tagged,0);
+        assert_eq!([(*target).metadata.plane(0)[4095],(*target).metadata.plane(1)[4095],(*target).metadata.plane(2)[4095]],[9,-128,1]);
+        mattmc_dh_column_release(input);mattmc_dh_source_release(source);mattmc_dh_source_release(target);
+    }
+}
+#[test]
+fn prepared_hashes_keep_the_logical_budget_and_finish_all_metadata_on_decline() {
+    use super::super::{source::*,mutable::*};
+    unsafe {
+        let source=mattmc_dh_source_create();let target=mattmc_dh_source_create();
+        let input=mattmc_dh_column_create(vec![0;4096].as_ptr(),4096);
+        for i in 0..17 {
+            assert_eq!(mattmc_dh_source_set(source,i,2,input),1);
+            let recipient=mattmc_dh_column_create([0].as_ptr(),1);
+            assert_eq!(mattmc_dh_source_set(target,i,2,recipient),1);
+            mattmc_dh_column_release(recipient);
+            (*source).metadata.plane_mut(0)[i as usize]=9;
+            (*source).metadata.plane_mut(1)[i as usize]=-128;
+        }
+        let previous=vec![0u8;WIDTH];let ids=[0i32];
+        let mut merge=Box::from_raw(mattmc_dh_same_detail_owned(target,source,previous.as_ptr(),ptr::null(),0,ids.as_ptr(),1,0));
+        let mut views=vec![0usize;WIDTH*2];let mut detached=vec![0u8;WIDTH];
+        assert_eq!(mattmc_dh_same_detail_commit_source_extents(&mut *merge,target,views.as_mut_ptr(),detached.as_mut_ptr()),1);
+        let mut tagged=99u64;
+        assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,6,&mut tagged),17);
+        assert_eq!(tagged,0);
+        assert_eq!(&(*target).metadata.plane(0)[..17],&[9;17]);
+        assert_eq!(&(*target).metadata.plane(1)[..17],&[-128;17]);
+        let mut old_hash=77;
+        assert_eq!(mattmc_dh_source_hash(target,6,(*target).metadata.plane(0).as_ptr(),(*target).metadata.plane(1).as_ptr(),&mut old_hash),0);
+        assert_eq!(old_hash,77);
+        mattmc_dh_column_release(input);mattmc_dh_source_release(source);mattmc_dh_source_release(target);
+    }
+}
 impl Reader {
     fn bytes(&mut self, n: usize) -> &[u8] { let i = self.1; self.1 += n; &self.0[i..self.1] }
     fn byte(&mut self) -> i8 { self.bytes(1)[0] as i8 }
@@ -118,7 +224,7 @@ fn all_actual_frozen_signed_generation_pairs_and_saved_sources_match_both_update
             let direct_pointer = unsafe { mattmc_dh_same_detail_sources(native_target, native_source, facts.as_ptr(), ptr::null(), 0, ids.as_ptr(), ids.len() as i32, 0) };
             let mut direct = unsafe { Box::from_raw(direct_pointer) };
             let mut direct_output = vec![0usize; WIDTH * 2]; let mut detached = vec![0u8; WIDTH];
-            unsafe { assert_eq!(mattmc_dh_same_detail_commit_source(&mut *direct,native_target,direct_output.as_mut_ptr(),detached.as_mut_ptr()),1); }
+            unsafe { assert_eq!(mattmc_dh_same_detail_commit_source_extents(&mut *direct,native_target,direct_output.as_mut_ptr(),detached.as_mut_ptr()),1); }
             let mut projection=vec![77u64;WIDTH*4];
             unsafe {
                 let saved=detached[4095];detached[4095]=2;
@@ -132,6 +238,15 @@ fn all_actual_frozen_signed_generation_pairs_and_saved_sources_match_both_update
                 let mut aliased=vec![99u64;WIDTH*4];
                 assert_eq!(mattmc_dh_same_detail_projection(&*direct,aliased.as_ptr().cast(),detached.as_ptr(),aliased.as_mut_ptr()),0);
                 assert!(aliased.iter().all(|&v|v==99));
+                assert_eq!(mattmc_dh_same_detail_extent_projection(&*direct,aliased.as_ptr().cast(),detached.as_ptr(),aliased.as_mut_ptr()),-1);
+                assert!(aliased.iter().all(|&v|v==99));
+                projection.fill(77);detached[4095]=2;
+                assert_eq!(mattmc_dh_same_detail_extent_projection(&*direct,direct_output.as_ptr(),detached.as_ptr(),projection.as_mut_ptr()),-1);
+                assert!(projection.iter().all(|&v|v==77));detached[4095]=saved;
+                let count=mattmc_dh_same_detail_extent_projection(&*direct,direct_output.as_ptr(),detached.as_ptr(),projection.as_mut_ptr());
+                assert_eq!(count,direct.flags.iter().filter(|&&f|f&1!=0).count() as i32);
+                let indices:Vec<_>=(0..WIDTH).filter(|&i|direct.flags[i]&1!=0).collect();
+                for (row,&i) in indices.iter().enumerate() {assert_eq!(&projection[row*4..row*4+4],&[i as u64,direct_output[i*2] as u64,direct_output[i*2+1] as u64,detached[i] as u64]);}
             }
             let mut generation: Vec<_> = target.iter().map(|s| s.generation).collect();
             let mut compression: Vec<_> = target.iter().map(|s| s.compression).collect(); let mut flags = vec![99u8; WIDTH];
@@ -231,12 +346,16 @@ fn later_reserve_failure_refreshes_moved_views_without_changing_any_values() {
     let mut targets = vec![0usize; WIDTH]; targets[0] = &mut first as *mut Column as usize; targets[1] = &mut second as *mut Column as usize;
     let mut output = vec![0usize; WIDTH * 2]; let mut count = 0;
     unsafe {
-        assert_eq!(commit_with_reserve(&mut merge, targets.as_ptr(), output.as_mut_ptr(), |points, wanted| {
+        assert_eq!(commit_checked(&mut merge, targets.as_ptr(), output.as_mut_ptr(), false, true, &mut |points, wanted| {
             count += 1;
             if count == 2 { return false; }
             // Force a moved allocation, instead of relying on realloc behavior.
             let mut fresh = Vec::with_capacity(wanted); fresh.extend_from_slice(points); *points = fresh; true
         }), -1);
+        let mut rows=vec![77u64;WIDTH*4];let detached=vec![1u8;WIDTH];
+        assert_eq!(mattmc_dh_same_detail_extent_projection(&merge,output.as_ptr(),detached.as_ptr(),rows.as_mut_ptr()),2);
+        assert_eq!(&rows[..8],&[0,first.points().as_ptr() as u64,1,1,1,second.points().as_ptr() as u64,1,1]);
+        assert!(rows[8..].iter().all(|&v|v==77));
     }
     assert_eq!(first.points(), [1]); assert_eq!(second.points(), [2]); assert!(!merge.committed);
     assert_eq!((output[0],output[1]), (first.points().as_ptr() as usize,1));

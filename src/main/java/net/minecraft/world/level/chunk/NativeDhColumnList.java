@@ -103,7 +103,7 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         if (mutable != null) mutable.acceptView(address, count);
     }
     /** Project a Rust table commit without restaging each native owner. */
-    void acceptMergeView(long address, long count, boolean committed, int newHash, boolean owned, MemorySegment replacement) {
+    void acceptMergeView(long address, long count, boolean owned, MemorySegment replacement) {
         if (replacement != null) detach(NativeDhMutableColumn.adoptOwner(replacement, group));
         else if (owned && mutable == null) {
             if (sourceLease == null) throw new IllegalStateException("Missing retained DH column lease");

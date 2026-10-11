@@ -28,6 +28,7 @@ public final class NativeDhSource implements AutoCloseable {
     private final java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
     private long[] closedMissing;
     private final MemorySegment owner;
+    private final NativeDhMetadata metadata;
     private final LongList[] bindings;
     private final NativeDhColumnGroup group;
     final WeakReference<NativeDhSource> weak = new WeakReference<>(this);
@@ -42,8 +43,26 @@ public final class NativeDhSource implements AutoCloseable {
             if (pointer.address() == 0) throw new OutOfMemoryError("DH source owner");
             var disposal = released;
             owner = pointer.reinterpret(1, Arena.ofAuto(), p -> { if (disposal.compareAndSet(false,true)) release(p); }); attached = true;
+            metadata = new NativeDhMetadata(owner);
         } catch (RuntimeException | Error e) { if (!attached && pointer.address() != 0) release(pointer); throw e; }
         catch (Throwable e) { if (!attached && pointer.address() != 0) release(pointer); throw new IllegalStateException(e); }
+    }
+    public NativeDhMetadataList generation() { return metadata.generation; }
+    public NativeDhMetadataList compression() { return metadata.compression; }
+    public void initializeUniform(boolean value) { metadata.uniform.fill((byte)(value?1:0)); }
+    public boolean uniform(int index) {
+        java.util.Objects.checkIndex(index,4096);
+        try { return metadata.uniform.get(ValueLayout.JAVA_BYTE,index)!=0; }
+        finally { Reference.reachabilityFence(metadata); }
+    }
+    public void uniform(int index, boolean value) {
+        java.util.Objects.checkIndex(index,4096);
+        try { metadata.uniform.set(ValueLayout.JAVA_BYTE,index,(byte)(value?1:0)); }
+        finally { Reference.reachabilityFence(metadata); }
+    }
+    /** Explicit compatibility snapshot; ordinary native consumers read the owned plane. */
+    public boolean[] uniformSnapshot() {
+        var values=new boolean[4096];for(int i=0;i<4096;i++)values[i]=uniform(i);return values;
     }
     /** Rust already owns present-empty slots; Java readers are demand-created. */
     public LongList getColumn(int index) {
@@ -76,10 +95,10 @@ public final class NativeDhSource implements AutoCloseable {
         finally{Reference.reachabilityFence(this);}
     }
     /** -1 keeps custom/closed readers on the original validation sequence. */
-    public int originalProducer(NativeDhColumns producer,long position,it.unimi.dsi.fastutil.bytes.ByteArrayList generation,it.unimi.dsi.fastutil.bytes.ByteArrayList compression){
-        if(!isLive()||generation.getClass()!=it.unimi.dsi.fastutil.bytes.ByteArrayList.class||compression.getClass()!=it.unimi.dsi.fastutil.bytes.ByteArrayList.class
+    public int originalProducer(NativeDhColumns producer,long position,it.unimi.dsi.fastutil.bytes.ByteList generation,it.unimi.dsi.fastutil.bytes.ByteList compression){
+        if(!isLive()||!NativeDhMetadataList.supported(generation)||!NativeDhMetadataList.supported(compression)
             ||generation.size()!=4096||compression.size()!=4096)return -1;
-        try{return (int)ORIGINAL.invokeExact(owner,producer.stageSourceOwner(),position,MemorySegment.ofArray(generation.elements()),MemorySegment.ofArray(compression.elements()));}
+        try{return (int)ORIGINAL.invokeExact(owner,producer.stageSourceOwner(),position,NativeDhMetadataList.borrow(generation),NativeDhMetadataList.borrow(compression));}
         catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(this);Reference.reachabilityFence(producer);}
     }
@@ -104,12 +123,12 @@ public final class NativeDhSource implements AutoCloseable {
         catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(this); Reference.reachabilityFence(column); }
     }
-    public long tryHash(long position,it.unimi.dsi.fastutil.bytes.ByteArrayList generation,it.unimi.dsi.fastutil.bytes.ByteArrayList compression){
-        if(!isLive()||generation.getClass()!=it.unimi.dsi.fastutil.bytes.ByteArrayList.class||compression.getClass()!=it.unimi.dsi.fastutil.bytes.ByteArrayList.class
+    public long tryHash(long position,it.unimi.dsi.fastutil.bytes.ByteList generation,it.unimi.dsi.fastutil.bytes.ByteList compression){
+        if(!isLive()||!NativeDhMetadataList.supported(generation)||!NativeDhMetadataList.supported(compression)
             ||generation.size()!=4096||compression.size()!=4096)return 0;
         var result=HASH_RESULT.get();
         try{
-            if((int)HASH.invokeExact(owner,position,MemorySegment.ofArray(generation.elements()),MemorySegment.ofArray(compression.elements()),result)!=1)return 0;
+            if((int)HASH.invokeExact(owner,position,NativeDhMetadataList.borrow(generation),NativeDhMetadataList.borrow(compression),result)!=1)return 0;
             return (1L<<32)|(result.get(ValueLayout.JAVA_INT,0)&0xffffffffL);
         }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(this);}

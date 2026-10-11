@@ -10,8 +10,10 @@ Java does not clear/copy/remap/hash each column through separate native calls.
 
 Admitted [material maps](RUST-DH-MATERIAL-MAPS.md) now also merge identities in
 Rust. Java orchestrates update/propagation flags and projects compatibility readers.
-Rust publishes generation/compression bytes into the existing semantic arrays;
-Java projects uniformity booleans and only the selected contributor-map actions.
+The [metadata owner](RUST-DH-SOURCE-METADATA.md) retains generation, compression
+and uniformity in Rust. Owned merges consume and publish these planes directly.
+Java projects selected contributor-map actions and only non-reused CPU extents;
+exact copy proofs leave existing list readers unchanged.
 Base-state hashing also reads the retained Rust table.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.

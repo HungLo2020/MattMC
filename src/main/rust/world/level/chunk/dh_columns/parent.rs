@@ -119,6 +119,30 @@ pub unsafe extern "C" fn mattmc_dh_parent_columns_create(
     std::sync::Arc::into_raw(std::sync::Arc::new(result)) as *mut ParentColumns
 }
 
+/// Read primary points and metadata from their source; no Java descriptor grid.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_parent_columns_source(
+    source: *const super::source::Source, materials: *const Materials,
+    remap: *const i32, count: i32, existing: *const u8, retained: i32,
+) -> *mut ParentColumns {
+    let (Some(source),Some(materials)) = (source.as_ref(),materials.as_ref()) else { return std::ptr::null_mut(); };
+    if !source.metadata.canonical() || count < 0 || retained < 0 || existing.is_null()
+        || count != 0 && (remap.is_null() || remap as usize % 4 != 0) { return std::ptr::null_mut(); }
+    let (generation,compression,uniform)=(source.metadata.plane(0),source.metadata.plane(1),source.metadata.plane(2));
+    let mut columns=Vec::with_capacity(4096);let mut flags=Vec::with_capacity(4096);
+    for i in 0..4096 {
+        let Some(column)=source.column(i) else { return std::ptr::null_mut(); };
+        if column.len()>4096 || uniform[i]!=0 && uniform[i]!=1 { return std::ptr::null_mut(); }
+        columns.push(column);
+        flags.push(compression[i] as u8 as usize | ((uniform[i] as usize)<<8)
+            | (usize::from(source.present(i))<<9) | ((generation[i] as u8 as usize)<<10));
+    }
+    let remap=if count==0 { &[] } else { std::slice::from_raw_parts(remap,count as usize) };
+    let Some(mut result)=build(&columns,materials,remap) else { return std::ptr::null_mut(); };
+    if semantics(&mut result,&columns,&flags,remap,std::slice::from_raw_parts(existing,1024),retained as usize).is_none() { return std::ptr::null_mut(); }
+    std::sync::Arc::into_raw(std::sync::Arc::new(result)) as *mut ParentColumns
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_parent_columns_view(owner: *const ParentColumns, output: *mut usize) -> i32 {
     if owner.is_null() || output.is_null() || output as usize % std::mem::align_of::<usize>() != 0 { return 0; }

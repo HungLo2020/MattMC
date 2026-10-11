@@ -492,4 +492,7 @@ realistic performance and long-memory verification remain pending.
 - **DH source state:** [retained source columns](../world/chunk/RUST-DH-SOURCE-TABLE.md)
   move the live primary-column table and direct tint access into Rust. Java keeps
   list identity projections and structural publication, with no point mirror.
-  Source update orchestration, metadata bytes and persistence remain to migrate.
+  [Source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now stores
+  generation/compression/uniformity in Rust, with direct merge/parent consumers.
+  Temporary Java list identities retain independent native leases; metadata-array
+  pooling is removed. Source update orchestration and persistence remain to migrate.

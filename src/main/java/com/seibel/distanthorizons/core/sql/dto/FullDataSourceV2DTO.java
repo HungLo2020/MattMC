@@ -639,7 +639,7 @@ public class FullDataSourceV2DTO
 	}
 	
 	
-	private static void writeGenerationStepsToBlob(ByteArrayList inputColumnGenStepByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
+	private static void writeGenerationStepsToBlob(it.unimi.dsi.fastutil.bytes.ByteList inputColumnGenStepByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
 	{
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
@@ -649,11 +649,13 @@ public class FullDataSourceV2DTO
 			}
 		}
 	}
-	private static void readBlobToGenerationSteps(ByteArrayList inputCompressedDataByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
+	private static void readBlobToGenerationSteps(ByteArrayList inputCompressedDataByteArray, it.unimi.dsi.fastutil.bytes.ByteList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try(DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
-			compressedIn.readFully(outputByteArray.elements(), 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			byte[] values=outputByteArray.toByteArray();
+            try { compressedIn.readFully(values, 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH); }
+            finally { outputByteArray.setElements(0, values, 0, values.length); }
 		}
 		catch (EOFException e)
 		{
@@ -677,11 +679,13 @@ public class FullDataSourceV2DTO
 			}
 		}
 	}
-	private static void readBlobToWorldCompressionMode(ByteArrayList inputCompressedDataByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
+	private static void readBlobToWorldCompressionMode(ByteArrayList inputCompressedDataByteArray, it.unimi.dsi.fastutil.bytes.ByteList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try(DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
-			compressedIn.readFully(outputByteArray.elements(), 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			byte[] values=outputByteArray.toByteArray();
+            try { compressedIn.readFully(values, 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH); }
+            finally { outputByteArray.setElements(0, values, 0, values.length); }
 		}
 		catch (EOFException e)
 		{

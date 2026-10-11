@@ -198,9 +198,7 @@ public class DistantHorizonsLodWaterReductionTest {
             inputPos, mapping, columns, steps, modes);
         FullDataSourceV2 output = FullDataSourceV2.createEmpty(outputPos);
         try {
-            java.lang.reflect.Field uniformity = FullDataSourceV2.class.getDeclaredField("semanticHorizontalUniform");
-            uniformity.setAccessible(true);
-            ((boolean[]) uniformity.get(input))[mappedInputIndex] = true;
+            input.nativeSource().uniform(mappedInputIndex, true);
             Method downsample = FullDataSourceV2.class.getDeclaredMethod(
                 "downsampleFromOneAboveDetailLevel", FullDataSourceV2.class, int[].class);
             downsample.setAccessible(true);

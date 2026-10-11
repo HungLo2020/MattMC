@@ -14,6 +14,8 @@ public final class NativeDhParentColumns {
     }
     private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.ADDRESS,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle SOURCE = handle("source", FunctionDescriptor.of(ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle VIEW = handle("view", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final class Scratch {
@@ -46,6 +48,18 @@ public final class NativeDhParentColumns {
     @Nullable public static NativeDhParentColumns build(NativeDhMaterials materials, LongList[] columns, int[] remap) {
         // This entry point requests only reduced columns, without footprint admission.
         return build(materials, columns, remap, null, null, null, 1024);
+    }
+    @Nullable public static NativeDhParentColumns buildSource(NativeDhMaterials materials, NativeDhSource source, int[] remap,
+        boolean[] previousFootprints, int retainedFootprints) {
+        if(materials==null||!source.isLive()||previousFootprints.length!=1024||retainedFootprints<0)return null;
+        var scratch=SCRATCH.get();
+        try {
+            for(int i=0;i<1024;i++)scratch.existing.setAtIndex(ValueLayout.JAVA_BYTE,i,(byte)(previousFootprints[i]?1:0));
+            var pointer=(MemorySegment)SOURCE.invokeExact(source.stageOwner(),materials.owner,materials.stageRemap(remap),remap.length,
+                scratch.existing,retainedFootprints);
+            return pointer.address()==0?null:new NativeDhParentColumns(pointer,scratch.metadata);
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally {Reference.reachabilityFence(source);Reference.reachabilityFence(materials);}
     }
     /** Input arrays contain facts; Rust determines uniformity and ordered admission. */
     @Nullable public static NativeDhParentColumns build(NativeDhMaterials materials, LongList[] columns, int[] remap,

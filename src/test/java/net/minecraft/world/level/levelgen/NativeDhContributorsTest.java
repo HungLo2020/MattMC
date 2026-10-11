@@ -158,7 +158,7 @@ class NativeDhContributorsTest {
                     proofs[x * 64 + z] = source.hasSemanticHorizontalUniformity(x, z);
                 }
                 int[] map = java.util.stream.IntStream.range(0, source.mapping.size()).map(i -> source.mapping.size() - 1 - i).toArray();
-                var parent = NativeDhParentColumns.build(materials, columns, map, source.columnWorldCompressionMode.elements(), proofs, new boolean[1024], 0);
+                var parent = NativeDhParentColumns.build(materials, columns, map, source.columnWorldCompressionMode.toByteArray(), proofs, new boolean[1024], 0);
                 assertNotNull(parent);
                 for (int x = 0; x < 64; x += 2) for (int z = 0; z < 64; z += 2) {
                     boolean expected = (boolean) predicate.invoke(null, source, x, z, map);

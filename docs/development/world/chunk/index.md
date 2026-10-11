@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Rust DH source metadata](RUST-DH-SOURCE-METADATA.md): authoritative generation,
+  compression and uniformity planes, direct merge/parent consumers and list lifetimes.
+
 - [Retained Rust DH source columns](RUST-DH-SOURCE-TABLE.md): primary column
   leases, source replacement and direct tint consumption without Java descriptors.
 

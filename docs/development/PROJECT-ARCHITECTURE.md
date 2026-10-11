@@ -335,7 +335,11 @@ Java retains resolver callbacks and projects primary cell handles/generations.
 The [retained DH source table](world/chunk/RUST-DH-SOURCE-TABLE.md) now owns live
 column leases and feeds this consumer directly, removing repeated Java
 neighborhood descriptor preparation. Source/list caller exclusion still applies;
-Java reference projections, update orchestration and persistence remain temporary.
+The [metadata owner](world/chunk/RUST-DH-SOURCE-METADATA.md) also retains
+generation, compression and uniformity planes; merge and parent consumers read
+them directly. Java byte-array mirrors and source phantom-pool registration are
+removed. Java identity projections, update orchestration and persistence remain
+temporary.
 The author reports six synthetic CPU scenarios matching Frozen checksums with
 Current medians at or below Frozen; realistic renderer/server acceptance remains
 separate. See the owner’s source and timing limits.

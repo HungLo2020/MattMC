@@ -4,10 +4,39 @@ use super::mutable::{Column, Lease};
 
 enum Entry { Missing, Empty, Unsupported, Native(Lease) }
 pub(crate) struct Source {
+    pub(super) metadata: std::sync::Arc<super::metadata::Metadata>,
     columns: Option<Box<[Entry]>>, identities: Option<Vec<usize>>, version: u64,
     identity: u64, remap: Vec<i32>, remap_revision: u64, remap_cached: bool,
+    disjoint: Option<[u64; 3]>,
 }
 impl Source {
+    #[inline(always)]
+    pub(super) unsafe fn bounded_column_hash(&self,index:usize,work:&mut usize)->Option<i32> {
+        match self.columns.as_ref().map(|columns| &columns[index]) {
+            Some(Entry::Missing)=>Some(0), None|Some(Entry::Empty)=>Some(1),
+            Some(Entry::Unsupported)=>None,
+            Some(Entry::Native(lease))=> {
+                let column=&*(lease.identity() as *const Column);
+                let count=column.points().len();*work+=count;
+                if count>4096||*work>65536 {None} else {Some(column.hash())}
+            }
+        }
+    }
+    /// One bounded pair proof, invalidated by either table's structural version.
+    /// IDs never recycle; the cache retains no other source or native pointer.
+    pub(super) fn disjoint_from(&mut self, source: &mut Self) -> bool {
+        let proof=[self.version,source.identity,source.version];
+        if self.disjoint==Some(proof) {return true;}
+        self.disjoint=None;
+        let identities=self.identities();
+        if identities.windows(2).any(|p|p[0]==p[1]) {return false;}
+        let mut a=0;
+        for &id in source.identities() {
+            while a<identities.len() && identities[a]<id {a+=1;}
+            if identities.get(a)==Some(&id) {return false;}
+        }
+        self.disjoint=Some(proof);true
+    }
     pub(super) fn version(&self) -> u64 { self.version }
     pub(super) fn mapping(&mut self, remap: &[i32]) -> [u64; 2] {
         // Retain at most 16KiB of remap proof per source. Larger maps still
@@ -50,8 +79,8 @@ impl Source {
 }
 #[no_mangle]
 pub extern "C" fn mattmc_dh_source_create() -> *mut Source {
-    Box::into_raw(Box::new(Source { columns: None, identities: None, version: 0,
-        identity: super::mutable::identity(), remap: Vec::new(), remap_revision: 0, remap_cached: false }))
+    Box::into_raw(Box::new(Source { metadata: std::sync::Arc::new(super::metadata::Metadata::new()), columns: None, identities: None, version: 0,
+        identity: super::mutable::identity(), remap: Vec::new(), remap_revision: 0, remap_cached: false, disjoint:None }))
 }
 /// Empty/null facts, unsupported callback input, or a retained primary column.
 #[no_mangle]
@@ -128,17 +157,7 @@ pub unsafe extern "C" fn mattmc_dh_source_hash(source: *const Source, pos: u64,
     let mut work = 0usize;
     let (mut data, mut steps, mut modes) = (1i32, 1i32, 1i32);
     for i in 0..4096 {
-        let column = match &source.columns.as_ref().unwrap()[i] {
-            Entry::Missing => 0,
-            Entry::Empty => 1,
-            Entry::Native(lease) => {
-                let column = &*(lease.identity() as *const Column);
-                let count = column.points().len(); work += count;
-                if count > 4096 || work > 65536 { return 0; }
-                column.hash()
-            },
-            Entry::Unsupported => return 0,
-        };
+        let Some(column)=source.bounded_column_hash(i,&mut work) else {return 0;};
         data = fold(data, column); steps = fold(steps, *generation.add(i) as i32); modes = fold(modes, *compression.add(i) as i32);
     }
     output.write(fold((pos ^ pos >> 32) as i32, data).wrapping_mul(17).wrapping_add(steps).wrapping_mul(43).wrapping_add(modes));
@@ -148,6 +167,25 @@ pub unsafe extern "C" fn mattmc_dh_source_hash(source: *const Source, pos: u64,
 #[cfg(test)] mod tests {
     use super::*;
     use super::super::mutable::*;
+    #[test]
+    fn pair_proof_survives_point_growth_but_rejects_replacement_aliases_and_duplicate_recipients() {
+        unsafe {
+            let source=mattmc_dh_source_create();let target=mattmc_dh_source_create();
+            let input=mattmc_dh_column_create([7].as_ptr(),1);let output=mattmc_dh_column_create([8].as_ptr(),1);
+            assert_eq!(mattmc_dh_source_set(source,10,2,input),1);assert_eq!(mattmc_dh_source_set(target,20,2,output),1);
+            assert!((*target).disjoint_from(&mut *source));let proof=(*target).disjoint;
+            assert_eq!(mattmc_dh_column_add(input,1,9),1);
+            assert!((*target).disjoint_from(&mut *source));assert_eq!((*target).disjoint,proof);
+            assert_eq!(mattmc_dh_source_set(source,30,2,output),1);
+            assert!(!(*target).disjoint_from(&mut *source));assert!((*target).disjoint.is_none());
+            assert_eq!(mattmc_dh_source_set(source,30,0,std::ptr::null_mut()),1);
+            assert!((*target).disjoint_from(&mut *source));
+            assert_eq!(mattmc_dh_source_set(target,40,2,output),1);
+            assert!(!(*target).disjoint_from(&mut *source));
+            mattmc_dh_column_release(input);mattmc_dh_column_release(output);
+            mattmc_dh_source_release(source);mattmc_dh_source_release(target);
+        }
+    }
     #[test]
     fn source_retains_primary_columns_across_aliases_growth_and_wrapper_release() {
         unsafe {
