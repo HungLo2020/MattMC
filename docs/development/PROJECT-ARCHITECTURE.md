@@ -454,8 +454,11 @@ audio thread that owns (and reopens) the device, the vanilla tickables'
 rules, music, ambience, subtitles and the preview; see
 [audio development](audio/index.md). Java
 [`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
-keeps the `SoundInstance` objects gameplay code creates, their entity samples,
-pack IO and the UI drawing. Sound-event, profile and
+keeps the `SoundInstance` objects gameplay code creates, custom tick callbacks,
+entity/biome/light and situational-music inputs, pack IO and UI drawing.
+The [shared ambient RNG boundary](audio/CLIENT-SOUNDS.md#shared-level-random)
+preserves raw state for the two legacy generators; arbitrary generators use
+a separately seeded compatibility sequence. Sound-event, profile and
 instrument identities belong to `content/sound/`, independent of those
 reloadable resources. The [verification scope](audio/SOUND-ENGINE.md#verification-scope)
 keeps policy/FFI tests separate from audible hardware and reload/shutdown

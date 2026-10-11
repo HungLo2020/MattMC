@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `52664da430edab005b09f64e2df29eaa79db95a1`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all 40 paths, including eight documents and the source-authored DH source-table owner, from promoted cutoff `d4400d33e8db2930331562daf57949823f8a3b61`. Clean fast-forward and combined validated publication preserve incoming ownership/tests; authored changes remain documentation only. Instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `e6bc0e29835e431327cc8d7007ffce5fe53ce1b4`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 54 paths, including four documents, new client-sounds owner, source-authored MkDocs navigation and the Java test-task null-device setting, from promoted cutoff `61ea4e45a3f82423b951be7543a4a75fedf48ffe`. Clean fast-forward and combined publication preserve the incoming code/build edits; authored changes remain documentation only. Instructions/workflows are unchanged.
+
+- Previous non-wiki default-branch snapshot integrated: `52664da430edab005b09f64e2df29eaa79db95a1`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all 40 paths, including eight documents and the source-authored DH source-table owner, from promoted cutoff `d4400d33e8db2930331562daf57949823f8a3b61`. Clean fast-forward and combined validated publication preserve incoming ownership/tests; authored changes remain documentation only. Instructions/workflows are unchanged.
 - Previous non-wiki default-branch snapshot integrated: `ed8dc5714631e0e55d31dbd448789f21a47bedf6`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 29 paths, including five documents and the source-authored MkDocs audio navigation, from promoted cutoff `26cc5d569b0c68c0e419ea7061020e21386975af`. Clean fast-forward and combined publication preserve incoming code/helper removals; authored changes remain documentation only. Repository instructions/deployment workflows are unchanged.
 - Previous non-wiki default-branch snapshot integrated: `5dcd25017197443df269f27193441a5580c6479a`; older citations retain their reviewed source scope.
@@ -3140,3 +3143,12 @@ Linked the verified [#773 audio ownership/acceptance review](https://github.com/
 - Preserved historical source/results/anchors and qualified the incoming archival report as author evidence. No Java/Rust/client/benchmark or cleanup execution by this review; strict documentation checks, independent review and guarded terminal deployment precede completion.
 
 Linked the verified [#777 source-table/lifetime review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6104462433) and [#709 CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6104463092). Both remain open. Native release assertions and closed-reader/group fixtures are source-inspected, not independently executed Java GC or runtime memory proof.
+
+
+## Batch 390: Native client audio policy and focused verification
+
+- Reconciled native tickable rules, seeded world events, music delay/fade/toast, ambience, subtitles, preview and device-reopen policy with remaining Java context, pack IO, UI and custom-instance callbacks. Preserved the incoming implementation and new owner page instead of restoring removed Java helper guidance.
+- Qualified legacy/shared RNG transfer versus arbitrary-generator compatibility. Distinguished 19 client-policy fixtures, 4,000 closed-engine reference ticks and four null-device record/state cases from actual asset playback, physical-device recovery, IO/shutdown and long-session acceptance. Test definitions were inspected, not executed by this documentation review.
+- Preserved historical headings, monthly prefix and prior coverage records. Source-owned null-driver/build and navigation changes remain incoming history; strict documentation validation, independent review and guarded terminal deployment precede completion.
+
+Linked the verified [#773 client-policy review](https://github.com/HungLo2020/MattMC/issues/773#issuecomment-6104878952). The issue remains open. Caller-side generation eviction, unjoined pack reads, controller-specific retention and physical-device acceptance remain qualified; no new issue, closure or runtime-suite execution is claimed.

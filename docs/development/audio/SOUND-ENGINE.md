@@ -1,14 +1,18 @@
 # Sound engine
 
-The Rust policy in [`audio/policy/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/audio/policy/mod.rs)
+The Rust policy in [`audio/policy/`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/rust/audio/policy/mod.rs)
 replaces vanilla `SoundEngineExecutor`, `ChannelAccess`, `SoundBufferLibrary`
 plus `SoundEventRegistration`, its serializer, the `Weighted` interface and
 `SoundEventListener`. `Sound` and `WeighedSoundEvents` remain Java views.
-[`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
+[`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
 retains the gameplay-facing Java API and instance callbacks. The sounds Rust
 plays on its own (music, ambience, world events, the preview) are covered in
 [client sounds](CLIENT-SOUNDS.md). Pack IO and the `SoundInstance` objects
 gameplay code creates remain Java.
+
+Source reviewed at [`e6bc0e29`](https://github.com/HungLo2020/MattMC/commit/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4).
+This documentation review inspected implementation and test definitions; it
+ran no Java/Rust suites, clients, device checks or audible-playback tests.
 
 ## Ownership
 
@@ -17,7 +21,7 @@ gameplay code creates remain Java.
 | Parsed `sounds.json` registry, weights and nested-event resolution | Reading `sounds.json` text and listing sound files during reload |
 | Asset cache (loading, ready, failed) per reload generation, and preload | Reading `.ogg` bytes from packs on the IO pool when Rust asks |
 | Voices, category volumes, released-instance age policy (normally 20 unpaused ticks; paused music bypasses the age gate), delays, manual loops, pause and resume | `SoundInstance` objects gameplay code creates: `resolve`, `canPlaySound` |
-| The vanilla tickables' `tick()` rules ([`rules.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/audio/policy/rules.rs)) | The entity facts those rules sample, and custom (mod) `tick()` bodies |
+| The vanilla tickables' `tick()` rules ([`rules.rs`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/rust/audio/policy/rules.rs)) | The entity facts those rules sample, and custom (mod) `tick()` bodies |
 | The "Sound engine" thread, which owns the OpenAL device, and reopening it after a device change | The sound device option and directional audio setting |
 | Subtitle entries and the once-per-event warnings | Drawing the subtitle overlay; logging Rust's queued lines |
 
@@ -45,7 +49,10 @@ not terminate the thread's command loop; a later initialization can recreate
 its device. Asset-generation eviction is invoked on the Java caller between
 stop-all and device cleanup (including during a reopen), so this is not a
 claim that every backend lifetime operation has moved onto the worker.
-Preserve reload/eviction thread-context checks.
+Preserve reload/eviction thread-context checks. Java pack reads run as
+`CompletableFuture` work on `nonCriticalIoPool`; these paths do not cancel or
+join those reads. Generation rejection prevents stale installation, but is
+not proof that all pack/ZIP reads have finished at shutdown.
 
 ## Tick order
 
@@ -56,7 +63,7 @@ Preserve reload/eviction thread-context checks.
    it with the same settings and reports `TICK_REOPENED`; Java then forgets
    every instance, as vanilla's reload does (`TICK_STOPPED` if reopening failed).
 2. When not paused: Java plays queued tickables and ticks the ticking sounds.
-   A [`RuledSoundInstance`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/resources/sounds/RuledSoundInstance.java)
+   A [`RuledSoundInstance`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/java/net/minecraft/client/resources/sounds/RuledSoundInstance.java)
    only writes a sample (removed, riding, speed, ...). Any other tickable runs
    its own `tick()` and sends its volume, pitch and position. Everything goes in
    one batch, and Rust returns the ruled instances that stopped or (bees)
@@ -74,8 +81,10 @@ Preserve reload/eviction thread-context checks.
 - **Caller-owned RNG.** A Java instance's resolution must consume its own
   `RandomSource` exactly as vanilla does. `resolve` is a step protocol: Rust
   asks for a draw bound, and Java calls `nextInt(bound)` and retries with the
-  draws so far. Rust-owned sounds draw from a bit-exact port of
-  `LegacyRandomSource` (`world/level/levelgen/random.rs`). The native
+  draws so far. Seeded Rust-owned events use the native
+  `LegacyRandomSource` port (`world/level/levelgen/random.rs`). Shared ambient
+  state transfer is limited to the two legacy implementations; see
+  [shared level random](CLIENT-SOUNDS.md#shared-level-random). The native
   resolver bounds nesting at 32; deeper/cyclic references can resolve empty
   rather than reproducing unbounded Java recursion. The Java bridge also caps
   retained draws at 64, returning empty before requesting a 65th. The focused draw tests
@@ -107,7 +116,8 @@ normally joins that worker after it closes the validation device, before the
 Rust engine initializes its device. Inspect the emitted validation status and
 errors; launching this helper is not proof of audible output or complete
 reload/disconnect/interrupted-shutdown behavior. It and `NativeAudioTest` are
-the only users of the Java `Library`/`Channel` bridge.
+the users of the Java `Library`/`Channel` playback objects; production device
+enumeration still calls `Library.availableSoundDevices()`.
 
 ## Troubleshooting
 
@@ -134,19 +144,25 @@ the only users of the Java `Library`/`Channel` bridge.
 
 ## Verification scope
 
-The [Rust policy tests](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/audio/policy/tests.rs)
+The [Rust policy tests](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/rust/audio/policy/tests.rs)
 inspect registry parsing/resolution, cache generations and pure playback-policy
 transitions. The bundled JSON fixture assumes each referenced file exists and
 uses one `bound - 1` draw sequence per event. It checks neither every weighted
 branch nor actual pack bytes, decoding or audible output.
-[`client_tests.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/audio/policy/client_tests.rs)
+[`client_tests.rs`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/rust/audio/policy/client_tests.rs)
 compares each rule, subtitles, native plays, music, ambience and the preview
-against values derived from the vanilla bodies, and Java `LegacyRandomSource`
-fixtures. The Java tests in `net.minecraft.client.sounds` check caller-draw
-requests and installed metadata (`NativeSoundPolicyTest`), the ambient
-handlers against vanilla's bodies on one level random over random ticks
-(`NativeAmbienceParityTest`), and the bindings end to end on OpenAL's null
-device (`NativeSoundEngineTest`; the Java test task sets `ALSOFT_DRIVERS=null`).
+against values derived from the vanilla bodies and Java `LegacyRandomSource`
+fixtures. The 19 client-policy definitions are source-inspected, not newly
+executed by this review. The Java tests retain caller-draw and installed
+metadata controls (`NativeSoundPolicyTest`), add 4,000 closed-engine ambience
+ticks against embedded Java bodies, and four null-device record/state cases.
+The latter call the native bindings directly without constructing a Java
+`SoundEngine`, and register asset names without supplying Ogg bytes. They do
+not exercise its reload/`forgetAll`/IO wiring, actual playback or device
+replacement. See the
+[client test breakdown](CLIENT-SOUNDS.md#tests) for the exact boundary. The
+Java test task sets `ALSOFT_DRIVERS=null`; this source-owned build setting is
+not a change to normal client device selection.
 
 The removed executor tests previously covered an active ZIP read during shutdown
 and idle-worker wake/restart. Their removal does not transfer those guarantees
@@ -157,6 +173,7 @@ play/stop/reload against real devices. Retain resource counts, status files and
 logs alongside listening checks; unit tests and Wiki CI do not establish audio
 hardware, long-session lifetime or complete migration acceptance.
 
-The [source ownership and acceptance review](https://github.com/HungLo2020/MattMC/issues/773#issuecomment-6104077162)
-records the earlier partial migration and the outstanding device, streaming and
-shutdown checks. Issue #773 remains open.
+The [earlier policy review](https://github.com/HungLo2020/MattMC/issues/773#issuecomment-6104077162)
+and [current client-policy review](https://github.com/HungLo2020/MattMC/issues/773#issuecomment-6104878952)
+record these successive ownership slices and the outstanding device, streaming
+and shutdown checks. Issue #773 remains open.
