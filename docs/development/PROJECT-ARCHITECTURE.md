@@ -442,14 +442,16 @@ transitional world asset transport; map palette data stays in `content/`. Future
 
 ### `audio/`
 
-The [native audio backend](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/audio/mod.rs)
+The [native audio backend](https://github.com/HungLo2020/MattMC/blob/ed8dc5714631e0e55d31dbd448789f21a47bedf6/src/main/rust/audio/mod.rs)
 owns playback resources, device-local buffers and decoding. Its `policy/`
 module owns `sounds.json` resolution, the asset cache, playback policy and
 the audio thread that owns the device; see [audio development](audio/index.md).
-Java [`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
+Java [`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/ed8dc5714631e0e55d31dbd448789f21a47bedf6/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
 keeps `SoundInstance` objects, listeners and pack IO. Sound-event, profile and
 instrument identities belong to `content/sound/`, independent of those
-reloadable resources.
+reloadable resources. The [verification scope](audio/SOUND-ENGINE.md#verification-scope)
+keeps policy/FFI tests separate from audible hardware and reload/shutdown
+acceptance; the native command thread persists across device cleanup.
 
 ### `network/`
 

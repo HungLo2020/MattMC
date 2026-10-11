@@ -11,8 +11,10 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `5dcd25017197443df269f27193441a5580c6479a`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all eight paths, including two guides, from promoted cutoff `868621b7cdea570e473deaf2bf7f643367159834`. Clean fast-forward and combined validated publication preserve source lifetime changes and diagnostic controls; instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `ed8dc5714631e0e55d31dbd448789f21a47bedf6`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 29 paths, including five documents and the source-authored MkDocs audio navigation, from promoted cutoff `26cc5d569b0c68c0e419ea7061020e21386975af`. Clean fast-forward and combined publication preserve incoming code/helper removals; authored changes remain documentation only. Repository instructions/deployment workflows are unchanged.
+- Previous non-wiki default-branch snapshot integrated: `5dcd25017197443df269f27193441a5580c6479a`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all eight paths, including two guides, from promoted cutoff `868621b7cdea570e473deaf2bf7f643367159834`. Clean fast-forward and combined validated publication preserve source lifetime changes and diagnostic controls; instructions/workflows are unchanged.
 - Previous non-wiki default-branch snapshot integrated: `85475b61defddd2da5e0d0a5f310093145a577d3`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 28 paths, including eight documents and the new source-authored DH tint owner, from promoted cutoff `493da75c6f1a7219261db74db1ead5f1b75a7e8e`. Clean fast-forward and combined validated publication preserve incoming source and author records; instructions/workflows are unchanged.
 - Previous non-wiki default-branch snapshot integrated: `2003b118dfac30ca501dc135b9de0e2d7e2567fb`; older citations retain their reviewed source scope.
@@ -3118,3 +3120,12 @@ Linked the verified [#777 ownership review](https://github.com/HungLo2020/MattMC
 - Documented timed-crash eligibility and action order, copied-world setup, scheduled-stop precedence and retained crash/report evidence. Preserved historical anchors, monthly content and full coverage history; strict docs validation, independent review and guarded terminal publication precede completion.
 
 Linked the verified [#777 grouped-lifetime review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103618931) and [#709 reported-measurement review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103620939). Both remain open; no independent runtime, GC or suite execution, and no Frozen baseline acceptance, follows.
+
+
+## Batch 388: Native audio policy ownership and verification boundaries
+
+- Reconciled the new audio guides with native registry/asset/playback policy and persistent device-thread ownership, while preserving Java RNG, callbacks, pack IO, subtitle/music/ambient responsibilities. Qualified synchronous policy locking, queued device operations and acknowledgement paths instead of claiming every call is nonblocking.
+- Documented bounded nesting, representative parsing checks and actual fixture scope: 14 Rust policy tests and three Java FFI definitions are inspected, not executed. Bundled JSON assumes resource presence and samples one draw sequence per event; audible output, interrupted IO/reload/shutdown and long-session resource acceptance remain separate.
+- Preserved incoming audio navigation and deleted-helper history. Current helper references route to native policy; historical coverage remains intact. Strict documentation build, independent source/link/history review and guarded nonforce publication precede terminal deployment. No Java/Rust/client/device checks were run.
+
+Linked the verified [#773 audio ownership/acceptance review](https://github.com/HungLo2020/MattMC/issues/773#issuecomment-6104077162). Policy admission is not audible playback; caller-side asset eviction and stream/reload/shutdown acceptance remain qualified. The issue remains open; no new tracker issue, closure or runtime test execution is claimed.
