@@ -26,8 +26,11 @@ column mutations detach into independent Rust vectors. The later
 in Rust. The quadrant producer also determines semantic uniformity and ordered
 footprint admission/capture from source facts in the same call. It now also
 selects signed generation/compression metadata and computes parent list hashes
-while appending remapped points. Java stores the resulting bytes and reads seeded
-hashes; it does not repeat these policies per group. Java still owns source update
+while appending remapped points. Java publishes those results through native
+metadata identity views and reads seeded hashes; it does not repeat these
+policies per group. The ordinary parent route borrows the retained source
+table and metadata directly; descriptor-based overloads remain compatibility
+routes. Java still owns source update
 orchestration, custom material-map callbacks, temporary metadata identity views, contextual color callbacks,
 persistence and render geometry construction.
 Legacy or explicitly replaced Java lists remain compatibility inputs. The subsequent
@@ -95,8 +98,9 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
   They are seeded before publication. List writes invalidate them before mutation;
   the complete occlusion pass publishes updated hashes before returning under
   the caller's exclusion rules.
-  The whole-quadrant path borrows bounded point descriptors and a semantic ID
-  remap table; it exports no point values. Custom/oversized inputs or enabled
+  The ordinary whole-quadrant path borrows the retained source table, native
+  metadata and semantic ID remap; the compatibility overload stages bounded
+  point descriptors. Neither exports point values. Custom/oversized inputs or enabled
   developer order validation retain per-column compatibility sequencing.
 - Demand-created empty lists from a full-data source share a
   [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java).

@@ -117,8 +117,10 @@ by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIF
    is false or Rust declines a view, retain that consumer's existing fallback
    (the explicit native record registration for meshing).
 
-A fresh-process lifecycle control, `NativeBlockRegistryReadinessTest`, queries
-readiness before bootstrap and then requires successful installation afterward.
+The [fresh-process readiness control](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/test/java/net/minecraft/world/level/block/NativeBlockRegistryReadinessTest.java)
+queries readiness before bootstrap and then requires successful installation
+afterward in a new JVM. This is a source-inspected focused sequence, not a
+newly executed suite or proof of concurrent/reentrant bootstrap safety.
 Run it with JDK25 and the native library built for the same worktree:
 
 ```sh

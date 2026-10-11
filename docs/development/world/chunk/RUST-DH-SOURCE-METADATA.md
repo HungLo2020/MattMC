@@ -1,6 +1,11 @@
 # Rust DH source metadata
 
-The current worktree moves generation, compression and horizontal-uniformity
+Source reviewed at [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
+Suite counts, timings and untracked receipt descriptions below are
+implementation-author reports. This documentation review inspected source and
+test assertions; it reran no Java/Rust suites, clients or benchmarks.
+
+This ownership slice moves generation, compression and horizontal-uniformity
 storage into Rust beside the retained source table. Ordinary same-detail merge
 preparation reads those planes directly, and publication updates them in Rust.
 Java no longer copies four byte planes or converts 4,096 booleans for that path.
@@ -17,8 +22,9 @@ Frozen reports changed data. Metadata-only updates preserve Frozen's cached
 hash; a bounded hash decline still completes metadata publication and lets the
 caller hash through its compatibility path. Selected columns reuse the completed merge's exact hashes and lengths during
 that immediate publication; unselected columns still read the primary table.
-Only bounded scalar counts survive commit; the borrowed source spans are
-cleared. Both paths enforce the same logical point budget. Do not use a prepared result
+Bounded per-column scalar lengths preserve the hash budget after borrowed
+point spans are cleared; merge metadata, hashes, remaps and footprint owners
+also survive as needed. Both paths enforce the same logical point budget. Do not use a prepared result
 after subsequent point edits or culling. The common preparation stream carries
 compact column facts and loads rare
 contributor arrays only after ordered admission. The latest CPU verification is recorded below; it does not establish gameplay
@@ -26,16 +32,16 @@ acceptance.
 
 When both contributor maps are empty, the temporary bridge uses a scoped native
 merge and releases it in `finally`. A fixed per-thread remap buffer replaces
-per-update confined allocation; no shared Java arena or Cleaner is registered
-for that operation. Both routes use the same Rust admission/commit policy.
+per-update confined allocation; that merge registers no shared arena or
+Cleaner. Bounded per-thread automatic-arena scratch remains. Both routes use the same Rust admission/commit policy.
 New column readers still retain their source group. Updates publishing
 contributor readers keep the shared merge lifetime; do not close it while those
 readers remain live.
 
-Implementation: [metadata owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/metadata.rs),
-[merge policy](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
-[parent consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/parent.rs)
-and [temporary list views](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhMetadataList.java).
+Implementation: [metadata owner](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/metadata.rs),
+[merge policy](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
+[parent consumer](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/parent.rs)
+and [temporary list views](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/net/minecraft/world/level/chunk/NativeDhMetadataList.java).
 
 ## Ownership and lifetime
 
@@ -49,7 +55,9 @@ and [temporary list views](https://github.com/HungLo2020/MattMC/blob/master/src/
 - The source table retains the metadata owner. Java metadata views hold an
   independent typed native lease and one shared automatic arena, so table close
   cannot invalidate retained metadata readers. That lease contains metadata,
-  not the source's primary column table or point vectors.
+  not the source's primary column table or point vectors. One retained list
+  can keep all three planes alive until automatic-arena collection; no GC
+  release deadline follows.
 - Keep the original DH caller exclusion through reads, edits, serialization and
   native consumers. Resizing invalidates borrowed extents; the list refreshes
   its private view before returning. Shared ownership adds lifetime protection,
@@ -91,26 +99,28 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-The combined tree on upstream `2edce1f66`, including the incoming audio
-migration, uses native image `ef31dac8` and passes serial full Rust (2,593
-passed, three ignored) and normal full Java tasks (1,943 reported, two
-skipped, zero failures/errors across 350 suites). All six Java
-workers map the exact native image. Controls include all 48 saved Frozen merge
+The author reports that the combined tree on upstream `2edce1f66`, including
+the incoming audio migration, uses native image `ef31dac8` and passes serial
+full Rust (2,593 passed, three ignored) and normal full Java tasks (1,943
+reported, 1,941 executed and two skipped, zero failures/errors across 350
+suites). The reported six Java workers map the exact native image. Controls include all 48 saved Frozen merge
 cases and both updates through the shared and scoped paths, signed bytes,
 null/empty columns, hashes, metadata-only cached-hash behavior, both compression
 modes, EOF prefixes, serialization and retained-reader lifetimes. A fresh-process
-registry control proves that an early readiness query cannot poison bootstrap.
+registry control checks false before bootstrap and true afterward in one
+fresh JVM. This focused sequence does not establish arbitrary concurrent or
+reentrant bootstrap behavior; see the [registry owner](../../game-model/RUST-BLOCK-REGISTRY.md).
 
-Fresh six alternating pairs, five 1,000-call warmups and 1,000 measured calls per
-JVM match checksums and source/native/compiled-class/Frozen/protected-prompt
-pins. CPU medians:
+The author reports six fresh alternating pairs, five 1,000-call warmups and
+1,000 measured calls per JVM with matching checksums and
+source/native/compiled-class/Frozen/protected-prompt pins. CPU medians:
 
 | Workload | Current ms | Frozen ms | Current/Frozen |
 |---|---:|---:|---:|
 | Create, hash and close 1,000 sources | 10.299 | 13.879 | 0.742 |
 | Change one input point, update and hash 1,000 times | 55.868 | 71.545 | 0.781 |
 
-Both pass the scoped comparison against Frozen. Creation costs more than the
+Both author-reported medians pass this scoped synthetic comparison against Frozen. Creation costs more than the
 earlier source-table-only checkpoint; these results do not claim a creation
 speedup over that version or a whole-game performance gain.
 
@@ -142,3 +152,31 @@ list type. Check source/native/compiled-class/Frozen/protected-prompt pins and
 keep builds, tests, observers, hashing and profiling outside timing windows.
 Receipts: `build/native-dh-metadata/`. Synthetic CPU results do not prove
 ordinary gameplay, FPS, crash cleanup or sustained host/GPU memory acceptance.
+
+
+The unchanged workload uses 4,096 columns with four points each. Create mode
+includes hash and close; update mode changes the first input point, merges and
+hashes the target with MERGE_SAME_BLOCKS and empty contributor maps. The
+0.781× result therefore measures the scoped empty-footprint route, not
+contributor-reader performance. The driver reports ratios without a speed threshold in its
+exit status; its native/compiled-driver guards do not establish every broader
+source/classpath guard stated in the author's receipts. See the
+[driver boundary](RUST-DH-SOURCE-TABLE.md#verification). The earlier 1.439×
+update failure stays historical; the newer comparison does not establish an
+FPS, streaming or long-memory gain. Serial suite success does not resolve the
+retained parallel X11/GLX `BadAccess` failure.
+
+
+The [metadata-list tests](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/test/java/net/minecraft/world/level/chunk/NativeDhMetadataListTest.java)
+inspect signed values, resize/iteration/self-add, retained mutation after source
+close and independent serialized values. Their truncated-blob checks use only
+UNCOMPRESSED inputs of 0, 137 and 4,096 bytes; they do not establish every codec
+failure path. The 48-case merge corpus has no contributor facts; separate
+controls cover contributors. Frozen parent policy fixtures and compatibility
+quadrant controls are distinct from the ordinary public-parent controls for
+the new direct route. None is an exhaustive malformed-input, concurrent-access
+or GC-release matrix.
+
+The [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6105286352)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6105286909)
+retain these boundaries. Both issues remain open.

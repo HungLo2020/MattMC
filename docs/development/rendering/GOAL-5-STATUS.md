@@ -1,8 +1,24 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
-The latest [retained DH source table](../world/chunk/RUST-DH-SOURCE-TABLE.md)
+[`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
+Native [DH metadata and direct parent inputs](../world/chunk/RUST-DH-SOURCE-METADATA.md)
+remove Java metadata mirrors and their phantom-pool registration. Java still
+owns source orchestration, persistence, compatibility identities and contextual
+callbacks; escaped metadata readers retain separate leases and mutation still
+requires caller exclusion. The author reports 2,593 serial Rust passes/three
+ignored and 1,943 Java cases reported/two skipped (1,941 executed). Six-pair
+synthetic update medians are 55.868/71.545 ms (0.781× Frozen), and creation is
+10.299/13.879 ms (0.742×). Creation costs more than the earlier source-table
+checkpoint; neither result establishes gameplay/FPS or sustained-memory
+acceptance. Failed candidates, stale-borrow budget abort and the separate
+combined-tag transformer diagnostic remain historical evidence. No suites or
+runtime workloads were rerun by this documentation review. See the
+[#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6105286352)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6105286909).
+
+At the earlier [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1) checkpoint,
+the [retained DH source table](../world/chunk/RUST-DH-SOURCE-TABLE.md)
 keeps primary column leases, hashes and copy proofs in Rust, with direct tint
 and same-detail consumers. Java still keeps lazy list identities, orchestration,
 metadata projections, persistence and compatibility callbacks. Source close

@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `e6bc0e29835e431327cc8d7007ffce5fe53ce1b4`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all 54 paths, including four documents, new client-sounds owner, source-authored MkDocs navigation and the Java test-task null-device setting, from promoted cutoff `61ea4e45a3f82423b951be7543a4a75fedf48ffe`. Clean fast-forward and combined publication preserve the incoming code/build edits; authored changes remain documentation only. Instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `64db2b31690fdd62ca1b1968d1cf076f0fa09108`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 32 paths, including eight documents and the new DH metadata owner, from promoted cutoff `2edce1f6630cef0ea00dc6a4d87020ecd2628d99`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
+
+- Previous non-wiki default-branch snapshot integrated: `e6bc0e29835e431327cc8d7007ffce5fe53ce1b4`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all 54 paths, including four documents, new client-sounds owner, source-authored MkDocs navigation and the Java test-task null-device setting, from promoted cutoff `61ea4e45a3f82423b951be7543a4a75fedf48ffe`. Clean fast-forward and combined publication preserve the incoming code/build edits; authored changes remain documentation only. Instructions/workflows are unchanged.
 
 - Previous non-wiki default-branch snapshot integrated: `52664da430edab005b09f64e2df29eaa79db95a1`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 40 paths, including eight documents and the source-authored DH source-table owner, from promoted cutoff `d4400d33e8db2930331562daf57949823f8a3b61`. Clean fast-forward and combined validated publication preserve incoming ownership/tests; authored changes remain documentation only. Instructions/workflows are unchanged.
@@ -3152,3 +3155,12 @@ Linked the verified [#777 source-table/lifetime review](https://github.com/HungL
 - Preserved historical headings, monthly prefix and prior coverage records. Source-owned null-driver/build and navigation changes remain incoming history; strict documentation validation, independent review and guarded terminal deployment precede completion.
 
 Linked the verified [#773 client-policy review](https://github.com/HungLo2020/MattMC/issues/773#issuecomment-6104878952). The issue remains open. Caller-side generation eviction, unjoined pack reads, controller-specific retention and physical-device acceptance remain qualified; no new issue, closure or runtime-suite execution is claimed.
+
+
+## Batch 391: Native DH metadata, parent inputs and verification chronology
+
+- Reconciled native generation/compression/uniformity ownership and direct merge/parent inputs with Java identity views, orchestration and persistence. Qualified table-close versus escaped-reader/group lifetime, caller exclusion and scoped versus shared merge lifetimes.
+- Kept newer synthetic update/creation comparisons distinct from the historical 1.439× update failure and rejected candidates. Author suite counts, timing receipts, stale-borrow budget correction and combined-tag diagnostic remain attributed; no broad FPS, gameplay or long-memory acceptance follows.
+- Qualified the fresh-JVM registry-readiness control and preserved source-owned documentation/history. No Java/Rust/client/benchmark checks were rerun; strict docs validation, independent review and guarded terminal publication precede completion.
+
+Linked the verified [#777 metadata ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6105286352) and [#709 CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6105286909). Both remain open. Inspected fixtures distinguish uncompressed EOF prefixes, contributor-free merge corpus and direct versus compatibility parent routes; no runtime or suite execution is claimed.

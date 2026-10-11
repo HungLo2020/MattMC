@@ -18,19 +18,24 @@ Base-state hashing also reads the retained Rust table.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.
 
-Current direct-source path reviewed at [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
+Current direct-source path reviewed at [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
 The earlier `5de23173a` release results below remain historical
 implementation-author reports; this review reran no suites or clients.
 See the [current evidence checkpoint](../../rendering/GOAL-5-STATUS.md)
 for remaining runtime, performance and sustained-memory acceptance gates.
 
-Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
-[CPU bridge](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
-[ordinary source consumer](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
+Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
+[CPU bridge](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
+[ordinary source consumer](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
 
 ## Lifetime and compatibility rules
 
-Prepared merge batches now have explicit `close()`. The source caller closes
+With empty source and recipient contributor maps, the current direct route
+uses a scoped native merge released in `finally`, plus a fixed per-thread
+remap buffer. Other prepared merge batches retain the shared lifetime below;
+see [metadata ownership](RUST-DH-SOURCE-METADATA.md#ownership-and-lifetime).
+
+Prepared merge batches have explicit `close()`. The source caller closes
 the batch in `finally` when it has published no non-null contributor footprint;
 this is a conservative publication flag, not a reachability test. Contributor
 readers keep the batch lifetime. This does not establish
@@ -65,7 +70,8 @@ a GC release deadline or permit closing a batch while those readers are live.
 - Preserve remove-before-admit footprint order, capacity1,024, per-column
   prefix256 and null versus present-empty/four-null footprints. Batch readers
   retain the immutable footprint owner after publication, not the source lease.
-- Custom sources/lists, aliased metadata backing arrays, resized metadata,
+- Custom sources/lists, aliased native metadata planes or Java backing arrays,
+  resized metadata,
   oversized columns, unsupported footprints or invalid remap IDs decline to
   the original per-column route before point publication. That route retains
   custom callbacks and the successful prefix when a later update throws.

@@ -137,7 +137,9 @@ Admitted DH world preparation includes native [height fields](../world/chunk/RUS
 [same-detail updates](../world/chunk/RUST-DH-SOURCE-UPDATES.md) and
 [change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md). The separate
 [render-column reduction](RUST-DH-RENDER-COLUMNS.md) consumes compact CPU storage.
-Java retains admission and wrapper bindings, update orchestration/public metadata,
+Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
+generation/compression/uniformity and direct parent inputs. Java retains
+admission and wrapper/list identities, update orchestration,
 persistence, quadtree inputs, contextual color callbacks/material resolution, faces,
 greedy mesh assembly and final packets. These CPU owners are separate from the
 DH render-column ledger and GPU resources. Preserve section-local snapshot timing

@@ -7,12 +7,12 @@ the migration. Stock tint calls no longer stage 9, 25 or 49 point descriptors,
 copy them across the boundary, or repeat the neighborhood plan in Java.
 Material IDs, point vectors and the table remain ordinary CPU data.
 
-Implementation: [source table](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/source.rs),
-[column leases](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/mutable.rs),
-[direct tint consumer](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/tint.rs)
-and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhSource.java).
+Implementation: [source table](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/source.rs),
+[column leases](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/mutable.rs),
+[direct tint consumer](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/tint.rs)
+and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/net/minecraft/world/level/chunk/NativeDhSource.java).
 
-Source reviewed at [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
+Source reviewed at [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
 The suite counts and timings below are implementation-author reports. This
 documentation review inspected source/test assertions, but reran no Java/Rust,
 client or benchmark checks and did not inspect untracked execution receipts.
@@ -95,22 +95,26 @@ columns in Rust. Source-owned identity proofs rebuild only after structural
 binding changes; preparation rejects aliases and direct publication rejects a
 stale recipient structural version. First writes detach producer spans in Rust;
 Java preserves list identity and refreshes its CPU projection. A bounded native
-call copies numeric addresses/counts/hashes/flags into reused heap arrays;
-Java does not perform thousands of checked FFM reads for that publication. Generation and
-compression policy publishes into the existing semantic byte arrays, with Java
-projecting uniformity booleans and sparse contributor actions. Immutable producer-hash admission checks typed native spans and signed metadata
+call projects changed CPU extents and ownership facts into reused heap arrays;
+exact-copy reuse leaves existing readers untouched. Generation, compression
+and uniformity publish into native metadata planes; Java retains
+list identities and projects sparse contributor actions. Immutable producer-hash admission checks typed native spans and signed metadata
 without constructing absent Java projections. Base-state hashes
-read primary points and borrowed signed metadata directly, with a bounded
+read primary points and owned signed metadata directly, with a bounded
 65,536-point/4,096-points-per-column critical call. Oversized or custom inputs
 keep their original hashing route. Preparation streams columns directly; absent contributor descriptors use one
-immutable default table rather than an allocation per merge. Source orchestration, byte storage,
-persistence codecs, contextual colors and geometry remain migration work.
-The subsequent [source metadata migration](RUST-DH-SOURCE-METADATA.md) moves
-generation/compression/uniformity storage and direct parent transport into Rust.
+immutable default table rather than an allocation per merge. Source orchestration, persistence codecs, contextual colors and geometry
+remain migration work.
+The current [source metadata migration](RUST-DH-SOURCE-METADATA.md) owns
+generation/compression/uniformity storage and direct parent transport in Rust.
 Its fresh verification is separate from the historical results below. Occlusion
 transport and source orchestration remain work.
 
 ## Verification
+
+The following source-table-only results belong to `52664da4`. The
+[metadata checkpoint](RUST-DH-SOURCE-METADATA.md#verification) records the newer
+synthetic comparison and test scope separately.
 
 Use JDK25 and the standard release profile:
 
@@ -160,7 +164,7 @@ Frozen in these synthetic scenarios; detail 8 uses the unsmoothed tint-cache
 route. These ratios are not isolated renderer or server gains. Repeated
 same-detail updates **fail** scoped performance parity: 1.439× Frozen. Primary
 hash reuse, exact copy proofs and fused traversal improve earlier candidates,
-but that gap still needs profiling and further migration. This intermediate
+but that checkpoint still failed its scoped comparison. This intermediate
 ownership batch does not establish whole-game performance acceptance.
 At that checkpoint, generation/compression storage, uniformity, orchestration,
 persistence and parent/occlusion transport remained work. The subsequent
