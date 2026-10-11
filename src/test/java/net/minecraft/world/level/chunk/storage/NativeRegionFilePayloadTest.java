@@ -99,6 +99,15 @@ class NativeRegionFilePayloadTest {
 			assertEquals(rawPayload.external(), rust.external(), "format " + version.getId());
 			assertEquals(rawPayload.payload().length, rust.compressedLength(), "format " + version.getId());
 			assertEquals(javaFingerprint, rust.fingerprint(), "format " + version.getId());
+            long handle = NativeRegionFileBridge.open(regionPath, false);
+            try {
+                var owned = NativeRegionFileBridge.readOwnedTape(handle, pos.x, pos.z, true);
+                try (var tape = owned.tape()) {
+                    assertEquals(javaFingerprint, owned.result().fingerprint());
+                    assertEquals(version.getId(), owned.result().compressionId());
+                    assertEquals(sampleTag("semantic-" + version.getId()), net.minecraft.nbt.NativeNbtRegionAccess.readTape(tape.copy()));
+                }
+            } finally { NativeRegionFileBridge.close(handle); }
 		}
 	}
 

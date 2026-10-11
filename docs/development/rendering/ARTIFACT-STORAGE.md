@@ -277,3 +277,13 @@ losslessly and removed two completed generated profiling worlds, saving255.5MiB.
 hashes and restoration; original `.jfr`, analyses and source corpus remain. The
 completed correctness driver retired nine disposable runtime workspaces while
 retaining captures and result receipts.
+
+Nine large JSON artifacts from the terminal October10 heightmap validation were
+replaced with lossless, SHA-verified gzip archives, saving1.013GiB.
+`build/native-owned-tape/completed-validation-archive.json` records original
+hashes and sizes. Failure receipts, logs, images and source worlds remain; restore an individual JSON with `gzip -dk`.
+The completed retained-tape validation retired nine disposable workspaces and
+the superseded saved-palette capture invocation through harness retention.
+Its compact saved-palette verification receipts remain under
+`build/native-saved-palettes/`; current captures and retention paths are recorded
+in the retained-tape validation summary.

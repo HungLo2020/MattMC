@@ -27,20 +27,26 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--benchmark", action="store_true")
     mode.add_argument("--profile", choices=("current", "frozen"), help="Record JFR over 1,000 warmed corpus loads")
+    parser.add_argument("--output", type=Path, default=OUT, help="Separate candidate receipt directory; never overwrite older evidence")
     parser.add_argument("--pairs", type=int, default=3)
     parser.add_argument("--cpu", type=int, default=max(os.sched_getaffinity(0)))
-    parser.add_argument("--reference", choices=("frozen", "predecessor", "saved-owner-checkpoint", "hydration-checkpoint"), default="frozen")
+    parser.add_argument("--reference", choices=("frozen", "predecessor", "saved-owner-checkpoint", "hydration-checkpoint", "owned-tape-predecessor"), default="frozen")
     options = parser.parse_args()
     if not options.java_home or options.pairs < 2 or options.cpu not in os.sched_getaffinity(0):
         parser.error("JDK25, at least two pairs and an available CPU are required")
     jdk = Path(options.java_home) / "bin"
-    OUT.mkdir(parents=True, exist_ok=True)
+    out = options.output.resolve()
+    out.mkdir(parents=True, exist_ok=True)
     cp = {side: (ROOT / f"build/native-chunk-tasks/{side}-classpath.txt").read_text().strip()
           for side in ("current", "frozen")}
     native_dirs = {"current": NATIVE.parent, "frozen": NATIVE.parent}
     if options.reference == "predecessor":
         cp[options.reference] = (OUT.parent / "predecessor-classpath.txt").read_text().strip()
         native_dirs[options.reference] = OUT.parent / "predecessor-native"
+    elif options.reference == "owned-tape-predecessor":
+        checkpoint = ROOT / "build/native-owned-tape/predecessor"
+        cp[options.reference] = (checkpoint / "classpath.txt").read_text().strip()
+        native_dirs[options.reference] = checkpoint / "native"
     elif options.reference in ("saved-owner-checkpoint", "hydration-checkpoint"):
         checkpoint = OUT.parent / options.reference
         cp[options.reference] = (checkpoint / "classpath.txt").read_text().strip()
@@ -64,11 +70,11 @@ def main():
     old = ROOT / "build/native-chunk-tasks/frozen-source-pins.json"
     if old.exists():
         assert pins["frozen_sources"] == json.loads(old.read_text())["files"]
-    classes = OUT / "oracle"
+    classes = out / "oracle"
     classes.mkdir(exist_ok=True)
 
     def run(command, name):
-        log = OUT / name
+        log = out / name
         with log.open("w") as stream:
             status = subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT).returncode
         if status:
@@ -91,6 +97,8 @@ def main():
         return command
 
     def check_images(side, output):
+        route = "rust-owned-tape" if side == "current" else "frozen-tag" if side == "frozen" else "rust-array-tape"
+        assert "LOAD_ROUTE " + route in output, "Unexpected read/parse boundary: " + side
         for name in CLASSES:
             resource = "net/minecraft/world/level/chunk/" + name + ".class"
             resolved = next(Path(base) / resource for base in cp[side].split(os.pathsep) if (Path(base) / resource).is_file())
@@ -107,21 +115,21 @@ def main():
     result = {"pins": pins, "driver_classes": compiled, "protocol": {"cpu": options.cpu,
               "warmups": 200, "rounds": 8, "saved_chunks_per_round": 40, "pairs": options.pairs},
               "pairs": [], "guards_pass": False, "performance_pass": False}
-    target = OUT / ("results-" + ("profile-" + options.profile if options.profile else options.reference) + ".json")
+    target = out / ("results-" + ("profile-" + options.profile if options.profile else options.reference) + ".json")
     target.write_text(json.dumps(result, indent=2) + "\n")
     try:
-        fresh = OUT / "rerecorded.bin.gz"
-        output = run(java("frozen", "record", OUT / "replay-frozen-world", fresh), "rerecord.log")
+        fresh = out / "rerecorded.bin.gz"
+        output = run(java("frozen", "record", out / "replay-frozen-world", fresh), "rerecord.log")
         check_images("frozen", output)
         assert gzip.decompress(fresh.read_bytes()) == gzip.decompress(FIXTURE.read_bytes())
-        output = run(java("current", "verify", OUT / "replay-current-world", FIXTURE), "replay.log")
+        output = run(java("current", "verify", out / "replay-current-world", FIXTURE), "replay.log")
         check_images("current", output)
         result["frozen_parity_pass"] = True
         if options.benchmark:
             for pair in range(options.pairs):
                 row = {"pair": pair}
                 for side in (["current", options.reference] if pair % 2 == 0 else [options.reference, "current"]):
-                    output = run(java(side, "bench", OUT / f"timing-{options.reference}-{pair}-{side}-world"),
+                    output = run(java(side, "bench", out / f"timing-{options.reference}-{pair}-{side}-world"),
                                  f"timing-{options.reference}-{pair}-{side}.log")
                     check_images(side, output)
                     values = [dict(zip(("nanoseconds", "checksum", "compilation_ms"),
@@ -139,8 +147,8 @@ def main():
             result["performance_pass"] = all(row["ratio"] <= 1 for row in result["pairs"])
         elif options.profile:
             side = options.profile
-            recording = OUT / f"profile-{side}.jfr"
-            output = run(java(side, "profile", OUT / f"profile-{side}-world", recording), f"profile-{side}.log")
+            recording = out / f"profile-{side}.jfr"
+            output = run(java(side, "profile", out / f"profile-{side}-world", recording), f"profile-{side}.log")
             check_images(side, output)
             assert "PROFILE_DONE " in output
             result["profile"] = {"side": side, "recording": str(recording), "chunks": 40000,

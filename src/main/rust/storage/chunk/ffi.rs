@@ -245,3 +245,20 @@ pub unsafe extern "C" fn mattmc_chunk_sections_fragment(state: i32, out: *mut u8
     }
     fragment.len() as i32
 }
+
+/// Decode the retained region tape without importing any Java byte buffer.
+/// # Safety
+/// Live vocabulary/biome bindings, live tape owner and four writable size words.
+/// The tape is locked for this call; concurrent close cannot free borrowed bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_sections_decode_owned(
+    vocabulary: u64, biomes: u64,
+    owner: *const crate::storage::nbt::owned::OwnedTape,
+    min_section: i32, max_section: i32, sizes: *mut i64,
+) -> i32 {
+    let Some(owner) = owner.as_ref() else { return -1 };
+    let bytes = owner.bytes.lock().unwrap();
+    let Some(bytes) = bytes.as_ref() else { return -1 };
+    let Ok(length) = i32::try_from(bytes.len()) else { return -1 };
+    mattmc_chunk_sections_decode(vocabulary, biomes, bytes.as_ptr(), length, min_section, max_section, sizes)
+}

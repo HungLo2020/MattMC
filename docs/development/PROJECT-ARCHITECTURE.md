@@ -344,8 +344,12 @@ primary local/global block and biome owners in `palette/saved.rs`. Java supplies
 bounded semantic IDs and saved words; it constructs no palette/bit-storage mirror
 for admitted imports. [Decoded-section hydration](world/chunk/RUST-DECODED-SECTIONS.md)
 creates those owners and saved light layers directly in Rust, eliminating Java
-array/list/stream reconstruction on admitted NBT loads. File orchestration and
-non-section root-tag parsing remain transitional.
+array/list/stream reconstruction on admitted NBT loads.
+[Retained region tapes](world/chunk/RUST-REGION-TAPE.md) connect the Rust file
+producer and decoder with explicit consumption/discard release. Full-tape Java
+copies and output-capacity retries are absent from admitted disk loads; validation
+fingerprints are requested only when validation is enabled. Java IO scheduling
+and non-section root-tag parsing remain transitional.
 [Player chunk distances](world/chunk-loading/RUST-PLAYER-DISTANCE.md) use
 `world/level/chunk_distance/` for DistanceManager's natural-spawn, player-ticket,
 [simulation](world/chunk-loading/RUST-SIMULATION-DISTANCE.md) and

@@ -18,7 +18,7 @@ public final class DecodedChunkVerification {
     static net.minecraft.server.packs.resources.MultiPackResourceManager resources;
     static PalettedContainerFactory factory;
     static final LevelHeightAccessor HEIGHT=LevelHeightAccessor.create(-64,384);
-    static MethodHandle readTape, loaded, parseLoaded;
+    static MethodHandle readTape, loaded, parseLoaded, readOwnedTape, ownedLoaded;
     static final UnaryOperator<CompoundTag> UPGRADE=UnaryOperator.identity();
     static void setup() throws Throwable {
         net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();
@@ -38,6 +38,13 @@ public final class DecodedChunkVerification {
             parseLoaded=lookup.findStatic(SerializableChunkData.class,"parseLoaded",MethodType.methodType(SerializableChunkData.class,
                 LevelHeightAccessor.class,PalettedContainerFactory.class,type,UnaryOperator.class))
                 .asType(MethodType.methodType(SerializableChunkData.class,LevelHeightAccessor.class,PalettedContainerFactory.class,Object.class,UnaryOperator.class));
+            try {
+                var tapeType=Class.forName("net.minecraft.world.level.chunk.storage.NativeChunkTape", false, DecodedChunkVerification.class.getClassLoader());
+                readOwnedTape=lookup.findVirtual(RegionFileStorage.class,"readOwnedTape",MethodType.methodType(tapeType,ChunkPos.class))
+                    .asType(MethodType.methodType(Object.class,RegionFileStorage.class,ChunkPos.class));
+                ownedLoaded=MethodHandles.insertArguments(lookup.findConstructor(type,MethodType.methodType(void.class,byte[].class,CompoundTag.class,tapeType)),
+                    0,(byte[])null,(CompoundTag)null).asType(MethodType.methodType(Object.class,Object.class));
+            } catch(ClassNotFoundException | NoSuchMethodException predecessor) { /* Prior region-array route. */ }
         } catch(ClassNotFoundException frozen) { /* Original ChunkMap reads the full tag and calls parse. */ }
     }
     static List<CompoundTag> corpus() throws IOException {
@@ -53,8 +60,14 @@ public final class DecodedChunkVerification {
     }
     static SerializableChunkData load(RegionFileStorage storage,ChunkPos pos) throws Throwable {
         if(readTape==null) return SerializableChunkData.parse(HEIGHT,factory,storage.read(pos));
-        byte[] tape=(byte[])readTape.invokeExact(storage,pos);
-        Object input=(Object)loaded.invokeExact(tape);
+        Object input;
+        if(readOwnedTape!=null) {
+            Object tape=(Object)readOwnedTape.invokeExact(storage,pos);
+            input=(Object)ownedLoaded.invokeExact(tape);
+        } else {
+            byte[] tape=(byte[])readTape.invokeExact(storage,pos);
+            input=(Object)loaded.invokeExact(tape);
+        }
         return (SerializableChunkData)parseLoaded.invokeExact(HEIGHT,factory,input,UPGRADE);
     }
     static Object member(Object object,String name) throws Exception {
@@ -107,6 +120,7 @@ public final class DecodedChunkVerification {
     }
     public static void main(String[] args) throws Throwable {
         setup();
+        System.out.println("LOAD_ROUTE " + (readOwnedTape != null ? "rust-owned-tape" : readTape != null ? "rust-array-tape" : "frozen-tag"));
         for (var type : new Class<?>[]{SerializableChunkData.class, RegionFileStorage.class, PalettedContainer.class, DataLayer.class}) {
             String resource = "/" + type.getName().replace('.', '/') + ".class";
             try (var bytes = type.getResourceAsStream(resource)) {

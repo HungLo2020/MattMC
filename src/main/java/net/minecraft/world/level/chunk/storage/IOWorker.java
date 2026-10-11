@@ -163,10 +163,12 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	/** A chunk {@link #loadForParse} found: its tape (from the region file or a
 	 * pending encoded write) or a pending write's tag copy. */
-	public record Loaded(@Nullable byte[] tape, @Nullable CompoundTag tag) {
+	public record Loaded(@Nullable byte[] tape, @Nullable CompoundTag tag, @Nullable NativeChunkTape nativeTape) implements AutoCloseable {
+        public Loaded(byte[] tape, CompoundTag tag) { this(tape, tag, null); }
+        @Override public void close() { if (this.nativeTape != null) this.nativeTape.close(); }
 		/** The tag {@link #loadAsync} would have returned. */
 		public CompoundTag fullTag() throws java.io.IOException {
-			return this.tag != null ? this.tag : net.minecraft.nbt.NativeNbtRegionAccess.readTape(this.tape);
+			return this.tag != null ? this.tag : net.minecraft.nbt.NativeNbtRegionAccess.readTape(this.nativeTape != null ? this.nativeTape.copy() : this.tape);
 		}
 	}
 
@@ -180,14 +182,14 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 				return Optional.ofNullable(pendingStore.copyData()).map(tag -> new Loaded(null, tag));
 			} else {
 				try {
-					byte[] tape = this.storage.readTape(chunkPos);
-					return Optional.ofNullable(tape).map(bytes -> new Loaded(bytes, null));
+					NativeChunkTape tape = this.storage.readOwnedTape(chunkPos);
+					return Optional.ofNullable(tape).map(bytes -> new Loaded(null, null, bytes));
 				} catch (Exception var4) {
 					LOGGER.warn("Failed to read chunk {}", chunkPos, var4);
 					throw var4;
 				}
 			}
-		});
+		}, result -> result.ifPresent(Loaded::close));
 	}
 
 	public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos chunkPos) {
@@ -248,10 +250,15 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	}
 
 	private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier) {
+        return this.submitThrowingTask(throwingSupplier, discarded -> {});
+    }
+    private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier,
+        java.util.function.Consumer<T> discard) {
 		return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
 			if (!this.shutdownRequested.get()) {
 				try {
-					completableFuture.complete(throwingSupplier.get());
+					T result = throwingSupplier.get();
+                    if (!completableFuture.complete(result)) discard.accept(result);
 				} catch (Exception var4) {
 					completableFuture.completeExceptionally(var4);
 				}

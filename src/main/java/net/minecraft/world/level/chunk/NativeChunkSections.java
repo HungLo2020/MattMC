@@ -40,6 +40,9 @@ public final class NativeChunkSections {
     private static final MethodHandle DECODE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_decode",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    private static final MethodHandle DECODE_OWNED = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_decode_owned",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     // Identity weak keys admit the codecs produced by the standard factory.
     // Custom factory codecs must run through the original tag reader.
     private static final java.util.concurrent.ConcurrentMap<PalettedContainerFactory, Boolean> FACTORIES =
@@ -392,6 +395,14 @@ public final class NativeChunkSections {
      * parses the whole tag). */
     @Nullable
     public static NativeDecodedChunkSections decode(byte[] tape, PalettedContainerFactory factory, int minSection, int maxSection) {
+        return decode(tape, null, factory, minSection, maxSection);
+    }
+    @Nullable public static NativeDecodedChunkSections decode(net.minecraft.world.level.chunk.storage.NativeChunkTape tape,
+        PalettedContainerFactory factory, int minSection, int maxSection) {
+        return decode(null, tape, factory, minSection, maxSection);
+    }
+    @Nullable private static NativeDecodedChunkSections decode(byte[] tape, net.minecraft.world.level.chunk.storage.NativeChunkTape owned,
+        PalettedContainerFactory factory, int minSection, int maxSection) {
         if (!enabled || !FACTORIES.containsKey(factory) || Vocabulary.HANDLE == 0 || factory.blockStatesStrategy().entryCount() != 4096 || factory.biomeStrategy().entryCount() != 64) {
             return null;
         }
@@ -404,10 +415,15 @@ public final class NativeChunkSections {
         long names = biomeNames(ids);
         if (names == 0) return null;
         try (Arena arena = Arena.ofConfined()) {
-            var input = arena.allocate(Math.max(1, tape.length), 8);
-            MemorySegment.copy(MemorySegment.ofArray(tape), 0, input, 0, tape.length);
             var sizes = arena.allocate(ValueLayout.JAVA_LONG, 4);
-            int status = (int)DECODE.invokeExact(Vocabulary.HANDLE, names, input, tape.length, minSection, maxSection, sizes);
+            int status;
+            if (owned != null) {
+                status = (int)DECODE_OWNED.invokeExact(Vocabulary.HANDLE, names, owned.owner(), minSection, maxSection, sizes);
+            } else {
+                var input = arena.allocate(Math.max(1, tape.length), 8);
+                MemorySegment.copy(MemorySegment.ofArray(tape), 0, input, 0, tape.length);
+                status = (int)DECODE.invokeExact(Vocabulary.HANDLE, names, input, tape.length, minSection, maxSection, sizes);
+            }
             if (status == -2) return null;
             if (status != 0) throw new IllegalStateException("Native chunk section decoding rejected its input: " + status);
             return NativeDecodedChunkSections.take(factory);

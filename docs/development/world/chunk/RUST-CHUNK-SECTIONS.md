@@ -52,7 +52,7 @@ sends biome names as `holderByNameCodec` writes them with each chunk.
 ## How a load flows
 
 1. `ChunkMap.scheduleChunkLoad` reads the chunk as tape
-   (`IOWorker.loadForParse`): the region file's tape, or a pending encoded
+   (`IOWorker.loadForParse`): the [retained Rust region tape](RUST-REGION-TAPE.md), or a pending encoded
    write's tape. A pending tag is copied as before.
 2. On the background executor, `SerializableChunkData.parseLoaded` passes the
    tape to Rust ([`load.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/storage/chunk/load.rs)).

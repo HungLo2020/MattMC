@@ -21,6 +21,7 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -302,6 +303,54 @@ class NativeChunkSectionsTest {
         assertTrue(lights > 0, "Saved lighting participates in the primary owner path");
     }
 
+    @Test void ownedRegionTapeParsesFrozenCorpusAndClosesBeforeReturnedOwnersAreUsed(@TempDir Path dir) throws Exception {
+        NativeChunkSections.setEnabled(true);
+        DecodedChunkVerification.factory = factory;
+        try (var storage = new RegionFileStorage(new RegionStorageInfo("owned-decode", Level.OVERWORLD, "chunk"), dir, false);
+             var input = new DataInputStream(new java.util.zip.GZIPInputStream(
+                 getClass().getResourceAsStream("/storage/frozen-decoded-chunks.bin.gz")))) {
+            var tags = corpus();
+            assertEquals(0x44434f31, input.readInt());
+            assertEquals(tags.size(), input.readInt());
+            for (var tag : tags) {
+                var pos = new ChunkPos(tag.getIntOr("xPos", 0), tag.getIntOr("zPos", 0));
+                storage.write(pos, tag);
+                assertEquals(pos.toLong(), input.readLong());
+                var expected = input.readNBytes(input.readInt());
+                var tape = storage.readOwnedTape(pos);
+                assertNotNull(tape);
+                assertArrayEquals(storage.readTape(pos), tape.copy());
+                long before = NativeChunkSections.LOADED.get();
+                var parsed = SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), factory,
+                    new IOWorker.Loaded(null, null, tape), t -> { throw new AssertionError("Unexpected upgrade"); });
+                assertEquals(before + 1, NativeChunkSections.LOADED.get());
+                assertThrows(IllegalStateException.class, tape::copy);
+                tape.close(); // close is idempotent, independent section owners remain valid
+                assertArrayEquals(expected, DecodedChunkVerification.fingerprint(parsed));
+            }
+            assertEquals(-1, input.read());
+            assertNull(storage.readOwnedTape(new ChunkPos(31, 31)));
+        }
+    }
+
+    @Test void olderOwnedTapeUsesUpgradeAndClosesOnUpgradeFailure(@TempDir Path dir) throws Exception {
+        var tag = corpus().getFirst();
+        tag.putInt("DataVersion", 1);
+        var pos = new ChunkPos(tag.getIntOr("xPos", 0), tag.getIntOr("zPos", 0));
+        try (var storage = new RegionFileStorage(new RegionStorageInfo("owned-upgrade", Level.OVERWORLD, "chunk"), dir, false)) {
+            storage.write(pos, tag);
+            var tape = storage.readOwnedTape(pos);
+            var marker = new IllegalArgumentException("upgrade failure");
+            var error = assertThrows(IllegalArgumentException.class, () -> SerializableChunkData.parseLoaded(
+                LevelHeightAccessor.create(-64, 384), factory, new IOWorker.Loaded(null, null, tape), full -> {
+                    assertEquals(tag, full);
+                    throw marker;
+                }));
+            assertSame(marker, error);
+            assertThrows(IllegalStateException.class, tape::copy);
+        }
+    }
+
     @Test void customFactoryCodecsKeepTheirLoadAndSaveCallbacks() throws Exception {
         var calls = new int[2];
         var blockCodec = factory.blockStatesContainerCodec().xmap(value -> { calls[0]++; return value; },
@@ -440,7 +489,7 @@ class NativeChunkSectionsTest {
             for (CompoundTag tag : tags.subList(0, 8)) {
                 var data = parse(tag);
                 var loaded = worker.loadForParse(data.chunkPos()).join().orElseThrow();
-                assertNotNull(loaded.tape());
+                assertTrue(loaded.tape() != null || loaded.nativeTape() != null, "Pending encoded tape or completed disk-owned tape");
                 assertEquals(fingerprint(data), fingerprint(SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), factory, loaded, t -> t)));
             }
             worker.synchronize(true).join();

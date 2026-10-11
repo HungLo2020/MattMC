@@ -17,7 +17,7 @@
 - Loaded-world sky/fog and DH columns share retained native biome bindings; unchanged publication avoids rebuilding owner rows.
 - General simulation, platform/network/startup, file orchestration and remaining extraction are Java. src/main/rust/app/mod.rs is empty; Java removal is incomplete.
 
-## Current batch: saved palettes and decoded sections (453df088)
+## Published saved palettes and decoded sections (45a074369;453df088)
 
 - Rust constructs canonical local/global block and biome owners directly; retains padding, palette order/unused entries, global remapping and validation policy.
 - Current-version NBT loads hydrate primary block/biome/light owners inside Rust. Java palette/word/light arrays and list/stream reconstruction are removed from admitted loads.
@@ -62,7 +62,7 @@
 ## Next migration targets
 
 - Continue authoritative world-state producers and direct consumers together; avoid Java packing followed by Rust reconstruction.
-- Move the region-produced tape directly to Rust decode; remove Java output/input copies, repeated capacity retries and unconditional validation fingerprints.
+- Validated batch: retained Rust region tape to native section decode; full Java tape round trip/retries removed, validation fingerprints opt-in. Explicit parse/discard closure and cross-thread CPU lifetime; release06529556:Rust2623pass/3ignored, Java1974reported/2skips/0fail (1972executed,361suites), actual40-chunk Frozen replay/guards pass. Three quiet guarded40-chunk Frozen pairs on i7-12700K CPU19:12.20–12.31/13.14–13.53ms C/F,ratios0.909–0.928,scoped floorPASS. All3 fresh45a074369 controls pass (ratios0.722–0.735;26–28% lower cost). Seven lifecycle cases and two settled Frozen pairs pass, VUID0;9 exact native artifacts and4 original1280×720 captures reviewed. First-view/streaming/FPS acceptance remains open; build/native-owned-tape/ retains receipts.
 - Continue DH source traversal/material resolution, collector candidates and contextual producers; move complete policy/ownership rather than isolated helper loops.
 - Use actual workload profiles to prioritize; sampled stacks overlap and startup/JIT work does not establish steady-state cost or an isolated speedup.
 - Treat measured performance gaps as continuing implementation work. Do not weaken GAL ownership or use Frozen Java Vulkan as a baseline.
@@ -89,8 +89,8 @@
 - Original stashes12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb remain protected.
 - Sync-and-push integrates upstream before one batch commit; preserve pending paths/modes/staging. No force-push/reset/blanket staging.
 - Prior pruning recovered~350GiB plus21.08GiB verified archival and17.04GiB unused Rust profiles; receipts remain in prior build/native-*/ directories.
-- This batch pruned30 prior and9 completed runtime work copies; source worlds, captures and receipts remain. JFR JSON gzip plus2 completed profiling worlds saved255.5MiB; completed-profile-archive.json records restoration/hashes.
+- Saved-palette batch pruned30 prior and9 completed runtime work copies; source worlds, captures and receipts remain. JFR JSON gzip plus2 completed profiling worlds saved255.5MiB; completed-profile-archive.json records restoration/hashes.
 - Verified36 lossless JSON archives save3.31GiB. Manifest: build/native-dh-saved-light/completed-json-archive.json; restore with gzip -dk PATH.json.gz.
 - Retired56 superseded October9 profiling videos (17.83GiB);447 PNGs, profiles and receipts retained. build/native-saved-palettes/retired-profile-videos.json records exact hashes; videos are not restorable.
-- Active/unresolved/unknown/symlinked scopes retain evidence. Earlier interrupted allocation-world cleanup did not establish recovery.
+- New boundary archived9 terminal older validation JSON files losslessly (1.013GiB saved); native-owned-tape/completed-validation-archive.json retains hashes. Active/unresolved/unknown/symlinked scopes retain evidence. Earlier interrupted allocation-world cleanup did not establish recovery.
 - Preserve prepared DH source and open first-view/startup/closed-pipe worlds. Retention requires recognized completion, driver exit0 and no live process.

@@ -59,6 +59,11 @@ public final class RegionFileStorage implements AutoCloseable {
 		return this.getRegionFile(chunkPos).readChunkTape(chunkPos);
 	}
 
+    /** Rust region producer retains its tape until the parse consumer finishes. */
+    @Nullable public NativeChunkTape readOwnedTape(ChunkPos chunkPos) throws IOException {
+        return this.getRegionFile(chunkPos).readOwnedTape(chunkPos);
+    }
+
 	public void scanChunk(ChunkPos chunkPos, StreamTagVisitor streamTagVisitor) throws IOException {
 		RegionFile regionFile = this.getRegionFile(chunkPos);
 		DataInputStream dataInputStream = regionFile.getChunkDataInputStream(chunkPos);

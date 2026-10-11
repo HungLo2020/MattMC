@@ -113,10 +113,13 @@ public record SerializableChunkData(
 	@Nullable
 	public static SerializableChunkData parseLoaded(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory,
 		IOWorker.Loaded loaded, java.util.function.UnaryOperator<CompoundTag> upgrade) {
-		try {
-			if (loaded.tape() != null) {
-				try (var decoded = net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.tape(), palettedContainerFactory,
-					levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY())) {
+		try (loaded) {
+			if (loaded.tape() != null || loaded.nativeTape() != null) {
+				try (var decoded = loaded.nativeTape() != null
+                    ? net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.nativeTape(), palettedContainerFactory,
+                        levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY())
+                    : net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.tape(), palettedContainerFactory,
+                        levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY())) {
 					if (decoded != null) {
 						CompoundTag root = net.minecraft.nbt.NativeNbtRegionAccess.readTape(decoded.root());
 						// upgradeChunkTag leaves a current-version tag untouched.

@@ -8,7 +8,9 @@ Java arrays, lists and streams before being imported back into Rust.
 uses the existing [saved-palette policy](RUST-SAVED-PALETTES.md) and live light
 owners. Java still schedules reads, binds registries, wraps section objects and
 parses the remaining root tag. This is an intermediate ownership boundary;
-chunk-file orchestration and the rest of chunk construction still need migration.
+[Retained region tapes](RUST-REGION-TAPE.md) now connect the Rust file producer
+and section consumer without full-tape Java copies. Java scheduling and the rest
+of chunk construction still need migration.
 
 ## Admission and lifetime
 
