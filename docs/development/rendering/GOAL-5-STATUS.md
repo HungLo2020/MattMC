@@ -1,8 +1,20 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`85475b61`](https://github.com/HungLo2020/MattMC/commit/85475b61defddd2da5e0d0a5f310093145a577d3).
-The latest CPU slice moves [cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md)
+[`5dcd2501`](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a).
+The latest follow-up groups the source-initialized mutable DH columns under
+one automatic arena. [Its lifetime guide](../world/chunk/RUST-DH-FULL-DATA.md#grouped-column-evidence)
+distinguishes grouped initialization from producer/replacement owners and
+retained-reader lifetime. The author reports improved forced-crash delay and
+two moving-camera runs per version; the two added Java tests inspect scopes
+and list behavior, not actual collection/release or crash timing. No broad
+memory, lifecycle or performance acceptance follows from this documentation
+review. [Timed crash recording](SESSION-RECORDING.md) remains a diagnostic. See
+the [ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103618931)
+and [reported-measurement review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103620939).
+
+At the preceding `85475b61` checkpoint,
+the CPU slice moves [cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md)
 into native cache storage and admitted sampling over retained columns/materials.
 Java keeps resolver callbacks, registry lookup and compatibility traversal. The
 author reports 288 Frozen neighborhoods, 480 mutable-key operations, 2,547 Rust

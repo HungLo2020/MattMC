@@ -11,8 +11,10 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `85475b61defddd2da5e0d0a5f310093145a577d3`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all 28 paths, including eight documents and the new source-authored DH tint owner, from promoted cutoff `493da75c6f1a7219261db74db1ead5f1b75a7e8e`. Clean fast-forward and combined validated publication preserve incoming source and author records; instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `5dcd25017197443df269f27193441a5580c6479a`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all eight paths, including two guides, from promoted cutoff `868621b7cdea570e473deaf2bf7f643367159834`. Clean fast-forward and combined validated publication preserve source lifetime changes and diagnostic controls; instructions/workflows are unchanged.
+- Previous non-wiki default-branch snapshot integrated: `85475b61defddd2da5e0d0a5f310093145a577d3`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all 28 paths, including eight documents and the new source-authored DH tint owner, from promoted cutoff `493da75c6f1a7219261db74db1ead5f1b75a7e8e`. Clean fast-forward and combined validated publication preserve incoming source and author records; instructions/workflows are unchanged.
 - Previous non-wiki default-branch snapshot integrated: `2003b118dfac30ca501dc135b9de0e2d7e2567fb`; older citations retain their reviewed source scope.
 - Previous synchronization preserves three incoming commits and all 41 paths, including eight guides/indexes and the new source-authored chunk-task owner, from promoted cutoff `5e566e87e967a476db373c5611f6d9cc19b969a9`. Clean fast-forward and combined validated publication retain the source fixes, queues and author reports. Repository instructions/workflows were unchanged.
 - Previous non-wiki default-branch snapshot integrated: `c00b11c8b8d0d6c81a83dc5168b3c781ce5fc3f4`; older citations retain their reviewed source scope.
@@ -3107,3 +3109,12 @@ The batch links the verified [#747 cleanup/transition](https://github.com/HungLo
 - Preserved historical headings, monthly prefix and all prior coverage records. Full strict documentation checks, independent source/rendered-link review and docs-only guarded publication precede completion.
 
 Linked the verified [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103285146) and [#709 CPU/preflight review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103287294). Independent decoding inspected 288 neighborhoods/seven class pins/8,296 point entries and 480 key operations/32 histories with exact EOF; no suites were rerun. Detail-8 stock-radius timing uses the unsmoothed cache route. Both issues remain open.
+
+
+## Batch 387: Grouped DH column lifetime and forced-crash diagnostics
+
+- Qualified source-initialized grouped columns versus producer/adopted/replacement ownership, GC-driven arena release and retained grouped-reader lifetime. Preserved the incoming implementation and distinguished pointer registration from explicit source closure or release deadlines.
+- Attributed phantom-cleanable, forced-crash delay and moving-camera results to the implementation author's commit. The two new test definitions check arena scopes and list behavior, not actual collection/release, source reuse or live crash timing; no suites or clients were rerun.
+- Documented timed-crash eligibility and action order, copied-world setup, scheduled-stop precedence and retained crash/report evidence. Preserved historical anchors, monthly content and full coverage history; strict docs validation, independent review and guarded terminal publication precede completion.
+
+Linked the verified [#777 grouped-lifetime review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103618931) and [#709 reported-measurement review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103620939). Both remain open; no independent runtime, GC or suite execution, and no Frozen baseline acceptance, follows.

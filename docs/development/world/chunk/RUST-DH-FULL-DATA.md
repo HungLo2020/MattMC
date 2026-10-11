@@ -41,14 +41,14 @@ descriptors and consumes updated extents/hashes without exporting point values.
 CPU checks for this newer pass are recorded below; hardware/gameplay and
 performance acceptance remain pending.
 
-Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
+Grouped-lifetime source reviewed at [`5dcd2501`](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a) on 2026-10-11. Earlier release evidence retains its own source scope; the results below are
 implementation-author reports, and this review did not rerun suites or clients.
-See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+See the [current evidence checkpoint](../../rendering/GOAL-5-STATUS.md)
 for remaining runtime, performance and sustained-memory acceptance gates.
 
-Implementation: [point owner and occlusion](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/dh_columns),
-[CPU list](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnList.java)
-and [source consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
+Implementation: [point owner and occlusion](https://github.com/HungLo2020/MattMC/tree/5dcd25017197443df269f27193441a5580c6479a/src/main/rust/world/level/chunk/dh_columns),
+[CPU list](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnList.java)
+and [source consumer](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
 The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.md).
 
 ## Constraints when changing this subsystem
@@ -85,15 +85,18 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
   The whole-quadrant path borrows bounded point descriptors and a semantic ID
   remap table; it exports no point values. Custom/oversized inputs or enabled
   developer order validation retain per-column compatibility sequencing.
-- A full-data source's own columns share one
-  [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java):
-  each mutable Rust vector registers only its pointer, and one cleanup frees
-  them all once the source and every column are unreachable (Frozen's pooled
-  arrays likewise live until their source closes). Do not give these columns a
-  per-column automatic arena: database loads create 4,096 per source, and the
-  resulting millions of GC cleanables made collections, including the crash
-  path's explicit `System.gc()`, take minutes. Columns created outside a
-  source keep their own arena.
+- The 4,096 empty lists initialized by a full-data source now share a
+  [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java).
+  Their mutable vectors register pointers under one automatic arena instead
+  of creating one cleanup per vector. The source, grouped lists and retained
+  segments keep that lifetime reachable; collection of the shared arena
+  triggers the group's release callback. This is GC-driven release, not an
+  explicit source-close operation or a bounded release deadline.
+- Grouping follows `empty(group)` initialization. Producer views, adopted
+  vectors and replacement lists do not automatically join a source's group;
+  ungrouped mutable vectors keep independent arenas. Clearing a grouped list
+  empties its contents without unregistering its pointer. A retained grouped
+  list can therefore keep other registered vectors alive until group release.
 - Detached mutable columns release both their former producer reference and
   arena-backed point segment after copying; either could otherwise retain a
   whole producer. Pin the previous owner/span through the copy. Other readers
@@ -145,7 +148,7 @@ and resized-generation-list exception prefixes. Full Java verification passes:
 prompt guards. Receipts: `build/native-dh-parent-metadata/`. Hardware, full Rust
 graphics, gameplay, performance and sustained memory acceptance remain pending.
 
-The [metadata recorder](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhParentMetadataOracle.java)
+The [metadata recorder](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/DevUtils/tests/world/chunk/GenerateFrozenDhParentMetadataOracle.java)
 checks Frozen's compiled `FullDataSourceV2` identity before invoking its actual
 private minimum-generation/maximum-compression helpers. DHP1 has32 canonical,
 extreme and signed-byte CPU patterns, each with1,024 groups. Raw SHA256:
@@ -159,13 +162,13 @@ changing production culling. Existing merge-only repeat checks still pass.
 
 Earlier reduction/occlusion verification follows; it does not accept later source.
 
-The [Frozen recorder](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhOcclusionOracle.java)
+The [Frozen recorder](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/DevUtils/tests/world/chunk/GenerateFrozenDhOcclusionOracle.java)
 uses the prior DHC1 production-column fixture and the untouched Frozen culler,
 with six checked class identities. It records 32 saved-column cases and two
 complete ordered passes each. Unique fixture biome identities preserve material
 ID positions; this does not establish saved-biome or gameplay parity. Raw DHO1
 SHA256: `3419a7da318caf78ddec3df594f83841b78a5307033577d7d3073df50b9b01eb`.
-The [reduction recorder](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhReductionOracle.java)
+The [reduction recorder](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/DevUtils/tests/world/chunk/GenerateFrozenDhReductionOracle.java)
 invokes untouched Frozen's private production reducer for every2×2 group in
 those32 cases, checking five production class identities. DHR1 raw SHA256:
 `8cb928a2dcf1259b76868c64c556bb56edf745254e157e18d7c9f4cae6e79d19`.
@@ -201,3 +204,27 @@ kernel/library mismatch currently prevents hardware captures; see
 [render verification](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 Earlier release839ff128 misses vanilla p99 and DH median FPS. Neither old
 timings nor the supplemental oracle establish a speedup for this change.
+
+## Grouped-column evidence
+
+The [implementation commit](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a)
+reports 13.4 million phantom cleanables and about 2.2 GB of bookkeeping at
+a forced crash. Its still-camera forced-crash comparison reports
+crash-report delay falling from 6.5 minutes to 20 seconds, with exit at 22
+seconds. Two interleaved moving-camera runs per version report FPS 41.0/50.2
+before and 57.8/54.9 after, with fewer long frames, lower runqueue wait and
+lower median post-GC heap. These are author-reported observations from that
+workload, not an independently rerun benchmark or broad GC/lifetime acceptance.
+
+The two [new Java fixtures](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/test/java/net/minecraft/world/level/chunk/NativeDhColumnGroupTest.java)
+check shared versus independent arena scopes and list add/set/remove/clear/hash
+semantics. They do not observe collection or native release, source reuse,
+retained-reader teardown, exception cleanup, or crash-report timing. This
+review inspected their assertions but ran no Java/Rust/client checks. Preserve
+those lifetime checks and sustained memory measurements as separate acceptance
+work; see [forced-crash recording](../../rendering/SESSION-RECORDING.md).
+
+The [group-lifetime review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103618931)
+and [measurement review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6103620939)
+retain those boundaries. The before/after moving-camera comparison is not a
+Frozen baseline comparison; both issues remain open.

@@ -78,7 +78,7 @@ variation with external load. Those observations are not renderer speedups.
 Compare render-thread CPU and run-queue time per frame (`stalls.csv`) and the
 "everything else" CPU (`cpu.csv` system minus client) alongside FPS.
 
-Timed actions, extended through [`2003b118`](https://github.com/HungLo2020/MattMC/blob/2003b118dfac30ca501dc135b9de0e2d7e2567fb/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
+Timed actions, extended through [`5dcd2501`](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
 take seconds since the sweep starts on the first eligible in-world frame:
 `--jvm-arg=-Dmattmc.dev.scriptedCamera.enableShadersAt=25` enables the selected
 pack. The default `enableShadersVia=toggle` uses the enable/reload API;
@@ -93,9 +93,21 @@ screen remains open after the sweep starts, camera movement and other timed
 actions wait, but due screenshots and the scheduled stop continue. Opening the
 map returns before the same frame's screenshot; a due shot is handled on a later
 frame. A screen already open before the sweep starts does not start its clock.
-`--jvm-arg=-Dmattmc.dev.scriptedCamera.crashAt=45` throws from the frame loop
-into Minecraft's emergency save and crash, for timing how quickly a client
-failure writes its crash report and exits.
+`--jvm-arg=-Dmattmc.dev.scriptedCamera.crashAt=45` deliberately throws from
+an eligible frame into Minecraft's emergency-save/crash path. Use the scripted
+driver's copied game/world, set the sweep duration later than the requested
+crash, and retain the forced-crash log marker, actual crash report and process
+exit timing. This is destructive to that client session, not an ordinary
+successful-run or parity result.
+
+The [timed-action ordering](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/client/dev/ScriptedCameraSweep.java)
+checks scheduled stop first. An open screen postpones this crash action; if the
+screen stays open until the stop, it never fires. On an eligible frame, shader
+actions run before the crash, and map opening, screenshots and camera movement
+come afterward. The threshold is elapsed time since sweep start, not an exact
+wall-clock crash guarantee. No new live-crash or GC/release test accompanies this
+option; the [grouped-column report](../world/chunk/RUST-DH-FULL-DATA.md#grouped-column-evidence)
+is author evidence from its recorded workload.
 The enable attempt is marked before application; a thrown failure does not
 turn this into an automatic retry loop. Start with `--config 'config/iris.properties:enableShaders=false'` and a valid
 selected pack available in the copied game. The scripted driver copies config,
