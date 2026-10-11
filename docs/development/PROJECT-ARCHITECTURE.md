@@ -199,13 +199,15 @@ mutations invalidate unread entries between callbacks.
 Java retains atomic chunk references, reference-CAS facts, scalar ring/range reads,
 radius relocation and callback delivery. This is partial client-world ownership.
 
-The local [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
+The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
 retains primary position/bounds components per world and queries them directly
-for ordinary camera culling. The local [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md)
+for ordinary camera culling. The [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md)
 in `world/level/entity_order/` retains client/server insertion order and immutable
 tick snapshots. Java keeps immutable API projections, object bindings, hooks,
-behavior callbacks and tick/extraction orchestration. These slices are under
-verification; general entity components and complete tick ownership remain unfinished.
+behavior callbacks and tick/extraction orchestration. The source now connects
+these consumers; the [combined author checkpoint](rendering/GOAL-5-STATUS.md#october-11-implementation-checkpoint)
+records scoped CPU/lifecycle/image passes and a vanilla-p99 failure. General
+entity components, complete tick ownership and broader runtime acceptance remain unfinished.
 
 At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/mod.rs),
 DH world CPU ownership also includes columns, mutable full-data recipients,
@@ -502,7 +504,7 @@ Important current subdirectories:
 - `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
 - `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).
 - `render/worldrender/`: the world renderer ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/README.md)). `terrain/staging.rs` retains assembled vertices by mesh key and generation until asset acceptance or discard. `terrain/publication.rs` owns published section-layer identities and changed rows, synchronized directly into the Rust section graph. Java still registers/removes those identities, coordinates asset acceptance and resource-reload swaps, and supplies build/sort/atlas inputs. Ordinary opaque/cutout terrain uses shared page resource sets; per-mesh bindings are created only when needed outside that path, and section/material keys reuse resident geometry for the same mesh generation and vertex ABI. See [render resource preparation](rendering/RENDER-ARCHITECTURE.md), [terrain publication](rendering/JAVA-BRIDGE.md#terrain-publication-registry) and [terrain intake](rendering/JAVA-BRIDGE.md#terrain-layer-intake) for the ownership, copy and lifetime limits.
-- `render/guirender/`: the GUI renderer: sprites, quads, item meshes and rasters, the panorama and GUI post effects ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/README.md)). Local ABI 80 [GUI item templates](rendering/RUST-GUI-ITEM-TEMPLATES.md) retain cached standard 3D render inputs in Rust and replace per-quad Java frame records; hardware/performance acceptance is pending.
+- `render/guirender/`: the GUI renderer: sprites, quads, item meshes and rasters, the panorama and GUI post effects ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/README.md)). ABI 80 [GUI item templates](rendering/RUST-GUI-ITEM-TEMPLATES.md) retain cached standard 3D render inputs in Rust and replace per-quad Java frame records; the guide separates reported GUI image passes from unfinished broad runtime and performance acceptance.
 - `render/bridge/`: the Java FFI bridge: the `mattmc_vulkanic_gal_*` C ABI, wire records, decoding and the context registry. It is the only code that creates GALs and chooses their backend ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/README.md)).
 
 ### `assets/`

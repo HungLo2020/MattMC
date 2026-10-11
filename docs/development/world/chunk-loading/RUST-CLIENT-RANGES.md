@@ -27,13 +27,17 @@ objects, block-entity maps, renderer callbacks and radius relocation.
   Rust lock does not turn Java reference publication and native notification
   into a transaction for arbitrary concurrent callers.
 
-Implementation: [range index](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/client_residency/range.rs),
-[client consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/multiplayer/ClientChunkCache.java)
-and [render extraction](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/renderer/LevelRenderer.java).
+Implementation at source `f92ea29d`: [range index](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/world/level/client_residency/range.rs),
+[client consumer](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/client/multiplayer/ClientChunkCache.java)
+and [render extraction](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/client/renderer/LevelRenderer.java).
 The [residency guide](RUST-CLIENT-RESIDENCY.md) covers remaining object bindings,
 empty-set escape and callback ordering.
 
 ## Verify
+
+This documentation review inspected source and verification drivers at
+`f92ea29d`; it did not rerun the suites, replays or hardware captures. Results
+below are author-recorded checkpoints with their own native identities.
 
 Use Linux x64, JDK25 and a release native library. The driver checks
 `/proc/self/maps`, expects Frozen at `../MattMC_JavaPerfTesting/MattMC`, and
@@ -44,6 +48,12 @@ prefixes over 645 cases: dense/sparse windows, negative/world-border positions,
 stale physical slots, replacements/drops, center/radius changes, nested readers
 and exceptions. Source, class, native image and protected-prompt guards pin the
 comparison. Java controls also cover dynamic custom getters and page retirement.
+The [range driver](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/DevUtils/tests/world/chunk/VerifyClientChunkRanges.java)
+allocates stock chunk fixtures with empty section arrays and a custom world's
+no-op unload callback. It exercises the actual selection/storage methods, not
+normal chunk construction, retained empty-counter admission or the renderer's
+block-entity callbacks. Its throwing case stops the range consumer; it does
+not verify an unload-callback failure.
 
 ```sh
 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release buildRustNative classes

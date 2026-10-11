@@ -85,13 +85,15 @@ Follow the owner boundary relevant to the next change:
   through callback-validated pages. Java keeps atomic chunk references,
   scalar ring/range reads, radius relocation and
   callback delivery; public empty-set escape transfers membership to Java.
-- **Entity world state:** the local [geometry slice](../world/entities/RUST-ENTITY-GEOMETRY.md)
+- **Entity world state:** the [geometry slice](../world/entities/RUST-ENTITY-GEOMETRY.md)
   owns primary position/bounds, coordinate-change policy and ordinary camera
   queries in a per-world generational store. Java keeps immutable API projections,
-  callbacks and ordered extraction. The local
+  callbacks and ordered extraction. The
   [ticking-membership owner](../world/entities/RUST-ENTITY-ORDER.md) now connects
   client/server membership and snapshot traversal to Rust; behavior callbacks
-  and simulation orchestration remain Java, and production verification is pending.
+  and simulation orchestration remain Java. The author reports scoped production
+  CPU/lifecycle/image checks; vanilla p99 and broader gameplay/streaming/memory
+  acceptance remain open.
   After accepting these slices, move
   active/despawn membership and section associations onto the same primary owner,
   then migrate motion/collision producers and their consumers. AI, synchronized

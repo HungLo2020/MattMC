@@ -56,9 +56,18 @@ exact measurement window and cleanup checks pass. Receipt:
 ABI 80 separately adds [GUI item template instances](RUST-GUI-ITEM-TEMPLATES.md):
 batch struct 97 appends CPU template identity and source-layer foil facts at
 fields 42/43; struct 118 defines a foil fact. Registration copies semantic inputs,
-and decoding acquires immutable CPU geometry before asynchronous submission.
-Templates and inline batch semantics are mutually exclusive. GPU ownership and
-the existing presentation route are unchanged.
+including resolving authored CPU poses synchronously. Templates and inline
+batch semantics are mutually exclusive: instance records zero inline material,
+geometry and transform fields; inline records omit both template fields.
+
+Caller-side queued decoding acquires immutable geometry before returning.
+The worker-decode route instead pins Java template leases and request storage
+until join or context destruction; failed handoff clears those pins. Explicit
+close before worker decode is not made safe by a reachability pin. Expanded
+batches and geometry still count toward frame admission. Registration's `-14`
+capacity result permits the existing inline semantic route; malformed inputs
+are errors. These are CPU owners, with separate atlas-generation publication;
+GPU ownership and the existing presentation route are unchanged.
 
 ## Native terrain selection frames
 

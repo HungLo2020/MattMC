@@ -1,11 +1,13 @@
 # Components and entities (proposal)
 
-> General component model remains proposed. The local
+> General component model remains proposed. The
 > [entity geometry slice](../world/entities/RUST-ENTITY-GEOMETRY.md) implements
-> primary position/bounds and ordinary camera queries. The local
+> primary position/bounds and ordinary camera queries. The
 > [ticking membership slice](../world/entities/RUST-ENTITY-ORDER.md) owns
 > client/server ordering and snapshots; Java still executes behavior callbacks.
-> Production verification of the new slice is pending.
+> The slice guides record scoped production CPU/runtime checks; this review did
+> not rerun them. Broader gameplay, performance and long-session memory
+> acceptance remain separate from implemented ownership.
 > See the [game model index](index.md).
 
 ## The model

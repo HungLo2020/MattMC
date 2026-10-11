@@ -7,9 +7,9 @@ networking or the complete simulation loop.
 
 ## Ownership and iteration
 
-The [Rust owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/entity_order)
+The [Rust owner at source `f92ea29d`](https://github.com/HungLo2020/MattMC/tree/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/world/level/entity_order)
 stores entity keys, insertion order, free slots and generational binding tokens.
-The [Java consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/entity/NativeEntityOrder.java)
+The [Java consumer](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/world/level/entity/NativeEntityOrder.java)
 holds an object-binding array; it has no ordered map or duplicated membership.
 Ordinary iteration reads retained immutable CPU pages without assembling a
 per-tick entity array. Page views are remapped only after table replacement or
@@ -29,6 +29,9 @@ in its retirement queue. Quiet ticks do not clone the table.
   mutate the list or throw. Capture the physical map receiver before that getter
   in add/remove/contains. Contains does not prepare a copy. Preserve the two
   active/passive map identities across repeated getter-driven iteration epochs.
+  A delayed add targeting an inactive physical map records its key for receiver
+  queries without retaining a Java behavior binding or scheduling a tick. That
+  map is cleared before a later copy reuses it.
 - Replacement preserves insertion position. Removal uses the argument's current
   ID. One physical object can remain under multiple keys after an ID change.
 - A nested iteration throws Frozen's `UnsupportedOperationException`; callback
@@ -44,6 +47,13 @@ Ticking membership is distinct from render tracking and geometry lease lifetime.
 
 ## Verify
 
+This documentation review inspected source and verification drivers at
+`f92ea29d`; it did not independently rerun the author-recorded results below.
+The replay requires Linux x64, JDK25, a release native library, Frozen at
+`../MattMC_JavaPerfTesting/MattMC`, and a new, nonexistent output directory.
+It asserts the recorded Frozen HEAD and protected prompt hash and checks
+`/proc/self/maps` for the loaded native image.
+
 ```sh
 ./gradlew -PmattmcRustProfile=release buildRustNative classes
 python3 DevUtils/tests/world/entity/VerifyEntityOrder.py \
@@ -53,12 +63,15 @@ CARGO_TARGET_DIR=build/rust/target-tests cargo test --profile suite \
   -- --test-threads=1
 ```
 
-The reference driver compiles against actual unchanged Frozen and Current
+The [reference driver](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/DevUtils/tests/world/entity/VerifyEntityOrder.java)
+compiles against actual unchanged Frozen and Current
 classes and compares complete ordered callback/member records. It checks source,
 compiled class and loaded native image identities. Its corpus covers virtual
 getter prefixes, replacement/removal, nested iteration, exception identity,
 numeric ID edges and growth during traversal. This CPU replay is supplemental;
-it does not prove realistic runtime performance or long-session memory behavior.
+it invokes `EntityTickList` with synthetic members and callbacks, not the full
+client/server simulation loops. It does not prove realistic runtime performance
+or long-session memory behavior.
 Keep failed receipts. The predecessor draft's 4,134-case Java control did not
 verify the native production consumer.
 

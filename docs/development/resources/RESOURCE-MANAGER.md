@@ -12,6 +12,26 @@ The constructor casts each supplied `PackResources` to `NativePackResources`;
 there is no adapter or fallback for another implementation. Use the
 [native pack suppliers](PACKS.md#pack-kinds) when adding pack sources.
 
+## Native atlas and model admission
+
+The reload handoff added at
+[`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8)
+uses [`MultiPackResourceManager.nativeManager`](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/src/main/java/net/minecraft/server/packs/resources/MultiPackResourceManager.java#L185).
+It accepts a `MultiPackResourceManager`, unwraps a `ReloadableResourceManager`
+to its current manager, or supplies a cached empty client manager for
+`ResourceManager.Empty.INSTANCE`. Other `ResourceManager` implementations
+throw `IllegalArgumentException("Resource manager has no native resources: …")`;
+there is no generic Java lookup adapter.
+
+[Atlas builds](ATLASES.md) and [model loads](MODELS.md) borrow `nativeHandle()`
+for a synchronous native load, with a Java reachability fence around the
+manager. Native stages use the manager's stacks and pack bytes directly, so
+Java resource-lookup overrides are not the source of their data. Filter
+upcalls remain on the calling Java preparation thread; workers read resolved
+pack locations afterward. The returned atlas/model session owns its loaded
+results, not the resource-manager handle. This handoff does not change the
+pack-close or file-snapshot limits below.
+
 ## Behavior to preserve
 
 - **Stacks.** Each namespace keeps the supplied packs in lowest-priority-first

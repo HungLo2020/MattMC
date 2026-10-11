@@ -23,9 +23,9 @@ into their read-only CPU views; Java sends no entity/bounds array. Another
 frustum's query, a mutation or a camera offset invalidates cached results.
 Storage order does not replace Java's gameplay or extraction order.
 
-See the [Rust owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_geometry/mod.rs),
-[CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/entity/NativeEntityGeometry.java)
-and [camera consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/renderer/entity/EntityRenderer.java).
+See source `f92ea29d`: the [Rust owner](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/world/level/entity_geometry/mod.rs),
+[CPU bridge](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/world/entity/NativeEntityGeometry.java)
+and [camera consumer](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/client/renderer/entity/EntityRenderer.java).
 These are CPU resources; GPU ownership remains entirely in Rust/GAL.
 
 ## Compatibility and lifetime
@@ -37,23 +37,28 @@ These are CPU resources; GPU ownership remains entirely in Rust/GAL.
   bounds against the resulting frustum; the next query observes the new owner.
 - Always invoke renderer culling-bound callbacks before admission, including
   living-entity equipment queries. A callback returning the current primary
-  immutable box can use the owner. Changed captures, derived/custom boxes,
-  custom hooks and frustum subclasses retain their original preparation and
-  callbacks. Leash-holder callbacks still occur after rejection.
+  immutable box can use the owner when the box and frustum have exact stock
+  classes and hooks are empty or consist solely of `RustGalEntityCullingHook`.
+  Changed captures, derived/custom boxes, custom hooks and frustum subclasses
+  retain their original preparation and
+  callbacks. Leash-holder callbacks still occur after frustum rejection;
+  an earlier hook veto returns immediately, as in the compatibility route.
 - Nested and throwing movement callbacks observe the committed position and
   compatibility projections. World transfer preserves the primary CPU view.
 - Native leases retain their world independently of Java level identity.
   Scoped lease closure removes its generational slot; production automatic
   scopes follow Java entity reachability. Removed entities can remain in this
-  store until their leases are collected. Explicit active/despawn membership
-  and other gameplay components remain future work.
+  store until their leases are collected. Explicit geometry active/despawn
+  membership and other gameplay components remain future work.
 - Queries and compatibility projections follow the existing world-thread
   contract. Atomic CPU fields do not make arbitrary concurrent Java entity
   mutation a supported snapshot API.
 
 ## Verification
 
-Use JDK25 and the release native library:
+This documentation review inspected source and verification drivers at
+`f92ea29d`; the results below are author-recorded and were not independently
+rerun. Use Linux x64, JDK25 and the release native library:
 
 ```sh
 ./gradlew -PmattmcRustProfile=release test -x testRustNative \
@@ -66,6 +71,14 @@ The oracle compiles the same driver separately against actual Frozen and
 Current classes. It records 11,057 movement/callback and renderer culling cases,
 then checks Current against that output with source, class and native-image
 guards. It does not establish realistic runtime or performance parity.
+The [driver](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/DevUtils/tests/world/entity/VerifyEntityGeometry.java)
+uses allocated entity fixtures and an explicit confined geometry scope. It
+does not exercise production automatic-scope reclamation; real unbound
+construction, transfer to a mocked `Level` and explicit closure have separate
+integration controls.
+Its wrapper requires Frozen at `../MattMC_JavaPerfTesting/MattMC`, checks the
+recorded Frozen HEAD and protected prompt hash, and verifies the loaded image
+through `/proc/self/maps`.
 Full Rust tests run serially because the existing suite shares native driver
 state. Receipts belong in `build/native-entity-geometry/`; retain rejected checks.
 

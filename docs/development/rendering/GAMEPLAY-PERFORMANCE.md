@@ -90,8 +90,11 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
-The October 11 combined checkpoint uses native `c487f375` on integrated
-master `6673fac82`. It includes the [client-range index](../world/chunk-loading/RUST-CLIENT-RANGES.md),
+The implementation author records the October 11 combined checkpoint with native
+`c487f375`, developed above `6673fac82` and subsequently published in
+[`f92ea29d`](https://github.com/HungLo2020/MattMC/commit/f92ea29dde0199a9ea65006e216ac92570b3b02b).
+This documentation review inspected source/assertions without rerunning workloads
+or inspecting untracked raw receipts. It includes the [client-range index](../world/chunk-loading/RUST-CLIENT-RANGES.md),
 [entity geometry](../world/entities/RUST-ENTITY-GEOMETRY.md),
 [ticking membership](../world/entities/RUST-ENTITY-ORDER.md),
 [GUI templates](RUST-GUI-ITEM-TEMPLATES.md) and
@@ -130,6 +133,12 @@ Receipts: `build/native-entity-order-receiver-fix/gameplay/{performance,final-gu
 `build/native-entity-order/receiver-fixed-replay/`. Retain all repeats and the
 rejected pre-getter receiver comparison recorded in the ticking guide.
 
+Subsequent source [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8)
+adds native atlas construction and model baking. Its [resource verification](../resources/VERIFICATION.md)
+records preparation/CPU workloads; it does not refresh this full-game matrix,
+lifecycle or image evidence. Do not carry this release's runtime pass/failure
+forward as verification of the later atlas/model integration.
+
 ### Historical tag-view/GUI checkpoint
 
 Preceding `a99b6f8d` separately passes four GUI pairs/eight original reviews
@@ -144,7 +153,7 @@ the unchanged respective code; they are not freshly repeated measurements of
 
 ### Historical entity-geometry consumer comparison
 
-The revised local [entity-geometry consumer](../world/entities/RUST-ENTITY-GEOMETRY.md)
+The historical [entity-geometry consumer](../world/entities/RUST-ENTITY-GEOMETRY.md)
 uses native image `a3c8a7fb` and renderer source `19d7a274`. Its fresh seven
 lifecycle cases and two settled Frozen image comparisons pass, with zero
 reported validation errors. All four original images were reviewed; nine Current
@@ -162,13 +171,14 @@ explain p99. Receipts: `build/native-entity-geometry-living-consumer/`.
 
 ### Historical client-range/readiness comparison
 
-The local [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
+The historical [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
 uses native image `77126827` and Java `LevelRenderer` source `bfe801db`.
 The implementation run on October 11 executes all 20 declared alternating
 comparisons on RTX3080Ti/NVIDIA `595.99.02`: 360 settle, 240 warmup and exactly
 6,000 measured frames, four repeats per side for vanilla + DH and two for each
 other mode. Every run is clean, and source/native/class/Frozen/prompt/prepared-input
-guards pass. The aggregate fails only vanilla p99; the candidate remains uncommitted.
+guards pass. The aggregate fails only vanilla p99; this candidate was uncommitted
+at the time of that report and predates the combined published source above.
 
 | Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
 |---|---:|---:|---|
@@ -198,7 +208,7 @@ first-frame, streaming, temporal or long-session memory acceptance.
 
 Later master source adds [resource ownership changes](../resources/index.md)
 at `398a0078`. Their [resource verification](../resources/VERIFICATION.md#latest-run)
-cites an earlier uncommitted build. The later integrated local checks above
+cites an earlier uncommitted build. The later combined author checks above
 add client/runtime evidence but do not prove server connection or broad reload
 acceptance. The rendering matrices below retain their exact
 release identities and do not validate those later changes.

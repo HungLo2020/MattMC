@@ -1,9 +1,11 @@
 # Tags and registry snapshots
 
-Implementation references below are pinned to `398a0078`. Java retains registry
-objects, holders, element values and their codecs; Rust owns tag parsing and
-resolution plans and the published identity/tag data used by synchronization.
-See [verification](VERIFICATION.md) for the older author-reported run and its limits.
+Tag loading and the original snapshot references retain the `398a0078` source
+pin; the native member-view changes below were reviewed at `f92ea29d`. Java
+retains registry objects, holders, element values and their codecs; Rust owns
+tag parsing and resolution plans and the published identity/tag data used by
+synchronization. See [verification](VERIFICATION.md) for the separate
+author-reported checkpoints and their limits.
 
 ## Tag loading
 
@@ -77,22 +79,29 @@ Java keeps known-pack masks per registry and client known-pack set, and tag maps
 until that registry's published tags change. Known masks are shared arrays that
 callers must not mutate.
 
-The local network consumer now reads immutable Rust member arrays directly via
-[`NativeRegistryTagView`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/core/NativeRegistryTagView.java).
-[`tag_view.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/registry/tag_view.rs)
-pins the registry's tag generation behind one CPU lease per payload map and
-exports 16-byte pointer/count descriptors. Java keeps only the map, names and
-read-only `IntList` views; it no longer reconstructs a flattened ID buffer or
-copies each list. Primitive packet writing and receive-side holder resolution
-use those views. No GPU handle or rendering ownership crosses this boundary.
+The network consumer now reads immutable Rust member arrays directly via
+[`NativeRegistryTagView`](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/core/NativeRegistryTagView.java).
+[`tag_view.rs`](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/content/registry/tag_view.rs)
+pins the registry's published tag set behind one CPU lease per nonempty payload
+map and exports 16-byte pointer/count descriptors. An empty tag-name set returns
+`Map.of()` without acquiring a lease. Java builds an unmodifiable map of names
+and read-only `IntList` views instead of reconstructing a flattened result
+buffer and copying each result list. Primitive packet writing reads those
+views; receive-side decoding and holder resolution remain Java-owned.
+The [publication cache](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/core/NativeRegistrySnapshot.java)
+still retains `sentIds` arrays, registry references and
+known-pack masks, so this does not remove all Java copies of tag IDs. No GPU
+handle or rendering ownership crosses this boundary.
 
-Retagging retires query generations, but queued payload maps and retained
-member sublists keep their original IDs. An automatic arena releases the lease
-once its views become unreachable. Each lease pins the whole tag set, not the
-registry elements; avoid retaining an isolated member view indefinitely if its
-payload is finished. New maps share unchanged native member arrays through
-`Arc`; identical rebinds retain the existing map. Holder binding, the Java scan
-that publishes IDs, registry objects and element codecs remain migration work.
+Retagging retires query generations, but acquired payload views keep their
+original IDs even after the registry context is released. Each member list
+retains the lease, and its memory segment is read-only; an automatic arena
+eventually releases the lease after its views become unreachable, without a
+deterministic close point. Each lease pins the whole tag set, not the registry
+elements; avoid retaining an isolated member view indefinitely if its payload
+is finished. New maps share unchanged native member arrays through `Arc`;
+identical rebinds retain the existing map. Holder binding, the Java scan that
+publishes IDs, registry objects and element codecs remain migration work.
 See the [verification record](VERIFICATION.md) for tested reload/lease behavior
 and the separate resource and gameplay performance limits.
 

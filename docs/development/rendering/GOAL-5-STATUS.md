@@ -4,7 +4,7 @@
 
 ## October 11 implementation checkpoint
 
-Work on integrated master `6673fac82` moves retained client chunk-range
+Source [`f92ea29d`](https://github.com/HungLo2020/MattMC/commit/f92ea29dde0199a9ea65006e216ac92570b3b02b), published above `6673fac82`, moves retained client chunk-range
 selection, primary entity geometry/camera queries, ticking membership/order,
 ordinary 3D GUI templates and immutable tag-member storage into Rust.
 Java still binds objects, invokes simulation/render callbacks and performs
@@ -15,7 +15,7 @@ See the [range](../world/chunk-loading/RUST-CLIENT-RANGES.md),
 [GUI](RUST-GUI-ITEM-TEMPLATES.md) and
 [tag](../resources/TAGS-AND-REGISTRIES.md) guides.
 
-Native `c487f375` passes fresh combined suites: 2,656 Rust tests with three
+The implementation author reports native `c487f375` passing combined suites: 2,656 Rust tests with three
 ignored and 2,003 executed Java/parity cases with two skipped, zero failures.
 Actual unchanged Frozen comparisons pass 11,057 geometry cases, 645 range
 cases and 4,143 ticking-order cases. The latter expanded corpus exposed a
@@ -23,7 +23,7 @@ pre-getter map-receiver regression in rejected `a9745542`; the repair preserves
 both physical map identities across getter-driven swaps. Failed evidence remains
 recorded in the ticking guide.
 
-Seven live lifecycle cases and two settled world image pairs pass with zero
+The same author record reports seven live lifecycle cases and two settled world image pairs passing with zero
 VUIDs. All four original images were reviewed and nine Current artifacts identify
 this native image. All 20 alternating timing runs are clean and final identity/input guards pass.
 All median average-FPS floors and three p99 floors pass; vanilla p99 misses by
@@ -45,11 +45,33 @@ temporal, broad-gameplay, sustained-streaming or long-session memory acceptance.
 The reboot resolved the historical graphics-driver mismatch; hardware testing
 runs normally. Continue profiling and migrating live world producers/consumers.
 
+The present documentation review inspected source and test assertions; it did not
+rerun these suites, benchmarks, lifecycles or untracked image receipts. These world/GUI/tag
+ownership slices are reviewed at `f92ea29d`; the named release images retain their
+separate author-reported verification windows.
+
+See the verified [entity](https://github.com/HungLo2020/MattMC/issues/770#issuecomment-6114769588),
+[client-range](https://github.com/HungLo2020/MattMC/issues/776#issuecomment-6114770203),
+[GUI](https://github.com/HungLo2020/MattMC/issues/772#issuecomment-6114770870),
+[tag-view](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6114771505) and
+[evidence](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6114772159)
+reviews. All five issues remain open.
+
+Later source [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8)
+moves [atlas construction](../resources/ATLASES.md) and
+[block/item model discovery and geometry baking](../resources/MODELS.md) into Rust.
+Java retains consumer objects, item definitions/model trees, state dispatch,
+special renderers and reload orchestration. Its [verification](../resources/VERIFICATION.md)
+uses scoped preparation/CPU comparisons, not a fresh full-game matrix or GPU
+reload acceptance. The `c487f375` rendering record above predates that source.
+The [atlas/model ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6114829418)
+keeps #771 open and distinguishes its Reference semantic gate from Frozen timing.
+
 ## Published source-review checkpoint
 
-The last independent source review reaches
+The preceding independent resource source review reached
 [`398a0078`](https://github.com/HungLo2020/MattMC/commit/398a00782007587c779264aaa62222036b8a9361).
-The latest source adds [pack/resource/tag and registry-snapshot owners](../resources/index.md).
+That source added [pack/resource/tag and registry-snapshot owners](../resources/index.md).
 Its [verification record](../resources/VERIFICATION.md#latest-run) describes
 uncommitted `437e2bc1` work with library `05bde869`; it is not integrated-head
 runtime acceptance. Java still orchestrates reloads and supplies objects,
@@ -83,13 +105,13 @@ See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#
 and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6110443686);
 both issues remain open.
 
-The subsequent local [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
+The historical, then-uncommitted [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
 passes fresh CPU checks, seven lifecycle cases and two reviewed settled pairs.
 Its complete 20-run matrix is clean but fails vanilla p99 (Current 3.217 ms /
-Frozen 3.124 ms); all other FPS/p99 floors pass. The candidate remains uncommitted.
+Frozen 3.124 ms); all other FPS/p99 floors pass. This earlier release predates the published combined source above.
 Guarded allocation profiles identify repeated GUI batch and entity-bound producers,
 without establishing an isolated p99 cause. See the
-[latest local matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+[historical client-range matrix](GAMEPLAY-PERFORMANCE.md#historical-client-rangereadiness-comparison).
 
 ## October 11 retained region-tape checkpoint
 

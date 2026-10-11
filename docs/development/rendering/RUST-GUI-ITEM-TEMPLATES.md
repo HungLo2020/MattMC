@@ -1,13 +1,19 @@
 # Rust GUI item templates
 
-Local implementation in progress. ABI 80 connects the ordinary cached 3D GUI
-item producer to immutable Rust CPU templates and the existing mesh consumer.
-The integrated native `a99b6f8d` passes full CPU checks and plain/static-foil
-Frozen GUI comparisons. Moving-foil capture admission was incorrect; the repaired route passes a fresh
-Frozen comparison at matching observed natural phases. All four GUI pairs,
-eight original reviews and source/native guards now pass. Combined runtime passes
-seven lifecycles and two settled world pairs. The completed 20-run performance
-matrix fails only vanilla p99; no isolated GUI speed improvement is claimed.
+Source reviewed at `f92ea29d`: ABI 80 connects the ordinary cached 3D GUI item
+producer to immutable Rust CPU templates and the existing mesh consumer.
+Java still owns model/tint callbacks and topology-cache admission; the template
+owns captured semantic inputs, not the complete GUI or item-model system.
+
+The reported `a99b6f8d` checkpoint passes all four GUI comparisons after the
+moving-foil capture-readiness repair, with eight original image reviews. Its
+allocation diagnostic and 20-run gameplay matrix are separate evidence; the
+matrix fails vanilla p99 and establishes no isolated GUI speed improvement.
+The later combined `c487f375` checkpoint does not rerun those GUI comparisons
+or allocation profiles. See the [current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+for its own runtime and performance scope. The results below are retained
+author reports; this documentation review did not rerun tests or inspect their
+ignored `build/` artifacts.
 
 ## Ownership direction
 
@@ -16,7 +22,7 @@ each frame. The preceding entity-consumer allocation profile attributes 134 MiB
 of 184 MiB of sampled GUI batch allocation to that producer over 15 seconds.
 These weighted samples are not per-frame rates or a vanilla p99 explanation.
 
-The [template core](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/mesh/template.rs)
+The [template core](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/render/guirender/mesh/template.rs)
 retains validated material layers, transforms and shared immutable geometry.
 Frame instantiation supplies placement, GUI extent/pose, clip, order, cache
 identity and source-layer foil facts. Rust creates the frontend requests directly;
@@ -31,7 +37,8 @@ GPU resources, passes, submission and presentation remain owned by Rust/GAL.
   geometry, even when shared. The global template budget is 64 MiB. This bounds
   template retention, not all renderer allocations or in-flight references.
 - Each frame still obeys the existing aggregate geometry-byte and batch limits.
-  Java admission and native preflight count the expanded geometry before allocating.
+  Java admission counts expanded batches, vertices and indices; native preflight
+  counts expanded batches and geometry bytes before allocating the expanded output.
   Invalid dynamic inputs leave the destination and its payload counter unchanged.
 - Owned frontend requests keep geometry alive after template release. Copy-on-write
   storage prevents later source mutation from changing captured geometry.
@@ -41,16 +48,40 @@ GPU resources, passes, submission and presentation remain owned by Rust/GAL.
   independent foil inputs, overlays, sequence ordering, resize and reload behavior.
   Registration copies geometry and resolves authored CPU poses synchronously.
   Positive registry identities are never reused and are not addresses or GPU handles.
-  Caller-side queued decode acquires ownership before returning; worker-decode
-  fallback separately pins Java leases through join, failure or context destruction.
+  Caller-side queued decode acquires geometry ownership before returning;
+  worker-decode fallback separately keeps Java leases reachable until join or
+  context destruction, and clears pins on failed handoff. Those references
+  prevent garbage-collection cleanup, not an explicit `close()`; callers must
+  not close an owner before pending decode acquires it.
 - The existing 256-entry topology cache retains leases. Reload/eviction removes
-  those references; automatic cleanup releases unreachable native owners. The
+  those references; Cleaner release of an unreachable native owner is eventual,
+  not synchronous with cache removal. The
   native registry also admits at most 1,024 owners. Capacity rejection uses status
-  -14 and retains the existing inline semantic route until topology invalidation.
+  -14 and retains the existing inline semantic route for that topology-cache
+  entry's lifetime; a recreated entry can try registration again.
   Malformed inputs throw; they are not treated as capacity rejection. Animated or
   uncached geometry continues its existing live extraction route.
 
+Atlas declarations are separate from the CPU geometry lease. Before retiring
+unused declarations, [publication](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/vulkanic/gui/GuiAtlasReferencePublication.java)
+visits the template's retained asset IDs; the outer instance deliberately has
+asset ID zero. Flush still resolves each retained declaration against the
+accepted texture generation, including unchanged tables. A live template does
+not make an old texture generation valid or own a GPU texture.
+
 ## Work and verification
+
+This section preserves the implementation sequence and its reported results.
+Pending checks in an earlier paragraph describe that checkpoint, not the final
+status summarized above. Source assertions can be inspected in the
+[Rust core controls](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/render/guirender/mesh/template/tests.rs),
+[ABI controls](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/render/bridge/tests/gui_item_templates.rs)
+and [Java lease/encoding controls](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/test/java/net/vulkanic/bridge/NativeGuiItemTemplateTest.java).
+Inspecting those assertions does not reproduce a test run or image review.
+The Java queue-pin fixture calls the pin helper reflectively and checks retained
+references after clearing the caller list; it does not execute an asynchronous
+worker handoff, join or failure. The native ABI fixture separately asserts that
+already decoded geometry survives releasing the template identity.
 
 Batch struct 97 appends template identity at field 42 and a source-layer foil
 slice at field 43. Struct 118 describes each foil fact. A template instance must
@@ -73,7 +104,7 @@ Receipts: `build/native-gui-item-templates/core-validation.json` and
 `build/native-gui-item-templates/core-tests.log`.
 Three new Rust ABI controls and 30 focused JDK tests pass on release `59e65c7b`.
 They cover mixed frames, independent clocks, stale identities,
-ambiguous inputs, transactional registration and worker lifetime pins. The combined serial Rust suite passes 2,638 tests (three ignored); Java executes
+ambiguous inputs, transactional registration and Java pin storage. The combined serial Rust suite passes 2,638 tests (three ignored); Java executes
 1,999 tests with two skips. Refreshed Frozen entity/range replays and source/native
 guards pass. Matched Frozen runtime, allocation and performance checks remain required. The preceding
 [entity-geometry matrix](../world/entities/RUST-ENTITY-GEOMETRY.md) predates this
@@ -124,7 +155,9 @@ runtime, GUI, allocation and gameplay timing acceptance remains pending.
 
 ## Current integrated GUI capture boundary
 
-Native `a99b6f8d` passes 2,651 serial Rust tests (three ignored), 2,002
+The GUI-specific capture record remains the reported `a99b6f8d` checkpoint;
+it is not a GUI rerun of the later `c487f375` image. Native `a99b6f8d` passes
+2,651 serial Rust tests (three ignored), 2,002
 executed Java/parity tests (two skipped), and Frozen entity/range replays.
 These full suites precede the capture-only repair below. Plain items and static
 foil pass actual world reload and face-lighting/foil comparisons; all four
@@ -162,7 +195,7 @@ or a p99 cause. All 20 fresh predeclared timing runs are clean and all final
 source/native/Frozen/prompt/prepared-input guards pass. All four median FPS
 floors pass; only vanilla p99 misses its floor: Current/Frozen 3.357/3.123 ms
 despite median average FPS 1,334.3/1,152.5. See the
-[complete integrated matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+[historical tag-view/GUI checkpoint summary](GAMEPLAY-PERFORMANCE.md#historical-tag-viewgui-checkpoint).
 Allocation and completed timing receipts are under the same phase-fix prefix;
 keep every repeat. Preserve the failed pair under
 `native-registry-tag-views-gui-20261011`; matching clocks and acknowledged

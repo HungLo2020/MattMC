@@ -359,11 +359,13 @@ The graph's needs-build/urgent marks are node bits; visible slots use visit
 stamps and animated-sprite lists are interned. These bookkeeping changes do not
 move world/entity semantics or resource-reload publication into the graph.
 
-The separate local [entity geometry owner](../world/entities/RUST-ENTITY-GEOMETRY.md)
+The separate [entity geometry owner](../world/entities/RUST-ENTITY-GEOMETRY.md)
 now supplies ordinary camera frustum flags from retained position/bounds
 components. Bounds preparation moves to mutations; immutable compatibility
 captures preserve hook and leash callback ordering. Custom policies retain
-their original route. Runtime/performance acceptance is pending.
+their original route. The [combined author checkpoint](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+records scoped lifecycle/image passes and a vanilla-p99 failure; broader runtime
+and long-session acceptance remain open.
 
 The whole-frame drained receipt describes the camera traversal, rather than
 every loaded section. An offscreen block update keeps its rebuild mark but
@@ -914,8 +916,13 @@ ABI 80 [GUI item templates](RUST-GUI-ITEM-TEMPLATES.md) retain cached standard
 3D material layers, resolved authored poses and geometry in a bounded Rust CPU
 owner. Java sends one item placement/cache reference plus source-layer foil
 facts, and Rust expands owned frontend requests. Animated/uncached models keep
-live extraction. This local handoff has not yet passed runtime/performance
-acceptance; its CPU template lease does not own GPU resources or presentation.
+live extraction. Frame limits apply to expanded geometry, and atlas publication
+retains the template's source asset IDs rather than the outer instance's zero
+asset ID. Its CPU lease does not own GPU resources or presentation.
+The reported `a99b6f8d` checkpoint passes four GUI comparisons and scoped world
+runtime checks; its gameplay matrix fails vanilla p99. The later combined
+`c487f375` checkpoint does not rerun those GUI or allocation comparisons. Keep
+these evidence boundaries separate from the [current gameplay matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
 
 GUI mesh geometry is content-keyed (raster key plus geometry fingerprint) and
 stays resident across frames: a draw re-uses a range once an accepted

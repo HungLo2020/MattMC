@@ -1,6 +1,6 @@
 # Rust client chunk residency
 
-At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/java/net/minecraft/client/multiplayer/ClientChunkCache.java),
+At [source `f92ea29d`](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/client/multiplayer/ClientChunkCache.java),
 supported client windows route through
 [Rust residency policy](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/client_residency/mod.rs).
 Rust owns logical slot publication, counts, center, the diagnostic position
@@ -17,6 +17,10 @@ scans; it does not pack Java booleans or rebuild Rust section arrays.
 - [Loaded-range consumers](RUST-CLIENT-RANGES.md) now select stock chunks through
   an incremental Rust coordinate index. Block-entity and moving-piston scans
   revalidate bounded pages between callbacks; custom bindings keep live getters.
+  Coordinate publication requires an exact `LevelChunk`; indexed traversal
+  also requires an exact `ClientChunkCache`. This is separate from the stricter
+  world, height-binding and section checks for retained empty-counter scans in
+  the [adapter](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/world/level/chunk/NativeClientResidency.java).
 - Count/header reads use a read-only native CPU view, without a downcall or world
   lock on each chunk lookup. These pointers are semantic owners, never GPU handles.
 - Slot publication and old-count removal precede unload. New admission follows
@@ -41,7 +45,7 @@ scans; it does not pack Java booleans or rebuild Rust section arrays.
 
 ## Verification
 
-This documentation review inspected the pinned source and recorded tests; it did
+This documentation review inspected source `f92ea29d` and recorded tests; it did
 not run game, native or Java suites. The author-recorded CPU checkpoint below
 predates later combined-source changes and is not current runtime acceptance.
 
@@ -76,6 +80,8 @@ Java tests (two skipped), including six focused client adapter controls. Six
 final Java workers load that exact library; Current/Frozen source and protected
 prompt checks pass. The combined DH semantic test's initial rejection and
 reconciliation are retained separately. These are supplemental contract results.
-Real world entry/streaming, rendering,
-Frozen-versus-Current frame times and long-session memory still require hardware
-validation before performance or full-parity acceptance.
+Later [range-consumer reports](RUST-CLIENT-RANGES.md#verify) and the
+[combined gameplay checkpoint](../../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+record scoped hardware entry, rendering and timing checks. They do not turn
+this older CPU checkpoint into current performance or full-parity acceptance;
+broad streaming and long-session memory acceptance remain open.
