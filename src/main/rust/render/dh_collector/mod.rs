@@ -13,6 +13,8 @@
 pub(crate) mod order;
 mod payload;
 mod visibility;
+pub(crate) use visibility::VisibleFrame as RenderListFrame;
+pub(crate) mod tree;
 mod frames;
 pub(crate) use frames::RetainedVisibleFrame;
 use crate::render::scene::lod::WorldLodInstances;

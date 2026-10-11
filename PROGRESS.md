@@ -3,94 +3,58 @@
 ## Goal and constraints
 
 - ACTIVE: remove Java/JVM system by system; one Rust library and executable with client/server modes.
-- Work on master in this checkout; publish validated batches incrementally. Latest authorization supersedes the earlier no-publication restriction.
-- Frozen OpenGL alone is the baseline: ../MattMC_JavaPerfTesting/MattMC, HEAD7a4d181717dc0c7da9086f1a17687dfd522ce417; never modify Frozen.
+- Work on master in this checkout; publish validated batches incrementally. Latest authorization supersedes earlier no-publication restrictions.
+- Frozen OpenGL alone is the baseline:../MattMC_JavaPerfTesting/MattMC,HEAD7a4d181717dc0c7da9086f1a17687dfd522ce417; never modify Frozen.
 - Preserve Rust/GAL GPU ownership and one presenter; transitional bridges carry bounded semantic CPU inputs.
-- Protect docs/STANDARD-COPILOT-PROMPTS.md, SHAc5695e9b. SUMMARY≤10 lines; this record≤100; ASSUMPTIONS stays concise.
+- Protect docs/STANDARD-COPILOT-PROMPTS.md,SHAc5695e9b. SUMMARY≤10 lines; this record≤100; ASSUMPTIONS stays concise.
 - Developer guides belong beside subsystems; test drivers in DevUtils/tests/. Run Wiki check after doc edits.
 
 ## Current ownership
 
 - Rust owns rendering/GAL/presentation, terrain assembly/visibility, block/biome sections, counters, light fields and biome color windows.
-- Rust owns DH points/material tables, source metadata/occlusion, tint/reduction, whole box construction, greedy topology, packet encoding and direct ledger handoff.
-- Client residency owns logical publication, counts, centers, fingerprints and empty membership; Java still binds chunk references and supplies callbacks.
-- Loaded-world sky/fog and DH columns share retained native biome bindings; unchanged publication avoids rebuilding owner rows.
-- General simulation, platform/network/startup, file orchestration and remaining extraction are Java. src/main/rust/app/mod.rs is empty; Java removal is incomplete.
+- Rust owns DH points/material tables, metadata/occlusion, tint/reduction, box construction, greedy topology, packet encoding and direct ledger handoff.
+- Local DH visibility also retains topology/section identities/container epochs and traverses and admits directly; Java still owns generation/retrieval scheduling and its generation tree.
+- Client residency owns logical publication, counts, centers, fingerprints and empty membership; Java binds chunk references/callbacks. Sky/fog and DH columns share retained biome bindings.
+- General simulation, platform/network/startup, file orchestration and remaining extraction are Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
 
-## Published saved palettes and decoded sections (45a074369;453df088)
+## DH visibility checkpoint
 
-- Rust constructs canonical local/global block and biome owners directly; retains padding, palette order/unused entries, global remapping and validation policy.
-- Current-version NBT loads hydrate primary block/biome/light owners inside Rust. Java palette/word/light arrays and list/stream reconstruction are removed from admitted loads.
-- Confined decode scopes release temporary vectors/root tape; independent returned owners feed native counters and light maps. Custom factories retain original codec callbacks.
-- d7107c13:33 focused Java controls pass, including40 actual Frozen saved chunks and primary/scope/copy ownership. Decode retains its originating factory; final Java scope controls also pass.
-- Separate82-case actual Frozen palette oracle covers widths, padding, aliases and copy/edit/save consumers. Earlier e5c83a3a checkpoint:fullRust2621pass/3ignored, Java1967reported/2skips/0fail.
-- Initial expanded Java run failed eager DH wrapper capture after pure helper initialization. Lazy actual-consumer binding plus early-init regression passes; initial failure and compile correction retained.
-- Full suites pass on d7107c13:Rust2623pass/3ignored; Java1969reported/2skips/0fail (1967executed,360suites). Three quiet guarded40-chunk pairs cost13.39–13.46ms Current vs8.29–8.32ms Frozen (~1.61–1.62×). Scoped floor FAIL; profile/predecessor next; a15c0555 runtime historical.
-- Earlier quiet saved-owner timings:blocks1~3.17–3.20×Frozen;blocks2~8.55–8.64×. Matrix terminated on measured JIT at17entries; all rounds retained, predecessor attribution absent.
-- Warmed guarded JFR pair:40,000 loads/side; native FFM signature buckets place~30% main samples in hydration/~48% region reads. Java allocation estimates7.01/18.23GB C/F, diagnostic only.
-- Word-wise native validation release453df088:fullRust2623pass/3ignored, Java1969reported/2skips/0fail;40 Frozen chunks and ownership controls pass. Compile visibility correction retained.
-- Fresh453df088 three-pair quiet load timing:Current10.22–10.30ms vsFrozen8.31ms (~1.23–1.24×, floor FAIL);~23–24% below earlier d710 observations. All3 quiet control pairs pass:22–23% lower than hydration checkpoint,26–27% lower than published baseline. Seven lifecycle cases and two settled Frozen pairs pass, VUID0;9 exact native artifacts and four original deterministic1280×720 captures reviewed.
-- Guides:docs/development/world/chunk/RUST-SAVED-PALETTES.md and RUST-DECODED-SECTIONS.md. Receipts/checkpoint controls:build/native-saved-palettes/.
+- Releaseebd3c9a3 moves ordinary render-list traversal into a retained Rust CPU owner. Stock frames send24 frustum floats/heights, without Java node traversal/candidate pairs or repeated generation imports.
+- Incremental mutations, identity tokens and container epochs fence late workers, detached nodes and older closes. Closing drops native bulk storage; custom CPU callbacks keep their original route.
+- Review found parent close-then-null could overwrite a concurrent worker install. Retirement now detaches under the section lock before close; two lifecycle regressions pass.
+- FullRust2626pass/3ignored; fullJava1978reported/2skips/0fail (1976executed,361suites). Repeated actual Frozen1280-walk oracle and source/class/native/driver guards pass after the retirement repair.
+- Hardware:7 lifecycle cases and2 settled Frozen pairs pass,VUID0;9 artifacts pin exactnative. All4 original1280×720 images reviewed: coast/trees/water/distant land, vanilla HUD/hand agree at tested poses.
+- Warmed Current/Frozen profiles pass/guarded:50000 warmup+60000 measured frames,15s itimer/dwarf. Current nativecollector256samples,Javaiterator0 (prior64); renderlist272vsprior278 inclusive. Compiler activity remains; no isolated speedup claim.
+- Fresh20-run comparison PASS:all clean;medianFPS C/F1431.4/1165.9,795.2/734.0,342.4/313.55,262.2/226.0;medianp99ms2.963/3.293,3.734/5.110,4.697/7.004,6.037/8.647 (vanilla/DH/shaders/combined). All eight floors pass; settled rotating/hidden-minimap scope only.
+- Controller65089 terminal exit0;all six stages and source/native/Frozen/protected-prompt/prepared-fixture guards pass. Receipts:build/native-dh-visibility/; guide:docs/development/rendering/RUST-DH-VISIBILITY.md.
 
-## Previous published batch: saved DH lighting
+## Published ownership checkpoints
 
-- Saved-light batch a15c0555 on integrated base abbd16d3d moves saved nibble decoding, compact bytes, allocation/counter policy and ownership into Rust.
-- Generation carries one field instead of two Java light-storage maps; admitted light/column consumers use the field directly.
-- Import defers emitter enumeration; unknown caches remain distinct from recorded empty caches. Public mutable/custom inputs retain compatibility behavior.
-- Preserve Frozen list order, skipped pairs, carried skylight, ignored extra bytes and mutable clear/edit behavior. No Java input pointers remain in Rust.
-- Actual64-case Frozen replay,52 native imports,256 native columns and deferred-emitter controls pass.
-- FullRust2618pass/3ignored; fullJava1962reported/2skips/0fail (1960executed,359 suite executions). Seven native consumers map the exact image.
-- Guards cover39570 Current/38176 Frozen inputs, compiled consumers/driver/tests, fixture, native library and protected prompt. Frozen HEAD unchanged.
-- Six alternating pairs per reference, five equal warmups,100 imports: C/F5.794/289.178ms; C/prior5.767/290.383ms. Checksums match; scoped cost ~98% lower.
-- Initial annotation/fixture-name/raw-pointer and benchmark logger-parser failures retained; corrected suites/comparisons pass.
-- Real DH CPU profile clean/exact, native boxes223/14341 samples; no importer calls sampled. Live importer admission remains unproved.
-- Hardware:7 lifecycle cases and2 settled Frozen pairs pass, VUID0;9 exact native artifacts and4 original1280×720 images reviewed.
-- Guide: docs/development/world/lighting/RUST-DH-SAVED-LIGHT.md; receipts: build/native-dh-saved-light/.
+- Previous publishedee809bbab retains region-to-section tapes in Rust; full Java tape round trip/retries removed, fingerprints opt-in. Release06529556:Rust2623pass/3ignored,Java1974reported/2skips/0fail; actual40-chunk Frozen replay/guards pass.
+- Three quiet40-chunk pairs on i7-12700K CPU19:Current12.20–12.31ms/Frozen13.14–13.53ms,ratios0.909–0.928 (7–9% lower scoped cost). All3 fresh45a074369 controls pass,26–28% lower. Seven lifecycle cases/two reviewed settled pairs pass,VUID0. Receipts:build/native-owned-tape/.
+- Earlier45a074369/453df088 construct primary block/biome/light owners directly from current-version saved NBT. Canonical format, originating custom factories and scope/copy lifetimes preserved. Actual82 palette cases/40 chunks pass; full suites pass.
+- Hydration's earlier~1.61–1.62× Frozen scoped cost fell to~1.23–1.24× with word-wise validation, then tape ownership passed the Frozen floor. Original failed timings/controls remain in build/native-saved-palettes/; world/chunk/RUST-SAVED-PALETTES.md and RUST-DECODED-SECTIONS.md document scope.
+- Saved-DH-lighta15c0555 owns nibble decoding/compact bytes and carries one native field into consumers. Actual64 Frozen cases/52 imports/256 columns pass; Rust2618pass/3ignored,Java1962reported/2skips/0fail; matched scoped import costs~98% lower. Guide:world/lighting/RUST-DH-SAVED-LIGHT.md; receipts:build/native-dh-saved-light/.
+- Historical saved-light20-run matrix:medianFPS C/F1362.55/1148.50,877.20/709.40,344.65/315.80,261.65/226.85 (vanilla/DH/shaders/combined). Aggregate FAIL:vanilla p99+0.029ms; other floors pass. All repeats retained. The new SUMMARY tracks the fresh local matrix rather than mixing images.
 
-## Current performance evidence
+## Next work and acceptance
 
-- NVIDIA kernel/userspace595.99.02 match after reboot; NVML and Vulkan enumerate RTX3080Ti.
-- Fresh20 predeclared alternating runs:360 settle/240 warmup/exact6000 measured frames; four DH repeats/side, two in other modes.
-- All runs clean; source/native/Frozen/prompt guards and10 Current fingerprints pass. Every repeat retained; no profiler/other client during timing.
-- MedianFPS C/F: vanilla1362.55/1148.50, DH877.20/709.40, shaders344.65/315.80, combined261.65/226.85.
-- Medianp99ms C/F:3.365/3.337,2.299/5.322,4.748/6.737,5.494/8.743, same mode order.
-- Aggregate performance gate FAIL: vanilla p99 misses by0.029ms. All FPS floors and other p99 floors pass; investigate rather than discard the miss.
-- Hidden-minimap settled rotating workload only; readiness restarts permitted. No isolated importer FPS gain or broad acceptance claim.
-- SUMMARY tracks every run; protocol/results: build/native-dh-saved-light/gameplay/performance.json.
-- Older0133e073 whole-box matrix passed all eight floors; historical evidence remains in docs/development/rendering/GAMEPLAY-PERFORMANCE.md and build/native-dh-box-gameplay/.
-
-## Next migration targets
-
-- Continue authoritative world-state producers and direct consumers together; avoid Java packing followed by Rust reconstruction.
-- Validated batch: retained Rust region tape to native section decode; full Java tape round trip/retries removed, validation fingerprints opt-in. Explicit parse/discard closure and cross-thread CPU lifetime; release06529556:Rust2623pass/3ignored, Java1974reported/2skips/0fail (1972executed,361suites), actual40-chunk Frozen replay/guards pass. Three quiet guarded40-chunk Frozen pairs on i7-12700K CPU19:12.20–12.31/13.14–13.53ms C/F,ratios0.909–0.928,scoped floorPASS. All3 fresh45a074369 controls pass (ratios0.722–0.735;26–28% lower cost). Seven lifecycle cases and two settled Frozen pairs pass, VUID0;9 exact native artifacts and4 original1280×720 captures reviewed. First-view/streaming/FPS acceptance remains open; build/native-owned-tape/ retains receipts.
-- Continue DH source traversal/material resolution, collector candidates and contextual producers; move complete policy/ownership rather than isolated helper loops.
-- Use actual workload profiles to prioritize; sampled stacks overlap and startup/JIT work does not establish steady-state cost or an isolated speedup.
-- Treat measured performance gaps as continuing implementation work. Do not weaken GAL ownership or use Frozen Java Vulkan as a baseline.
-
-## Remaining correctness and acceptance
-
+- Use actual workload profiles to prioritize live world/per-frame producers and consumers. Performance gaps guide more ownership migration; do not weaken GAL or treat them as migration blockers.
+- Ordinary DH currently exports keys back to Java although its admitted caller only needs their count. Output-copy samples are small; assess this alongside remaining generation and entity/world extraction rather than declaring a gain from source inspection.
 - First shader-enabled world frame, temporal pop-in/flicker, sustained streaming and long host/GPU memory behavior remain unproved.
-- Settled captures occur after terrain admission; they do not resolve the user's first-turn nearby terrain gaps with shaders+DH.
-- Broad gameplay/state transitions still need coverage: entities/items/hands, particles/weather, transparency, GUI/HUD, resource packs, representative shaders and DH combinations.
-- Earlier16.45-block travel and short RSS/allocation profiles are diagnostic; they do not establish sustained-streaming or memory acceptance.
-- Earlier strict height-world teardown/closed-channel race remains unresolved. Preserve those failures.
-- Earlier parallel Rust GLX BadAccess/poisoned-lock cascade remains unresolved; serial full-suite success does not fix that race.
+- Settled captures occur after terrain admission; they do not resolve the user's first-turn nearby regular-chunk gaps with shaders+DH.
+- Broad gameplay/transitions still need coverage:entities/items/hands, particles/weather, transparency, GUI/HUD, resource packs, representative shaders and DH combinations.
+- Earlier16.45-block travel and short RSS/allocation profiles are diagnostic, not sustained-streaming or memory acceptance.
+- Earlier strict height-world teardown/closed-channel race and parallel Rust GLX BadAccess/poisoned-lock cascade remain unresolved; serial suite success does not fix them. Preserve failures.
 - No JVM-free executable exists; remaining game behavior, networking and platform systems require migration before goal completion.
-
-## History and evidence locations
-
-- World storage/palette/counters, heights/lighting, full-data/contributors and source ownership: docs/development/world/ indexes and build/native-*/ receipts.
-- DH reduction/boxes/quads/packets/handoff: docs/development/rendering/ subsystem guides; retain failed candidates and exact image/protocol identities.
-- Previous handoff111c5922, source-owner and source-metadata regressions remain historical; their scoped results do not accept the new candidate.
-- Previous whole-box batch: abbd16d3d, exact remote proof and clean status recorded in build/native-dh-faces/publish/.
 
 ## Preservation and cleanup
 
-- Original stashes12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb remain protected.
-- Sync-and-push integrates upstream before one batch commit; preserve pending paths/modes/staging. No force-push/reset/blanket staging.
-- Prior pruning recovered~350GiB plus21.08GiB verified archival and17.04GiB unused Rust profiles; receipts remain in prior build/native-*/ directories.
-- Saved-palette batch pruned30 prior and9 completed runtime work copies; source worlds, captures and receipts remain. JFR JSON gzip plus2 completed profiling worlds saved255.5MiB; completed-profile-archive.json records restoration/hashes.
-- Verified36 lossless JSON archives save3.31GiB. Manifest: build/native-dh-saved-light/completed-json-archive.json; restore with gzip -dk PATH.json.gz.
-- Retired56 superseded October9 profiling videos (17.83GiB);447 PNGs, profiles and receipts retained. build/native-saved-palettes/retired-profile-videos.json records exact hashes; videos are not restorable.
-- New boundary archived9 terminal older validation JSON files losslessly (1.013GiB saved); native-owned-tape/completed-validation-archive.json retains hashes. Active/unresolved/unknown/symlinked scopes retain evidence. Earlier interrupted allocation-world cleanup did not establish recovery.
-- Preserve prepared DH source and open first-view/startup/closed-pipe worlds. Retention requires recognized completion, driver exit0 and no live process.
+- Original stashes12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb remain protected. Sync-and-push integrated documentation-onlybe0499204 (batch397); all23 pending paths restored, architecture notes combine both changes. Temporary integration stash61e418a3 retained through publication verification.
+- Stage explicit reviewed paths only; no force-push/reset/blanket staging. Fresh performance matrix and guards pass; publication proof belongs in build/native-dh-visibility/publish/.
+- Prior pruning recovered~350GiB plus21.08GiB verified archival and17.04GiB unused Rust profiles. Lossless JSON archives retain original/restoration hashes; restore with gzip -dk PATH.json.gz.
+- Earlier56 superseded profiling videos retired (17.83GiB);447 PNGs/profiles/receipts remain. Native-saved-palettes/retired-profile-videos.json records hashes; those videos are not restorable.
+- Current batch archived162 terminal predecessor JSON files losslessly (12.05GiB saved), including unchanged failed FPS aggregates; images/logs/receipts retained. Hash manifests:build/native-dh-visibility/{completed-json-archive,historical-completed-json-archive}.json.
+- Prior18 completed generated chunk-test worlds and2 completed tape-profile workspaces retired; corpus/logs/results remain. Both completed visibility-profile workspaces and20 completed timing workspaces retired after terminal controller/equivalence review; completed-workspaces.json records decisions.
+- Preserve prepared DH sources and open first-view/startup/closed-pipe worlds. Retention requires recognized completion, driver exit0 and no live process; unknown/active/symlinked scopes remain.
+- Developer guides and build/native-*/ receipts retain detailed subsystem histories, rejected candidates and publication identities. Earlier interrupted allocation-world cleanup did not establish recovery.

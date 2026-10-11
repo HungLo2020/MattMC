@@ -376,8 +376,15 @@ staged payload even when recording fails.
 it selects and applies a ledger-owned update, then returns identities for
 Java's acknowledgement. An apply failure releases its in-flight selection;
 a provenance-bearing selection stays on Java's packed asset path. Neither
-selection nor asset acceptance is a presentation receipt. The batched visible
-query receives `(column key, generation)` pairs and filters stale generations
+selection nor asset acceptance is a presentation receipt. The ordinary visible
+query uses a [retained CPU topology](RUST-DH-VISIBILITY.md) maintained through
+`mattmc_dh_visibility_*` mutation/state calls. `mattmc_dh_collector_visible_tree`
+borrows 24 normalized frustum floats and four writable statistic longs, traverses
+under the owner lock, releases that lock before ledger admission and retains no
+Java address or GPU handle. Explicit close drops bulk topology immediately;
+automatic FFM scope cleanup releases the wrapper after scoped users finish.
+The compatibility batched visible query receives `(column key, generation)`
+pairs. Both routes filter stale generations
 before requesting publication, sorting and admitting segments. Its count is the
 number of pairs, and the result's nine-long header includes a stale-container
 count before the sorted keys. This changed standalone buffer contract requires

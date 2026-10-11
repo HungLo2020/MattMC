@@ -53,6 +53,7 @@ public class RenderBufferHandler implements AutoCloseable
 	private DistantHorizonsSemanticCollector.VisibleFrame semanticVisibleFrame = DistantHorizonsSemanticCollector.VisibleFrame.EMPTY;
 	
 	private int visibleBufferCount;
+    private final long[] rustWalkStats = new long[4];
 	private int culledBufferCount;
 	private int shadowVisibleBufferCount;
 	private int shadowCulledBufferCount;
@@ -155,6 +156,19 @@ public class RenderBufferHandler implements AutoCloseable
 		
 		
 		
+        var nativeTree=this.lodQuadTree.nativeVisibility();
+        if (!isShadowPass && nativeTree!=null && nativeTree.compatible()
+            && DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+            && (!enableFrustumCulling || frustum.getClass()==DhFrustumBounds.class || frustum.getClass()==NeverCullFrustum.class)) {
+            DhFrustumBounds bounds=enableFrustumCulling && frustum.getClass()==DhFrustumBounds.class ? (DhFrustumBounds)frustum : null;
+            this.semanticVisibleFrame=DistantHorizonsSemanticCollector.collectVisibleTree(nativeTree,
+                bounds==null?null:bounds.rustVisibilityPlanes(),bounds==null?0F:bounds.worldMinY,bounds==null?0F:bounds.worldMaxY,this.rustWalkStats);
+            this.visibleBufferCount=0;this.culledBufferCount=(int)this.rustWalkStats[1];
+            if(this.semanticVisibleFrame.requestFailures()>0) LOGGER.error("Error requesting publication of ["+this.semanticVisibleFrame.requestFailures()
+                +"] visible DH columns, first: ["+this.semanticVisibleFrame.requestFailure()+"].");
+            return;
+        }
+
 		//=========================//
 		// Update the section list //
 		//=========================//

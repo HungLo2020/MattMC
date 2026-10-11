@@ -2,7 +2,6 @@ package com.seibel.distanthorizons.core.render;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
-import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodBufferContainer;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
 import com.seibel.distanthorizons.core.level.IDhClientLevel;
@@ -54,7 +53,28 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 	 */
 	private final ConcurrentLinkedQueue<Long> sectionsToReload = new ConcurrentLinkedQueue<>();
 	private final IDhClientLevel level; //FIXME: Proper hierarchy to remove this reference!
-	private final ReentrantLock treeReadWriteLock = new ReentrantLock();
+	private final net.vulkanic.world.NativeDhVisibility nativeVisibility;
+    private final com.seibel.distanthorizons.core.util.objects.quadTree.QuadTreeMutationObserver<LodRenderSection> visibilityObserver =
+        new com.seibel.distanthorizons.core.util.objects.quadTree.QuadTreeMutationObserver<>() {
+            public void added(long key) { if (nativeVisibility != null) nativeVisibility.event(0,key,0,0); }
+            public void valueChanged(long key,LodRenderSection previous,LodRenderSection current) {
+                if (nativeVisibility == null) return;
+                if (current != null && current.getClass() != LodRenderSection.class) {nativeVisibility.requireCompatibility();return;}
+                long token=nativeVisibility.event(1,key,current==null?0:1,0);
+                if (current != null) current.bindNativeVisibility(nativeVisibility,token);
+            }
+            public void childrenRemoved(long key) {if(nativeVisibility!=null) nativeVisibility.event(2,key,0,0);}
+            public void removed(long key) {if(nativeVisibility!=null) nativeVisibility.event(3,key,0,0);}
+        };
+    @Override protected com.seibel.distanthorizons.core.util.objects.quadTree.QuadTreeMutationObserver<LodRenderSection> mutationObserver() {
+        return this.nativeVisibility == null ? null : this.visibilityObserver;
+    }
+    public net.vulkanic.world.NativeDhVisibility nativeVisibility() { return this.nativeVisibility; }
+    @Override public void setCenterBlockPos(DhBlockPos2D center,java.util.function.Consumer<? super LodRenderSection> removed) {
+        super.setCenterBlockPos(center,removed);
+        if (this.nativeVisibility != null) this.nativeVisibility.event(4,0L,center.x,center.z);
+    }
+    private final ReentrantLock treeReadWriteLock = new ReentrantLock();
 	private final AtomicBoolean fullDataRetrievalQueueRunning = new AtomicBoolean(false);
 	
 	private ArrayList<LodRenderSection> debugRenderSections = new ArrayList<>();
@@ -97,6 +117,10 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 	{
 		super(viewDiameterInBlocks, new DhBlockPos2D(initialPlayerBlockX, initialPlayerBlockZ), DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL);
 		
+        this.nativeVisibility = getClass() == LodQuadTree.class
+            && net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+            ? new net.vulkanic.world.NativeDhVisibility(this.treeRootDetailLevel,this.treeLeafDetailLevel,
+                viewDiameterInBlocks,initialPlayerBlockX,initialPlayerBlockZ) : null;
 		DebugRenderer.register(this, Config.Client.Advanced.Debugging.DebugWireframe.showQuadTreeRenderStatus);
 		
 		this.level = level;
@@ -303,12 +327,7 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 								// onRenderDisabled doesn't need to be 
 								// called since these sections shouldn't be loaded
 								parentRenderSection.setRenderingEnabled(false);
-								LodBufferContainer buffer = parentRenderSection.bufferContainer;
-								if (buffer != null)
-								{
-									buffer.close();
-									parentRenderSection.bufferContainer = null;
-								}
+								parentRenderSection.retireBuiltContainer();
 							}
 						}
 						
@@ -562,7 +581,7 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 					if (quadNode.value != null)
 					{
 						quadNode.value.close();
-						quadNode.value = null;
+						quadNode.setValue(quadNode.sectionPos, null);
 					}
 				}
 				
@@ -732,6 +751,7 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 	public void close()
 	{
 		LOGGER.info("Shutting down LodQuadTree...");
+        if (this.nativeVisibility != null) this.nativeVisibility.close();
 		
 		DebugRenderer.unregister(this, Config.Client.Advanced.Debugging.DebugWireframe.showQuadTreeRenderStatus);
 		
@@ -752,7 +772,7 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 					if (renderSection != null)
 					{
 						renderSection.close();
-						quadNode.value = null;
+						quadNode.setValue(quadNode.sectionPos, null);
 					}
 				}
 			}

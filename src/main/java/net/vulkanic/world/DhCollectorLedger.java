@@ -102,6 +102,8 @@ final class DhCollectorLedger {
 		ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
 	private static final MethodHandle PENDING_UPDATE = bind("pending_update", false, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_INT);
+    private static final MethodHandle VISIBLE_TREE=bind("visible_tree",true,ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_FLOAT,ValueLayout.JAVA_FLOAT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS);
 	private static final MethodHandle ACKNOWLEDGE = bind("acknowledge", true, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
 	private static final MethodHandle RELEASE_IN_FLIGHT = bindVoid("release_in_flight", ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
@@ -414,6 +416,13 @@ final class DhCollectorLedger {
 	 * generation) pairs: [unpublished, request failures, first failed key, its
 	 * error code, opaque, side, up, water, stale containers, then the keys near
 	 * to far]. */
+    static long[] visibleTree(NativeDhVisibility tree,float[] planes,float minY,float maxY,int flags,long[] stats) {
+        if((planes!=null && planes.length!=24) || stats.length!=4) throw new IllegalArgumentException("Invalid DH tree frame extents");
+        try {
+            MemorySegment input=planes==null ? MemorySegment.NULL : MemorySegment.ofArray(planes);
+            return takeOutput(check((int)VISIBLE_TREE.invokeExact(tree.owner(),input,minY,maxY,flags,MemorySegment.ofArray(stats))));
+        } catch(RuntimeException error) {throw error;} catch(Throwable error) {throw failure("visible tree",error);}
+    }
 	static long[] visibleFrame(long[] walked, int count, int centerX, int centerZ, int flags) {
 		try {
 			return takeOutput(check((int)VISIBLE_FRAME.invokeExact(MemorySegment.ofArray(walked), count, centerX, centerZ, flags)));

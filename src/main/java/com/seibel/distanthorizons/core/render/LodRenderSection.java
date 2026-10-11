@@ -70,6 +70,25 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	
 	
 	private boolean renderingEnabled = false;
+    private net.vulkanic.world.NativeDhVisibility nativeVisibility;
+    private long nativeVisibilityToken;
+    private long nativeVisibilityEpoch;
+    synchronized void bindNativeVisibility(net.vulkanic.world.NativeDhVisibility owner,long token) {
+        this.nativeVisibility=owner;this.nativeVisibilityToken=token;this.publishNativeVisibility();this.watchNativeContainerClose();
+    }
+    private void watchNativeContainerClose() {
+        if(this.nativeVisibility==null || this.bufferContainer==null || this.bufferContainer.getClass()!=LodBufferContainer.class) return;
+        var owner=this.nativeVisibility;long token=this.nativeVisibilityToken;long epoch=this.nativeVisibilityEpoch;long key=this.pos;
+        this.bufferContainer.setRustVisibilityCloseListener(() -> owner.invalidate(key,token,epoch));
+    }
+    private void publishNativeVisibility() {
+        if(this.nativeVisibility==null)return;
+        if(this.bufferContainer!=null && this.bufferContainer.getClass()!=LodBufferContainer.class) {
+            this.nativeVisibility.requireCompatibility();return;
+        }
+        long generation=this.closed || this.bufferContainer==null ? -1L : this.bufferContainer.rustSemanticWalkGeneration();
+        this.nativeVisibility.state(this.pos,this.nativeVisibilityToken,this.renderingEnabled,generation,this.nativeVisibilityEpoch);
+    }
 	/** Set by {@link #close()}; guarded by {@code this}. A late build must not install after it. */
 	private boolean closed = false;
 
@@ -407,12 +426,31 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 				// semantic publication still has the same DH section lifetime. Keep the
 				// container so close/reload retires that publication exactly once.
 				this.bufferContainer = buffer.renderDataReady() ? buffer : null;
+                this.nativeVisibilityEpoch++;
+                this.publishNativeVisibility();this.watchNativeContainerClose();
 			}
 		}
 
 		if (containerToClose != null)
 		{
 			containerToClose.close();
+		}
+	}
+
+	/** Detach before closing so a completed worker build cannot be overwritten. */
+	void retireBuiltContainer()
+	{
+		LodBufferContainer retired;
+		synchronized (this)
+		{
+			retired = this.bufferContainer;
+			this.bufferContainer = null;
+			this.nativeVisibilityEpoch++;
+			this.publishNativeVisibility();
+		}
+		if (retired != null)
+		{
+			retired.close();
 		}
 	}
 	
@@ -464,7 +502,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	 * However, to prevent holes in the world when disabling sections we need to
 	 * enable the new section(s) first before disabling the old one(s).
 	 */
-	public void setRenderingEnabled(boolean enabled) { this.renderingEnabled = enabled;}
+	public synchronized void setRenderingEnabled(boolean enabled) { this.renderingEnabled = enabled; this.publishNativeVisibility(); }
 	
 	/** @see LodRenderSection#setRenderingEnabled */
 	public void onRenderingEnabled() { this.startRenderingBeacons(); }
@@ -743,6 +781,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		synchronized (this)
 		{
 			this.closed = true;
+            this.publishNativeVisibility();
 			container = this.bufferContainer;
 		}
 		if (container != null)

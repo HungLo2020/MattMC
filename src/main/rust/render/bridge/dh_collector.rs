@@ -408,6 +408,10 @@ pub unsafe extern "C" fn mattmc_dh_collector_visible_frame(walked: *const i64, c
     let raw = if count <= 0 { &[][..] } else { std::slice::from_raw_parts(walked, count as usize * 2) };
     let walked: Vec<(i64, i64)> = raw.chunks_exact(2).map(|w| (w[0], w[1])).collect();
     let frame = with(|l| l.collect_visible_frame(&walked, [center_x, center_z], flags & 1 != 0, flags & 2 != 0));
+    store_visible_result(frame)
+}
+
+fn store_visible_result(frame: Option<Result<crate::render::dh_collector::RenderListFrame, Failure>>) -> i32 {
     match frame {
         None => ERR_POISONED,
         Some(Err(failure)) => code(failure),
@@ -831,4 +835,41 @@ fn assets(update: &PendingUpdate) -> Result<(Vec<WorldLodColumnAsset>, Vec<World
         retirements.push(WorldLodColumnRetirement { column_key: key as u64, column_generation: generation as u64 });
     }
     Ok((assets, retirements))
+}
+
+/// Traverse the retained CPU topology and consume its candidates directly in
+/// the existing ledger. No per-node Java arrays or generation imports.
+/// # Safety
+/// Live scoped visibility owner, optional24 float planes, four writable longs.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_collector_visible_tree(
+    owner:*const crate::render::dh_collector::tree::Owner, planes:*const f32,
+    min_y:f32,max_y:f32,flags:i32,stats:*mut i64,
+) -> i32 {
+    use crate::render::dh_collector::tree::Frustum;
+    let Some(owner)=owner.as_ref() else {return ERR_POISONED};
+    if stats.is_null() {return ERR_POISONED;}
+    let planes=if planes.is_null() {None} else {Some(&*(planes as *const [f32;24]))};
+    let data=owner.0.lock().unwrap();
+    let (walk,center)=if let Some(tree)=data.as_ref() {
+        (tree.walk(&Frustum{planes,min_y,max_y}),tree.center)
+    } else {(Default::default(),[0,0])};
+    drop(data);
+    std::ptr::copy_nonoverlapping([walk.visited,walk.culled,walk.disabled,walk.missing].as_ptr(),stats,4);
+    store_visible_result(with(|l|l.collect_visible_frame(&walk.candidates,center,flags&1!=0,flags&2!=0)))
+}
+
+/// Explicit CPU inspection for verification, never the production admission input.
+/// # Safety
+/// Live scoped owner; optional24 normalized planes valid for this call only.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_visibility_walk(
+    owner:*const crate::render::dh_collector::tree::Owner,planes:*const f32,min_y:f32,max_y:f32,
+) -> i32 {
+    let Some(owner)=owner.as_ref() else {return ERR_POISONED};
+    let planes=if planes.is_null() {None} else {Some(&*(planes as *const [f32;24]))};
+    let data=owner.0.lock().unwrap();
+    let walk=data.as_ref().map(|tree|tree.walk(&crate::render::dh_collector::tree::Frustum{planes,min_y,max_y})).unwrap_or_default();
+    let mut out=vec![walk.visited,walk.culled,walk.disabled,walk.missing];
+    out.extend(walk.candidates.into_iter().flat_map(|(key,generation)|[key,generation]));store_output(out)
 }

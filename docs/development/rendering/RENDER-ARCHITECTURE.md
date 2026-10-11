@@ -328,10 +328,11 @@ with FPS varying by terrain throughput. Those component reports do not establish
 isolated FPS gains; see [session recording](SESSION-RECORDING.md) and
 [allocation evidence](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints).
 
-Distant Horizons builds its render list on the render thread without
-`LodQuadTree`'s lock while the tick thread can recenter the tree. The node
-iterator therefore skips root positions that left the tree after it captured
-them; an out-of-bounds root previously crashed the client during world load.
+Ordinary Distant Horizons frames traverse a [retained Rust visibility owner](RUST-DH-VISIBILITY.md)
+under its own lock; incremental generation-tree changes maintain that owner.
+Custom CPU traversal still runs without `LodQuadTree`'s tick lock, so its node
+iterator skips root positions that left the tree after it captured them.
+An out-of-bounds root previously crashed that traversal during world load.
 
 ## Resource ownership and retries
 
@@ -688,11 +689,13 @@ Pending visible-key and segment lists each have a 16,384-entry bound. Keep these
 limits separate from frontend admission and GPU-resource retirement. See
 [ledger selection and trimming](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/dh_collector/mod.rs).
 
-Each frame, DH's quadtree walk (`RenderBufferHandler.buildRenderList`)
-collects the key and generation of each drawable container it reaches, and
-batches their lifecycle, publication and visibility work in one ledger call,
-`collectVisibleFrame`. This replaces per-column round trips, not every ledger
-call in a frame. That call:
+Each ordinary frame, `RenderBufferHandler.buildRenderList` calls
+`collectVisibleTree` with the retained CPU owner, normalized frustum planes and
+height bounds. Rust traverses a coherent topology snapshot, releases the owner
+lock, then directly supplies candidates to the ledger. Java generation-tree
+mutations, section enablement and container swaps maintain that topology;
+identity tokens and epochs reject stale callbacks. Custom CPU callbacks retain
+the Java walk and batched `collectVisibleFrame` pairs. Both ledger routes:
 1. drops containers whose generation is no longer current, then requests
    publication of the unpublished columns, in walk order;
 2. sorts the keys near to far, keeping walk order for equal distances;
@@ -700,8 +703,9 @@ call in a frame. That call:
 4. admits the visible segments.
 
 The native sort preserves walk order at equal Manhattan distance from the
-quadtree center, including Java integer arithmetic. Java still owns the quadtree
-walk and frustum decisions. With exact-atlas coverage, `LodRenderer` still
+quadtree center, including Java integer arithmetic. Rust owns stock traversal
+and frustum decisions; Java still supplies camera inputs and orchestrates
+generation/retrieval. With exact-atlas coverage, `LodRenderer` still
 admits each column through `recordVisibleMaterialColumn`; begin/consume,
 route selection, generic callbacks and render parameters remain separate.
 `consumeVisibleFrame` publishes a native CPU frame identity/lifecycle/count only

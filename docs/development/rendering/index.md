@@ -17,6 +17,7 @@ each module there has a short README with its own file map.
   greedy topology, semantic outcomes and Frozen verification.
 - [Rust DH semantic packets](RUST-DH-PACKETS.md): native layer selection,
   contextual callback plans, vertex packing and transport ownership.
+- [Retained Rust DH visibility](RUST-DH-VISIBILITY.md): incremental topology/lifecycle, direct native traversal and callback compatibility.
 - [Native DH column handoff](RUST-DH-COLUMN-HANDOFF.md): scoped packet storage,
   direct ledger ownership transfer and diagnostic projections.
 - [Rust DH box production](RUST-DH-VERTICAL-FACES.md): complete visibility,

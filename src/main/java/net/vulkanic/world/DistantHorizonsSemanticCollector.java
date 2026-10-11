@@ -2539,6 +2539,18 @@ public final class DistantHorizonsSemanticCollector {
 		synchronized (LOCK) {
 			frame = DhCollectorLedger.visibleFrame(walked, count, centerX, centerZ, flags);
 		}
+        return visibleFrameResult(frame,admit);
+    }
+
+    public static VisibleFrame collectVisibleTree(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats) {
+        boolean enabled=enabled();boolean admit=enabled&&!exactAtlasCoverageRequested();
+        int flags=(enabled?DhCollectorLedger.VISIBLE_FRAME_ENABLED:0)|(admit?DhCollectorLedger.VISIBLE_FRAME_ADMIT:0);
+        long[] frame;
+        synchronized(LOCK) {frame=DhCollectorLedger.visibleTree(tree,planes,minY,maxY,flags,stats);}
+        return visibleFrameResult(frame,admit);
+    }
+
+    private static VisibleFrame visibleFrameResult(long[] frame,boolean admit) {
 		String requestFailure = null;
 		if (frame[1] > 0L) {
 			try {

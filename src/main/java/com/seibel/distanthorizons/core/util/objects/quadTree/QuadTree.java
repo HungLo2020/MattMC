@@ -79,6 +79,8 @@ public class QuadTree<T>
 	// getters and setters //
 	//=====================//
 	
+    protected QuadTreeMutationObserver<T> mutationObserver() { return null; }
+
 	/** @return the node at the given section position */
 	@Nullable
 	public final QuadNode<T> getNode(long pos) throws IndexOutOfBoundsException { return this.getOrSetNode(pos, false, null, true); }
@@ -129,7 +131,7 @@ public class QuadTree<T>
 				return null;
 			}
 			
-			topQuadNode = new QuadNode<T>(rootPos, this.treeLeafDetailLevel);
+			topQuadNode = new QuadNode<T>(rootPos, this.treeLeafDetailLevel, this.mutationObserver());
 			boolean successfullyAdded = this.topRingList.set(ringListPosX, ringListPosZ, topQuadNode);
 			if (!successfullyAdded)
 			{
@@ -258,6 +260,7 @@ public class QuadTree<T>
 				
 				removedItemConsumer.accept(quadNode.value);
 			}
+            if (quadNode != null) quadNode.detachObservation();
 		});
 
 

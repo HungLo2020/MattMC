@@ -40,6 +40,11 @@ public class LodBufferContainer implements AutoCloseable
 	 * Java GPU upload: retaining the container lets the owning render section
 	 * retire that asset from {@link #close()} at the normal DH boundary. */
 	private boolean rustSemanticBuffersPublished = false;
+    private Runnable rustVisibilityCloseListener;
+    public synchronized void setRustVisibilityCloseListener(Runnable listener) {
+        this.rustVisibilityCloseListener=listener;
+        if(!this.rustSemanticBuffersPublished) {this.rustVisibilityCloseListener=null;listener.run();}
+    }
 	private long rustSemanticColumnGeneration = 0L;
 	private net.vulkanic.world.DistantHorizonsSemanticCollector.SemanticColumnLease rustSemanticColumnLease;
 	
@@ -192,6 +197,8 @@ public class LodBufferContainer implements AutoCloseable
 	{
 		this.buffersUploaded = false;
 		this.rustSemanticBuffersPublished = false;
+        Runnable listener=this.rustVisibilityCloseListener;this.rustVisibilityCloseListener=null;
+        if(listener!=null) listener.run();
 		// Keep the copied semantic asset lifecycle aligned with the legacy LOD
 		// container. This touches no native renderer object or GL state.
 		// Only the lease retires anything: a container that never recorded a
