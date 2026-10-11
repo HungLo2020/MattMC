@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `64db2b31690fdd62ca1b1968d1cf076f0fa09108`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all 32 paths, including eight documents and the new DH metadata owner, from promoted cutoff `2edce1f6630cef0ea00dc6a4d87020ecd2628d99`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `7cf8b68cc4fab2f01ba142eaa48092399ec53edc`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 25 paths, including eight documents, new source-occlusion owner and source-authored culling verification mode, from promoted cutoff `437e2bc15e6c54af45115125a0512495814ea12c`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
+
+- Previous non-wiki default-branch snapshot integrated: `64db2b31690fdd62ca1b1968d1cf076f0fa09108`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all 32 paths, including eight documents and the new DH metadata owner, from promoted cutoff `2edce1f6630cef0ea00dc6a4d87020ecd2628d99`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
 
 - Previous non-wiki default-branch snapshot integrated: `e6bc0e29835e431327cc8d7007ffce5fe53ce1b4`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 54 paths, including four documents, new client-sounds owner, source-authored MkDocs navigation and the Java test-task null-device setting, from promoted cutoff `61ea4e45a3f82423b951be7543a4a75fedf48ffe`. Clean fast-forward and combined publication preserve the incoming code/build edits; authored changes remain documentation only. Instructions/workflows are unchanged.
@@ -3164,3 +3167,12 @@ Linked the verified [#773 client-policy review](https://github.com/HungLo2020/Ma
 - Qualified the fresh-JVM registry-readiness control and preserved source-owned documentation/history. No Java/Rust/client/benchmark checks were rerun; strict docs validation, independent review and guarded terminal publication precede completion.
 
 Linked the verified [#777 metadata ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6105286352) and [#709 CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6105286909). Both remain open. Inspected fixtures distinguish uncompressed EOF prefixes, contributor-free merge corpus and direct versus compatibility parent routes; no runtime or suite execution is claimed.
+
+
+## Batch 392: Native source culling, reader publication and close compatibility
+
+- Reconciled direct native source admission/culling and new-vector publication with escaped-reader projection and compatibility routes. Documented close-time reader materialization and independent/grouped leases; the 512-byte presence bitmap does not bound retained point memory.
+- Kept author-reported create/update/cull comparisons separate from earlier metadata and failed candidates, including material/compression/count differences. Source fixtures and measured reports are inspected, not independently rerun or broad gameplay/memory acceptance.
+- Preserved incoming verification tooling, historical headings and append-only monthly/coverage history. Strict documentation validation, independent source/artifact review and guarded terminal deployment precede completion; no Java/Rust/client/benchmark work by this documentation review.
+
+Linked the verified [#777 source-occlusion review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6105718187) and [#709 CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6105718671). Both remain open. Native injected-detachment failure, close-reader fixtures and actual-removal checks remain bounded source evidence; no suites or real allocation-failure/runtime lifecycle checks were run.

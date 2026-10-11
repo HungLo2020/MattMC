@@ -20,15 +20,15 @@ Base-state hashing also reads the retained Rust table.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.
 
-Current direct-source path reviewed at [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
+Current direct-source path reviewed at [`7cf8b68c`](https://github.com/HungLo2020/MattMC/commit/7cf8b68cc4fab2f01ba142eaa48092399ec53edc).
 The earlier `5de23173a` release results below remain historical
 implementation-author reports; this review reran no suites or clients.
 See the [current evidence checkpoint](../../rendering/GOAL-5-STATUS.md)
 for remaining runtime, performance and sustained-memory acceptance gates.
 
-Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
-[CPU bridge](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
-[ordinary source consumer](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
+Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
+[CPU bridge](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
+[ordinary source consumer](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
 
 ## Lifetime and compatibility rules
 

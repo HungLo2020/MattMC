@@ -5,6 +5,10 @@ Suite counts, timings and untracked receipt descriptions below are
 implementation-author reports. This documentation review inspected source and
 test assertions; it reran no Java/Rust suites, clients or benchmarks.
 
+The later [source-occlusion checkpoint](RUST-DH-SOURCE-OCCLUSION.md) adds
+native reader registration and direct primary publication; the metadata-stage
+timings below remain historical and do not verify that later implementation.
+
 This ownership slice moves generation, compression and horizontal-uniformity
 storage into Rust beside the retained source table. Ordinary same-detail merge
 preparation reads those planes directly, and publication updates them in Rust.

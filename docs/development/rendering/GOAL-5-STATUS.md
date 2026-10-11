@@ -1,8 +1,24 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
-Native [DH metadata and direct parent inputs](../world/chunk/RUST-DH-SOURCE-METADATA.md)
+[`7cf8b68c`](https://github.com/HungLo2020/MattMC/commit/7cf8b68cc4fab2f01ba142eaa48092399ec53edc).
+The [owned DH source-culling route](../world/chunk/RUST-DH-SOURCE-OCCLUSION.md)
+now admits, selects, detaches and culls from the native table in Frozen order,
+with direct new-vector publication and escaped-reader projection. Java keeps
+orchestration, persistence and compatibility readers. Explicit close may create
+readers to preserve unescaped native values before releasing the table; its
+512-byte presence snapshot is not a bound on retained point memory.
+The author reports image `4f211cbd`, 2,597 Rust passes/three ignored and 1,946
+Java cases reported/two skipped (1,944 executed). Six-pair synthetic
+create/update/cull ratios are 0.756/0.814/0.964× Frozen. Rejected candidates,
+different material/compression workloads and the earlier concurrent-build
+failure remain qualified. This review ran no suites or workloads; these reports
+do not establish FPS, streaming, broad parity or sustained-memory acceptance.
+See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6105718187)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6105718671).
+
+At the preceding [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108) metadata checkpoint,
+native [DH metadata and direct parent inputs](../world/chunk/RUST-DH-SOURCE-METADATA.md)
 remove Java metadata mirrors and their phantom-pool registration. Java still
 owns source orchestration, persistence, compatibility identities and contextual
 callbacks; escaped metadata readers retain separate leases and mutation still

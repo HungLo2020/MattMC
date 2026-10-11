@@ -7,12 +7,12 @@ the migration. Stock tint calls no longer stage 9, 25 or 49 point descriptors,
 copy them across the boundary, or repeat the neighborhood plan in Java.
 Material IDs, point vectors and the table remain ordinary CPU data.
 
-Implementation: [source table](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/source.rs),
-[column leases](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/mutable.rs),
-[direct tint consumer](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/rust/world/level/chunk/dh_columns/tint.rs)
-and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/main/java/net/minecraft/world/level/chunk/NativeDhSource.java).
+Implementation: [source table](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/rust/world/level/chunk/dh_columns/source.rs),
+[column leases](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/rust/world/level/chunk/dh_columns/mutable.rs),
+[direct tint consumer](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/rust/world/level/chunk/dh_columns/tint.rs)
+and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/7cf8b68cc4fab2f01ba142eaa48092399ec53edc/src/main/java/net/minecraft/world/level/chunk/NativeDhSource.java).
 
-Source reviewed at [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
+Source reviewed at [`7cf8b68c`](https://github.com/HungLo2020/MattMC/commit/7cf8b68cc4fab2f01ba142eaa48092399ec53edc).
 The suite counts and timings below are implementation-author reports. This
 documentation review inspected source/test assertions, but reran no Java/Rust,
 client or benchmark checks and did not inspect untracked execution receipts.
@@ -47,7 +47,8 @@ client or benchmark checks and did not inspect untracked execution receipts.
   nonempty immutable list can install a new empty primary allocation; it need
   not preserve the old allocation identity. Java readers refresh CPU views
   after growth, detachment or replacement.
-- Lazy source lists and newly adopted retained-source merge vectors share the source's
+- Lazy source lists, including demand-created readers of directly published
+  native vectors, share the source's
   `NativeDhColumnGroup` automatic arena. First materialization of a grouped
   empty list retains that group. Immutable producer/parent spans retain their
   independent leases; replacement lists retain their original lifetime. One
@@ -59,11 +60,15 @@ client or benchmark checks and did not inspect untracked execution receipts.
   copy. Merge/culling projections refresh escaped readers only. Empty and null
   facts remain distinct even when neither has a Java object.
 - Source closure first retains unescaped native values for closed-source reader
-  compatibility, using two compact bitsets rather than 4,096 Java queries.
+  compatibility, using missing-slot and native-slot bitsets rather than 4,096
+  Java kind queries. It materializes Java readers for previously unbound native
+  values before release; their leases can keep those allocations alive.
   It then releases the Rust table and its primary leases immediately.
   Retained Java column readers keep their own native leases and remain usable.
   A closed source preserves a 512-byte presence snapshot for lazy empty/null
-  compatibility readers; it retains no copied points or live native table.
+  compatibility readers; this bitmap is not a bound on total retained memory.
+  There is no copied point array or live native table, but the source can now
+  retain compatibility readers and their grouped point leases.
   Its native consumers decline to compatibility readers after closure.
 - Reference counts protect allocation lifetime, including arena cleanup on
   another thread. They do **not** permit simultaneous point reads and writes.

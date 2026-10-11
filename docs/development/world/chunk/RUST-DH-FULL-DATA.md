@@ -12,7 +12,8 @@ for compatibility inputs and its measurements are historical.
 At [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1),
 `FullDataSourceV2.close()` closed the table in a `finally` path after its
 metadata-pool close. The metadata migration removes that pool registration;
-source close now releases the table directly. Escaped readers retain independent
+source close now materializes any unescaped native values as compatibility
+readers before releasing the table. Those readers and previously escaped ones retain independent
 leases and grouped allocations still have the separate GC lifetime described
 below. Source close does not guarantee that every column allocation is freed.
 
@@ -55,8 +56,9 @@ remains Java. Its guide records the source-borrowing and failure-publication con
 
 The current source also performs the complete 64×64 occlusion pass in
 one Rust call over existing owners. It follows Frozen's x/z and neighbor order,
-so later centers observe earlier mutations. Java stages bounded owner/view
-descriptors and consumes updated extents/hashes without exporting point values.
+so later centers observe earlier mutations. The ordinary route reads the
+retained source directly and Java refreshes escaped CPU extents; the
+descriptor adapter remains a compatibility route. Neither exports point values.
 CPU checks for this newer pass are recorded below; hardware/gameplay and
 performance acceptance remain pending for those earlier checkpoints.
 
@@ -99,8 +101,10 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
   facts; do not send Java policy answers or normalize unknown enum values.
   Parent hashes use wrapped Java long-list arithmetic over remapped outputs.
   They are seeded before publication. List writes invalidate them before mutation;
-  the complete occlusion pass publishes updated hashes before returning under
-  the caller's exclusion rules.
+  the owned occlusion pass invalidates primary hashes while mutating points,
+  then hash reads recompute on demand. Its output refreshes escaped extents;
+  the older descriptor adapter also returns changed/hash rows. Keep caller
+  exclusion through either path.
   The ordinary whole-quadrant path borrows the retained source table, native
   metadata and semantic ID remap; the compatibility overload stages bounded
   point descriptors. Neither exports point values. Custom/oversized inputs or enabled

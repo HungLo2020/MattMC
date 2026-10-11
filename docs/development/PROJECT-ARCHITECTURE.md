@@ -345,9 +345,10 @@ primary columns directly: Rust admits and detaches centers and preserves the
 complete Frozen pass order. Rust publishes new columns and registers escaped
 reader identities; Java receives selected extents and creates CPU leases on
 demand.
-The author reports six synthetic CPU scenarios matching Frozen checksums with
-Current medians at or below Frozen; realistic renderer/server acceptance remains
-separate. See the owner’s source and timing limits.
+The earlier [tint scenarios](world/biome/RUST-DH-TINT.md) and newer
+[source-update/culling comparisons](world/chunk/RUST-DH-SOURCE-OCCLUSION.md#verification-and-cpu-comparison)
+have separate author-reported workloads and source scopes. None establishes
+realistic renderer/server acceptance; preserve the owner-specific timing limits.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.
