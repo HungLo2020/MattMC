@@ -91,11 +91,25 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 ## Current hardware evidence boundary
 
 The following release-separated matrices and lifecycle/image/profile results
-are implementation-author reports inspected at
-[`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8).
+are implementation-author reports reconciled through
+[`ee809bba`](https://github.com/HungLo2020/MattMC/commit/ee809bbabbbb04707aced101c00d25d0fcdcde00).
 This documentation review did not rerun these workloads or inspect the
 untracked raw receipts. A settled rotating-view gate is not ordinary-play,
 first-frame, streaming, temporal or long-session memory acceptance.
+
+The newer [retained region-tape release](../world/chunk/RUST-REGION-TAPE.md)
+`06529556` has author-reported seven fresh lifecycle cases and two settled
+Frozen image comparisons, but no new FPS matrix. Its three CPU19 comparisons
+load/parse forty saved chunks per round: Current 12.20–12.31 ms versus Frozen
+13.14–13.53 ms, ratios 0.909–0.928. Three same-CPU previous-Current controls
+also pass. The timing driver calls region read/parse directly and excludes
+`IOWorker`/`ChunkMap` asynchronous scheduling. Those component timings must not
+be spliced into the earlier CPU11
+hydration series or attributed to gameplay FPS. The prior hydration and primitive
+saved-palette regressions remain in their owner guides. Sampled Java allocation
+in the earlier hydration profile excludes native allocation and is not a memory
+bound. Source-author artifact retention/pruning records describe their work;
+this documentation review performed no artifact cleanup.
 
 The saved-light candidate `a15c0555` on `abbd16d3d` has a fresh 20-run matrix
 under the restored NVIDIA `595.99.02` driver. All runs are clean, all source,

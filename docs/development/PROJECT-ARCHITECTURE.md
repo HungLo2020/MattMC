@@ -523,9 +523,12 @@ palette storage bits from the shared block registry. Java still orchestrates chu
 capture, supplies per-chunk biome names, builds the remaining root compound
 and owns save scheduling. Pending writes retain tape and create Java tags lazily when read;
 unsupported section inputs keep the Java encoding route. Eligible current-version
-loads also decode section tape natively; Java reconstructs containers and the
-remaining chunk state, with non-current/noncanonical input retaining upgrade
-and parse compatibility. This boundary does not migrate the complete chunk
+loads use [retained region tapes](world/chunk/RUST-REGION-TAPE.md) and
+[decoded-section hydration](world/chunk/RUST-DECODED-SECTIONS.md) to create
+primary block, biome and light owners inside Rust. Java wraps their leases and
+parses remaining root/chunk state; it no longer reconstructs admitted section
+palette/word/light arrays before native import. Non-current/noncanonical input
+retains full-tag upgrade and parse compatibility. This boundary does not migrate the complete chunk
 lifecycle or establish concurrent-save parity.
 The `nbt/`, `poi/` and `region/` modules retain their separate responsibilities.
 

@@ -41,7 +41,8 @@
 - [Direct saved-palette owners](RUST-SAVED-PALETTES.md): local/global block and
   biome imports into primary Rust storage, compatibility constraints and Frozen replay.
 - [Retained Rust region tapes](RUST-REGION-TAPE.md): direct region-to-decoder CPU
-  ownership, deterministic release, compatibility escapes and verification.
+  ownership, explicit bulk release, automatic wrapper lifetime, compatibility
+  escapes and verification.
 - [Rust decoded-section ownership](RUST-DECODED-SECTIONS.md): saved NBT directly
   to primary block, biome and light owners, decode scopes and real-chunk verification.
 - [Rust palette resizing](RUST-PALETTE-RESIZE.md): bulk storage remapping during

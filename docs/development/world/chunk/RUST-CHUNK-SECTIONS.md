@@ -70,9 +70,12 @@ sends biome names as `holderByNameCodec` writes them with each chunk.
    ownership handoff and custom-factory admission rule.
    `parse` reads everything else from the root.
 4. Java falls back to its original route for tag-only input, a non-current data
-   version, a Rust decline, or an `unpack` that does not succeed cleanly. It
+   version, a decode/hydration decline, or a custom factory. It
    upgrades the full tag and parses it, so logging, partial results and
-   exceptions are the original ones.
+   exceptions follow that compatibility route. `parseLoaded` closes its loaded
+   tape on success, fallback and failure; direct `loadForParse` callers must
+   consume or close their result. The region-tape owner guide describes the
+   explicit bulk release and automatic wrapper lifetime.
 
 Rust declines, so Java decodes the chunk, for:
 - a palette entry that is not the canonical encoding of a registered state

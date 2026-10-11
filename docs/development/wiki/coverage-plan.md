@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `b32fd91c847f3660bebec4dcc8d268efcdd589c8`; older citations retain their reviewed source scope.
-- Latest synchronization preserves two incoming commits and all 48 paths, including fourteen documents, new box/saved-light owners and source-authored drivers/fixtures, from promoted cutoff `abb76887396a810aa244d3146ea8c558a2666f67`. Clean fast-forward and combined validated publication preserve both source changes and earlier authored wiki history. Instructions/workflows are unchanged; publisher edits remain documentation only.
+- Latest non-wiki default-branch snapshot integrated: `ee809bbabbbb04707aced101c00d25d0fcdcde00`; older citations retain their reviewed source scope.
+- Latest synchronization preserves two incoming commits and all 53 paths, including twelve documents and three source-authored storage owners, from promoted cutoff `0d0a58153b420bc95fcbfc29badf08b73c4be82e`. Clean fast-forward and combined validated publication preserve source/tests and earlier wiki work. Instructions/workflows are unchanged; authored edits remain documentation only.
+
+- Previous non-wiki default-branch snapshot integrated: `b32fd91c847f3660bebec4dcc8d268efcdd589c8`; older citations retain their reviewed source scope.
+- Previous synchronization preserves two incoming commits and all 48 paths, including fourteen documents, new box/saved-light owners and source-authored drivers/fixtures, from promoted cutoff `abb76887396a810aa244d3146ea8c558a2666f67`. Clean fast-forward and combined validated publication preserve both source changes and earlier authored wiki history. Instructions/workflows are unchanged; publisher edits remain documentation only.
 
 - Previous non-wiki default-branch snapshot integrated: `660d19e1b865bf6a2b481300de3aafc934e406b5`; older citations retain their reviewed source scope.
 - Previous synchronization preserves two incoming commits and all 37 paths, including eleven documents and the new packet/handoff owners, source-authored verification drivers and fixtures, from promoted cutoff `2b7311757045acc1eb032b57f308180fb7e3c173`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
@@ -3224,3 +3227,11 @@ both issues remain open. The independent review inspected committed fixture byte
 See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6108300818)
 and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6108302807);
 both issues remain open. The source review reran no suites or workloads and established no new defect or issue closure.
+
+## Batch 397: Saved-palette, decoded-section and region-tape reconciliation
+
+Reconciled the current [saved-palette](../world/chunk/RUST-SAVED-PALETTES.md), [decoded-section](../world/chunk/RUST-DECODED-SECTIONS.md) and [region-tape](../world/chunk/RUST-REGION-TAPE.md) ownership boundaries with remaining Java IO/root parsing and compatibility. Architecture, migration and chunk-load routes now distinguish primary native hydration from earlier Java reconstruction. Explicit bulk release remains separate from automatic wrapper reclamation and broader lifecycle acceptance.
+
+The [Goal 5 checkpoint](../rendering/GOAL-5-STATUS.md) and [performance guide](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary) separate author-reported `06529556` CPU19 loader/lifecycle/image results from earlier primitive/hydration failures and the historical `a15c0555` FPS matrix, whose vanilla p99 still fails. This documentation review reran no runtime suites, benchmarks or captures and performed no artifact cleanup. Existing historical headings, receipts and source-owned pages remain preserved; complete game migration and broad runtime acceptance remain open.
+
+Bounded tracker crosslinks: [#774 ownership](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6109687781) and [#709 evidence](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6109689904), both open. The separate #818 recovery issue is not repaired by this loader migration.

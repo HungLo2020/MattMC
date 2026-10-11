@@ -1,6 +1,37 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** Current source review reaches
+[`ee809bba`](https://github.com/HungLo2020/MattMC/commit/ee809bbabbbb04707aced101c00d25d0fcdcde00).
+[Saved palettes](../world/chunk/RUST-SAVED-PALETTES.md),
+[decoded sections](../world/chunk/RUST-DECODED-SECTIONS.md) and
+[retained region tapes](../world/chunk/RUST-REGION-TAPE.md) move admitted
+block/biome/light construction and the disk-to-decoder tape into Rust owners.
+Java retains IO scheduling, registry binding, wrappers, remaining root parsing,
+upgrade/custom compatibility and broader chunk lifecycle.
+
+The implementation author reports release `06529556`: 2,623 Rust passes/three
+ignored and 1,974 Java cases reported, including two skips (1,972 executed).
+The reported 40-chunk Frozen replay, three quiet CPU19 timing pairs, seven fresh
+lifecycle cases and two settled image pairs pass their respective checks.
+CPU19 Current/Frozen ratios are 0.909–0.928; three same-CPU controls against
+published `45a074369` are 0.722–0.735. These scoped loader timings are separate
+from earlier CPU11 hydration regressions and primitive-palette caller failures.
+They do not establish a whole-game FPS gain or sustained-streaming/memory bounds.
+
+No new FPS matrix accompanies this tape release. The latest recorded matrix
+remains the older `a15c0555` saved-DH-light result below, with vanilla p99 failing.
+Runtime and timing results here are author reports; this documentation review
+inspected source and assertions without rerunning suites or untracked captures.
+The owner guides preserve failed candidates, corrected test assumptions/bootstrap
+ordering and the superseded concurrent Gradle report-write failure.
+
+See the [#774 ownership review](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6109687781)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6109689904).
+Both issues remain open; the separate save-future recovery scope in #818 is unchanged.
+
+## October 11 saved-DH-light checkpoint
+
+The preceding source review reached
 [`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8).
 The [saved-DH light importer](../world/lighting/RUST-DH-SAVED-LIGHT.md) now
 preserves nibble/list-order, allocation/counter and carried-sky policy in a

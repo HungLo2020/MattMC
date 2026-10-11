@@ -58,8 +58,14 @@ Follow the owner boundary relevant to the next change:
   block/counter owners and an independently admitted shared biome collection;
   consumers observe growth without keeping a stale generation snapshot. Java
   still validates compatibility identities and container replacement.
-  Java chunk orchestration, compatibility serialization and remaining bulk
-  producers still need migration.
+  [Saved-palette loading](../world/chunk/RUST-SAVED-PALETTES.md) and
+  [decoded-section hydration](../world/chunk/RUST-DECODED-SECTIONS.md) now
+  create primary native block, biome and light owners. The
+  [retained region tape](../world/chunk/RUST-REGION-TAPE.md) connects disk
+  production to section decoding without a full-tape Java round trip on the
+  admitted path. Java still schedules IO, binds registries, wraps sections and
+  parses the remaining root; compatibility and older-version paths can copy the
+  full tape. This does not migrate complete chunk orchestration or save recovery.
 - **Client residency:** [native window bookkeeping](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md)
   owns logical slots, counts, center, position fingerprints and empty membership.
   Ordinary empty scans read retained counters and stop before each Java callback.
