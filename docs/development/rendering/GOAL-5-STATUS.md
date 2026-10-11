@@ -1,8 +1,24 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`7cf8b68c`](https://github.com/HungLo2020/MattMC/commit/7cf8b68cc4fab2f01ba142eaa48092399ec53edc).
-The [owned DH source-culling route](../world/chunk/RUST-DH-SOURCE-OCCLUSION.md)
+[`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
+Ordinary [DH quad builds](RUST-DH-QUADS.md) now retain twelve directional lists,
+admission/premerge policy, stable sort and greedy passes in Rust. Java keeps
+contextual face production, identity interning and final packet encoding;
+subclasses retain the Java path. Per-list row copies precede encoding callbacks,
+and build-local close follows synchronous packet construction, with Cleaner
+fallback rather than a demonstrated release deadline.
+The author reports image `9ac7111b`, 2,604 Rust passes/three ignored and 1,949
+Java cases reported/two skipped (1,947 executed). Six synthetic topology/packet
+comparisons pass their scoped median gates; the initial smooth 1.173× failure
+and removed inlining experiment remain historical. This source/fixture review
+reran no suites or benchmarks and establishes no gameplay/FPS, GPU-image or
+long-session memory acceptance. See the
+[#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6106127269)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6106127723).
+
+At the preceding [`7cf8b68c`](https://github.com/HungLo2020/MattMC/commit/7cf8b68cc4fab2f01ba142eaa48092399ec53edc) source-culling checkpoint,
+the [owned DH source-culling route](../world/chunk/RUST-DH-SOURCE-OCCLUSION.md)
 now admits, selects, detaches and culls from the native table in Frozen order,
 with direct new-vector publication and escaped-reader projection. Java keeps
 orchestration, persistence and compatibility readers. Explicit close may create
@@ -90,8 +106,8 @@ FPS gain. That CPU checkpoint established no hardware acceptance or driver recov
 At the preceding `5de23173` checkpoint, retained terrain selection, client residency, shared chunk/biome inputs and DH
 producer policies had native CPU owners. That slice moves complete
 compact [DH render-column reduction](RUST-DH-RENDER-COLUMNS.md) into Rust.
-Java still performs contextual color callbacks, face construction, greedy
-merging, final packets and substantial world/application orchestration.
+At that stage Java still performed contextual color callbacks, face construction,
+greedy merging, final packets and substantial world/application orchestration.
 
 **The earlier driver blocker is cleared; new MattMC hardware acceptance remains pending.** The
 [committed record](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/PROGRESS.md)

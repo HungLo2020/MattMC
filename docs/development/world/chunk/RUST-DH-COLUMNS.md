@@ -8,8 +8,9 @@ mutable recipient storage, parent reduction and direct bulk operations;
 Java publishes compatibility views and retains update orchestration, persistence
 and contextual hooks. [Compact render-column reduction](../../rendering/RUST-DH-RENDER-COLUMNS.md)
 is Rust-owned, as are admitted [cached tint neighborhoods](../biome/RUST-DH-TINT.md).
-Contextual resolver callbacks, faces, greedy merging and final render packets
-remain Java. Complete Java removal and current runtime acceptance remain open.
+The ordinary [quad owner](../../rendering/RUST-DH-QUADS.md) now retains
+directional lists and greedy topology in Rust. Contextual resolver callbacks,
+face production and final render packets remain Java, with subclass compatibility. Complete Java removal and current runtime acceptance remain open.
 
 The producer borrows existing [block owners](RUST-LIVE-SECTIONS.md),
 [biome owners](../biome/RUST-LIVE-BIOMES.md),

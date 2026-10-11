@@ -194,7 +194,7 @@ At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b6
 DH world CPU ownership also includes columns, mutable full-data recipients,
 parent reduction, ordered occlusion, contributor snapshots, material-map
 identities/remapping, same-detail merges and change hashes. The separate
-`render/dh_columns/` owner reduces compact render columns. Java still supplies
+`render/dh_columns/` owner reduces compact render columns. At that checkpoint Java supplied
 admission/wrapper bindings, update orchestration, metadata list identities and persistence,
 contextual colors/material resolution, faces, greedy mesh assembly and final
 packets. The following release-specific records describe successive checkpoints;

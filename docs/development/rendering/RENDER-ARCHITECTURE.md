@@ -140,8 +140,9 @@ Admitted DH world preparation includes native [height fields](../world/chunk/RUS
 Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
 generation/compression/uniformity and direct parent inputs. Java retains
 admission and wrapper/list identities, update orchestration,
-persistence, quadtree inputs, contextual color callbacks/material resolution, faces,
-greedy mesh assembly and final packets. These CPU owners are separate from the
+persistence, quadtree inputs, contextual color callbacks/material resolution,
+face production and final packets. Ordinary [quad builds](RUST-DH-QUADS.md)
+now retain quad lists and greedy topology in Rust; subclasses keep Java policy. These CPU owners are separate from the
 DH render-column ledger and GPU resources. Preserve section-local snapshot timing
 and caller exclusion; no whole-world transaction or runtime/performance acceptance
 is implied by the ownership change.
@@ -576,7 +577,8 @@ conversion, face construction, greedy merging and semantic packet construction.
 The subsequent [contributor migration](../world/chunk/RUST-DH-CONTRIBUTORS.md)
 retains bounded point footprints, clipping and ID remapping in Rust instead of
 exporting Java point arrays; disabled preservation still skips that work. Java
-continues to own the render-column conversion, faces, merges and final packets.
+retained those later stages at that contributor checkpoint. The current
+[quad owner](RUST-DH-QUADS.md) supersedes ordinary Java quad storage and merging.
 
 Exact-topology merge restrictions require both the exact flag and the Rust
 geometry route. Use separate launches for A/B switches: the exact flag is
@@ -587,15 +589,18 @@ The later [render-column reduction](RUST-DH-RENDER-COLUMNS.md) owns the complete
 compact reduction algorithm in Rust. Canonical Java views borrow existing heap
 storage for one bounded native call and direct destination publication; they do
 not construct or sort a second Java reducer graph. Contextual resolver callbacks,
-faces, greedy merging and final packet construction remain Java; the admitted
+face production and final packet construction remain Java; ordinary quad
+storage/greedy policy is now [native](RUST-DH-QUADS.md). The admitted
 [cached tint path](../world/biome/RUST-DH-TINT.md) now samples retained inputs in Rust.
 
-DH's greedy merge sorts each face list by
+At the historical `fc1d529d` checkpoint, Java sorted each face list by
 [`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):
 primitive `key | index` values preserve the existing signed comparator order
 and stable ties through the original index for lists of at most 65,536 quads.
 Larger lists retain the comparator sort; mixed directions also fall back to its
-existing validation. The exact-topology decision is read once per merge pass.
+existing validation. The exact-topology decision was read once per merge pass. The current native
+quad owner preserves the signed/stable ordering with cached keys and in-place
+permutation; see its [constraints](RUST-DH-QUADS.md#constraints).
 The earlier `fc1d529d` review retained a `ColumnBox` leaf transparency deviation.
 The later `dd966dae` repair makes that face-culling helper classify **water only**
 as material-forced transparent, removing its special leaves classification.

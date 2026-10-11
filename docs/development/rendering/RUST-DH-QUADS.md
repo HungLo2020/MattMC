@@ -1,5 +1,10 @@
 # Rust DH quad builds
 
+Source reviewed at [`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
+Suite totals, measured timings and untracked receipt descriptions below are
+implementation-author reports. This documentation review inspected source and
+fixture assertions; it ran no Java/Rust suites, client, GPU or benchmark checks.
+
 Ordinary `LodQuadBuilder` instances retain their twelve directional quad lists
 in `render/dh_quads/`. Rust owns opacity/water admission, adjacent premerging,
 stable sort order, both greedy passes, overlap flags and semantic merge
@@ -8,13 +13,17 @@ VulkanicGAL retains all GPU ownership.
 
 Java still supplies faces and contextual color callbacks, interns source
 identities, and encodes final semantic packets. Packet construction copies
-immutable native rows before invoking Java callbacks. Temporary `BufferQuad`
+native rows into independent Java byte arrays for all direction lists requested
+by that packet method before encoding callbacks. Each list copy is separately
+protected by the lease lock; the four packet methods are separate captures,
+not one atomic snapshot of every list in a builder. Temporary `BufferQuad`
 projections exist during encoding; no persistent Java quad mirror is kept.
-Subclassed builders retain the existing Java compatibility implementation.
+The native path requires `getClass() == LodQuadBuilder.class`; subclassed
+builders retain the existing Java compatibility implementation.
 
-Implementation: [Rust owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/dh_quads),
-[CPU lease](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilder.java)
-and [builder](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java).
+Implementation: [Rust owner](https://github.com/HungLo2020/MattMC/tree/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/rust/render/dh_quads),
+[CPU lease](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilder.java)
+and [builder](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java).
 
 ## Constraints
 
@@ -35,7 +44,8 @@ and [builder](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com
   Store no Java objects or GPU runtime state in native lists.
 - Close builders after packet construction. `LodRenderSection` releases its
   builder after the synchronous semantic build; the collector owns independent
-  packet bytes. The cleaner releases abandoned builders. Native operations and
+  packet bytes. Earlier failed or skipped asynchronous stages can instead
+  leave cleanup to the Cleaner; no collection deadline is established. Native operations and
   close exclude each other. No global quad pool or world cache is added.
 
 ## Verify
@@ -49,11 +59,12 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-[VerifyDhQuads.java](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/VerifyDhQuads.java)
+[VerifyDhQuads.java](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/DevUtils/tests/rendering/VerifyDhQuads.java)
 records actual untouched Frozen add/premerge/greedy output and vertex bytes.
 The fixture embeds compiled-class hashes and512 synthetic CPU cases covering
-signed coordinates, ties, curvature, overlaps, transparency, empty builds,
-large widths and repeated merges. Expected algorithms are not copied.
+signed coordinates, ties, curvature, overlaps, transparency, large widths
+and repeated merges. Its size generator never produces an empty input; the
+separate rejected-admission/close test checks a still-empty builder. Expected algorithms are not copied.
 Supplemental controls compare current semantic companions with the actual Java
 compatibility builder, check lease closure and invalid input prefixes.
 
@@ -65,7 +76,7 @@ overlapping and scattered faces. Receipts belong in
 `build/native-dh-quad-owner/`. CPU fixtures and timings do not establish gameplay
 FPS, visual parity or long-session memory acceptance.
 
-The [Python runner](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/VerifyDhQuads.py)
+The [Python runner](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/DevUtils/tests/rendering/VerifyDhQuads.py)
 accepts `--mode topology|packets`, explicit JDK, compiled-driver, classpath-file,
 native-directory and output paths; it pins driver/native bytes, checks result
 checksums, and rejects a Current median above Frozen. Do not overlap timed
@@ -73,8 +84,8 @@ runs with compilation, tests, profiling or input hashing.
 
 ## Recorded CPU checkpoint
 
-Image `9ac7111b`, six alternating pairs per scenario, five2,000-build warmups
-and2,000 measured builds/JVM,2,048 faces per build:
+The author reports image `9ac7111b`, six alternating pairs per scenario, five
+2,000-build warmups and 2,000 measured builds/JVM, with 2,048 faces per build:
 
 | Workload | Current ms | Frozen ms | Current/Frozen |
 |---|---:|---:|---:|
@@ -85,9 +96,10 @@ and2,000 measured builds/JVM,2,048 faces per build:
 | Overlapping with packets | 442.196 | 629.144 | 0.703 |
 | Scattered with packets | 442.743 | 913.023 | 0.485 |
 
-All six scoped median gates pass, with matching checksums and driver/native
-pins. The full source/Frozen/compiled-class guards match before and after
-measurement. Documentation-only upstream `517aae517` leaves these inputs
+All six author-reported scoped median gates pass, with matching checksums
+and driver/native pins. Broader source/Frozen/compiled-class guards are
+reported to match before and after measurement; those untracked receipts
+were not independently inspected here. Documentation-only upstream `517aae517` leaves these inputs
 unchanged. These are synthetic CPU results, not gameplay acceptance.
 
 Initial smooth topology failed at139.764/119.126ms (1.173×). Forced inlining
@@ -98,8 +110,43 @@ compressed. Exact-match Frozen replay and seven native controls cover the new
 sort, including65,536/65,537-row threshold behavior. Receipts:
 `build/native-dh-quad-owner/`.
 
-Final full suites on upstream `517aae517` report2,604 Rust passes/three ignored,
-and1,949 Java cases reported/two skipped (1,947 executed), zero failures/errors
-across352 Java suites. Six Java workers load the exact native image. All
+The author reports final full suites on upstream `517aae517`: 2,604 Rust
+passes/three ignored, and 1,949 Java cases reported/two skipped (1,947
+executed), zero failures/errors across 352 Java suites. Six Java workers load the exact native image. All
 39,544 Current/38,176 Frozen source pins, native/compiled-class/fixture/driver
 guards and protected prompt match; Frozen is unchanged. Wiki validation passes.
+
+
+## Evidence limits
+
+The [Java controls](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/test/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilderTest.java)
+contain three test methods: the recorded 512-case Frozen corpus, 64 semantic
+companion seeds against an actual subclass compatibility builder, and invalid
+input prefix/idempotent close checks. The seven [Rust controls](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/rust/render/dh_quads/tests.rs)
+cover layout, policy, signed/curvature boundaries and stable sorting, including
+the 65,536/65,537 transition. Source assertions do not establish Cleaner release
+timing, all callback/reentrant mutation cases, threaded build teardown or
+long-session allocation bounds.
+
+The benchmark constructs synthetic faces before timing and uses a proxy render
+wrapper (constant shade and no live world). It measures builder creation,
+admission, merging, count consumption and release; packet mode additionally
+encodes and consumes bytes. It does not measure chunk/world traversal, real
+contextual face production, GPU submission or visual output. The smooth seed
+uses width 2,048 and alpha 128, whereas overlapping/scattered seeds use alpha
+255 with water still transparent; curvature and overlap diagnostics are off.
+These are distinct synthetic input scenarios. Topology checksums consume only opaque/transparent counts; packet checksums
+add packed vertex-byte sums, not semantic companion arrays or exact per-byte
+equality. Recorded corpus and semantic companion equality controls are
+separate evidence. The corpus uses stone/water and a constant-shade proxy; it
+does not exercise dirt/shade callback reentry or live contextual face inputs.
+The replay checks that four embedded class-hash strings have length 64; it
+does not rehash and compare those Frozen compiled classes during replay.
+
+Unlike the older source benchmark, this Python runner exits unsuccessfully if
+the Current median exceeds Frozen. It rechecks its selected native/driver files
+before each JVM and afterward, but does not itself hash every classpath entry,
+source file or Frozen inventory. Keep the broader author receipt guards
+separate from the checks enforced by this command.
+
+The [#777 quad ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6106127269) and [#709 CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6106127723) retain these migration and acceptance boundaries. Both issues remain open.

@@ -165,11 +165,14 @@ or all frame preparation into Rust.
 The October 10 [material-preservation policy](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 skips exact block provenance in ordinary play while retaining it for exact
 material topology, capture/legacy observation and the explicit forced A/B
-build. Java still converts full data to render columns, constructs faces,
-sorts/merges quads and builds semantic packets. Dense/scratch/packet sidecar
+build. At that checkpoint Java converted full data to render columns,
+constructed faces, sorted/merged quads and built semantic packets. The later
+[render-column](RUST-DH-RENDER-COLUMNS.md) and [quad](RUST-DH-QUADS.md) owners
+move reduction and ordinary greedy topology into Rust; Java retains contextual
+face production and final packet encoding, plus subclass compatibility. Dense/scratch/packet sidecar
 arrays remain allocated. Exact-material publication has its own narrower gate;
 forced preservation alone enables neither publication nor exact topology.
-These CPU work reductions do not migrate those producers, change GPU ownership,
+The earlier preservation-only reductions did not migrate those producers or change GPU ownership,
 or establish ordinary-play acceptance from diagnostic profiles.
 
 Reduced-color GPU columns now suballocate shared device vertex/index pages;
