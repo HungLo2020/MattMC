@@ -43,7 +43,7 @@ import net.vulkanic.VulkanicAPI;
  * A singleton that contains everything
  * related to rendering in Minecraft.
  */
-public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
+public class MinecraftRenderWrapper implements IMinecraftRenderWrapper, IMinecraftRenderWrapper.NativeShadeFacts
 {
 	public static final MinecraftRenderWrapper INSTANCE = new MinecraftRenderWrapper();
 	
@@ -229,6 +229,29 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		wrapper.setLightmapId(tetxureId);
 	}
 	
+	@Override
+	public boolean hasNativeShadeFacts() {
+		if (getClass() != MinecraftRenderWrapper.class || MC == null) return false;
+		var level = MC.level;
+		if (level == null) return true;
+		if (level.getClass() != net.minecraft.client.multiplayer.ClientLevel.class) return false;
+		var effect = level.effects().getClass();
+		return effect == net.minecraft.client.renderer.DimensionSpecialEffects.OverworldEffects.class
+			|| effect == net.minecraft.client.renderer.DimensionSpecialEffects.NetherEffects.class
+			|| effect == net.minecraft.client.renderer.DimensionSpecialEffects.EndEffects.class
+			|| effect == net.minecraft.client.renderer.DimensionSpecialEffects.PrimordialCavesEffects.class;
+	}
+
+	@Override
+	public int getNativeShadeFacts() {
+		if (!hasNativeShadeFacts()) return -1;
+		int mode = Config.Client.Advanced.Graphics.Quality.lodShading.get().ordinal();
+		var level = MC.level;
+		return mode | (level != null ? 4 : 0)
+			| (level != null && level.effects().constantAmbientLight() ? 8 : 0)
+			| (net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading() ? 16 : 0);
+	}
+
 	@Override
 	public float getShade(EDhDirection lodDirection)
 	{

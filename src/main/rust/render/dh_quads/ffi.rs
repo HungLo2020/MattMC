@@ -13,6 +13,100 @@ fn policy(flags: u64) -> Policy {
     }
 }
 
+fn quad(geometry: u64, attributes: u64, color: u32, identity: i32, position: i64) -> Quad {
+    Quad {
+        x: geometry as i16,
+        y: (geometry >> 16) as i16,
+        z: (geometry >> 32) as i16,
+        width: (geometry >> 48) as i16,
+        height: attributes as i16,
+        direction: (attributes >> 16) as u8,
+        material: (attributes >> 24) as u8,
+        sky: (attributes >> 32) as u8,
+        block: (attributes >> 40) as u8,
+        error: 0,
+        variant: (attributes >> 56) as u8,
+        color,
+        identity,
+        position,
+    }
+}
+
+/// Whole box facts and four borrowed exact neighbor windows; no source pointer escapes.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_box_add(
+    owner: *mut Builder,
+    geometry: u64,
+    attributes: u64,
+    color: u32,
+    identity: i32,
+    position: i64,
+    top: u64,
+    bottom: u64,
+    north: *const u64,
+    north_count: i32,
+    south: *const u64,
+    south_count: i32,
+    west: *const u64,
+    west_count: i32,
+    east: *const u64,
+    east_count: i32,
+    cave_y: i32,
+    flags: u32,
+    spans: *const u64,
+    span_count: i32,
+    shade01: u64,
+    shade23: u64,
+    shade45: u64,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        let inputs = [
+            (north, north_count),
+            (south, south_count),
+            (west, west_count),
+            (east, east_count),
+        ];
+        if inputs
+            .iter()
+            .any(|&(p, n)| !(-1..=super::faces::LIMIT as i32).contains(&n) || n > 0 && !aligned(p))
+            || !(0..=super::faces::LIMIT as i32).contains(&span_count)
+            || span_count > 0 && !aligned(spans)
+        {
+            return 0;
+        }
+        let Some(owner) = owner.as_mut() else {
+            return 0;
+        };
+        let neighbors = inputs.map(|(p, n)| {
+            if n < 0 {
+                None
+            } else if n == 0 {
+                Some(&[][..])
+            } else {
+                Some(std::slice::from_raw_parts(p, n as usize))
+            }
+        });
+        let spans = if span_count == 0 {
+            &[][..]
+        } else {
+            std::slice::from_raw_parts(spans, span_count as usize * 3)
+        };
+        super::boxes::produce(
+            owner,
+            quad(geometry, attributes, color, identity, position),
+            top,
+            bottom,
+            neighbors,
+            cave_y,
+            flags,
+            spans,
+            [shade01, shade23, shade45],
+            policy(attributes),
+        )
+    }))
+    .unwrap_or(0)
+}
+
 #[no_mangle]
 pub extern "C" fn mattmc_dh_quads_create(transparency: i32) -> *mut Builder {
     Box::into_raw(Box::new(Builder::new(transparency != 0)))
@@ -39,22 +133,7 @@ pub unsafe extern "C" fn mattmc_dh_quads_add(
         let Some(owner) = owner.as_mut() else {
             return 0;
         };
-        let quad = Quad {
-            x: geometry as i16,
-            y: (geometry >> 16) as i16,
-            z: (geometry >> 32) as i16,
-            width: (geometry >> 48) as i16,
-            height: attributes as i16,
-            direction: (attributes >> 16) as u8,
-            material: (attributes >> 24) as u8,
-            sky: (attributes >> 32) as u8,
-            block: (attributes >> 40) as u8,
-            error: 0,
-            variant: (attributes >> 56) as u8,
-            color,
-            identity,
-            position,
-        };
+        let quad = quad(geometry, attributes, color, identity, position);
         i32::from(owner.add(quad, attributes & (1 << 48) != 0, policy(attributes)))
     }))
     .unwrap_or(0)

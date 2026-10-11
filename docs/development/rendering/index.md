@@ -19,6 +19,8 @@ each module there has a short README with its own file map.
   contextual callback plans, vertex packing and transport ownership.
 - [Native DH column handoff](RUST-DH-COLUMN-HANDOFF.md): scoped packet storage,
   direct ledger ownership transfer and diagnostic projections.
+- [Rust DH box production](RUST-DH-VERTICAL-FACES.md): complete visibility,
+  shade/fake-ocean policy, borrowed neighbors and direct native consumption.
 - [Native terrain face policy](RUST-TERRAIN-CULLING.md): direct retained-state
   culling, immutable geometry ownership and callback compatibility.
 - [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light

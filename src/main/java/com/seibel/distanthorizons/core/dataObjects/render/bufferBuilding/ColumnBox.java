@@ -66,6 +66,17 @@ public class ColumnBox
 			byte skyLight, byte blockLight,
 			long topData, long bottomData, ColumnArrayView[] adjData, boolean[] isAdjDataSameDetailLevel)
 	{
+		if (MC_RENDER instanceof IMinecraftRenderWrapper.NativeShadeFacts facts && facts.hasNativeShadeFacts()) {
+			int caveY = Integer.MIN_VALUE;
+			if (Config.Client.Advanced.Graphics.Culling.enableCaveCulling.get())
+				caveY = Config.Client.Advanced.Graphics.Culling.caveCullingHeight.get() - clientLevel.getLevelWrapper().getMinHeight();
+			var transparency = Config.Client.Advanced.Graphics.Quality.transparency.get();
+			if (builder.addNativeBox(width,yHeight,minX,minY,minZ,color,irisBlockMaterialId,semanticMaterialId,
+				semanticVariantState,semanticVariantPosition,semanticMaterialSpans,skyLight,blockLight,topData,bottomData,
+				adjData,isAdjDataSameDetailLevel,caveY,transparency.transparencyEnabled,transparency.fakeTransparencyEnabled,
+				facts.getNativeShadeFacts(),null)) return;
+		}
+
 		//================//
 		// variable setup //
 		//================//

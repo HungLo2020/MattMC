@@ -1,6 +1,8 @@
 //! Build-local DH quad ownership and Frozen greedy topology. CPU facts only.
-mod ffi;
+mod boxes;
 pub(crate) mod column;
+mod faces;
+mod ffi;
 #[cfg(test)]
 mod packet_tests;
 mod packets;
@@ -133,6 +135,7 @@ pub(super) struct Builder {
     transparency: bool,
     // Reused across this build's merge passes, at most 65,536 primitive keys.
     sort_keys: Vec<i64>,
+    face_scratch: faces::Scratch,
 }
 
 impl Builder {
@@ -143,6 +146,7 @@ impl Builder {
             premerges: 0,
             transparency,
             sort_keys: Vec::new(),
+            face_scratch: faces::Scratch::default(),
         }
     }
 

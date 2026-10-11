@@ -2,6 +2,9 @@ package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
+import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.Cleaner;
@@ -27,7 +30,16 @@ final class NativeDhQuadBuilder implements AutoCloseable {
     private static final MethodHandle COPY = bind("mattmc_dh_quads_copy", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle COUNT = bind("mattmc_dh_quads_count", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle BOX = bind("mattmc_dh_box_add", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
     private static final EDhDirection[] DIRECTIONS = EDhDirection.values();
+    private static final Class<?> EMPTY_SPANS = List.of().getClass();
+    private static final Class<?> SMALL_SPANS = List.of(0).getClass();
     private static final class Lease implements Runnable {
         MemorySegment pointer;
         Lease(MemorySegment pointer) { this.pointer = pointer; }
@@ -82,6 +94,62 @@ final class NativeDhQuadBuilder implements AutoCloseable {
         synchronized (lease) {
             try { if ((int)MERGE.invokeExact(pointer(), policy()) != 1) throw new IllegalStateException("Native DH merge failed"); }
             catch (Throwable e) { throw failure(e); }
+            finally { Reference.reachabilityFence(this); }
+        }
+    }
+    private static boolean canonical(ColumnArrayView v) {
+        return v == null || v.data != null && v.data.getClass() == LongArrayList.class
+            && v.size >= 0 && v.size <= 4096 && v.offset >= 0 && v.offset <= v.data.size()-v.size;
+    }
+    private static MemorySegment borrow(ColumnArrayView v) {
+        return v == null || v.size == 0 ? MemorySegment.NULL
+            : MemorySegment.ofArray(((LongArrayList)v.data).elements()).asSlice(v.offset*8L,v.size*8L);
+    }
+    private static int length(ColumnArrayView v) { return v == null ? -1 : v.size; }
+    /** Complete admission precedes native mutation. Replay shades are bounded immutable CPU facts. */
+    boolean box(short width, short height, short x, short y, short z, int color, byte material,
+        int identity, byte variant, long position, List<ColumnRenderSource.SemanticMaterialSpan> spans,
+        byte sky, byte block, long top, long bottom, ColumnArrayView[] neighbors, boolean[] same,
+        int caveY, boolean transparency, boolean fakeOcean, int shadeFacts, float[] replayShades) {
+        if (neighbors == null || neighbors.length < 4 || same == null || same.length < 4
+            || spans == null || spans.getClass() != EMPTY_SPANS && spans.getClass() != SMALL_SPANS
+            || spans.size() > 4096 || shadeFacts < 0 || replayShades != null && replayShades.length != 6) return false;
+        for (int d=0;d<4;d++) if (!canonical(neighbors[d])) return false;
+        MemorySegment intervals=MemorySegment.NULL;
+        int spanCount=spans.size();
+        if (spanCount!=0) {
+            long[] words=new long[spanCount*3];
+            for(int i=0;i<spanCount;i++) {
+                var v=spans.get(i);words[i*3]=(v.minY() & 0xffffffffL) | (long)v.maxY()<<32;
+                words[i*3+1]=(v.materialId() & 0xffffffffL) | (v.variantState() & 0xffL)<<32;
+                words[i*3+2]=v.variantPosition();
+            }
+            intervals=MemorySegment.ofArray(words);
+        }
+        long geometry=(x & 0xffffL) | (y & 0xffffL)<<16 | (z & 0xffffL)<<32 | (width & 0xffffL)<<48;
+        long attributes=(height & 0xffffL) | (material & 0xffL)<<24 | (sky & 0xffL)<<32
+            | (block & 0xffL)<<40 | policy() | (variant & 0xffL)<<56;
+        int flags=(transparency?1:0) | (fakeOcean?2:0) | shadeFacts<<8;
+        for(int d=0;d<4;d++) if(same[d]) flags|=1<<(d+2);
+        long shade01=0,shade23=0,shade45=0;
+        if(replayShades!=null) {
+            flags|=1<<16;
+            shade01=(Float.floatToRawIntBits(replayShades[0]) & 0xffffffffL) | (long)Float.floatToRawIntBits(replayShades[1])<<32;
+            shade23=(Float.floatToRawIntBits(replayShades[2]) & 0xffffffffL) | (long)Float.floatToRawIntBits(replayShades[3])<<32;
+            shade45=(Float.floatToRawIntBits(replayShades[4]) & 0xffffffffL) | (long)Float.floatToRawIntBits(replayShades[5])<<32;
+        }
+        var north=borrow(neighbors[0]);var south=borrow(neighbors[1]);var west=borrow(neighbors[2]);var east=borrow(neighbors[3]);
+        synchronized(lease) {
+            if(lease.pointer.address()==0) return false;
+            try {
+                int result=(int)BOX.invokeExact(pointer(),geometry,attributes,color,identity,position,top,bottom,
+                    north,length(neighbors[0]),south,length(neighbors[1]),west,length(neighbors[2]),east,length(neighbors[3]),
+                    caveY,flags,intervals,spanCount,shade01,shade23,shade45);
+                if(result==-2) throw new IllegalArgumentException("Size 0 quad!");
+                if(result==-3) throw new IllegalArgumentException("Negative sized quad!");
+                if(result!=1) throw new IllegalStateException("Native DH box admission failed");
+                return true;
+            } catch(Throwable e) { throw failure(e); }
             finally { Reference.reachabilityFence(this); }
         }
     }

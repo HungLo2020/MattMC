@@ -489,8 +489,12 @@ CPU storage. It removes Java reducer graph/sort construction; contextual color
 callbacks, face construction and final packets remained subsequent work at that
 checkpoint. Current [packet plans](../rendering/RUST-DH-PACKETS.md) and
 [column handoff](../rendering/RUST-DH-COLUMN-HANDOFF.md) supersede ordinary
-Java final-packet encoding and transport; contextual callbacks and face
-construction remain Java.
+Java final-packet encoding and transport. [Complete box production](../rendering/RUST-DH-VERTICAL-FACES.md)
+now owns top/bottom visibility, fake-ocean geometry, stock shading, adjacent
+light intervals and semantic splitting in Rust. Java supplies bounded CPU facts
+and borrows existing compact neighbors; source traversal, material resolution
+and custom callbacks remain Java. The box guide records its current checks;
+the reduction checkpoint below remains historical.
 Actual Frozen3,616-case synthetic CPU replay is supplemental. Releaseee1676ec
 passes four focused Rust checks,27 architecture checks, five focused Java controls
 and full1,914 reported Java tests (two skips, zero failures/errors). Hardware,

@@ -13,8 +13,12 @@ stable sort order, both greedy passes, overlap flags and semantic merge
 outcomes. This is build-local CPU policy within the existing Rust library.
 VulkanicGAL retains all GPU ownership.
 
-Java still supplies faces and contextual color callbacks and interns source
-identities. [Rust packet plans](RUST-DH-PACKETS.md) capture each selected
+Java still traverses sources, supplies contextual color callbacks and interns
+source identities. Complete box production owns horizontal visibility,
+fake-ocean geometry and stock shading from bounded CPU facts; verification is
+recorded in the face guide. [Vertical visibility/light and
+semantic splitting](RUST-DH-VERTICAL-FACES.md) now consume borrowed neighbor
+columns directly into this Rust owner. [Rust packet plans](RUST-DH-PACKETS.md) capture each selected
 layer under the native lease lock before callbacks and encode the final bytes.
 The four packet methods remain separate captures, not one atomic snapshot of
 all builder lists. Ordinary encoding no longer reconstructs Java `BufferQuad`

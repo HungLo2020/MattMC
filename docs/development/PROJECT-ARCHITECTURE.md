@@ -202,10 +202,17 @@ they do not verify the combined source's runtime or performance.
 
 Ordinary [DH quad builds](rendering/RUST-DH-QUADS.md) now retain directional
 quad storage, opacity admission, premerging and greedy policy in Rust. Java
-retains face production, contextual getter implementations and collector
+retains source traversal, contextual getter implementations and collector
 lifecycle orchestration. [Packet plans](rendering/RUST-DH-PACKETS.md) now own layer selection,
 callback admission/order, shading and vertex/companion encoding;
 subclass compatibility remains Java. This advances the reviewed checkpoint above.
+
+[Box and vertical face policy](rendering/RUST-DH-VERTICAL-FACES.md) also moves complete
+box geometry, fake-ocean policy and stock directional shading into Rust, and owns neighbor
+visibility/light intervals and semantic splits in Rust, directly consuming them
+into the quad owner. Java lends canonical compact columns and bounded immutable shade facts for
+ordinary builds. Source traversal and contextual material resolution remain Java;
+custom shade providers retain their ordered compatibility callbacks.
 
 Admitted [DH height fields](world/chunk/RUST-DH-HEIGHTMAPS.md) in
 `world/level/chunk/dh_heightmaps/` scan live block owners and section counters

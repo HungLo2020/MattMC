@@ -129,9 +129,10 @@ Mean RGB differences are `[0.151, 0.237, 0.219]` and `[3.644, 4.176, 3.869]`;
 DH extension covers 19.39% of the image and passes its existing color gate.
 Lighting, water and foliage differences remain. Runtime receipt:
 `artifacts/graphics-captures/validation/native-dh-column-handoff-correctness-20261011/summary.json`.
-These bounded checks do not establish gameplay FPS, first-frame/temporal
-rendering, sustained streaming or long-session host/GPU memory acceptance.
-
+A subsequent [20-run gameplay matrix](GAMEPLAY-PERFORMANCE.md#october-11-native-handoff-matrix)
+is clean but fails vanilla p99 and DH FPS; both shader modes pass their measured
+floors. Neither these settled checks nor that rotating workload establish
+first-frame/temporal rendering, sustained streaming or long-session memory acceptance.
 
 ## Review boundaries
 

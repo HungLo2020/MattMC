@@ -7,7 +7,10 @@ point buffer, construct reducer nodes, sort links or repeat reduction policy.
 Full-data conversion still performs contextual block-color callbacks in Java.
 [Cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md) use retained
 native column/material inputs and Rust cache storage, with recorded Frozen CPU
-replay and scoped timing verification. Face construction remains Java. The
+replay and scoped timing verification. [Vertical face policy](RUST-DH-VERTICAL-FACES.md) now splits neighbor visibility,
+light and semantic intervals in Rust. Complete box production also moves
+horizontal visibility, fake-ocean geometry and stock directional shade into Rust;
+source traversal and contextual implementations remain Java. The
 ordinary [DH quad builder](RUST-DH-QUADS.md)
 now owns quad storage and greedy policy in Rust; subclasses retain Java compatibility.
 [Packet plans](RUST-DH-PACKETS.md) and [native column handoff](RUST-DH-COLUMN-HANDOFF.md)

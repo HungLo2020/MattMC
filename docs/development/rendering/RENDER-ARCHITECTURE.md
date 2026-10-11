@@ -602,6 +602,13 @@ getter results and requested diagnostic arrays; ordinary final buffers transfer
 through the [native column owner](RUST-DH-COLUMN-HANDOFF.md). Subclass compatibility retains the
 Java implementation; VulkanicGAL GPU ownership is unchanged.
 
+[Complete box policy](RUST-DH-VERTICAL-FACES.md) borrows canonical neighbor
+words, owns horizontal visibility, fake-ocean geometry, vertical light intervals
+and semantic splits, and inserts faces directly into the quad owner. Stock
+shading consumes immutable mode/world/ambient/flat CPU facts. Source traversal
+and contextual material resolution still reside in Java; custom shade providers
+retain their ordered compatibility callbacks. Verification is recorded in that guide.
+
 At the historical `fc1d529d` checkpoint, Java sorted each face list by
 [`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):
 primitive `key | index` values preserve the existing signed comparator order

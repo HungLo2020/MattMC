@@ -1,5 +1,19 @@
 # Goal 5 rendering checkpoint
 
+## October 11 complete DH box checkpoint
+
+[Rust DH box production](RUST-DH-VERTICAL-FACES.md) owns ordinary top/bottom
+visibility, fake-ocean geometry, stock shade policy, neighbor light intervals
+and semantic splitting. Java retains source traversal, contextual material
+resolution and custom callback compatibility. Native image `0133e073` passes
+the full Rust/Java suites, seven lifecycle scenarios and two reviewed settled
+Frozen pairs; the box guide records exact counts, fixtures and CPU comparisons.
+See the [latest gameplay matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+for measured FPS/p99 and its limits. These checks do not establish broad parity,
+first-frame/temporal behavior, sustained streaming or long-session memory bounds.
+
+## Earlier independent source review
+
 **Goal 5 remains incomplete.** The current source review reaches
 [`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5).
 [Native packet plans](RUST-DH-PACKETS.md) now select layers, order contextual

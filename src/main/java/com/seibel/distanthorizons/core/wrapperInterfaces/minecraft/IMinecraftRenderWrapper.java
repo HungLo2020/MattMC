@@ -64,6 +64,14 @@ public interface IMinecraftRenderWrapper extends IBindable
 	ILightMapWrapper getLightmapWrapper(@NotNull ILevelWrapper level);
 	
 	float getShade(EDhDirection lodDirection);
+
+	/** Explicit opt-in for callback-free immutable CPU shade facts. */
+	interface NativeShadeFacts {
+		boolean hasNativeShadeFacts();
+		/** AUTO/ENABLED/DISABLED plus world/ambient/flat bits; -1 declines. */
+		int getNativeShadeFacts();
+	}
+
 	
 	
 	

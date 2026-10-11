@@ -196,7 +196,16 @@ public class LodQuadBuilder implements AutoCloseable
 	//===========//
 	// add quads //
 	//===========//
-	
+
+	boolean addNativeBox(short width, short height, short x, short y, short z, int color, byte material,
+		int identity, byte variant, long position, List<ColumnRenderSource.SemanticMaterialSpan> spans,
+		byte sky, byte block, long top, long bottom,
+		com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView[] neighbors, boolean[] same,
+		int caveY, boolean transparency, boolean fakeOcean, int shadeFacts, float[] replayShades) {
+		return nativeQuads != null && nativeQuads.box(width,height,x,y,z,color,material,identity,variant,position,
+			spans,sky,block,top,bottom,neighbors,same,caveY,transparency,fakeOcean,shadeFacts,replayShades);
+	}
+
 	public void addQuadAdj(
 			EDhDirection dir, 
 			short x, short y, short z,

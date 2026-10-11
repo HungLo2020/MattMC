@@ -90,15 +90,68 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
-At [source `5de23173`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77),
-new retained-world/DH producer and complete reduction checks are CPU evidence.
-The author's latest NVIDIA driver/library mismatch prevented hardware entry;
-software-device failures and interrupted teardown remain failed evidence.
-Do not reuse an older travel profile or settled image as acceptance of this
-newer source. The last measured `839ff128` still fails vanilla p99 and DH FPS,
-while newer declared timing runs have not started. See the
-[release-separated record](GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
-and [hardware preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+Reboot restored matching NVIDIA kernel/userspace `595.99.02`; NVML and Vulkan
+successfully enumerate the RTX3080Ti. Complete [Rust DH box production](RUST-DH-VERTICAL-FACES.md),
+native `0133e073` tested on integrated source `abb768873`, passes seven lifecycle
+scenarios and two reviewed settled vanilla/Iris+DH Frozen image pairs, with zero
+reported validation errors. Nine Current correctness artifacts fingerprint it.
+
+Its predeclared rotating-view matrix contains 20 isolated alternating runs:
+360 settle frames, 240 warmup frames and exactly 6,000 measured frames per run.
+DH has four repeats per side; other modes have two. Every runtime health,
+Current/Frozen source, native and protected-prompt guard passes, all ten Current
+artifacts fingerprint the image, and no owned clients remain. Every declared
+repeat is retained; none was discarded or replaced.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
+|---|---:|---:|---|
+| Vanilla | 1427.95 / 1171.55 | 2.905 / 3.024 | Both pass |
+| Vanilla + DH | 841.15 / 676.20 | 3.064 / 5.653 | Both pass |
+| Shaders | 346.20 / 318.95 | 4.456 / 5.976 | Both pass |
+| Shaders + DH | 266.50 / 226.65 | 5.445 / 8.757 | Both pass |
+
+Every measured FPS/p99 floor passes. The workload hides the minimap and can
+restart partial timing windows while terrain becomes ready. It does not
+establish ordinary visible-HUD, sustained travel, startup, first-frame, temporal
+or long-session memory acceptance. Prior matrices remain historical;
+these repeats do not isolate the DH producer's contribution to FPS.
+
+Receipts: `build/native-dh-box-gameplay/performance.json` and paired artifacts
+under `artifacts/graphics-captures/validation/native-dh-box-perf-20261011/`.
+All individual FPS values are retained in root `SUMMARY.md` and raw receipts.
+See [hardware preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
+
+## October 11 native handoff matrix
+
+Reboot restored matching NVIDIA kernel/userspace `595.99.02`. NVML and
+Vulkan enumerate the RTX3080Ti. Native handoff `111c5922` on source `660d19e1`
+passes seven Iris+DH lifecycle cases and two reviewed settled Frozen pairs.
+Those checks do not prove temporal rendering or sustained streaming.
+
+That predeclared matrix includes 20 isolated alternating runs, each with
+360 settle frames, 240 warmup frames and exactly 6,000 measured frames. DH has
+four runs per side; the other modes have two. All runtime health, source,
+untouched Frozen, native and protected-prompt guards pass. Every Current run
+fingerprints the same native image. Every declared run is retained.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
+|---|---:|---:|---|
+| Vanilla | 1401.55 / 1175.70 | 3.317 / 3.137 | p99 fails |
+| Vanilla + DH | 812.35 / 828.20 | 3.387 / 4.094 | FPS fails |
+| Shaders | 342.15 / 315.95 | 5.121 / 6.863 | Both pass |
+| Shaders + DH | 261.85 / 227.15 | 6.233 / 8.626 | Both pass |
+
+Overall performance acceptance fails. This existing rotating-view workload
+hides the minimap and can restart partial timing windows while terrain becomes
+ready. It does not establish ordinary visible-HUD, sustained travel, startup,
+first-frame, temporal or long-session memory acceptance. The older `839ff128`
+matrix remains historical; driver and intervening ownership changes prevent an
+isolated before/after speedup claim.
+
+Receipts: `build/native-dh-handoff-gameplay/performance.json` and the paired
+artifacts under `artifacts/graphics-captures/validation/native-dh-handoff-perf-20261011/`.
+See [handoff verification](RUST-DH-COLUMN-HANDOFF.md) and
+[hardware preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 
 ## Image and DH allocation constraints
 
