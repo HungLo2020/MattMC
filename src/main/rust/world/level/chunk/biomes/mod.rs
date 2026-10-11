@@ -130,17 +130,11 @@ impl Owner {
                 return None;
             }
         }
-        let generation = Arc::new(Generation::new(bits, requested, global, palette, words));
-        if (0..CELLS).any(|i| {
-            generation.local(i)
-                >= if global {
-                    limit as usize
-                } else {
-                    palette.len()
-                }
-        }) {
+        let bound = if global { limit as usize } else { palette.len() };
+        if !super::palette::valid_indices(words, bits, CELLS, bound) {
             return None;
         }
+        let generation = Arc::new(Generation::new(bits, requested, global, palette, words));
         Some(Self {
             state: Mutex::new(State { generation }),
             limit,

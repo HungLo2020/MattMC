@@ -339,6 +339,13 @@ compatibility section recounts; canonical recounts scan the live owner directly.
 `world/level/chunk/palette/resize/` provides bulk remapping during block palette growth.
 [Global palette loading](world/chunk/RUST-PALETTE-UNPACKING.md) uses
 `world/level/chunk/palette/unpack/` and the existing encoder for saved-data repacking.
+[Direct saved-palette loading](world/chunk/RUST-SAVED-PALETTES.md) now constructs
+primary local/global block and biome owners in `palette/saved.rs`. Java supplies
+bounded semantic IDs and saved words; it constructs no palette/bit-storage mirror
+for admitted imports. [Decoded-section hydration](world/chunk/RUST-DECODED-SECTIONS.md)
+creates those owners and saved light layers directly in Rust, eliminating Java
+array/list/stream reconstruction on admitted NBT loads. File orchestration and
+non-section root-tag parsing remain transitional.
 [Player chunk distances](world/chunk-loading/RUST-PLAYER-DISTANCE.md) use
 `world/level/chunk_distance/` for DistanceManager's natural-spawn, player-ticket,
 [simulation](world/chunk-loading/RUST-SIMULATION-DISTANCE.md) and

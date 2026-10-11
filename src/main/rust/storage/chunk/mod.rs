@@ -6,6 +6,7 @@
 //! block registry. See `NativeChunkSections`.
 pub(crate) mod ffi;
 pub(crate) mod load;
+pub(crate) mod hydrate;
 pub(crate) mod vocabulary;
 #[cfg(test)]
 mod tests;

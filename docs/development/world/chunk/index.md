@@ -38,6 +38,10 @@
   and block scans, callback compatibility and complete caller verification.
 - [Rust global palette loading](RUST-PALETTE-UNPACKING.md): saved-data repacking,
   exact codec compatibility and complete caller performance verification.
+- [Direct saved-palette owners](RUST-SAVED-PALETTES.md): local/global block and
+  biome imports into primary Rust storage, compatibility constraints and Frozen replay.
+- [Rust decoded-section ownership](RUST-DECODED-SECTIONS.md): saved NBT directly
+  to primary block, biome and light owners, decode scopes and real-chunk verification.
 - [Rust palette resizing](RUST-PALETTE-RESIZE.md): bulk storage remapping during
   block palette growth, ownership constraints and focused verification.
 - [Rust palette histograms](RUST-PALETTE-HISTOGRAM.md): ordered counting and

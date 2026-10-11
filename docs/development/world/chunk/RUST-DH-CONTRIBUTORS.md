@@ -58,6 +58,12 @@ parent reduction and occlusion; its older verification does not accept this sour
   the whole quadrant's immutable point/footprint owner; include this retention
   in runtime memory checks. Existing source exclusion remains required.
 
+Pure semantic helpers may initialize the transformer before DH platform setup.
+Its wrapper dependency is now resolved on the first actual column conversion;
+helper calls must not capture an absent injector binding. The contributor test
+initializes the transformer before registering the fixture dependencies to cover
+that order explicitly.
+
 ## Verification
 
 With JDK25 and the standard release flags:

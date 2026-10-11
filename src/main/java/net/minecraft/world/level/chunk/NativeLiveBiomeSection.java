@@ -95,6 +95,9 @@ final class NativeLiveBiomeSection<T> {
     private NativeLiveBiomeSection(MemorySegment pointer, Binding<T> binding) {
         this(pointer, binding, null);
     }
+    static <T> NativeLiveBiomeSection<T> adoptOwned(MemorySegment pointer, Binding<T> binding) {
+        return new NativeLiveBiomeSection<>(pointer, binding);
+    }
     private NativeLiveBiomeSection(MemorySegment pointer, Binding<T> binding, SingletonAliases<T> aliases) {
         try { this.owner = pointer.asReadOnly().reinterpret(1, Arena.ofAuto(), p -> release(RELEASE, p)); }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }

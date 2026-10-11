@@ -115,16 +115,17 @@ public record SerializableChunkData(
 		IOWorker.Loaded loaded, java.util.function.UnaryOperator<CompoundTag> upgrade) {
 		try {
 			if (loaded.tape() != null) {
-				var decoded = net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.tape(), palettedContainerFactory,
-					levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY());
-				if (decoded != null) {
-					CompoundTag root = net.minecraft.nbt.NativeNbtRegionAccess.readTape(decoded.root());
-					// upgradeChunkTag leaves a current-version tag untouched.
-					if (ChunkStorage.getVersion(root) == net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version()) {
-						List<SerializableChunkData.SectionData> sections = sections(decoded, palettedContainerFactory);
-						if (sections != null) {
-							net.minecraft.world.level.chunk.NativeChunkSections.LOADED.incrementAndGet();
-							return parse(levelHeightAccessor, palettedContainerFactory, root, sections);
+				try (var decoded = net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.tape(), palettedContainerFactory,
+					levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY())) {
+					if (decoded != null) {
+						CompoundTag root = net.minecraft.nbt.NativeNbtRegionAccess.readTape(decoded.root());
+						// upgradeChunkTag leaves a current-version tag untouched.
+						if (ChunkStorage.getVersion(root) == net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version()) {
+							List<SerializableChunkData.SectionData> sections = decoded.sections();
+							if (sections != null) {
+								net.minecraft.world.level.chunk.NativeChunkSections.LOADED.incrementAndGet();
+								return parse(levelHeightAccessor, palettedContainerFactory, root, sections);
+							}
 						}
 					}
 				}
@@ -133,63 +134,6 @@ public record SerializableChunkData(
 		} catch (java.io.IOException exception) {
 			throw new java.io.UncheckedIOException(exception);
 		}
-	}
-
-	/** Sections as parse builds them from Rust's decode, or null when a
-	 * container would not unpack cleanly (Java's codecs then report it). */
-	@Nullable
-	private static List<SerializableChunkData.SectionData> sections(net.minecraft.world.level.chunk.NativeChunkSections.Decoded decoded,
-		PalettedContainerFactory palettedContainerFactory) {
-		int[] ints = decoded.ints();
-		int at = 0, words = 0, bytes = 0;
-		int count = ints[at++];
-		List<SerializableChunkData.SectionData> list = new ArrayList(count);
-		for (int k = 0; k < count; k++) {
-			int y = ints[at++], flags = ints[at++];
-			LevelChunkSection levelChunkSection = null;
-			if ((flags & 16) != 0) {
-				PalettedContainer<BlockState> states;
-				if ((flags & 1) != 0) {
-					int size = ints[at++], length = ints[at++];
-					List<BlockState> palette = new ArrayList<>(size);
-					for (int i = 0; i < size; i++) palette.add(decoded.state(ints[at++]));
-					Optional<java.util.stream.LongStream> data = length < 0 ? Optional.empty() : Optional.of(java.util.stream.LongStream.of(Arrays.copyOfRange(decoded.longs(), words, words + length)));
-					words += Math.max(length, 0);
-					com.mojang.serialization.DataResult<PalettedContainer<BlockState>> result = PalettedContainer.unpack(palettedContainerFactory.blockStatesStrategy(),
-						new PalettedContainerRO.PackedData<>(palette, data));
-					if (result.error().isPresent() || result.result().isEmpty()) return null;
-					states = result.result().get();
-				} else {
-					states = palettedContainerFactory.createForBlockStates();
-				}
-				PalettedContainerRO<Holder<Biome>> biomes;
-				if ((flags & 2) != 0) {
-					int size = ints[at++], length = ints[at++];
-					List<Holder<Biome>> palette = new ArrayList<>(size);
-					for (int i = 0; i < size; i++) palette.add(decoded.biomes().byId(ints[at++]));
-					Optional<java.util.stream.LongStream> data = length < 0 ? Optional.empty() : Optional.of(java.util.stream.LongStream.of(Arrays.copyOfRange(decoded.longs(), words, words + length)));
-					words += Math.max(length, 0);
-					com.mojang.serialization.DataResult<PalettedContainer<Holder<Biome>>> result = PalettedContainer.unpack(palettedContainerFactory.biomeStrategy(),
-						new PalettedContainerRO.PackedData<>(palette, data));
-					if (result.error().isPresent() || result.result().isEmpty()) return null;
-					biomes = result.result().get();
-				} else {
-					biomes = palettedContainerFactory.createForBiomes();
-				}
-				levelChunkSection = new LevelChunkSection(states, biomes);
-			}
-			DataLayer blockLight = null, skyLight = null;
-			if ((flags & 4) != 0) {
-				blockLight = new DataLayer(Arrays.copyOfRange(decoded.bytes(), bytes, bytes + 2048));
-				bytes += 2048;
-			}
-			if ((flags & 8) != 0) {
-				skyLight = new DataLayer(Arrays.copyOfRange(decoded.bytes(), bytes, bytes + 2048));
-				bytes += 2048;
-			}
-			list.add(new SerializableChunkData.SectionData(y, levelChunkSection, blockLight, skyLight));
-		}
-		return list;
 	}
 
 	@Nullable

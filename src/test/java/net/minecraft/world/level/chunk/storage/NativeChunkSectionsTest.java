@@ -252,6 +252,75 @@ class NativeChunkSectionsTest {
         System.out.println("CHUNK_SECTIONS_LOAD_PARITY saved_chunks=" + rust);
     }
 
+    @Test void savedChunksMatchActualFrozenOwnersAndSurviveDecodeScope() throws Exception {
+        NativeChunkSections.setEnabled(true);
+        DecodedChunkVerification.factory = factory;
+        var dataField = PalettedContainer.class.getDeclaredField("data");
+        dataField.setAccessible(true);
+        var lightField = DataLayer.class.getDeclaredField("data");
+        lightField.setAccessible(true);
+        int lights = 0;
+        var tags = corpus();
+        try (var input = new DataInputStream(new java.util.zip.GZIPInputStream(
+                getClass().getResourceAsStream("/storage/frozen-decoded-chunks.bin.gz")))) {
+            assertEquals(0x44434f31, input.readInt());
+            assertEquals(tags.size(), input.readInt());
+            for (var tag : tags) {
+                var position = new ChunkPos(tag.getIntOr("xPos", 0), tag.getIntOr("zPos", 0));
+                assertEquals(position.toLong(), input.readLong());
+                byte[] expected = input.readNBytes(input.readInt());
+                long before = NativeChunkSections.LOADED.get();
+                var parsed = SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), factory,
+                    new IOWorker.Loaded(NativeNbtRegionAccess.writeTape(tag), null), t -> {
+                        throw new AssertionError("Current saved chunk must not require an upgrade");
+                    });
+                assertEquals(before + 1, NativeChunkSections.LOADED.get());
+                assertNotNull(parsed);
+                // parseLoaded already closed its native decode scope. Returned owners
+                // must remain independent, with no Java packed/light mirrors.
+                for (var row : parsed.sectionData()) {
+                    if (row.chunkSection() != null) {
+                        assertNull(dataField.get(row.chunkSection().getStates()));
+                        assertNull(dataField.get(row.chunkSection().getBiomes()));
+                    }
+                    for (var layer : new DataLayer[]{row.blockLight(), row.skyLight()}) if (layer != null) {
+                        assertNull(lightField.get(layer));
+                        assertNotEquals(0, layer.nativeLightOwnerForMap().address());
+                        lights++;
+                    }
+                }
+                assertArrayEquals(expected, DecodedChunkVerification.fingerprint(parsed), "actual Frozen " + position);
+                for (var row : parsed.sectionData()) if (row.chunkSection() != null) {
+                    var copied = row.chunkSection().getStates().copy();
+                    var original = row.chunkSection().getBlockState(0, 0, 0);
+                    copied.getAndSetUnchecked(0, 0, 0, original.isAir() ? Blocks.STONE.defaultBlockState() : Blocks.AIR.defaultBlockState());
+                    assertSame(original, row.chunkSection().getBlockState(0, 0, 0));
+                }
+            }
+            assertEquals(-1, input.read());
+        }
+        assertTrue(lights > 0, "Saved lighting participates in the primary owner path");
+    }
+
+    @Test void customFactoryCodecsKeepTheirLoadAndSaveCallbacks() throws Exception {
+        var calls = new int[2];
+        var blockCodec = factory.blockStatesContainerCodec().xmap(value -> { calls[0]++; return value; },
+            value -> { calls[1]++; return value; });
+        var custom = new PalettedContainerFactory(factory.blockStatesStrategy(), factory.defaultBlockState(), blockCodec,
+            factory.biomeStrategy(), factory.defaultBiome(), factory.biomeContainerCodec());
+        var tag = corpus().getFirst();
+        long loaded = NativeChunkSections.LOADED.get(), encoded = NativeChunkSections.CHUNKS.get();
+        NativeChunkSections.setEnabled(true);
+        var parsed = SerializableChunkData.parseLoaded(LevelHeightAccessor.create(-64, 384), custom,
+            new IOWorker.Loaded(NativeNbtRegionAccess.writeTape(tag), null), java.util.function.UnaryOperator.identity());
+        assertNotNull(parsed);
+        assertTrue(calls[0] > 0);
+        assertEquals(loaded, NativeChunkSections.LOADED.get());
+        parsed.encode();
+        assertTrue(calls[1] > 0);
+        assertEquals(encoded, NativeChunkSections.CHUNKS.get());
+    }
+
     /** Edited saved chunks: what Rust must decline (Java decodes) and what it must still read. */
     @Test void nonCanonicalAndOddSectionsLoadIdentically(@TempDir Path dir) throws Exception {
         var tags = corpus();

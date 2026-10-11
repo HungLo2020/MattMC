@@ -50,8 +50,15 @@ final class NativeLightLayer {
             releaseView(view);
             throw failure;
         }
-        this.view = new Projection(view);
+        this.view = Projection.adoptOwned(view);
         return this;
+    }
+    /** Consumes both unique leases, including on projection/allocation failure. */
+    static NativeLightLayer adoptOwned(MemorySegment owner, MemorySegment view) {
+        NativeLightLayer result;
+        try { result = new NativeLightLayer(); }
+        catch (RuntimeException | Error failure) { releaseOwner(owner); releaseView(view); throw failure; }
+        return result.adopt(owner, view);
     }
     static NativeLightLayer create(int value) {
         NativeLightLayer result = new NativeLightLayer();
@@ -83,7 +90,7 @@ final class NativeLightLayer {
     private void updateView(int status) {
         if (status != 0) throw new IllegalArgumentException("Invalid native light input");
         MemorySegment changed = changedView.get(ValueLayout.ADDRESS, 0);
-        if (changed.address() != 0) view = new Projection(changed);
+        if (changed.address() != 0) view = Projection.adoptOwned(changed);
     }
     void set(int index, int value) {
         try { updateView((int) SET.invokeExact(owner, index, value, changedView)); }
@@ -137,14 +144,20 @@ final class NativeLightLayer {
     static final class Projection {
         private final MemorySegment metadata;
         private final MemorySegment bytes;
-        Projection(MemorySegment pointer) {
-            Arena lifetime = Arena.ofAuto();
+        static Projection adoptOwned(MemorySegment pointer) {
+            Arena lifetime;
+            MemorySegment metadata;
             try {
+                lifetime = Arena.ofAuto();
                 metadata = pointer.asReadOnly().reinterpret(16, lifetime, NativeLightLayer::releaseView);
             } catch (RuntimeException | Error failure) {
                 releaseView(pointer);
                 throw failure;
             }
+            return new Projection(metadata, lifetime);
+        }
+        private Projection(MemorySegment metadata, Arena lifetime) {
+            this.metadata = metadata;
             MemorySegment address = metadata.get(ValueLayout.ADDRESS, 8);
             bytes = address.address() == 0 ? null : address.asReadOnly().reinterpret(2048, lifetime, null);
         }

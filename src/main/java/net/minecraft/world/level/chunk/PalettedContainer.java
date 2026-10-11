@@ -130,6 +130,16 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		this.adoptNative();
 	}
 
+	PalettedContainer(Strategy<T> strategy, NativeLiveBlockSection owner) {
+		this.strategy = strategy;
+		this.nativeBlocks = owner;
+	}
+
+	PalettedContainer(Strategy<T> strategy, NativeLiveBiomeSection<T> owner) {
+		this.strategy = strategy;
+		this.nativeBiomes = owner;
+	}
+
 	private PalettedContainer(PalettedContainer<T> palettedContainer) {
 		this.strategy = palettedContainer.strategy;
 		var live = palettedContainer.nativeBlocks;
@@ -422,6 +432,8 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			BitStorage bitStorage;
 			Palette<T> palette;
 			if (configuration.bitsInMemory() == 0) {
+				var loaded = NativeSavedPaletteLoading.unpack(strategy, list, NativeSavedPaletteLoading.EMPTY_WORDS);
+				if (loaded != null) return DataResult.success(loaded);
 				palette = configuration.createPalette(strategy, list);
 				bitStorage = new ZeroBitStorage(i);
 			} else {
@@ -433,6 +445,8 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 				long[] ls = ((LongStream)optional.get()).toArray();
 
 				try {
+					var owned = NativeSavedPaletteLoading.unpack(strategy, list, ls);
+					if (owned != null) return DataResult.success(owned);
 					if (!configuration.alwaysRepack() && configuration.bitsInMemory() == j) {
 						palette = configuration.createPalette(strategy, list);
 						bitStorage = new SimpleBitStorage(configuration.bitsInMemory(), i, ls);

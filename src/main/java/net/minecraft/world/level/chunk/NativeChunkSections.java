@@ -40,9 +40,13 @@ public final class NativeChunkSections {
     private static final MethodHandle DECODE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_decode",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle TAKE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_sections_take",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-        java.lang.foreign.Linker.Option.critical(true));
+    // Identity weak keys admit the codecs produced by the standard factory.
+    // Custom factory codecs must run through the original tag reader.
+    private static final java.util.concurrent.ConcurrentMap<PalettedContainerFactory, Boolean> FACTORIES =
+        new com.google.common.collect.MapMaker().weakKeys().makeMap();
+    static void registerFactory(PalettedContainerFactory factory) {
+        if (NativeLiveBiomeSection.binding(factory.biomeStrategy()) != null) FACTORIES.put(factory, Boolean.TRUE);
+    }
     private static final java.lang.ref.Cleaner CLEANER = java.lang.ref.Cleaner.create();
     // Each biome registry's names for loading; weak keys compare ID maps by identity.
     private static final java.util.concurrent.ConcurrentMap<IdMap<Holder<Biome>>, BiomeNames> BIOME_NAMES =
@@ -139,7 +143,7 @@ public final class NativeChunkSections {
      * Rust does not model (the caller then encodes with Java). */
     @Nullable
     public static byte[] encode(List<SerializableChunkData.SectionData> sections, PalettedContainerFactory factory) {
-        if (!enabled || Vocabulary.HANDLE == 0 || factory.blockStatesStrategy().entryCount() != 4096
+        if (!enabled || !FACTORIES.containsKey(factory) || Vocabulary.HANDLE == 0 || factory.blockStatesStrategy().entryCount() != 4096
             || factory.biomeStrategy().entryCount() != 64) return null;
         Scratch scratch = SCRATCH.get();
         if (scratch.blockStrategy != factory.blockStatesStrategy()) {
@@ -383,18 +387,12 @@ public final class NativeChunkSections {
      * {@code ints}: section count, then per section y, flags (1 block states,
      * 2 biomes, 4 block light, 8 sky light, 16 within the height) and for each
      * container its palette size, word count (-1 without data) and entries. */
-    public record Decoded(byte[] root, int[] ints, long[] longs, byte[] bytes, IdMap<Holder<Biome>> biomes) {
-        public BlockState state(int label) {
-            return Block.BLOCK_STATE_REGISTRY.byId(label);
-        }
-    }
-
     /** Decodes a saved chunk's tape for a level with sections
      * {@code minSection..maxSection}; null when Rust declines (Java then
      * parses the whole tag). */
     @Nullable
-    public static Decoded decode(byte[] tape, PalettedContainerFactory factory, int minSection, int maxSection) {
-        if (!enabled || Vocabulary.HANDLE == 0 || factory.blockStatesStrategy().entryCount() != 4096 || factory.biomeStrategy().entryCount() != 64) {
+    public static NativeDecodedChunkSections decode(byte[] tape, PalettedContainerFactory factory, int minSection, int maxSection) {
+        if (!enabled || !FACTORIES.containsKey(factory) || Vocabulary.HANDLE == 0 || factory.blockStatesStrategy().entryCount() != 4096 || factory.biomeStrategy().entryCount() != 64) {
             return null;
         }
         Scratch scratch = SCRATCH.get();
@@ -412,14 +410,7 @@ public final class NativeChunkSections {
             int status = (int)DECODE.invokeExact(Vocabulary.HANDLE, names, input, tape.length, minSection, maxSection, sizes);
             if (status == -2) return null;
             if (status != 0) throw new IllegalStateException("Native chunk section decoding rejected its input: " + status);
-            int[] ints = new int[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 0)];
-            long[] longs = new long[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 1)];
-            byte[] bytes = new byte[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 2)];
-            byte[] root = new byte[(int)sizes.getAtIndex(ValueLayout.JAVA_LONG, 3)];
-            status = (int)TAKE.invokeExact(MemorySegment.ofArray(ints), MemorySegment.ofArray(longs), MemorySegment.ofArray(bytes),
-                MemorySegment.ofArray(root));
-            if (status != 0) throw new IllegalStateException("Native chunk section decoding lost its result");
-            return new Decoded(root, ints, longs, bytes, ids);
+            return NativeDecodedChunkSections.take(factory);
         } catch (RuntimeException | Error error) {
             throw error;
         } catch (Throwable error) {

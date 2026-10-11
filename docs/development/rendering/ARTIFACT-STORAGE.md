@@ -7,6 +7,20 @@ worlds as saves, even when their parent directory is named `cache`.
 Cleanup histories below are implementation-author reports; this documentation
 review did not inspect their original files or rerun cleanup.
 
+## Superseded profile videos: 2026-10-11
+
+Retired 56 `window-crop.nut` videos from seven completed October9 CPU/allocation
+flight scopes, reclaiming17.83GiB. Each scope's profiling receipts reported
+success and driver exit0; no process or open file used the target scopes.
+All447 endpoint/derived PNGs, source identities, profiles, metrics and completion
+receipts remain. Current runs and open terrain/startup investigations were excluded.
+
+The exact paths, original video sizes/SHA256 and preserved receipts are recorded
+in `build/native-saved-palettes/retired-profile-videos.json`. These obsolete
+clips were deleted, not archived; they cannot be restored from that receipt.
+Historical profile metrics and endpoint reviews remain available, while the
+retired videos no longer provide independent temporal evidence.
+
 ## Lossless validation archival: 2026-10-10
 
 The [implementation author’s record](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/docs/development/rendering/ARTIFACT-STORAGE.md)
@@ -256,3 +270,10 @@ Perform cleanup while no test client or affected build is running. Never edit
 the Frozen repository as part of capture cleanup. Record actual filesystem
 free-space changes separately from logical file sizes, which can differ because
 of hardlinks, directory overhead, or concurrent disk activity.
+
+The saved-palette batch also archived the two completed JFR event JSON files
+losslessly and removed two completed generated profiling worlds, saving255.5MiB.
+`build/native-saved-palettes/chunk-loader/completed-profile-archive.json` records
+hashes and restoration; original `.jfr`, analyses and source corpus remain. The
+completed correctness driver retired nine disposable runtime workspaces while
+retaining captures and result receipts.

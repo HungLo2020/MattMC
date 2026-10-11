@@ -2,7 +2,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
-const BYTES: usize = 2048;
+pub(crate) const BYTES: usize = 2048;
 pub(crate) mod ffi;
 
 struct Generation {

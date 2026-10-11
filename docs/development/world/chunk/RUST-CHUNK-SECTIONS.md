@@ -60,12 +60,14 @@ sends biome names as `holderByNameCodec` writes them with each chunk.
    - Palette states are identified by matching each entry's tape byte for byte
      against the save vocabulary's encoded compounds.
    - Biome names are looked up in the registry's names.
-   - It also returns storage words, light layers and `Y`, plus the root tape
-     without `sections`.
+   - Storage words, light layers and `Y` remain in a scoped Rust decode owner;
+     Java receives the root tape without `sections`.
 3. Java reads that smaller root as a tag. If its `DataVersion` is current
-   (`upgradeChunkTag` would return it unchanged), Java builds each section the
-   way the codecs do: `PalettedContainer.unpack` with the decoded palette and
-   words, `new DataLayer(bytes)`, and default containers for missing keys.
+   (`upgradeChunkTag` would return it unchanged), Rust hydrates primary block,
+   biome and light owners directly. Java wraps independent leases in section
+   objects, without palette/word/light arrays or list/stream reconstruction.
+   [Decode scopes and primary hydration](RUST-DECODED-SECTIONS.md) describe the
+   ownership handoff and custom-factory admission rule.
    `parse` reads everything else from the root.
 4. Java falls back to its original route for tag-only input, a non-current data
    version, a Rust decline, or an `unpack` that does not succeed cleanly. It

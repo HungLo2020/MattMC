@@ -34,7 +34,11 @@ public class FullDataToRenderDataTransformer
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
-	private static final IWrapperFactory WRAPPER_FACTORY = SingletonInjector.INSTANCE.get(IWrapperFactory.class);
+	// Pure semantic helpers can run before platform dependencies are registered.
+	private static final class WrapperDependencies
+	{
+		private static final IWrapperFactory FACTORY = SingletonInjector.INSTANCE.get(IWrapperFactory.class);
+	}
 	
 	private static final LongOpenHashSet BROKEN_POS_SET = new LongOpenHashSet();
 	private static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("Data Transformer");
@@ -421,17 +425,18 @@ public class FullDataToRenderDataTransformer
 		boolean ignoreNonCollidingBlocks = (Config.Client.Advanced.Graphics.Quality.blocksToIgnore.get() == EDhApiBlocksToAvoid.NON_COLLIDING);
 		boolean colorBelowWithAvoidedBlocks = Config.Client.Advanced.Graphics.Quality.tintWithAvoidedBlocks.get();
 		
-		HashSet<IBlockStateWrapper> blockStatesToIgnore = WRAPPER_FACTORY.getRendererIgnoredBlocks(levelWrapper);
-		HashSet<IBlockStateWrapper> caveBlockStatesToIgnore = WRAPPER_FACTORY.getRendererIgnoredCaveBlocks(levelWrapper);
+		IWrapperFactory wrapperFactory = WrapperDependencies.FACTORY;
+		HashSet<IBlockStateWrapper> blockStatesToIgnore = wrapperFactory.getRendererIgnoredBlocks(levelWrapper);
+		HashSet<IBlockStateWrapper> caveBlockStatesToIgnore = wrapperFactory.getRendererIgnoredCaveBlocks(levelWrapper);
 		
 		// build snow block cache if needed
 		if (snowLayerBlockStates == null)
 		{
 			snowLayerBlockStates = new HashSet<>();
 			// ignore snow layers 1-3, everything above should be considered a full block
-			snowLayerBlockStates.add(WRAPPER_FACTORY.deserializeBlockStateWrapperOrGetDefault("minecraft:snow_STATE_{layers:1}", levelWrapper));
-			snowLayerBlockStates.add(WRAPPER_FACTORY.deserializeBlockStateWrapperOrGetDefault("minecraft:snow_STATE_{layers:2}", levelWrapper));
-			snowLayerBlockStates.add(WRAPPER_FACTORY.deserializeBlockStateWrapperOrGetDefault("minecraft:snow_STATE_{layers:3}", levelWrapper));
+			snowLayerBlockStates.add(wrapperFactory.deserializeBlockStateWrapperOrGetDefault("minecraft:snow_STATE_{layers:1}", levelWrapper));
+			snowLayerBlockStates.add(wrapperFactory.deserializeBlockStateWrapperOrGetDefault("minecraft:snow_STATE_{layers:2}", levelWrapper));
+			snowLayerBlockStates.add(wrapperFactory.deserializeBlockStateWrapperOrGetDefault("minecraft:snow_STATE_{layers:3}", levelWrapper));
 		}
 		
 		int caveCullingMaxY = Config.Client.Advanced.Graphics.Culling.caveCullingHeight.get() - levelWrapper.getMinHeight();

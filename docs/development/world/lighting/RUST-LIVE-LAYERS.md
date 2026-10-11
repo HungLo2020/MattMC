@@ -9,6 +9,12 @@ repetition run in Rust. This subsystem has no rendering or GPU dependencies.
 
 ## Handoffs
 
+[Saved chunk hydration](../chunk/RUST-DECODED-SECTIONS.md) now creates light
+owners directly from Rust-decoded bytes. Returned owners and their CPU views
+outlive the decode scope and enter the native light map without a Java byte-array
+mirror. This batch has separate verification; historical runtime results below
+do not accept it.
+
 [`NativeLightBlocks`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeLightBlocks.java)
 passes a pinned CPU owner to propagation. Rust takes an independent snapshot
 without a Java byte-array projection. This still copies native bytes into a

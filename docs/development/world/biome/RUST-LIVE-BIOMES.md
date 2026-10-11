@@ -9,6 +9,11 @@ world's immutable color table and reuses its cubic window while source
 generations remain current. The admitted native path avoids Java's 216-color grid; compatibility
 sampling retains its original callbacks.
 
+[Saved palette imports](../chunk/RUST-SAVED-PALETTES.md) now construct this primary
+owner directly for admitted local and global palettes, without Java palette or
+bit-storage reconstruction. Registry object resolution and NBT array hydration
+remain Java work; the saved-palette guide records candidate verification separately.
+
 At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/java/net/minecraft/world/level/chunk/NativeBiomeChunkInputs.java),
 the [retained input owner](../chunk/RUST-DH-CHUNK-INPUTS.md) shares one immutable
 biome binding between this index and DH column inputs. Unchanged bindings reuse

@@ -9,6 +9,10 @@ thread_local! {
     static DECODED: RefCell<Option<Decoded>> = const { RefCell::new(None) };
 }
 
+pub(crate) fn take_decoded() -> Option<Decoded> {
+    DECODED.with(|decoded| decoded.borrow_mut().take())
+}
+
 /// The block-state vocabulary built from the installed block registry
 /// (labels are state ids). Returns 0 when the registry is not installed or
 /// Java must encode its states. Never freed.

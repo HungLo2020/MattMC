@@ -45,6 +45,12 @@ public class DataLayer {
         this.defaultValue = owner.view().rawDefault();
     }
 
+    /** Package-internal saved decode handoff; consumes independent native leases. */
+    static DataLayer adoptDecoded(java.lang.foreign.MemorySegment owner, java.lang.foreign.MemorySegment view) {
+        var layer = NativeLightLayer.adoptOwned(owner, view);
+        return new DataLayer(layer);
+    }
+
     @Nullable
     NativeLightLayer nativeLightLayer() { return this.nativeLayer; }
 

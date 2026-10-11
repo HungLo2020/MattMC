@@ -17,7 +17,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /** CPU ownership/transport evidence, not a gameplay or performance acceptance. */
 @Tag("parity")
 class NativeDhContributorsTest {
-    @BeforeAll static void bootstrap() throws Exception { NativeDhColumnsTest.bootstrap(); }
+    @BeforeAll static void bootstrap() throws Exception {
+        Class.forName("com.seibel.distanthorizons.core.dataObjects.transformers.FullDataToRenderDataTransformer");
+        NativeDhColumnsTest.bootstrap();
+    }
     @Test void allSavedNativeFootprintsPreserveExactRemappingAndDirectConsumerOwnership() {
         int nonempty = 0;
         for (int test = 0; test < 32; test++) {

@@ -18,6 +18,10 @@ owners and fuse with canonical writes. Admitted [live biome palettes and sky
 sampling](../biome/RUST-LIVE-BIOMES.md) have separate Rust owners. Java retains
 chunk orchestration, scheduling and compatibility paths.
 
+[Direct saved-palette loading](RUST-SAVED-PALETTES.md) now creates the primary
+owner without first constructing Java palettes or bit storage. NBT/codec object
+resolution and saved-word stream materialization remain transitional Java work.
+
 At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/inputs.rs),
 [shared chunk inputs](RUST-DH-CHUNK-INPUTS.md) retain reference-counted primary
 block and counter owners, including owners produced by stage adoption. Consumers

@@ -213,19 +213,11 @@ impl Owner {
             }
             entries.push(value as u32);
         }
-        let generation = Arc::new(Generation::new(bits, requested, global, &entries, words));
-        for index in 0..ENTRIES {
-            let id = generation.local(index);
-            if id
-                >= if global {
-                    limit as usize
-                } else {
-                    palette.len()
-                }
-            {
-                return None;
-            }
+        let bound = if global { limit as usize } else { palette.len() };
+        if !super::palette::valid_indices(words, bits, ENTRIES, bound) {
+            return None;
         }
+        let generation = Arc::new(Generation::new(bits, requested, global, &entries, words));
         Some(Self {
             state: Mutex::new(State { generation, ids }),
             limit,
@@ -470,7 +462,7 @@ impl Owner {
         s.generation.changed();
         true
     }
-    fn capture(&self) -> Box<[u16; ENTRIES]> {
+    pub(crate) fn capture(&self) -> Box<[u16; ENTRIES]> {
         let s = self.state.lock().unwrap();
         if s.generation.bits == 0 {
             return Box::new([s.generation.state(0) as u16; ENTRIES]);
