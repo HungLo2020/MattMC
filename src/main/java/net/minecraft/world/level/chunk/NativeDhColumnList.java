@@ -14,6 +14,11 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     private Object owner;
     private MemorySegment points;
     private NativeDhMutableColumn mutable;
+    private NativeDhMutableColumn sourceLease;
+    private record Binding(java.lang.ref.WeakReference<NativeDhSource> source, int index) {}
+    private java.lang.ref.WeakReference<NativeDhSource> source;
+    private int sourceIndex;
+    private java.util.ArrayList<Binding> aliases;
     private boolean hashValid;
     private int hash;
     /** Arena owner for a mutable copy (null: the copy gets its own arena). */
@@ -28,7 +33,38 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         var view = empty(); view.group = group; return view;
     }
     static NativeDhColumnList fromOwned(NativeDhMutableColumn column) {
-        var view = empty(); view.mutable = column; return view;
+        var view = empty(column.group()); view.mutable = column; return view;
+    }
+    void attach(NativeDhSource value, int index) {
+        if (source != null && source.get() == null) source = null;
+        if (aliases != null) { aliases.removeIf(b -> b.source.get() == null); if (aliases.isEmpty()) aliases = null; }
+        if (source == null) { source = value.weak; sourceIndex = index; }
+        else if (source != value.weak || sourceIndex != index) {
+            if (aliases == null) aliases = new java.util.ArrayList<>();
+            if (aliases.stream().noneMatch(b -> b.source == value.weak && b.index == index)) aliases.add(new Binding(value.weak, index));
+        }
+    }
+    void detach(NativeDhSource value, int index) {
+        if (source == value.weak && sourceIndex == index) source = null;
+        if (aliases != null) { aliases.removeIf(b -> b.source == value.weak && b.index == index || b.source.get() == null); if (aliases.isEmpty()) aliases = null; }
+    }
+    private void publishLease() {
+        var lease = (mutable == null ? sourceLease : mutable).stageOwner();
+        if (source != null) { var value = source.get(); if (value != null) value.materialized(sourceIndex, this, lease); }
+        if (aliases != null) for (var binding : aliases) {
+            var value = binding.source.get(); if (value != null) value.materialized(binding.index, this, lease);
+        }
+    }
+    MemorySegment stageSourceOwner() {
+        if (mutable != null) return mutable.stageOwner();
+        if (sourceLease == null) {
+            if (points.byteSize() == 0 && owner == null && source == null && aliases == null) return MemorySegment.NULL;
+            sourceLease = owner instanceof NativeDhColumns producer ? producer.sharedColumn(points)
+                : owner instanceof NativeDhParentColumns parent ? parent.sharedColumn(points)
+                : new NativeDhMutableColumn(points, size(), group);
+            publishLease();
+        }
+        return sourceLease.stageOwner();
     }
     public boolean isOriginalProducerView() { return owner instanceof NativeDhColumns && mutable == null; }
     public boolean isOriginalParentView() { return owner instanceof NativeDhParentColumns && mutable == null; }
@@ -46,14 +82,16 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         finally { Reference.reachabilityFence(this); }
     }
     private NativeDhMutableColumn write() {
-        hashValid = false;
         return ensureMutable();
     }
     private NativeDhMutableColumn ensureMutable() {
         if (mutable == null) {
             var previousOwner = owner;
             var previousPoints = points;
-            try { detach(new NativeDhMutableColumn(previousPoints, size(), group)); }
+            try {
+                if (sourceLease != null) { sourceLease.makeOwned(); detach(sourceLease); }
+                else detach(new NativeDhMutableColumn(previousPoints, size(), group));
+            }
             finally { Reference.reachabilityFence(previousOwner); Reference.reachabilityFence(previousPoints); Reference.reachabilityFence(this); }
         }
         return mutable;
@@ -63,10 +101,19 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     }
     void acceptOcclusionView(MemorySegment address, long count, boolean changed, int newHash) {
         if (mutable != null) mutable.acceptView(address, count);
-        if (changed) { hash = newHash; hashValid = true; }
+    }
+    /** Project a Rust table commit without restaging each native owner. */
+    void acceptMergeView(long address, long count, boolean committed, int newHash, boolean owned, MemorySegment replacement) {
+        if (replacement != null) detach(NativeDhMutableColumn.adoptOwner(replacement, group));
+        else if (owned && mutable == null) {
+            if (sourceLease == null) throw new IllegalStateException("Missing retained DH column lease");
+            detach(sourceLease);
+        }
+        if (mutable != null) mutable.acceptView(address, count);
     }
     private void detach(NativeDhMutableColumn values) {
-        mutable = values;
+        mutable = values; sourceLease = null;
+        publishLease();
         // The independent vector has copied the values. Keeping either the owner
         // or its arena-backed segment would unnecessarily retain the entire producer.
         owner = null;
@@ -76,7 +123,6 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     @Override public void add(int index, long value) { ensureIndex(index); write().add(index, value); }
     @Override public long removeLong(int index) { long old = getLong(index); write().remove(index, index + 1); return old; }
     @Override public void clear() {
-        hashValid = false;
         if (mutable == null) { if (points.byteSize() != 0) detach(new NativeDhMutableColumn(MemorySegment.NULL, 0, group)); }
         else mutable.remove(0, size());
     }
@@ -101,7 +147,12 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         return addAll(index, (it.unimi.dsi.fastutil.longs.LongCollection) values);
     }
     @Override public int hashCode() {
-        try { if (!hashValid) { hash = size() == 0 ? 1 : NativeDhMutableColumn.hash(data(), size()); hashValid = true; } return hash; }
+        try {
+            if (mutable != null) return mutable.hash();
+            if (sourceLease != null) return sourceLease.hash();
+            if (!hashValid) { hash = size() == 0 ? 1 : NativeDhMutableColumn.hash(data(), size()); hashValid = true; }
+            return hash;
+        }
         finally { Reference.reachabilityFence(this); }
     }
     public void remapIds(int[] ids) { write().remap(ids); }

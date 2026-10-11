@@ -326,6 +326,13 @@ unsafe fn blend(
             slice::from_raw_parts(pair[0] as *const u64, pair[1])
         };
     }
+    blend_columns(cache, center, map, x, y, z, min_y, radius,
+        &plan[..count as usize], &columns[..count as usize], out, bounded)
+}
+// Both transport routes share the exact Frozen traversal and mutation prefix.
+unsafe fn blend_columns(cache: &Cache, center: &Biome, map: &Map,
+    x: i32, y: i32, z: i32, min_y: i32, radius: i32,
+    plan: &[i32], columns: &[&[u64]], out: *mut i32, bounded: bool) -> i32 {
     let colors = match cache.0.try_lock() {
         Ok(v) => v,
         Err(TryLockError::Poisoned(e)) => e.into_inner(),
@@ -337,7 +344,7 @@ unsafe fn blend(
     let mut final_z = z;
     let relative_y = y.wrapping_sub(min_y);
     let width = (radius * 2 + 1) as usize;
-    for i in 0..count as usize {
+    for i in 0..plan.len() {
         final_x = x - radius + (i / width) as i32;
         final_z = z - radius + (i % width) as i32;
         if plan[i] < 0 {
@@ -444,3 +451,36 @@ export_blend!(mattmc_dh_tint_blend, false);
 // At most4096 point visits/49 keys, with collision/string limits above; no
 // allocation, blocking locks or callbacks. Oversized/contended inputs decline.
 export_blend!(mattmc_dh_tint_blend_bounded, true);
+
+macro_rules! export_source_blend {
+    ($name:ident, $bounded:expr) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn $name(
+            cache: *const Cache, center: *const Biome, map: *const Map,
+            source: *const super::source::Source, pos: u64,
+            x: i32, y: i32, z: i32, min_y: i32, radius: i32, out: *mut i32,
+        ) -> i32 {
+            let (Some(cache), Some(center), Some(map), Some(source)) =
+                (cache.as_ref(), center.as_ref(), map.as_ref(), source.as_ref()) else { return 0; };
+            if out.is_null() || out as usize % 4 != 0 { return 0; }
+            let mut plan = [0; 49];
+            let count = mattmc_dh_tint_plan(pos, x, z, radius, plan.as_mut_ptr());
+            if count <= 0 { return 0; }
+            let mut columns = [&[][..]; 49];
+            let mut work = 0;
+            for (i, &index) in plan[..count as usize].iter().enumerate() {
+                if index >= 0 {
+                    let Some(points) = source.column(index as usize) else { return 0; };
+                    if points.len() > 4096 { return 0; }
+                    columns[i] = points;
+                    work += points.len();
+                    if $bounded && work > 4096 { return 0; }
+                }
+            }
+            blend_columns(cache, center, map, x, y, z, min_y, radius,
+                &plan[..count as usize], &columns[..count as usize], out, $bounded)
+        }
+    };
+}
+export_source_blend!(mattmc_dh_tint_source, false);
+export_source_blend!(mattmc_dh_tint_source_bounded, true);

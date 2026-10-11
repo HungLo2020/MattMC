@@ -211,7 +211,7 @@ fn complete_ordered_occlusion_passes_match_actual_frozen_saved_columns() {
         for _ in 0..count { r.i(); opacities.push(r.byte()); }
         let mut columns: Vec<Vec<u64>> = (0..4096).map(|_| { let n = r.i(); (0..n).map(|_| r.long()).collect() }).collect();
         let policy = materials::Materials(opacities.iter().map(|&opacity| materials::Fact { opacity, air: false, liquid: false }).collect());
-        let mut batch: Vec<_> = columns.iter().cloned().map(mutable::Column).collect();
+        let mut batch: Vec<_> = columns.iter().cloned().map(mutable::Column::new).collect();
         for pass in 0..2 {
             let raw: Vec<usize> = batch.iter_mut().flat_map(|c| [c as *mut mutable::Column as usize, 0, 0]).collect();
             let mut output = vec![0usize; 4096 * 4];
@@ -227,7 +227,7 @@ fn complete_ordered_occlusion_passes_match_actual_frozen_saved_columns() {
                 removed += before - center.len(); columns[index] = center;
             }}
             for (index, column) in columns.iter().enumerate() {
-                assert_eq!(&batch[index].0, column, "{name} whole pass {pass} column {index}");
+                assert_eq!(batch[index].points(), column, "{name} whole pass {pass} column {index}");
                 assert_eq!(output[index * 4 + 1], column.len());
                 assert_eq!(r.i() as usize, column.len(), "{name} pass {pass} column {index}");
                 for &point in column { assert_eq!(r.long(), point, "{name} pass {pass} column {index}"); }

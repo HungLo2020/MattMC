@@ -517,8 +517,9 @@ public class DhLightingEngine
 		// note that this alternate logic assumes the 
 		// data point above is being lit from the top.
 		// this is a fine assumption for water and oceans.
-		for (LongList list : dataSource.dataPoints)
+		for (int columnIndex = 0; columnIndex < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; columnIndex++)
 		{
+			LongList list = dataSource.getColumn(columnIndex);
 			if (list != null)
 			{
 				for (int index = 0, size = list.size(); index < size; index++)

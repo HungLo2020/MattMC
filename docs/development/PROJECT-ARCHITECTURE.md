@@ -332,6 +332,10 @@ callbacks; it keeps no pending priority map or per-chunk task-list owner.
 [Cached DH tint neighborhoods](world/biome/RUST-DH-TINT.md) read native full-data
 columns and material identity leases. Rust owns color storage and sampling;
 Java retains resolver callbacks and projects primary cell handles/generations.
+The [retained DH source table](world/chunk/RUST-DH-SOURCE-TABLE.md) now owns live
+column leases and feeds this consumer directly, removing repeated Java
+neighborhood descriptor preparation. Source/list caller exclusion still applies;
+Java reference projections, update orchestration and persistence remain temporary.
 The author reports six synthetic CPU scenarios matching Frozen checksums with
 Current medians at or below Frozen; realistic renderer/server acceptance remains
 separate. See the owner’s source and timing limits.

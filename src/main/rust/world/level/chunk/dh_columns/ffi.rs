@@ -63,7 +63,7 @@ fn production(input: Input<'_>) -> *mut Columns {
         Some(Facts { state: if air { 0 } else { id }, air, solid: dh.solid,
             liquid: flags.contains(crate::content::block::StateFlags::HAS_FLUID), opacity: dh.opacity })
     };
-    build(input, facts).map_or(std::ptr::null_mut(), Box::into_raw)
+    build(input, facts).map_or(std::ptr::null_mut(), |value| std::sync::Arc::into_raw(std::sync::Arc::<Columns>::from(value)) as *mut Columns)
 }
 /// Ten address-sized metadata fields, valid until this owner's release:
 /// points/count, offsets, materials/count, position, chunkX/Z, compression, hash.
@@ -90,6 +90,6 @@ pub unsafe extern "C" fn mattmc_dh_columns_view(owner: *const Columns, output: *
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_columns_release(owner: *mut Columns) {
     if !owner.is_null() {
-        drop(Box::from_raw(owner));
+        drop(std::sync::Arc::from_raw(owner));
     }
 }

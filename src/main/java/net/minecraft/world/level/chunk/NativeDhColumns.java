@@ -106,6 +106,7 @@ public final class NativeDhColumns {
         catch (Throwable e) { throw new IllegalStateException("Cannot build native DH columns", e); }
         finally { Reference.reachabilityFence(sections); Reference.reachabilityFence(input); }
     }
+    MemorySegment stageSourceOwner() { return owner; }
     public long position() { return pos; }
     public int offsetX() { return (chunkX & 3) * 16; }
     public int offsetZ() { return (chunkZ & 3) * 16; }
@@ -132,4 +133,9 @@ public final class NativeDhColumns {
             return new NativeDhColumnList(this, points.asSlice(start * 8L, (end - start) * 8L));
         } finally { Reference.reachabilityFence(owner); }
     }
+    NativeDhMutableColumn sharedColumn(MemorySegment span) {
+        try { return NativeDhMutableColumn.shared(0, owner, (span.address() - points.address()) / 8, (int)(span.byteSize() / 8)); }
+        finally { Reference.reachabilityFence(this); }
+    }
+
 }

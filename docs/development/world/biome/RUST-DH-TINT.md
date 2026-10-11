@@ -2,9 +2,9 @@
 
 The current implementation moves canonical DH block/biome tint-cache storage
 and cached neighborhood sampling into
-[`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/85475b61defddd2da5e0d0a5f310093145a577d3/src/main/rust/world/level/chunk/dh_columns/tint.rs).
-The normal tint getter borrows existing native full-data column spans and the
-retained material map. It exports no point arrays and builds no second source.
+[`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/tint.rs).
+The normal tint getter reads the [retained Rust source table](../chunk/RUST-DH-SOURCE-TABLE.md)
+and material map directly. It exports no point arrays and builds no second source.
 Resolver callbacks and client registry/holder lookup remain Java. Custom wrappers,
 nonempty Java columns, oversized spans and unsupported coordinates retain the
 original callback route. This is a CPU migration, not complete color rendering
@@ -34,16 +34,16 @@ untracked raw receipts.
 - Native locks never enclose resolver callbacks. Resolver-driven traversal keeps
   Java sequencing so callbacks may mutate sources or throw. Only the cached
   traversal admits to Rust; preserve callback behavior before extending admission.
-- Existing caller exclusion pins every column and material owner through the
-  borrowed call. Column growth refreshes spans each time. Scratch pins clear in
-  `finally`; each calling thread holds at most 49 descriptors and numeric results.
-  The pure bounded plan uses a critical call over a reused heap index array.
-  A nonblocking critical blend borrows heap descriptors directly for at most
-  4,096 point visits, 49 keys, 16 hash collisions per key and 128 UTF16 units
+- Caller exclusion pins the retained source, material map and tint bindings
+  throughout the call. Rust plans the neighborhood and reads primary columns,
+  including their current extent after growth. Normal stock sources need no
+  Java point descriptors or second Java neighborhood plan.
+  The bounded critical call allocates nothing and never waits for locks; limits
+  are 4,096 point visits, 49 keys, 16 hash collisions per key and 128 UTF16 units
   per compared identity. Larger or contended inputs decline without output
-  writes and retry through a normal call with one descriptor copy. If that
-  call also declines, the original Java traversal runs. Neither call invokes
-  callbacks under a native lock.
+  writes and retry through an ordinary native call. Neither invokes callbacks
+  under a native lock. The older borrowed-descriptor adapter remains for
+  compatibility inputs, with scratch pins cleared in `finally`.
   Stock radii 0..3 and section details 6..8 admit. Overflow/custom settings decline.
 - Frozen's negative-coordinate relative-column formula is preserved, including
   truncating division after its negative offset. Do not replace it with a normal
@@ -74,6 +74,8 @@ The initial attempt to seed through a resolver required a live client and failed
 its log/partial fixture are retained. The completed recorder seeds Frozen's cache
 directly and does not claim resolver or gameplay verification.
 
+The following results are historical, before direct source-table consumption;
+current table verification is recorded in the linked source guide.
 The author reports that release `007ebaef` passes the full Rust suite: 2,547 passed, three intentionally
 ignored and zero failures. Five Java adapter controls match recorded Frozen
 answers, mutable keys, concurrent color publication, callback mutation and

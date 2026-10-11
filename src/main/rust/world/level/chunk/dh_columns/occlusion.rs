@@ -54,9 +54,8 @@ pub(crate) fn cull(center: &mut Vec<u64>, adjacent: [&[u64]; 4], transparent: &i
 pub unsafe extern "C" fn mattmc_dh_column_cull(owner: *mut Column, neighbors: *const usize, materials: *const Materials) -> i32 {
     if owner.is_null() || materials.is_null() || neighbors.is_null() || neighbors as usize % std::mem::align_of::<usize>() != 0 { return 0; }
     let raw = slice::from_raw_parts(neighbors, 8);
-    let previous = &(*owner).0;
-    let start = previous.as_ptr() as usize;
-    let end = start + previous.capacity() * 8;
+    let previous = (*owner).points();
+    let (start,end) = (*owner).allocation().unwrap_or((0,0));
     let mut adjacent = [&[][..]; 4];
     for i in 0..4 {
         let (pointer, count) = (raw[i * 2], raw[i * 2 + 1]);
@@ -67,5 +66,5 @@ pub unsafe extern "C" fn mattmc_dh_column_cull(owner: *mut Column, neighbors: *c
     }
     let facts = &(*materials).0;
     if previous.iter().chain(adjacent.iter().flat_map(|c| c.iter())).any(|p| *p as u32 as usize >= facts.len()) { return 0; }
-    if cull(&mut (*owner).0, adjacent, &|point| facts[point as u32 as usize].opacity < 16) { 2 } else { 1 }
+    if cull(Column::points_mut(owner), adjacent, &|point| facts[point as u32 as usize].opacity < 16) { 2 } else { 1 }
 }

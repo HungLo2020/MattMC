@@ -215,7 +215,7 @@ class NativeDhContributorsTest {
              var legacy = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(1));
              var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()));
              var expected = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
-            legacy.dataPoints[0] = new LongArrayList(legacy.dataPoints[0]); // Force the original per-group Java path.
+            legacy.setColumn(0, new LongArrayList(legacy.getColumn(0))); // Force the original per-group Java path.
             source.columnWorldCompressionMode.size(4095); legacy.columnWorldCompressionMode.size(4095);
             var actualError = assertThrows(IndexOutOfBoundsException.class, () -> parent.updateFromDataSource(source));
             var expectedError = assertThrows(IndexOutOfBoundsException.class, () -> expected.updateFromDataSource(legacy));

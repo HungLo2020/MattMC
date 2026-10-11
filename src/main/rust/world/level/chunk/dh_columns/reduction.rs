@@ -88,6 +88,6 @@ pub unsafe extern "C" fn mattmc_dh_column_reduce(inputs: *const usize, materials
     }
     let Some(points) = reduce(columns, &(*materials).0) else { return 0; };
     if points.is_empty() { return 1; }
-    *output = Box::into_raw(Box::new(Column(points))) as usize;
+    *output = Box::into_raw(Box::new(Column::new(points))) as usize;
     2
 }

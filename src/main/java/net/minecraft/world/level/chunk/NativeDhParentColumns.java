@@ -115,4 +115,9 @@ public final class NativeDhParentColumns {
     private static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); } catch (Throwable e) { throw new IllegalStateException(e); }
     }
+    NativeDhMutableColumn sharedColumn(MemorySegment span) {
+        try { return NativeDhMutableColumn.shared(1, owner, (span.address() - points.address()) / 8, (int)(span.byteSize() / 8)); }
+        finally { Reference.reachabilityFence(this); }
+    }
+
 }

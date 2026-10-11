@@ -7,6 +7,18 @@ worlds as saves, even when their parent directory is named `cache`.
 Cleanup histories below are implementation-author reports; this documentation
 review did not inspect their original files or rerun cleanup.
 
+## Lossless validation archival: 2026-10-10
+
+The current cleanup archived 253 large JSON diagnostics from fourteen completed
+October9 validation scopes. Each adjacent `.gz` was decompressed and its SHA256
+verified before removing the original. Actual free space increased21.08GiB;
+workspace paths, saves, screenshots, profile captures and the open investigations
+were excluded. This is archival of exact evidence bytes, not removal of results.
+The saved exact-target plan, per-file hashes and disk/worktree/prompt checks are
+in `build/native-dh-source-owner/validation-archive-*`. Restore individual paths
+with `gzip -dk -- FILE.json.gz` when an older consumer needs plain JSON; current
+archive-aware audit readers preserve declared original paths.
+
 ## Bulk retirement: 2026-10-08
 
 The [implementation author's cleanup record at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/docs/development/rendering/ARTIFACT-STORAGE.md)

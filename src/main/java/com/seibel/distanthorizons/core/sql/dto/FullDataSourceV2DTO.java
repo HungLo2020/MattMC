@@ -96,16 +96,16 @@ public class FullDataSourceV2DTO
 		FullDataSourceV2DTO dto = FullDataSourceV2DTO.CreateEmptyDataSourceForDecoding();
 		
 		// populate arrays
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedDataByteArray, null, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedDataByteArray, null, compressionModeEnum);
 		writeGenerationStepsToBlob(dataSource.columnGenerationSteps, dto.compressedColumnGenStepByteArray, compressionModeEnum);
 		writeWorldCompressionModeToBlob(dataSource, dto.compressedWorldCompressionModeByteArray, compressionModeEnum);
 		writeSemanticHorizontalContributorsToBlob(dataSource, dto.compressedSemanticHorizontalContributorByteArray, compressionModeEnum);
 		writeDataMappingToBlob(dataSource.mapping, dto.compressedMappingByteArray, compressionModeEnum);
 		// adjacent full data
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedNorthAdjDataByteArray, EDhDirection.NORTH, compressionModeEnum);
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedSouthAdjDataByteArray, EDhDirection.SOUTH, compressionModeEnum);
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedEastAdjDataByteArray, EDhDirection.EAST, compressionModeEnum);
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedWestAdjDataByteArray, EDhDirection.WEST, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedNorthAdjDataByteArray, EDhDirection.NORTH, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedSouthAdjDataByteArray, EDhDirection.SOUTH, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedEastAdjDataByteArray, EDhDirection.EAST, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedWestAdjDataByteArray, EDhDirection.WEST, compressionModeEnum);
 		
 		// populate individual variables
 		{
@@ -222,7 +222,7 @@ public class FullDataSourceV2DTO
 		// clear any old data so we can start fresh
 		for (int i = 0; i < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; i++)
 		{
-			@NotNull LongList array = dataSource.dataPoints[i];
+			@NotNull LongList array = dataSource.getColumn(i);
 			array.clear();
 			array.add(FullDataPointUtil.EMPTY_DATA_POINT);
 		}
@@ -244,17 +244,17 @@ public class FullDataSourceV2DTO
 			
 			if (this.dataFormatVersion == 1)
 			{
-				readBlobToDataSourceDataArrayV1(this.compressedDataByteArray, dataSource.dataPoints, compressionModeEnum);
+				readBlobToDataSourceDataArrayV1(this.compressedDataByteArray, dataSource, compressionModeEnum);
 			}
 			else
 			{
 				// doesn't include adjacent (ie edge) data
-				readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource.dataPoints, null, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource, null, compressionModeEnum);
 				
-				readBlobToDataSourceDataArrayV2(this.compressedNorthAdjDataByteArray, dataSource.dataPoints, EDhDirection.NORTH, compressionModeEnum);
-				readBlobToDataSourceDataArrayV2(this.compressedSouthAdjDataByteArray, dataSource.dataPoints, EDhDirection.SOUTH, compressionModeEnum);
-				readBlobToDataSourceDataArrayV2(this.compressedEastAdjDataByteArray, dataSource.dataPoints, EDhDirection.EAST, compressionModeEnum);
-				readBlobToDataSourceDataArrayV2(this.compressedWestAdjDataByteArray, dataSource.dataPoints, EDhDirection.WEST, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedNorthAdjDataByteArray, dataSource, EDhDirection.NORTH, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedSouthAdjDataByteArray, dataSource, EDhDirection.SOUTH, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedEastAdjDataByteArray, dataSource, EDhDirection.EAST, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedWestAdjDataByteArray, dataSource, EDhDirection.WEST, compressionModeEnum);
 			}
 		}
 		else
@@ -264,7 +264,7 @@ public class FullDataSourceV2DTO
 			// this is done so data sources down-stream
 			// can all be handled identically regardless of
 			// whether they're a full or partial data source
-			readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource.dataPoints, direction, compressionModeEnum);	
+			readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource, direction, compressionModeEnum);
 		}
 		
 		
@@ -316,7 +316,7 @@ public class FullDataSourceV2DTO
 	//=================//
 	
 	private static void readBlobToDataSourceDataArrayV1(
-			ByteArrayList inputCompressedDataByteArray, LongList[] outputDataLongArray,
+			ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 outputDataLongArray,
 			EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
@@ -332,7 +332,7 @@ public class FullDataSourceV2DTO
 					throw new DataCorruptedException("Read DataSource Blob data at index [" + xz + "], column length [" + dataColumnLength + "] should be greater than zero.");
 				}
 				
-				LongList dataColumn = outputDataLongArray[xz];
+				LongList dataColumn = outputDataLongArray.getColumn(xz);
 				ListUtil.clearAndSetSize(dataColumn, dataColumnLength);
 				
 				// read column data (will be skipped if no data was present)
@@ -350,7 +350,7 @@ public class FullDataSourceV2DTO
 	}
 	
 	private static void writeDataSourceDataArrayToBlobV2(
-			LongList[] inputDataArray, ByteArrayList outputByteArray,
+			FullDataSourceV2 inputDataArray, ByteArrayList outputByteArray,
 			@Nullable EDhDirection direction, EDhApiDataCompressionMode compressionModeEnum) throws IOException
 	{
 		int minX, maxX, minZ, maxZ;
@@ -383,7 +383,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x,z);
 					
-					LongList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					VarintUtil.writeVarint(compressedOut, size);
 				}
@@ -398,7 +398,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = col != null ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -429,7 +429,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -447,7 +447,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -473,7 +473,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -492,7 +492,7 @@ public class FullDataSourceV2DTO
 	}
 	private static void readBlobToDataSourceDataArrayV2(
 			ByteArrayList inputCompressedDataByteArray,
-			LongList[] outputDataLongArray,
+			FullDataSourceV2 outputDataLongArray,
 			@Nullable EDhDirection direction, EDhApiDataCompressionMode compressionModeEnum)
 			throws IOException, DataCorruptedException
 	{
@@ -525,7 +525,7 @@ public class FullDataSourceV2DTO
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
 					int count = VarintUtil.readVarint(compressedIn);
-					ListUtil.clearAndSetSize(outputDataLongArray[index], count);
+					ListUtil.clearAndSetSize(outputDataLongArray.getColumn(index), count);
 				}
 			}
 			
@@ -535,7 +535,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -551,7 +551,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -569,7 +569,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -592,7 +592,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -622,7 +622,7 @@ public class FullDataSourceV2DTO
 					for (int z = minZ; z < maxZ; z++)
 					{
 						int index = FullDataSourceV2.relativePosToIndex(x, z);
-						LongList col = outputDataLongArray[index];
+						LongList col = outputDataLongArray.getColumn(index);
 						
 						for (int i = 0; i < col.size(); i++)
 						{

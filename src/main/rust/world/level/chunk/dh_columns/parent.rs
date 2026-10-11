@@ -2,7 +2,7 @@
 use super::{contributors::{capture, Snapshot}, materials::Materials, reduction::reduce};
 
 pub(crate) struct ParentColumns {
-    points: Box<[u64]>,
+    pub(super) points: Box<[u64]>,
     offsets: Box<[usize]>,
     uniform: Box<[u8]>,
     metadata: Box<[[i8; 2]]>,
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn mattmc_dh_parent_columns_create(
     if semantics(&mut result, &columns, &flags, remap, std::slice::from_raw_parts(existing, 1024), retained as usize).is_none() {
         return std::ptr::null_mut();
     }
-    Box::into_raw(Box::new(result))
+    std::sync::Arc::into_raw(std::sync::Arc::new(result)) as *mut ParentColumns
 }
 
 #[no_mangle]
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn mattmc_dh_parent_columns_view(owner: *const ParentColum
 
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_parent_columns_release(owner: *mut ParentColumns) {
-    if !owner.is_null() { drop(Box::from_raw(owner)); }
+    if !owner.is_null() { drop(std::sync::Arc::from_raw(owner)); }
 }
 
 #[cfg(test)]

@@ -25,14 +25,14 @@ class NativeDhReductionTest {
         try (var source = FullDataSourceV2.createNative(columns); var materials = NativeDhMaterials.create(source.mapping)) {
             assertNotNull(materials); int hash = source.hashCode();
             int[] ids = java.util.stream.IntStream.range(0, source.mapping.size()).toArray();
-            var inputs = source.dataPoints.clone(); inputs[0] = new LongArrayList();
+            var inputs = source.columnReferences(); inputs[0] = new LongArrayList();
             assertNull(NativeDhParentColumns.build(materials, inputs, ids), "Custom list keeps compatibility path");
             var oversized = NativeDhColumnList.empty(); oversized.addElements(0, new long[4097]); inputs[0] = oversized;
             assertNull(NativeDhParentColumns.build(materials, inputs, ids));
             var invalid = NativeDhColumnList.empty(); invalid.add(FullDataPointUtil.encode(Integer.MAX_VALUE, 1, 0, (byte) 0, (byte) 0)); inputs[0] = invalid;
             assertNull(NativeDhParentColumns.build(materials, inputs, ids));
             int[] unsupported = new int[ids.length]; java.util.Arrays.fill(unsupported, -1);
-            assertNull(NativeDhParentColumns.build(materials, source.dataPoints, unsupported));
+            assertNull(NativeDhParentColumns.build(materials, source.columnReferences(), unsupported));
             assertEquals(hash, source.hashCode());
         } catch (com.seibel.distanthorizons.core.util.objects.DataCorruptedException e) { throw new AssertionError(e); }
     }
@@ -88,7 +88,7 @@ class NativeDhReductionTest {
                         assertEquals(in.readUnsignedByte(), wrapper.getOpacity());
                         assertEquals(in.readBoolean(), wrapper.isAir()); assertEquals(in.readBoolean(), wrapper.isLiquid());
                     }
-                    for (var column : source.dataPoints) {
+                    for (var column : source.columnReferences()) {
                         assertEquals(in.readInt(), column.size()); for (int p = 0; p < column.size(); p++) assertEquals(in.readLong(), column.getLong(p));
                     }
                     int sourceHash = source.hashCode(); assertTrue(parent.updateFromDataSource(source));
@@ -99,8 +99,8 @@ class NativeDhReductionTest {
                         assertNotNull(materials);
                         int[] identity = java.util.stream.IntStream.range(0, source.mapping.size()).toArray();
                         int[] reverse = java.util.stream.IntStream.range(0, source.mapping.size()).map(i -> source.mapping.size() - 1 - i).toArray();
-                        var quadrant = NativeDhParentColumns.build(materials, source.dataPoints, identity);
-                        var remapped = NativeDhParentColumns.build(materials, source.dataPoints, reverse);
+                        var quadrant = NativeDhParentColumns.build(materials, source.columnReferences(), identity);
+                        var remapped = NativeDhParentColumns.build(materials, source.columnReferences(), reverse);
                         assertNotNull(quadrant, name + " whole native quadrant admission");
                         assertNotNull(remapped, name + " whole native remapped quadrant admission");
                         for (int x = 0; x < 64; x += 2) for (int z = 0; z < 64; z += 2) {
@@ -125,7 +125,7 @@ class NativeDhReductionTest {
                     }
                     assertEquals(sourceHash, source.hashCode());
                     int index = FullDataSourceV2.relativePosToIndex(columns.offsetX(), columns.offsetZ());
-                    assertTrue(columns.ownsOriginalColumn(source.dataPoints[index], 0, 0));
+                    assertTrue(columns.ownsOriginalColumn(source.getColumn(index), 0, 0));
                     retained = parent.getColumnAtRelPos(ox + columns.offsetX() / 2, oz + columns.offsetZ() / 2); before = new LongArrayList(retained);
                 }
                 assertFalse(before.isEmpty()); assertEquals(before, retained, "Native parent result survives source/parent/material lease close");
@@ -147,17 +147,18 @@ class NativeDhReductionTest {
                 int[] map = java.util.stream.IntStream.range(0, source.mapping.size()).map(i -> source.mapping.size() - 1 - i).toArray();
                 for (int test = 0; test < 32; test++) {
                     byte[] steps = input.readNBytes(4096), modes = input.readNBytes(4096);
-                    var parent = NativeDhParentColumns.build(materials, source.dataPoints, map, modes, null, null, 1024, steps);
+                    var parent = NativeDhParentColumns.build(materials, source.columnReferences(), map, modes, null, null, 1024, steps);
                     assertNotNull(parent);
                     for (int x = 0; x < 32; x++) for (int z = 0; z < 32; z++) {
                         assertEquals(input.readByte(), parent.generationStep(x, z)); assertEquals(input.readByte(), parent.compressionMode(x, z));
                         var column = parent.column(x, z);
-                        var hashValid = NativeDhColumnList.class.getDeclaredField("hashValid"); hashValid.setAccessible(true);
-                        assertTrue(hashValid.getBoolean(column), "Native parent seeds the immutable hash before the first hash read");
-                        assertEquals(new LongArrayList(column).hashCode(), column.hashCode());
+                        int seededHash = column.hashCode();
+                        assertEquals(new LongArrayList(column).hashCode(), seededHash);
                         if (!column.isEmpty()) {
                             long value = column.getLong(0); column.set(0, value ^ (1L << 60));
-                            assertFalse(hashValid.getBoolean(column), "Mutation invalidates the seeded hash");
+                            int expectedHash = new LongArrayList(column).hashCode();
+                            assertNotEquals(seededHash, expectedHash, "The mutation changes the wrapped list hash");
+                            assertEquals(expectedHash, column.hashCode(), "Rust hash validity observes the mutation");
                             var oldOwner = NativeDhColumnList.class.getDeclaredField("owner"); oldOwner.setAccessible(true);
                             var oldPoints = NativeDhColumnList.class.getDeclaredField("points"); oldPoints.setAccessible(true);
                             assertNull(oldOwner.get(column), "Detached vectors stop retaining the parent producer");
@@ -166,7 +167,7 @@ class NativeDhReductionTest {
                         }
                     }
                     steps[0] ^= 0x7f; modes[0] ^= 0x7f;
-                    assertNull(NativeDhParentColumns.build(materials, source.dataPoints, map, modes, null, null, 1024, new byte[4095]));
+                    assertNull(NativeDhParentColumns.build(materials, source.columnReferences(), map, modes, null, null, 1024, new byte[4095]));
                 }
             }
             assertEquals(-1, input.read());
@@ -177,7 +178,7 @@ class NativeDhReductionTest {
              var legacy = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(1));
              var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()));
              var expected = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
-            legacy.dataPoints[0] = new LongArrayList(legacy.dataPoints[0]);
+            legacy.setColumn(0, new LongArrayList(legacy.getColumn(0)));
             for (int i = 0; i < 4096; i++) {
                 source.columnGenerationSteps.set(i, (byte)i); legacy.columnGenerationSteps.set(i, (byte)i);
                 source.columnWorldCompressionMode.set(i, (byte)(255 - i)); legacy.columnWorldCompressionMode.set(i, (byte)(255 - i));
@@ -202,7 +203,7 @@ class NativeDhReductionTest {
         var columns = NativeDhColumnsTest.savedNativeColumns(1); assertNotNull(columns);
         try (var source = FullDataSourceV2.createNative(columns); var materials = NativeDhMaterials.create(source.mapping)) {
             int[] map = java.util.stream.IntStream.range(0, source.mapping.size()).toArray();
-            var parent = NativeDhParentColumns.build(materials, source.dataPoints, map); assertNotNull(parent);
+            var parent = NativeDhParentColumns.build(materials, source.columnReferences(), map); assertNotNull(parent);
             int x = columns.offsetX() / 2, z = columns.offsetZ() / 2;
             var cleared = parent.column(x, z); var retained = parent.column(x, z); assertFalse(cleared.isEmpty());
             var expected = new LongArrayList(retained);

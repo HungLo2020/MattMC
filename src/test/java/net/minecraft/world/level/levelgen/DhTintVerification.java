@@ -50,7 +50,10 @@ public final class DhTintVerification {
         for(int i=0;i<4;i++){biomes[i]=biome("test:benchmark_tint_"+i);source.mapping.addIfNotPresentAndGetId(biomes[i],BlockStateWrapper.AIR);seed(biomes[i],colors[i]);}
         // Frozen exposes LongArrayList[] and Current LongList[]; bind that
         // storage difference once, outside both warmup and measured work.
-        var columns=(Object[])FullDataSourceV2.class.getField("dataPoints").get(source);
+        var field=FullDataSourceV2.class.getDeclaredField("dataPoints");field.setAccessible(true);
+        var columns=(Object[])field.get(source);
+            var columnGetter=FullDataSourceV2.class.getDeclaredMethod("getColumnAtRelPos",int.class,int.class);
+            for(int x=0;x<64;x++)for(int z=0;z<64;z++)if(columns[x*64+z]==null)columns[x*64+z]=columnGetter.invoke(source,x,z);
         for(int x=0;x<64;x++)for(int z=0;z<64;z++)for(int j=3;j>=0;j--)((it.unimi.dsi.fastutil.longs.LongList)columns[x*64+z]).add(FullDataPointUtil.encode((x+3*z+j)%4,8,j*8,(byte)5,(byte)15));
         Config.Client.Advanced.Graphics.Quality.lodBiomeBlending.setWithoutFiringEvents(radius);
         var getter=new TintWithoutLevelOverrider();getter.update(biomes[0],BlockStateWrapper.AIR,source,level);

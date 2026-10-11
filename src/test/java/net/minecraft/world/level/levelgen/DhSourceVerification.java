@@ -1,0 +1,67 @@
+package net.minecraft.world.level.levelgen;
+
+import com.seibel.distanthorizons.api.enums.config.EDhApiWorldCompressionMode;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import com.seibel.distanthorizons.common.wrappers.WrapperFactory;
+import com.seibel.distanthorizons.common.wrappers.block.*;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.util.FullDataPointUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import java.lang.reflect.*;
+import java.nio.file.Path;
+import java.util.Objects;
+
+/** Identical compiled source lifecycle/update workload; supplemental CPU evidence. */
+public final class DhSourceVerification {
+    private static BiomeWrapper biome() throws Exception {
+        var ctor=BiomeWrapper.class.getDeclaredConstructors()[0];ctor.setAccessible(true);
+        var value=(BiomeWrapper)ctor.newInstance(null,null);
+        var text=BiomeWrapper.class.getDeclaredField("serialString");text.setAccessible(true);text.set(value,"test:source_workflow");
+        var hash=BiomeWrapper.class.getDeclaredField("hashCode");hash.setAccessible(true);hash.setInt(value,Objects.hash("test:source_workflow"));
+        return value;
+    }
+    private static long run(String mode, FullDataSourceV2 input, FullDataSourceV2 target, it.unimi.dsi.fastutil.longs.LongList changedColumn, int rounds) throws Exception {
+        long checksum=0;
+        for(int i=0;i<rounds;i++) {
+            if(mode.equals("create")) {
+                try(var source=FullDataSourceV2.createEmpty(6)) { checksum+=source.hashCode(); }
+            } else {
+                // Existing authoritative points change before each complete update.
+                changedColumn.set(0,FullDataPointUtil.encode(0,8,24,(byte)(i&15),(byte)15));
+                checksum+=target.updateFromDataSource(input)?1:0;
+                checksum+=target.hashCode();
+            }
+        }
+        return checksum;
+    }
+    public static void main(String[] args) throws Exception {
+        String mode=args[2];if(!mode.equals("create")&&!mode.equals("merge"))throw new IllegalArgumentException(mode);
+        net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();
+        SingletonInjector.INSTANCE.bind(IWrapperFactory.class,WrapperFactory.INSTANCE);
+        var shared=(IMinecraftSharedWrapper)Proxy.newProxyInstance(IMinecraftSharedWrapper.class.getClassLoader(),new Class<?>[]{IMinecraftSharedWrapper.class},(p,m,a)->switch(m.getName()){
+            case "getInstallationDirectory"->Path.of("run").toFile();case "isDedicatedServer"->false;case "getDelayedSetupComplete"->true;default->throw new UnsupportedOperationException(m.toString());});
+        SingletonInjector.INSTANCE.bind(IMinecraftSharedWrapper.class,shared);
+        Config.Common.LodBuilding.worldCompression.setWithoutFiringEvents(EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
+        try(var input=FullDataSourceV2.createEmpty(6);var target=FullDataSourceV2.createEmpty(6)) {
+            input.mapping.addIfNotPresentAndGetId(biome(),BlockStateWrapper.AIR);
+            // Bind Frozen/Current array and return-type differences once, outside timing.
+            var field=FullDataSourceV2.class.getDeclaredField("dataPoints");field.setAccessible(true);
+            var columns=(Object[])field.get(input);
+            var getter=FullDataSourceV2.class.getDeclaredMethod("getColumnAtRelPos",int.class,int.class);
+            for(int x=0;x<64;x++)for(int z=0;z<64;z++)if(columns[x*64+z]==null)columns[x*64+z]=getter.invoke(input,x,z);
+            for(int x=0;x<64;x++)for(int z=0;z<64;z++) {
+                var list=(it.unimi.dsi.fastutil.longs.LongList)columns[x*64+z];
+                for(int j=3;j>=0;j--)list.add(FullDataPointUtil.encode(0,8,j*8,(byte)5,(byte)15));
+                input.columnGenerationSteps.set(x*64+z,EDhApiWorldGenerationStep.LIGHT.value);
+            }
+            input.isEmpty=false;
+            int rounds=Integer.parseInt(args[0]),warm=Integer.parseInt(args[1]);
+            for(int i=0;i<5;i++)run(mode,input,target,(it.unimi.dsi.fastutil.longs.LongList)columns[0],warm);
+            long start=System.nanoTime();long checksum=run(mode,input,target,(it.unimi.dsi.fastutil.longs.LongList)columns[0],rounds);long elapsed=System.nanoTime()-start;
+            System.out.println("DH_SOURCE "+elapsed+" "+checksum);
+        }
+    }
+}

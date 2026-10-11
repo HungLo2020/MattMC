@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Retained Rust DH source columns](RUST-DH-SOURCE-TABLE.md): primary column
+  leases, source replacement and direct tint consumption without Java descriptors.
+
 - [Rust DH change hashes](RUST-DH-CHANGE-HASH.md): retained-input sampling,
   cached field semantics, mutable emitter boundaries and actual Frozen replay.
 

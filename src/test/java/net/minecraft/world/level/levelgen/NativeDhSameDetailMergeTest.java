@@ -31,14 +31,14 @@ class NativeDhSameDetailMergeTest {
         var source = FullDataSourceV2.createEmpty(6);
         for (int i = 0; i < 4096; i++) {
             source.columnGenerationSteps.set(i, state[i].generation); source.columnWorldCompressionMode.set(i, state[i].compression);
-            if (state[i].points == null) source.dataPoints[i] = null;
-            else source.dataPoints[i].addElements(0, state[i].points);
+            if (state[i].points == null) source.setColumn(i, null);
+            else source.getColumn(i).addElements(0, state[i].points);
         }
         return source;
     }
     private static void forceOriginalRoute(FullDataSourceV2 source) {
-        for (int i = 0; i < 4096; i++) if (source.dataPoints[i] != null) {
-            source.dataPoints[i] = new LongArrayList(source.dataPoints[i]); return;
+        for (int i = 0; i < 4096; i++) if (source.getColumn(i) != null) {
+            source.setColumn(i, new LongArrayList(source.getColumn(i))); return;
         }
         throw new AssertionError("Fixture requires one original target reader");
     }
@@ -50,10 +50,10 @@ class NativeDhSameDetailMergeTest {
         for (int i = 0; i < 4096; i++) {
             assertEquals(expected[i].generation, source.columnGenerationSteps.getByte(i), context + " generation " + i);
             assertEquals(expected[i].compression, source.columnWorldCompressionMode.getByte(i), context + " compression " + i);
-            if (expected[i].points == null) assertNull(source.dataPoints[i], context + " null " + i);
+            if (expected[i].points == null) assertNull(source.getColumn(i), context + " null " + i);
             else {
-                assertArrayEquals(expected[i].points, source.dataPoints[i].toLongArray(), context + " points " + i);
-                assertEquals(new LongArrayList(expected[i].points).hashCode(), source.dataPoints[i].hashCode(), context + " hash " + i);
+                assertArrayEquals(expected[i].points, source.getColumn(i).toLongArray(), context + " points " + i);
+                assertEquals(new LongArrayList(expected[i].points).hashCode(), source.getColumn(i).hashCode(), context + " hash " + i);
             }
         }
     }
@@ -65,21 +65,39 @@ class NativeDhSameDetailMergeTest {
             for (int test = 0; test < 48; test++) {
                 String name = in.readUTF(); int[] remap = new int[in.readInt()]; for (int i = 0; i < remap.length; i++) remap[i] = in.readInt();
                 boolean empty = in.readBoolean(); var targetState = read(in); var inputState = read(in);
-                try (var target = source(targetState); var original = source(targetState); var input = source(inputState)) {
-                    target.isEmpty = original.isEmpty = empty; forceOriginalRoute(original);
-                    LongList[] identities = target.dataPoints.clone();
+                try (var target = source(targetState); var direct = source(targetState); var original = source(targetState); var input = source(inputState)) {
+                    target.isEmpty = direct.isEmpty = original.isEmpty = empty; forceOriginalRoute(original);
+                    LongList[] identities = target.columnReferences(), directIdentities = direct.columnReferences();
                     for (int pass = 0; pass < 2; pass++) {
                         boolean changed = in.readBoolean(), expectedEmpty = in.readBoolean(); var expected = read(in);
-                        var nativeMerge = NativeDhSameDetailMerge.prepare(target.dataPoints, input.dataPoints, target.columnGenerationSteps,
+                        var nativeMerge = NativeDhSameDetailMerge.prepare(target.columnReferences(), input.columnReferences(), target.columnGenerationSteps,
                             target.columnWorldCompressionMode, input.columnGenerationSteps, input.columnWorldCompressionMode,
                             new boolean[4096], Map.of(), Map.of(), remap);
                         assertNotNull(nativeMerge, name + " must admit actual native ABI"); assertEquals(changed, nativeMerge.changed());
-                        nativeMerge.commit(target.dataPoints);
+                        nativeMerge.commit(target.columnReferences(), target.nativeSource());
                         for (int i = 0; i < 4096; i++) if (nativeMerge.updated(i)) {
                             target.columnGenerationSteps.set(i, nativeMerge.generation(i)); target.columnWorldCompressionMode.set(i, nativeMerge.compression(i));
                             target.isEmpty = false;
-                            if (identities[i] != null) assertSame(identities[i], target.dataPoints[i]);
+                            if (identities[i] != null) assertSame(identities[i], target.getColumn(i));
                         }
+                        var retainedMerge = NativeDhSameDetailMerge.prepareSources(direct.nativeSource(),input.nativeSource(),
+                            direct.columnGenerationSteps,direct.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,
+                            new boolean[4096],Map.of(),Map.of(),remap);
+                        assertNotNull(retainedMerge,name + " retained admission"); assertEquals(changed,retainedMerge.changed());
+                        retainedMerge.commit(direct.columnReferences(),direct.nativeSource());
+                        if (retainedMerge.publishMetadata(direct.columnGenerationSteps,direct.columnWorldCompressionMode,new boolean[4096])) direct.isEmpty = false;
+                        assertEquals(0,retainedMerge.footprintActionCount(),"No contributor facts in Frozen corpus");
+                        for(int i=0;i<4096;i++) if(directIdentities[i]!=null) assertSame(directIdentities[i],direct.getColumn(i),name + " retained identity " + i);
+                        assertEquals(expectedEmpty,direct.isEmpty); check(expected,direct,name + " retained pass " + pass);
+                        // Exact saved Frozen state also exercises signed byte/null/overflow hashing.
+                        int expectedHash = Long.hashCode(6); Object[] columns = new Object[4096];
+                        var generations = new it.unimi.dsi.fastutil.bytes.ByteArrayList();
+                        var compression = new it.unimi.dsi.fastutil.bytes.ByteArrayList();
+                        for(int i=0;i<4096;i++) { columns[i]=expected[i].points==null?null:new LongArrayList(expected[i].points);
+                            generations.add(expected[i].generation); compression.add(expected[i].compression); }
+                        expectedHash=43*(17*(31*expectedHash+Arrays.deepHashCode(columns))+generations.hashCode())+compression.hashCode();
+                        long retainedHash=direct.nativeSource().tryHash(6,direct.columnGenerationSteps,direct.columnWorldCompressionMode);
+                        assertEquals(1,retainedHash>>>32,name + " retained hash admission"); assertEquals(expectedHash,(int)retainedHash,name + " saved Frozen state hash");
                         assertEquals(changed, update(original, input, remap), name + " original route flag");
                         assertEquals(expectedEmpty, target.isEmpty); assertEquals(expectedEmpty, original.isEmpty);
                         check(expected, target, name + " native pass " + pass); check(expected, original, name + " original pass " + pass);
@@ -99,10 +117,10 @@ class NativeDhSameDetailMergeTest {
             int x = columns.offsetX(), z = columns.offsetZ(), i = x * 64 + z;
             try (var input = FullDataSourceV2.createNative(columns); var target = FullDataSourceV2.createEmpty(columns.position())) {
                 input.setSemanticHorizontalUniformity(x, z, false);
-                input.setSemanticHorizontalContributors(x, z, new LongList[]{input.dataPoints[i], null, new LongArrayList(), input.dataPoints[i]});
-                var identity = target.dataPoints[i]; int sourceHash = input.hashCode();
-                assertTrue(target.updateFromDataSource(input)); assertSame(identity, target.dataPoints[i]);
-                assertEquals(input.dataPoints[i], target.dataPoints[i]); assertEquals(sourceHash, input.hashCode());
+                input.setSemanticHorizontalContributors(x, z, new LongList[]{input.getColumn(i), null, new LongArrayList(), input.getColumn(i)});
+                var identity = target.getColumn(i); int sourceHash = input.hashCode();
+                assertTrue(target.updateFromDataSource(input)); assertSame(identity, target.getColumn(i));
+                assertEquals(input.getColumn(i), target.getColumn(i)); assertEquals(sourceHash, input.hashCode());
                 retained = target.getRetainedSemanticHorizontalContributors(x, z); assertNotNull(retained);
                 var owner = retained[0].getClass().getDeclaredField("owner"); owner.setAccessible(true);
                 var batch = assertInstanceOf(NativeDhSameDetailMerge.class, owner.get(retained[0]), "Ordinary update must use complete native producer");
@@ -110,7 +128,7 @@ class NativeDhSameDetailMergeTest {
                 assertNull(lease.get(batch), "Committed readers must not retain the borrowed source array");
                 retainedPoints = new LongArrayList(retained[0]); assertThrows(UnsupportedOperationException.class, () -> target.getRetainedSemanticHorizontalContributors(x,z)[0].set(0, 9));
                 assertFalse(target.updateFromDataSource(input), "Merge-only repeat preserves Frozen change detection");
-                input.dataPoints[i].clear(); assertEquals(retainedPoints, retained[0]);
+                input.getColumn(i).clear(); assertEquals(retainedPoints, retained[0]);
             }
             assertEquals(retainedPoints, retained[0], "Committed footprints release borrowed source leases and own independent points");
         } finally { setting.setWithoutFiringEvents(previous); }
@@ -119,7 +137,7 @@ class NativeDhSameDetailMergeTest {
         try (var input = FullDataSourceV2.createEmpty(6); var target = FullDataSourceV2.createEmpty(6); var original = FullDataSourceV2.createEmpty(6)) {
             LongList[] footprint = {new LongArrayList(new long[]{0}), null, new LongArrayList(), new LongArrayList(new long[]{0})};
             for (int i = 0; i < 4096; i++) {
-                if (i < 3) { input.dataPoints[i].add(0); input.columnGenerationSteps.set(i, (byte)9); input.setSemanticHorizontalUniformity(i / 64, i % 64, i == 0); }
+                if (i < 3) { input.getColumn(i).add(0); input.columnGenerationSteps.set(i, (byte)9); input.setSemanticHorizontalUniformity(i / 64, i % 64, i == 0); }
                 if (i == 0 || i >= 100 && i < 1123) {
                     target.setSemanticHorizontalContributors(i / 64, i % 64, footprint); original.setSemanticHorizontalContributors(i / 64, i % 64, footprint);
                 }
@@ -127,7 +145,7 @@ class NativeDhSameDetailMergeTest {
             input.setSemanticHorizontalContributors(0, 1, footprint); input.setSemanticHorizontalContributors(0, 2, footprint);
             forceOriginalRoute(original); assertEquals(update(original, input, new int[]{7}), update(target, input, new int[]{7}));
             for (int i = 0; i < 4096; i++) {
-                assertEquals(original.dataPoints[i], target.dataPoints[i]); assertEquals(original.hasSemanticHorizontalUniformity(i/64,i%64), target.hasSemanticHorizontalUniformity(i/64,i%64));
+                assertEquals(original.getColumn(i), target.getColumn(i)); assertEquals(original.hasSemanticHorizontalUniformity(i/64,i%64), target.hasSemanticHorizontalUniformity(i/64,i%64));
                 assertArrayEquals(original.getSemanticHorizontalContributors(i/64,i%64), target.getSemanticHorizontalContributors(i/64,i%64));
             }
             assertNotNull(target.getSemanticHorizontalContributors(0,1)); assertNull(target.getSemanticHorizontalContributors(0,2));
@@ -136,38 +154,159 @@ class NativeDhSameDetailMergeTest {
     @Test void invalidRemapAndResizedMetadataRetainOriginalSuccessfulPrefix() throws Exception {
         for (boolean shortMetadata : new boolean[]{false,true}) {
             try (var input = FullDataSourceV2.createEmpty(6); var target = FullDataSourceV2.createEmpty(6); var original = FullDataSourceV2.createEmpty(6)) {
-                input.dataPoints[0].add(0); input.columnGenerationSteps.set(0,(byte)9);
+                input.getColumn(0).add(0); input.columnGenerationSteps.set(0,(byte)9);
                 int bad = shortMetadata ? 4095 : 1; input.columnGenerationSteps.set(bad,(byte)9);
-                input.dataPoints[bad].addElements(0,new long[]{1, shortMetadata ? 0 : 2});
+                input.getColumn(bad).addElements(0,new long[]{1, shortMetadata ? 0 : 2});
                 if (shortMetadata) input.columnWorldCompressionMode.size(4095);
                 forceOriginalRoute(original);
                 var expected = assertThrows(InvocationTargetException.class, () -> update(original,input,new int[]{7,8})).getCause();
                 var actual = assertThrows(InvocationTargetException.class, () -> update(target,input,new int[]{7,8})).getCause();
                 assertEquals(expected.getClass(),actual.getClass()); assertEquals(expected.getMessage(),actual.getMessage());
                 assertEquals(original.columnGenerationSteps,target.columnGenerationSteps); assertEquals(original.columnWorldCompressionMode,target.columnWorldCompressionMode);
-                for (int i = 0; i < 4096; i++) assertEquals(original.dataPoints[i],target.dataPoints[i],"Successful prefix column "+i);
+                for (int i = 0; i < 4096; i++) assertEquals(original.getColumn(i),target.getColumn(i),"Successful prefix column "+i);
             }
         }
     }
     @Test void listAliasesSharedMetadataAndCustomCallbacksDeclineBeforeNativePublication() throws Exception {
         try (var input = FullDataSourceV2.createEmpty(6); var target = FullDataSourceV2.createEmpty(6)) {
-            target.dataPoints[0].add(42); var old = new LongArrayList(target.dataPoints[0]);
-            input.dataPoints[0] = target.dataPoints[0]; input.columnGenerationSteps.set(0,(byte)9);
-            assertNull(NativeDhSameDetailMerge.prepare(target.dataPoints,input.dataPoints,target.columnGenerationSteps,target.columnWorldCompressionMode,
+            target.getColumn(0).add(42); var old = new LongArrayList(target.getColumn(0));
+            input.setColumn(0, target.getColumn(0)); input.columnGenerationSteps.set(0,(byte)9);
+            assertNull(NativeDhSameDetailMerge.prepare(target.columnReferences(),input.columnReferences(),target.columnGenerationSteps,target.columnWorldCompressionMode,
                 input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{0}));
-            assertEquals(old,target.dataPoints[0]);
+            assertEquals(old,target.getColumn(0));
             int[] calls = {0};
-            input.dataPoints[0] = new LongArrayList(new long[]{0}) {
+            input.setColumn(0, new LongArrayList(new long[]{0}) {
                 @Override public int size() { calls[0]++; throw new IllegalStateException("original custom size callback"); }
-            };
-            assertNull(NativeDhSameDetailMerge.prepare(target.dataPoints,input.dataPoints,target.columnGenerationSteps,target.columnWorldCompressionMode,
+            });
+            assertNull(NativeDhSameDetailMerge.prepare(target.columnReferences(),input.columnReferences(),target.columnGenerationSteps,target.columnWorldCompressionMode,
                 input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{0}));
             assertEquals(0,calls[0]);
             var error = assertThrows(InvocationTargetException.class, () -> update(target,input,new int[]{0})).getCause();
-            assertEquals("original custom size callback",error.getMessage()); assertEquals(1,calls[0]); assertEquals(old,target.dataPoints[0]);
-            input.dataPoints[0] = NativeDhColumnList.empty();
-            assertNull(NativeDhSameDetailMerge.prepare(target.dataPoints,input.dataPoints,target.columnGenerationSteps,target.columnWorldCompressionMode,
+            assertEquals("original custom size callback",error.getMessage()); assertEquals(1,calls[0]); assertEquals(old,target.getColumn(0));
+            input.setColumn(0, NativeDhColumnList.empty());
+            assertNull(NativeDhSameDetailMerge.prepare(target.columnReferences(),input.columnReferences(),target.columnGenerationSteps,target.columnWorldCompressionMode,
                 target.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{0}));
         }
     }
+    @Test void retainedPublicationDetachesProducerRecipientsAndRejectsStaleStructuralProofs() throws Exception {
+        var columns=NativeDhColumnsTest.savedNativeColumns(1);
+        int index=columns.offsetX()*64+columns.offsetZ();
+        try(var target=FullDataSourceV2.createNative(columns);var input=FullDataSourceV2.createEmpty(columns.position())) {
+            var identity=(NativeDhColumnList)target.getColumn(index);
+            assertTrue(identity.isOriginalProducerView());
+            input.getColumn(index).add(0); input.columnGenerationSteps.set(index,(byte)9);
+            input.columnWorldCompressionMode.set(index,(byte)-128);
+            var merge=NativeDhSameDetailMerge.prepareSources(target.nativeSource(),input.nativeSource(),target.columnGenerationSteps,
+                target.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{17});
+            assertNotNull(merge); merge.commit(target.columnReferences(),target.nativeSource());
+            assertTrue(merge.publishMetadata(target.columnGenerationSteps,target.columnWorldCompressionMode,new boolean[4096]));
+            assertSame(identity,target.getColumn(index)); assertFalse(identity.isOriginalProducerView());
+            assertEquals(new LongArrayList(new long[]{17}),identity); assertEquals((byte)-128,target.columnWorldCompressionMode.getByte(index));
+            var stale=NativeDhSameDetailMerge.prepareSources(target.nativeSource(),input.nativeSource(),target.columnGenerationSteps,
+                target.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{18});
+            assertNotNull(stale); target.setColumn(4095,NativeDhColumnList.empty());
+            assertThrows(IllegalStateException.class,()->stale.commit(target.columnReferences(),target.nativeSource()));
+            assertEquals(new LongArrayList(new long[]{17}),identity,"Structural changes reject before point publication");
+        }
+    }
+    @Test void retainedIdentityProofDetectsEmptyAliasesAfterAnEarlierSuccessfulAdmission() {
+        try(var target=FullDataSourceV2.createEmpty(6);var input=FullDataSourceV2.createEmpty(6)) {
+            assertNotNull(NativeDhSameDetailMerge.prepareSources(target.nativeSource(),input.nativeSource(),target.columnGenerationSteps,
+                target.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{0}));
+            target.setColumn(1,target.getColumn(0));
+            assertNull(NativeDhSameDetailMerge.prepareSources(target.nativeSource(),input.nativeSource(),target.columnGenerationSteps,
+                target.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{0}));
+            target.setColumn(1,NativeDhColumnList.empty()); input.setColumn(2,target.getColumn(0));
+            assertNull(NativeDhSameDetailMerge.prepareSources(target.nativeSource(),input.nativeSource(),target.columnGenerationSteps,
+                target.columnWorldCompressionMode,input.columnGenerationSteps,input.columnWorldCompressionMode,new boolean[4096],Map.of(),Map.of(),new int[]{0}));
+        }
+    }
+    @Test void repeatedUpdatesObserveSourceRecipientAndRemapChangesEvenWhenPointsHaveEqualHashes() throws Exception {
+        try(var target=FullDataSourceV2.createEmpty(6);var input=FullDataSourceV2.createEmpty(6)) {
+            var recipient=target.getColumn(0);var source=input.getColumn(0);
+            recipient.addElements(0,new long[]{1,0});source.addElements(0,new long[]{0,31});
+            target.columnGenerationSteps.set(0,(byte)9);input.columnGenerationSteps.set(0,(byte)9);
+            int[] ids=java.util.stream.IntStream.range(0,32).toArray();
+            assertEquals(recipient.hashCode(),source.hashCode());
+            assertFalse(update(target,input,ids));assertEquals(LongArrayList.of(0,31),recipient);
+            assertFalse(update(target,input,ids));assertSame(recipient,target.getColumn(0));
+            source.set(0,1);source.set(1,0);
+            assertFalse(update(target,input,ids));assertEquals(LongArrayList.of(1,0),recipient);
+            recipient.set(0,0);recipient.set(1,31);
+            assertFalse(update(target,input,ids));assertEquals(LongArrayList.of(1,0),recipient);
+            ids[1]=-1;assertTrue(update(target,input,ids));assertEquals(LongArrayList.of(-1,0),recipient);
+            assertFalse(update(target,input,ids));
+            ids[1]=1;assertTrue(update(target,input,ids));assertFalse(update(target,input,ids));
+            var replacement=NativeDhColumnList.empty();replacement.addElements(0,new long[]{1,0});input.setColumn(0,replacement);
+            assertFalse(update(target,input,ids));assertEquals(LongArrayList.of(1,0),recipient);
+            assertEquals(new LongArrayList(recipient).hashCode(),recipient.hashCode());
+        }
+    }
+
+    @Test void emptySourceReadersAreLazyAndClosedReadersPreservePresenceAndPointLifetime() throws Exception {
+        var source=FullDataSourceV2.createEmpty(6);
+        try {
+            var field=FullDataSourceV2.class.getDeclaredField("dataPoints");field.setAccessible(true);
+            var projections=(LongList[])field.get(source);
+            assertTrue(Arrays.stream(projections).allMatch(Objects::isNull));
+            long hash=source.nativeSource().tryHash(6,source.columnGenerationSteps,source.columnWorldCompressionMode);
+            assertEquals(1,hash>>>32); assertEquals((int)hash,source.hashCode());
+            assertTrue(Arrays.stream(projections).allMatch(Objects::isNull),"Native empty hashing must not construct Java readers");
+            // Scalar metadata edits must still affect the authoritative empty-state hash.
+            source.columnGenerationSteps.set(123,(byte)-128);source.columnWorldCompressionMode.set(456,(byte)127);
+            long edited=source.nativeSource().tryHash(6,source.columnGenerationSteps,source.columnWorldCompressionMode);
+            assertNotEquals((int)hash,(int)edited);assertTrue(Arrays.stream(projections).allMatch(Objects::isNull));
+            var uniform=FullDataSourceV2.class.getDeclaredMethod("semanticallyUniformTwoByTwo",FullDataSourceV2.class,int.class,int.class,int[].class);
+            uniform.setAccessible(true);
+            for(int index:new int[]{0,1,64,65})source.columnWorldCompressionMode.set(index,EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value);
+            assertEquals(true,uniform.invoke(null,source,0,0,new int[]{0}),"Lazy present-empty readers preserve uniformity");
+            source.setColumn(1,null);assertEquals(false,uniform.invoke(null,source,0,0,new int[]{0}),"Explicit null differs from a lazy empty reader");
+            var reader=source.getColumn(0);assertSame(reader,source.getColumn(0));
+            source.setColumn(4095,null);assertNull(source.getColumn(4095));
+            source.close();assertFalse(source.nativeSource().isLive());
+            assertThrows(IllegalStateException.class,()->source.nativeSource().stageOwner());
+            assertNull(source.getColumn(4095));assertTrue(source.getColumn(4094).isEmpty());
+            reader.add(31);assertSame(reader,source.getColumn(0));assertEquals(31,source.getColumn(0).getLong(0));
+            source.getColumn(4094).add(7);assertEquals(7,source.getColumn(4094).getLong(0));
+            assertEquals(0,source.nativeSource().tryHash(6,source.columnGenerationSteps,source.columnWorldCompressionMode));
+        } finally {if(source.nativeSource().isLive())source.close();}
+    }
+
+    @Test void lazyAndAdoptedSourceColumnsKeepGroupedLifetimeAcrossClose() throws Exception {
+        var points = NativeDhColumnList.class.getDeclaredMethod("stagePoints"); points.setAccessible(true);
+        var bindings = FullDataSourceV2.class.getDeclaredField("dataPoints"); bindings.setAccessible(true);
+        var target = FullDataSourceV2.createEmpty(6);
+        try (var input = FullDataSourceV2.createEmpty(6)) {
+            var first = target.getColumn(0); // Existing empty identity must survive adoption.
+            target.setColumn(1, null); // Missing and unprojected empty recipients both need adoption.
+            for (int i = 0; i < 3; i++) {
+                input.getColumn(i).add(0); input.columnGenerationSteps.set(i, (byte)9);
+            }
+            var merge = NativeDhSameDetailMerge.prepareSources(target.nativeSource(), input.nativeSource(),
+                target.columnGenerationSteps, target.columnWorldCompressionMode,
+                input.columnGenerationSteps, input.columnWorldCompressionMode,
+                new boolean[4096], Map.of(), Map.of(), new int[]{0});
+            assertNotNull(merge);
+            try {
+                merge.commit((LongList[])bindings.get(target), target.nativeSource());
+                assertSame(first, target.getColumn(0));
+                var scope = ((java.lang.foreign.MemorySegment)points.invoke(first)).scope();
+                for (int i = 1; i < 3; i++) {
+                    assertSame(scope, ((java.lang.foreign.MemorySegment)points.invoke(target.getColumn(i))).scope());
+                    assertEquals(LongArrayList.of(0), target.getColumn(i));
+                }
+                var lazy = target.getColumn(3); lazy.add(7);
+                assertSame(scope, ((java.lang.foreign.MemorySegment)points.invoke(lazy)).scope());
+                var retained = target.getColumn(2);
+                target.close();
+                assertFalse(target.nativeSource().isLive());
+                first.set(0, 31); retained.add(8); lazy.clear();
+                assertEquals(LongArrayList.of(31), first);
+                assertEquals(LongArrayList.of(0, 8), retained);
+                assertTrue(lazy.isEmpty());
+                assertTrue(scope.isAlive(), "Explicit table close must not invalidate retained grouped readers");
+            } finally { merge.close(); }
+        } finally { if (target.nativeSource().isLive()) target.close(); }
+    }
+
 }

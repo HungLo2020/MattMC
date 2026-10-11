@@ -489,3 +489,7 @@ realistic performance and long-memory verification remain pending.
   synthetic CPU scenarios matching Frozen checksums with Current medians at or
   below Frozen, and passing full Rust/Java suites. These reports were not rerun
   in the documentation review and do not establish whole-game acceptance.
+- **DH source state:** [retained source columns](../world/chunk/RUST-DH-SOURCE-TABLE.md)
+  move the live primary-column table and direct tint access into Rust. Java keeps
+  list identity projections and structural publication, with no point mirror.
+  Source update orchestration, metadata bytes and persistence remain to migrate.

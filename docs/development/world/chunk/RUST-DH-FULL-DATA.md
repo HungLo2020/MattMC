@@ -1,5 +1,10 @@
 # Rust DH full-data columns
 
+The subsequent [retained source table](RUST-DH-SOURCE-TABLE.md) owns the live
+column references in Rust and feeds cached tint directly. It preserves primary
+point storage and list identity across writes; source orchestration, metadata
+bytes and persistence remain transitional Java work.
+
 Mutable full-data columns use Rust
 point vectors with direct CPU readers. Native producer columns detach on their
 first mutation into independent Rust storage. Bulk list copies and ID remapping
@@ -39,9 +44,9 @@ one Rust call over existing owners. It follows Frozen's x/z and neighbor order,
 so later centers observe earlier mutations. Java stages bounded owner/view
 descriptors and consumes updated extents/hashes without exporting point values.
 CPU checks for this newer pass are recorded below; hardware/gameplay and
-performance acceptance remain pending.
+performance acceptance remain pending for those earlier checkpoints.
 
-Grouped-lifetime source reviewed at [`5dcd2501`](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a) on 2026-10-11. Earlier release evidence retains its own source scope; the results below are
+Historical grouped-lifetime source reviewed at [`5dcd2501`](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a) on 2026-10-11. Earlier release evidence retains its own source scope; the results below are
 implementation-author reports, and this review did not rerun suites or clients.
 See the [current evidence checkpoint](../../rendering/GOAL-5-STATUS.md)
 for remaining runtime, performance and sustained-memory acceptance gates.
@@ -85,15 +90,16 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
   The whole-quadrant path borrows bounded point descriptors and a semantic ID
   remap table; it exports no point values. Custom/oversized inputs or enabled
   developer order validation retain per-column compatibility sequencing.
-- The 4,096 empty lists initialized by a full-data source now share a
+- Demand-created empty lists from a full-data source share a
   [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java).
   Their mutable vectors register pointers under one automatic arena instead
   of creating one cleanup per vector. The source, grouped lists and retained
   segments keep that lifetime reachable; collection of the shared arena
   triggers the group's release callback. This is GC-driven release, not an
   explicit source-close operation or a bounded release deadline.
-- Grouping follows `empty(group)` initialization. Producer views, adopted
-  vectors and replacement lists do not automatically join a source's group;
+- Grouping follows `empty(group)` initialization and newly adopted vectors
+  in the retained-source merge. Producer views and externally replaced lists
+  do not automatically join a source's group;
   ungrouped mutable vectors keep independent arenas. Clearing a grouped list
   empties its contents without unregistering its pointer. A retained grouped
   list can therefore keep other registered vectors alive until group release.
@@ -200,7 +206,8 @@ is also retained. No full Rust or hardware acceptance follows.
 
 Final hardware suites, ordinary runtime admission, paired profiles,
 equivalent Frozen timing and memory checks remain required. An NVIDIA
-kernel/library mismatch currently prevents hardware captures; see
+kernel/library mismatch previously prevented hardware captures and was cleared
+by the user's October 10 reboot; see
 [render verification](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 Earlier release839ff128 misses vanilla p99 and DH median FPS. Neither old
 timings nor the supplemental oracle establish a speedup for this change.

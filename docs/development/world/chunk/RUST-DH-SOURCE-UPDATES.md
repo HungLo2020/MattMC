@@ -2,14 +2,17 @@
 
 The same-detail recipient merge runs
 through Rust preparation and publication over existing native point owners.
+Preparation reads the [retained source table](RUST-DH-SOURCE-TABLE.md) directly.
 Rust selects generation eligibility, remaps IDs, computes wrapped hashes and
 the global change flag, and admits/clips/remaps contributor footprints in x/z
 order. Publication copies directly into existing recipient vector capacity;
 Java does not clear/copy/remap/hash each column through separate native calls.
 
 Admitted [material maps](RUST-DH-MATERIAL-MAPS.md) now also merge identities in
-Rust. Java orchestrates update/propagation flags,
-stores public generation/compression bytes and publishes compatibility readers.
+Rust. Java orchestrates update/propagation flags and projects compatibility readers.
+Rust publishes generation/compression bytes into the existing semantic arrays;
+Java projects uniformity booleans and only the selected contributor-map actions.
+Base-state hashing also reads the retained Rust table.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.
 
@@ -26,9 +29,16 @@ Implementation: [merge policy and publication](https://github.com/HungLo2020/Mat
 
 - Keep caller exclusion across preparation and publication. Prepared source
   spans are borrowed native CPU data, not a source snapshot or a transaction.
-  The bridge pins the original source list array until publication succeeds;
+  The direct bridge pins both source tables until publication succeeds; the
+  compatibility adapter pins the original source list array.
   Rust then clears borrowed spans and Java clears that lease. Contributor
   snapshots own independent values and may survive source mutation/unload.
+- The direct route reuses source-owned identity proofs until structural binding
+  changes. Point growth cannot change primary identity. Preparation rejects
+  duplicate recipient identities and any source/recipient primary alias.
+  Direct commit checks the recipient structural version again before mutation;
+  distinct Rust-owned vectors cannot overlap. Compatibility descriptor commits
+  retain their explicit allocation-overlap and identity checks.
 - Preserve existing recipient list identity and vector capacity. Null recipients
   are adopted separately; unadopted vectors remain owned by the batch. Updating
   a native producer view detaches it before publication. There is no point-array

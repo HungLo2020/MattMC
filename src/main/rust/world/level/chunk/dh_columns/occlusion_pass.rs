@@ -7,7 +7,7 @@ use std::{mem::align_of, slice};
 struct Input { owner: *mut Column, points: *const u64, count: usize }
 impl Input {
     unsafe fn points<'a>(self) -> &'a [u64] {
-        if !self.owner.is_null() { &(*self.owner).0 }
+        if !self.owner.is_null() { (*self.owner).points() }
         else if self.count == 0 { &[] }
         else { slice::from_raw_parts(self.points, self.count) }
     }
@@ -31,9 +31,9 @@ pub unsafe extern "C" fn mattmc_dh_columns_cull_pass(raw: *const usize, policy: 
         } else {
             if input.owner as usize % align_of::<Column>() != 0 || record[1] != 0 || record[2] != 0 { return 0; }
             owners.push(record[0]);
-            let column = &(*input.owner).0;
+            let column = (*input.owner).points();
             if column.len() > 4096 { return 0; }
-            if column.capacity() != 0 { allocations.push((column.as_ptr() as usize, column.as_ptr() as usize + column.capacity() * 8)); }
+            if let Some(allocation) = (*input.owner).allocation() { allocations.push(allocation); }
         }
         if input.points().iter().any(|p| *p as u32 as usize >= facts.len()) { return 0; }
         inputs.push(input);
@@ -62,10 +62,9 @@ pub unsafe extern "C" fn mattmc_dh_columns_cull_pass(raw: *const usize, policy: 
         let i = x * 64 + z;
         if inputs[i].owner.is_null() || inputs[i].points().len() <= 1 { continue; }
         let adjacent = [i + 64, i - 64, i + 1, i - 1].map(|n| inputs[n].points());
-        if cull(&mut (*inputs[i].owner).0, adjacent, &|p| facts[p as u32 as usize].opacity < 16) {
+        if cull(Column::points_mut(inputs[i].owner), adjacent, &|p| facts[p as u32 as usize].opacity < 16) {
             output[i * 4 + 2] = 1;
-            output[i * 4 + 3] = (*inputs[i].owner).0.iter().fold(1i32, |h, &p|
-                h.wrapping_mul(31).wrapping_add((p ^ (p >> 32)) as i32)) as u32 as usize;
+            output[i * 4 + 3] = (*inputs[i].owner).hash() as u32 as usize;
         }
     }}
     for (i, input) in inputs.into_iter().enumerate() {
@@ -82,33 +81,35 @@ mod tests {
     #[test]
     fn immutable_neighbors_and_mutable_center_match_ordered_point_and_hash_output() {
         let policy = Materials(vec![Fact { opacity: 16, air: false, liquid: false }].into_boxed_slice());
-        let mut center = Column(vec![(2u64 << 44) | (1u64 << 32), (1u64 << 44) | (1u64 << 32), 1u64 << 32]);
+        let mut center = Column::new(vec![(2u64 << 44) | (1u64 << 32), (1u64 << 44) | (1u64 << 32), 1u64 << 32]);
+        let previous_hash = center.hash();
         let adjacent = [3u64 << 32];
         let mut raw = vec![0usize; 4096 * 3]; let mut out = vec![0; 4096 * 4]; let i = 65;
         raw[i * 3] = &mut center as *mut Column as usize;
         for n in [i + 64, i - 64, i + 1, i - 1] { raw[n * 3 + 1] = adjacent.as_ptr() as usize; raw[n * 3 + 2] = 1; }
         unsafe { assert_eq!(mattmc_dh_columns_cull_pass(raw.as_ptr(), &policy, out.as_mut_ptr()), 1); }
-        assert_eq!(center.0, [(1u64 << 44) | (2u64 << 32), 1u64 << 32]);
+        assert_eq!(center.points(), [(1u64 << 44) | (2u64 << 32), 1u64 << 32]);
         assert_eq!((out[i * 4 + 1], out[i * 4 + 2]), (2, 1));
-        let hash = center.0.iter().fold(1i32, |h, &p| h.wrapping_mul(31).wrapping_add((p ^ (p >> 32)) as i32));
+        let hash = center.points().iter().fold(1i32, |h, &p| h.wrapping_mul(31).wrapping_add((p ^ (p >> 32)) as i32));
         assert_eq!(out[i * 4 + 3] as u32 as i32, hash);
+        assert_eq!(center.hash(),hash); assert_ne!(previous_hash,hash);
     }
     #[test]
     fn aliases_bad_ids_and_overlapping_readers_decline_before_mutation() {
         let policy = Materials(vec![Fact { opacity: 16, air: false, liquid: false }].into_boxed_slice());
-        let mut center = Column(vec![3u64 << 32, 2u64 << 32, 1u64 << 32]);
-        let old = center.0.clone();
+        let mut center = Column::new(vec![3u64 << 32, 2u64 << 32, 1u64 << 32]);
+        let old = center.points().to_vec();
         let mut raw = vec![0usize; 4096 * 3]; let mut out = vec![99; 4096 * 4];
         let i = 64 + 1;
         raw[i * 3] = &mut center as *mut Column as usize;
         raw[(i + 64) * 3] = raw[i * 3];
         unsafe { assert_eq!(mattmc_dh_columns_cull_pass(raw.as_ptr(), &policy, out.as_mut_ptr()), 0); }
-        assert_eq!(center.0, old); assert!(out.iter().all(|&x| x == 99));
-        raw[(i + 64) * 3] = 0; raw[(i + 64) * 3 + 1] = center.0.as_ptr() as usize; raw[(i + 64) * 3 + 2] = 3;
+        assert_eq!(center.points(), old); assert!(out.iter().all(|&x| x == 99));
+        raw[(i + 64) * 3] = 0; raw[(i + 64) * 3 + 1] = center.points().as_ptr() as usize; raw[(i + 64) * 3 + 2] = 3;
         unsafe { assert_eq!(mattmc_dh_columns_cull_pass(raw.as_ptr(), &policy, out.as_mut_ptr()), 0); }
-        assert_eq!(center.0, old);
-        raw[(i + 64) * 3 + 1] = 0; raw[(i + 64) * 3 + 2] = 0; center.0[0] |= 1;
+        assert_eq!(center.points(), old);
+        raw[(i + 64) * 3 + 1] = 0; raw[(i + 64) * 3 + 2] = 0; unsafe { Column::points_mut(&mut center)[0] |= 1; }
         unsafe { assert_eq!(mattmc_dh_columns_cull_pass(raw.as_ptr(), &policy, out.as_mut_ptr()), 0); }
-        assert_eq!(center.0[0], old[0] | 1); assert!(out.iter().all(|&x| x == 99));
+        assert_eq!(center.points()[0], old[0] | 1); assert!(out.iter().all(|&x| x == 99));
     }
 }
