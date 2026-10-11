@@ -151,16 +151,22 @@ generation, so a record's presence proves it is current.
 
 The [DH column ledger](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 retains immutable packed payloads and publication/lease/route state in Rust.
-Java still walks the quadtree, supplies requested exact-material provenance
-and render parameters, and hands the selected native CPU frame reference to
-the renderer. Selected records
+The [retained visibility owner](RUST-DH-VISIBILITY.md) now walks stock camera
+topology and supplies native candidates directly to the ledger. Java retains
+generation/retrieval orchestration, requested exact-material provenance, camera
+parameters and custom/shadow traversal, and hands the selected CPU frame
+reference to the renderer. Sorted key/statistic results still cross to Java;
+selected segment records
 are copied back only for diagnostics/compatibility observers. Ordinary publication builds frontend
 assets from the ledger; exact-material provenance retains the Java publication
 path. Batched collection checks each walked container's generation before
 publication/visibility admission. Container close retires only its lease, and
 a build finishing after section close releases its new container instead of
-installing it. These changes preserve CPU lifetime without moving the DH tree
-or all frame preparation into Rust.
+installing it. Section tokens/container epochs reject stale callbacks, and
+retirement detaches an old container before closing it. Selection locks the
+visibility topology, then releases that lock before collector admission; this
+is not an atomic transaction across both owners. Java
+generation-tree ownership and broader frame preparation remain transitional.
 
 The October 10 [material-preservation policy](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 skips exact block provenance in ordinary play while retaining it for exact

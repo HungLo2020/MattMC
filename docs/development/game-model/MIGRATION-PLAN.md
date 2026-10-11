@@ -110,6 +110,12 @@ Follow the owner boundary relevant to the next change:
   contextual getter results. [Native column handoff](../rendering/RUST-DH-COLUMN-HANDOFF.md)
   now retains final buffers through ledger publication; Java arrays are requested
   for diagnostics and compatibility packet APIs.
+  [Retained DH visibility](../rendering/RUST-DH-VISIBILITY.md) now consumes
+  incremental generation-tree changes and performs stock camera traversal,
+  frustum decisions and candidate production in Rust. Java still owns the
+  generation tree, retrieval/scheduling, frame inputs and custom/shadow callbacks.
+  Sorted key results remain projected to Java; direct native candidate supply
+  does not make all frame preparation native.
   The following release narrative records successive migration and verification
   checkpoints, rather than one current acceptance result: [height fields](../world/chunk/RUST-DH-HEIGHTMAPS.md)
   scan live blocks/counters and publish immutable CPU leases. The

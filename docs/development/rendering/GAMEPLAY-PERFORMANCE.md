@@ -92,12 +92,44 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 The following release-separated matrices and lifecycle/image/profile results
 are implementation-author reports reconciled through
-[`ee809bba`](https://github.com/HungLo2020/MattMC/commit/ee809bbabbbb04707aced101c00d25d0fcdcde00).
+[`65457ef8`](https://github.com/HungLo2020/MattMC/commit/65457ef80471487cbdb4ad566e23e9eca07912bc).
 This documentation review did not rerun these workloads or inspect the
 untracked raw receipts. A settled rotating-view gate is not ordinary-play,
 first-frame, streaming, temporal or long-session memory acceptance.
 
-The newer [retained region-tape release](../world/chunk/RUST-REGION-TAPE.md)
+The latest [DH visibility release](RUST-DH-VISIBILITY.md), `ebd3c9a3`, has an
+author-reported 20-run matrix on RTX3080Ti/NVIDIA `595.99.02`: 360 settle,
+240 warmup and exactly 6,000 measured frames per run, alternating Current and
+Frozen. Vanilla + DH has four repeats per side; other modes have two. All declared runs
+are retained, with source/native/Frozen/prompt/prepared-world/shader guards and
+ten Current fingerprints reported passing.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
+|---|---:|---:|---|
+| Vanilla | 1431.4 / 1165.9 | 2.963 / 3.293 | Both pass |
+| Vanilla + DH | 795.2 / 734.0 | 3.734 / 5.110 | Both pass |
+| Shaders | 342.4 / 313.55 | 4.697 / 7.004 | Both pass |
+| Shaders + DH | 262.2 / 226.0 | 6.037 / 8.647 | Both pass |
+
+All eight measured floors pass in this settled, rotating, hidden-minimap
+workload. The author also reports seven lifecycle cases and two settled Frozen
+image pairs with zero GAL validation failures, nine Current fingerprints and
+four original images reviewed. These results do not establish first-frame,
+first-turn, temporal, sustained-streaming, long-session memory or broad gameplay
+parity. They do not isolate the visibility migration's FPS contribution.
+
+The warmed Current profile has 256 native collector samples and no Java node
+iterator samples, versus 64 iterator samples in the predecessor. Inclusive
+render-list samples are 272/278; compilation remains active, so these counts
+are diagnostic rather than an isolated CPU speedup. Receipts remain under
+`build/native-dh-visibility/`, including `gameplay/performance.json`,
+`gameplay/runtime-review.json` and `warmed-profile-comparison.json`.
+Source-author cleanup/archive records do not mean this documentation review
+performed cleanup or independently inspected those raw artifacts.
+
+## October 11 region-tape evidence
+
+The preceding [retained region-tape release](../world/chunk/RUST-REGION-TAPE.md)
 `06529556` has author-reported seven fresh lifecycle cases and two settled
 Frozen image comparisons, but no new FPS matrix. Its three CPU19 comparisons
 load/parse forty saved chunks per round: Current 12.20–12.31 ms versus Frozen
@@ -111,7 +143,9 @@ in the earlier hydration profile excludes native allocation and is not a memory
 bound. Source-author artifact retention/pruning records describe their work;
 this documentation review performed no artifact cleanup.
 
-The saved-light candidate `a15c0555` on `abbd16d3d` has a fresh 20-run matrix
+## October 11 saved-DH-light matrix
+
+The historical saved-light candidate `a15c0555` on `abbd16d3d` had a 20-run matrix
 under the restored NVIDIA `595.99.02` driver. All runs are clean, all source,
 native, untouched-Frozen and protected-prompt guards pass, and ten Current
 artifacts fingerprint this library. Protocol: alternating isolated JVMs, 360
@@ -138,7 +172,9 @@ saved-light importer calls; it cannot prove live importer admission.
 
 Receipts: `build/native-dh-saved-light/gameplay/performance.json` and paired
 artifacts under `artifacts/graphics-captures/validation/native-dh-saved-light-perf-20261011/`.
-All individual FPS values are in root `SUMMARY.md` and raw receipts. Twenty
+Individual saved-light FPS values remain in the
+[pinned summary](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/SUMMARY.md)
+and raw receipts; current root `SUMMARY.md` now records the visibility release. Twenty
 completed generated world copies were pruned after evaluation; input and result
 receipts remain. See [saved-light ownership and component checks](../world/lighting/RUST-DH-SAVED-LIGHT.md).
 

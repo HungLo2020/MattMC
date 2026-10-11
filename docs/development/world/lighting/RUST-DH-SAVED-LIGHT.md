@@ -102,7 +102,7 @@ consumed-output checksums pass. The initial runner failed to parse Frozen's
 logger-prefixed JSON; its successful process output and failure are retained.
 Only the parser changed before rerunning the complete declared comparisons.
 
-The fresh [20-run gameplay matrix](../../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+The historical [20-run gameplay matrix](../../rendering/GAMEPLAY-PERFORMANCE.md#october-11-saved-dh-light-matrix)
 is clean and passes all FPS floors plus three p99 floors. Its aggregate gate
 fails because vanilla p99 is 3.365/3.337 ms Current/Frozen. Every declared repeat
 is retained; no isolated importer FPS improvement is claimed. The clean real DH

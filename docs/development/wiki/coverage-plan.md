@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `ee809bbabbbb04707aced101c00d25d0fcdcde00`; older citations retain their reviewed source scope.
-- Latest synchronization preserves two incoming commits and all 53 paths, including twelve documents and three source-authored storage owners, from promoted cutoff `0d0a58153b420bc95fcbfc29badf08b73c4be82e`. Clean fast-forward and combined validated publication preserve source/tests and earlier wiki work. Instructions/workflows are unchanged; authored edits remain documentation only.
+- Latest non-wiki default-branch snapshot integrated: `65457ef80471487cbdb4ad566e23e9eca07912bc`; older citations retain their reviewed source scope.
+- Latest synchronization preserves one incoming commit and all 25 paths, including five documents and the source-authored retained visibility guide, from promoted cutoff `be0499204c8aaf48f64262926b7e893098285e24`. Clean fast-forward and combined validated publication preserve both source and wiki history. Instructions/workflows are unchanged; authored edits remain documentation only.
+
+- Previous non-wiki default-branch snapshot integrated: `ee809bbabbbb04707aced101c00d25d0fcdcde00`; older citations retain their reviewed source scope.
+- Previous synchronization preserves two incoming commits and all 53 paths, including twelve documents and three source-authored storage owners, from promoted cutoff `0d0a58153b420bc95fcbfc29badf08b73c4be82e`. Clean fast-forward and combined validated publication preserve source/tests and earlier wiki work. Instructions/workflows are unchanged; authored edits remain documentation only.
 
 - Previous non-wiki default-branch snapshot integrated: `b32fd91c847f3660bebec4dcc8d268efcdd589c8`; older citations retain their reviewed source scope.
 - Previous synchronization preserves two incoming commits and all 48 paths, including fourteen documents, new box/saved-light owners and source-authored drivers/fixtures, from promoted cutoff `abb76887396a810aa244d3146ea8c558a2666f67`. Clean fast-forward and combined validated publication preserve both source changes and earlier authored wiki history. Instructions/workflows are unchanged; publisher edits remain documentation only.
@@ -3235,3 +3238,11 @@ Reconciled the current [saved-palette](../world/chunk/RUST-SAVED-PALETTES.md), [
 The [Goal 5 checkpoint](../rendering/GOAL-5-STATUS.md) and [performance guide](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary) separate author-reported `06529556` CPU19 loader/lifecycle/image results from earlier primitive/hydration failures and the historical `a15c0555` FPS matrix, whose vanilla p99 still fails. This documentation review reran no runtime suites, benchmarks or captures and performed no artifact cleanup. Existing historical headings, receipts and source-owned pages remain preserved; complete game migration and broad runtime acceptance remain open.
 
 Bounded tracker crosslinks: [#774 ownership](https://github.com/HungLo2020/MattMC/issues/774#issuecomment-6109687781) and [#709 evidence](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6109689904), both open. The separate #818 recovery issue is not repaired by this loader migration.
+
+## Batch 398: Retained DH visibility and current settled evidence
+
+Reconciled [retained visibility](../rendering/RUST-DH-VISIBILITY.md), the [Java/native boundary](../rendering/JAVA-BRIDGE.md) and [retained scene](../rendering/RETAINED-SCENE.md) with native topology traversal/candidate supply and remaining Java generation, frame inputs and compatibility. Separate topology/ledger locks, identity/epoch retirement and copied sorted-result keys remain explicit.
+
+The [current checkpoint](../rendering/GOAL-5-STATUS.md) and [performance matrix](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary) now record the author's `ebd3c9a3` pass of all eight settled FPS/p99 floors, preserving older saved-light failure and region-tape component timings as historical. Generic-tree replay, lifecycle controls, author runtime reports and sampled profile limits remain distinct. This documentation review ran no game/native suites, benchmarks or captures, performed no artifact cleanup and makes no broad gameplay/streaming/memory acceptance claim.
+
+Bounded tracker crosslinks: [#777 ownership](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6110441802) and [#709 evidence](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6110443686), both open. The generic-tree oracle and deterministic mocked-close interleaving do not substitute for every production collector/concurrency path.

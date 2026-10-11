@@ -384,12 +384,13 @@ under the owner lock, releases that lock before ledger admission and retains no
 Java address or GPU handle. Explicit close drops bulk topology immediately;
 automatic FFM scope cleanup releases the wrapper after scoped users finish.
 The compatibility batched visible query receives `(column key, generation)`
-pairs. Both routes filter stale generations
-before requesting publication, sorting and admitting segments. Its count is the
-number of pairs, and the result's nine-long header includes a stale-container
-count before the sorted keys. This changed standalone buffer contract requires
+pairs; its input count is the number of pairs. Both routes filter stale
+generations before requesting publication, sorting and admitting segments.
+Both return a nine-long header, including the stale-container count, followed
+by sorted keys. This changed standalone buffer contract requires
 matching Java/native builds; it is separate from the whole-frame ABI version.
-Walk keys still cross the Java boundary; ordinary consumed segment records stay
+Native traversal candidates do not make a Java round trip, but sorted result
+keys still cross the Java boundary; ordinary consumed segment records stay
 in Rust. Explicit diagnostics and legacy inline frames retain copied records. See
 [ledger publication and selection](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
 for route gating, protection, bounds and the remaining Java producers.

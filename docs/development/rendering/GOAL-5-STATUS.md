@@ -1,6 +1,36 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** Current source review reaches
+[`65457ef8`](https://github.com/HungLo2020/MattMC/commit/65457ef80471487cbdb4ad566e23e9eca07912bc).
+[Retained DH visibility](RUST-DH-VISIBILITY.md) owns incremental topology,
+section/container identity and stock camera traversal, feeding candidates
+directly to the native collector. Java retains generation/retrieval, frame
+inputs and custom/shadow callbacks. Visibility selection and ledger admission
+use separate lock scopes; sorted key results still return to Java.
+
+The implementation author reports release `ebd3c9a3`: 2,626 Rust passes/three
+ignored, 1,978 Java cases reported (1,976 executed/two skipped), 1,280 Frozen
+walk comparisons, seven lifecycle cases and two settled image pairs. The latest
+20-run matrix passes all four median FPS and all four p99 floors. See the
+[current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+for values, repeat counts and hidden-minimap/settling limits. The older
+`a15c0555` vanilla-p99 failure remains historical below; it is no longer the
+latest measured result.
+
+This documentation review inspected source/assertions without rerunning suites,
+benchmarks or untracked captures. Generic-tree replay and separate lifecycle
+fixtures do not establish every production interleaving. Sampled native/Java
+profile counts with compiler activity do not prove an isolated speedup.
+First-frame/first-turn behavior, temporal parity, sustained streaming, long-session
+memory and broad gameplay acceptance remain open.
+
+See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6110441802)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6110443686);
+both issues remain open.
+
+## October 11 retained region-tape checkpoint
+
+The preceding source review reached
 [`ee809bba`](https://github.com/HungLo2020/MattMC/commit/ee809bbabbbb04707aced101c00d25d0fcdcde00).
 [Saved palettes](../world/chunk/RUST-SAVED-PALETTES.md),
 [decoded sections](../world/chunk/RUST-DECODED-SECTIONS.md) and
@@ -18,8 +48,9 @@ published `45a074369` are 0.722–0.735. These scoped loader timings are separat
 from earlier CPU11 hydration regressions and primitive-palette caller failures.
 They do not establish a whole-game FPS gain or sustained-streaming/memory bounds.
 
-No new FPS matrix accompanies this tape release. The latest recorded matrix
-remains the older `a15c0555` saved-DH-light result below, with vanilla p99 failing.
+No new FPS matrix accompanied this tape release. At that checkpoint the latest
+record was the `a15c0555` saved-DH-light result below, with vanilla p99 failing;
+the later visibility matrix above supersedes it as the latest measured result.
 Runtime and timing results here are author reports; this documentation review
 inspected source and assertions without rerunning suites or untracked captures.
 The owner guides preserve failed candidates, corrected test assumptions/bootstrap
@@ -51,7 +82,7 @@ Saved-input synthetic medians are 5.794/289.178 ms against Frozen and
 5.767/290.383 ms against previous Current. The sampled live DH profile contains
 no saved-importer call and does not prove live saved-light admission. All
 runtime/suite/timing results are author reports, not independently rerun here;
-see the [current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+see the [saved-light matrix](GAMEPLAY-PERFORMANCE.md#october-11-saved-dh-light-matrix)
 for hidden-HUD/settling/repeat limits and open temporal/streaming/memory gates.
 See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6108300818)
 and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6108302807);
