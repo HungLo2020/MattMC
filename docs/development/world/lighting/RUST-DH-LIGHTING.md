@@ -5,6 +5,12 @@ Java retains exact-input admission, wrapper publication, correctness flags,
 error handling and compatibility lighting. Broad gameplay and long-session
 resource acceptance remain open.
 
+The current [saved-light migration](RUST-DH-SAVED-LIGHT.md) imports ordinary
+persisted lighting directly into this Rust field owner. Generation carries the
+owner into native passes and column production; externally supplied mutable
+stores still retain compatibility behavior. Its verification is separate from
+the historical checkpoints below.
+
 Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
 implementation-author reports, and this review did not rerun suites or clients.
 See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)

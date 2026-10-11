@@ -90,6 +90,39 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
+The saved-light candidate `a15c0555` on `abbd16d3d` has a fresh 20-run matrix
+under the restored NVIDIA `595.99.02` driver. All runs are clean, all source,
+native, untouched-Frozen and protected-prompt guards pass, and ten Current
+artifacts fingerprint this library. Protocol: alternating isolated JVMs, 360
+settle frames, 240 warmup frames and exactly 6,000 measured frames; four DH
+repeats per side and two per side in other modes. All repeats are retained.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
+|---|---:|---:|---|
+| Vanilla | 1362.55 / 1148.50 | 3.365 / 3.337 | p99 fails |
+| Vanilla + DH | 877.20 / 709.40 | 2.299 / 5.322 | Both pass |
+| Shaders | 344.65 / 315.80 | 4.748 / 6.737 | Both pass |
+| Shaders + DH | 261.65 / 226.85 | 5.494 / 8.743 | Both pass |
+
+The aggregate floor gate **fails**: vanilla p99 is 0.029 ms above Frozen.
+Every FPS floor and the other three p99 floors pass. This is a settled rotating
+workload with hidden minimap and readiness restarts; it does not isolate a
+saved-light FPS improvement or establish sustained travel, startup, temporal or
+long-session memory acceptance. Seven lifecycle cases and both settled Frozen
+image pairs pass with zero reported validation errors; nine Current artifacts
+fingerprint this library and all four original images were reviewed. Existing
+color/lighting differences remain; settled images do not prove temporal parity.
+The clean diagnostic DH profile maps this exact library but does not sample
+saved-light importer calls; it cannot prove live importer admission.
+
+Receipts: `build/native-dh-saved-light/gameplay/performance.json` and paired
+artifacts under `artifacts/graphics-captures/validation/native-dh-saved-light-perf-20261011/`.
+All individual FPS values are in root `SUMMARY.md` and raw receipts. Twenty
+completed generated world copies were pruned after evaluation; input and result
+receipts remain. See [saved-light ownership and component checks](../world/lighting/RUST-DH-SAVED-LIGHT.md).
+
+## October 11 complete DH box matrix
+
 Reboot restored matching NVIDIA kernel/userspace `595.99.02`; NVML and Vulkan
 successfully enumerate the RTX3080Ti. Complete [Rust DH box production](RUST-DH-VERTICAL-FACES.md),
 native `0133e073` tested on integrated source `abb768873`, passes seven lifecycle
@@ -118,7 +151,8 @@ these repeats do not isolate the DH producer's contribution to FPS.
 
 Receipts: `build/native-dh-box-gameplay/performance.json` and paired artifacts
 under `artifacts/graphics-captures/validation/native-dh-box-perf-20261011/`.
-All individual FPS values are retained in root `SUMMARY.md` and raw receipts.
+All individual FPS values remain in the raw receipts; root `SUMMARY.md` tracks
+the newer candidate above.
 See [hardware preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 
 ## October 11 native handoff matrix

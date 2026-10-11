@@ -21,10 +21,10 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.TimerUtil;
 import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
 import com.seibel.distanthorizons.core.util.objects.UncheckedInterruptedException;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkCompoundTagParser.LoadedChunkLighting;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -294,8 +294,7 @@ public final class BatchGenerationEnvironment implements IBatchGeneratorEnvironm
 		DummyLightEngine dummyLightEngine = new DummyLightEngine(lightGetterAdaptor);
 		
 		// reused data between each offset
-		Map<DhChunkPos, ChunkLightStorage> chunkSkyLightingByDhPos = Collections.synchronizedMap(new HashMap<>());
-		Map<DhChunkPos, ChunkLightStorage> chunkBlockLightingByDhPos = Collections.synchronizedMap(new HashMap<>());
+		Map<DhChunkPos, LoadedChunkLighting> chunkLightingByDhPos = Collections.synchronizedMap(new HashMap<>());
 		Map<DhChunkPos, ChunkWrapper> chunkWrappersByDhPos = Collections.synchronizedMap(new HashMap<>());
 		
 		
@@ -320,7 +319,7 @@ public final class BatchGenerationEnvironment implements IBatchGeneratorEnvironm
 				// running async allows file IO to run in parallel when C2ME is present
 				= this.chunkFileReader.createEmptyOrPreExistingChunkWrapperAsync(
 					chunkPos.x, chunkPos.z,
-					chunkSkyLightingByDhPos, chunkBlockLightingByDhPos, chunkWrappersByDhPos);
+					chunkLightingByDhPos, chunkWrappersByDhPos);
 			
 			readFutureByDhChunkPos.put(dhChunkPos, getExistingChunkFuture);
 		}
@@ -438,29 +437,8 @@ public final class BatchGenerationEnvironment implements IBatchGeneratorEnvironm
 							ChunkWrapper chunkWrapper = new ChunkWrapper(chunk, this.dhServerLevel.getLevelWrapper());
 							chunkWrapperList.set(relX, relZ, chunkWrapper);
 							
-							// try setting the wrapper's lighting
-							if (chunkBlockLightingByDhPos.containsKey(chunkWrapper.getChunkPos()))
-							{
-								// block
-								ChunkLightStorage blockLightStorage = chunkBlockLightingByDhPos.get(chunkWrapper.getChunkPos());
-								// if the light storage is empty then we should try generating the lighting
-								// ourselves, the light data is probably missing
-								if (blockLightStorage != null
-									&& !blockLightStorage.isEmpty())
-								{
-									chunkWrapper.setBlockLightStorage(blockLightStorage);
-									chunkWrapper.setIsDhBlockLightCorrect(true);
-								}
-								
-								// sky
-								ChunkLightStorage skyLightStorage = chunkSkyLightingByDhPos.get(chunkWrapper.getChunkPos());
-								if (skyLightStorage != null
-									&& !skyLightStorage.isEmpty())
-								{
-									chunkWrapper.setSkyLightStorage(skyLightStorage);
-									chunkWrapper.setIsDhSkyLightCorrect(true);
-								}
-							}
+							var savedLighting = chunkLightingByDhPos.get(chunkWrapper.getChunkPos());
+							if (savedLighting != null) savedLighting.applyTo(chunkWrapper);
 							
 							chunkWrappersByDhPos.put(chunkPos, chunkWrapper);
 						}

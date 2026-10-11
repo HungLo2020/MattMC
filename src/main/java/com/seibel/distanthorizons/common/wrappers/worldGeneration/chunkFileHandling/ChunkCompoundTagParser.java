@@ -459,6 +459,43 @@ public class ChunkCompoundTagParser
 		
 		return combinedStorage;
 	}
+
+	/** Generation consumes a Rust light owner; public mutable imports retain readLight. */
+	public static LoadedChunkLighting readLightingForGeneration(ChunkAccess chunk, CompoundTag chunkData)
+	{
+		var field = net.minecraft.world.level.chunk.NativeDhSavedLighting.read(chunk, chunkData);
+		if (field != null) return new LoadedChunkLighting(field, null);
+		var legacy = readLight(chunk, chunkData);
+		return legacy == null ? null : new LoadedChunkLighting(null, legacy);
+	}
+
+	public static final class LoadedChunkLighting
+	{
+		private final net.minecraft.world.level.chunk.NativeDhLighting.Field field;
+		private final CombinedChunkLightStorage legacy;
+		private LoadedChunkLighting(net.minecraft.world.level.chunk.NativeDhLighting.Field field, CombinedChunkLightStorage legacy)
+		{ this.field = field; this.legacy = legacy; }
+		public net.minecraft.world.level.chunk.NativeDhLighting.Field nativeField() { return field; }
+		public void applyTo(ChunkWrapper wrapper)
+		{
+			if (field != null)
+			{
+				if (!field.hasAllocatedSections(false)) return;
+				if (wrapper.nativeDhLightingInput() != null && field.minY() == wrapper.getInclusiveMinBuildHeight()
+					&& field.maxY() == wrapper.getExclusiveMaxBuildHeight())
+				{
+					wrapper.adoptNativeDhLighting(field);
+					wrapper.setIsDhBlockLightCorrect(true);
+					wrapper.setIsDhSkyLightCorrect(true);
+					return;
+				}
+			}
+			ChunkLightStorage block = field == null ? legacy.blockLightStorage : field.copyToMutableStorage(false);
+			ChunkLightStorage sky = field == null ? legacy.skyLightStorage : field.copyToMutableStorage(true);
+			if (block != null && !block.isEmpty()) { wrapper.setBlockLightStorage(block); wrapper.setIsDhBlockLightCorrect(true); }
+			if (sky != null && !sky.isEmpty()) { wrapper.setSkyLightStorage(sky); wrapper.setIsDhSkyLightCorrect(true); }
+		}
+	}
 	/** source: https://minecraft.wiki/w/Chunk_format#Block_Format */
 	private static byte getNibbleAtIndex(byte[] arr, int index)
 	{

@@ -162,8 +162,8 @@ pub unsafe extern "C" fn mattmc_dh_light_field_view(field: *const Field, out: *m
         f.sky.data.len(),
         f.sky.offsets.as_ptr() as usize,
         f.block.offsets.len(),
-        f.sources.as_ptr() as usize,
-        f.sources.len(),
+        f.sources.as_ref().map_or(0, |s| s.as_ptr() as usize),
+        f.sources.as_ref().map_or(usize::MAX, |s| s.len()),
         f.min_y as usize,
     ]);
     1

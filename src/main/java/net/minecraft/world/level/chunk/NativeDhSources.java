@@ -44,9 +44,9 @@ public final class NativeDhSources {
         }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException("Cannot enumerate native emitters",e);}
         finally{Reference.reachabilityFence(inputs);}
     }
-    static NativeDhSources fromField(NativeDhLighting.Field field) {
+    @Nullable static NativeDhSources fromField(NativeDhLighting.Field field) {
         try {
-            var pointer=(MemorySegment)FROM_FIELD.invokeExact(field.stageOwner());if(pointer.address()==0)throw new IllegalStateException("Missing native emitter cache");
+            var pointer=(MemorySegment)FROM_FIELD.invokeExact(field.stageOwner());if(pointer.address()==0)return null;
             return new NativeDhSources(pointer,SCRATCH.get().metadata);
         }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(field);}

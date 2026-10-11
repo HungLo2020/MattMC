@@ -10,8 +10,10 @@ and contextual hooks. [Compact render-column reduction](../../rendering/RUST-DH-
 is Rust-owned, as are admitted [cached tint neighborhoods](../biome/RUST-DH-TINT.md).
 The ordinary [quad owner](../../rendering/RUST-DH-QUADS.md) now retains
 directional lists and greedy topology in Rust. Contextual resolver callbacks,
-face production and collector lifecycle orchestration remain Java, with subclass
-compatibility. [Packet planning/encoding](../../rendering/RUST-DH-PACKETS.md) and
+collector lifecycle orchestration remain Java, with subclass compatibility.
+[Complete box production](../../rendering/RUST-DH-VERTICAL-FACES.md) now owns
+ordinary visibility, stock shading, light intervals and semantic splits.
+[Packet planning/encoding](../../rendering/RUST-DH-PACKETS.md) and
 [final column handoff](../../rendering/RUST-DH-COLUMN-HANDOFF.md) now retain
 ordinary packet bytes in Rust through ledger publication. Complete Java removal
 and broad runtime acceptance remain open.
@@ -26,6 +28,11 @@ arrays and a pointer triplet buffer on every build. Java passes chunk metadata; 
 not construct dense voxel inputs or output point arrays. Outputs retain no live
 chunk, light owner or world. A bounded compatibility table resolves each unique
 block/biome wrapper once; the native material IDs remain authoritative.
+
+The current [saved-light migration](../lighting/RUST-DH-SAVED-LIGHT.md) lets
+generation supply persisted lighting through the same Rust field owner, without
+Java voxel setters or a dense reconstruction for this consumer. Its new checks
+are recorded separately from the historical results below.
 
 Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
 implementation-author reports, and this review did not rerun suites or clients.

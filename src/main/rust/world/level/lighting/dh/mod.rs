@@ -60,7 +60,7 @@ pub(crate) struct Field {
     sky: Layer,
     block_meta: Box<[Option<SectionMeta>]>,
     sky_meta: Box<[Option<SectionMeta>]>,
-    pub(crate) sources: Arc<[u32]>,
+    pub(crate) sources: Option<Arc<[u32]>>,
 }
 impl Field {
     #[cfg(test)]
@@ -71,7 +71,7 @@ impl Field {
             sky: Layer::from_cells(cells, 4),
             block_meta: SectionMeta::initial(cells, 0),
             sky_meta: SectionMeta::initial(cells, 4),
-            sources,
+            sources: Some(sources),
         }
     }
     pub(crate) fn len(&self) -> usize {
@@ -267,8 +267,8 @@ pub(crate) fn build(
                 return None;
             }
             s.positions.clone()
-        } else if let Some(p) = previous {
-            p.sources.clone()
+        } else if let Some(sources) = previous.and_then(|p| p.sources.as_ref()) {
+            sources.clone()
         } else {
             states
                 .iter()
@@ -426,7 +426,7 @@ pub(crate) fn build(
                     sky: Layer::from_cells(&c.lights, 4),
                     block_meta: c.block_meta,
                     sky_meta: c.sky_meta,
-                    sources: c.sources,
+                    sources: Some(c.sources),
                 };
                 (c.slot, field)
             })
@@ -434,6 +434,7 @@ pub(crate) fn build(
         iterations,
     })
 }
+mod saved;
 mod ffi;
 pub(crate) mod sources;
 #[cfg(test)]

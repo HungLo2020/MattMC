@@ -131,7 +131,7 @@ fn actual_frozen_all_saved_lights_and_work_counts_across_three_passes() {
                     sources::build(&refs[i], mins[i], |id| emission.get(id as usize).copied())
                         .unwrap();
                 assert_eq!(
-                    sources.positions, fields[i].sources,
+                    Some(sources.positions), fields[i].sources,
                     "Frozen first emitter enumeration {name} slot{}",
                     slots[i]
                 );
@@ -236,7 +236,7 @@ fn published_uniform_sections_are_constants_and_dense_sections_are_packed() {
     assert_eq!(dense.expand(), cells);
     assert_eq!(dense.level(1, 0, 0, false), 9);
     assert_eq!(dense.level(2, 0, 0, true), 7);
-    assert!(Arc::ptr_eq(&dense.sources, &dense.clone().sources));
+    assert!(Arc::ptr_eq(dense.sources.as_ref().unwrap(), dense.clone().sources.as_ref().unwrap()));
 }
 
 #[test]
@@ -326,7 +326,7 @@ fn actual_frozen_stale_empty_counter_reads_differ_from_raw_emitter_enumeration()
                 r.bytes(8192).as_ref(),
                 "case {case} phase {phase} all cells"
             );
-            assert_eq!(field.sources.len(), source_count as usize);
+            assert_eq!(field.sources.as_ref().unwrap().len(), source_count as usize);
             previous = Some(field);
         }
     }

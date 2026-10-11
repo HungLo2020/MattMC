@@ -90,9 +90,10 @@ pub unsafe extern "C" fn mattmc_dh_light_field_sources(field: *const Field) -> *
         return std::ptr::null_mut();
     }
     let f = &*field;
+    let Some(positions) = f.sources.as_ref() else { return std::ptr::null_mut(); };
     Box::into_raw(Box::new(Sources {
         min_y: f.min_y,
-        positions: f.sources.clone(),
+        positions: positions.clone(),
     }))
 }
 /// Three CPU metadata values: immutable u32 index data, count, minimum Y.

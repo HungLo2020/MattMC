@@ -447,4 +447,31 @@ class NativeDhColumnsTest {
         finally { if(previous==null)BiomeWrapper.WRAPPER_BY_BIOME.remove(holder);else BiomeWrapper.WRAPPER_BY_BIOME.put(holder,previous); }
         source.setPersistedStatus(ChunkStatus.EMPTY);assertNull(NativeDhColumns.build(level,wrapper,1));
     }
+    @Test void savedLightOwnerDirectlyFeedsTheWholeColumnProducer() {
+        var source=chunk(0,1);var tag=new net.minecraft.nbt.CompoundTag();var rows=new net.minecraft.nbt.ListTag();
+        for(int i=0;i<source.getSectionsForRead().length;i++) {
+            var row=new net.minecraft.nbt.CompoundTag();byte[] block=new byte[2048],sky=new byte[2048];
+            for(int n=0;n<2048;n++){block[n]=(byte)(n*17+i);sky[n]=(byte)(n*31-i);}
+            row.putByteArray("BlockLight",block);row.putByteArray("SkyLight",sky);rows.add(row);
+        }
+        tag.put("sections",rows);
+        var imported=com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkCompoundTagParser.readLightingForGeneration(source,tag);
+        assertNotNull(imported.nativeField());var actual=new ChunkWrapper(source,level);imported.applyTo(actual);
+        assertSame(imported.nativeField(),actual.nativeDhLightingInput().previous());
+        var expected=new ChunkWrapper(source,level);
+        var legacy=com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkCompoundTagParser.readLight(source,tag);
+        expected.setBlockLightStorage(legacy.blockLightStorage);expected.setSkyLightStorage(legacy.skyLightStorage);expected.setIsDhBlockLightCorrect(true);
+        try(var nativeSource=LodDataBuilder.createFromChunk(level,actual);var compatible=LodDataBuilder.createFromChunk(level,expected)) {
+            int nativeColumns=0;
+            for(int x=0;x<64;x++)for(int z=0;z<64;z++) {
+                var a=nativeSource.getColumnAtRelPos(x,z);var b=compatible.getColumnAtRelPos(x,z);
+                assertArrayEquals(b.toLongArray(),a.toLongArray());
+                if(a instanceof NativeDhColumnList column&&column.isOriginalProducerView())nativeColumns++;
+            }
+            assertEquals(256,nativeColumns,"Actual whole-producer admission with saved lighting");
+            assertEquals(compatible.mapping.size(),nativeSource.mapping.size());
+            assertEquals(compatible.mapping.hashCode(),nativeSource.mapping.hashCode());
+            assertEquals(compatible.hashCode(),nativeSource.hashCode());
+        }
+    }
 }

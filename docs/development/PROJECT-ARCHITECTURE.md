@@ -231,6 +231,12 @@ wrapper getters borrow those fields. Java retains exact-input admission,
 wrapper publication, correctness flags, mutable emitter-list projections and
 compatibility lighting. A mutable light operation detaches to Java storage;
 section-local locks do not make a whole chunk or neighborhood transactional.
+The ordinary [saved DH lighting reader](world/lighting/RUST-DH-SAVED-LIGHT.md)
+also borrows existing NBT nibbles into this owner. Rust determines skipped pairs,
+carried skylight, compact bytes and original section counters; generation carries
+one field instead of two Java light-storage maps. Imported fields defer emitter
+enumeration until its existing consumer boundary. Java retains NBT/file reads,
+wrapper admission and public mutable compatibility.
 The in-progress [DH column producer](world/chunk/RUST-DH-COLUMNS.md) borrows
 block, biome, counter, height and light owners to construct immutable points,
 material IDs and source hashes in Rust. Java publishes direct `LongList` CPU
@@ -453,8 +459,8 @@ Important current subdirectories:
 - `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics) and GAL creation. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
 - `render/dh_collector/`: the Distant Horizons column ledger: generations, column payloads, publication, retirement, owner leases, the prepared frame's visible segments and route receipts ([rendering architecture](rendering/RENDER-ARCHITECTURE.md)). Its Java exports are `render/bridge/dh_collector.rs`. Java still supplies the DH quadtree candidates, material provenance and frame parameters; native ledger ownership does not move those producers into Rust.
-- `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual resolver callbacks and faces still belong to Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
-- `render/dh_quads/`: retained ordinary quad storage, greedy topology, semantic packet plans and scoped column builds. Rust encodes final buffers and moves them directly into the ledger; Java supplies contextual scalars, lifecycle calls and requested diagnostic projections. See [quad builds](rendering/RUST-DH-QUADS.md), [packets](rendering/RUST-DH-PACKETS.md) and [native handoff](rendering/RUST-DH-COLUMN-HANDOFF.md).
+- `render/dh_columns/`: complete compact render-column reduction, exact sort ties, water/material companions and bounded worker scratch. Canonical Java consumers borrow existing CPU storage and publish directly; contextual material resolver callbacks remain Java. See [render columns](rendering/RUST-DH-RENDER-COLUMNS.md).
+- `render/dh_quads/`: retained ordinary quad storage, complete box visibility/geometry/shading, greedy topology, semantic packet plans and scoped column builds. Rust encodes final buffers and moves them directly into the ledger; Java supplies bounded contextual facts, lifecycle calls and requested diagnostic projections. See [box production](rendering/RUST-DH-VERTICAL-FACES.md), [quad builds](rendering/RUST-DH-QUADS.md), [packets](rendering/RUST-DH-PACKETS.md) and [native handoff](rendering/RUST-DH-COLUMN-HANDOFF.md).
 - `render/clouds/`: built-in DH cloud motion, placement, culling and color-change history in CPU owners. Java retains texture/API boxes, world-color queries and callbacks; see [cloud preparation](rendering/RUST-DH-CLOUDS.md).
 - `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). This does not implement native item registries or gameplay.
 - `render/scene/`: wire and data vocabulary shared by Java and the renderers, including immutable native terrain selections consumed directly by frame decoding ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).

@@ -433,7 +433,7 @@ public class ChunkWrapper implements IChunkWrapper
 		if (this.nativeSources == null)
 		{
 			var field = this.nativeLighting;
-			this.nativeSources = field != null ? field.retainSources()
+			this.nativeSources = field != null && field.sourceCount() >= 0 ? field.retainSources()
 				: net.minecraft.world.level.chunk.NativeDhSources.build(this.chunk);
 		}
 		return this.nativeSources;
@@ -593,7 +593,7 @@ public class ChunkWrapper implements IChunkWrapper
 			if (this.getClass() == ChunkWrapper.class && this.nativeSources == null)
 			{
 				var field = this.nativeLighting;
-				this.nativeSources = field != null ? field.retainSources()
+				this.nativeSources = field != null && field.sourceCount() >= 0 ? field.retainSources()
 					: net.minecraft.world.level.chunk.NativeDhSources.build(this.chunk);
 			}
 			var sources = this.nativeSources;

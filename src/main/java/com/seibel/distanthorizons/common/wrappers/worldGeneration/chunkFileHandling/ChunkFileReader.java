@@ -9,7 +9,6 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.util.ExceptionUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
 
 import net.minecraft.nbt.CompoundTag;
@@ -99,8 +98,7 @@ public class ChunkFileReader implements AutoCloseable
 	 */
 	public CompletableFuture<ChunkWrapper> createEmptyOrPreExistingChunkWrapperAsync(
 		int chunkX, int chunkZ,
-		Map<DhChunkPos, ChunkLightStorage> chunkSkyLightingByDhPos,
-		Map<DhChunkPos, ChunkLightStorage> chunkBlockLightingByDhPos,
+		Map<DhChunkPos, ChunkCompoundTagParser.LoadedChunkLighting> chunkLightingByDhPos,
 		Map<DhChunkPos, ChunkWrapper> generatedChunkWrapperByDhPos)
 	{
 		ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
@@ -117,12 +115,11 @@ public class ChunkFileReader implements AutoCloseable
 				ChunkWrapper newChunkWrapper = this.loadOrMakeChunkWrapper(chunkPos, chunkData);
 				
 				// attempt to get chunk lighting
-				ChunkCompoundTagParser.CombinedChunkLightStorage combinedLights = ChunkCompoundTagParser.readLight(newChunkWrapper.getChunk(), chunkData);
+				ChunkCompoundTagParser.LoadedChunkLighting combinedLights = ChunkCompoundTagParser.readLightingForGeneration(newChunkWrapper.getChunk(), chunkData);
 				if (combinedLights != null)
 				{
 					// may be empty, empty checks are handled later
-					chunkSkyLightingByDhPos.put(dhChunkPos, combinedLights.skyLightStorage);
-					chunkBlockLightingByDhPos.put(dhChunkPos, combinedLights.blockLightStorage);
+					chunkLightingByDhPos.put(dhChunkPos, combinedLights);
 				}
 				
 				return newChunkWrapper;

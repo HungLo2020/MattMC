@@ -9,6 +9,8 @@ contextual rendering callbacks.
 - [Rust DH lighting pass](RUST-DH-LIGHTING.md): whole native producer and
   direct CPU light consumers, executable Frozen stale-counter/escape regressions
   and separate current runtime acceptance.
+- [Rust saved DH lighting](RUST-DH-SAVED-LIGHT.md): borrowed saved nibbles,
+  native field ownership, deferred emitter caches and direct generation consumers.
 - [Rust skylight-source reconstruction](RUST-SKYLIGHT-SOURCES.md): packed scans,
   exact occlusion tables, ownership and focused acceptance checks.
 - [Rust light-map publication](RUST-LIGHT-MAPS.md): shared 64-shard snapshots,

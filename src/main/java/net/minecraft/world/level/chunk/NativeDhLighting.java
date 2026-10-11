@@ -26,6 +26,11 @@ public final class NativeDhLighting {
     private static final MethodHandle FIELD_RELEASE = handle("mattmc_dh_light_field_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle SECTION_META = handle("mattmc_dh_light_section_meta", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
+    private static final MethodHandle HAS_STORAGE = handle("mattmc_dh_light_has_storage", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    static Field adoptSaved(MemorySegment pointer) {
+        try (Arena scratch = Arena.ofConfined()) { return new Field(pointer, scratch.allocate(80, 8)); }
+    }
     public record ChunkInput(ChunkAccess chunk, NativeDhHeightmaps heights, @Nullable Field previous, @Nullable NativeDhSources sources) {}
     private static final class Scratch {
         final Arena arena = Arena.ofAuto();
@@ -106,6 +111,7 @@ public final class NativeDhLighting {
         private final MemorySegment owner,blockBytes,skyBytes,blockSections,skySections,sources;
         private final int sections;
         private final int minY;
+        private final boolean cachedSources;
         private Field(MemorySegment pointer,MemorySegment metadata) {
             Arena arena=Arena.ofAuto();boolean attached=false;
             try {
@@ -114,19 +120,20 @@ public final class NativeDhLighting {
                 long blockLength=metadata.getAtIndex(ValueLayout.JAVA_LONG,1),skyLength=metadata.getAtIndex(ValueLayout.JAVA_LONG,4);
                 long sectionCount=metadata.getAtIndex(ValueLayout.JAVA_LONG,6),sourceCount=metadata.getAtIndex(ValueLayout.JAVA_LONG,8);
                 if(sectionCount<1||sectionCount>256||blockLength<0||skyLength<0||blockLength>sectionCount*2048||skyLength>sectionCount*2048
-                    ||blockLength%2048!=0||skyLength%2048!=0||sourceCount<0||sourceCount>sectionCount*4096)throw new IllegalStateException("DH light view bounds");
+                    ||blockLength%2048!=0||skyLength%2048!=0||sourceCount < -1 ||sourceCount>sectionCount*4096)throw new IllegalStateException("DH light view bounds");
                 sections=(int)sectionCount;
                 blockBytes=metadata.getAtIndex(ValueLayout.ADDRESS,0).reinterpret(blockLength,arena,null).asReadOnly();
                 blockSections=metadata.getAtIndex(ValueLayout.ADDRESS,2).reinterpret(sectionCount*4,arena,null).asReadOnly();
                 skyBytes=metadata.getAtIndex(ValueLayout.ADDRESS,3).reinterpret(skyLength,arena,null).asReadOnly();
                 skySections=metadata.getAtIndex(ValueLayout.ADDRESS,5).reinterpret(sectionCount*4,arena,null).asReadOnly();
-                sources=metadata.getAtIndex(ValueLayout.ADDRESS,7).reinterpret(sourceCount*4,arena,null).asReadOnly();
+                cachedSources = sourceCount >= 0;
+                sources=metadata.getAtIndex(ValueLayout.ADDRESS,7).reinterpret(Math.max(0,sourceCount)*4,arena,null).asReadOnly();
                 minY=(int)metadata.getAtIndex(ValueLayout.JAVA_LONG,9);
             } catch(RuntimeException|Error e) {if(!attached)releaseField(pointer);throw e;}
             catch(Throwable e) {if(!attached)releaseField(pointer);throw new IllegalStateException("Cannot adopt DH lights",e);}
         }
         MemorySegment stageOwner(){return owner;}
-        public NativeDhSources retainSources(){return NativeDhSources.fromField(this);}
+        @Nullable public NativeDhSources retainSources(){return NativeDhSources.fromField(this);}
         public int minY(){return minY;}
         public int maxY(){return minY+sections*16;}
         public int light(int x,int y,int z,boolean sky) {
@@ -140,7 +147,17 @@ public final class NativeDhLighting {
                 return(packed>>((index&1)*4))&15;
             } finally {Reference.reachabilityFence(this);}
         }
-        public int sourceCount(){return(int)(sources.byteSize()/4);}
+        /** -1 means the first emitter enumeration has not happened yet. */
+        public int sourceCount(){return cachedSources ? (int)(sources.byteSize()/4) : -1;}
+        public boolean hasAllocatedSections(boolean sky) {
+            try {
+                int result = (int)HAS_STORAGE.invokeExact(owner,sky ? 1 : 0);
+                if(result < 0) throw new IllegalStateException("Invalid DH light allocation state");
+                return result == 1;
+            } catch(RuntimeException | Error e) { throw e; }
+            catch(Throwable e) { throw new IllegalStateException("Cannot query DH light allocation",e); }
+            finally { Reference.reachabilityFence(this); }
+        }
         /** Transfer exact retained policy state when a public mutation escapes. */
         public com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage copyToMutableStorage(boolean sky) {
             var storage = sky

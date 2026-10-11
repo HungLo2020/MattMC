@@ -108,7 +108,12 @@ Follow the owner boundary relevant to the next change:
   [lighting and emitter owners](../world/lighting/RUST-DH-LIGHTING.md) perform
   admitted whole passes and serve direct chunk light reads. Java retains strict
   admission, wrapper publication, flags, public mutable projections and fallback
-  behavior. The in-progress [column producer](../world/chunk/RUST-DH-COLUMNS.md)
+  behavior. The [saved-light reader](../world/lighting/RUST-DH-SAVED-LIGHT.md)
+  now imports borrowed saved nibbles into the same native field, preserving
+  allocation/counter policy and deferred emitter enumeration. Generation carries
+  one field to native light/column consumers; Java still owns NBT/file reads and
+  compatibility wrappers. Its guide records the separate current verification.
+  The in-progress [column producer](../world/chunk/RUST-DH-COLUMNS.md)
   now owns admitted voxel scans, material IDs, immutable points and source hashes;
   `LongList` consumers read CPU views without a point-array projection. Java
   retains mutable recipient merges, orchestration and contextual hooks. Final CPU
