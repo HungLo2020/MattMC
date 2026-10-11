@@ -1,9 +1,7 @@
 package net.minecraft.client.player;
 
-import com.google.common.collect.Lists;
 import net.logging.LogUtils;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
 import net.minecraft.api.EnvType;
@@ -23,15 +21,11 @@ import net.minecraft.client.gui.screens.inventory.TestBlockEditScreen;
 import net.minecraft.client.gui.screens.inventory.TestInstanceBlockEditScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.resources.sounds.AmbientSoundHandler;
-import net.minecraft.client.resources.sounds.BiomeAmbientSoundsHandler;
-import net.minecraft.client.resources.sounds.BubbleColumnAmbientSoundHandler;
 import net.minecraft.client.resources.sounds.ElytraOnPlayerSoundInstance;
 import net.minecraft.client.resources.sounds.RidingHappyGhastSoundInstance;
 import net.minecraft.client.resources.sounds.RidingMinecartSoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.client.resources.sounds.UnderwaterAmbientSoundHandler;
-import net.minecraft.client.resources.sounds.UnderwaterAmbientSoundInstances;
+import net.minecraft.client.sounds.LocalPlayerAmbience;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -110,7 +104,7 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	public final ClientPacketListener connection;
 	private final StatsCounter stats;
 	private final TickThrottler dropSpamThrottler = new TickThrottler(20, 1280);
-	private final List<AmbientSoundHandler> ambientSoundHandlers = Lists.<AmbientSoundHandler>newArrayList();
+	private final LocalPlayerAmbience ambience;
 	private int permissionLevel = 0;
 	private double xLast;
 	private double yLast;
@@ -164,9 +158,7 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		this.stats = statsCounter;
 		this.lastSentInput = input;
 		this.wasSprinting = bl;
-		this.ambientSoundHandlers.add(new UnderwaterAmbientSoundHandler(this, minecraft.getSoundManager()));
-		this.ambientSoundHandlers.add(new BubbleColumnAmbientSoundHandler(this));
-		this.ambientSoundHandlers.add(new BiomeAmbientSoundsHandler(this, minecraft.getSoundManager(), clientLevel.getBiomeManager()));
+		this.ambience = new LocalPlayerAmbience(this, clientLevel.getBiomeManager());
 	}
 
 	public void heal(float f) {
@@ -223,20 +215,12 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 				this.sendPosition();
 			}
 
-			for (AmbientSoundHandler ambientSoundHandler : this.ambientSoundHandlers) {
-				ambientSoundHandler.tick();
-			}
+			this.ambience.tick();
 		}
 	}
 
 	public float getCurrentMood() {
-		for (AmbientSoundHandler ambientSoundHandler : this.ambientSoundHandlers) {
-			if (ambientSoundHandler instanceof BiomeAmbientSoundsHandler) {
-				return ((BiomeAmbientSoundsHandler)ambientSoundHandler).getMoodiness();
-			}
-		}
-
-		return 0.0F;
+		return this.ambience.getMoodiness();
 	}
 
 	private void sendPosition() {
@@ -1140,7 +1124,7 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		} else {
 			if (!bl && bl2) {
 				this.level().playLocalSound(this.getX(), this.getY(), this.getZ(), SoundEvents.AMBIENT_UNDERWATER_ENTER, SoundSource.AMBIENT, 1.0F, 1.0F, false);
-				this.minecraft.getSoundManager().play(new UnderwaterAmbientSoundInstances.UnderwaterAmbientSoundInstance(this));
+				this.ambience.playUnderwaterLoop();
 			}
 
 			if (bl && !bl2) {
@@ -1189,12 +1173,6 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 
 	@Override
 	public float getCurrentConstantMood() {
-		for (AmbientSoundHandler ambientSoundHandler : this.ambientSoundHandlers) {
-			if (ambientSoundHandler instanceof net.minecraft.client.resources.sounds.BiomeAmbientSoundsHandler handler) {
-				return handler.getConstantMood();
-			}
-		}
-
-		return 0.0F;
+		return this.ambience.getConstantMood();
 	}
 }

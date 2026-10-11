@@ -29,7 +29,9 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.util.profiling.Zone;
 import net.minecraft.util.valueproviders.ConstantFloat;
@@ -202,12 +204,31 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 		return this.soundEngine.isActive(soundInstance);
 	}
 
-	public void addListener(SoundEventListener soundEventListener) {
-		this.soundEngine.addEventListener(soundEventListener);
+	/**
+	 * Plays a seeded world sound event (`ClientLevel.playSound`); Rust
+	 * resolves it like a `SimpleSoundInstance` with `RandomSource.create(seed)`.
+	 * A positive `delay` waits that many ticks.
+	 */
+	public void playEvent(SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch, long seed, double x, double y, double z, int delay) {
+		this.soundEngine.playEvent(soundEvent.location(), soundSource, volume, pitch, seed, x, y, z, delay);
 	}
 
-	public void removeListener(SoundEventListener soundEventListener) {
-		this.soundEngine.removeEventListener(soundEventListener);
+	/** The options screen's volume slider preview (`SoundPreviewHandler`). */
+	public void preview(SoundSource soundSource, float volume) {
+		NativeSoundClient.preview(soundSource.ordinal(), volume);
+	}
+
+	/** Starts or stops recording subtitles for the overlay. */
+	public void setSubtitlesListening(boolean listening) {
+		NativeSoundClient.subtitlesListen(listening, SharedConstants.DEBUG_SUBTITLES);
+	}
+
+	/**
+	 * The subtitles audible from `listener` this frame, their expired plays
+	 * purged after `displayMillis`, in draw order.
+	 */
+	public List<SoundSubtitle> subtitleFrame(Vec3 listener, double displayMillis) {
+		return NativeSoundClient.subtitleFrame(listener.x, listener.y, listener.z, displayMillis);
 	}
 
 	public void stop(@Nullable ResourceLocation resourceLocation, @Nullable SoundSource soundSource) {

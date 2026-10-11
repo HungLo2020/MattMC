@@ -1,6 +1,6 @@
-//! Playback policy (`SoundEngine` without the Java instance objects).
+//! Playback policy (`SoundEngine` without the instance objects).
 //!
-//! Tracks active instances by Java instance ID, category volumes, the
+//! Tracks active instances by instance ID, category volumes, the
 //! minimum source lifetime, delayed and manually looping playback,
 //! pause-except and released-source cleanup. It is device-free: every audio
 //! effect becomes a [`VoiceOp`] the device-owner thread executes in order, so
@@ -20,10 +20,14 @@ use super::super::commands::{
 };
 use super::super::listener::ListenerTransform;
 use super::assets::{AssetCache, AssetLookup};
+use super::rules::clamp;
 
 /// `SoundSource` ordinals.
 pub(crate) const CATEGORY_COUNT: usize = 11;
 pub(crate) const CATEGORY_MUSIC: u8 = 1;
+pub(crate) const CATEGORY_PLAYERS: u8 = 7;
+pub(crate) const CATEGORY_AMBIENT: u8 = 8;
+pub(crate) const CATEGORY_UI: u8 = 10;
 /// `MIN_SOURCE_LIFETIME` in ticks.
 const MIN_SOURCE_LIFETIME: i32 = 20;
 
@@ -120,17 +124,6 @@ impl Default for Policy {
             assets: AssetCache::default(),
             ops: Vec::new(),
         }
-    }
-}
-
-/// `Mth.clamp`: `value < min ? min : Math.min(value, max)`, so NaN stays NaN.
-fn clamp(value: f32, min: f32, max: f32) -> f32 {
-    if value < min {
-        min
-    } else if value.is_nan() || value <= max {
-        value
-    } else {
-        max
     }
 }
 

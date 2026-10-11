@@ -56,5 +56,6 @@ nav:
       - Audio:
           - Overview: development/audio/index.md
           - Sound Engine: development/audio/SOUND-ENGINE.md
+          - Client Sounds: development/audio/CLIENT-SOUNDS.md
   - Changelog: changelog/CHANGELOG.md
   - Changes: changes/changes.md

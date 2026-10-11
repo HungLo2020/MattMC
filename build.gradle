@@ -556,6 +556,8 @@ tasks.withType(Test).configureEach {
     inputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
             .withPropertyName('mattmcRustNativeLibrary')
     systemProperty 'mattmc.rust.natives.dir', rustBuiltNativesDir.get().asFile.absolutePath
+    // Sound engine tests open OpenAL's silent null device, never real hardware.
+    environment 'ALSOFT_DRIVERS', 'null'
     jvmArgs rustNativeJvmArgs
     def corpusReplayInput = providers.gradleProperty('mattmcMeshingCorpusReplayInput')
     if (corpusReplayInput.isPresent()) {

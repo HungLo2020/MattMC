@@ -401,8 +401,9 @@ retains admitted cached box geometry exported by Java once; Rust derives DH
 solidity and opacity using that geometry and existing block-registry facts.
 Dynamic/custom shape providers and incompatible policies keep Java callbacks.
 The catalog does not migrate shape construction or contextual collision queries.
-Playback resources, resolution and playback policy live in `audio/`; Java
-retains sound instances, listeners and pack reads. Block-family configuration and state policy do
+Playback resources, resolution, playback policy, music, ambience and
+subtitles live in `audio/`; Java retains sound instance objects, entity
+samples and pack reads. Block-family configuration and state policy do
 not migrate world callbacks, scheduling or entity queries. General gameplay remains Java.
 
 [`content/fluid`](game-model/FLUID-DEFINITIONS.md) owns built-in fluid names,
@@ -448,14 +449,17 @@ transitional world asset transport; map palette data stays in `content/`. Future
 
 The [native audio backend](https://github.com/HungLo2020/MattMC/blob/ed8dc5714631e0e55d31dbd448789f21a47bedf6/src/main/rust/audio/mod.rs)
 owns playback resources, device-local buffers and decoding. Its `policy/`
-module owns `sounds.json` resolution, the asset cache, playback policy and
-the audio thread that owns the device; see [audio development](audio/index.md).
-Java [`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/ed8dc5714631e0e55d31dbd448789f21a47bedf6/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
-keeps `SoundInstance` objects, listeners and pack IO. Sound-event, profile and
+module owns `sounds.json` resolution, the asset cache, playback policy, the
+audio thread that owns (and reopens) the device, the vanilla tickables'
+rules, music, ambience, subtitles and the preview; see
+[audio development](audio/index.md). Java
+[`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
+keeps the `SoundInstance` objects gameplay code creates, their entity samples,
+pack IO and the UI drawing. Sound-event, profile and
 instrument identities belong to `content/sound/`, independent of those
 reloadable resources. The [verification scope](audio/SOUND-ENGINE.md#verification-scope)
 keeps policy/FFI tests separate from audible hardware and reload/shutdown
-acceptance; the native command thread persists across device cleanup.
+acceptance; the native command thread persists across device cleanup and reopening.
 
 ### `network/`
 

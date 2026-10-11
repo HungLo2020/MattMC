@@ -4,15 +4,13 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.NewMinecartBehavior;
 
+/** The inside-the-minecart sound (above or under water); rule in Rust. */
 @Environment(EnvType.CLIENT)
-public class RidingMinecartSoundInstance extends AbstractTickableSoundInstance {
-	private static final float VOLUME_MIN = 0.0F;
-	private static final float VOLUME_MAX = 0.75F;
+public class RidingMinecartSoundInstance extends RuledTickableSoundInstance {
 	private final Player player;
 	private final AbstractMinecart minecart;
 	private final boolean underwaterSound;
@@ -39,19 +37,21 @@ public class RidingMinecartSoundInstance extends AbstractTickableSoundInstance {
 	}
 
 	@Override
-	public void tick() {
-		if (this.minecart.isRemoved() || !this.player.isPassenger() || this.player.getVehicle() != this.minecart) {
-			this.stop();
-		} else if (this.underwaterSound != this.player.isUnderWater()) {
-			this.volume = 0.0F;
-		} else {
-			float f = (float)this.minecart.getDeltaMovement().horizontalDistance();
-			boolean bl = !this.minecart.isOnRails() && this.minecart.getBehavior() instanceof NewMinecartBehavior;
-			if (f >= 0.01F && !bl) {
-				this.volume = Mth.clampedLerp(0.0F, 0.75F, f);
-			} else {
-				this.volume = 0.0F;
-			}
-		}
+	public int soundRule() {
+		return RULE_RIDING_MINECART;
+	}
+
+	@Override
+	public int soundRuleParameter() {
+		return this.underwaterSound ? 1 : 0;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_REMOVED, this.minecart.isRemoved());
+		sample.flag(SAMPLE_RIDING, this.player.isPassenger() && this.player.getVehicle() == this.minecart);
+		sample.flag(SAMPLE_UNDERWATER, this.player.isUnderWater());
+		sample.flag(SAMPLE_OFF_RAILS, !this.minecart.isOnRails() && this.minecart.getBehavior() instanceof NewMinecartBehavior);
+		sample.value = (float)this.minecart.getDeltaMovement().horizontalDistance();
 	}
 }

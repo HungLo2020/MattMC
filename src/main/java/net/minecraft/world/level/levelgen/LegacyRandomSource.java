@@ -48,6 +48,16 @@ public class LegacyRandomSource implements BitRandomSource {
 		}
 	}
 
+	/** The scrambled 48-bit state, for native code that continues this sequence. */
+	public long rawSeed() {
+		return this.seed.get();
+	}
+
+	/** Continues from a scrambled state written back by native code (the Gaussian cache is untouched). */
+	public void setRawSeed(long l) {
+		this.seed.set(l & 281474976710655L);
+	}
+
 	@Override
 	public double nextGaussian() {
 		return this.gaussianSource.nextGaussian();

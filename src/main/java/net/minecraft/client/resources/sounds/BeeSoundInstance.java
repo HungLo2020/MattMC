@@ -5,16 +5,12 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.animal.Bee;
 
+/** A bee's buzz; Rust runs its speed rule and the switch to the other loop. */
 @Environment(EnvType.CLIENT)
-public abstract class BeeSoundInstance extends AbstractTickableSoundInstance {
-	private static final float VOLUME_MIN = 0.0F;
-	private static final float VOLUME_MAX = 1.2F;
-	private static final float PITCH_MIN = 0.0F;
+public abstract class BeeSoundInstance extends RuledTickableSoundInstance {
 	protected final Bee bee;
-	private boolean hasSwitched;
 
 	public BeeSoundInstance(Bee bee, SoundEvent soundEvent, SoundSource soundSource) {
 		super(soundEvent, soundSource, SoundInstance.createUnseededRandom());
@@ -28,39 +24,6 @@ public abstract class BeeSoundInstance extends AbstractTickableSoundInstance {
 	}
 
 	@Override
-	public void tick() {
-		boolean bl = this.shouldSwitchSounds();
-		if (bl && !this.isStopped()) {
-			Minecraft.getInstance().getSoundManager().queueTickingSound(this.getAlternativeSoundInstance());
-			this.hasSwitched = true;
-		}
-
-		if (!this.bee.isRemoved() && !this.hasSwitched) {
-			this.x = (float)this.bee.getX();
-			this.y = (float)this.bee.getY();
-			this.z = (float)this.bee.getZ();
-			float f = (float)this.bee.getDeltaMovement().horizontalDistance();
-			if (f >= 0.01F) {
-				this.pitch = Mth.lerp(Mth.clamp(f, this.getMinPitch(), this.getMaxPitch()), this.getMinPitch(), this.getMaxPitch());
-				this.volume = Mth.lerp(Mth.clamp(f, 0.0F, 0.5F), 0.0F, 1.2F);
-			} else {
-				this.pitch = 0.0F;
-				this.volume = 0.0F;
-			}
-		} else {
-			this.stop();
-		}
-	}
-
-	private float getMinPitch() {
-		return this.bee.isBaby() ? 1.1F : 0.7F;
-	}
-
-	private float getMaxPitch() {
-		return this.bee.isBaby() ? 1.5F : 1.1F;
-	}
-
-	@Override
 	public boolean canStartSilent() {
 		return true;
 	}
@@ -68,6 +31,25 @@ public abstract class BeeSoundInstance extends AbstractTickableSoundInstance {
 	@Override
 	public boolean canPlaySound() {
 		return !this.bee.isSilent();
+	}
+
+	@Override
+	public int soundRule() {
+		return RULE_BEE;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_SWITCH, this.shouldSwitchSounds());
+		sample.flag(SAMPLE_REMOVED, this.bee.isRemoved());
+		sample.flag(SAMPLE_BABY, this.bee.isBaby());
+		sample.position(this.bee.getX(), this.bee.getY(), this.bee.getZ());
+		sample.value = (float)this.bee.getDeltaMovement().horizontalDistance();
+	}
+
+	@Override
+	public void onSoundRuleSwitched() {
+		Minecraft.getInstance().getSoundManager().queueTickingSound(this.getAlternativeSoundInstance());
 	}
 
 	protected abstract AbstractTickableSoundInstance getAlternativeSoundInstance();

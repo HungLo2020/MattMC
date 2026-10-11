@@ -4,19 +4,13 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.NewMinecartBehavior;
 
+/** A rolling minecart's sound; its speed-to-volume rule runs in Rust. */
 @Environment(EnvType.CLIENT)
-public class MinecartSoundInstance extends AbstractTickableSoundInstance {
-	private static final float VOLUME_MIN = 0.0F;
-	private static final float VOLUME_MAX = 0.7F;
-	private static final float PITCH_MIN = 0.0F;
-	private static final float PITCH_MAX = 1.0F;
-	private static final float PITCH_DELTA = 0.0025F;
+public class MinecartSoundInstance extends RuledTickableSoundInstance {
 	private final AbstractMinecart minecart;
-	private float pitch = 0.0F;
 
 	public MinecartSoundInstance(AbstractMinecart abstractMinecart) {
 		super(SoundEvents.MINECART_RIDING, SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
@@ -40,22 +34,16 @@ public class MinecartSoundInstance extends AbstractTickableSoundInstance {
 	}
 
 	@Override
-	public void tick() {
-		if (this.minecart.isRemoved()) {
-			this.stop();
-		} else {
-			this.x = (float)this.minecart.getX();
-			this.y = (float)this.minecart.getY();
-			this.z = (float)this.minecart.getZ();
-			float f = (float)this.minecart.getDeltaMovement().horizontalDistance();
-			boolean bl = !this.minecart.isOnRails() && this.minecart.getBehavior() instanceof NewMinecartBehavior;
-			if (f >= 0.01F && this.minecart.level().tickRateManager().runsNormally() && !bl) {
-				this.pitch = Mth.clamp(this.pitch + 0.0025F, 0.0F, 1.0F);
-				this.volume = Mth.lerp(Mth.clamp(f, 0.0F, 0.5F), 0.0F, 0.7F);
-			} else {
-				this.pitch = 0.0F;
-				this.volume = 0.0F;
-			}
-		}
+	public int soundRule() {
+		return RULE_MINECART;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_REMOVED, this.minecart.isRemoved());
+		sample.flag(SAMPLE_RUNS_NORMALLY, this.minecart.level().tickRateManager().runsNormally());
+		sample.flag(SAMPLE_OFF_RAILS, !this.minecart.isOnRails() && this.minecart.getBehavior() instanceof NewMinecartBehavior);
+		sample.position(this.minecart.getX(), this.minecart.getY(), this.minecart.getZ());
+		sample.value = (float)this.minecart.getDeltaMovement().horizontalDistance();
 	}
 }

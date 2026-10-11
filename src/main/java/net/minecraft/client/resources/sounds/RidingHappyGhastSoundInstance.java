@@ -3,14 +3,12 @@ package net.minecraft.client.resources.sounds;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.animal.HappyGhast;
 import net.minecraft.world.entity.player.Player;
 
+/** Wind while riding a happy ghast; its speed rule runs in Rust. */
 @Environment(EnvType.CLIENT)
-public class RidingHappyGhastSoundInstance extends AbstractTickableSoundInstance {
-	private static final float VOLUME_MIN = 0.0F;
-	private static final float VOLUME_MAX = 1.0F;
+public class RidingHappyGhastSoundInstance extends RuledTickableSoundInstance {
 	private final Player player;
 	private final HappyGhast happyGhast;
 
@@ -30,16 +28,14 @@ public class RidingHappyGhastSoundInstance extends AbstractTickableSoundInstance
 	}
 
 	@Override
-	public void tick() {
-		if (!this.happyGhast.isRemoved() && this.player.isPassenger() && this.player.getVehicle() == this.happyGhast) {
-			float f = (float)this.happyGhast.getDeltaMovement().length();
-			if (f >= 0.01F) {
-				this.volume = 5.0F * Mth.clampedLerp(0.0F, 1.0F, f);
-			} else {
-				this.volume = 0.0F;
-			}
-		} else {
-			this.stop();
-		}
+	public int soundRule() {
+		return RULE_RIDING_HAPPY_GHAST;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_REMOVED, this.happyGhast.isRemoved());
+		sample.flag(SAMPLE_RIDING, this.player.isPassenger() && this.player.getVehicle() == this.happyGhast);
+		sample.value = (float)this.happyGhast.getDeltaMovement().length();
 	}
 }

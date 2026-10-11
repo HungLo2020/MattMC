@@ -2,8 +2,8 @@
 //! `ChannelAccess`).
 //!
 //! OpenAL devices may only be touched by the thread that created them, so one
-//! Rust thread owns the device and every voice. Callers lock the [`Policy`],
-//! and its [`VoiceOp`]s are queued in order; device creation, teardown and
+//! Rust thread owns the device and every voice. Callers lock the [`Client`]
+//! (and its policy), and the policy's [`VoiceOp`]s are queued in order; device creation, teardown and
 //! "release all" block until done. Stopped voices are detected once per device
 //! tick and reported back to the policy, as `ChannelAccess.scheduleTick` does.
 
@@ -20,7 +20,8 @@ use super::super::commands::{
 use super::super::errors::AudioError;
 use super::super::listener::ListenerTransform;
 use super::super::source::{AL_PAUSED, AL_PLAYING, AL_STOPPED};
-use super::engine::{Policy, VoiceOp};
+use super::client::Client;
+use super::engine::VoiceOp;
 
 /// `DEFAULT_DEVICE_CHECK_INTERVAL_MS`.
 const DEVICE_CHECK_INTERVAL: Duration = Duration::from_millis(1000);
@@ -39,22 +40,25 @@ enum Command {
 }
 
 pub(crate) struct Engine {
-    policy: Mutex<Policy>,
+    client: Mutex<Client>,
     queue: Mutex<VecDeque<Command>>,
     wake: Condvar,
     released: Mutex<Vec<u64>>,
     reload_needed: AtomicBool,
     pool_counts: Mutex<[i32; 4]>,
+    /// The last opened device's preference and HRTF flag, for reopening.
+    device_settings: Mutex<Option<(Option<String>, bool)>>,
     started: std::sync::Once,
 }
 
 pub(crate) static ENGINE: LazyLock<Engine> = LazyLock::new(|| Engine {
-    policy: Mutex::new(Policy::default()),
+    client: Mutex::new(Client::default()),
     queue: Mutex::new(VecDeque::new()),
     wake: Condvar::new(),
     released: Mutex::new(Vec::new()),
     reload_needed: AtomicBool::new(false),
     pool_counts: Mutex::new([0; 4]),
+    device_settings: Mutex::new(None),
     started: std::sync::Once::new(),
 });
 
@@ -78,14 +82,14 @@ impl Engine {
         self.wake.notify_one();
     }
 
-    /// Runs `f` on the policy, then queues the device work it produced.
-    pub(crate) fn with_policy<R>(&'static self, f: impl FnOnce(&mut Policy) -> R) -> R {
-        let mut policy = lock(&self.policy);
+    /// Runs `f` on the client, then queues the device work it produced.
+    pub(crate) fn with_client<R>(&'static self, f: impl FnOnce(&mut Client) -> R) -> R {
+        let mut client = lock(&self.client);
         for voice in std::mem::take(&mut *lock(&self.released)) {
-            policy.voice_released(voice);
+            client.policy.voice_released(voice);
         }
-        let result = f(&mut policy);
-        let ops = policy.take_ops();
+        let result = f(&mut client);
+        let ops = client.policy.take_ops();
         if !ops.is_empty() {
             self.push(Command::Ops(ops));
         }
@@ -99,16 +103,58 @@ impl Engine {
         result.recv().unwrap_or_else(|_| Err("sound engine thread stopped".into()))
     }
 
-    /// `stopAll`: drops queued work, releases every voice and forgets the policy.
+    /// `stopAll`: drops queued work, releases every voice and forgets the
+    /// playing instances (controllers keep theirs, now inactive).
     pub(crate) fn stop_all(&'static self) {
-        let mut policy = lock(&self.policy);
+        let mut client = lock(&self.client);
         lock(&self.queue).retain(|command| !matches!(command, Command::Ops(_)));
-        policy.clear();
+        client.policy.clear();
+        client.clear_playback();
         lock(&self.released).clear();
         let (reply, done) = sync_channel(1);
         self.push(Command::ReleaseAll { reply });
-        drop(policy);
+        drop(client);
         let _ = done.recv();
+    }
+
+    /// `SoundEngine.loadLibrary`: opens the device, marks the engine loaded
+    /// and requests the registry's preloads.
+    pub(crate) fn open(&'static self, preferred: Option<String>, hrtf: bool) -> Result<(), String> {
+        *lock(&self.device_settings) = Some((preferred.clone(), hrtf));
+        self.reload_needed.store(false, Ordering::Release);
+        self.init(preferred, hrtf)?;
+        self.with_client(|client| {
+            client.policy.loaded = true;
+            for path in client.registry.preload_paths() {
+                client.policy.assets.preload(&path);
+            }
+        });
+        Ok(())
+    }
+
+    /// `SoundEngine.destroy`: stops everything, forgets the asset generation
+    /// and closes the device.
+    pub(crate) fn close(&'static self) {
+        if !self.with_client(|client| client.policy.loaded) {
+            return;
+        }
+        self.stop_all();
+        let previous = self.with_client(|client| {
+            client.policy.loaded = false;
+            client.policy.assets.clear()
+        });
+        let _ = backend::destroy_asset_generation(previous);
+        self.cleanup();
+    }
+
+    /// The device changed or disconnected: closes and reopens it with the
+    /// same settings (`SoundEngine.reload` without the resource checks).
+    pub(crate) fn reopen(&'static self) -> Result<(), String> {
+        let Some((preferred, hrtf)) = lock(&self.device_settings).clone() else {
+            return Ok(());
+        };
+        self.close();
+        self.open(preferred, hrtf)
     }
 
     /// Destroys the device (`Library.cleanup`).

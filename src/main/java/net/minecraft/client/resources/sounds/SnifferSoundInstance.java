@@ -6,10 +6,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 
+/** A sniffer's digging; its rule runs in Rust. */
 @Environment(EnvType.CLIENT)
-public class SnifferSoundInstance extends AbstractTickableSoundInstance {
-	private static final float VOLUME = 1.0F;
-	private static final float PITCH = 1.0F;
+public class SnifferSoundInstance extends RuledTickableSoundInstance {
 	private final Sniffer sniffer;
 
 	public SnifferSoundInstance(Sniffer sniffer) {
@@ -26,15 +25,15 @@ public class SnifferSoundInstance extends AbstractTickableSoundInstance {
 	}
 
 	@Override
-	public void tick() {
-		if (!this.sniffer.isRemoved() && this.sniffer.getTarget() == null && this.sniffer.canPlayDiggingSound()) {
-			this.x = (float)this.sniffer.getX();
-			this.y = (float)this.sniffer.getY();
-			this.z = (float)this.sniffer.getZ();
-			this.volume = 1.0F;
-			this.pitch = 1.0F;
-		} else {
-			this.stop();
-		}
+	public int soundRule() {
+		return RULE_SNIFFER;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_REMOVED, this.sniffer.isRemoved());
+		sample.flag(SAMPLE_HAS_TARGET, this.sniffer.getTarget() != null);
+		sample.flag(SAMPLE_CAN_DIG, this.sniffer.canPlayDiggingSound());
+		sample.position(this.sniffer.getX(), this.sniffer.getY(), this.sniffer.getZ());
 	}
 }

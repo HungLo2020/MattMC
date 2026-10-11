@@ -6,12 +6,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.monster.Guardian;
 
+/** A guardian's beam charge; its attack-scale rule runs in Rust. */
 @Environment(EnvType.CLIENT)
-public class GuardianAttackSoundInstance extends AbstractTickableSoundInstance {
-	private static final float VOLUME_MIN = 0.0F;
-	private static final float VOLUME_SCALE = 1.0F;
-	private static final float PITCH_MIN = 0.7F;
-	private static final float PITCH_SCALE = 0.5F;
+public class GuardianAttackSoundInstance extends RuledTickableSoundInstance {
 	private final Guardian guardian;
 
 	public GuardianAttackSoundInstance(Guardian guardian) {
@@ -28,16 +25,15 @@ public class GuardianAttackSoundInstance extends AbstractTickableSoundInstance {
 	}
 
 	@Override
-	public void tick() {
-		if (!this.guardian.isRemoved() && this.guardian.getTarget() == null) {
-			this.x = (float)this.guardian.getX();
-			this.y = (float)this.guardian.getY();
-			this.z = (float)this.guardian.getZ();
-			float f = this.guardian.getAttackAnimationScale(0.0F);
-			this.volume = 0.0F + 1.0F * f * f;
-			this.pitch = 0.7F + 0.5F * f;
-		} else {
-			this.stop();
-		}
+	public int soundRule() {
+		return RULE_GUARDIAN_ATTACK;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_REMOVED, this.guardian.isRemoved());
+		sample.flag(SAMPLE_HAS_TARGET, this.guardian.getTarget() != null);
+		sample.position(this.guardian.getX(), this.guardian.getY(), this.guardian.getZ());
+		sample.value = this.guardian.getAttackAnimationScale(0.0F);
 	}
 }

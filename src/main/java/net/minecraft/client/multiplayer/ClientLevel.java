@@ -777,13 +777,9 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 
 	private void playSound(double d, double e, double f, SoundEvent soundEvent, SoundSource soundSource, float g, float h, boolean bl, long l) {
 		double i = this.minecraft.gameRenderer.getMainCamera().getPosition().distanceToSqr(d, e, f);
-		SimpleSoundInstance simpleSoundInstance = new SimpleSoundInstance(soundEvent, soundSource, g, h, RandomSource.create(l), d, e, f);
-		if (bl && i > 100.0) {
-			double j = Math.sqrt(i) / 40.0;
-			this.minecraft.getSoundManager().playDelayed(simpleSoundInstance, (int)(j * 20.0));
-		} else {
-			this.minecraft.getSoundManager().play(simpleSoundInstance);
-		}
+		// Rust resolves and plays it as `new SimpleSoundInstance(..., RandomSource.create(l), d, e, f)`.
+		int delay = bl && i > 100.0 ? (int)(Math.sqrt(i) / 40.0 * 20.0) : 0;
+		this.minecraft.getSoundManager().playEvent(soundEvent, soundSource, g, h, l, d, e, f, delay);
 	}
 
 	public void createFireworks(double d, double e, double f, double g, double h, double i, List<FireworkExplosion> list) {

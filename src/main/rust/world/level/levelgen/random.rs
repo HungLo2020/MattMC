@@ -1,7 +1,8 @@
 //! Bit-exact ports of Java's world-generation randomness: `Xoroshiro128PlusPlus`
 //! behind `XoroshiroRandomSource`, the 48-bit LCG behind `LegacyRandomSource`,
-//! and their positional factories' `at(x, y, z)`. Only the draws world
-//! generation uses natively are provided; Java keeps every other caller.
+//! and their positional factories' `at(x, y, z)`. Only the draws native
+//! callers use are provided (world generation, and client audio's shared
+//! level random); Java keeps every other caller.
 
 pub(crate) use crate::core::math::position_seed;
 
@@ -59,6 +60,7 @@ impl Xoroshiro {
 }
 
 /// `LegacyRandomSource` (single-threaded; the Java atomics only detect misuse).
+#[derive(Clone, Debug)]
 pub(crate) struct Legacy {
     seed: i64,
 }
@@ -93,6 +95,25 @@ impl Legacy {
 
     pub fn next_float(&mut self) -> f32 {
         self.next(24) as f32 * 5.960_464_5e-8_f32
+    }
+
+    /// `BitRandomSource.nextDouble`: `long * 1.110223E-16F` is float
+    /// arithmetic in Java, so the result has float precision.
+    pub fn next_double(&mut self) -> f64 {
+        let high = self.next(26) as i64;
+        let low = self.next(27) as i64;
+        f64::from(((high << 27) + low) as f32 * 1.110_223e-16_f32)
+    }
+
+    /// A source continuing from an already scrambled 48-bit state, as read
+    /// from a Java `LegacyRandomSource`'s seed field.
+    pub fn from_raw(state: i64) -> Self {
+        Self { seed: state & MASK }
+    }
+
+    /// The scrambled 48-bit state, to hand back to the Java source.
+    pub fn raw(&self) -> i64 {
+        self.seed
     }
 
     /// `setSeed`: the scrambled 48-bit seed.

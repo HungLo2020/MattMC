@@ -52,7 +52,6 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.client.sounds.SoundPreviewHandler;
 import net.minecraft.client.tutorial.TutorialSteps;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.StringTag;
@@ -1074,7 +1073,7 @@ public class Options {
 			SoundManager soundManager = minecraft.getSoundManager();
 			soundManager.updateSourceVolume(soundSource);
 			if (minecraft.level == null) {
-				SoundPreviewHandler.preview(soundManager, soundSource, double_.floatValue());
+				soundManager.preview(soundSource, double_.floatValue());
 			}
 		});
 	}

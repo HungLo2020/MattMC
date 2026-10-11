@@ -7,8 +7,9 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 
+/** A sound following an entity until it is removed (rule in Rust). */
 @Environment(EnvType.CLIENT)
-public class EntityBoundSoundInstance extends AbstractTickableSoundInstance {
+public class EntityBoundSoundInstance extends RuledTickableSoundInstance {
 	private final Entity entity;
 
 	public EntityBoundSoundInstance(SoundEvent soundEvent, SoundSource soundSource, float f, float g, Entity entity, long l) {
@@ -27,13 +28,13 @@ public class EntityBoundSoundInstance extends AbstractTickableSoundInstance {
 	}
 
 	@Override
-	public void tick() {
-		if (this.entity.isRemoved()) {
-			this.stop();
-		} else {
-			this.x = (float)this.entity.getX();
-			this.y = (float)this.entity.getY();
-			this.z = (float)this.entity.getZ();
-		}
+	public int soundRule() {
+		return RULE_ENTITY_BOUND;
+	}
+
+	@Override
+	public void sampleSoundRule(RuledSoundInstance.Sample sample) {
+		sample.flag(SAMPLE_REMOVED, this.entity.isRemoved());
+		sample.position(this.entity.getX(), this.entity.getY(), this.entity.getZ());
 	}
 }

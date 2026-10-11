@@ -129,18 +129,25 @@ impl SoundRegistry {
             return Resolution::UnknownEvent;
         };
         let mut draws = draws.iter().copied();
-        match self.event_sound(event, &mut draws, 0) {
+        match self.event_sound(event, &mut |_| draws.next(), 0) {
             Ok(Some(sound)) => Resolution::Sound(sound),
             Ok(None) => Resolution::Empty,
             Err(bound) => Resolution::NeedDraw(bound),
         }
     }
 
-    /// `WeighedSoundEvents.getSound(random)`: `None` is `EMPTY_SOUND`.
+    /// Resolves `event` drawing `next(bound)` from a Rust-owned random source
+    /// (`None` is `EMPTY_SOUND`).
+    pub(crate) fn resolve_with(&self, event: u32, next: &mut impl FnMut(i32) -> i32) -> Option<ResolvedSound> {
+        self.event_sound(event, &mut |bound| Some(next(bound)), 0).unwrap_or(None)
+    }
+
+    /// `WeighedSoundEvents.getSound(random)`: `None` is `EMPTY_SOUND`. A
+    /// draw callback returning `None` aborts with the bound it needed.
     fn event_sound(
         &self,
         event: u32,
-        draws: &mut impl Iterator<Item = i32>,
+        draw: &mut impl FnMut(i32) -> Option<i32>,
         depth: usize,
     ) -> Result<Option<ResolvedSound>, i32> {
         let entries = &self.events[event as usize].entries;
@@ -148,11 +155,16 @@ impl SoundRegistry {
         if entries.is_empty() || total == 0 {
             return Ok(None);
         }
-        let mut choice = draws.next().ok_or(total)?;
+        if total < 0 {
+            // An overflowed weight sum: a step caller's `nextInt` throws as
+            // Java's does; `resolve_with` plays nothing.
+            return Err(total);
+        }
+        let mut choice = draw(total).ok_or(total)?;
         for &spec in entries {
             choice -= self.entry_weight(spec, depth);
             if choice < 0 {
-                return self.entry_sound(spec, draws, depth).map(Some);
+                return self.entry_sound(spec, draw, depth).map(Some);
             }
         }
         Ok(None)
@@ -161,7 +173,7 @@ impl SoundRegistry {
     fn entry_sound(
         &self,
         spec_index: u32,
-        draws: &mut impl Iterator<Item = i32>,
+        draw: &mut impl FnMut(i32) -> Option<i32>,
         depth: usize,
     ) -> Result<ResolvedSound, i32> {
         let spec = &self.specs[spec_index as usize];
@@ -181,7 +193,7 @@ impl SoundRegistry {
         // target is missing or draws nothing) into a new FILE sound that
         // multiplies volume/pitch, keeps the outer weight and ORs `stream`.
         let inner = match self.event_index(&spec.location) {
-            Some(target) if depth < MAX_NESTING => self.event_sound(target, draws, depth + 1)?,
+            Some(target) if depth < MAX_NESTING => self.event_sound(target, draw, depth + 1)?,
             _ => None,
         };
         let inner = inner.unwrap_or_else(empty_sound);

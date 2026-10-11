@@ -8,6 +8,7 @@ import net.blaze3d.audio.ListenerTransform;
 import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +21,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Options;
+import net.minecraft.client.resources.sounds.RuledSoundInstance;
 import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.TickableSoundInstance;
@@ -29,6 +31,9 @@ import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.ConstantFloat;
+import net.minecraft.util.valueproviders.SampledFloat;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -37,20 +42,22 @@ import org.slf4j.MarkerFactory;
 
 /**
  * The Java side of the Rust playback engine (`audio/policy`). Rust owns the
- * device thread, voices, category volumes, the minimum source lifetime,
- * delayed and manual-loop scheduling, released-source cleanup, pause/resume,
- * device-change detection and the asset cache. Java keeps the
- * {@link SoundInstance} objects (resolution draws, per-tick behavior),
- * listeners and pack IO, and identifies instances to Rust by numeric ID.
+ * device thread and its recovery, voices, category volumes, the minimum
+ * source lifetime, delayed and manual-loop scheduling, released-source
+ * cleanup, pause/resume, the asset cache, subtitles, the once-per-event
+ * warnings and the per-tick rules of the vanilla tickables. Java keeps the
+ * {@link SoundInstance} objects gameplay code creates (resolution draws,
+ * `canPlaySound`, entity samples, custom `tick()` bodies) and pack IO, and
+ * identifies instances to Rust by numeric ID.
  */
 @Environment(EnvType.CLIENT)
 public class SoundEngine {
 	private static final Marker MARKER = MarkerFactory.getMarker("SOUNDS");
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final Set<ResourceLocation> ONLY_WARN_ONCE = Sets.<ResourceLocation>newHashSet();
 	public static final String MISSING_SOUND = "FOR THE DEBUG!";
 	public static final String OPEN_AL_SOFT_PREFIX = "OpenAL Soft on ";
 	public static final int OPEN_AL_SOFT_PREFIX_LENGTH = "OpenAL Soft on ".length();
+	private static final RandomSource FACTOR_RANDOM = RandomSource.create();
 	private final MusicManager musicManager;
 	private final SoundManager soundManager;
 	private final Options options;
@@ -62,9 +69,9 @@ public class SoundEngine {
 	private final Long2ObjectOpenHashMap<SoundInstance> instancesById = new Long2ObjectOpenHashMap<>();
 	private final Set<SoundInstance> activeInstances = Sets.newIdentityHashSet();
 	private final List<TickableSoundInstance> tickingSounds = Lists.<TickableSoundInstance>newArrayList();
-	private final List<SoundEventListener> listeners = Lists.<SoundEventListener>newArrayList();
 	private final List<TickableSoundInstance> queuedTickableSounds = Lists.<TickableSoundInstance>newArrayList();
 	private final NativeSoundPolicy.TickingBatch tickingBatch = new NativeSoundPolicy.TickingBatch();
+	private final RuledSoundInstance.Sample ruleSample = new RuledSoundInstance.Sample();
 	private ListenerTransform listenerTransform = ListenerTransform.INITIAL;
 
 	public SoundEngine(MusicManager musicManager, SoundManager soundManager, Options options, ResourceProvider resourceProvider) {
@@ -72,21 +79,22 @@ public class SoundEngine {
 		this.soundManager = soundManager;
 		this.options = options;
 		this.resources = resourceProvider;
+		NativeSoundPolicy.setAssetLoader(this::loadRequestedAssets);
 	}
 
 	public void reload() {
-		ONLY_WARN_ONCE.clear();
-
+		List<String> missing = new ArrayList<>();
 		for (SoundEvent soundEvent : BuiltInRegistries.SOUND_EVENT) {
 			if (soundEvent != SoundEvents.EMPTY) {
 				ResourceLocation resourceLocation = soundEvent.location();
 				if (this.soundManager.getSoundEvent(resourceLocation) == null) {
 					LOGGER.warn("Missing sound for event: {}", BuiltInRegistries.SOUND_EVENT.getKey(soundEvent));
-					ONLY_WARN_ONCE.add(resourceLocation);
+					missing.add(resourceLocation.toString());
 				}
 			}
 		}
 
+		NativeSoundPolicy.resetWarnings(missing);
 		this.destroy();
 		this.loadLibrary();
 	}
@@ -176,32 +184,34 @@ public class SoundEngine {
 	public void stopAll() {
 		if (this.loaded) {
 			NativeSoundPolicy.stopAll();
-			this.instanceIds.clear();
-			this.instancesById.clear();
-			this.activeInstances.clear();
-			this.tickingSounds.clear();
-			this.queuedTickableSounds.clear();
+			this.forgetAll();
 		}
 	}
 
-	public void addEventListener(SoundEventListener soundEventListener) {
-		this.listeners.add(soundEventListener);
-	}
-
-	public void removeEventListener(SoundEventListener soundEventListener) {
-		this.listeners.remove(soundEventListener);
+	private void forgetAll() {
+		this.instanceIds.clear();
+		this.instancesById.clear();
+		this.activeInstances.clear();
+		this.tickingSounds.clear();
+		this.queuedTickableSounds.clear();
 	}
 
 	public void tick(boolean bl) {
-		if (NativeSoundPolicy.tickBegin(bl)) {
-			this.reload();
+		int begin = NativeSoundPolicy.tickBegin(bl);
+		if ((begin & NativeSoundPolicy.TICK_REOPENED) != 0) {
+			// Rust reopened the output device: every instance was released.
+			this.forgetAll();
+			if ((begin & NativeSoundPolicy.TICK_STOPPED) != 0) {
+				this.loaded = false;
+			}
 		}
 
+		NativeSoundPolicy.loadAssetsIfRequested(begin);
 		if (!bl) {
 			this.tickInGameSound();
 		}
 
-		NativeSoundPolicy.tickEnd(bl);
+		NativeSoundPolicy.loadAssetsIfRequested(NativeSoundPolicy.tickEnd(bl));
 		this.forgetReleased();
 		if (!bl) {
 			for (long id : NativeSoundPolicy.takeDue()) {
@@ -217,6 +227,18 @@ public class SoundEngine {
 		}
 
 		NativeSoundPolicy.deviceTick();
+		this.logRustLines();
+	}
+
+	private void logRustLines() {
+		for (String line : NativeSoundPolicy.takeLogs()) {
+			String message = line.length() > 2 ? line.substring(2) : line;
+			switch (line.charAt(0)) {
+				case 'E' -> LOGGER.error(MARKER, message);
+				case 'W' -> LOGGER.warn(MARKER, message);
+				default -> LOGGER.info(MARKER, message);
+			}
+		}
 	}
 
 	private void tickInGameSound() {
@@ -228,18 +250,38 @@ public class SoundEngine {
 				this.stop(tickableSoundInstance);
 			}
 
+			long id = this.instanceIds.get(tickableSoundInstance);
+			if (tickableSoundInstance instanceof RuledSoundInstance ruled) {
+				RuledSoundInstance.Sample sample = this.ruleSample;
+				sample.clear();
+				ruled.sampleSoundRule(sample);
+				this.tickingBatch.addSample(id, sample.flags, sample.value, sample.x, sample.y, sample.z);
+				continue;
+			}
+
 			tickableSoundInstance.tick();
 			if (tickableSoundInstance.isStopped()) {
 				this.stop(tickableSoundInstance);
 			} else {
-				this.tickingBatch.add(
-					this.instanceIds.get(tickableSoundInstance), tickableSoundInstance.getVolume(), tickableSoundInstance.getPitch(),
+				this.tickingBatch.addPlain(
+					id, tickableSoundInstance.getVolume(), tickableSoundInstance.getPitch(),
 					tickableSoundInstance.getX(), tickableSoundInstance.getY(), tickableSoundInstance.getZ()
 				);
 			}
 		}
 
-		this.tickingBatch.flush();
+		for (long outcome : this.tickingBatch.flush()) {
+			long id = outcome & ~(NativeSoundPolicy.OUTCOME_STOPPED | NativeSoundPolicy.OUTCOME_SWITCHED);
+			if (this.instancesById.get(id) instanceof RuledSoundInstance ruled) {
+				if ((outcome & NativeSoundPolicy.OUTCOME_SWITCHED) != 0L) {
+					ruled.onSoundRuleSwitched();
+				}
+
+				if ((outcome & NativeSoundPolicy.OUTCOME_STOPPED) != 0L) {
+					ruled.markSoundRuleStopped();
+				}
+			}
+		}
 	}
 
 	/** Drops released instances; requeued manual loops keep their object. */
@@ -288,77 +330,77 @@ public class SoundEngine {
 			return SoundEngine.PlayResult.NOT_STARTED;
 		} else if (!soundInstance.canPlaySound()) {
 			return SoundEngine.PlayResult.NOT_STARTED;
-		} else {
-			WeighedSoundEvents weighedSoundEvents = soundInstance.resolve(this.soundManager);
-			ResourceLocation resourceLocation = soundInstance.getLocation();
-			if (weighedSoundEvents == null) {
-				if (ONLY_WARN_ONCE.add(resourceLocation)) {
-					LOGGER.warn(MARKER, "Unable to play unknown soundEvent: {}", resourceLocation);
-				}
+		}
 
-				if (!SharedConstants.DEBUG_SUBTITLES) {
-					return SoundEngine.PlayResult.NOT_STARTED;
-				}
-
-				weighedSoundEvents = new WeighedSoundEvents(resourceLocation, "FOR THE DEBUG!");
+		WeighedSoundEvents weighedSoundEvents = soundInstance.resolve(this.soundManager);
+		ResourceLocation resourceLocation = soundInstance.getLocation();
+		if (weighedSoundEvents == null) {
+			if (NativeSoundPolicy.warnOnce(resourceLocation.toString())) {
+				LOGGER.warn(MARKER, "Unable to play unknown soundEvent: {}", resourceLocation);
 			}
 
-			Sound sound = soundInstance.getSound();
-			if (sound == SoundManager.INTENTIONALLY_EMPTY_SOUND) {
+			// DEBUG_SUBTITLES keeps going with a placeholder event, whose empty
+			// sound then stops the play below.
+			if (!SharedConstants.DEBUG_SUBTITLES) {
 				return SoundEngine.PlayResult.NOT_STARTED;
-			} else if (sound == SoundManager.EMPTY_SOUND) {
-				if (ONLY_WARN_ONCE.add(resourceLocation)) {
-					LOGGER.warn(MARKER, "Unable to play empty soundEvent: {}", resourceLocation);
-				}
-
-				return SoundEngine.PlayResult.NOT_STARTED;
-			} else {
-				float f = soundInstance.getVolume();
-				float g = Math.max(f, 1.0F) * sound.getAttenuationDistance();
-				SoundSource soundSource = soundInstance.getSource();
-				float pitch = soundInstance.getPitch();
-				SoundInstance.Attenuation attenuation = soundInstance.getAttenuation();
-				boolean bl = soundInstance.isRelative();
-				if (!this.listeners.isEmpty()) {
-					float j = !bl && attenuation != SoundInstance.Attenuation.NONE ? g : Float.POSITIVE_INFINITY;
-
-					for (SoundEventListener soundEventListener : this.listeners) {
-						soundEventListener.onPlaySound(soundInstance, weighedSoundEvents, j);
-					}
-				}
-
-				int flags = (attenuation == SoundInstance.Attenuation.LINEAR ? NativeSoundPolicy.PLAY_FLAG_LINEAR : 0)
-					| (bl ? NativeSoundPolicy.PLAY_FLAG_RELATIVE : 0)
-					| (soundInstance.isLooping() ? NativeSoundPolicy.PLAY_FLAG_LOOPING : 0)
-					| (sound.shouldStream() ? NativeSoundPolicy.PLAY_FLAG_STREAM : 0)
-					| (soundInstance.canStartSilent() ? NativeSoundPolicy.PLAY_FLAG_CAN_START_SILENT : 0);
-				long id = this.idFor(soundInstance);
-				int result = NativeSoundPolicy.play(
-					id, (float)soundInstance.getX(), (float)soundInstance.getY(), (float)soundInstance.getZ(), f, pitch,
-					soundInstance.getDelay(), sound.getAttenuationDistance(), soundSource.ordinal(), flags,
-					resourceLocation.toString(), sound.getPath().toString()
-				);
-				if ((result & NativeSoundPolicy.PLAY_ASSET_REQUESTS) != 0) {
-					this.loadRequestedAssets();
-				}
-
-				SoundEngine.PlayResult playResult = SoundEngine.PlayResult.values()[result & 0xFF];
-				if (playResult == SoundEngine.PlayResult.NOT_STARTED) {
-					if (!NativeSoundPolicy.knows(id)) {
-						this.forget(id, soundInstance);
-					}
-
-					return playResult;
-				}
-
-				this.activeInstances.add(soundInstance);
-				if (soundInstance instanceof TickableSoundInstance tickable) {
-					this.tickingSounds.add(tickable);
-				}
-
-				return playResult;
 			}
 		}
+
+		Sound sound = soundInstance.getSound();
+		if (sound == SoundManager.INTENTIONALLY_EMPTY_SOUND) {
+			return SoundEngine.PlayResult.NOT_STARTED;
+		} else if (sound == SoundManager.EMPTY_SOUND) {
+			if (NativeSoundPolicy.warnOnce(resourceLocation.toString())) {
+				LOGGER.warn(MARKER, "Unable to play empty soundEvent: {}", resourceLocation);
+			}
+
+			return SoundEngine.PlayResult.NOT_STARTED;
+		}
+
+		SoundInstance.Attenuation attenuation = soundInstance.getAttenuation();
+		int flags = (attenuation == SoundInstance.Attenuation.LINEAR ? NativeSoundPolicy.PLAY_FLAG_LINEAR : 0)
+			| (soundInstance.isRelative() ? NativeSoundPolicy.PLAY_FLAG_RELATIVE : 0)
+			| (soundInstance.isLooping() ? NativeSoundPolicy.PLAY_FLAG_LOOPING : 0)
+			| (sound.shouldStream() ? NativeSoundPolicy.PLAY_FLAG_STREAM : 0)
+			| (soundInstance.canStartSilent() ? NativeSoundPolicy.PLAY_FLAG_CAN_START_SILENT : 0);
+		NativeSoundPolicy.Rule rule = soundInstance instanceof RuledSoundInstance ruled
+			? new NativeSoundPolicy.Rule(ruled.soundRule(), ruled.soundRuleParameter(), ruled.ruleBaseVolume(), ruled.ruleBasePitch(),
+				factor(sound.getVolume()), factor(sound.getPitch()))
+			: NativeSoundPolicy.NO_RULE;
+		long id = this.idFor(soundInstance);
+		int result = NativeSoundPolicy.loadAssetsIfRequested(NativeSoundPolicy.play(
+			id, soundInstance.getX(), soundInstance.getY(), soundInstance.getZ(), soundInstance.getVolume(), soundInstance.getPitch(),
+			soundInstance.getDelay(), sound.getAttenuationDistance(), soundInstance.getSource().ordinal(), flags, rule,
+			resourceLocation.toString(), sound.getPath().toString()
+		));
+		SoundEngine.PlayResult playResult = SoundEngine.PlayResult.values()[result & 0xFF];
+		if (playResult == SoundEngine.PlayResult.NOT_STARTED) {
+			if (!NativeSoundPolicy.knows(id)) {
+				this.forget(id, soundInstance);
+			}
+
+			return playResult;
+		}
+
+		this.activeInstances.add(soundInstance);
+		if (soundInstance instanceof TickableSoundInstance tickable) {
+			this.tickingSounds.add(tickable);
+		}
+
+		return playResult;
+	}
+
+	/** A resolved sound's volume or pitch factor (sounds.json values are constant). */
+	private static float factor(SampledFloat value) {
+		return value instanceof ConstantFloat constant ? constant.getValue() : value.sample(FACTOR_RANDOM);
+	}
+
+	/**
+	 * A seeded world sound event (`ClientLevel.playSound`) that Rust resolves
+	 * and plays, after `delay` ticks when positive.
+	 */
+	public void playEvent(ResourceLocation event, SoundSource source, float volume, float pitch, long seed, double x, double y, double z, int delay) {
+		NativeSoundClient.playEvent(event.toString(), source.ordinal(), volume, pitch, seed, x, y, z, delay, NativeSoundClient.EVENT_FLAG_LINEAR);
 	}
 
 	public void queueTickingSound(TickableSoundInstance tickableSoundInstance) {
