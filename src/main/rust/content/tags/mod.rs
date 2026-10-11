@@ -42,7 +42,7 @@ impl Location {
     }
 
     /// `ResourceLocation.parse` (via `bySeparator(':')`), as `ResourceLocation.read`.
-    fn parse(text: &str) -> Result<Location, String> {
+    pub(crate) fn parse(text: &str) -> Result<Location, String> {
         let (namespace, path) = match text.find(':') {
             Some(0) => ("minecraft", &text[1..]),
             Some(at) => (&text[..at], &text[at + 1..]),

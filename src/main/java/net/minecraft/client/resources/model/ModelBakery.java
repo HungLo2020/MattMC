@@ -5,9 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import net.minecraft.api.EnvType;
@@ -17,15 +15,8 @@ import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
-import net.minecraft.client.renderer.block.model.SingleVariant;
-import net.minecraft.client.renderer.block.model.TextureSlots;
 import net.minecraft.client.renderer.item.ClientItem;
 import net.minecraft.client.renderer.item.ItemModel;
-import net.minecraft.client.renderer.item.MissingItemModel;
-import net.minecraft.client.renderer.item.ModelRenderProperties;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.thread.ParallelMapTransform;
 import net.minecraft.world.level.block.state.BlockState;
@@ -53,50 +44,32 @@ public class ModelBakery {
 	private final EntityModelSet entityModelSet;
 	private final MaterialSet materials;
 	private final PlayerSkinRenderCache playerSkinRenderCache;
-	private final Map<BlockState, BlockStateModel.UnbakedRoot> unbakedBlockStateModels;
 	private final Map<ResourceLocation, ClientItem> clientInfos;
-	final Map<ResourceLocation, ResolvedModel> resolvedModels;
-	final ResolvedModel missingModel;
+	private final NativeModels.Baked baked;
 
+	/** Item model baking over the block state and geometry bake Rust made (`NativeModels`). */
 	public ModelBakery(
-		EntityModelSet entityModelSet,
-		MaterialSet materialSet,
-		PlayerSkinRenderCache playerSkinRenderCache,
-		Map<BlockState, BlockStateModel.UnbakedRoot> map,
-		Map<ResourceLocation, ClientItem> map2,
-		Map<ResourceLocation, ResolvedModel> map3,
-		ResolvedModel resolvedModel
+		EntityModelSet entityModelSet, MaterialSet materialSet, PlayerSkinRenderCache playerSkinRenderCache, Map<ResourceLocation, ClientItem> map,
+		NativeModels.Baked baked
 	) {
 		this.entityModelSet = entityModelSet;
 		this.materials = materialSet;
 		this.playerSkinRenderCache = playerSkinRenderCache;
-		this.unbakedBlockStateModels = map;
-		this.clientInfos = map2;
-		this.resolvedModels = map3;
-		this.missingModel = resolvedModel;
+		this.clientInfos = map;
+		this.baked = baked;
 	}
 
-	public CompletableFuture<ModelBakery.BakingResult> bakeModels(SpriteGetter spriteGetter, Executor executor) {
-		ModelBakery.MissingModels missingModels = ModelBakery.MissingModels.bake(this.missingModel, spriteGetter);
-		ModelBakery.ModelBakerImpl modelBakerImpl = new ModelBakery.ModelBakerImpl(spriteGetter);
-		CompletableFuture<Map<BlockState, BlockStateModel>> completableFuture = ParallelMapTransform.schedule(
-			this.unbakedBlockStateModels, (blockState, unbakedRoot) -> {
-				try {
-					return unbakedRoot.bake(blockState, modelBakerImpl);
-				} catch (Exception var4x) {
-					LOGGER.warn("Unable to bake model: '{}': {}", blockState, var4x);
-					return null;
-				}
-			}, executor
-		);
-		CompletableFuture<Map<ResourceLocation, ItemModel>> completableFuture2 = ParallelMapTransform.schedule(
+	public CompletableFuture<ModelBakery.BakingResult> bakeModels(Executor executor) {
+		ModelBakery.MissingModels missingModels = this.baked.missingModels();
+		ModelBaker modelBaker = this.baked.itemBaker();
+		CompletableFuture<Map<ResourceLocation, ItemModel>> completableFuture = ParallelMapTransform.schedule(
 			this.clientInfos,
 			(resourceLocation, clientItem) -> {
 				try {
 					return clientItem.model()
 						.bake(
 							new ItemModel.BakingContext(
-								modelBakerImpl, this.entityModelSet, this.materials, this.playerSkinRenderCache, missingModels.item, clientItem.registrySwapper()
+								modelBaker, this.entityModelSet, this.materials, this.playerSkinRenderCache, missingModels.item, clientItem.registrySwapper()
 							)
 						);
 				} catch (Exception var6x) {
@@ -113,7 +86,7 @@ public class ModelBakery {
 				map.put(resourceLocation, properties);
 			}
 		});
-		return completableFuture.thenCombine(completableFuture2, (map2, map3) -> new ModelBakery.BakingResult(missingModels, map2, map3, map));
+		return completableFuture.thenApply(map3 -> new ModelBakery.BakingResult(missingModels, this.baked.blockStateModels(), map3, map));
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -127,66 +100,5 @@ public class ModelBakery {
 
 	@Environment(EnvType.CLIENT)
 	public record MissingModels(BlockStateModel block, ItemModel item) {
-
-		public static ModelBakery.MissingModels bake(ResolvedModel resolvedModel, SpriteGetter spriteGetter) {
-			ModelBaker modelBaker = new ModelBaker() {
-				@Override
-				public ResolvedModel getModel(ResourceLocation resourceLocation) {
-					throw new IllegalStateException("Missing model can't have dependencies, but asked for " + resourceLocation);
-				}
-
-				@Override
-				public <T> T compute(ModelBaker.SharedOperationKey<T> sharedOperationKey) {
-					return sharedOperationKey.compute(this);
-				}
-
-				@Override
-				public SpriteGetter sprites() {
-					return spriteGetter;
-				}
-			};
-			TextureSlots textureSlots = resolvedModel.getTopTextureSlots();
-			boolean bl = resolvedModel.getTopAmbientOcclusion();
-			boolean bl2 = resolvedModel.getTopGuiLight().lightLikeBlock();
-			ItemTransforms itemTransforms = resolvedModel.getTopTransforms();
-			QuadCollection quadCollection = resolvedModel.bakeTopGeometry(textureSlots, modelBaker, BlockModelRotation.X0_Y0);
-			TextureAtlasSprite textureAtlasSprite = resolvedModel.resolveParticleSprite(textureSlots, modelBaker);
-			BlockStateModel blockStateModel = new SingleVariant(new SimpleModelWrapper(quadCollection, bl, textureAtlasSprite));
-			ItemModel itemModel = new MissingItemModel(quadCollection.getAll(), new ModelRenderProperties(bl2, textureAtlasSprite, itemTransforms));
-			return new ModelBakery.MissingModels(blockStateModel, itemModel);
-		}
-	}
-
-	@Environment(EnvType.CLIENT)
-	class ModelBakerImpl implements ModelBaker {
-		private final SpriteGetter sprites;
-		private final Map<ModelBaker.SharedOperationKey<Object>, Object> operationCache = new ConcurrentHashMap();
-		private final Function<ModelBaker.SharedOperationKey<Object>, Object> cacheComputeFunction = sharedOperationKey -> sharedOperationKey.compute(this);
-
-		ModelBakerImpl(final SpriteGetter spriteGetter) {
-			this.sprites = spriteGetter;
-		}
-
-		@Override
-		public SpriteGetter sprites() {
-			return this.sprites;
-		}
-
-		@Override
-		public ResolvedModel getModel(ResourceLocation resourceLocation) {
-			ResolvedModel resolvedModel = (ResolvedModel)ModelBakery.this.resolvedModels.get(resourceLocation);
-			if (resolvedModel == null) {
-				ModelBakery.LOGGER.warn("Requested a model that was not discovered previously: {}", resourceLocation);
-				return ModelBakery.this.missingModel;
-			} else {
-				return resolvedModel;
-			}
-		}
-
-		@Override
-		@SuppressWarnings("unchecked")
-		public <T> T compute(ModelBaker.SharedOperationKey<T> sharedOperationKey) {
-			return (T)this.operationCache.computeIfAbsent((ModelBaker.SharedOperationKey<Object>)(ModelBaker.SharedOperationKey<?>)sharedOperationKey, this.cacheComputeFunction);
-		}
 	}
 }

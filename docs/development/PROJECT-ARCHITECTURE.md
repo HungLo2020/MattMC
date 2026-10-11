@@ -16,8 +16,10 @@ src/main/rust/
 ├── lib.rs
 ├── app/
 ├── assets/
+│   ├── models/
 │   ├── packs/
-│   └── resources/
+│   ├── resources/
+│   └── textures/
 ├── audio/
 ├── compat/
 ├── content/
@@ -129,7 +131,7 @@ Application-level orchestration belongs here. This is the intended home for futu
 
 ### `core/`
 
-Shared engine primitives belong here. Use this for low-level types, algorithms, memory utilities, math, identifiers, and cross-subsystem foundations that are not specifically rendering, world, platform, or gameplay code. `core/math.rs` supplies exact coordinate seeding shared by content, world generation and terrain meshing.
+Shared engine primitives belong here. Use this for low-level types, algorithms, memory utilities, math, identifiers, and cross-subsystem foundations that are not specifically rendering, world, platform, or gameplay code. `core/math.rs` supplies exact coordinate seeding shared by content, world generation and terrain meshing. `core/json.rs` parses JSON with Gson's semantics (key order, duplicate keys, number text) and `core/dfu.rs` decodes it with DataFixerUpper `JsonOps` rules; `core/parallel.rs` runs scoped worker maps whose Java log lines the calling thread emits.
 
 ### `world/`
 
@@ -509,11 +511,15 @@ Asset loading, decoding, caching, and resource processing belong here.
 `assets/packs/` opens and reads directory, ZIP and vanilla packs and owns
 `pack.mcmeta` formats, overlays and compatibility; `assets/repository.rs`
 discovers packs and orders the selection; `assets/resources/` is the resource
-manager (namespace stacks, filters, sidecar metadata). Java keeps the
-`PackResources`/`ResourceManager` API and metadata section codecs; see
-[resource packs and registries](resources/index.md).
+manager (namespace stacks, filters, sidecar metadata). `assets/textures/`
+builds texture atlases (sprite sources, PNG decoding, Sodium preprocessing,
+stitching, mip levels) and `assets/models/` loads, resolves and bakes block and
+item models. Java keeps the `PackResources`/`ResourceManager` API, metadata
+section codecs, item definitions and the atlas and baked model objects its
+consumers use; see [resource packs and registries](resources/index.md),
+[texture atlases](resources/ATLASES.md) and [models](resources/MODELS.md).
 `assets/map_image.rs` performs bounded indexed-map PNG encoding for the
-transitional world asset transport; map palette data stays in `content/`. Future Rust-side texture, model, shader and language work should live here when it is not exclusively part of a rendering backend.
+transitional world asset transport; map palette data stays in `content/`. Future Rust-side shader and language work should live here when it is not exclusively part of a rendering backend.
 
 ### `audio/`
 

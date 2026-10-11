@@ -1,5 +1,9 @@
 # Verification
 
+Three drivers check this area: resource stacks, tags and registry sync
+against Frozen (this section through [Limits](#limits)); [atlases](#atlases)
+and [models](#models) against Frozen and a Reference checkout.
+
 [`VerifyResourceStacks.py`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/DevUtils/tests/resources/VerifyResourceStacks.py)
 runs the same observer,
 [`ResourceStackReference.java`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/DevUtils/tests/resources/ResourceStackReference.java),
@@ -202,3 +206,68 @@ runtime acceptance. The [tag ordering helper](TAGS-AND-REGISTRIES.md#tag-loading
 also has an explicit collision-tree limit.
 Check those in game: use the pack screen, run `/reload` and join a world, and
 look for resource, tag or registry errors in the log.
+
+## Reference checkouts
+
+The atlas and model drivers compare records with **Reference**: the last
+commit whose Java pipeline they replace, checked out and built on its own
+(`git worktree add build/reference-head <commit>`, then
+`./gradlew -PmattmcRustProfile=release classes buildRustNative` there).
+Frozen is timed and, where its observer can see the same state, compared too.
+Remove the worktree with `git worktree remove` when done.
+
+## Atlases
+
+[`VerifyAtlases.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/textures/VerifyAtlases.py)
+runs [`AtlasReference.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/textures/AtlasReference.java)
+on Reference, Current and Frozen in alternating fresh JVMs. Every known atlas
+is built by `SpriteLoader.loadAndStitch` over this checkout's resources: alone,
+with an edge-case fixture pack (PNG encodings, animation metadata errors,
+unstitch and paletted sources, filters, broken definitions, GUI metadata), and
+from a pack whose sprites allow four mip levels. Records hold sizes, mip
+levels, map order, placements, UVs, frames, flags, per-level pixel hashes and
+uploaded first-frame snapshots; Current must match Reference, and sorted
+WARN/ERROR first lines must match. Frozen has no semantic device, so it skips
+snapshots and is timed only.
+
+**Latest run** (uncommitted work on `398a0078`, Frozen `7a4d1817`, five
+rounds, five warm iterations): passed. 8,414 record lines matched Reference in
+every round. Loading all atlases in parallel took 82.4 ms against Frozen's
+115.5 ms (0.713; rounds 0.65–0.73) and Reference's 105.1 ms.
+
+## Models
+
+[`VerifyModels.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/models/VerifyModels.py)
+runs [`ModelReference.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/models/ModelReference.java)
+the same way. It stitches every atlas (no upload), runs
+`ModelManager.reload` up to its preparation barrier, and records, alone and
+with two fixture packs: per block state the model class, particle,
+render-group partition and the parts collected for four seeds (every quad's
+vertices, tint, face, sprite, shade, light); per item model id the baked item
+model tree and properties; and the missing models. Fixtures cover model JSON
+errors and number forms, parent and texture-reference cycles, element and face
+rotations, display transforms, generated items over animated and partly
+transparent sprites, weighted and multipart blockstates, overlaps and errors,
+a blockstate split across packs, special-model bases and item definitions
+over missing models.
+
+Normalized, because Java itself varies per JVM: generated items' SOUTH/NORTH
+front faces, unresolved texture reference lines, and group numbering (the
+partition is compared). WARN entries compare with their continuation lines;
+ERROR entries compare their header only, since Java's cause is a Gson or DFU
+exception with a stack trace.
+
+**Latest run** (uncommitted work on `398a0078`, Frozen `7a4d1817`, five
+rounds, five warm iterations): passed. 67,433 record lines were identical in
+all 15 runs, Frozen's included, and the 4,351 warning entries matched
+Reference.
+
+| Timing | Current | Frozen | Reference | Current/Frozen | Rounds |
+| --- | --- | --- | --- | --- | --- |
+| Model reload (atlases precomputed) | 138.0 ms | 150.2 ms | 152.9 ms | 0.919 | 0.73–1.06 |
+| Atlas + model reload | 224.2 ms | 285.2 ms | 252.8 ms | 0.786 | 0.76–0.91 |
+
+**Limits:** neither driver uploads through a real GPU, applies the reload to a
+running client, renders, or exercises resource-pack switching in game. Check
+those by joining a world, switching resource packs and comparing the log's
+model and texture warnings with Frozen's.

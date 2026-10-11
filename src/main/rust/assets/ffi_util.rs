@@ -54,8 +54,16 @@ pub(crate) struct Writer {
 }
 
 impl Writer {
+    pub(crate) fn u8(&mut self, value: u8) {
+        self.bytes.push(value);
+    }
+
     pub(crate) fn u16(&mut self, value: u16) {
         self.bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    pub(crate) fn f32(&mut self, value: f32) {
+        self.bytes.extend_from_slice(&value.to_bits().to_le_bytes());
     }
 
     pub(crate) fn u32(&mut self, value: u32) {
@@ -101,6 +109,26 @@ impl<'a> Reader<'a> {
         let slice = self.bytes.get(self.at..self.at + 4)?;
         self.at += 4;
         Some(u32::from_le_bytes(slice.try_into().ok()?))
+    }
+
+    pub(crate) fn u16(&mut self) -> Option<u16> {
+        let slice = self.bytes.get(self.at..self.at + 2)?;
+        self.at += 2;
+        Some(u16::from_le_bytes(slice.try_into().ok()?))
+    }
+
+    pub(crate) fn i32(&mut self) -> Option<i32> {
+        self.u32().map(|value| value as i32)
+    }
+
+    pub(crate) fn u64(&mut self) -> Option<u64> {
+        let slice = self.bytes.get(self.at..self.at + 8)?;
+        self.at += 8;
+        Some(u64::from_le_bytes(slice.try_into().ok()?))
+    }
+
+    pub(crate) fn f32(&mut self) -> Option<f32> {
+        self.u32().map(f32::from_bits)
     }
 
     /// A u32-length-prefixed byte field.

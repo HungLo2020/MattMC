@@ -1,8 +1,6 @@
 package net.minecraft.client.resources.model;
 
-import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -33,13 +31,12 @@ public class BlockStateDefinitions {
 		return (BlockState)((BlockState)(bl ? GLOW_ITEM_FRAME_FAKE_DEFINITION : ITEM_FRAME_FAKE_DEFINITION).any()).setValue(BlockStateProperties.MAP, bl2);
 	}
 
-	static Function<ResourceLocation, StateDefinition<Block, BlockState>> definitionLocationToBlockStateMapper() {
-		Map<ResourceLocation, StateDefinition<Block, BlockState>> map = new HashMap(STATIC_DEFINITIONS);
-
+	/** Every blockstate definition id and its states (`definitionLocationToBlockStateMapper`): the item frames' fake ones, then each block's. */
+	static Map<ResourceLocation, StateDefinition<Block, BlockState>> definitions() {
+		Map<ResourceLocation, StateDefinition<Block, BlockState>> map = new java.util.LinkedHashMap<>(STATIC_DEFINITIONS);
 		for (Block block : BuiltInRegistries.BLOCK) {
 			map.put(block.builtInRegistryHolder().key().location(), block.getStateDefinition());
 		}
-
-		return map::get;
+		return map;
 	}
 }

@@ -1,33 +1,34 @@
 package net.minecraft.client.renderer.texture;
 
+import net.blaze3d.platform.NativeImage;
 import net.logging.LogUtils;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.CrashReport;
-import net.minecraft.CrashReportCategory;
-import net.minecraft.ReportedException;
-import net.minecraft.Util;
-import net.minecraft.client.renderer.texture.atlas.SpriteResourceLoader;
-import net.minecraft.client.renderer.texture.atlas.SpriteSourceList;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.metadata.MetadataSectionType.WithValue;
+import net.minecraft.server.packs.resources.MultiPackResourceManager;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.Mth;
+import net.minecraft.server.packs.resources.ResourceMetadata;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.Zone;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Builds an atlas from resource packs. Rust (`assets/textures`) runs the
+ * atlas definition's sprite sources, decodes and preprocesses sprites,
+ * stitches them and generates mip levels; Java decodes extra metadata
+ * sections (such as the GUI atlas's) and keeps the sprite objects.
+ */
 @Environment(EnvType.CLIENT)
 public class SpriteLoader {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -47,115 +48,103 @@ public class SpriteLoader {
 		return new SpriteLoader(textureAtlas.location(), textureAtlas.maxSupportedTextureSize(), textureAtlas.getWidth(), textureAtlas.getHeight());
 	}
 
-	private SpriteLoader.Preparations stitch(List<SpriteContents> list, int i, Executor executor) {
-		Zone zone = Profiler.get().zone(() -> "stitch " + this.location);
-
-		SpriteLoader.Preparations var17;
-		try {
-			int j = this.maxSupportedTextureSize;
-			Stitcher<SpriteContents> stitcher = new Stitcher<>(j, j, i);
-			int k = Integer.MAX_VALUE;
-			int l = 1 << i;
-
-			for (SpriteContents spriteContents : list) {
-				k = Math.min(k, Math.min(spriteContents.width(), spriteContents.height()));
-				int m = Math.min(Integer.lowestOneBit(spriteContents.width()), Integer.lowestOneBit(spriteContents.height()));
-				if (m < l) {
-					LOGGER.warn(
-						"Texture {} with size {}x{} limits mip level from {} to {}",
-						spriteContents.name(),
-						spriteContents.width(),
-						spriteContents.height(),
-						Mth.log2(l),
-						Mth.log2(m)
-					);
-					l = m;
-				}
-
-				stitcher.registerSprite(spriteContents);
-			}
-
-			int n = Math.min(k, l);
-			int o = Mth.log2(n);
-			int m;
-			if (o < i) {
-				LOGGER.warn("{}: dropping miplevel from {} to {}, because of minimum power of two: {}", this.location, i, o, n);
-				m = o;
-			} else {
-				m = i;
-			}
-
+	/**
+	 * Decodes each kept sidecar's extra sections; a sprite whose sections fail
+	 * to decode is dropped, as `SpriteResourceLoader` returned null for it.
+	 */
+	private static Map<ResourceLocation, List<WithValue<?>>> decodeExtraMetadata(NativeAtlasBuild build, Set<MetadataSectionType<?>> set) {
+		Map<ResourceLocation, List<WithValue<?>>> metadata = new HashMap<>();
+		if (set.isEmpty()) {
+			return metadata;
+		}
+		List<NativeAtlasBuild.Metadata> kept = build.metadata();
+		int[] rejected = new int[kept.size()];
+		int count = 0;
+		for (NativeAtlasBuild.Metadata sidecar : kept) {
 			try {
-				stitcher.stitch();
-			} catch (StitcherException var19) {
-				CrashReport crashReport = CrashReport.forThrowable(var19, "Stitching");
-				CrashReportCategory crashReportCategory = crashReport.addCategory("Stitcher");
-				crashReportCategory.setDetail(
-					"Sprites",
-					var19.getAllSprites()
-						.stream()
-						.map(entry -> String.format(Locale.ROOT, "%s[%dx%d]", entry.name(), entry.width(), entry.height()))
-						.collect(Collectors.joining(","))
-				);
-				crashReportCategory.setDetail("Max Texture Size", j);
-				throw new ReportedException(crashReport);
-			}
-
-			int p = Math.max(stitcher.getWidth(), this.minWidth);
-			int q = Math.max(stitcher.getHeight(), this.minHeight);
-			Map<ResourceLocation, TextureAtlasSprite> map = this.getStitchedSprites(stitcher, p, q);
-			TextureAtlasSprite textureAtlasSprite = (TextureAtlasSprite)map.get(MissingTextureAtlasSprite.getLocation());
-			CompletableFuture<Void> completableFuture;
-			if (m > 0) {
-				completableFuture = CompletableFuture.runAsync(
-					() -> map.values().forEach(textureAtlasSpritex -> textureAtlasSpritex.contents().increaseMipLevel(m)), executor
-				);
-			} else {
-				completableFuture = CompletableFuture.completedFuture(null);
-			}
-
-			var17 = new SpriteLoader.Preparations(p, q, m, textureAtlasSprite, map, completableFuture);
-		} catch (Throwable var20) {
-			if (zone != null) {
-				try {
-					zone.close();
-				} catch (Throwable var18) {
-					var20.addSuppressed(var18);
+				ResourceMetadata resourceMetadata = ResourceMetadata.fromJsonStream(new ByteArrayInputStream(sidecar.json().getBytes(StandardCharsets.UTF_8)));
+				List<WithValue<?>> sections = resourceMetadata.getTypedSections(set);
+				if (!sections.isEmpty()) {
+					metadata.put(sidecar.name(), sections);
 				}
+			} catch (Exception exception) {
+				LOGGER.error("Unable to parse metadata from {}", sidecar.name(), exception);
+				rejected[count++] = sidecar.index();
 			}
-
-			throw var20;
 		}
-
-		if (zone != null) {
-			zone.close();
-		}
-
-		return var17;
+		build.drop(java.util.Arrays.copyOf(rejected, count));
+		return metadata;
 	}
 
-	private static CompletableFuture<List<SpriteContents>> runSpriteSuppliers(
-		SpriteResourceLoader spriteResourceLoader, List<Function<SpriteResourceLoader, SpriteContents>> list, Executor executor
-	) {
-		List<CompletableFuture<SpriteContents>> list2 = list.stream()
-			.map(function -> CompletableFuture.supplyAsync(() -> (SpriteContents)function.apply(spriteResourceLoader), executor))
-			.toList();
-		return Util.sequence(list2).thenApply(listx -> listx.stream().filter(Objects::nonNull).toList());
+	private SpriteLoader.Preparations stitch(NativeAtlasBuild build, int mipLevel, Set<MetadataSectionType<?>> set, Executor executor) {
+		Zone zone = Profiler.get().zone(() -> "stitch " + this.location);
+
+		try {
+			Map<ResourceLocation, List<WithValue<?>>> metadata = decodeExtraMetadata(build, set);
+			NativeAtlasBuild.Layout layout = build.stitch(mipLevel, this.maxSupportedTextureSize, this.minWidth, this.minHeight);
+			List<NativeAtlasBuild.Placed> placed = layout.sprites();
+			int[] indices = new int[placed.size()];
+			NativeImage[] sheets = new NativeImage[placed.size()];
+			for (int position = 0; position < placed.size(); position++) {
+				NativeAtlasBuild.Placed sprite = placed.get(position);
+				indices[position] = sprite.index();
+				sheets[position] = new NativeImage(sprite.sheetWidth(), sprite.sheetHeight(), false);
+			}
+			build.copy(0, indices, sheets);
+			Map<ResourceLocation, TextureAtlasSprite> map = new HashMap<>();
+			SpriteContents[] contents = new SpriteContents[placed.size()];
+			for (int position = 0; position < placed.size(); position++) {
+				NativeAtlasBuild.Placed sprite = placed.get(position);
+				contents[position] = new SpriteContents(sprite.name(), sprite.width(), sprite.height(), sheets[position], sprite.frames(),
+					sprite.frameRowSize(), sprite.interpolate(), sprite.transparent(), sprite.translucent(), metadata.getOrDefault(sprite.name(), List.of()));
+				map.put(sprite.name(), new TextureAtlasSprite(this.location, contents[position], layout.width(), layout.height(), sprite.x(), sprite.y()));
+			}
+			TextureAtlasSprite missing = map.get(MissingTextureAtlasSprite.getLocation());
+			int level = layout.mipLevel();
+			CompletableFuture<Void> readyForUpload;
+			if (level > 0) {
+				readyForUpload = CompletableFuture.runAsync(() -> {
+					try (build) {
+						build.generateMips();
+						NativeImage[][] levels = new NativeImage[contents.length][];
+						for (int position = 0; position < contents.length; position++) {
+							levels[position] = new NativeImage[level + 1];
+							levels[position][0] = sheets[position];
+						}
+						for (int mip = 1; mip <= level; mip++) {
+							NativeImage[] images = new NativeImage[contents.length];
+							for (int position = 0; position < contents.length; position++) {
+								images[position] = new NativeImage(sheets[position].getWidth() >> mip, sheets[position].getHeight() >> mip, false);
+								levels[position][mip] = images[position];
+							}
+							build.copy(mip, indices, images);
+						}
+						for (int position = 0; position < contents.length; position++) {
+							contents[position].byMipLevel = levels[position];
+						}
+					}
+				}, executor);
+			} else {
+				build.close();
+				readyForUpload = CompletableFuture.completedFuture(null);
+			}
+			return new SpriteLoader.Preparations(layout.width(), layout.height(), level, missing, map, readyForUpload);
+		} catch (RuntimeException failure) {
+			build.close();
+			throw failure;
+		} finally {
+			if (zone != null) {
+				zone.close();
+			}
+		}
 	}
 
 	public CompletableFuture<SpriteLoader.Preparations> loadAndStitch(
 		ResourceManager resourceManager, ResourceLocation resourceLocation, int i, Executor executor, Set<MetadataSectionType<?>> set
 	) {
-		SpriteResourceLoader spriteResourceLoader = SpriteResourceLoader.create(set);
-		return CompletableFuture.supplyAsync(() -> SpriteSourceList.load(resourceManager, resourceLocation).list(resourceManager), executor)
-			.thenCompose(list -> runSpriteSuppliers(spriteResourceLoader, list, executor))
-			.thenApply(list -> this.stitch(list, i, executor));
-	}
-
-	private Map<ResourceLocation, TextureAtlasSprite> getStitchedSprites(Stitcher<SpriteContents> stitcher, int i, int j) {
-		Map<ResourceLocation, TextureAtlasSprite> map = new HashMap();
-		stitcher.gatherSprites((spriteContents, k, l) -> map.put(spriteContents.name(), new TextureAtlasSprite(this.location, spriteContents, i, j, k, l)));
-		return map;
+		MultiPackResourceManager manager = MultiPackResourceManager.nativeManager(resourceManager);
+		return CompletableFuture.supplyAsync(() -> NativeAtlasBuild.load(manager, this.location, resourceLocation, !set.isEmpty()), executor)
+			.thenApply(build -> this.stitch(build, i, set, executor));
 	}
 
 	@Environment(EnvType.CLIENT)

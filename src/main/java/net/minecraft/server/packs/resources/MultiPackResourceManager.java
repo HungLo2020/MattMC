@@ -166,6 +166,35 @@ public class MultiPackResourceManager implements CloseableResourceManager {
 		}
 	}
 
+	/**
+	 * This manager's native handle, for Rust stages that read resources
+	 * directly (`assets/textures`, `assets/models`). Valid while this
+	 * manager is reachable.
+	 */
+	public long nativeHandle() {
+		return this.handle;
+	}
+
+	private static final java.util.Map<net.minecraft.server.packs.PackType, MultiPackResourceManager> EMPTY = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/**
+	 * The native manager behind `resourceManager`: itself, a reloadable
+	 * manager's current resources, or an empty manager for
+	 * `ResourceManager.Empty`.
+	 */
+	public static MultiPackResourceManager nativeManager(ResourceManager resourceManager) {
+		if (resourceManager instanceof MultiPackResourceManager manager) {
+			return manager;
+		}
+		if (resourceManager instanceof ReloadableResourceManager reloadable) {
+			return nativeManager(reloadable.resources());
+		}
+		if (resourceManager == ResourceManager.Empty.INSTANCE) {
+			return EMPTY.computeIfAbsent(PackType.CLIENT_RESOURCES, type -> new MultiPackResourceManager(type, List.of()));
+		}
+		throw new IllegalArgumentException("Resource manager has no native resources: " + resourceManager);
+	}
+
 	@Override
 	public Stream<PackResources> listPacks() {
 		return this.packs.stream();

@@ -47,8 +47,10 @@ Follow the owner boundary relevant to the next change:
 
 - **Packs, tags and synchronization:** [resource owners](../resources/index.md)
   now handle bundled pack IO/discovery/selection, namespace stacks and tag
-  planning/resolution. Java retains regex and element-lookup callbacks, reload
-  orchestration, object codecs/model baking and typed registry storage.
+  planning/resolution, and build [texture atlases](../resources/ATLASES.md) and
+  bake [block/item models](../resources/MODELS.md). Java retains regex and
+  element-lookup callbacks, reload orchestration, object codecs, item
+  definitions, the baked model objects and typed registry storage.
   [Identity snapshots](../resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
   publish frozen IDs/known-pack masks/tag lists for synchronization; they do
   not replace item/entity/biome registries or establish an atomic generation

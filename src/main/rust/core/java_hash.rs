@@ -27,7 +27,7 @@ fn spread(hash: i32) -> u32 {
 
 /// `HashMap`'s table size after `count` insertions from `initial` buckets
 /// (resizing when the size exceeds three quarters of the table).
-fn table_size(initial: usize, count: usize) -> usize {
+pub(crate) fn table_size(initial: usize, count: usize) -> usize {
     let mut table = initial.max(1).next_power_of_two();
     while count > table * 3 / 4 {
         table *= 2;
@@ -48,7 +48,14 @@ pub(crate) enum Insertion {
 /// whose first table has `initial` buckets (16 for `new HashMap()`): indices
 /// into `hashes`.
 pub(crate) fn iteration_order(hashes: &[i32], initial: usize, insertion: Insertion) -> Vec<usize> {
-    let mask = (table_size(initial, hashes.len()) - 1) as u32;
+    iteration_order_in(hashes, table_size(initial, hashes.len()), insertion)
+}
+
+/// The iteration order of `hashes` (in insertion order) in a table of
+/// `table` buckets: for maps whose table grew larger than their final
+/// size because entries were removed (`table_size` of the peak size).
+pub(crate) fn iteration_order_in(hashes: &[i32], table: usize, insertion: Insertion) -> Vec<usize> {
+    let mask = (table - 1) as u32;
     let mut order: Vec<usize> = (0..hashes.len()).collect();
     match insertion {
         Insertion::Put => order.sort_by_key(|&index| (spread(hashes[index]) & mask, index)),

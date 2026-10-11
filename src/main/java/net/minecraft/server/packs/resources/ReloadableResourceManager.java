@@ -32,6 +32,11 @@ public class ReloadableResourceManager implements ResourceManager, AutoCloseable
 		this.resources.close();
 	}
 
+	/** The current pack resources (a native `MultiPackResourceManager`). */
+	CloseableResourceManager resources() {
+		return this.resources;
+	}
+
 	public void registerReloadListener(PreparableReloadListener preparableReloadListener) {
 		this.listeners.add(preparableReloadListener);
 	}

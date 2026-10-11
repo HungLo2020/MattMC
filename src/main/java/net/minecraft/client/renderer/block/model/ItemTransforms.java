@@ -1,11 +1,5 @@
 package net.minecraft.client.renderer.block.model;
 
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import java.lang.reflect.Type;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -49,35 +43,4 @@ public record ItemTransforms(
 		};
 	}
 
-	@Environment(EnvType.CLIENT)
-	protected static class Deserializer implements JsonDeserializer<ItemTransforms> {
-		public ItemTransforms deserialize(JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
-			JsonObject jsonObject = jsonElement.getAsJsonObject();
-			ItemTransform itemTransform = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND);
-			ItemTransform itemTransform2 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.THIRD_PERSON_LEFT_HAND);
-			if (itemTransform2 == ItemTransform.NO_TRANSFORM) {
-				itemTransform2 = itemTransform;
-			}
-
-			ItemTransform itemTransform3 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.FIRST_PERSON_RIGHT_HAND);
-			ItemTransform itemTransform4 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.FIRST_PERSON_LEFT_HAND);
-			if (itemTransform4 == ItemTransform.NO_TRANSFORM) {
-				itemTransform4 = itemTransform3;
-			}
-
-			ItemTransform itemTransform5 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.HEAD);
-			ItemTransform itemTransform6 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.GUI);
-			ItemTransform itemTransform7 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.GROUND);
-			ItemTransform itemTransform8 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.FIXED);
-			ItemTransform itemTransform9 = this.getTransform(jsonDeserializationContext, jsonObject, ItemDisplayContext.ON_SHELF);
-			return new ItemTransforms(
-				itemTransform2, itemTransform, itemTransform4, itemTransform3, itemTransform5, itemTransform6, itemTransform7, itemTransform8, itemTransform9
-			);
-		}
-
-		private ItemTransform getTransform(JsonDeserializationContext jsonDeserializationContext, JsonObject jsonObject, ItemDisplayContext itemDisplayContext) {
-			String string = itemDisplayContext.getSerializedName();
-			return jsonObject.has(string) ? jsonDeserializationContext.deserialize(jsonObject.get(string), ItemTransform.class) : ItemTransform.NO_TRANSFORM;
-		}
-	}
 }

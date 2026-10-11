@@ -72,6 +72,16 @@ unsafe fn handle(handle: u64) -> Option<&'static Handle> {
     }
 }
 
+/// Runs `action` with the manager behind a Java handle and its filters.
+/// Filters may call Java, so this runs on a Java thread.
+///
+/// # Safety
+/// `handle` must be live for the call.
+pub(crate) unsafe fn with_manager<R>(handle: u64, action: impl FnOnce(&Manager, &dyn Filters) -> R) -> Option<R> {
+    let handle = unsafe { self::handle(handle) }?;
+    Some(action(&handle.manager, handle.filters()))
+}
+
 /// Registers Java's filter upcall (`filter(token, pack, kind, text) != 0`).
 ///
 /// # Safety

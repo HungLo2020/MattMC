@@ -133,6 +133,16 @@ impl Manager {
         self.packs.get(index).map_or("", |pack| pack.id.as_str())
     }
 
+    /// Reads a located resource (`Resource.open`).
+    pub(crate) fn read(&self, located: Located, namespace: &str, path: &str) -> std::io::Result<Vec<u8>> {
+        self.packs[located.pack as usize].read(located.entry, &format!("{namespace}/{path}"))
+    }
+
+    /// `Resource.sourcePackId()`.
+    pub(crate) fn pack_id(&self, pack: u16) -> &str {
+        self.packs.get(pack as usize).map_or("", |pack| pack.id.as_str())
+    }
+
     fn lookup(&self, pack: u16, namespace: &str, path: &str) -> Option<Located> {
         self.packs[pack as usize]
             .resource(self.pack_type, namespace, path)
