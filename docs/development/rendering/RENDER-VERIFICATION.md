@@ -70,8 +70,10 @@ seven Iris+DH lifecycle scenarios and reviewed original-resolution vanilla and
 Iris+DH Frozen pairs are reported to pass, with zero GAL validation failures.
 This documentation review did not rerun those checks or inspect their raw
 receipts. This extends the
-bounded runtime evidence; FPS, first-frame/temporal rendering, sustained
-streaming and long-memory acceptance remain separate, unproved requirements.
+bounded runtime evidence. Subsequent [release-separated timing matrices](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+include a box-image settled pass followed by a saved-light aggregate failure
+on vanilla p99. These author-reported results do not establish first-frame,
+temporal, sustained-streaming or long-memory acceptance.
 
 ### Mid-world shader-enable check
 

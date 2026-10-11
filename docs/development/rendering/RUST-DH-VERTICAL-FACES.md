@@ -1,5 +1,10 @@
 # Rust DH box production
 
+Source reviewed at [`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8). Suite results, timings, profiles and hardware/capture checks below are
+implementation-author reports. This documentation review inspected source and
+fixture assertions; it did not rerun Java/Rust suites, clients, captures or
+benchmarks, or independently inspect the untracked runtime receipts.
+
 Ordinary DH builds now produce complete boxes in Rust: top/bottom visibility,
 fake-ocean geometry, stock directional shading, neighbor light intervals and
 semantic material splits. One synchronous call borrows existing compact
@@ -12,10 +17,10 @@ facts. Custom shade implementations retain their ordered callbacks. This is a
 step toward moving the complete render-source producer and consumer into Rust;
 GPU resources and presentation remain owned by VulkanicGAL.
 
-Implementation: [complete box policy](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_quads/boxes.rs),
-[vertical policy](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_quads/faces.rs),
-[borrowed storage bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilder.java)
-and [box consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnBox.java).
+Implementation: [complete box policy](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/rust/render/dh_quads/boxes.rs),
+[vertical policy](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/rust/render/dh_quads/faces.rs),
+[borrowed storage bridge](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhQuadBuilder.java)
+and [box consumer](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnBox.java).
 
 ## Constraints
 
@@ -38,7 +43,8 @@ and [box consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/jav
   the bridge allocates a bounded numeric projection once per box. This is not
   allocation-free construction.
 - Canonical exact `LongArrayList` windows and immutable JDK span lists admit.
-  Custom getters, malformed extents, more than 4,096 points/spans, subclasses
+  Custom getters, malformed extents, more than 4,096 points per neighbor or
+  4,096 semantic spans, and subclasses
   retain the compatibility path. Bounds are checked
   before the native call. Native pointers never outlive that call.
 - Each build retains two numeric scratch vectors. Neighbor processing swaps
@@ -98,7 +104,7 @@ active terrain settling, not just the settled view. Receipt:
 `artifacts/graphics-captures/goal5/native-dh-handoff-active-dh-cpu-20261011/current/receipt.json`.
 These inclusive samples overlap and do not establish an isolated speedup.
 
-The cleaned candidate `0133e073` passes the Frozen callback corpus, 768 complete
+The author reports cleaned candidate `0133e073` passing the Frozen callback corpus, 768 complete
 native-box replays, 192 current semantic boxes, the actual 48-value shade corpus
 and reentrant/custom/closed-owner controls. Full Rust passes 2,616 tests with
 three ignored; full Java reports 1,959 with two skips and zero failures/errors
@@ -120,7 +126,7 @@ Mean RGB differences are .259/.445/.499 (vanilla) and 3.668/4.169/3.856 (combine
 existing color/lighting differences remain. Receipts:
 `artifacts/graphics-captures/validation/native-dh-box-correctness-20261011/summary.json`.
 All twenty fresh alternating 6,000-frame timings pass health/input guards and
-every measured FPS/p99 floor. The [current gameplay matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+every measured FPS/p99 floor. The [box-specific gameplay matrix](GAMEPLAY-PERFORMANCE.md#october-11-complete-dh-box-matrix)
 records all medians and protocol limits; it does not isolate this component's
 FPS contribution. The earlier handoff matrix remains historical. Receipts:
 `build/native-dh-faces/`. Initial recorder setup, invalid test-span and unsupported test-subclass failures
@@ -142,3 +148,28 @@ operation. Stock worlds supply mode/world/ambient/flat scalar facts; no Iris GPU
 state is borrowed. Custom wrappers and unsupported neighbor windows retain the
 existing path. CPU component gains and settled captures do not establish
 first-frame, temporal, sustained-streaming or long-session memory acceptance.
+
+
+## Source review limits
+
+The [Java verifier](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/test/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhFacesTest.java)
+separates 3,072 Frozen callback-route records from 768 no-injected-failure
+complete native-box comparisons and 192 Current semantic controls. The 48-value
+shade corpus exercises the actual getter on an unconstructed CPU level, not
+48 rendered worlds. Replay checks embedded class-hash string lengths; it does
+not recompute the Frozen class hashes. Retained custom callback failure/reentry
+controls therefore must not be described as failure injection into every
+admitted callback-free whole-box route.
+
+Canonical storage windows and immutable semantic spans are synchronously
+borrowed; Java traversal/context resolution still prepares them. Scratch may
+retain capacity until the quad owner closes. CPU fixture equality and sampled
+native calls do not establish concurrent mutation, cancellation/teardown timing,
+first-frame geometry or a process-wide memory bound.
+
+The [timing runner](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/DevUtils/tests/rendering/VerifyDhFaces.py)
+enforces a median-at-most-reference exit gate, compares count checksums and
+rehashes selected driver/native files. It does not itself hash every source,
+classpath entry or Frozen inventory, and its count checksum is weaker than
+exact face/semantic equality fixtures. Keep full author guard receipts and
+actual gameplay/profile evidence separate from this synthetic command.

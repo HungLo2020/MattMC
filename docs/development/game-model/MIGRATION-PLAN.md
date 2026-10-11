@@ -93,10 +93,12 @@ Follow the owner boundary relevant to the next change:
   [render-reduction](../rendering/RUST-DH-RENDER-COLUMNS.md) owners supersede
   earlier Java column, merge, identity-map and hash loops. Java retains admission,
   compatibility wrappers, orchestration/public metadata, persistence, contextual
-  colors/material resolution, face construction and collector lifecycle calls.
+  colors/material resolution, source traversal and collector lifecycle calls.
+  [Complete box production](../rendering/RUST-DH-VERTICAL-FACES.md) owns admitted
+  face geometry, stock shading and neighbor-light/material splits.
   Ordinary [quad builds](../rendering/RUST-DH-QUADS.md) now move storage,
   opacity admission, premerging and greedy topology into Rust; Java retains
-  contextual face production plus subclass compatibility. Ordinary
+  contextual source/material inputs plus subclass compatibility. Ordinary
   [semantic packets](../rendering/RUST-DH-PACKETS.md) move layer selection,
   callback planning, shading and byte packing into Rust; Java supplies raw
   contextual getter results. [Native column handoff](../rendering/RUST-DH-COLUMN-HANDOFF.md)

@@ -1,20 +1,47 @@
 # Goal 5 rendering checkpoint
 
+**Goal 5 remains incomplete.** Current source review reaches
+[`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8).
+The [saved-DH light importer](../world/lighting/RUST-DH-SAVED-LIGHT.md) now
+preserves nibble/list-order, allocation/counter and carried-sky policy in a
+native immutable field used by generation's existing light/column consumers.
+Java retains file/NBT orchestration, wrapper publication and compatibility;
+emitter enumeration remains deferred to its original consumer boundary.
+
+The author reports image `a15c0555`, 2,618 Rust passes/three ignored and 1,960
+executed Java cases/two skipped, plus seven lifecycle scenarios and two settled
+image pairs. Its new 20-run matrix passes all FPS floors and three p99 floors,
+but the aggregate **fails** on vanilla p99: 3.365/3.337 ms Current/Frozen.
+The preceding box image `0133e073` passed all its measured settled floors;
+the older handoff `111c5922` failed vanilla p99 and vanilla+DH FPS. These are
+distinct release records, not an isolated component speedup series.
+
+Saved-input synthetic medians are 5.794/289.178 ms against Frozen and
+5.767/290.383 ms against previous Current. The sampled live DH profile contains
+no saved-importer call and does not prove live saved-light admission. All
+runtime/suite/timing results are author reports, not independently rerun here;
+see the [current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+for hidden-HUD/settling/repeat limits and open temporal/streaming/memory gates.
+See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6108300818)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6108302807);
+both issues remain open.
+
 ## October 11 complete DH box checkpoint
 
 [Rust DH box production](RUST-DH-VERTICAL-FACES.md) owns ordinary top/bottom
 visibility, fake-ocean geometry, stock shade policy, neighbor light intervals
 and semantic splitting. Java retains source traversal, contextual material
-resolution and custom callback compatibility. Native image `0133e073` passes
+resolution and custom callback compatibility. The author reports native image
+`0133e073` passing
 the full Rust/Java suites, seven lifecycle scenarios and two reviewed settled
 Frozen pairs; the box guide records exact counts, fixtures and CPU comparisons.
-See the [latest gameplay matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+See the [box-specific gameplay matrix](GAMEPLAY-PERFORMANCE.md#october-11-complete-dh-box-matrix)
 for measured FPS/p99 and its limits. These checks do not establish broad parity,
 first-frame/temporal behavior, sustained streaming or long-session memory bounds.
 
 ## Earlier independent source review
 
-**Goal 5 remains incomplete.** The current source review reaches
+The preceding source review reached
 [`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5).
 [Native packet plans](RUST-DH-PACKETS.md) now select layers, order contextual
 callbacks and encode vertices/companions. The [scoped column owner](RUST-DH-COLUMN-HANDOFF.md)
@@ -160,7 +187,7 @@ author checkpoint above adds seven lifecycle scenarios and two settled image
 pairs; broad runtime/performance acceptance remains open. See
 [driver preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 
-The latest full settled FPS checkpoint discussed here remains the older `839ff128`: twenty author-recorded
+Before the newer matrices above, the settled FPS checkpoint was `839ff128`: twenty author-recorded
 settled runs still fail vanilla p99 and DH median FPS. Earlier `3f00217d`
 passed its own settled floors with a narrow DH margin; neither its pass nor
 `839ff128`'s measurements validate the subsequent retained-world/reduction
@@ -179,8 +206,9 @@ This review inspected committed source and reports, not unbundled runtime
 receipts, and did not rerun those workloads. The five independent scripted-setup
 fixtures belong to `fc1d529d`; no new Java/Rust or client execution is claimed
 for this source reconciliation. The later author-reported entry/lifecycle/image
-checks are bounded; sustained streaming, broad visual/temporal parity, new FPS
-floors, long-session memory and complete scene migration remain open.
+checks are bounded; the latest aggregate FPS/p99 gate still fails as described
+above. Sustained streaming, broad visual/temporal parity, long-session memory
+and complete scene migration remain open.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary

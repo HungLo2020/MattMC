@@ -169,7 +169,9 @@ build. At that checkpoint Java converted full data to render columns,
 constructed faces, sorted/merged quads and built semantic packets. The later
 [render-column](RUST-DH-RENDER-COLUMNS.md) and [quad](RUST-DH-QUADS.md) owners
 move reduction and ordinary greedy topology into Rust; Java retains contextual
-face production and contextual getters, plus subclass compatibility. The later
+source traversal and contextual getters, plus subclass compatibility.
+[Complete box production](RUST-DH-VERTICAL-FACES.md) now owns admitted
+face geometry, stock shades and neighbor-light/material splitting. The later
 [packet owner](RUST-DH-PACKETS.md) moves layer selection, callback planning,
 shading and vertex/companion encoding into Rust. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
 now moves final buffers into the ledger without ordinary Java packet transport;

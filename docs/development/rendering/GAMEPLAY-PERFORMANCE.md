@@ -90,6 +90,13 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
+The following release-separated matrices and lifecycle/image/profile results
+are implementation-author reports inspected at
+[`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8).
+This documentation review did not rerun these workloads or inspect the
+untracked raw receipts. A settled rotating-view gate is not ordinary-play,
+first-frame, streaming, temporal or long-session memory acceptance.
+
 The saved-light candidate `a15c0555` on `abbd16d3d` has a fresh 20-run matrix
 under the restored NVIDIA `595.99.02` driver. All runs are clean, all source,
 native, untouched-Frozen and protected-prompt guards pass, and ten Current
@@ -104,7 +111,7 @@ repeats per side and two per side in other modes. All repeats are retained.
 | Shaders | 344.65 / 315.80 | 4.748 / 6.737 | Both pass |
 | Shaders + DH | 261.65 / 226.85 | 5.494 / 8.743 | Both pass |
 
-The aggregate floor gate **fails**: vanilla p99 is 0.029 ms above Frozen.
+The aggregate floor gate **fails**: vanilla p99 is slightly above Frozen (about 0.03 ms).
 Every FPS floor and the other three p99 floors pass. This is a settled rotating
 workload with hidden minimap and readiness restarts; it does not isolate a
 saved-light FPS improvement or establish sustained travel, startup, temporal or

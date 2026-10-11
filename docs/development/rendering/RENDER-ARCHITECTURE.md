@@ -141,7 +141,8 @@ Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
 generation/compression/uniformity and direct parent inputs. Java retains
 admission and wrapper/list identities, update orchestration,
 persistence, quadtree inputs, contextual color callbacks/material resolution,
-face production and collector lifecycle orchestration. Ordinary [quad builds](RUST-DH-QUADS.md)
+source traversal and collector lifecycle orchestration. Ordinary [box production](RUST-DH-VERTICAL-FACES.md)
+now owns geometry, stock shades and neighbor-light/material splitting. Ordinary [quad builds](RUST-DH-QUADS.md)
 retain quad lists and greedy topology in Rust; [packet plans](RUST-DH-PACKETS.md)
 encode final vertices and companions. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
 moves those buffers directly into the ledger; requested Java projections serve
@@ -592,7 +593,8 @@ The later [render-column reduction](RUST-DH-RENDER-COLUMNS.md) owns the complete
 compact reduction algorithm in Rust. Canonical Java views borrow existing heap
 storage for one bounded native call and direct destination publication; they do
 not construct or sort a second Java reducer graph. Contextual resolver callbacks,
-faces and contextual getter implementations remain Java; the admitted
+source traversal and contextual getter implementations remain Java; ordinary
+box/face construction is now [native](RUST-DH-VERTICAL-FACES.md). The admitted
 [cached tint path](../world/biome/RUST-DH-TINT.md) now samples retained inputs in Rust.
 
 Ordinary [quad builds](RUST-DH-QUADS.md) retain lists and merge topology in Rust.

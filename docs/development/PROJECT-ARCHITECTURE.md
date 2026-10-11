@@ -552,7 +552,10 @@ counter owners for callback-bounded empty scans and moves logical slots, counts,
 center and empty membership into Rust. Java still binds chunk objects, supplies
 reference-CAS facts, projects ring reads, orchestrates relocation, and delivers
 compatibility callbacks. Exact Frozen CPU replay is supplemental evidence;
-hardware/performance and long-memory acceptance remain pending.
+the [release-separated runtime record](rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+now includes bounded author-reported lifecycle/images and settled timings.
+The latest aggregate timing gate fails; broad temporal/streaming and long-memory
+acceptance remain open.
 
 The local [DH change-hash producer](world/chunk/RUST-DH-CHANGE-HASH.md) owns
 sampling and wrapped identity/hash policy over retained block/biome/counter

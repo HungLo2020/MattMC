@@ -55,9 +55,10 @@ replay. Expected encoding is executed by Frozen, not copied into the recorder.
 
 These controls and isolated CPU builder timings do not establish gameplay FPS,
 visual parity, streaming or sustained memory acceptance. Current packet test
-and benchmark receipts belong in `build/native-dh-packets/`. Face emission,
-contextual getter implementations and collector lifecycle orchestration remain
-Java; their migration is subsequent work. The later native handoff supersedes
+and benchmark receipts belong in `build/native-dh-packets/`. Face emission
+remained Java at that packet checkpoint; current [box production](RUST-DH-VERTICAL-FACES.md)
+owns admitted geometry, stock shading and interval/material splits. Contextual
+getter implementations, source traversal and collector lifecycle calls remain Java. The later native handoff supersedes
 the transport-array path measured below.
 
 ## Recorded CPU checkpoint

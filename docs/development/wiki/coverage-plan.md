@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `660d19e1b865bf6a2b481300de3aafc934e406b5`; older citations retain their reviewed source scope.
-- Latest synchronization preserves two incoming commits and all 37 paths, including eleven documents and the new packet/handoff owners, source-authored verification drivers and fixtures, from promoted cutoff `2b7311757045acc1eb032b57f308180fb7e3c173`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `b32fd91c847f3660bebec4dcc8d268efcdd589c8`; older citations retain their reviewed source scope.
+- Latest synchronization preserves two incoming commits and all 48 paths, including fourteen documents, new box/saved-light owners and source-authored drivers/fixtures, from promoted cutoff `abb76887396a810aa244d3146ea8c558a2666f67`. Clean fast-forward and combined validated publication preserve both source changes and earlier authored wiki history. Instructions/workflows are unchanged; publisher edits remain documentation only.
+
+- Previous non-wiki default-branch snapshot integrated: `660d19e1b865bf6a2b481300de3aafc934e406b5`; older citations retain their reviewed source scope.
+- Previous synchronization preserves two incoming commits and all 37 paths, including eleven documents and the new packet/handoff owners, source-authored verification drivers and fixtures, from promoted cutoff `2b7311757045acc1eb032b57f308180fb7e3c173`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
 
 - Previous non-wiki default-branch snapshot integrated: `f8feb3ff553242127e1e9533f7af89b4fd5e1a8d`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 19 paths, including five documents, new DH quad owner and source-authored verifier/fixture, from promoted cutoff `517aae51767fc128cb7b31da1255794ce5938ade`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
@@ -3210,3 +3213,14 @@ both issues remain open. The independent review inspected committed fixture byte
 - Expanded the existing Carrot/Potato/Beetroot owner with exact Fortune I–III ranges, the nonuniform bonus-roll distribution, replanting costs and the difference between breaking and MattMC reset harvesting. Preserved separate Poisonous Potato odds, mature Beetroot count and immature planting-item drops.
 - Clarified main-hand fallback versus hoe loot context, secondary-use dispatch, the block-drop rule and Beetroot Bone Meal consumption when the age increment is zero. Rechecked current native age defaults/tick eligibility while retaining the original review and citations.
 - One substantive player owner plus monthly/checkpoint records; no new page, item-route rewrite, source synchronization or gameplay implementation. Source/loot inspection and strict documentation checks do not establish in-game yield, growth timing or interaction acceptance.
+
+
+## Batch 396: Complete DH box and saved-light ownership reconciliation
+
+- Reconciled native complete-box geometry/shading/neighbor intervals and saved-light import/generation handoff with remaining Java source/material/file/NBT/orchestration/compatibility owners. Corrected overlapping current face-production descriptions while preserving historical checkpoints and headings.
+- Separated the older handoff timing failure, box-image settled pass and latest saved-light vanilla-p99 aggregate failure. Attributed suite/profile/lifecycle/image results and artifact-retention operations to the source author; no runtime work or cleanup was performed by this documentation review.
+- Qualified callback versus complete-box fixture routes, length-only class pins, native saved-input admission, deferred emitters, automatic field lifetime, sampled-output/count checksums and synthetic runner guards. Strict docs checks, independent review and guarded terminal deployment precede completion; no broad gameplay/performance/memory acceptance is inferred.
+
+See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6108300818)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6108302807);
+both issues remain open. The source review reran no suites or workloads and established no new defect or issue closure.

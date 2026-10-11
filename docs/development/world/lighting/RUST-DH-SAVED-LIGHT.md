@@ -1,5 +1,10 @@
 # Rust saved DH lighting
 
+Source reviewed at [`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8). Suite results, timings, profiles and hardware/capture checks below are
+implementation-author reports. This documentation review inspected source and
+fixture assertions; it did not rerun Java/Rust suites, clients, captures or
+benchmarks, or independently inspect the untracked runtime receipts.
+
 The ordinary DH generation reader borrows saved NBT nibble arrays once per
 section. Rust determines skipped pairs, carried skylight, uniform compression
 and section counter state, and publishes an immutable light owner. Generation
@@ -10,11 +15,12 @@ light-storage maps.
 Java still owns file-read orchestration and parsed NBT objects. The bridge
 exposes bounded semantic CPU arrays; it does not pack a dense voxel projection.
 Custom/malformed inputs retain the existing public `readLight` behavior and
-diagnostics. General Java lighting/storage and startup remain migration work.
+diagnostics. Java engine orchestration/publication, compatibility storage and startup remain
+migration work; this is a saved-DH input route, not complete lighting ownership.
 
-Implementation: [saved policy](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/dh/saved.rs),
-[borrowed importer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhSavedLighting.java),
-[generation handoff](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/chunkFileHandling/ChunkCompoundTagParser.java).
+Implementation: [saved policy](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/rust/world/level/lighting/dh/saved.rs),
+[borrowed importer](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/java/net/minecraft/world/level/chunk/NativeDhSavedLighting.java),
+[generation handoff](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/chunkFileHandling/ChunkCompoundTagParser.java).
 
 ## Constraints
 
@@ -58,7 +64,7 @@ actual untouched Frozen reader. Its 64-case corpus pins seven compiled classes
 and records every value, allocation, constant, counter and exception, plus
 subsequent mutable clear/edit outcomes. Cases cover missing/empty/padded/mixed
 arrays, nonzero and negative bounds, extra sections and malformed tags.
-JNI replay separately asserts native admission, retained field independence,
+Java/native replay separately asserts native admission, retained field independence,
 deferred emitter enumeration and direct whole-column production.
 
 The same compiled driver accepts `bench CALLS`: five equal warmups followed by
@@ -83,7 +89,7 @@ mapped native images before accepting results; equal checksums are required.
 
 ## Current verification (2026-10-11)
 
-Candidate `a15c0555` passes full Rust (2,618 passed, three ignored) and Java/JNI
+The author reports candidate `a15c0555` passing full Rust (2,618 passed, three ignored) and Java/native
 (1,960 executed, two skipped) suites with zero failures. Seven observed native
 consumers loaded that exact library. The 64-case Frozen replay, deferred-emitter
 controls and 256-column integration all pass; source/class/library/Frozen and
@@ -117,3 +123,35 @@ four original 1280×720 images were reviewed. Existing color/lighting difference
 remain; these settled images show no new gaps. Receipt:
 `build/native-dh-saved-light/hardware-review.json`. Streaming, first-frame, temporal
 and sustained memory acceptance remain open.
+
+
+## Source review limits
+
+The [saved-input bridge](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/main/java/net/minecraft/world/level/chunk/NativeDhSavedLighting.java)
+admits exact `LevelChunk`/`ProtoChunk`, `CompoundTag` and `ListTag` classes plus
+aligned bounded heights. Unsupported input returns to the public compatibility
+reader. Native add/finish or downcall errors can throw; decline is not a blanket
+rollback or recovery guarantee. The scoped import builder is released in the
+`finally` path, while the returned field uses its existing automatic lifetime.
+Its later collection is not proved by the synchronous borrow boundary.
+
+The [two Java methods](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/test/java/net/minecraft/world/level/levelgen/NativeDhSavedLightingTest.java)
+inspect the 64-case Frozen record with 52 asserted native admissions, mutable
+copy clear/edit independence, deferred emitters after a block edit, a next
+native light pass and a no-height compatibility wrapper. The separate
+[column control](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/src/test/java/net/minecraft/world/level/levelgen/NativeDhColumnsTest.java)
+checks saved input through constructed chunk-to-column production. These are
+CPU fixtures; they do not run a region-file load/IO pipeline, full generation
+lifecycle, source-close race or long-session reclamation. Embedded Frozen class
+hashes are checked for string length during replay, not reauthenticated against
+the original compiled classes. Exception classes/outcomes are compared; exact
+log text and every admitted height limit are not covered by that corpus.
+
+The [Python runner](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/DevUtils/tests/world/lighting/VerifyDhSavedLighting.py)
+does enforce a Current-median-at-most-reference exit gate and validates mapped
+native-image hashes, route flags, call counts and sampled-output checksums. It
+rehashes selected driver/native files before each JVM and afterward; complete
+source/Frozen/classpath integrity remains a separate author receipt claim.
+The timed fixture repeatedly imports 24 constructed saved sections and consumes
+sampled reads, with GC-managed output release. Its large component-time reduction
+does not demonstrate live saved-light admission or an isolated gameplay gain.
