@@ -486,7 +486,11 @@ admission and callbacks, not per-voxel packing or the hash loops.
 The subsequent [DH render-column reduction](../rendering/RUST-DH-RENDER-COLUMNS.md)
 owns the whole compact reduction policy in Rust and borrows existing canonical
 CPU storage. It removes Java reducer graph/sort construction; contextual color
-callbacks, face construction and final packets remain subsequent migration work.
+callbacks, face construction and final packets remained subsequent work at that
+checkpoint. Current [packet plans](../rendering/RUST-DH-PACKETS.md) and
+[column handoff](../rendering/RUST-DH-COLUMN-HANDOFF.md) supersede ordinary
+Java final-packet encoding and transport; contextual callbacks and face
+construction remain Java.
 Actual Frozen3,616-case synthetic CPU replay is supplemental. Releaseee1676ec
 passes four focused Rust checks,27 architecture checks, five focused Java controls
 and full1,914 reported Java tests (two skips, zero failures/errors). Hardware,

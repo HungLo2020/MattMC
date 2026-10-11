@@ -1,17 +1,37 @@
 # Goal 5 rendering checkpoint
 
-**Goal 5 remains incomplete.** The preceding source review reaches
+**Goal 5 remains incomplete.** The current source review reaches
+[`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5).
+[Native packet plans](RUST-DH-PACKETS.md) now select layers, order contextual
+callbacks and encode vertices/companions. The [scoped column owner](RUST-DH-COLUMN-HANDOFF.md)
+retains final bytes through direct ledger publication; Java supplies contextual
+values, face production, identities and lifecycle orchestration, with subclass
+compatibility and diagnostic projections. Independent layer plans and explicit
+build close do not establish whole-builder atomicity or bounded GC timing.
+
+The author reports image `111c5922`: 2,611 Rust passes/three ignored and 1,958
+Java cases reported (1,956 executed/two skipped). It also reports seven fresh
+Iris+DH lifecycle scenarios and two reviewed settled vanilla/Iris+DH Frozen image
+pairs, with no GAL validation failures. These are newly reported bounded
+hardware checks, not independently rerun here. Six synthetic Frozen CPU gates
+pass; a separate previous-Current publication comparison is 0.4–2.5% slower
+without grass callbacks and 2.0–3.5% faster with them. There is no overall isolated
+speedup or new gameplay/FPS, temporal, streaming or long-session memory acceptance.
+Earlier packet image `6ae38d7a` and its byte-sum timings remain distinct from the
+latest count/byte-extent workload. Failed initial controls/builds and profiling
+receipts are preserved in the owner guides.
+See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6107119728)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6107121390);
+both issues remain open.
+
+The preceding quad-owner source review reaches
 [`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
-Ordinary [DH quad builds](RUST-DH-QUADS.md) now retain twelve directional lists,
-admission/premerge policy, stable sort and greedy passes in Rust. Java keeps
-contextual face production, identity interning and collector lifecycle calls;
-subclasses retain the Java path. The subsequent [packet owner](RUST-DH-PACKETS.md)
-now plans callbacks and encodes ordinary packet bytes in Rust. Independent
-native layer plans precede encoding callbacks. The later [column handoff](RUST-DH-COLUMN-HANDOFF.md)
-retains final buffers through native ledger publication without ordinary Java
-packet-array transport,
-and build-local close follows synchronous packet construction, with Cleaner
-fallback rather than a demonstrated release deadline.
+At that stage, ordinary [DH quad builds](RUST-DH-QUADS.md) retained twelve
+directional lists, admission/premerge policy, stable sort and greedy passes in
+Rust. Java still encoded final packets from per-list copied rows; the later
+packet and handoff owners above supersede that boundary. Build-local close
+followed synchronous construction, with Cleaner fallback rather than a
+proven release deadline.
 The author reports image `9ac7111b`, 2,604 Rust passes/three ignored and 1,949
 Java cases reported/two skipped (1,947 executed). Six synthetic topology/packet
 comparisons pass their scoped median gates; the initial smooth 1.173× failure
@@ -113,7 +133,7 @@ compact [DH render-column reduction](RUST-DH-RENDER-COLUMNS.md) into Rust.
 At that stage Java still performed contextual color callbacks, face construction,
 greedy merging, final packets and substantial world/application orchestration.
 
-**The earlier driver blocker is cleared; new MattMC hardware acceptance remains pending.** The
+**Historical driver recovery and subsequent bounded hardware checks.** The
 [committed record](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/PROGRESS.md)
 reports mismatched NVIDIA kernel/user libraries, an ABI 79 invocation that
 failed before world entry with X11 `BadDrawable`, and interrupted teardown.
@@ -121,10 +141,12 @@ The [subsequent author record](https://github.com/HungLo2020/MattMC/blob/85475b6
 reports that the user's reboot restored matching NVIDIA libraries/kernel and
 a standalone Vulkan presentation probe passed. It also reports the full Rust
 suite passing after serializing presenter-admission fixtures. These checks do not
-replace the failed or unstarted MattMC runtime gates. See
+replace the then-failed or unstarted MattMC runtime gates. The later `111c5922`
+author checkpoint above adds seven lifecycle scenarios and two settled image
+pairs; broad runtime/performance acceptance remains open. See
 [driver preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures).
 
-The latest measured image is the older `839ff128`: twenty author-recorded
+The latest full settled FPS checkpoint discussed here remains the older `839ff128`: twenty author-recorded
 settled runs still fail vanilla p99 and DH median FPS. Earlier `3f00217d`
 passed its own settled floors with a narrow DH margin; neither its pass nor
 `839ff128`'s measurements validate the subsequent retained-world/reduction
@@ -142,8 +164,9 @@ Java/Rust suites, lifecycle runs, captures and profiles below are author reports
 This review inspected committed source and reports, not unbundled runtime
 receipts, and did not rerun those workloads. The five independent scripted-setup
 fixtures belong to `fc1d529d`; no new Java/Rust or client execution is claimed
-for this source reconciliation. Entry, sustained streaming, broad visual/temporal
-parity, long-session memory and complete scene migration remain open.
+for this source reconciliation. The later author-reported entry/lifecycle/image
+checks are bounded; sustained streaming, broad visual/temporal parity, new FPS
+floors, long-session memory and complete scene migration remain open.
 
 Rust owns terrain graph bookkeeping, publication identities, ordinary terrain
 selection and assembly, rig hierarchy composition, the DH ledger and ordinary

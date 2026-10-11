@@ -1,5 +1,10 @@
 # Rust DH semantic packets
 
+Source reviewed at [`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5). Suite totals, timings, lifecycle runs and image comparisons below are
+implementation-author reports. This review inspected source and fixture
+assertions; it did not rerun Java/Rust suites, clients, captures or benchmarks,
+or independently inspect the untracked runtime receipts.
+
 Ordinary DH builders use `render/dh_quads/packets.rs` to select each packet
 layer, plan contextual callbacks, shade colors and encode vertices and semantic
 companions. Java supplies contextual dirt colors and directional shade scalars
@@ -29,8 +34,8 @@ VulkanicGAL still owns resources, submission and presentation.
   semantic companion arrays must have matching extents. No native pointers or
   GPU handles enter these arrays.
 
-Implementation: [packet owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_quads/packets.rs),
-[scoped callback bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhPacketPlan.java).
+Implementation: [packet owner](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/main/rust/render/dh_quads/packets.rs),
+[scoped callback bridge](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhPacketPlan.java).
 
 ## Verification
 
@@ -84,3 +89,26 @@ Both failed runs are retained; final suites pass. These checks do not accept
 whole-game performance or visual parity for this later release.
 Documentation-only upstream `2b7311757` was integrated afterward; exact guards
 confirm unchanged runtime source, native image, classes, fixtures and driver.
+
+
+## Evidence limits
+
+The [four Java methods](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/test/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhPacketPlanTest.java)
+separate recorded byte/callback-prefix replay from source mutation/close during
+a callback, the 16,385-quad split with aligned companions, and failure/closed-plan
+controls. The 96-case recorder varies grass/debug/transparency/error settings
+over three fixed 72-face layouts. It disables earth curvature and supplies
+proxy dirt/shade callbacks; it does not execute live biome/world face production.
+Seven compiled-class hashes are embedded when recording, but replay checks only
+their string lengths. It does not reauthenticate those Frozen class bytes.
+
+The [recording driver](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/DevUtils/tests/rendering/VerifyDhPackets.java)
+compares flattened packed bytes and ordered callback traces, not original
+segment boundaries. The Frozen corpus does
+not itself verify Current-only semantic identity/variant/position companions;
+separate controls inspect those arrays. Complete-column replay uses one callback
+timeline across four layers, and normalizes failed calls to empty layer outputs.
+Its failure-prefix equality does not prove rollback of arbitrary callback side
+effects or all intermediate layer allocations. A plan protects one selected
+layer; callbacks between layers can affect later captures, so there is no atomic
+whole-builder snapshot or concurrent-mutator acceptance.

@@ -10,7 +10,11 @@ and contextual hooks. [Compact render-column reduction](../../rendering/RUST-DH-
 is Rust-owned, as are admitted [cached tint neighborhoods](../biome/RUST-DH-TINT.md).
 The ordinary [quad owner](../../rendering/RUST-DH-QUADS.md) now retains
 directional lists and greedy topology in Rust. Contextual resolver callbacks,
-face production and final render packets remain Java, with subclass compatibility. Complete Java removal and current runtime acceptance remain open.
+face production and collector lifecycle orchestration remain Java, with subclass
+compatibility. [Packet planning/encoding](../../rendering/RUST-DH-PACKETS.md) and
+[final column handoff](../../rendering/RUST-DH-COLUMN-HANDOFF.md) now retain
+ordinary packet bytes in Rust through ledger publication. Complete Java removal
+and broad runtime acceptance remain open.
 
 The producer borrows existing [block owners](RUST-LIVE-SECTIONS.md),
 [biome owners](../biome/RUST-LIVE-BIOMES.md),

@@ -173,8 +173,10 @@ face production and contextual getters, plus subclass compatibility. The later
 [packet owner](RUST-DH-PACKETS.md) moves layer selection, callback planning,
 shading and vertex/companion encoding into Rust. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
 now moves final buffers into the ledger without ordinary Java packet transport;
-Java retains lifecycle calls and requested diagnostic projections. Dense/scratch/packet sidecar
-arrays remain allocated. Exact-material publication has its own narrower gate;
+Java retains lifecycle calls, callback-event/results arrays and requested
+diagnostic projections. Native final payloads/companions remain allocated;
+the ordinary Java packet round trip is removed, while requested provenance
+and explicit compatibility packet APIs still copy Java arrays. Exact-material publication has its own narrower gate;
 forced preservation alone enables neither publication nor exact topology.
 The earlier preservation-only reductions did not migrate those producers or change GPU ownership,
 or establish ordinary-play acceptance from diagnostic profiles.

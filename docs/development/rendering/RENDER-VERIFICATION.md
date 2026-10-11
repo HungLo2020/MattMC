@@ -61,13 +61,15 @@ with no reported validation errors. The subsequent full Rust suite passes
 Receipts are `build/native-dh-tint/{driver-restored.json,rust-full-final.log}`.
 This is the author’s driver/test evidence; this documentation review did not
 rerun the probe or suites or inspect those raw receipt files. The reported
-driver blocker is cleared, while MattMC world entry,
-lifecycle, image comparisons, FPS and sustained-memory gates still need running.
+driver blocker was cleared at that checkpoint, while MattMC world entry,
+lifecycle, image comparisons, FPS and sustained-memory gates then needed running.
 
 The later [native column handoff checkpoint](RUST-DH-COLUMN-HANDOFF.md#recorded-cpu-checkpoint)
-records fresh release `111c5922` hardware checks on that restored driver:
+records the author’s fresh release `111c5922` hardware checks on that restored driver:
 seven Iris+DH lifecycle scenarios and reviewed original-resolution vanilla and
-Iris+DH Frozen pairs pass, with zero GAL validation failures. This extends the
+Iris+DH Frozen pairs are reported to pass, with zero GAL validation failures.
+This documentation review did not rerun those checks or inspect their raw
+receipts. This extends the
 bounded runtime evidence; FPS, first-frame/temporal rendering, sustained
 streaming and long-memory acceptance remain separate, unproved requirements.
 

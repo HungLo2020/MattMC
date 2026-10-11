@@ -1,5 +1,10 @@
 # Native DH column handoff
 
+Source reviewed at [`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5). Suite totals, timings, lifecycle runs and image comparisons below are
+implementation-author reports. This review inspected source and fixture
+assertions; it did not rerun Java/Rust suites, clients, captures or benchmarks,
+or independently inspect the untracked runtime receipts.
+
 Ordinary DH container builds now keep final packet bytes in a scoped Rust
 column build. Rust splits each of the four layers, retains aligned semantic
 companions, computes output coverage and validates publication. The collector
@@ -13,9 +18,9 @@ water auditing requests a bounded stream/color sample projection. Subclasses
 retain their existing packet-method overrides. This is CPU ownership only:
 VulkanicGAL still owns every GPU resource, submission and presentation.
 
-Implementation: [column build](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_quads/column.rs),
-[scoped Java lease](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhBuiltColumn.java),
-[ledger handoff](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/dh_collector.rs).
+Implementation: [column build](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/main/rust/render/dh_quads/column.rs),
+[scoped Java lease](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhBuiltColumn.java),
+[ledger handoff](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/main/rust/render/bridge/dh_collector.rs).
 
 ## Ownership and ordering
 
@@ -33,7 +38,9 @@ Implementation: [column build](https://github.com/HungLo2020/MattMC/blob/master/
   the previous snapshot route did. The collector lock covers recording and
   owner acquisition. Existing equality/reuse, reset, retention and late-close
   behavior remains in the shared Rust ledger policy.
-- Publication consumes the native payload once. Closing the build releases its
+- Publication consumes the native payload once, before downstream ledger recording.
+  A ledger failure cannot retry the same consumed build; this is not an
+  error-atomic publication/rollback guarantee. Closing the build releases its
   companions and any unpublished bytes; published bytes belong to the ledger.
   Close via try-with-resources on success and failure. The Cleaner handles
   abandoned Java leases; reachability fences protect calls, with no promised
@@ -69,7 +76,7 @@ is against the preceding Current image, not a Frozen publication benchmark.
 
 ## Recorded CPU checkpoint
 
-Release `111c5922`, on `d42abf1c`, passes 2,611 Rust tests with three ignored
+The author reports release `111c5922`, on `d42abf1c`, passing 2,611 Rust tests with three ignored
 and 1,958 Java cases reported with two skipped, zero failures/errors (1,956
 executed; 357 suite executions). All six Java workers map that exact release.
 Public replay passes 1,920 packet checks and 480 complete column callback
@@ -114,7 +121,7 @@ build, timing and profiling receipts remain alongside the revised results.
 Receipts: `build/native-dh-column-handoff/`; final comparisons use the `fused-`
 prefix. Initial compilation collided with the existing world-column export;
 new build exports use `mattmc_dh_built_column_*`. The failed build is retained.
-Fresh hardware verification passes seven Iris+DH lifecycle scenarios with
+The author reports fresh hardware verification passing seven Iris+DH lifecycle scenarios with
 zero exceptions, panics, dependency violations or GAL validation failures.
 Every case selects the RTX3080Ti and fingerprints this exact release. Settled
 vanilla and Iris+DH Frozen pairs pass, with original 1280×720 images reviewed.
@@ -124,3 +131,36 @@ Lighting, water and foliage differences remain. Runtime receipt:
 `artifacts/graphics-captures/validation/native-dh-column-handoff-correctness-20261011/summary.json`.
 These bounded checks do not establish gameplay FPS, first-frame/temporal
 rendering, sustained streaming or long-session host/GPU memory acceptance.
+
+
+## Review boundaries
+
+The [three build-owner tests](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/test/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/NativeDhBuiltColumnTest.java)
+inspect recorded four-layer byte/callback replay, source-close independence and
+split companions, and incomplete/invalid publication. The [two handoff tests](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/src/test/java/net/vulkanic/world/NativeDhColumnHandoffTest.java)
+compare explicit packets with native publication for one constructed column,
+generation/provenance reuse and lease retirement, then exercise no-capture
+publication and an empty build preserving an existing owner. These are CPU
+controls, not real chunk streaming, asynchronous teardown or a GC deadline. Injected
+callback failures use visits 0/1/3/11, so the recorded grass failures occur in
+the first layer; later-layer partial-build cleanup follows inspected control
+flow rather than a direct failure case in that corpus.
+
+Java still allocates callback-event/result arrays and orchestrates collector
+publication; capture/provenance requests copy packets and companions. Native
+encoding also allocates final payloads. The eliminated ordinary Java packet
+round trip therefore does not imply allocation-free or end-to-end zero-copy
+rendering. The 16,384-quad split and 512-segment admission limit bound a column's
+transport shape, not all simultaneous build/ledger/GPU memory. Water auditing
+returns at most 16 distinct stream/color pairs per layer (up to 64 total), but
+finding them can scan the retained vertices; output bounds do not imply
+constant traversal cost.
+
+The [column recorder](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/DevUtils/tests/rendering/VerifyDhPackets.java)
+checks seven embedded hash strings for length, not their correspondence to
+the Frozen class files during replay. Its 480 sequences are 96 synthetic cases
+with five failure settings, not 480 distinct worlds. Broader source/class/image
+guards and reviewed 1280×720 captures remain author receipt claims. The fresh
+reported lifecycle/image checks supersede the earlier unstarted hardware
+checkpoint only for their stated release and scenarios; they do not establish
+new FPS floors, temporal parity, streaming or long-session resource bounds.

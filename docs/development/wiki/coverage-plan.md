@@ -11,8 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest non-wiki default-branch snapshot integrated: `f8feb3ff553242127e1e9533f7af89b4fd5e1a8d`; older citations retain their reviewed source scope.
-- Latest synchronization preserves one incoming commit and all 19 paths, including five documents, new DH quad owner and source-authored verifier/fixture, from promoted cutoff `517aae51767fc128cb7b31da1255794ce5938ade`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
+- Latest non-wiki default-branch snapshot integrated: `660d19e1b865bf6a2b481300de3aafc934e406b5`; older citations retain their reviewed source scope.
+- Latest synchronization preserves two incoming commits and all 37 paths, including eleven documents and the new packet/handoff owners, source-authored verification drivers and fixtures, from promoted cutoff `2b7311757045acc1eb032b57f308180fb7e3c173`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
+
+- Previous non-wiki default-branch snapshot integrated: `f8feb3ff553242127e1e9533f7af89b4fd5e1a8d`; older citations retain their reviewed source scope.
+- Previous synchronization preserves one incoming commit and all 19 paths, including five documents, new DH quad owner and source-authored verifier/fixture, from promoted cutoff `517aae51767fc128cb7b31da1255794ce5938ade`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
 
 - Previous non-wiki default-branch snapshot integrated: `7cf8b68cc4fab2f01ba142eaa48092399ec53edc`; older citations retain their reviewed source scope.
 - Previous synchronization preserves one incoming commit and all 25 paths, including eight documents, new source-occlusion owner and source-authored culling verification mode, from promoted cutoff `437e2bc15e6c54af45115125a0512495814ea12c`. Clean fast-forward and combined validated publication preserve source/tests and author evidence; authored changes remain documentation only. Instructions/workflows are unchanged.
@@ -3188,3 +3191,15 @@ Linked the verified [#777 source-occlusion review](https://github.com/HungLo2020
 - Preserved incoming source verifier/fixture, historical headings and append-only monthly/coverage records. No Java/Rust/client/GPU/benchmark execution by this review; strict docs checks, independent review and guarded terminal deployment precede completion.
 
 Linked the verified [#777 quad ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6106127269) and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6106127723). Both remain open. The corpus contains no empty inputs, hash strings are not reauthenticated by replay, and separate packet captures do not prove whole-builder atomicity; no runtime suite or benchmark was rerun.
+
+
+## Batch 394: Native DH packet and column handoff reconciliation
+
+- Reconciled native layer plans, callback ordering, byte/companion encoding and direct ledger handoff with Java contextual face production, identities, lifecycle calls and diagnostic copies. Preserved per-layer capture and explicit-close/Cleaner limits without whole-builder atomicity or allocation-free claims.
+- Distinguished exact byte/callback fixtures, companion controls and CPU publication tests from author-only suite, timing and hardware receipts. Embedded hashes are length-checked during replay; 480 sequences are 96 synthetic cases/five failure settings. Preserved earlier failed controls/builds and distinct byte-sum versus extent benchmarks.
+- Advanced current rendering status to the author's seven fresh lifecycle scenarios and two settled image pairs, retaining open new FPS/temporal/streaming/long-memory acceptance and mixed previous-Current publication timings. No runtime suites or captures were rerun by this review.
+- Preserved incoming histories and append-only monthly/coverage records. Strict documentation checks, independent review, fresh remote guards and terminal deployment precede completion.
+
+See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6107119728)
+and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6107121390);
+both issues remain open. The independent review inspected committed fixture bytes and source assertions, not runtime implementation execution. Both source commits and all incoming author evidence remain preserved.

@@ -60,7 +60,7 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-[VerifyDhQuads.java](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/VerifyDhQuads.java)
+[VerifyDhQuads.java](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/DevUtils/tests/rendering/VerifyDhQuads.java)
 records actual untouched Frozen add/premerge/greedy output and vertex bytes.
 The fixture embeds compiled-class hashes and512 synthetic CPU cases covering
 signed coordinates, ties, curvature, overlaps, transparency, large widths
@@ -79,8 +79,9 @@ Receipts belong in
 `build/native-dh-quad-owner/`. CPU fixtures and timings do not establish gameplay
 FPS, visual parity or long-session memory acceptance.
 
-The [Python runner](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/VerifyDhQuads.py)
-accepts `--mode topology|packets|grass-packets`, explicit JDK, compiled-driver, classpath-file,
+The [Python runner](https://github.com/HungLo2020/MattMC/blob/660d19e1b865bf6a2b481300de3aafc934e406b5/DevUtils/tests/rendering/VerifyDhQuads.py)
+accepts `--mode topology|packets|grass-packets|native-column|grass-native-column`,
+explicit JDK, compiled-driver, classpath-file,
 native-directory and output paths; it pins driver/native bytes, checks result
 checksums, and rejects a Current median above Frozen. Do not overlap timed
 runs with compilation, tests, profiling or input hashing.
