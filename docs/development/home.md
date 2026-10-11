@@ -16,4 +16,5 @@ and link to source for implementation details. Follow the
 - [World Systems](world/index.md)
 - [Rust Game Model (proposal)](game-model/index.md)
 - [Network Systems](network/index.md)
+- [Audio](audio/index.md)
 - [Wiki Expansion Maintenance](wiki/index.md)

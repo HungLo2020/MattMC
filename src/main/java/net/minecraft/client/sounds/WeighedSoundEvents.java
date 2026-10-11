@@ -1,7 +1,5 @@
 package net.minecraft.client.sounds;
 
-import com.google.common.collect.Lists;
-import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
@@ -11,15 +9,29 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.ConstantFloat;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * A view of one registered sound event. Weighting, nesting and resolution are
+ * owned by the Rust registry; this keeps the event's identity and subtitle,
+ * and draws from the caller's random source so its sequence is unchanged.
+ */
 @Environment(EnvType.CLIENT)
-public class WeighedSoundEvents implements Weighted<Sound> {
-	private final List<Weighted<Sound>> list = Lists.<Weighted<Sound>>newArrayList();
+public class WeighedSoundEvents {
+	private final ResourceLocation location;
 	@Nullable
 	private final Component subtitle;
+	/** False for Java-side placeholders that have no registry entry. */
+	private final boolean registered;
 
 	public WeighedSoundEvents(ResourceLocation resourceLocation, @Nullable String string) {
+		this(resourceLocation, string, false);
+	}
+
+	private WeighedSoundEvents(ResourceLocation resourceLocation, @Nullable String string, boolean registered) {
+		this.location = resourceLocation;
+		this.registered = registered;
 		if (SharedConstants.DEBUG_SUBTITLES) {
 			MutableComponent mutableComponent = Component.literal(resourceLocation.getPath());
 			if ("FOR THE DEBUG!".equals(string)) {
@@ -32,48 +44,37 @@ public class WeighedSoundEvents implements Weighted<Sound> {
 		}
 	}
 
-	@Override
+	/** A view of a registered event and its subtitle key. */
+	static WeighedSoundEvents registered(ResourceLocation location, @Nullable String subtitle) {
+		return new WeighedSoundEvents(location, subtitle, true);
+	}
+
 	public int getWeight() {
-		int i = 0;
-
-		for (Weighted<Sound> weighted : this.list) {
-			i += weighted.getWeight();
-		}
-
-		return i;
+		return this.registered ? NativeSoundPolicy.eventWeight(this.location.toString()) : 0;
 	}
 
 	public Sound getSound(RandomSource randomSource) {
-		int i = this.getWeight();
-		if (!this.list.isEmpty() && i != 0) {
-			int j = randomSource.nextInt(i);
-
-			for (Weighted<Sound> weighted : this.list) {
-				j -= weighted.getWeight();
-				if (j < 0) {
-					return weighted.getSound(randomSource);
-				}
-			}
-
-			return SoundManager.EMPTY_SOUND;
-		} else {
+		if (!this.registered) {
 			return SoundManager.EMPTY_SOUND;
 		}
-	}
-
-	public void addSound(Weighted<Sound> weighted) {
-		this.list.add(weighted);
+		NativeSoundPolicy.Resolved resolved = NativeSoundPolicy.resolve(this.location.toString(), randomSource::nextInt);
+		if (resolved.kind() != NativeSoundPolicy.RESOLVE_SOUND) {
+			return SoundManager.EMPTY_SOUND;
+		}
+		return new Sound(
+			ResourceLocation.parse(resolved.location()),
+			ConstantFloat.of(resolved.volume()),
+			ConstantFloat.of(resolved.pitch()),
+			resolved.weight(),
+			Sound.Type.FILE,
+			(resolved.flags() & NativeSoundPolicy.RESOLVED_STREAM) != 0,
+			(resolved.flags() & NativeSoundPolicy.RESOLVED_PRELOAD) != 0,
+			resolved.attenuationDistance()
+		);
 	}
 
 	@Nullable
 	public Component getSubtitle() {
 		return this.subtitle;
-	}
-
-	@Override
-	public void preloadIfRequired(SoundEngine soundEngine) {
-		for (Weighted<Sound> weighted : this.list) {
-			weighted.preloadIfRequired(soundEngine);
-		}
 	}
 }

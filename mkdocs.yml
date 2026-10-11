@@ -53,5 +53,8 @@ nav:
           - Overview: development/world/index.md
           - Biomes: development/world/biome/index.md
           - World Generation: development/world/levelgen/index.md
+      - Audio:
+          - Overview: development/audio/index.md
+          - Sound Engine: development/audio/SOUND-ENGINE.md
   - Changelog: changelog/CHANGELOG.md
   - Changes: changes/changes.md

@@ -15,13 +15,11 @@ reference event IDs in break/step/place/hit/fall order; distinct profile names
 retain distinct identities even when they select the same events. The two
 integrated Alex's Caves profiles share this owner.
 
-Sound metadata has process lifetime and no world or device references. Playback
-sources, buffers and decoding remain in `audio/`. Java `SoundEngine` retains
-sound resolution and scheduling; `SoundBufferLibrary` still loads pack resources,
-keeps asset futures and runs generation/close callbacks when clearing its cache.
-See the [audio boundary](../PROJECT-ARCHITECTURE.md#audio). These reloadable
-resources are separate from immutable definitions; this slice does not complete
-audio migration.
+Sound metadata has process lifetime and no world or device references. Reloadable
+`sounds.json` resolution, the asset cache and playback policy live in
+`audio/policy/`, separate from these immutable definitions; see
+[audio development](../audio/index.md) and the
+[audio boundary](../PROJECT-ARCHITECTURE.md#audio).
 
 ## Temporary Java views
 

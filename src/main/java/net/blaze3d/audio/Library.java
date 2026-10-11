@@ -112,6 +112,11 @@ public class Library {
 	}
 
 	public List<String> getAvailableSoundDevices() {
+		return availableSoundDevices();
+	}
+
+	/** Output devices OpenAL can open; needs no device. */
+	public static List<String> availableSoundDevices() {
 		return NativeAudio.availableDevices();
 	}
 
