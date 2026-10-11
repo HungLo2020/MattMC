@@ -1,7 +1,14 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** Current source review reaches
-[`65457ef8`](https://github.com/HungLo2020/MattMC/commit/65457ef80471487cbdb4ad566e23e9eca07912bc).
+[`398a0078`](https://github.com/HungLo2020/MattMC/commit/398a00782007587c779264aaa62222036b8a9361).
+The latest source adds [pack/resource/tag and registry-snapshot owners](../resources/index.md).
+Its [verification record](../resources/VERIFICATION.md#latest-run) describes
+uncommitted `437e2bc1` work with library `05bde869`; it is not integrated-head
+runtime acceptance. Java still orchestrates reloads and supplies objects,
+codecs, models and callbacks. The rendering evidence below remains the prior
+`65457ef8` visibility checkpoint and does not accept the later resource changes.
+
 [Retained DH visibility](RUST-DH-VISIBILITY.md) owns incremental topology,
 section/container identity and stock camera traversal, feeding candidates
 directly to the native collector. Java retains generation/retrieval, frame
@@ -10,7 +17,7 @@ use separate lock scopes; sorted key results still return to Java.
 
 The implementation author reports release `ebd3c9a3`: 2,626 Rust passes/three
 ignored, 1,978 Java cases reported (1,976 executed/two skipped), 1,280 Frozen
-walk comparisons, seven lifecycle cases and two settled image pairs. The latest
+walk comparisons, seven lifecycle cases and two settled image pairs. The latest recorded rendering
 20-run matrix passes all four median FPS and all four p99 floors. See the
 [current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
 for values, repeat counts and hidden-minimap/settling limits. The older

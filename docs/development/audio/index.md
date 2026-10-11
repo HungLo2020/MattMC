@@ -4,7 +4,9 @@ Client audio is moving into Rust ([issue #773](https://github.com/HungLo2020/Mat
 Rust owns `sounds.json` resolution, the asset cache, the playback engine and
 the thread that owns the OpenAL device, device recovery, the vanilla
 tickables' per-tick rules, music, the local player's ambience, subtitles and
-the volume preview. Java keeps pack IO, the `SoundInstance` objects gameplay
+the volume preview. Java keeps asynchronous resource-read scheduling through
+the [native-backed pack manager](../resources/RESOURCE-MANAGER.md), the
+`SoundInstance` objects gameplay
 code creates, the entity facts their rules sample, the situation music follows,
 and drawing the toast and subtitle overlay.
 

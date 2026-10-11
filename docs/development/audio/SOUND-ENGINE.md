@@ -7,19 +7,25 @@ plus `SoundEventRegistration`, its serializer, the `Weighted` interface and
 [`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
 retains the gameplay-facing Java API and instance callbacks. The sounds Rust
 plays on its own (music, ambience, world events, the preview) are covered in
-[client sounds](CLIENT-SOUNDS.md). Pack IO and the `SoundInstance` objects
-gameplay code creates remain Java.
+[client sounds](CLIENT-SOUNDS.md). Java still schedules resource reads and
+owns the `SoundInstance` objects gameplay code creates. Bundled pack access
+now runs through the [native-backed resource manager](../resources/RESOURCE-MANAGER.md);
+this does not remove the Java async task or byte-array handoff to audio.
 
-Source reviewed at [`e6bc0e29`](https://github.com/HungLo2020/MattMC/commit/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4).
+Audio policy source reviewed at [`e6bc0e29`](https://github.com/HungLo2020/MattMC/commit/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4).
 This documentation review inspected implementation and test definitions; it
 ran no Java/Rust suites, clients, device checks or audible-playback tests.
+The resource-provider boundary was reconciled at
+[`398a0078`](https://github.com/HungLo2020/MattMC/commit/398a00782007587c779264aaa62222036b8a9361);
+[asset requests](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/client/sounds/SoundEngine.java#L134-L145)
+still open resources and copy bytes in Java-managed IO tasks.
 
 ## Ownership
 
 | Rust owns | Java still owns |
 | --- | --- |
-| Parsed `sounds.json` registry, weights and nested-event resolution | Reading `sounds.json` text and listing sound files during reload |
-| Asset cache (loading, ready, failed) per reload generation, and preload | Reading `.ogg` bytes from packs on the IO pool when Rust asks |
+| Parsed `sounds.json` registry, weights and nested-event resolution | Requesting `sounds.json` text and sound listings through the resource manager during reload |
+| Asset cache (loading, ready, failed) per reload generation, and preload | Scheduling `.ogg` resource reads and copying returned bytes on the IO pool when Rust asks |
 | Voices, category volumes, released-instance age policy (normally 20 unpaused ticks; paused music bypasses the age gate), delays, manual loops, pause and resume | `SoundInstance` objects gameplay code creates: `resolve`, `canPlaySound` |
 | The vanilla tickables' `tick()` rules ([`rules.rs`](https://github.com/HungLo2020/MattMC/blob/e6bc0e29835e431327cc8d7007ffce5fe53ce1b4/src/main/rust/audio/policy/rules.rs)) | The entity facts those rules sample, and custom (mod) `tick()` bodies |
 | The "Sound engine" thread, which owns the OpenAL device, and reopening it after a device change | The sound device option and directional audio setting |
@@ -49,7 +55,7 @@ not terminate the thread's command loop; a later initialization can recreate
 its device. Asset-generation eviction is invoked on the Java caller between
 stop-all and device cleanup (including during a reopen), so this is not a
 claim that every backend lifetime operation has moved onto the worker.
-Preserve reload/eviction thread-context checks. Java pack reads run as
+Preserve reload/eviction thread-context checks. Java resource-read tasks run as
 `CompletableFuture` work on `nonCriticalIoPool`; these paths do not cancel or
 join those reads. Generation rejection prevents stale installation, but is
 not proof that all pack/ZIP reads have finished at shutdown.

@@ -45,6 +45,15 @@ documentation review inspects source and adds no runtime verification.
 
 Follow the owner boundary relevant to the next change:
 
+- **Packs, tags and synchronization:** [resource owners](../resources/index.md)
+  now handle bundled pack IO/discovery/selection, namespace stacks and tag
+  planning/resolution. Java retains regex and element-lookup callbacks, reload
+  orchestration, object codecs/model baking and typed registry storage.
+  [Identity snapshots](../resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
+  publish frozen IDs/known-pack masks/tag lists for synchronization; they do
+  not replace item/entity/biome registries or establish an atomic generation
+  across resource/model/atlas/mesh consumers. The linked verification records
+  have their own historical source/library identity and acceptance limits.
 - **Server scheduling:** [chunk-task queues](../world/chunk-loading/RUST-CHUNK-TASKS.md)
   own priority buckets, ordered chunk membership, task lists and reprioritization
   in Rust. Java temporarily pins callables and retains consecutive dispatch,

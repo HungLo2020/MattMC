@@ -514,7 +514,10 @@ rules, music, ambience, subtitles and the preview; see
 [audio development](audio/index.md). Java
 [`SoundEngine`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/sounds/SoundEngine.java)
 keeps the `SoundInstance` objects gameplay code creates, custom tick callbacks,
-entity/biome/light and situational-music inputs, pack IO and UI drawing.
+entity/biome/light and situational-music inputs, asynchronous resource-read
+scheduling and UI drawing. Bundled pack IO now uses the
+[resource owners](resources/index.md); Java still requests/copies sound bytes
+and returns them to the audio asset cache on its IO pool.
 The [shared ambient RNG boundary](audio/CLIENT-SOUNDS.md#shared-level-random)
 preserves raw state for the two legacy generators; arbitrary generators use
 a separately seeded compatibility sequence. Sound-event, profile and

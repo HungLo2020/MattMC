@@ -97,7 +97,13 @@ This documentation review did not rerun these workloads or inspect the
 untracked raw receipts. A settled rotating-view gate is not ordinary-play,
 first-frame, streaming, temporal or long-session memory acceptance.
 
-The latest [DH visibility release](RUST-DH-VISIBILITY.md), `ebd3c9a3`, has an
+Current source also contains [resource ownership changes](../resources/index.md)
+at `398a0078`. Their [resource verification](../resources/VERIFICATION.md#latest-run)
+cites an earlier uncommitted build, with no fresh client/server/reload acceptance
+for this integrated revision. The rendering matrices below retain their exact
+release identities and do not validate those later changes.
+
+The latest recorded [DH visibility release](RUST-DH-VISIBILITY.md), `ebd3c9a3`, has an
 author-reported 20-run matrix on RTX3080Ti/NVIDIA `595.99.02`: 360 settle,
 240 warmup and exactly 6,000 measured frames per run, alternating Current and
 Frozen. Vanilla + DH has four repeats per side; other modes have two. All declared runs

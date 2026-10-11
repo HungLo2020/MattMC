@@ -1,64 +1,105 @@
 # Tags and registry snapshots
 
+Implementation references below are pinned to `398a0078`. Java retains registry
+objects, holders, element values and their codecs; Rust owns tag parsing and
+resolution plans and the published identity/tag data used by synchronization.
+See [verification](VERIFICATION.md) for the older author-reported run and its limits.
+
 ## Tag loading
 
-[`TagLoader`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/tags/TagLoader.java)
+[`TagLoader`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/tags/TagLoader.java#L39-L100)
 reads each tag file's bytes from the resource manager and passes them to
-[`content/tags`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/tags/mod.rs),
+[`content/tags`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/rust/content/tags/mod.rs),
 which decodes the files and applies `replace`. It then orders tags as
 `DependencySorter` did and plans the element lookups. Java performs those lookups in the planned
 order, because a registration-time lookup can create holders, and Rust then
-resolves each tag's members. Java logs
-`Couldn't load tag … as it is missing following references: …` as before.
+resolves the member lookup indices. Java reconstructs the value lists, removes
+duplicate values in encounter order, and logs
+`Couldn't load tag … as it is missing following references: …` for omitted
+tags with missing required references.
+
+The parsed files and plan live behind a native handle owned by `TagLoader.Loaded`.
+Its Cleaner releases the handle when the wrapper becomes reclaimable;
+[planning and resolution do not consume it](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/rust/content/tags/ffi.rs#L23-L124).
+This is garbage-collection-driven cleanup, not an explicit close at the end of
+`build`. Native result buffers are copied into Java and freed by
+[`NativeTags`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/tags/NativeTags.java#L39-L45).
 
 Constraints:
 
-- Output and lookup order follow Java `HashMap` iteration, which
-  [`core/java_hash.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/core/java_hash.rs)
-  reproduces. Tags enter the map through `computeIfAbsent`, which prepends
-  within a bucket; `put` appends. Choosing the wrong mode changes binding order.
-- A tag that includes itself overflowed Java's stack. Rust reports that case
-  and Java throws `StackOverflowError`, so callers fail the same way.
+- Output and lookup order use the Java `HashMap` bucket-order model in
+  [`core/java_hash.rs`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/rust/core/java_hash.rs#L1-L10).
+  Tags enter the map through `computeIfAbsent`, which prepends within a bucket;
+  `put` appends. Choosing the wrong mode changes binding order. The helper does
+  not model buckets converted to collision trees, so this is not an arbitrary
+  identifier/collision compatibility guarantee.
+- A self-reference alone fails resolution as a missing reference. A dependent
+  tag can trigger Java's endless cycle-check recursion depending on map order;
+  Rust detects that case and Java throws `StackOverflowError`. The
+  [focused fixture](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/rust/content/tags/tests.rs#L55-L69)
+  distinguishes these cases.
 - `DependencySorter` itself stays in Java; `FontManager` still uses it.
 
 ## Registry identity snapshot
 
-[`NativeRegistrySnapshot`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/core/NativeRegistrySnapshot.java)
-publishes a frozen registry set to [`content/registry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/registry/mod.rs):
+[`NativeRegistrySnapshot`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/NativeRegistrySnapshot.java#L333-L411)
+publishes a registry set lazily on its first query to
+[`content/registry`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/rust/content/registry/mod.rs):
 each registry's elements by network ID, each element's known pack, and its
-tags as ID lists. Two consumers use it:
+tags as ID lists. Callers must keep the element set frozen; the snapshot copies
+Java's IDs and registration data rather than taking ownership of live gameplay
+objects. Two synchronization consumers use it:
 
-- `RegistrySynchronization.packRegistries` asks which elements the client
+- [`RegistrySynchronization.packRegistries`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/RegistrySynchronization.java#L28-L74) asks which elements the client
   already has from its known packs; only those elements' keys are sent. It now
   takes the `LayeredRegistryAccess`. Element data is still encoded by the
   Java element codecs.
-- `TagNetworkSerialization.serializeTagsToNetwork` takes each network-safe
-  registry's tag ID lists from the snapshot.
+- [`TagNetworkSerialization.serializeTagsToNetwork`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/tags/TagNetworkSerialization.java#L20-L48) takes each network-safe
+  registry's tag ID lists from the snapshot. Java still writes the payload and
+  resolves received IDs back to holders.
 
-A snapshot is keyed by a stable access (`LayeredRegistryAccess.compositeAccess()`;
-`getAccessFrom` builds a new object per call) and released when that access is
-collected. Each publish is a new generation; queries against a retired one fail
-instead of returning stale IDs. `MappedRegistry.refreshTagsInHolders` reports
-tag rebinds. The next query walks only the rebound registries and publishes a
-delta: registries whose tags did not change are skipped, and changed ones refer
-to the previous generation's members and names wherever those are unchanged.
-Elements and IDs carry over in Rust. Java keeps decoded answers (known masks
-per registry set; tag maps until their registry changes), reusing a tag's list
-only when it still matches Rust's members.
+A snapshot is keyed by a stable access:
+[`LayeredRegistryAccess.compositeAccess()`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/LayeredRegistryAccess.java#L50-L85)
+returns the stored object, while `getAccessFrom` builds a new one per call.
+Java's weak-key cache and Cleaner tie the native context to that access's
+lifetime; cleanup is not an explicit reload/close operation. Each actual
+publish creates a new generation. Rust rejects queries naming a retired
+generation, and shares unchanged element/tag data between generations through
+[`Arc` ownership](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/rust/content/registry/mod.rs#L103-L161).
 
-Errors stay where Java raised them: a registry with unbound tags, or a tag
-holding an unregistered value, fails only when its network tags are requested,
-with Java's message.
+[`MappedRegistry.refreshTagsInHolders`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/MappedRegistry.java#L352-L363)
+reports tag rebinds. The next query checks registry versions and walks the tags
+only of rebound registries. An identical rebind publishes nothing; a changed
+registry publishes a delta referring to previous names and member lists where
+possible. Elements and IDs carry over in Rust.
+
+Java keeps known-pack masks per registry and client known-pack set, and tag maps
+until that registry's published tags change. Known masks are shared arrays that
+callers must not mutate. Tag maps and member lists are immutable; a previous
+member list is reused only after matching Rust's returned IDs. The
+[cache and decode path](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/NativeRegistrySnapshot.java#L454-L561)
+copies native output and frees each result buffer.
+
+During publication, unbound tags or a tag holding a non-reference value are
+recorded as that registry's serialization error. `networkTags` raises it when
+the registry's network tags are requested, preserving the Java message rather
+than making unrelated identity/known-pack queries fail.
 
 The payload map's iteration order is Java's: tag names are inserted in
 `getTags()` order. That order comes from `TagKey` hashes, and `ResourceKey`
 uses identity hash codes, so the wire order of colliding tags varies between
 JVM runs in Frozen too. Compare payload contents across runs, and check order
-against Java's algorithm in the same JVM.
+against Java's algorithm in the same JVM, as the
+[observer does](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/DevUtils/tests/resources/ResourceStackReference.java#L603-L638).
 
 ## Troubleshooting
 
 - *`Registry snapshot has no registry`*: the access passed was not the one the
   registries came from. Pass `compositeAccess()` of the same layered access.
-- *`Registry snapshot of … is stale`*: a registry's size changed after its set
-  was published. Registries must be frozen before synchronization.
+- *`Registry snapshot of … is stale`*:
+  [`packRegistries` detected a known-mask length mismatch](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/RegistrySynchronization.java#L54-L58).
+  Check that the snapshot and registry come from the same frozen set. This is
+  a size check, not a general guard against same-size element changes.
+- *`Registry snapshot generation retired during a query`*: a native query used
+  an old context/generation pair. Use the Java snapshot API and the current
+  stable access; do not retain native generation handles across publications.
