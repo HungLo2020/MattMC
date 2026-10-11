@@ -7,3 +7,5 @@ pub mod property;
 pub mod state;
 pub mod sound;
 pub mod map_color;
+pub mod registry;
+pub mod tags;

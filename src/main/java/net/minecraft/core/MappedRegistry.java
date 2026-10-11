@@ -359,6 +359,7 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 			}
 		});
 		map.forEach(Holder.Reference::bindTags);
+		NativeRegistrySnapshot.tagsChanged(this);
 	}
 
 	public void bindAllTagsToEmpty() {

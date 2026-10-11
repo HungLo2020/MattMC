@@ -48,7 +48,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackDetector;
+import net.minecraft.server.packs.repository.FolderRepositorySource;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.world.level.validation.ForbiddenSymlinkInfo;
@@ -267,20 +267,11 @@ public class PackSelectionScreen extends Screen {
 						if (bl) {
 							List<Path> list2 = new ArrayList(list.size());
 							Set<Path> set = new HashSet(list);
-							PackDetector<Path> packDetector = new PackDetector<Path>(this.minecraft.directoryValidator()) {
-								protected Path createZipPack(Path path) {
-									return path;
-								}
-
-								protected Path createDirectoryPack(Path path) {
-									return path;
-								}
-							};
 							List<ForbiddenSymlinkInfo> list3 = new ArrayList();
 
 							for (Path path : list) {
 								try {
-									Path path2 = (Path)packDetector.detectPackResources(path, list3);
+									Path path2 = FolderRepositorySource.detectPackPath(path, this.minecraft.directoryValidator(), list3);
 									if (path2 == null) {
 										LOGGER.warn("Path {} does not seem like pack", path);
 									} else {

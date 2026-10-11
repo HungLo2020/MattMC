@@ -25,46 +25,53 @@ public class RegistrySynchronization {
 		.<ResourceKey<? extends Registry<?>>>map(key -> key)
 		.collect(Collectors.toUnmodifiableSet());
 
+	/**
+	 * Packs every synchronized registry for a client that has `set`'s packs:
+	 * Rust's registry snapshot decides which elements the client already
+	 * knows, so only their keys are sent; the rest are encoded here.
+	 */
 	public static void packRegistries(
 		DynamicOps<Tag> dynamicOps,
-		RegistryAccess registryAccess,
+		LayeredRegistryAccess<RegistryLayer> layeredRegistryAccess,
 		Set<KnownPack> set,
 		BiConsumer<ResourceKey<? extends Registry<?>>, List<RegistrySynchronization.PackedRegistryEntry>> biConsumer
 	) {
-		RegistryDataLoader.SYNCHRONIZED_REGISTRIES.forEach(registryData -> packRegistry(dynamicOps, registryData, registryAccess, set, biConsumer));
+		RegistryAccess registryAccess = layeredRegistryAccess.getAccessFrom(RegistryLayer.WORLDGEN);
+		RegistryAccess snapshot = layeredRegistryAccess.compositeAccess();
+		RegistryDataLoader.SYNCHRONIZED_REGISTRIES.forEach(
+			registryData -> packRegistry(dynamicOps, registryData, registryAccess, snapshot, set, biConsumer)
+		);
 	}
 
 	private static <T> void packRegistry(
 		DynamicOps<Tag> dynamicOps,
 		RegistryDataLoader.RegistryData<T> registryData,
 		RegistryAccess registryAccess,
+		RegistryAccess snapshot,
 		Set<KnownPack> set,
 		BiConsumer<ResourceKey<? extends Registry<?>>, List<RegistrySynchronization.PackedRegistryEntry>> biConsumer
 	) {
-		registryAccess.lookup(registryData.key())
-			.ifPresent(
-				registry -> {
-					List<RegistrySynchronization.PackedRegistryEntry> list = new ArrayList(registry.size());
-					registry.listElements()
-						.forEach(
-							reference -> {
-								boolean bl = registry.registrationInfo(reference.key()).flatMap(RegistrationInfo::knownPackInfo).filter(set::contains).isPresent();
-								Optional<Tag> optional;
-								if (bl) {
-									optional = Optional.empty();
-								} else {
-									Tag tag = registryData.elementCodec()
-										.encodeStart(dynamicOps, (T)reference.value())
-										.getOrThrow(string -> new IllegalArgumentException("Failed to serialize " + reference.key() + ": " + string));
-									optional = Optional.of(tag);
-								}
-
-								list.add(new RegistrySynchronization.PackedRegistryEntry(reference.key().location(), optional));
-							}
-						);
-					biConsumer.accept(registry.key(), list);
+		registryAccess.lookup(registryData.key()).ifPresent(registry -> {
+			boolean[] known = NativeRegistrySnapshot.knownElements(snapshot, registry.key(), set);
+			if (known.length != registry.size()) {
+				throw new IllegalStateException("Registry snapshot of " + registry.key() + " is stale");
+			}
+			List<RegistrySynchronization.PackedRegistryEntry> list = new ArrayList<>(registry.size());
+			for (int id = 0; id < known.length; id++) {
+				Holder.Reference<T> reference = registry.get(id).orElseThrow();
+				Optional<Tag> optional;
+				if (known[id]) {
+					optional = Optional.empty();
+				} else {
+					Tag tag = registryData.elementCodec()
+						.encodeStart(dynamicOps, reference.value())
+						.getOrThrow(string -> new IllegalArgumentException("Failed to serialize " + reference.key() + ": " + string));
+					optional = Optional.of(tag);
 				}
-			);
+				list.add(new RegistrySynchronization.PackedRegistryEntry(reference.key().location(), optional));
+			}
+			biConsumer.accept(registry.key(), list);
+		});
 	}
 
 	private static Stream<RegistryAccess.RegistryEntry<?>> ownedNetworkableRegistries(RegistryAccess registryAccess) {

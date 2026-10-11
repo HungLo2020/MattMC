@@ -17,4 +17,5 @@ and link to source for implementation details. Follow the
 - [Rust Game Model (proposal)](game-model/index.md)
 - [Network Systems](network/index.md)
 - [Audio](audio/index.md)
+- [Resource Packs and Registries](resources/index.md)
 - [Wiki Expansion Maintenance](wiki/index.md)

@@ -150,7 +150,7 @@ public class VanillaPackResourcesBuilder {
 	}
 
 	public VanillaPackResources build(PackLocationInfo packLocationInfo) {
-		return new VanillaPackResources(
+		return VanillaPackResources.open(
 			packLocationInfo,
 			this.metadata,
 			Set.copyOf(this.namespaces),

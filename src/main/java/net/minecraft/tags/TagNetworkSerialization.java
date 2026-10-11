@@ -1,7 +1,5 @@
 package net.minecraft.tags;
 
-import com.mojang.datafixers.util.Pair;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.HashMap;
 import java.util.List;
@@ -10,7 +8,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import net.minecraft.core.Holder;
 import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.NativeRegistrySnapshot;
 import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySynchronization;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
@@ -18,33 +18,19 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.RegistryLayer;
 
 public class TagNetworkSerialization {
+	/** Each network-safe registry's tags as ID lists, from Rust's registry snapshot. */
 	public static Map<ResourceKey<? extends Registry<?>>, TagNetworkSerialization.NetworkPayload> serializeTagsToNetwork(
 		LayeredRegistryAccess<RegistryLayer> layeredRegistryAccess
 	) {
+		RegistryAccess snapshot = layeredRegistryAccess.compositeAccess();
 		Map<ResourceKey<? extends Registry<?>>, TagNetworkSerialization.NetworkPayload> result = new HashMap<>();
-		RegistrySynchronization.networkSafeRegistries(layeredRegistryAccess)
-			.map(registryEntry -> Pair.of(registryEntry.key(), serializeToNetwork(registryEntry.value())))
-			.filter(pair -> !pair.getSecond().isEmpty())
-			.forEach(pair -> result.put(pair.getFirst(), pair.getSecond()));
-		return result;
-	}
-
-	private static <T> TagNetworkSerialization.NetworkPayload serializeToNetwork(Registry<T> registry) {
-		Map<ResourceLocation, IntList> map = new HashMap();
-		registry.getTags().forEach(named -> {
-			IntList intList = new IntArrayList(named.size());
-
-			for (Holder<T> holder : named) {
-				if (holder.kind() != Holder.Kind.REFERENCE) {
-					throw new IllegalStateException("Can't serialize unregistered value " + holder);
-				}
-
-				intList.add(registry.getId(holder.value()));
+		RegistrySynchronization.networkSafeRegistries(layeredRegistryAccess).forEach(registryEntry -> {
+			Map<ResourceLocation, IntList> tags = NativeRegistrySnapshot.networkTags(snapshot, registryEntry.key());
+			if (!tags.isEmpty()) {
+				result.put(registryEntry.key(), new TagNetworkSerialization.NetworkPayload(tags));
 			}
-
-			map.put(named.key().location(), intList);
 		});
-		return new TagNetworkSerialization.NetworkPayload(map);
+		return result;
 	}
 
 	static <T> TagLoader.LoadResult<T> deserializeTagsFromNetwork(Registry<T> registry, TagNetworkSerialization.NetworkPayload networkPayload) {

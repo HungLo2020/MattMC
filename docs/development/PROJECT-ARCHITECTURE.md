@@ -16,6 +16,8 @@ src/main/rust/
 ├── lib.rs
 ├── app/
 ├── assets/
+│   ├── packs/
+│   └── resources/
 ├── audio/
 ├── compat/
 ├── content/
@@ -26,8 +28,10 @@ src/main/rust/
 │   ├── fluid/
 │   ├── map_color/
 │   ├── property/
+│   ├── registry/
 │   ├── sound/
-│   └── state/
+│   ├── state/
+│   └── tags/
 ├── core/
 ├── gameplay/
 │   └── tacz/
@@ -457,6 +461,13 @@ property declarations and ordered domains. The block registry shares immutable
 schemas directly; Java enum/property objects are temporary compatibility views.
 The 11 declarations for integrated content retain their distinct identities.
 
+[`content/tags`](resources/TAGS-AND-REGISTRIES.md#tag-loading) decodes tag
+files, orders them and resolves their members; Java performs the element
+lookups it plans. [`content/registry`](resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
+holds identity snapshots of frozen registry sets (network IDs, known packs, tag
+ID lists) behind registry and tag synchronization; registry storage and
+element codecs remain Java.
+
 Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/contextual-predicate functions, motion/solid/custom flags and contextual gameplay, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
 
 ### `render/`
@@ -484,8 +495,14 @@ Important current subdirectories:
 ### `assets/`
 
 Asset loading, decoding, caching, and resource processing belong here.
+`assets/packs/` opens and reads directory, ZIP and vanilla packs and owns
+`pack.mcmeta` formats, overlays and compatibility; `assets/repository.rs`
+discovers packs and orders the selection; `assets/resources/` is the resource
+manager (namespace stacks, filters, sidecar metadata). Java keeps the
+`PackResources`/`ResourceManager` API and metadata section codecs; see
+[resource packs and registries](resources/index.md).
 `assets/map_image.rs` performs bounded indexed-map PNG encoding for the
-transitional world asset transport; map palette data stays in `content/`. Future Rust-side texture, model, shader, language, and pack-resource work should live here when it is not exclusively part of a rendering backend.
+transitional world asset transport; map palette data stays in `content/`. Future Rust-side texture, model, shader and language work should live here when it is not exclusively part of a rendering backend.
 
 ### `audio/`
 

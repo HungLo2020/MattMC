@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -12,8 +13,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import net.minecraft.Util;
 import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.world.flag.FeatureFlagSet;
 import org.jetbrains.annotations.Nullable;
 
@@ -81,16 +82,20 @@ public class PackRepository {
 		}
 	}
 
+	/** The requested available packs, then the required ones (order decided by Rust). */
 	private List<Pack> rebuildSelected(Collection<String> collection) {
-		List<Pack> list = (List<Pack>)this.getAvailablePacks(collection).collect(Util.toMutableList());
-
-		for (Pack pack : this.available.values()) {
-			if (pack.isRequired() && !list.contains(pack)) {
-				pack.getDefaultPosition().insert(list, pack, Pack::selectionConfig, false);
-			}
+		List<Pack> packs = List.copyOf(this.available.values());
+		List<net.minecraft.server.packs.NativePacks.Selectable> selectable = new ArrayList<>(packs.size());
+		for (Pack pack : packs) {
+			PackSelectionConfig config = pack.selectionConfig();
+			selectable.add(new net.minecraft.server.packs.NativePacks.Selectable(pack.getId(), config.required(), config.defaultPosition().ordinal(),
+				config.fixedPosition()));
 		}
-
-		return ImmutableList.copyOf(list);
+		ImmutableList.Builder<Pack> list = ImmutableList.builder();
+		for (int index : net.minecraft.server.packs.NativePacks.rebuildSelected(selectable, List.copyOf(collection))) {
+			list.add(packs.get(index));
+		}
+		return list.build();
 	}
 
 	private Stream<Pack> getAvailablePacks(Collection<String> collection) {
