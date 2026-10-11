@@ -526,7 +526,8 @@ public class FullDataSourceV2
 				try (var nativePolicy = net.minecraft.world.level.chunk.NativeDhMaterials.create(this.mapping))
 				{
 				if (this.getClass() != FullDataSourceV2.class
-					|| !net.minecraft.world.level.chunk.NativeDhOcclusionPass.tryCull(nativePolicy, this.columnReferences()))
+					|| (!net.minecraft.world.level.chunk.NativeDhOcclusionPass.tryCull(nativePolicy, this.nativeSource)
+						&& !net.minecraft.world.level.chunk.NativeDhOcclusionPass.tryCull(nativePolicy, this.columnReferences())))
 				{
 				for (int x = 0; x < WIDTH; x++)
 				{

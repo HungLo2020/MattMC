@@ -12,8 +12,10 @@ Admitted [material maps](RUST-DH-MATERIAL-MAPS.md) now also merge identities in
 Rust. Java orchestrates update/propagation flags and projects compatibility readers.
 The [metadata owner](RUST-DH-SOURCE-METADATA.md) retains generation, compression
 and uniformity in Rust. Owned merges consume and publish these planes directly.
-Java projects selected contributor-map actions and only non-reused CPU extents;
-exact copy proofs leave existing list readers unchanged.
+Rust also publishes newly created vectors directly into the primary table
+and owns bounded registration/selection of escaped CPU readers.
+Java projects selected contributor-map actions and changed extents for escaped
+readers only; exact copy proofs leave existing list readers unchanged.
 Base-state hashing also reads the retained Rust table.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.
@@ -54,8 +56,17 @@ a GC release deadline or permit closing a batch while those readers are live.
   remap stamp before mutation;
   distinct Rust-owned vectors cannot overlap. Compatibility descriptor commits
   retain their explicit allocation-overlap and identity checks.
-- Preserve existing recipient list identity and vector capacity. Null recipients
-  are adopted separately; unadopted vectors remain owned by the batch. Updating
+- Primary columns also own a scalar maximum-ID cache, invalidated by point
+  writes. Identity remaps validate their range against it and use the original
+  column hash as a hint; exact-copy reuse still needs the separate copy proof.
+  Admitted identity copies use a bulk span copy. Capacity-only reserve changes
+  neither values nor hash/ID/copy proofs. Verification and performance limits
+  are recorded with [source occlusion](RUST-DH-SOURCE-OCCLUSION.md).
+- Preserve existing recipient list identity and vector capacity. Direct source
+  commits transfer new vectors to the source without Java adoption. Unescaped
+  readers stay native until demand; escaped empty readers acquire independent
+  leases without changing list identity. Descriptor compatibility commits still
+  transfer new vectors from the batch to their Java recipients. Updating
   a native producer view detaches it before publication. There is no point-array
   export or Java point mirror and no GPU handle crosses this boundary.
 - Validate recipient aliases and source/recipient allocation overlap before

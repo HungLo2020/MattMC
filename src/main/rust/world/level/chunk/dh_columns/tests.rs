@@ -212,10 +212,18 @@ fn complete_ordered_occlusion_passes_match_actual_frozen_saved_columns() {
         let mut columns: Vec<Vec<u64>> = (0..4096).map(|_| { let n = r.i(); (0..n).map(|_| r.long()).collect() }).collect();
         let policy = materials::Materials(opacities.iter().map(|&opacity| materials::Fact { opacity, air: false, liquid: false }).collect());
         let mut batch: Vec<_> = columns.iter().cloned().map(mutable::Column::new).collect();
+        let owned = source::mattmc_dh_source_create();
+        unsafe { for (i, points) in columns.iter().enumerate() {
+            let column = mutable::mattmc_dh_column_create(points.as_ptr(), points.len() as i32);
+            assert_eq!(source::mattmc_dh_source_set(owned, i as i32, 2, column), 1);
+            mutable::mattmc_dh_column_release(column);
+        }}
         for pass in 0..2 {
             let raw: Vec<usize> = batch.iter_mut().flat_map(|c| [c as *mut mutable::Column as usize, 0, 0]).collect();
             let mut output = vec![0usize; 4096 * 4];
             unsafe { assert_eq!(occlusion_pass::mattmc_dh_columns_cull_pass(raw.as_ptr(), &policy, output.as_mut_ptr()), 1); }
+            let mut projected = vec![0usize; 1 + 4096 * 3];
+            unsafe { assert_eq!(occlusion_pass::mattmc_dh_source_cull(owned, &policy, projected.as_mut_ptr()), 1); }
             for x in 1..63 { for z in 1..63 {
                 let index = x * 64 + z;
                 if columns[index].len() <= 1 { continue; }
@@ -228,11 +236,16 @@ fn complete_ordered_occlusion_passes_match_actual_frozen_saved_columns() {
             }}
             for (index, column) in columns.iter().enumerate() {
                 assert_eq!(batch[index].points(), column, "{name} whole pass {pass} column {index}");
+                unsafe {
+                    assert_eq!((*owned).column(index).unwrap(), column, "{name} owned pass {pass} column {index}");
+                    assert_eq!((*(*owned).owner(index)).hash(), batch[index].hash());
+                }
                 assert_eq!(output[index * 4 + 1], column.len());
                 assert_eq!(r.i() as usize, column.len(), "{name} pass {pass} column {index}");
                 for &point in column { assert_eq!(r.long(), point, "{name} pass {pass} column {index}"); }
             }
         }
+        unsafe { source::mattmc_dh_source_release(owned); }
     }
     assert!(removed > 0, "Saved corpus must exercise actual mutation");
     assert_eq!(r.1, r.0.len());

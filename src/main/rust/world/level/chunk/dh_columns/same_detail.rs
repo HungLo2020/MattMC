@@ -40,6 +40,7 @@ pub(crate) struct Merge<'a> {
     source_proof: Option<(*const super::source::Source, u64, [u64; 2])>,
     reused: [u64; WIDTH / 64],
     writes: Vec<u32>,
+    identity_remap: bool,
 }
 fn hash(points: &[u64]) -> i32 {
     points.iter().fold(1i32, |h, &p| h.wrapping_mul(31).wrapping_add((p ^ (p >> 32)) as i32))
@@ -58,9 +59,9 @@ pub(crate) fn build<'a>(inputs: &[Input<'a, '_>], remap: &[i32], retained: usize
     build_columns(inputs.iter().map(|input| Some((ColumnInput {
         source:input.source,target:input.target,generation:input.generation,
         compression:input.compression,uniform:input.uniform,previous_footprint:input.previous_footprint,
-    },None))),remap,retained,|i|inputs[i].footprint)
+    },None,false))),remap,retained,|i|inputs[i].footprint)
 }
-fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<'a,'b>, Option<i32>)>>, remap: &[i32], mut retained: usize,
+fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<'a,'b>, Option<i32>, bool)>>, remap: &[i32], mut retained: usize,
     mut footprint:impl FnMut(usize)->Option<[Option<&'b [u64]>;4]>) -> Option<Merge<'a>> {
     if inputs.len() != WIDTH { return None; }
     let mut result = Merge { sources: vec![None; WIDTH].into_boxed_slice(), remap: remap.to_vec().into_boxed_slice(),
@@ -69,13 +70,14 @@ fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<
         counts: vec![0;WIDTH].into_boxed_slice(),
         descriptors: None,
         actions: Vec::new(), _footprints: Vec::new(), changed: false, committed: false, target_source: None,
-        source_proof: None, reused: [0; WIDTH / 64], writes: Vec::new() };
+        source_proof: None, reused: [0; WIDTH / 64], writes: Vec::new(),
+        identity_remap: remap.iter().enumerate().all(|(i,&id)| id as i64 == i as i64) };
     for (index, input) in inputs.enumerate() {
-        let (input, reused_hash)=input?;
+        let (input, hash_hint, reused)=input?;
         let Some(source) = input.source else { continue; };
         if !admit(input.generation[0], input.generation[1]) { continue; }
-        let mut new_hash = reused_hash.unwrap_or(1);
-        if reused_hash.is_none() { for &point in source {
+        let mut new_hash = hash_hint.unwrap_or(1);
+        if hash_hint.is_none() { for &point in source {
             let id = *remap.get(point as u32 as usize)?;
             let point = point & !(u32::MAX as u64) | id as i64 as u64;
             new_hash = new_hash.wrapping_mul(31).wrapping_add((point ^ (point >> 32)) as i32);
@@ -83,8 +85,8 @@ fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<
         // Frozen's changed flag is global. Metadata-only replacements do not
         // set it, and later columns stop comparing old hashes once it is true.
         result.changed |= input.target.is_none_or(|target| target.len() != source.len());
-        if !result.changed && reused_hash.is_none() { result.changed = hash(input.target.unwrap()) != new_hash; }
-        if reused_hash.is_some() { result.reused[index / 64] |= 1 << (index % 64); }
+        if !result.changed && !reused { result.changed = hash(input.target.unwrap()) != new_hash; }
+        if reused { result.reused[index / 64] |= 1 << (index % 64); }
         else {result.writes.push(index as u32);}
         result.sources[index] = Some(source);
         // A scalar length survives release of the borrowed source spans at
@@ -205,6 +207,7 @@ unsafe fn sources_data(
     }
     let ids = if count == 0 { &[] } else { slice::from_raw_parts(remap, count as usize) };
     let mapping = target.mapping(ids);
+    let identity_remap = ids.iter().enumerate().all(|(i,&id)| id as i64 == i as i64);
     // Select borrowed planes once. Repeating the compatibility/native selection
     // inside each column prevents the ordinary owned consumer from staying small.
     let (old_generation,new_generation,compression,uniform): (&[u8],&[u8],&[u8],&[u8]) = if let Some(f)=facts {
@@ -223,10 +226,16 @@ unsafe fn sources_data(
         // Keep the real source span for explicit compatibility-copy consumers.
         let old=if reused_hash.is_some() {new} else {target.column(i)?};
         if new.len()>4096 || old.len()>4096 {return None;}
+        let hash_hint = if reused_hash.is_some() { reused_hash }
+            else if identity_remap && !input_owner.is_null()
+                && admit(old_generation[i] as i8,new_generation[i] as i8) {
+                if !(*input_owner).ids_fit(ids.len()) { return None; }
+                Some((*input_owner).hash())
+            } else { None };
         Some((ColumnInput { source: source.present(i).then_some(new),target: target.present(i).then_some(old),
             generation:[old_generation[i] as i8,new_generation[i] as i8],
             compression:compression[i] as i8,
-            uniform:uniform[i]!=0,previous_footprint:previous[i]!=0 }, reused_hash))
+            uniform:uniform[i]!=0,previous_footprint:previous[i]!=0 }, hash_hint, reused_hash.is_some()))
     });
     build_columns(inputs, ids, retained as usize,|i|footprint_inputs.as_ref().and_then(|columns|columns[i])).map_or(ptr::null_mut(), |mut m| {
         m.target_source = Some((target_pointer, target.version()));
@@ -271,6 +280,19 @@ pub unsafe extern "C" fn mattmc_dh_same_detail_projection(owner:*const Merge<'_>
 /// Four words per row: column index, CPU address, count, existing owned lease.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_same_detail_extent_projection(owner:*const Merge<'_>,views:*const usize,detached:*const u8,output:*mut u64)->i32 {
+    extent_projection(owner,views,detached,output,|_|true)
+}
+/// Reader registration is native, so ordinary publication need not construct
+/// thousands of rows just for Java to discard unescaped columns.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_same_detail_reader_projection(owner:*const Merge<'_>,target:*const super::source::Source,
+    views:*const usize,detached:*const u8,output:*mut u64)->i32 {
+    let (Some(merge),Some(source))=(owner.as_ref(),target.as_ref()) else{return -1;};
+    if merge.target_source.is_none_or(|(p,_)|p!=target){return -1;}
+    extent_projection(owner,views,detached,output,|i|source.has_reader(i))
+}
+unsafe fn extent_projection(owner:*const Merge<'_>,views:*const usize,detached:*const u8,output:*mut u64,
+    reader:impl Fn(usize)->bool)->i32 {
     let Some(owner)=owner.as_ref() else{return -1;};
     if views.is_null()||views as usize%align_of::<usize>()!=0||detached.is_null()||output.is_null()||output as usize%8!=0{return -1;}
     let Some(end)=(output as usize).checked_add(WIDTH*4*8) else{return -1;};
@@ -286,6 +308,7 @@ pub unsafe extern "C" fn mattmc_dh_same_detail_extent_projection(owner:*const Me
     }
     let mut rows=0;
     for &index in &owner.writes {let i=index as usize;
+        if !reader(i){continue;}
         output.add(rows*4).write(i as u64);output.add(rows*4+1).write(views[i*2] as u64);
         output.add(rows*4+2).write(views[i*2+1] as u64);output.add(rows*4+3).write(detached[i] as u64);
         rows+=1;
@@ -418,11 +441,11 @@ unsafe fn commit_checked(owner: *mut Merge<'_>, targets: *const usize, output: *
             continue;
         }
         let Some(source) = owner.sources[index] else { continue; };
-        let points = if target == 0 {
+        let column = if target == 0 {
             owner.columns[index] = Some(Box::new(Column::new(Vec::new())));
-            Column::points_mut(&mut **owner.columns[index].as_mut().unwrap())
-        } else { Column::points_mut(target as *mut Column) };
-        if !reserve(points, source.len()) { reserved = false; break; }
+            &mut **owner.columns[index].as_mut().unwrap() as *mut Column
+        } else { target as *mut Column };
+        if !Column::reserve(column, source.len(), reserve) { reserved = false; break; }
     }
     if !reserved {
         for &index in indices {let index=index as usize;let target=targets[index];
@@ -439,10 +462,13 @@ unsafe fn commit_checked(owner: *mut Merge<'_>, targets: *const usize, output: *
             else { target as *mut Column };
         let points = Column::points_mut(column);
         points.clear();
+        if owner.identity_remap { points.extend_from_slice(source); }
+        else {
         for &point in source {
             let id = owner.remap[point as u32 as usize];
             points.push(point & !(u32::MAX as u64) | id as i64 as u64);
         };
+        }
         output[index * 2] = points.as_ptr() as usize; output[index * 2 + 1] = points.len();
         Column::publish_hash(column, owner.hashes[index]);
     }
@@ -463,6 +489,23 @@ pub unsafe extern "C" fn mattmc_dh_same_detail_commit_source(owner: *mut Merge<'
 pub unsafe extern "C" fn mattmc_dh_same_detail_commit_source_extents(owner: *mut Merge<'_>, target: *const super::source::Source,
     output: *mut usize, detached: *mut u8) -> i32 {
     commit_source(owner,target,output,detached,true)
+}
+/// Complete primary publication, including previously empty/null recipients.
+/// The merge relinquishes each new vector to the source, so releasing the
+/// preparation never invalidates its points. Java projects escaped readers only.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_same_detail_commit_primary_extents(owner: *mut Merge<'_>, target: *mut super::source::Source,
+    output: *mut usize, detached: *mut u8) -> i32 {
+    let result=commit_source(owner,target,output,detached,true);
+    if result==1 {
+        let merge=&mut *owner;
+        for &index in &merge.writes {
+            if let Some(column)=merge.columns[index as usize].take() {
+                (*target).adopt(index as usize,column);
+            }
+        }
+    }
+    result
 }
 unsafe fn commit_source(owner: *mut Merge<'_>, target: *const super::source::Source,
     output: *mut usize, detached: *mut u8, sparse:bool) -> i32 {

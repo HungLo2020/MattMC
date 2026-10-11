@@ -172,7 +172,7 @@ class NativeDhColumnsTest {
             assertEquals(-1,in.read());
         }
     }
-    private static com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper occlusionBiome(int id) {
+    static com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper occlusionBiome(int id) {
         var type = com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper.class;
         return (com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
             (proxy, method, args) -> switch (method.getName()) {
@@ -211,7 +211,7 @@ class NativeDhColumnsTest {
                     try (var policy = NativeDhMaterials.create(source.mapping)) {
                         assertNotNull(policy, name + " canonical material admission");
                         for (int pass = 0; pass < 2; pass++) {
-                            assertTrue(NativeDhOcclusionPass.tryCull(policy, batch.columnReferences()), name + " actual complete native pass");
+                            assertTrue(NativeDhOcclusionPass.tryCull(policy, batch.nativeSource()), name + " actual owned native pass");
                             for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) {
                                 var center = (NativeDhColumnList) source.getColumnAtRelPos(x, z);
                                 if (center.size() <= 1) continue;
@@ -240,6 +240,47 @@ class NativeDhColumnsTest {
         assertTrue(admitted > 1000, "The saved corpus must exercise actual native consumers");
         assertTrue(removed > 0, "The corpus must include real occlusion mutations");
     }
+    @Test void ownedOcclusionDetachesProducerCentersAndRetainedReadersSurviveClose() throws Exception {
+        var columns = NativeDhColumns.build(level, light(chunk(0, 0)), 1);
+        assertNotNull(columns);
+        NativeDhColumnList retained; LongArrayList expected;
+        try (var owned = FullDataSourceV2.createNative(columns); var compatibility = FullDataSourceV2.createNative(columns);
+             var policy = NativeDhMaterials.create(owned.mapping)) {
+            assertNotNull(policy);
+            int center = -1;
+            for (int x = columns.offsetX() + 1; x < columns.offsetX() + 15 && center == -1; x++)
+                for (int z = columns.offsetZ() + 1; z < columns.offsetZ() + 15; z++)
+                    if (owned.getColumnAtRelPos(x, z).size() > 1) { center = x * 64 + z; break; }
+            assertTrue(center >= 0, "Saved input must include a writable producer center");
+            retained = (NativeDhColumnList) owned.getColumn(center);
+            var producer = columns.column(center / 64 - columns.offsetX(), center % 64 - columns.offsetZ());
+            var original = new LongArrayList(producer);
+            assertTrue(retained.isOriginalProducerView());
+            assertTrue(NativeDhOcclusionPass.tryCull(policy, owned.nativeSource()));
+            assertTrue(NativeDhOcclusionPass.tryCull(policy, compatibility.columnReferences()));
+            assertSame(retained, owned.getColumn(center));
+            assertFalse(retained.isOriginalProducerView());
+            assertEquals(original, producer, "Culling preserves independent immutable producer values");
+            for (int i = 0; i < 4096; i++) {
+                assertEquals(compatibility.getColumn(i), owned.getColumn(i));
+                assertEquals(compatibility.getColumn(i).hashCode(), owned.getColumn(i).hashCode());
+            }
+            expected = new LongArrayList(retained);
+        }
+        assertEquals(expected, retained);
+        retained.add(0L); expected.add(0L);
+        assertEquals(expected, retained); assertEquals(expected.hashCode(), retained.hashCode());
+    }
+    @Test void ownedEmptyOcclusionDoesNotMaterializeJavaColumnReaders() throws Exception {
+        try (var source = FullDataSourceV2.createEmpty(6)) {
+            source.mapping.addIfNotPresentAndGetId(occlusionBiome(0), BlockStateWrapper.AIR);
+            try (var policy = NativeDhMaterials.create(source.mapping)) {
+                assertNotNull(policy); assertTrue(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
+                var field = FullDataSourceV2.class.getDeclaredField("dataPoints"); field.setAccessible(true);
+                assertTrue(Arrays.stream((Object[]) field.get(source)).allMatch(Objects::isNull));
+            }
+        }
+    }
     @Test void completeOcclusionDeclinesAliasesCustomCallbacksAndBadIdsWithoutChangingPoints() {
         try (var source = FullDataSourceV2.createEmpty(6)) {
             source.mapping.addIfNotPresentAndGetId(occlusionBiome(0), BlockStateWrapper.AIR);
@@ -249,17 +290,21 @@ class NativeDhColumnsTest {
                 original.add(3L << 32); original.add(1L << 32);
                 int oldHash = original.hashCode(); var old = new LongArrayList(original);
                 LongList next = source.getColumn(66); source.setColumn(66, original);
+                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
                 assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
                 assertEquals(old, original); assertEquals(oldHash, original.hashCode());
                 source.setColumn(66, new LongArrayList() {
                     @Override public boolean isEmpty() { throw new AssertionError("Custom callback must remain in original route"); }
                 });
+                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
                 assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
                 assertEquals(old, original);
                 source.setColumn(66, new LongArrayList(new long[]{1L << 32}));
+                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
                 assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
                 source.setColumn(66, next);
                 original.set(0, (3L << 32) | 0xffff_ffffL); old = new LongArrayList(original);
+                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
                 assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
                 assertEquals(old, original);
                 original.set(0, 3L << 32);

@@ -21,7 +21,11 @@ public final class NativeDhSource implements AutoCloseable {
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle KIND = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_kind",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT),Linker.Option.critical(false));
-    private static final MethodHandle MISSING = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_missing",
+    private static final MethodHandle RETAIN_COLUMN = handle("retain_column",
+        FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle READER = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_reader",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT),Linker.Option.critical(false));
+    private static final MethodHandle MISSING = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_reader_masks",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle ORIGINAL = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_original",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
@@ -64,14 +68,29 @@ public final class NativeDhSource implements AutoCloseable {
     public boolean[] uniformSnapshot() {
         var values=new boolean[4096];for(int i=0;i<4096;i++)values[i]=uniform(i);return values;
     }
-    /** Rust already owns present-empty slots; Java readers are demand-created. */
+    /** Rust owns empty slots and committed vectors; readers are demand-created. */
     public LongList getColumn(int index) {
         var column=bindings[index];
         if(column!=null)return column;
         int kind=kind(index);
         if(kind==0)return null;
+        if(kind==2) {
+            var view=NativeDhMutableColumn.adopt(retainColumn(index),group);
+            bindings[index]=view;view.attach(this,index);return view;
+        }
         if(kind!=3)throw new IllegalStateException("Missing DH identity projection");
+        if(isLive())try {if((int)READER.invokeExact(owner,index)!=1)throw new IllegalStateException("Invalid DH reader registration");}
+        catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally {Reference.reachabilityFence(this);}
         var empty=NativeDhColumnList.empty(group);bindings[index]=empty;empty.attach(this,index);return empty;
+    }
+    /** Mutation projection must not create readers for unescaped native columns. */
+    NativeDhColumnList reader(int index) { return (NativeDhColumnList)bindings[index]; }
+    MemorySegment retainColumn(int index) {
+        if(!isLive())throw new IllegalStateException("Closed DH source");
+        try {return (MemorySegment)RETAIN_COLUMN.invokeExact(owner,index);}
+        catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally {Reference.reachabilityFence(this);}
     }
     public LongList[] columnReferences() {
         for(int i=0;i<4096;i++)getColumn(i);
@@ -86,10 +105,20 @@ public final class NativeDhSource implements AutoCloseable {
     public boolean isLive(){return !released.get();}
     @Override public void close() {
         if(!isLive())return;
-        var missing=new long[64];
+        var masks=new long[128];
         try {
-            if((int)MISSING.invokeExact(owner,MemorySegment.ofArray(missing))!=1)throw new IllegalStateException("Invalid DH source presence");
-            closedMissing=missing;
+            if((int)MISSING.invokeExact(owner,MemorySegment.ofArray(masks))!=1)throw new IllegalStateException("Invalid DH source presence");
+            // Closed sources still expose native values. Retain unescaped
+            // vectors before table release, without constructing empty readers.
+            for(int word=0;word<64;word++) {
+                long bits=masks[64+word];
+                while(bits!=0) {
+                    int index=word*64+Long.numberOfTrailingZeros(bits);
+                    if(bindings[index]==null)getColumn(index);
+                    bits&=bits-1;
+                }
+            }
+            closedMissing=java.util.Arrays.copyOf(masks,64);
             if(released.compareAndSet(false,true))release(owner);
         }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(this);}

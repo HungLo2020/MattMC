@@ -4,6 +4,7 @@ use std::slice;
 fn bottom(point: u64) -> i32 { ((point >> 44) & 4095) as i32 }
 fn height(point: u64) -> i32 { ((point >> 32) & 4095) as i32 }
 
+#[inline(always)]
 fn coverage(center: u64, adjacent: &[u64], mut index: i32, transparent: &impl Fn(u64) -> bool) -> i32 {
     if adjacent.is_empty() || adjacent.len() == 1 && adjacent[0] == 0 { return !index; }
     let (low, high) = (bottom(center), bottom(center) + height(center));
@@ -19,6 +20,7 @@ fn coverage(center: u64, adjacent: &[u64], mut index: i32, transparent: &impl Fn
     // exhaustion at -1. Do not reinterpret suspected Frozen behavior.
     !index
 }
+#[inline]
 pub(crate) fn cull(center: &mut Vec<u64>, adjacent: [&[u64]; 4], transparent: &impl Fn(u64) -> bool) -> bool {
     if adjacent.iter().any(|c| c.is_empty()) { return false; }
     let mut indices = adjacent.map(|c| c.len() as i32 - 1);

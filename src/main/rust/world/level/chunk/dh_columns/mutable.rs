@@ -21,13 +21,16 @@ pub(crate) struct Column {
     backing: Option<Backing>,
     references: AtomicUsize,
     hash: AtomicU64,
+    maximum_id: Cell<u64>,
     identity: u64,
     revision: Cell<u64>,
     copied: Cell<Option<CopyProof>>,
 }
 impl Column {
+    #[inline] pub(super) fn is_owned(&self) -> bool { self.backing.is_none() }
     pub(crate) fn new(points: Vec<u64>) -> Self {
         Self { points, backing: None, references: AtomicUsize::new(1), hash: AtomicU64::new(0),
+            maximum_id: Cell::new(0),
             identity: identity(), revision: Cell::new(0), copied: Cell::new(None) }
     }
     pub(super) fn original_producer(&self, producer: *const Columns, first: usize, count: usize) -> bool {
@@ -48,9 +51,29 @@ impl Column {
     pub(crate) unsafe fn points_mut<'a>(owner: *mut Self) -> &'a mut Vec<u64> {
         debug_assert!((*owner).backing.is_none());
         (*owner).hash.store(0,Ordering::Relaxed);
+        (*owner).maximum_id.set(0);
         (*owner).copied.set(None);
         (*owner).revision.set((*owner).revision.get().checked_add(1).unwrap_or_else(|| std::process::abort()));
         &mut (*owner).points
+    }
+    /// Capacity changes preserve values, hashes and exact copy proofs. The
+    /// private callback may reserve only; callers publish relocated extents.
+    pub(super) unsafe fn reserve(owner: *mut Self, count: usize,
+        reserve: &mut impl FnMut(&mut Vec<u64>, usize) -> bool) -> bool {
+        debug_assert!((*owner).backing.is_none());
+        reserve(&mut (*owner).points, count)
+    }
+    /// One bounded scalar admission cache, invalidated by every point write.
+    /// It retains no mapping/source and works across identity-map growth/shrink.
+    #[inline]
+    pub(super) fn ids_fit(&self, count: usize) -> bool {
+        if self.points().is_empty() { return true; }
+        let mut cached = self.maximum_id.get();
+        if cached >> 32 == 0 {
+            let max = self.points().iter().map(|p| *p as u32).max().unwrap();
+            cached = (1u64 << 32) | max as u64; self.maximum_id.set(cached);
+        }
+        (cached as u32 as usize) < count
     }
     #[inline]
     pub(crate) fn hash(&self) -> i32 {
@@ -85,6 +108,10 @@ impl Column {
 /// A retained primary column, without another point allocation or Java owner.
 pub(crate) struct Lease(*mut Column);
 impl Lease {
+    pub(super) fn adopt(owner: Box<Column>) -> Self { Self(Box::into_raw(owner)) }
+    pub(super) fn into_raw(self) -> *mut Column {
+        let owner = self.0; std::mem::forget(self); owner
+    }
     #[inline] pub(crate) fn identity(&self) -> usize { self.0 as usize }
     pub(crate) unsafe fn retain(owner: *mut Column) -> Self {
         let old = (*owner).references.fetch_add(1, Ordering::Relaxed);
@@ -253,6 +280,9 @@ mod tests {
                 let points = (*owner).points();
                 assert_eq!((*owner).hash(), mattmc_dh_column_hash(points.as_ptr(), points.len() as i32));
                 assert_eq!((*owner).hash.load(Ordering::Relaxed), (1u64 << 32) | (*owner).hash() as u32 as u64);
+                for count in 0..5 {
+                    assert_eq!((*owner).ids_fit(count), points.iter().all(|p| (*p as u32 as usize) < count));
+                }
             };
             check();
             assert_eq!(mattmc_dh_column_set(owner, 0, u64::MAX), 1); check();

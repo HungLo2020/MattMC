@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--pairs", type=int, default=6)
     parser.add_argument("--rounds", type=int, default=1000)
     parser.add_argument("--warmup-rounds", type=int, default=1000)
-    parser.add_argument("--mode", choices=("create", "merge"), required=True)
+    parser.add_argument("--mode", choices=("create", "merge", "cull"), required=True)
     args = parser.parse_args()
     if not 2 <= args.pairs <= 50 or args.rounds < 1 or args.warmup_rounds < 1:
         parser.error("pairs must be 2..50; measured and warmup rounds must be positive")

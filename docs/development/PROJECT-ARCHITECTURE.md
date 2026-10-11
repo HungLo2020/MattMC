@@ -340,6 +340,11 @@ generation, compression and uniformity planes; merge and parent consumers read
 them directly. Java byte-array mirrors and source phantom-pool registration are
 removed. Java identity projections, update orchestration and persistence remain
 temporary.
+[Owned source occlusion](world/chunk/RUST-DH-SOURCE-OCCLUSION.md) also reads
+primary columns directly: Rust admits and detaches centers and preserves the
+complete Frozen pass order. Rust publishes new columns and registers escaped
+reader identities; Java receives selected extents and creates CPU leases on
+demand.
 The author reports six synthetic CPU scenarios matching Frozen checksums with
 Current medians at or below Frozen; realistic renderer/server acceptance remains
 separate. See the owner’s source and timing limits.

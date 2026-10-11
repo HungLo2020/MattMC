@@ -54,7 +54,13 @@ client or benchmark checks and did not inspect untracked execution receipts.
   retained grouped reader can keep every registered vector alive until the
   group is collected. Grouping reduces cleanup records; it does not establish
   prompt native release or sustained-memory acceptance.
-- Source closure releases the Rust table and its primary leases immediately.
+- Retained-source commits install new vectors directly in Rust. Their Java
+  readers are demand-created, with independent primary leases and no point
+  copy. Merge/culling projections refresh escaped readers only. Empty and null
+  facts remain distinct even when neither has a Java object.
+- Source closure first retains unescaped native values for closed-source reader
+  compatibility, using two compact bitsets rather than 4,096 Java queries.
+  It then releases the Rust table and its primary leases immediately.
   Retained Java column readers keep their own native leases and remain usable.
   A closed source preserves a 512-byte presence snapshot for lazy empty/null
   compatibility readers; it retains no copied points or live native table.
@@ -107,8 +113,9 @@ immutable default table rather than an allocation per merge. Source orchestratio
 remain migration work.
 The current [source metadata migration](RUST-DH-SOURCE-METADATA.md) owns
 generation/compression/uniformity storage and direct parent transport in Rust.
-Its fresh verification is separate from the historical results below. Occlusion
-transport and source orchestration remain work.
+Its fresh verification is separate from the historical results below. The
+[source occlusion continuation](RUST-DH-SOURCE-OCCLUSION.md) owns reader registration
+and direct pass transport; source orchestration remains work.
 
 ## Verification
 

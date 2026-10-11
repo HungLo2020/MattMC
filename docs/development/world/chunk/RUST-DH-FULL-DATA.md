@@ -6,6 +6,9 @@ ownership while Java list identity survives writes; growth and detachment may
 change the backing storage. The [metadata owner](RUST-DH-SOURCE-METADATA.md)
 also owns generation/compression/uniformity planes and feeds parent reduction
 directly. Source orchestration and persistence remain transitional Java work.
+The later [owned source occlusion](RUST-DH-SOURCE-OCCLUSION.md) reads that table
+directly and projects only escaped center readers; the descriptor route below remains
+for compatibility inputs and its measurements are historical.
 At [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1),
 `FullDataSourceV2.close()` closed the table in a `finally` path after its
 metadata-pool close. The metadata migration removes that pool registration;

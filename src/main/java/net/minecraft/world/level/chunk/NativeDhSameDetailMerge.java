@@ -35,8 +35,8 @@ public final class NativeDhSameDetailMerge implements AutoCloseable {
     private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.ADDRESS,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle VIEW = handle("view", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    private static final MethodHandle PROJECTION = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_dh_same_detail_extent_projection",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
+    private static final MethodHandle PROJECTION = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_dh_same_detail_reader_projection",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle OWNED = handle("owned", FunctionDescriptor.of(ValueLayout.ADDRESS,
         ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,
         ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
@@ -44,7 +44,7 @@ public final class NativeDhSameDetailMerge implements AutoCloseable {
         ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle APPLY_OWNED_HASH = handle("metadata_owned_hash", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
-    private static final MethodHandle COMMIT_SOURCE = handle("commit_source_extents", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+    private static final MethodHandle COMMIT_SOURCE = handle("commit_primary_extents", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle COMMIT = handle("commit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle TAKE = handle("take", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
@@ -277,21 +277,16 @@ public final class NativeDhSameDetailMerge implements AutoCloseable {
             int result = (int) COMMIT_SOURCE.invokeExact(owner, source.stageOwner(), scratch.output, scratch.detached);
             if (result != 1 && result != -1) throw new IllegalStateException("Invalid retained DH publication");
             var publication=SOURCE_SCRATCH.get();
-            int rowCount=(int)PROJECTION.invokeExact(owner,scratch.output,scratch.detached,publication.projectionHeap);
+            int rowCount=(int)PROJECTION.invokeExact(owner,source.stageOwner(),scratch.output,scratch.detached,publication.projectionHeap);
             if(rowCount<0||rowCount>4096)throw new IllegalStateException("Invalid DH projection");
             var rows=publication.projection;
             for (int row = 0; row < rowCount; row++) {
                 int i=(int)rows[row*4];
-                var column = (NativeDhColumnList) columns[i];
+                var column = source.reader(i);
+                if(column==null)continue;
                 boolean hasOwner = rows[row*4+3]!=0;
                 MemorySegment replacement = null;
-                if (result == 1 && !hasOwner) replacement = (MemorySegment) TAKE.invokeExact(owner,i);
-                if (column == null) {
-                    if (result == -1) continue;
-                    column = NativeDhMutableColumn.adopt(replacement, source.group());
-                    source.setColumn(i,column);
-                    replacement = null;
-                }
+                if (result == 1 && !hasOwner) replacement = source.retainColumn(i);
                 // Read numeric addresses: unchanged extents need no temporary FFM segment.
                 column.acceptMergeView(rows[row*4+1],rows[row*4+2],hasOwner,replacement);
             }

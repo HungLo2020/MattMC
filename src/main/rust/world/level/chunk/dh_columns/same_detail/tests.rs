@@ -1,6 +1,42 @@
 use super::*;
 use std::io::Read;
 #[test]
+fn primary_commit_owns_new_columns_without_projection_and_readers_survive_both_owners() {
+    use super::super::{source::*,mutable::*};
+    unsafe {
+        let source=mattmc_dh_source_create();let target=mattmc_dh_source_create();
+        let input=mattmc_dh_column_create([0,31].as_ptr(),2);
+        assert_eq!(mattmc_dh_source_set(source,7,2,input),1);
+        (*source).metadata.plane_mut(0)[7]=9;
+        let previous=vec![0u8;WIDTH];let ids:Vec<i32>=(0..32).collect();
+        assert!(mattmc_dh_source_retain_column(target,7).is_null());
+        assert!(mattmc_dh_source_retain_column(target,-1).is_null());
+        assert!(mattmc_dh_source_retain_column(target,4096).is_null());
+        let mut views=vec![0usize;WIDTH*2];let mut detached=vec![0u8;WIDTH];
+        let merge=mattmc_dh_same_detail_owned(target,source,previous.as_ptr(),ptr::null(),0,ids.as_ptr(),32,0);
+        assert!(!merge.is_null());
+        assert_eq!(mattmc_dh_same_detail_commit_primary_extents(merge,target,views.as_mut_ptr(),detached.as_mut_ptr()),1);
+        let recipient=(*target).owner(7);
+        assert!(!recipient.is_null());assert_ne!(recipient,input);
+        assert_eq!((*target).column(7).unwrap(),[0,31]);
+        let mut rows=vec![99u64;WIDTH*4];
+        assert_eq!(mattmc_dh_same_detail_reader_projection(merge,target,views.as_ptr(),detached.as_ptr(),rows.as_mut_ptr()),0);
+        assert!(rows.iter().all(|&v|v==99));
+        let reader=mattmc_dh_source_retain_column(target,7);assert_eq!(reader,recipient);
+        assert_eq!(mattmc_dh_same_detail_reader_projection(merge,target,views.as_ptr(),detached.as_ptr(),rows.as_mut_ptr()),1);
+        assert_eq!(&rows[..4],&[7,(*recipient).points().as_ptr() as u64,2,0]);
+        assert!(mattmc_dh_same_detail_take(merge,7).is_null(),"The source owns the original vector lease");
+        assert_eq!(mattmc_dh_same_detail_metadata_owned(merge,target),1);
+        mattmc_dh_same_detail_release(merge);
+        assert_eq!((*target).column(7).unwrap(),[0,31]);
+        mattmc_dh_column_release(input);mattmc_dh_source_release(source);
+        let mut hash=0;assert_eq!(mattmc_dh_source_hash(target,6,(*target).metadata.plane(0).as_ptr(),(*target).metadata.plane(1).as_ptr(),&mut hash),1);
+        mattmc_dh_source_release(target);
+        assert_eq!((*reader).points(),[0,31]);assert_eq!(mattmc_dh_column_add(reader,2,7),1);
+        assert_eq!((*reader).points(),[0,31,7]);mattmc_dh_column_release(reader);
+    }
+}
+#[test]
 fn copy_proofs_track_source_target_remap_and_replacement_without_trusting_hash_collisions() {
     use super::super::{source::*, mutable::*};
     unsafe {
@@ -46,6 +82,19 @@ fn copy_proofs_track_source_target_remap_and_replacement_without_trusting_hash_c
         let oversized: Vec<i32> = (0..4097).collect();
         assert!(!update(false,&oversized)); assert!(!update(false,&oversized));
         assert!(!update(false,&ids)); assert!(!update(true,&ids));
+
+        // Cached original hashes are hints, never a copy or admission proof.
+        // A narrower identity map must still reject the current maximum ID.
+        assert!(mattmc_dh_same_detail_sources(target,source,facts.as_ptr(),ptr::null(),0,[0].as_ptr(),1,0).is_null());
+        let mut rejected_facts=facts.clone();rejected_facts[WIDTH*2]=0;
+        let skipped=mattmc_dh_same_detail_sources(target,source,rejected_facts.as_ptr(),ptr::null(),0,[0].as_ptr(),1,0);
+        assert!(!skipped.is_null());assert!(!(*skipped).changed);
+        mattmc_dh_same_detail_release(skipped);
+        assert_eq!(mattmc_dh_column_set(replacement,0,0),1);
+        assert!(update(false,&[0]));assert_eq!((*recipient).points(),[0,0]);
+        assert!(!update(true,&[0]));
+        assert_eq!(mattmc_dh_column_set(replacement,0,1),1);
+        assert!(update(false,&ids));assert_eq!((*recipient).points(),[1,0]);
 
         // The checked descriptor ABI may publish to a different allocation;
         // it always copies, even if preparation proved the original target.
@@ -346,6 +395,8 @@ fn later_reserve_failure_refreshes_moved_views_without_changing_any_values() {
     let mut targets = vec![0usize; WIDTH]; targets[0] = &mut first as *mut Column as usize; targets[1] = &mut second as *mut Column as usize;
     let mut output = vec![0usize; WIDTH * 2]; let mut count = 0;
     unsafe {
+        let before_hash=first.hash();assert!(first.ids_fit(2));
+        let proof=first.proof([1,1]);Column::publish_copy(&mut first,proof);
         assert_eq!(commit_checked(&mut merge, targets.as_ptr(), output.as_mut_ptr(), false, true, &mut |points, wanted| {
             count += 1;
             if count == 2 { return false; }
@@ -356,6 +407,8 @@ fn later_reserve_failure_refreshes_moved_views_without_changing_any_values() {
         assert_eq!(mattmc_dh_same_detail_extent_projection(&merge,output.as_ptr(),detached.as_ptr(),rows.as_mut_ptr()),2);
         assert_eq!(&rows[..8],&[0,first.points().as_ptr() as u64,1,1,1,second.points().as_ptr() as u64,1,1]);
         assert!(rows[8..].iter().all(|&v|v==77));
+        assert_eq!(first.hash(),before_hash);assert!(first.ids_fit(2));
+        assert!(first.copied_from(proof),"Capacity-only failure preserves exact value proof");
     }
     assert_eq!(first.points(), [1]); assert_eq!(second.points(), [2]); assert!(!merge.committed);
     assert_eq!((output[0],output[1]), (first.points().as_ptr() as usize,1));

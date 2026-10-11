@@ -85,7 +85,9 @@ remap contents as described in the [source table guide](RUST-DH-SOURCE-TABLE.md)
 Persistence remains Java orchestration. Decoder writes must preserve bytes
 successfully read before EOF, and callers must not silently turn a live view
 into an independent array. Sparse contributor-map transport, contextual colors,
-geometry and whole-source occlusion transport remain subsequent migration work.
+geometry remain subsequent migration work. The later
+[source occlusion migration](RUST-DH-SOURCE-OCCLUSION.md) removes ordinary Java
+descriptor-grid construction and center selection.
 There are no GPU handles or presenter changes in this CPU migration.
 
 ## Verification

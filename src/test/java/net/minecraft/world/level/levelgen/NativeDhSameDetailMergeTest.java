@@ -341,4 +341,31 @@ class NativeDhSameDetailMergeTest {
         } finally { if (target.nativeSource().isLive()) target.close(); }
     }
 
+    @Test void primaryPublicationAndOcclusionLeaveUnescapedReadersNativeUntilDemandOrClose() throws Exception {
+        var field=FullDataSourceV2.class.getDeclaredField("dataPoints");field.setAccessible(true);
+        var target=FullDataSourceV2.createEmpty(6);
+        try(var input=FullDataSourceV2.createEmpty(6)) {
+            target.mapping.addIfNotPresentAndGetId(NativeDhColumnsTest.occlusionBiome(0),com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper.AIR);
+            var escaped=target.getColumn(0);
+            target.setColumn(1,null);
+            for(int i:new int[]{0,1,2,64,65,66,129}) {
+                input.getColumn(i).addElements(0,new long[]{0,0});input.columnGenerationSteps.set(i,(byte)9);
+            }
+            assertTrue(update(target,input,new int[]{0}));
+            var bindings=(LongList[])field.get(target);
+            assertSame(escaped,bindings[0]);assertEquals(LongArrayList.of(0,0),escaped);
+            for(int i:new int[]{1,2,64,65,66,129})assertNull(bindings[i],"Unescaped primary "+i);
+            try(var policy=NativeDhMaterials.create(target.mapping)) {
+                assertNotNull(policy);assertTrue(NativeDhOcclusionPass.tryCull(policy,target.nativeSource()));
+            }
+            assertNull(bindings[65],"Native culling must not materialize its selected center");
+            var retained=target.getColumn(1);assertEquals(LongArrayList.of(0,0),retained);
+            assertSame(retained,target.getColumn(1));assertNull(bindings[2]);
+            target.close();
+            assertEquals(LongArrayList.of(0,0),target.getColumn(2),"Unescaped values survive explicit close");
+            retained.add(7);assertEquals(LongArrayList.of(0,0,7),retained);
+            assertSame(escaped,target.getColumn(0));
+        } finally {if(target.nativeSource().isLive())target.close();}
+    }
+
 }

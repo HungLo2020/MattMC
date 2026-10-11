@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Rust DH source occlusion](RUST-DH-SOURCE-OCCLUSION.md): owner-based admission,
+  detachment, ordered culling and sparse CPU reader projection.
+
 - [Rust DH source metadata](RUST-DH-SOURCE-METADATA.md): authoritative generation,
   compression and uniformity planes, direct merge/parent consumers and list lifetimes.
 

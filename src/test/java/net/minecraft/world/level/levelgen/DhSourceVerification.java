@@ -23,6 +23,16 @@ public final class DhSourceVerification {
         var hash=BiomeWrapper.class.getDeclaredField("hashCode");hash.setAccessible(true);hash.setInt(value,Objects.hash("test:source_workflow"));
         return value;
     }
+    /** CPU-only registered stone identity; no world/contextual color callbacks. */
+    private static BlockStateWrapper stone() throws Exception {
+        var ctor=BlockStateWrapper.class.getDeclaredConstructors()[0];ctor.setAccessible(true);
+        var value=(BlockStateWrapper)ctor.newInstance(null,null);
+        for(var entry:java.util.Map.of("blockState",net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(),
+            "serialString","minecraft:stone_STATE_", "hashCode",Objects.hash("minecraft:stone_STATE_"),"opacity",16).entrySet()) {
+            var field=BlockStateWrapper.class.getDeclaredField(entry.getKey());field.setAccessible(true);field.set(value,entry.getValue());
+        }
+        return value;
+    }
     private static long run(String mode, FullDataSourceV2 input, FullDataSourceV2 target, it.unimi.dsi.fastutil.longs.LongList changedColumn, int rounds) throws Exception {
         long checksum=0;
         for(int i=0;i<rounds;i++) {
@@ -38,15 +48,18 @@ public final class DhSourceVerification {
         return checksum;
     }
     public static void main(String[] args) throws Exception {
-        String mode=args[2];if(!mode.equals("create")&&!mode.equals("merge"))throw new IllegalArgumentException(mode);
+        String mode=args[2];if(!mode.equals("create")&&!mode.equals("merge")&&!mode.equals("cull"))throw new IllegalArgumentException(mode);
         net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();
         SingletonInjector.INSTANCE.bind(IWrapperFactory.class,WrapperFactory.INSTANCE);
         var shared=(IMinecraftSharedWrapper)Proxy.newProxyInstance(IMinecraftSharedWrapper.class.getClassLoader(),new Class<?>[]{IMinecraftSharedWrapper.class},(p,m,a)->switch(m.getName()){
             case "getInstallationDirectory"->Path.of("run").toFile();case "isDedicatedServer"->false;case "getDelayedSetupComplete"->true;default->throw new UnsupportedOperationException(m.toString());});
         SingletonInjector.INSTANCE.bind(IMinecraftSharedWrapper.class,shared);
-        Config.Common.LodBuilding.worldCompression.setWithoutFiringEvents(EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
+        Config.Common.LodBuilding.worldCompression.setWithoutFiringEvents(mode.equals("cull")
+            ? EDhApiWorldCompressionMode.VISUALLY_EQUAL : EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
         try(var input=FullDataSourceV2.createEmpty(6);var target=FullDataSourceV2.createEmpty(6)) {
-            input.mapping.addIfNotPresentAndGetId(biome(),BlockStateWrapper.AIR);
+            input.mapping.addIfNotPresentAndGetId(biome(),mode.equals("cull")
+                ? stone()
+                : BlockStateWrapper.AIR);
             // Bind Frozen/Current array and return-type differences once, outside timing.
             var field=FullDataSourceV2.class.getDeclaredField("dataPoints");field.setAccessible(true);
             var columns=(Object[])field.get(input);
@@ -61,6 +74,8 @@ public final class DhSourceVerification {
             input.isEmpty=false;
             int rounds=Integer.parseInt(args[0]),warm=Integer.parseInt(args[1]);
             for(int i=0;i<5;i++)run(mode,input,target,(it.unimi.dsi.fastutil.longs.LongList)columns[0],warm);
+            if(mode.equals("cull")&&((it.unimi.dsi.fastutil.longs.LongList)getter.invoke(target,1,1)).size()>=4)
+                throw new AssertionError("Culling workload must remove actual hidden points");
             long start=System.nanoTime();long checksum=run(mode,input,target,(it.unimi.dsi.fastutil.longs.LongList)columns[0],rounds);long elapsed=System.nanoTime()-start;
             System.out.println("DH_SOURCE "+elapsed+" "+checksum);
         }

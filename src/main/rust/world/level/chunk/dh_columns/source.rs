@@ -8,8 +8,20 @@ pub(crate) struct Source {
     columns: Option<Box<[Entry]>>, identities: Option<Vec<usize>>, version: u64,
     identity: u64, remap: Vec<i32>, remap_revision: u64, remap_cached: bool,
     disjoint: Option<[u64; 3]>,
+    readers: [u64; 64],
 }
 impl Source {
+    #[inline] pub(super) fn has_reader(&self,index:usize)->bool {self.readers[index/64]&(1u64<<(index%64))!=0}
+    fn mark_reader(&mut self,index:usize,present:bool) {
+        let bit=1u64<<(index%64);if present{self.readers[index/64]|=bit;}else{self.readers[index/64]&=!bit;}
+    }
+    /// Transfer a newly committed vector directly into the authoritative table.
+    /// No Java reader or second point allocation is required for publication.
+    pub(super) fn adopt(&mut self, index: usize, column: Box<Column>) {
+        self.columns.get_or_insert_with(||(0..4096).map(|_|Entry::Empty).collect())[index] = Entry::Native(Lease::adopt(column));
+        self.identities = None;
+        self.version = self.version.checked_add(1).unwrap_or_else(|| std::process::abort());
+    }
     #[inline(always)]
     pub(super) unsafe fn bounded_column_hash(&self,index:usize,work:&mut usize)->Option<i32> {
         match self.columns.as_ref().map(|columns| &columns[index]) {
@@ -80,7 +92,7 @@ impl Source {
 #[no_mangle]
 pub extern "C" fn mattmc_dh_source_create() -> *mut Source {
     Box::into_raw(Box::new(Source { metadata: std::sync::Arc::new(super::metadata::Metadata::new()), columns: None, identities: None, version: 0,
-        identity: super::mutable::identity(), remap: Vec::new(), remap_revision: 0, remap_cached: false, disjoint:None }))
+        identity: super::mutable::identity(), remap: Vec::new(), remap_revision: 0, remap_cached: false, disjoint:None,readers:[0;64] }))
 }
 /// Empty/null facts, unsupported callback input, or a retained primary column.
 #[no_mangle]
@@ -94,6 +106,7 @@ pub unsafe extern "C" fn mattmc_dh_source_set(source: *mut Source, index: i32, k
         _ => return 0,
     };
     (*source).columns.get_or_insert_with(||(0..4096).map(|_|Entry::Empty).collect())[index as usize] = entry;
+    (*source).mark_reader(index as usize,kind!=0);
     (*source).identities = None; (*source).version = (*source).version.checked_add(1).unwrap_or_else(|| std::process::abort());
     1
 }
@@ -108,6 +121,23 @@ pub unsafe extern "C" fn mattmc_dh_source_kind(source: *const Source,index: i32)
     if !(0..4096).contains(&index){return -1;}
     match source.columns.as_ref().map(|columns| &columns[index as usize]) {Some(Entry::Missing)=>0,None|Some(Entry::Empty)=>3,Some(Entry::Unsupported)=>1,Some(Entry::Native(_))=>2}
 }
+/// Independent CPU lease for a demand-created reader. The caller adopts or
+/// releases this reference; source closure cannot invalidate the reader.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_retain_column(source: *mut Source, index: i32) -> *mut Column {
+    let Some(source)=source.as_mut() else{return std::ptr::null_mut();};
+    if !(0..4096).contains(&index){return std::ptr::null_mut();}
+    let owner=source.owner(index as usize);
+    if !owner.is_null(){source.mark_reader(index as usize,true);}
+    if owner.is_null(){owner}else{Lease::retain(owner).into_raw()}
+}
+/// Register an escaped present-empty Java identity without creating a vector.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_reader(source:*mut Source,index:i32)->i32 {
+    let Some(source)=source.as_mut() else{return 0;};
+    if !(0..4096).contains(&index)||!source.present(index as usize){return 0;}
+    source.mark_reader(index as usize,true);1
+}
 /// Closed Java readers retain only a compact presence snapshot, never points.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_source_missing(source:*const Source,output:*mut u64)->i32 {
@@ -115,6 +145,21 @@ pub unsafe extern "C" fn mattmc_dh_source_missing(source:*const Source,output:*m
     if output.is_null() || output as usize%8!=0{return 0;}
     let output=std::slice::from_raw_parts_mut(output,64);output.fill(0);
     if source.columns.is_some(){for i in 0..4096 {if !source.present(i){output[i/64]|=1u64<<(i%64);}}}
+    1
+}
+/// Close projects native values once and retains the original null/empty facts.
+/// Two compact bitsets avoid a Java downcall for every unused empty slot.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_reader_masks(source:*const Source,output:*mut u64)->i32 {
+    let Some(source)=source.as_ref() else{return 0;};
+    if output.is_null()||output as usize%8!=0{return 0;}
+    let output=std::slice::from_raw_parts_mut(output,128);output.fill(0);
+    if let Some(columns)=&source.columns {
+        for (i,column) in columns.iter().enumerate() {
+            let plane=match column {Entry::Missing=>0,Entry::Native(_)=>64,_=>continue};
+            output[plane+i/64]|=1u64<<(i%64);
+        }
+    }
     1
 }
 /// Verify the immutable producer hash without constructing empty Java lists.

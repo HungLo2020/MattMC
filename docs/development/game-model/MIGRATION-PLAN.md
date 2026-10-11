@@ -494,5 +494,9 @@ realistic performance and long-memory verification remain pending.
   list identity projections and structural publication, with no point mirror.
   [Source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now stores
   generation/compression/uniformity in Rust, with direct merge/parent consumers.
+  [Owned source occlusion](../world/chunk/RUST-DH-SOURCE-OCCLUSION.md) now also
+  selects and detaches centers directly from the primary table, without a Java
+  input grid. Rust publishes new vectors and selects escaped reader extents;
+  Java creates independent reader leases on demand.
   Temporary Java list identities retain independent native leases; metadata-array
   pooling is removed. Source update orchestration and persistence remain to migrate.
