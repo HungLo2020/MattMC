@@ -17,6 +17,8 @@ each module there has a short README with its own file map.
   greedy topology, semantic outcomes and Frozen verification.
 - [Rust DH semantic packets](RUST-DH-PACKETS.md): native layer selection,
   contextual callback plans, vertex packing and transport ownership.
+- [Native DH column handoff](RUST-DH-COLUMN-HANDOFF.md): scoped packet storage,
+  direct ledger ownership transfer and diagnostic projections.
 - [Native terrain face policy](RUST-TERRAIN-CULLING.md): direct retained-state
   culling, immutable geometry ownership and callback compatibility.
 - [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light

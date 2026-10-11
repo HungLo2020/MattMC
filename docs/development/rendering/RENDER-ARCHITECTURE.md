@@ -141,9 +141,11 @@ Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
 generation/compression/uniformity and direct parent inputs. Java retains
 admission and wrapper/list identities, update orchestration,
 persistence, quadtree inputs, contextual color callbacks/material resolution,
-face production and final collector transport. Ordinary [quad builds](RUST-DH-QUADS.md)
+face production and collector lifecycle orchestration. Ordinary [quad builds](RUST-DH-QUADS.md)
 retain quad lists and greedy topology in Rust; [packet plans](RUST-DH-PACKETS.md)
-encode final vertices and companions. Subclasses keep Java policy. These CPU owners are separate from the
+encode final vertices and companions. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
+moves those buffers directly into the ledger; requested Java projections serve
+diagnostics. Subclasses keep Java policy. These CPU owners are separate from the
 DH render-column ledger and GPU resources. Preserve section-local snapshot timing
 and caller exclusion; no whole-world transaction or runtime/performance acceptance
 is implied by the ownership change.
@@ -596,7 +598,8 @@ faces and contextual getter implementations remain Java; the admitted
 Ordinary [quad builds](RUST-DH-QUADS.md) retain lists and merge topology in Rust.
 [Packet plans](RUST-DH-PACKETS.md) now select layers, determine ordered contextual
 callbacks and encode final vertices and semantic companions. Java supplies raw
-getter results and final transport arrays. Subclass compatibility retains the
+getter results and requested diagnostic arrays; ordinary final buffers transfer
+through the [native column owner](RUST-DH-COLUMN-HANDOFF.md). Subclass compatibility retains the
 Java implementation; VulkanicGAL GPU ownership is unchanged.
 
 At the historical `fc1d529d` checkpoint, Java sorted each face list by

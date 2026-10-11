@@ -1461,6 +1461,48 @@ public final class DistantHorizonsSemanticCollector {
 			opaque, transparentSide, transparentUp, transparentWaterUp, true);
 	}
 
+	/** Ordinary native producers transfer final CPU bytes directly into the Rust ledger. */
+	public static SemanticColumnLease recordOwnedNativeRustSemanticBuiltColumn(
+		long columnKey, DhBlockPos origin,
+		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
+		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
+		com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.NativeDhBuiltColumn column
+	) {
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, 0L);
+		Objects.requireNonNull(semanticMaterials, "semanticMaterials");
+		if (graphicsAuditEnabled()) {
+			int[] samples = column.waterSamples();
+			String[] streams = {"opaque", "transparent-side", "transparent-up", "water-up"};
+			for (int i = 0; i < samples.length; i += 2) {
+				int color = samples[i + 1];
+				recordPackedWaterColorSample(streams[samples[i]], color >>> 16 & 255, color >>> 8 & 255, color & 255, color >>> 24);
+			}
+		}
+		LodMaterialProvenanceSnapshot provenance = null;
+		if (materialProvenancePublicationRequired()) {
+			var opaque = column.project(0); var side = column.project(1);
+			var up = column.project(2); var water = column.project(3);
+			provenance = new LodMaterialProvenanceSnapshot(
+				semanticMaterials, inputCoverage, column.coverage(),
+				validateOwnedMaterialIds(opaque, semanticMaterials.size()), opaque.semanticVariantStates(), opaque.semanticVariantPositions(),
+				validateOwnedMaterialIds(side, semanticMaterials.size()), side.semanticVariantStates(), side.semanticVariantPositions(),
+				validateOwnedMaterialIds(up, semanticMaterials.size()), up.semanticVariantStates(), up.semanticVariantPositions(),
+				validateOwnedMaterialIds(water, semanticMaterials.size()), water.semanticVariantStates(), water.semanticVariantPositions());
+		}
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, 0L);
+		Objects.requireNonNull(origin, "origin");
+		long generation = DhCollectorLedger.allocateGeneration();
+		int x = origin.getX(), y = origin.getY(), z = origin.getZ();
+		column.validatePublication(generation);
+		synchronized (LOCK) {
+			long[] result = new long[2];
+			int effects = DhCollectorLedger.check(column.record(ledgerConfig(), columnKey, generation, x, y, z,
+				provenance == null ? -1L : provenance.byteSize(), Objects.equals(MATERIAL_PROVENANCE.get(columnKey), provenance), true, result));
+			applyEffectsLocked(effects, provenance, Map.of());
+			return new SemanticColumnLease(columnKey, result[0], result[1]);
+		}
+	}
+
 	private static SemanticColumnLease recordRustSemanticColumn(
 		long columnKey,
 		DhBlockPos origin,
@@ -1500,17 +1542,17 @@ public final class DistantHorizonsSemanticCollector {
 			for (int offset = 0; offset + VERTEX_STRIDE_BYTES <= packet.length; offset += VERTEX_STRIDE_BYTES) {
 				int material = packet[offset + 12] & 0xff;
 				if (material != EDhApiBlockMaterial.WATER.index) continue;
-				String sample = stream + ":rgb="
-					+ (packet[offset + 8] & 0xff) + ","
-					+ (packet[offset + 9] & 0xff) + ","
-					+ (packet[offset + 10] & 0xff)
-					+ ":alpha=" + (packet[offset + 11] & 0xff);
-				synchronized (AUDIT_PACKED_WATER_COLORS) {
-					if (AUDIT_PACKED_WATER_COLORS.size() >= 16 || !AUDIT_PACKED_WATER_COLORS.add(sample)) continue;
-				}
-				System.out.println("[MattMC graphics audit] DH packed water vertex " + sample);
+				recordPackedWaterColorSample(stream, packet[offset + 8] & 255, packet[offset + 9] & 255, packet[offset + 10] & 255, packet[offset + 11] & 255);
 			}
 		}
+	}
+
+	private static void recordPackedWaterColorSample(String stream, int red, int green, int blue, int alpha) {
+		String sample = stream + ":rgb=" + red + "," + green + "," + blue + ":alpha=" + alpha;
+		synchronized (AUDIT_PACKED_WATER_COLORS) {
+			if (AUDIT_PACKED_WATER_COLORS.size() >= 16 || !AUDIT_PACKED_WATER_COLORS.add(sample)) return;
+		}
+		System.out.println("[MattMC graphics audit] DH packed water vertex " + sample);
 	}
 
 	private static List<int[]> validateOwnedMaterialIds(

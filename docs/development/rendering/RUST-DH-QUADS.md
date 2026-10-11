@@ -14,11 +14,12 @@ outcomes. This is build-local CPU policy within the existing Rust library.
 VulkanicGAL retains all GPU ownership.
 
 Java still supplies faces and contextual color callbacks and interns source
-identities. [Rust packet plans](RUST-DH-PACKETS.md) now capture each selected
+identities. [Rust packet plans](RUST-DH-PACKETS.md) capture each selected
 layer under the native lease lock before callbacks and encode the final bytes.
 The four packet methods remain separate captures, not one atomic snapshot of
 all builder lists. Ordinary encoding no longer reconstructs Java `BufferQuad`
-projections. The native path requires `getClass() == LodQuadBuilder.class`;
+projections. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md) also keeps final
+buffers in Rust through ledger publication. The native path requires `getClass() == LodQuadBuilder.class`;
 subclassed builders retain the Java compatibility implementation.
 
 Implementation: [Rust owner](https://github.com/HungLo2020/MattMC/tree/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d/src/main/rust/render/dh_quads),

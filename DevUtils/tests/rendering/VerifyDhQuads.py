@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--rounds', type=int, default=300)
     parser.add_argument('--quads', type=int, default=2048)
     parser.add_argument('--seed', type=int, choices=(0, 1, 2), required=True)
-    parser.add_argument('--mode', choices=('topology', 'packets', 'grass-packets'), required=True)
+    parser.add_argument('--mode', choices=('topology', 'packets', 'grass-packets', 'native-column', 'grass-native-column'), required=True)
     args = parser.parse_args()
     if not 2 <= args.pairs <= 50 or args.rounds < 1 or args.quads < 1:
         parser.error('positive rounds/quads and 2..50 pairs required')
@@ -43,6 +43,7 @@ def main():
              (['frozen', 'current'] if pair % 2 == 0 else ['current', 'frozen'])]
     protocol = {'scope': 'synthetic CPU build lifecycle; no gameplay/FPS acceptance',
                 'mode': args.mode, 'seed': args.seed, 'quads': args.quads, 'rounds': args.rounds,
+                'consumption': 'counts and final byte extent' if 'native-column' in args.mode else 'counts and packed byte sums' if 'packets' in args.mode else 'counts',
                 'warmup': 'five equally sized rounds per JVM', 'order': order, 'pins': pins}
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n')
     rows = []

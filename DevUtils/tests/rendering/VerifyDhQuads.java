@@ -19,9 +19,11 @@ public final class VerifyDhQuads {
     private static final EDhDirection[] DIRECTIONS = EDhDirection.values();
     private static Field nativeField;
     private static Method snapshot,close,put,packedVertexBuffers;
+    private static Method nativeColumn,nativeColumnBytes;
     private static final Method[] packets = new Method[4];
     private static boolean encode;
     private static boolean grass;
+    private static boolean columnExtent;
     private static final IClientLevelWrapper LEVEL = (IClientLevelWrapper)Proxy.newProxyInstance(
         IClientLevelWrapper.class.getClassLoader(),new Class<?>[]{IClientLevelWrapper.class},(p,m,a)->{
             if(m.getName().equals("getDirtBlockColor"))return 0xff987654;
@@ -47,6 +49,10 @@ public final class VerifyDhQuads {
             close=type.getMethod("close");
             packedVertexBuffers=Class.forName(type.getName()+"$SemanticVertexBufferBuild").getMethod("packedVertexBuffers");
         } catch(NoSuchFieldException ignored) {}
+        if(nativeField!=null)try {
+            nativeColumn=type.getMethod("makeNativeRustSemanticColumn");
+            nativeColumnBytes=nativeColumn.getReturnType().getMethod("byteSize");
+        }catch(NoSuchMethodException ignored){}
         put=type.getDeclaredMethod("putQuad",ByteBuffer.class,BufferQuad.class);put.setAccessible(true);
         String[] layers={"Opaque","Transparent","TransparentUp","TransparentWaterUp"};
         for(int i=0;i<layers.length;i++)packets[i]=type.getMethod("make"+layers[i]+(nativeField==null?"VertexBuffers":"RustSemanticBuffers"));
@@ -117,16 +123,20 @@ public final class VerifyDhQuads {
         for(int i=0;i<rounds;i++){
             var b=new LodQuadBuilder(true,LEVEL);for(var q:values)add(b,q);b.mergeQuads();
             sum+=b.getCurrentOpaqueQuadsCount()*31L+b.getCurrentTransparentQuadsCount();
-            if(encode)for(var method:packets){
+            if(columnExtent&&nativeColumn!=null){
+                Object value=nativeColumn.invoke(b);
+                try {sum+=(long)nativeColumnBytes.invoke(value);}finally{((AutoCloseable)value).close();}
+            }else if(encode)for(var method:packets){
                 Object result=method.invoke(b);
                 if(nativeField==null){
                     for(Object value:(List<?>)result){var bytes=(ByteBuffer)value;
-                        for(int j=0;j<bytes.remaining();j++)sum+=Byte.toUnsignedInt(bytes.get(bytes.position()+j));
+                        if(columnExtent)sum+=bytes.remaining();
+                        else for(int j=0;j<bytes.remaining();j++)sum+=Byte.toUnsignedInt(bytes.get(bytes.position()+j));
                         org.lwjgl.system.MemoryUtil.memFree(bytes);
                     }
                 }else{
                     var buffers=(List<?>)packedVertexBuffers.invoke(result);
-                    for(Object value:buffers)for(byte v:(byte[])value)sum+=Byte.toUnsignedInt(v);
+                    for(Object value:buffers){if(columnExtent)sum+=((byte[])value).length;else for(byte v:(byte[])value)sum+=Byte.toUnsignedInt(v);}
                 }
             }
             release(b);
@@ -136,8 +146,9 @@ public final class VerifyDhQuads {
     public static void main(String[] args) throws Exception {
         setup();
         if(args[0].equals("record")){record(Path.of(args[1]));return;}
-        encode=args.length>5 && (args[5].equals("packets") || args[5].equals("grass-packets"));
-        grass=args.length>5 && args[5].equals("grass-packets");
+        columnExtent=args.length>5&&(args[5].equals("native-column")||args[5].equals("grass-native-column"));
+        encode=columnExtent||args.length>5 && (args[5].equals("packets") || args[5].equals("grass-packets"));
+        grass=args.length>5 && (args[5].equals("grass-packets")||args[5].equals("grass-native-column"));
         boolean current=args[1].equals("current");if(current!=(nativeField!=null))throw new IllegalStateException("Wrong tree");
         Config.Client.Advanced.Graphics.Experimental.earthCurveRatio.setWithoutFiringEvents(0);
         Config.Client.Advanced.Debugging.showOverlappingQuadErrors.setWithoutFiringEvents(false);

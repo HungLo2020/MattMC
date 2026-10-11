@@ -82,6 +82,28 @@ public final class VerifyDhPackets {
         return result;
     }
     private record Result(byte[] vertices,List<String> callbacks,boolean failed){}
+    private record ColumnResult(byte[][] vertices,List<String> callbacks,boolean failed){}
+    private static byte[] flatten(Object value)throws Exception {
+        var flat=new ByteArrayOutputStream();
+        if(current){for(Object packet:(List<?>)bytes.invoke(value))flat.write((byte[])packet);}
+        else for(Object packet:(List<?>)value){var b=(ByteBuffer)packet;byte[] data=new byte[b.remaining()];b.get(data);flat.write(data);org.lwjgl.system.MemoryUtil.memFree(b);}
+        return flat.toByteArray();
+    }
+    /** One callback timeline across all four layers, as actual container production executes them. */
+    private static ColumnResult runColumn(LodQuadBuilder builder,int failure)throws Exception {
+        trace.clear();dirt=shade=calls=0;fail=failure;byte[][] data={new byte[0],new byte[0],new byte[0],new byte[0]};
+        try {
+            if(current) {
+                Object column=LodQuadBuilder.class.getMethod("makeNativeRustSemanticColumn").invoke(builder);
+                try {var project=column.getClass().getMethod("project",int.class);for(int layer=0;layer<4;layer++)data[layer]=flatten(project.invoke(column,layer));}
+                finally {((AutoCloseable)column).close();}
+            } else for(int layer=0;layer<4;layer++)data[layer]=flatten(PACKETS[layer].invoke(builder));
+            return new ColumnResult(data,List.copyOf(trace),false);
+        }catch(InvocationTargetException e) {
+            if(!(e.getCause() instanceof Injected))throw e;
+            return new ColumnResult(new byte[][]{new byte[0],new byte[0],new byte[0],new byte[0]},List.copyOf(trace),true);
+        }
+    }
     private static Result run(LodQuadBuilder builder,int route,int failure)throws Exception{
         trace.clear();dirt=shade=calls=0;fail=failure;
         var flat=new ByteArrayOutputStream();boolean failed=false;
@@ -147,7 +169,35 @@ public final class VerifyDhPackets {
         }
         System.out.println("PASS Current public packet route: "+calls+" actual Frozen outputs/callback prefixes");
     }
+    private static void columns(Path file,boolean record)throws Exception {
+        if(record==current)throw new IllegalStateException("Record on Frozen; replay on Current");
+        DataOutputStream out=record?new DataOutputStream(new GZIPOutputStream(Files.newOutputStream(file))):null;
+        DataInputStream in=record?null:new DataInputStream(new GZIPInputStream(Files.newInputStream(file)));
+        try {
+            if(record){out.writeInt(0x44484331);out.writeBoolean(ByteOrder.nativeOrder()==ByteOrder.LITTLE_ENDIAN);}
+            else {if(in.readInt()!=0x44484331||in.readBoolean()!=(ByteOrder.nativeOrder()==ByteOrder.LITTLE_ENDIAN))throw new IOException("Wrong column format/endianness");}
+            Class<?>[] pins={LodQuadBuilder.class,BufferQuad.class,EDhDirection.class,Config.class,com.seibel.distanthorizons.core.util.ColorUtil.class,EDhApiGrassSideRendering.class,EDhApiDebugRendering.class};
+            if(record){out.writeInt(pins.length);for(var c:pins){out.writeUTF(c.getName());out.writeUTF(hash(c));}out.writeInt(96);}
+            else {if(in.readInt()!=7)throw new IOException("Wrong pin count");for(int i=0;i<7;i++){in.readUTF();if(in.readUTF().length()!=64)throw new IOException("Invalid pin");}if(in.readInt()!=96)throw new IOException("Wrong case count");}
+            for(int c=0;c<96;c++) {
+                boolean trans,debug,errors;int grass;List<Face> values;
+                if(record){trans=(c&1)!=0;debug=(c&2)!=0;errors=(c&4)!=0;grass=c/8%4;values=faces(c/32);out.writeBoolean(trans);out.writeBoolean(debug);out.writeBoolean(errors);out.writeInt(grass);out.writeInt(values.size());for(var f:values)f.write(out);}
+                else {trans=in.readBoolean();debug=in.readBoolean();errors=in.readBoolean();grass=in.readInt();values=new ArrayList<>();int n=in.readInt();for(int i=0;i<n;i++)values.add(Face.read(in));}
+                configure(debug,grass,errors);var builder=new LodQuadBuilder(trans,LEVEL);
+                try {
+                    for(var f:values)f.add(builder);builder.mergeQuads();
+                    for(int failure:FAILURES) {
+                        var actual=runColumn(builder,failure);
+                        if(record){out.writeBoolean(actual.failed);for(var layer:actual.vertices){out.writeInt(layer.length);out.write(layer);}out.writeInt(actual.callbacks.size());for(String event:actual.callbacks)out.writeUTF(event);}
+                        else {boolean failed=in.readBoolean();if(failed!=actual.failed)throw new AssertionError("column failure case="+c);for(int layer=0;layer<4;layer++){byte[] expected=in.readNBytes(in.readInt());if(!Arrays.equals(expected,actual.vertices[layer]))throw new AssertionError("column bytes case="+c+" layer="+layer+" failure="+failure);}int n=in.readInt();var events=new ArrayList<String>();for(int i=0;i<n;i++)events.add(in.readUTF());if(!events.equals(actual.callbacks))throw new AssertionError("column callback prefix case="+c+" failure="+failure);}
+                    }
+                }finally{if(close!=null)close.invoke(builder);}
+            }
+            if(!record&&in.read()!=-1)throw new IOException("Trailing column data");
+        }finally{if(out!=null)out.close();if(in!=null)in.close();}
+        System.out.println((record?"Actual Frozen":"PASS Current public native column")+" cases=96 × five callback failure settings, four ordered layers");
+    }
     public static void main(String[] args)throws Exception{
-        setup();if(args[0].equals("record"))record(Path.of(args[1]));else if(args[0].equals("verify"))verify(Path.of(args[1]));else throw new IllegalArgumentException("record|verify PATH");
+        setup();switch(args[0]){case "record"->record(Path.of(args[1]));case "verify"->verify(Path.of(args[1]));case "record-column"->columns(Path.of(args[1]),true);case "verify-column"->columns(Path.of(args[1]),false);default->throw new IllegalArgumentException("record|verify|record-column|verify-column PATH");}
     }
 }

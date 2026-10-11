@@ -243,6 +243,28 @@ pub unsafe extern "C" fn mattmc_dh_collector_record_built(
         provenance_bytes: (provenance_bytes >= 0).then_some(provenance_bytes),
         same_provenance: same_provenance != 0,
     };
+    record_owned_built(config_bits, key, built, retain_owner, out)
+}
+
+/// Moves already encoded Rust CPU storage into the ledger, without heap transport or staging.
+/// The scoped build retains its companions for diagnostics; its payload is single-use.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_collector_record_native(
+    owner: *mut crate::render::dh_quads::column::ColumnBuild,
+    config_bits: i32, key: i64, generation: i64,
+    origin_x: i32, origin_y: i32, origin_z: i32,
+    provenance_bytes: i64, same_provenance: i32, retain_owner: i32, out: *mut i64,
+) -> i32 {
+    let Some(owner) = owner.as_mut() else { return ERR_POISONED };
+    if owner.validate() != 0 || generation <= 0 || out.is_null() || out as usize % 8 != 0 { return ERR_POISONED; }
+    let mut payload = owner.take_payload().unwrap();
+    payload.origin = [origin_x, origin_y, origin_z];
+    let built = Built { column: Column::new(generation, payload),
+        provenance_bytes: (provenance_bytes >= 0).then_some(provenance_bytes), same_provenance: same_provenance != 0 };
+    record_owned_built(config_bits, key, built, retain_owner, out)
+}
+
+unsafe fn record_owned_built(config_bits: i32, key: i64, built: Built, retain_owner: i32, out: *mut i64) -> i32 {
     let config = config(config_bits);
     let out = std::slice::from_raw_parts_mut(out, 2);
     with_effects(|l, effects| {

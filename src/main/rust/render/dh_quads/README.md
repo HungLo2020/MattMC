@@ -3,6 +3,7 @@
 Build-local CPU policy for ordinary DH geometry. `mod.rs` owns typed lists,
 classification, stable sorting and greedy merging. `packets.rs` owns immutable
 layer plans, ordered callback events, shading and final byte encoding;
+`column.rs` retains final packets and companions for direct ledger transfer;
 `ffi.rs` exposes scoped CPU leases and caller-owned copies. GPU ownership stays
 in VulkanicGAL.
 

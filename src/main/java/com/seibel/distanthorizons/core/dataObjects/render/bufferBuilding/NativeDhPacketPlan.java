@@ -53,8 +53,9 @@ final class NativeDhPacketPlan implements AutoCloseable {
             return count;
         } catch (Throwable e) { throw failure(e); }
     }
-    LodQuadBuilder.SemanticVertexBufferBuild build(IClientLevelWrapper level, IMinecraftRenderWrapper render) {
-        int quads = count(0), events = count(1), callbacks = count(2);
+    private record Callbacks(int[] colors, float[] shades) {}
+    private Callbacks callbacks(IClientLevelWrapper level, IMinecraftRenderWrapper render) {
+        int events = count(1), callbacks = count(2);
         int[] colors = new int[callbacks];
         float[] shades = new float[callbacks];
         if (events != 0) {
@@ -77,6 +78,16 @@ final class NativeDhPacketPlan implements AutoCloseable {
                 }
             }
         }
+        return new Callbacks(colors, shades);
+    }
+    void appendTo(NativeDhBuiltColumn column, int route, IClientLevelWrapper level, IMinecraftRenderWrapper render) {
+        var values = callbacks(level, render);
+        column.append(owner, route, values.colors(), values.shades());
+    }
+    LodQuadBuilder.SemanticVertexBufferBuild build(IClientLevelWrapper level, IMinecraftRenderWrapper render) {
+        int quads = count(0);
+        var values = callbacks(level, render);
+        int[] colors = values.colors(); float[] shades = values.shades(); int callbacks = colors.length;
         var vertices = new ArrayList<byte[]>(3);
         var identities = new ArrayList<int[]>(3);
         var variants = new ArrayList<byte[]>(3);

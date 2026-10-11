@@ -3,8 +3,10 @@
 Ordinary DH builders use `render/dh_quads/packets.rs` to select each packet
 layer, plan contextual callbacks, shade colors and encode vertices and semantic
 companions. Java supplies contextual dirt colors and directional shade scalars
-in the original order. It allocates the final transport arrays; it no longer
-reconstructs temporary `BufferQuad` objects to encode ordinary packets.
+in the original order. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md) now
+retains final packets in Rust through ledger publication. Java transport arrays
+are requested for explicit packet APIs and diagnostics; ordinary production
+does not reconstruct temporary `BufferQuad` objects or Java vertex packets.
 Subclassed builders retain the existing compatibility implementation.
 
 The packet plan is an independent immutable CPU snapshot. Close it with
@@ -49,8 +51,9 @@ replay. Expected encoding is executed by Frozen, not copied into the recorder.
 These controls and isolated CPU builder timings do not establish gameplay FPS,
 visual parity, streaming or sustained memory acceptance. Current packet test
 and benchmark receipts belong in `build/native-dh-packets/`. Face emission,
-contextual getter implementations and final collector transport remain Java;
-their migration is subsequent work.
+contextual getter implementations and collector lifecycle orchestration remain
+Java; their migration is subsequent work. The later native handoff supersedes
+the transport-array path measured below.
 
 ## Recorded CPU checkpoint
 

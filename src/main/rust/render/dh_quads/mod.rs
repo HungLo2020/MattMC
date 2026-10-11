@@ -1,5 +1,6 @@
 //! Build-local DH quad ownership and Frozen greedy topology. CPU facts only.
 mod ffi;
+pub(crate) mod column;
 #[cfg(test)]
 mod packet_tests;
 mod packets;

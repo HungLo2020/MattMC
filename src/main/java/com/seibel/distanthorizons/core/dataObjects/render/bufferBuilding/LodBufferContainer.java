@@ -99,15 +99,21 @@ public class LodBufferContainer implements AutoCloseable
 			if (!net.vulkanic.world.DistantHorizonsSemanticCollector.enabled()) {
 				throw new IllegalStateException("Rust whole-frame DH route selected without semantic collection");
 			}
-			LodQuadBuilder.SemanticVertexBufferBuild opaque = builder.makeOpaqueRustSemanticBuffers();
-			LodQuadBuilder.SemanticVertexBufferBuild transparent = builder.makeTransparentRustSemanticBuffers();
-			LodQuadBuilder.SemanticVertexBufferBuild transparentUp = builder.makeTransparentUpRustSemanticBuffers();
-			LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp = builder.makeTransparentWaterUpRustSemanticBuffers();
-			this.rustSemanticColumnLease = net.vulkanic.world.DistantHorizonsSemanticCollector.recordOwnedRustSemanticBuiltColumn(
-				this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(),
-				LodQuadBuilder.semanticQuadCoverage(opaque, transparent, transparentUp, transparentWaterUp),
-				opaque, transparent, transparentUp, transparentWaterUp
-			);
+			try (NativeDhBuiltColumn column = builder.makeNativeRustSemanticColumn()) {
+				if (column != null) {
+					this.rustSemanticColumnLease = net.vulkanic.world.DistantHorizonsSemanticCollector.recordOwnedNativeRustSemanticBuiltColumn(
+						this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(), column);
+				} else {
+					LodQuadBuilder.SemanticVertexBufferBuild opaque = builder.makeOpaqueRustSemanticBuffers();
+					LodQuadBuilder.SemanticVertexBufferBuild transparent = builder.makeTransparentRustSemanticBuffers();
+					LodQuadBuilder.SemanticVertexBufferBuild transparentUp = builder.makeTransparentUpRustSemanticBuffers();
+					LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp = builder.makeTransparentWaterUpRustSemanticBuffers();
+					this.rustSemanticColumnLease = net.vulkanic.world.DistantHorizonsSemanticCollector.recordOwnedRustSemanticBuiltColumn(
+						this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(),
+						LodQuadBuilder.semanticQuadCoverage(opaque, transparent, transparentUp, transparentWaterUp),
+						opaque, transparent, transparentUp, transparentWaterUp);
+				}
+			}
 			this.rustSemanticColumnGeneration = this.rustSemanticColumnLease.generation();
 			this.rustSemanticBuffersPublished = true;
 			// This route intentionally owns no Java GL VBO and schedules no Java GL

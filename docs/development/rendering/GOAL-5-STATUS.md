@@ -4,10 +4,12 @@
 [`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
 Ordinary [DH quad builds](RUST-DH-QUADS.md) now retain twelve directional lists,
 admission/premerge policy, stable sort and greedy passes in Rust. Java keeps
-contextual face production, identity interning and final collector transport;
+contextual face production, identity interning and collector lifecycle calls;
 subclasses retain the Java path. The subsequent [packet owner](RUST-DH-PACKETS.md)
 now plans callbacks and encodes ordinary packet bytes in Rust. Independent
-native layer plans precede encoding callbacks,
+native layer plans precede encoding callbacks. The later [column handoff](RUST-DH-COLUMN-HANDOFF.md)
+retains final buffers through native ledger publication without ordinary Java
+packet-array transport,
 and build-local close follows synchronous packet construction, with Cleaner
 fallback rather than a demonstrated release deadline.
 The author reports image `9ac7111b`, 2,604 Rust passes/three ignored and 1,949

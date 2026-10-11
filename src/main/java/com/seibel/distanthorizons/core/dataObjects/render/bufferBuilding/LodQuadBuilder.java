@@ -527,12 +527,29 @@ public class LodQuadBuilder implements AutoCloseable
 
 	private SemanticVertexBufferBuild makePacketBuild(int route, List<BufferQuad>[] compatibility, int[] directions, Predicate<BufferQuad> filter) {
 		if (nativeQuads == null) return makeSemanticVertexBufferBuild(compatibility, directions, filter);
-		int grass = debugRenderingMode != EDhApiDebugRendering.OFF || grassSideRenderingMode == EDhApiGrassSideRendering.AS_GRASS
-			? 0 : grassSideRenderingMode == EDhApiGrassSideRendering.AS_DIRT ? 1
-			: grassSideRenderingMode == EDhApiGrassSideRendering.FADE_TO_DIRT ? 2 : 3;
-		try (NativeDhPacketPlan plan = nativeQuads.packetPlan(route, grass)) {
+		try (NativeDhPacketPlan plan = nativeQuads.packetPlan(route, packetGrassMode())) {
 			return plan.build(clientLevelWrapper, MC_RENDER);
 		}
+	}
+
+	private int packetGrassMode() {
+		return debugRenderingMode != EDhApiDebugRendering.OFF || grassSideRenderingMode == EDhApiGrassSideRendering.AS_GRASS
+			? 0 : grassSideRenderingMode == EDhApiGrassSideRendering.AS_DIRT ? 1
+			: grassSideRenderingMode == EDhApiGrassSideRendering.FADE_TO_DIRT ? 2 : 3;
+	}
+
+	/** Ordinary production retains final packets in Rust; subclasses keep their packet overrides. */
+	public NativeDhBuiltColumn makeNativeRustSemanticColumn() {
+		if (nativeQuads == null) return null;
+		var column = new NativeDhBuiltColumn();
+		try {
+			for (int route = 0; route < 4; route++) {
+				try (var plan = nativeQuads.packetPlan(route, packetGrassMode())) {
+					plan.appendTo(column, route, clientLevelWrapper, MC_RENDER);
+				}
+			}
+			return column;
+		} catch (Throwable failure) { column.close(); throw failure; }
 	}
 
 	private SemanticVertexBufferBuild makeSemanticVertexBufferBuild(

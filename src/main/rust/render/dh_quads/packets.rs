@@ -25,6 +25,7 @@ pub(super) struct Entry {
     pub callbacks: [i32; 4],
 }
 pub(super) struct Plan {
+    pub route: i32,
     pub entries: Vec<Entry>,
     pub events: Vec<Event>,
     pub callbacks: usize,
@@ -44,6 +45,7 @@ impl Plan {
             return None;
         }
         let mut plan = Self {
+            route,
             entries: Vec::new(),
             events: Vec::new(),
             callbacks: 0,
