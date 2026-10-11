@@ -256,4 +256,5 @@ updates. It performs no wait or retirement. See the
 | `barrier before ... does not cover prior ... access` | The declared source state omits an earlier access. The error includes the resource label and command list; trace their stage order and correct the producer's barrier. |
 | `attachment load depends on a prior pass that did not store` | A pass loads an attachment that an earlier pass ended with `DontCare`. |
 | `UnsupportedFeature` | The backend lacks a feature or limit the request needs; check capabilities first. |
+| `ResourceLimit` | A bounded retained CPU store is full. GUI template registration uses -14 for this admission result; malformed semantic input remains an error. |
 | `GAL command-recording scope is not active` | `finish_command_recording` without a matching `begin_command_recording`. |

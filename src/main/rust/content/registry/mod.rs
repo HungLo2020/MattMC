@@ -11,6 +11,7 @@
 //! tag ID lists sent over the network.
 
 pub mod ffi;
+mod tag_view;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};

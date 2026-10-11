@@ -108,7 +108,9 @@ def report(visual,scenario,reference):
                     if doc.get("guiItemGlintSpeed")!=(0.5 if phase is not None else 0) or doc.get("guiItemGlintStrength")!=0.5:
                         raise ValueError("actual block foil settings differ")
                     observed.append(sources(doc.get("guiItemFoilSources")))
-                reload=doc.get("worldResourceReload",{})
+                reload=doc.get("worldResourceReload")
+                if not isinstance(reload,dict):
+                    raise ValueError("actual block foil reload receipt missing")
                 expected=["vanilla","file/mattmc-block-item-foil"] if current else ["vanilla"]
                 if reload.get("complete") is not True or reload.get("selectedAtCapture")!=expected:
                     raise ValueError("actual block foil reload/pack differs")

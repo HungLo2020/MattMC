@@ -1,6 +1,53 @@
 # Goal 5 rendering checkpoint
 
-**Goal 5 remains incomplete.** Current source review reaches
+**Goal 5 remains incomplete.**
+
+## October 11 implementation checkpoint
+
+Work on integrated master `6673fac82` moves retained client chunk-range
+selection, primary entity geometry/camera queries, ticking membership/order,
+ordinary 3D GUI templates and immutable tag-member storage into Rust.
+Java still binds objects, invokes simulation/render callbacks and performs
+unmigrated behavior, networking and startup. The Rust executable is unfinished.
+See the [range](../world/chunk-loading/RUST-CLIENT-RANGES.md),
+[geometry](../world/entities/RUST-ENTITY-GEOMETRY.md),
+[ticking](../world/entities/RUST-ENTITY-ORDER.md),
+[GUI](RUST-GUI-ITEM-TEMPLATES.md) and
+[tag](../resources/TAGS-AND-REGISTRIES.md) guides.
+
+Native `c487f375` passes fresh combined suites: 2,656 Rust tests with three
+ignored and 2,003 executed Java/parity cases with two skipped, zero failures.
+Actual unchanged Frozen comparisons pass 11,057 geometry cases, 645 range
+cases and 4,143 ticking-order cases. The latter expanded corpus exposed a
+pre-getter map-receiver regression in rejected `a9745542`; the repair preserves
+both physical map identities across getter-driven swaps. Failed evidence remains
+recorded in the ticking guide.
+
+Seven live lifecycle cases and two settled world image pairs pass with zero
+VUIDs. All four original images were reviewed and nine Current artifacts identify
+this native image. All 20 alternating timing runs are clean and final identity/input guards pass.
+All median average-FPS floors and three p99 floors pass; vanilla p99 misses by
+4.8% (3.410/3.253 ms Current/Frozen). The complete matrix and limits are in
+[gameplay performance](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+Receipts: `build/native-entity-order-receiver-fix/` and
+`build/native-entity-order/receiver-fixed-replay/`.
+
+Preceding `a99b6f8d` separately passes four GUI pairs/eight original reviews
+after a capture-only readiness repair, without freezing clocks or changing
+tolerances. Its resource replay matches all ten 89,630-line records and passes
+nine warm aggregate floors; cold cost and one retag pair are slower. Allocation
+samples show less GUI batch allocation but do not isolate a per-frame speedup or
+explain p99. Those receipts remain in the subsystem guides; they are not fresh
+GUI/resource measurements of `c487f375`.
+
+Settled checks do not close first shader-world-frame, first-turn nearby terrain,
+temporal, broad-gameplay, sustained-streaming or long-session memory acceptance.
+The reboot resolved the historical graphics-driver mismatch; hardware testing
+runs normally. Continue profiling and migrating live world producers/consumers.
+
+## Published source-review checkpoint
+
+The last independent source review reaches
 [`398a0078`](https://github.com/HungLo2020/MattMC/commit/398a00782007587c779264aaa62222036b8a9361).
 The latest source adds [pack/resource/tag and registry-snapshot owners](../resources/index.md).
 Its [verification record](../resources/VERIFICATION.md#latest-run) describes
@@ -17,12 +64,13 @@ use separate lock scopes; sorted key results still return to Java.
 
 The implementation author reports release `ebd3c9a3`: 2,626 Rust passes/three
 ignored, 1,978 Java cases reported (1,976 executed/two skipped), 1,280 Frozen
-walk comparisons, seven lifecycle cases and two settled image pairs. The latest recorded rendering
+walk comparisons, seven lifecycle cases and two settled image pairs. At that published checkpoint, the recorded rendering
 20-run matrix passes all four median FPS and all four p99 floors. See the
-[current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+[published visibility matrix](GAMEPLAY-PERFORMANCE.md#october-11-published-dh-visibility-checkpoint)
 for values, repeat counts and hidden-minimap/settling limits. The older
 `a15c0555` vanilla-p99 failure remains historical below; it is no longer the
-latest measured result.
+latest result for that published checkpoint. The newer combined matrix above
+retains its vanilla p99 failure.
 
 This documentation review inspected source/assertions without rerunning suites,
 benchmarks or untracked captures. Generic-tree replay and separate lifecycle
@@ -34,6 +82,14 @@ memory and broad gameplay acceptance remain open.
 See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6110441802)
 and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6110443686);
 both issues remain open.
+
+The subsequent local [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
+passes fresh CPU checks, seven lifecycle cases and two reviewed settled pairs.
+Its complete 20-run matrix is clean but fails vanilla p99 (Current 3.217 ms /
+Frozen 3.124 ms); all other FPS/p99 floors pass. The candidate remains uncommitted.
+Guarded allocation profiles identify repeated GUI batch and entity-bound producers,
+without establishing an isolated p99 cause. See the
+[latest local matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
 
 ## October 11 retained region-tape checkpoint
 

@@ -132,3 +132,40 @@ fn detached_native_table_declines_further_empty_mutation_without_losing_ring_pol
         mattmc_client_residency_snapshot_release(snapshot);mattmc_client_residency_release(world);
     }
 }
+
+#[test]
+fn range_pages_observe_replacement_center_and_custom_bindings_between_callbacks() {
+    use super::ffi::*;
+    unsafe {
+        let world=mattmc_client_residency_create(3);
+        let mut page=[0i64;8]; // Two stock bindings per page.
+        let install=|x:i32,z:i32| {
+            let index=z.rem_euclid(7)*7+x.rem_euclid(7);
+            assert!(mattmc_client_residency_change(world,5,index,x,z)>0);
+        };
+        install(2,1); install(-2,-1); install(0,0);
+        assert_eq!(mattmc_client_residency_range(world,-3,3,-3,3,-3,-3,page.as_mut_ptr(),8),2);
+        assert_eq!(&page[2..],[47,-2,-1,0,0,0]);
+        let revision=page[1];
+        // Original callback can replace a future ring slot or move the center.
+        install(7,0); // replaces (0,0), outside the old live window
+        assert_eq!(mattmc_client_residency_range(world,-3,3,-3,3,-1,-1,page.as_mut_ptr(),8),1);
+        assert_ne!(revision,page[1]); assert_eq!(&page[2..5],[9,2,1]);
+        assert_eq!(mattmc_client_residency_change(world,3,0,7,0),0);
+        assert_eq!(mattmc_client_residency_range(world,-3,10,-3,3,-3,-3,page.as_mut_ptr(),8),1);
+        assert_eq!(&page[2..5],[0,7,0]);
+        assert!(mattmc_client_residency_change(world,0,1,1,0)>0);
+        assert_eq!(mattmc_client_residency_range(world,-3,10,-3,3,-3,-3,page.as_mut_ptr(),8),-2);
+        assert_eq!(mattmc_client_residency_change(world,1,1,0,0),0);
+        assert_eq!(mattmc_client_residency_range(world,-3,10,-3,3,-3,-3,page.as_mut_ptr(),8),1);
+        // Wrong physical slots must not become visible through the index.
+        assert!(mattmc_client_residency_change(world,5,2,8,0)>0);
+        assert_eq!(mattmc_client_residency_range(world,-3,10,-3,3,-3,-3,page.as_mut_ptr(),8),1);
+        install(8,0);
+        assert!(mattmc_client_residency_change(world,5,2,8,0)>0);
+        assert_eq!(mattmc_client_residency_range(world,-3,10,-3,3,-3,-3,page.as_mut_ptr(),8),2);
+        assert_eq!(mattmc_client_residency_change(world,1,2,0,0),0);
+        assert_eq!(mattmc_client_residency_range(world,-3,10,-3,3,-3,-3,page.as_mut_ptr(),8),2);
+        mattmc_client_residency_release(world);
+    }
+}

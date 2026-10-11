@@ -474,7 +474,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			boolean extractedForProbe = false;
 			if (shouldRenderEntity) {
 				BlockPos blockPos = entity.blockPosition();
-				compiledSection = this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos);
+				// Readiness does not gate this semantic stream. Query it only for
+				// the falling-block observer; custom callbacks retain their order.
+				if (probeFallingBlock || this.getClass() != LevelRenderer.class || this.level.getClass() != ClientLevel.class) {
+					compiledSection = this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos);
+				}
 				// Java's entity extraction historically waited for the nearby terrain
 				// section to become compiled because the same pass immediately emitted
 				// Java terrain and entity draws. Rust whole-frame ownership separates
@@ -2081,16 +2085,12 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		// Each block entity belongs to one chunk, so the scan can only repeat
 		// positions the section pass already extracted.
 		boolean deduplicate = !extractedBlockEntityPositions.isEmpty();
-		for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
-			for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
-				LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-				if (chunk == null) continue;
-				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-					if (deduplicate && extractedBlockEntityPositions.contains(blockEntity.getBlockPos().asLong())) continue;
-					this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
-				}
+		this.level.getChunkSource().forEachLoadedChunkInRange(centerChunkX,centerChunkZ,radius,chunk -> {
+			for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+				if (deduplicate && extractedBlockEntityPositions.contains(blockEntity.getBlockPos().asLong())) continue;
+				this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
 			}
-		}
+		});
 		return;
 
 	}
@@ -2158,43 +2158,26 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		int centerChunkX = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.x()));
 		int centerChunkZ = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.z()));
 		int radius = this.minecraft.options.getEffectiveRenderDistance() + 1;
-		int chunksScanned = 0;
-		int blockEntitiesInspected = 0;
-		int pistonEntitiesFound = 0;
-		int pistonStatesExtracted = 0;
-		for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
-			for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
-				LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-				if (chunk == null) {
-					continue;
-				}
-				chunksScanned++;
-				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-					blockEntitiesInspected++;
-					if (!(blockEntity instanceof PistonMovingBlockEntity pistonMovingBlockEntity)) {
-						continue;
-					}
-					pistonEntitiesFound++;
-					PistonHeadRenderState renderState = this.blockEntityRenderDispatcher.tryExtractRenderState(
-						pistonMovingBlockEntity,
-						partialTick,
-						null
-					);
-					if (renderState != null) {
-						this.levelRenderState.blockEntityRenderStates.add(renderState);
-						pistonStatesExtracted++;
-					}
+		int[] counts = new int[4]; // Diagnostic counts remain local to this extraction.
+		this.level.getChunkSource().forEachLoadedChunkInRange(centerChunkX,centerChunkZ,radius,chunk -> {
+			counts[0]++;
+			for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+				counts[1]++;
+				if (!(blockEntity instanceof PistonMovingBlockEntity pistonMovingBlockEntity)) continue;
+				counts[2]++;
+				PistonHeadRenderState renderState = this.blockEntityRenderDispatcher.tryExtractRenderState(
+					pistonMovingBlockEntity, partialTick, null);
+				if (renderState != null) {
+					this.levelRenderState.blockEntityRenderStates.add(renderState);
+					counts[3]++;
 				}
 			}
-		}
+		});
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan(
 			"rust-vulkan-whole-frame",
 			visiblePistonStates,
 			true,
-			chunksScanned,
-			blockEntitiesInspected,
-			pistonEntitiesFound,
-			pistonStatesExtracted,
+			counts[0], counts[1], counts[2], counts[3],
 			System.nanoTime() - startedNanos
 		);
 	}

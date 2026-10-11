@@ -1,7 +1,9 @@
 //! C ABI for registry identity snapshots (`NativeRegistrySnapshot`).
 
 use super::{current, publish, Elements, KnownPack, Snapshot, Table, Tags};
-use crate::assets::ffi_util::{bytes_arg, give, str_arg, Reader, Writer};
+use crate::assets::ffi_util::{bytes_arg, give, str_arg, Reader};
+#[cfg(test)]
+use crate::assets::ffi_util::Writer;
 use crate::content::tags::Location;
 use std::sync::Arc;
 
@@ -181,26 +183,45 @@ pub unsafe extern "C" fn mattmc_registry_known_elements(
     }
 }
 
-/// Tags of the registry at publish `index` for the network: per tag in
-/// publish order (Java's tag iteration order, whose names Java kept),
-/// u32-counted member IDs. Returns 0, -1 for an absent registry, -2 for a
-/// retired generation.
+/// Pins the current registry's immutable tag member arrays for a network
+/// payload. Rows are `(const u32* members, u64 count)` in tag publish order.
+/// Returns 0, -1 for invalid outputs/absent registry, or -2 for a retired
+/// generation. The lease survives later publications and context release.
 ///
 /// # Safety
-/// Outputs writable.
+/// Outputs must be writable. Read rows/members only until releasing the lease.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_registry_tags(context: u32, generation: u64, index: u32, out_ptr: *mut *mut u8, out_len: *mut u64) -> i64 {
+pub unsafe extern "C" fn mattmc_registry_tag_view(
+    context: u32,
+    generation: u64,
+    index: u32,
+    out_owner: *mut *mut u8,
+    out_rows: *mut *const u8,
+    out_count: *mut u64,
+) -> i64 {
+    if out_owner.is_null() || out_rows.is_null() || out_count.is_null() {
+        return MISSING;
+    }
     let Some(snapshot) = current(context, generation) else { return STALE };
     let Some(table) = snapshot.table_at(index as usize) else { return MISSING };
-    let mut writer = Writer::default();
-    for (_, members) in table.tags.iter() {
-        writer.u32(members.len() as u32);
-        for &member in members.iter() {
-            writer.u32(member);
-        }
+    let view = Box::new(super::tag_view::TagView::new(Arc::clone(&table.tags)));
+    unsafe {
+        out_rows.write(view.rows.as_ptr().cast());
+        out_count.write(view.rows.len() as u64);
+        out_owner.write(Box::into_raw(view).cast());
     }
-    unsafe { give(writer.bytes, out_ptr, out_len) };
     0
+}
+
+/// Releases a payload's tag member lease without affecting current snapshots.
+///
+/// # Safety
+/// `owner` is null or an unreleased lease returned by `registry_tag_view`.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_registry_tag_view_release(owner: *mut u8) {
+    if !owner.is_null() {
+        drop(unsafe { Box::from_raw(owner.cast::<super::tag_view::TagView>()) });
+    }
 }
 
 /// Drops `context`'s snapshot (its registries were discarded).
@@ -298,5 +319,31 @@ mod tests {
         assert_eq!(0, retag(context, reordered, &[("fourth", Err(9))], true), "references must name previous tags");
         assert_eq!(STALE as u64, retag(context, generation, &[], true), "retired generations are refused");
         super::super::release(context);
+    }
+
+    #[test]
+    fn payload_views_survive_retag_and_context_release_and_drop_their_owner() {
+        let context = 32;
+        let records = publish_records(&[("first", Ok(&[0, 1, u32::MAX, 0])), ("empty", Ok(&[]))]);
+        let generation = unsafe { mattmc_registry_publish(context, records.as_ptr(), records.len() as u64) };
+        let weak = Arc::downgrade(&current(context, generation).unwrap().table_at(0).unwrap().tags[0].1);
+        let mut owner = std::ptr::null_mut();
+        let mut rows = std::ptr::null();
+        let mut count = 0;
+        assert_eq!(0, unsafe { mattmc_registry_tag_view(context, generation, 0, &mut owner, &mut rows, &mut count) });
+        let view = unsafe { std::slice::from_raw_parts(rows.cast::<super::super::tag_view::MemberView>(), count as usize) };
+        let members = unsafe { std::slice::from_raw_parts(view[0].members, view[0].count as usize) };
+        assert_eq!(2, count);
+        assert_eq!(0, view[1].count);
+        let newer = retag(context, generation, &[("first", Ok(&[1])), ("empty", Ok(&[]))], false);
+        assert!(newer != 0 && newer != STALE as u64);
+        assert_eq!(STALE, unsafe { mattmc_registry_tag_view(context, generation, 0, &mut owner, &mut rows, &mut count) });
+        assert_eq!(MISSING, unsafe { mattmc_registry_tag_view(context, newer, 9, &mut owner, &mut rows, &mut count) });
+        assert_eq!(MISSING, unsafe { mattmc_registry_tag_view(context, newer, 0, std::ptr::null_mut(), &mut rows, &mut count) });
+        super::super::release(context);
+        assert_eq!([0, 1, u32::MAX, 0], members, "already queued payloads keep their original member arrays");
+        assert!(weak.upgrade().is_some());
+        unsafe { mattmc_registry_tag_view_release(owner) };
+        assert!(weak.upgrade().is_none(), "neither retired context nor released payload retains storage");
     }
 }

@@ -30,6 +30,8 @@ each module there has a short README with its own file map.
   colors and generation-validated reuse, Java lifecycle events and bounded evidence.
 - [Native item-layer preparation](RUST-ITEM-LAYERS.md): authored CPU poses,
   direct GUI/world/hand consumption and lazy mutable-mesh allocation.
+- [Rust GUI item templates](RUST-GUI-ITEM-TEMPLATES.md): retained semantic
+  layers, ABI 80 frame instances, lifetime rules and pending acceptance.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:
   handles, validation, submission, hazards and common errors.
 - [Java Bridge](JAVA-BRIDGE.md): the C ABI Java calls, and how to change it

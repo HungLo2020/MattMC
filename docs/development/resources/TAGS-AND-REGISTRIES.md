@@ -75,10 +75,26 @@ possible. Elements and IDs carry over in Rust.
 
 Java keeps known-pack masks per registry and client known-pack set, and tag maps
 until that registry's published tags change. Known masks are shared arrays that
-callers must not mutate. Tag maps and member lists are immutable; a previous
-member list is reused only after matching Rust's returned IDs. The
-[cache and decode path](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/src/main/java/net/minecraft/core/NativeRegistrySnapshot.java#L454-L561)
-copies native output and frees each result buffer.
+callers must not mutate.
+
+The local network consumer now reads immutable Rust member arrays directly via
+[`NativeRegistryTagView`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/core/NativeRegistryTagView.java).
+[`tag_view.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/registry/tag_view.rs)
+pins the registry's tag generation behind one CPU lease per payload map and
+exports 16-byte pointer/count descriptors. Java keeps only the map, names and
+read-only `IntList` views; it no longer reconstructs a flattened ID buffer or
+copies each list. Primitive packet writing and receive-side holder resolution
+use those views. No GPU handle or rendering ownership crosses this boundary.
+
+Retagging retires query generations, but queued payload maps and retained
+member sublists keep their original IDs. An automatic arena releases the lease
+once its views become unreachable. Each lease pins the whole tag set, not the
+registry elements; avoid retaining an isolated member view indefinitely if its
+payload is finished. New maps share unchanged native member arrays through
+`Arc`; identical rebinds retain the existing map. Holder binding, the Java scan
+that publishes IDs, registry objects and element codecs remain migration work.
+See the [verification record](VERIFICATION.md) for tested reload/lease behavior
+and the separate resource and gameplay performance limits.
 
 During publication, unbound tags or a tag holding a non-reference value are
 recorded as that registry's serialization error. `networkTags` raises it when

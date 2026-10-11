@@ -12,8 +12,11 @@ scans; it does not pack Java booleans or rebuild Rust section arrays.
 ## Working constraints
 
 - Java still binds atomic `LevelChunk` references, supplies reference-CAS facts,
-  projects ring indexing/range reads, orchestrates radius relocation, and delivers
+  projects scalar ring/range reads, orchestrates radius relocation, and delivers
   world/biome/hook callbacks. This is not a completed client-world migration.
+- [Loaded-range consumers](RUST-CLIENT-RANGES.md) now select stock chunks through
+  an incremental Rust coordinate index. Block-entity and moving-piston scans
+  revalidate bounded pages between callbacks; custom bindings keep live getters.
 - Count/header reads use a read-only native CPU view, without a downcall or world
   lock on each chunk lookup. These pointers are semantic owners, never GPU handles.
 - Slot publication and old-count removal precede unload. New admission follows

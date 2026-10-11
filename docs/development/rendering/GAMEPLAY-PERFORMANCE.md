@@ -90,6 +90,105 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
+The October 11 combined checkpoint uses native `c487f375` on integrated
+master `6673fac82`. It includes the [client-range index](../world/chunk-loading/RUST-CLIENT-RANGES.md),
+[entity geometry](../world/entities/RUST-ENTITY-GEOMETRY.md),
+[ticking membership](../world/entities/RUST-ENTITY-ORDER.md),
+[GUI templates](RUST-GUI-ITEM-TEMPLATES.md) and
+[immutable tag-member views](../resources/TAGS-AND-REGISTRIES.md).
+All 20 predeclared alternating runs finished cleanly: exactly 6,000 measured
+frames each after 360 settle and 240 warmup frames, four repeats per side for
+vanilla + DH and two per side for the other modes. No profiler or other game
+client ran during timing. Every repeat remains recorded.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
+|---|---:|---:|---|
+| Vanilla | 1351.75 / 1146.45 | 3.410 / 3.253 | p99 fails |
+| Vanilla + DH | 833.00 / 712.00 | 2.815 / 5.481 | Both pass |
+| Shaders | 352.65 / 312.65 | 4.756 / 7.181 | Both pass |
+| Shaders + DH | 264.80 / 226.00 | 5.371 / 9.124 | Both pass |
+
+**Aggregate performance fails only vanilla p99**, by 4.8%. All four median
+average-FPS floors pass. All source/native/Frozen/prompt/prepared-input guards
+and ten Current timing native identities pass; no clients remain. The
+controller exits 1 only at performance evaluation. Timing execution and the
+integrity checks succeed. This is a settled rotating scene with a hidden
+minimap, not startup, first-turn, ordinary-play, sustained-streaming or
+long-memory acceptance. These comparisons do not isolate a migration speedup
+or identify the vanilla p99 cause. The remaining miss guides further profiling
+and live world ownership work; the migration goal remains incomplete.
+
+Fresh combined suites pass 2,656 Rust tests (three ignored) and 2,003 executed
+Java/parity cases (two skipped), zero failures. Actual unchanged Frozen
+geometry/range/ticking comparisons pass 11,057/645/4,143 cases with
+source/class/native guards. Seven live lifecycles and two settled world pairs
+pass with zero VUIDs; all four originals were reviewed and nine Current runtime
+artifacts pin this native image.
+
+Receipts: `build/native-entity-order-receiver-fix/gameplay/{performance,final-guards}.json`,
+`cpu-results.json`, `runtime-original-review.json` and
+`build/native-entity-order/receiver-fixed-replay/`. Retain all repeats and the
+rejected pre-getter receiver comparison recorded in the ticking guide.
+
+### Historical tag-view/GUI checkpoint
+
+Preceding `a99b6f8d` separately passes four GUI pairs/eight original reviews
+and its five-pair resource replay. Its 20 clean timings also miss vanilla p99
+(3.357/3.123 ms Current/Frozen). Guarded 15-second samples show GUI batch
+allocation 184→85.5 MiB and ordinary 3D batch allocation 134→28 MiB; frame
+counts/revisions differ, preventing a per-frame or isolated speedup claim.
+Those GUI/resource/allocation measurements remain historical evidence for
+the unchanged respective code; they are not freshly repeated measurements of
+`c487f375`. Receipts: `build/native-registry-tag-views-phase-fix/` and the
+[resource verification record](../resources/VERIFICATION.md).
+
+### Historical entity-geometry consumer comparison
+
+The revised local [entity-geometry consumer](../world/entities/RUST-ENTITY-GEOMETRY.md)
+uses native image `a3c8a7fb` and renderer source `19d7a274`. Its fresh seven
+lifecycle cases and two settled Frozen image comparisons pass, with zero
+reported validation errors. All four original images were reviewed; nine Current
+artifacts and the renderer class pass identity guards. All 20 revised timing runs are clean and source/native/Frozen/prompt/prepared-input
+guards pass. Median FPS Current/Frozen is 1315.6/1187.1, 764.2/726.85, 345.0/311.0
+and 254.85/218.95 (vanilla/DH/shaders/combined). Only vanilla p99 fails:
+3.557/3.047 ms; other p99 medians are 4.094/5.051, 5.694/7.077 and 6.313/9.537 ms.
+Every declared repeat remains recorded. No aggregate acceptance or isolated
+speedup is claimed. These timings predate the
+[GUI template handoff](RUST-GUI-ITEM-TEMPLATES.md); the integrated checks above
+supersede them for the newer candidate. CPU suites and both refreshed
+Frozen oracles pass. Warmed render-thread culling samples fall from 101 to 2 MiB;
+those fixed-window allocation samples have different frame counts and do not
+explain p99. Receipts: `build/native-entity-geometry-living-consumer/`.
+
+### Historical client-range/readiness comparison
+
+The local [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
+uses native image `77126827` and Java `LevelRenderer` source `bfe801db`.
+The implementation run on October 11 executes all 20 declared alternating
+comparisons on RTX3080Ti/NVIDIA `595.99.02`: 360 settle, 240 warmup and exactly
+6,000 measured frames, four repeats per side for vanilla + DH and two for each
+other mode. Every run is clean, and source/native/class/Frozen/prompt/prepared-input
+guards pass. The aggregate fails only vanilla p99; the candidate remains uncommitted.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
+|---|---:|---:|---|
+| Vanilla | 1400.8 / 1174.9 | 3.217 / 3.124 | p99 fails |
+| Vanilla + DH | 875.0 / 603.05 | 2.394 / 6.884 | Both pass |
+| Shaders | 348.9 / 316.6 | 5.284 / 6.463 | Both pass |
+| Shaders + DH | 261.15 / 225.6 | 5.608 / 8.705 | Both pass |
+
+Seven lifecycle cases and two settled image comparisons pass, with zero GAL
+validation failures; all four originals were reviewed and nine Current artifacts
+pin the native image. Paired allocation profiles also pass their guards;
+repeated GUI batch records and entity bounds are concrete producer targets.
+Sampled allocation totals include observers and different profiled frame counts;
+they do not isolate a regression, gain or p99 cause. First-frame/first-turn,
+temporal, sustained-streaming, long-memory and broad gameplay acceptance remain open.
+Receipts: `build/native-client-ranges-readiness/`. The earlier range-only
+vanilla p99 failure remains in `build/native-client-ranges/gameplay/`.
+
+## October 11 published DH visibility checkpoint
+
 The following release-separated matrices and lifecycle/image/profile results
 are implementation-author reports reconciled through
 [`65457ef8`](https://github.com/HungLo2020/MattMC/commit/65457ef80471487cbdb4ad566e23e9eca07912bc).
@@ -97,10 +196,11 @@ This documentation review did not rerun these workloads or inspect the
 untracked raw receipts. A settled rotating-view gate is not ordinary-play,
 first-frame, streaming, temporal or long-session memory acceptance.
 
-Current source also contains [resource ownership changes](../resources/index.md)
+Later master source adds [resource ownership changes](../resources/index.md)
 at `398a0078`. Their [resource verification](../resources/VERIFICATION.md#latest-run)
-cites an earlier uncommitted build, with no fresh client/server/reload acceptance
-for this integrated revision. The rendering matrices below retain their exact
+cites an earlier uncommitted build. The later integrated local checks above
+add client/runtime evidence but do not prove server connection or broad reload
+acceptance. The rendering matrices below retain their exact
 release identities and do not validate those later changes.
 
 The latest recorded [DH visibility release](RUST-DH-VISIBILITY.md), `ebd3c9a3`, has an
@@ -180,7 +280,7 @@ Receipts: `build/native-dh-saved-light/gameplay/performance.json` and paired
 artifacts under `artifacts/graphics-captures/validation/native-dh-saved-light-perf-20261011/`.
 Individual saved-light FPS values remain in the
 [pinned summary](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660bebec4dcc8d268efcdd589c8/SUMMARY.md)
-and raw receipts; current root `SUMMARY.md` now records the visibility release. Twenty
+and raw receipts; current root `SUMMARY.md` records the latest tested candidate. Twenty
 completed generated world copies were pruned after evaluation; input and result
 receipts remain. See [saved-light ownership and component checks](../world/lighting/RUST-DH-SAVED-LIGHT.md).
 

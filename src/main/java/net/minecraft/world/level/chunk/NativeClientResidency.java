@@ -5,6 +5,7 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Reference;
+import java.util.ArrayDeque;
 import java.util.function.LongConsumer;
 import net.minecraft.core.SectionPos;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -32,6 +33,11 @@ public final class NativeClientResidency {
     private static final MethodHandle SNAPSHOT_VALUE = handle("snapshot_value", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle SNAPSHOT_COPY = handle("snapshot_copy", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle SNAPSHOT_RELEASE = handle("snapshot_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle RANGE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_client_residency_range",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
+    private static final ThreadLocal<ArrayDeque<long[]>> RANGE_BUFFERS = ThreadLocal.withInitial(ArrayDeque::new);
     private static final VarHandle INT = ValueLayout.JAVA_INT.varHandle(), LONG = ValueLayout.JAVA_LONG.varHandle();
     private static final ThreadLocal<MemorySegment> RESULT = ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(16, 8));
     private final MemorySegment owner, view;
@@ -46,7 +52,7 @@ public final class NativeClientResidency {
                 var view = (MemorySegment)VIEW.invokeExact(pointer);
                 var scoped = pointer.reinterpret(1, Arena.ofAuto(), NativeClientResidency::release);
                 attached = true;
-                return new NativeClientResidency(scoped, view.reinterpret(24).asReadOnly());
+                return new NativeClientResidency(scoped, view.reinterpret(32).asReadOnly());
             } finally { if (!attached) release(pointer); }
         } catch (Throwable failure) { throw failure(failure); }
     }
@@ -61,6 +67,56 @@ public final class NativeClientResidency {
     public void center(int x, int z) { change(3, 0, x, z); }
     /** Call immediately after atomic Java-reference publication, before callbacks. */
     public long publish(int index, boolean present) { return change(0, index, present ? 1 : 0, 0); }
+    /** Immutable stock coordinates join slot publication before unload callbacks. */
+    public long publish(int index, @Nullable LevelChunk chunk) {
+        if (chunk == null || chunk.getClass() != LevelChunk.class) return publish(index, chunk != null);
+        var pos = chunk.getPos();
+        return change(5, index, pos.x, pos.z);
+    }
+    private long revision() {
+        try { return (long)LONG.getAcquire(view, 24L); }
+        finally { Reference.reachabilityFence(this); }
+    }
+    public Range range(int minX, int maxX, int minZ, int maxZ) { return new Range(minX, maxX, minZ, maxZ); }
+    /** Bounded borrowed CPU pages, revalidated after every external callback. */
+    public final class Range implements AutoCloseable {
+        private final int minX, maxX, minZ, maxZ;
+        private long[] buffer;
+        private int offset, count;
+        private long pageRevision;
+        private boolean loaded;
+        public int x, z;
+        private Range(int minX, int maxX, int minZ, int maxZ) {
+            this.minX=minX; this.maxX=maxX; this.minZ=minZ; this.maxZ=maxZ;
+            buffer=RANGE_BUFFERS.get().pollFirst();
+            if (buffer==null) buffer=new long[194];
+        }
+        /** -1: exhausted; -2: preserve live custom getters at this coordinate. */
+        public int next(int cursorX, int cursorZ) {
+            if (buffer==null) throw new IllegalStateException("Closed residency range");
+            if (!loaded || pageRevision!=revision() || offset==count && count==64) {
+                try {
+                    int status=(int)RANGE.invokeExact(owner,minX,maxX,minZ,maxZ,cursorX,cursorZ,
+                        MemorySegment.ofArray(buffer),buffer.length);
+                    if (status==-2) { loaded=false; return -2; }
+                    if (status<0) throw new IllegalStateException("Invalid native residency range");
+                    count=status; offset=0; pageRevision=buffer[1]; loaded=true;
+                } catch (Throwable failure) { throw failure(failure); }
+                finally { Reference.reachabilityFence(NativeClientResidency.this); }
+            }
+            if (offset==count) return -1;
+            int at=2+3*offset++;
+            x=(int)buffer[at+1]; z=(int)buffer[at+2];
+            return (int)buffer[at];
+        }
+        @Override public void close() {
+            if (buffer!=null) {
+                var pool=RANGE_BUFFERS.get();
+                if (pool.size()<4) pool.addFirst(buffer);
+                buffer=null;
+            }
+        }
+    }
     public void dropped(int index) { change(1, index, 0, 0); }
     public void admitted() { change(2, 0, 0, 0); }
     public long identity(int index) {

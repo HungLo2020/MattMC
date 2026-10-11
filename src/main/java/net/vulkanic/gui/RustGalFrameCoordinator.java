@@ -566,7 +566,8 @@ public final class RustGalFrameCoordinator {
 				meshItems++;
 				meshBatches += request.payload().meshBatches().size();
 				for (VulkanicGalBridge.GuiMeshBatchRecord batch : request.payload().meshBatches()) {
-					meshAssetIds.add(batch.assetId());
+					if (batch.nativeTemplate() == null) meshAssetIds.add(batch.assetId());
+                    else for (long assetId : batch.nativeTemplate().assetIds()) meshAssetIds.add(assetId);
 				}
 			}
 				auditMessage("Rust GUI extracted mesh items=" + meshItems
@@ -947,6 +948,7 @@ public final class RustGalFrameCoordinator {
 			int guiTextAffineQuadCount = 0;
 			int guiItemAffineQuadCount = 0;
 			int meshVertexCount = 0;
+            int meshExpandedBatchCount = 0;
 			int meshIndexCount = 0;
 			for (RustGalFrameScheduler.Item<QueuedGuiRequest> request : requests) {
 				int incomingAffineQuadCount = request.payload().affineQuads().size();
@@ -957,22 +959,25 @@ public final class RustGalFrameCoordinator {
 				}
 				if (!request.payload().meshBatches().isEmpty()) {
 					long incomingVertices = 0L;
+                    long incomingBatches = 0L;
 					long incomingIndices = 0L;
 					for (VulkanicGalBridge.GuiMeshBatchRecord batch : request.payload().meshBatches()) {
-						incomingVertices += batch.vertices().size();
-						incomingIndices += batch.indices().size();
+						var template = batch.nativeTemplate();
+                        incomingBatches += template == null ? 1 : template.batchCount();
+                        incomingVertices += template == null ? batch.vertices().size() : template.vertexCount();
+                        incomingIndices += template == null ? batch.indices().size() : template.indexCount();
 					}
-					if (meshBatchRequests.size() + request.payload().meshBatches().size() > MAX_RUST_GUI_MESH_BATCHES
+					if (meshExpandedBatchCount + incomingBatches > MAX_RUST_GUI_MESH_BATCHES
 						|| (long)meshVertexCount + incomingVertices > MAX_RUST_GUI_MESH_VERTICES
 						|| (long)meshIndexCount + incomingIndices > MAX_RUST_GUI_MESH_INDICES) {
-						long projectedBatches = (long)meshBatchRequests.size() + request.payload().meshBatches().size();
+						long projectedBatches = (long)meshExpandedBatchCount + incomingBatches;
 						long projectedVertices = (long)meshVertexCount + incomingVertices;
 						long projectedIndices = (long)meshIndexCount + incomingIndices;
 						throw new IllegalStateException(
 							"Rust whole-frame GUI mesh capacity exceeded"
-								+ " current=(batches=" + meshBatchRequests.size() + ",vertices=" + meshVertexCount
+								+ " current=(batches=" + meshExpandedBatchCount + ",vertices=" + meshVertexCount
 								+ ",indices=" + meshIndexCount + ")"
-								+ " incoming=(batches=" + request.payload().meshBatches().size() + ",vertices=" + incomingVertices
+								+ " incoming=(batches=" + incomingBatches + ",vertices=" + incomingVertices
 								+ ",indices=" + incomingIndices + ")"
 								+ " projected=(batches=" + projectedBatches + ",vertices=" + projectedVertices
 								+ ",indices=" + projectedIndices + ")"
@@ -983,6 +988,7 @@ public final class RustGalFrameCoordinator {
 						);
 					}
 					meshVertexCount = Math.addExact(meshVertexCount, Math.toIntExact(incomingVertices));
+					meshExpandedBatchCount = Math.addExact(meshExpandedBatchCount, Math.toIntExact(incomingBatches));
 					meshIndexCount = Math.addExact(meshIndexCount, Math.toIntExact(incomingIndices));
 				}
 				request.payload().appendTo(spriteRequests, affineQuadRequests, meshBatchRequests, tiledQuadRequests, request.token().sequence());

@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mojang.serialization.Lifecycle;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.tags.TagKey;
@@ -107,5 +110,46 @@ final class NativeRegistrySnapshotTest {
 
 		ResourceLocation nine = ResourceLocation.fromNamespaceAndPath("other", "word_9");
 		assertEquals(words.getId(words.getValue(nine)), NativeRegistrySnapshot.id(access, WORDS, nine), "IDs carry over a rebind");
+	}
+
+	@Test
+	void nativeMemberViewsKeepQueuedPayloadsImmutableAcrossReloads() {
+		MappedRegistry<String> words = words();
+		bind(words, 7, 5);
+		Map<TagKey<String>, List<Holder<String>>> special = new HashMap<>();
+		words.getTags().forEach(named -> special.put(named.key(), named.stream().toList()));
+		special.put(TagKey.create(WORDS, ResourceLocation.fromNamespaceAndPath("test", "repeated")),
+			List.of(words.get(63).orElseThrow(), words.get(1).orElseThrow(), words.get(63).orElseThrow()));
+		special.put(TagKey.create(WORDS, ResourceLocation.fromNamespaceAndPath("test", "empty")), List.of());
+		words.prepareTagReload(new TagLoader.LoadResult<>(WORDS, special)).apply();
+		RegistryAccess access = new RegistryAccess.ImmutableRegistryAccess(List.of(words));
+		Map<ResourceLocation, IntList> expected = reference(words);
+		Map<ResourceLocation, IntList> old = NativeRegistrySnapshot.networkTags(access, WORDS);
+		IntList members = old.get(ResourceLocation.fromNamespaceAndPath("test", "repeated"));
+		IntList slice = members.subList(0, members.size());
+		assertThrows(UnsupportedOperationException.class, () -> members.add(42));
+		assertThrows(UnsupportedOperationException.class, () -> members.set(0, 42));
+		assertThrows(UnsupportedOperationException.class, members::clear);
+		assertThrows(UnsupportedOperationException.class, () -> old.clear());
+		assertThrows(IndexOutOfBoundsException.class, () -> members.getInt(-1));
+		assertThrows(IndexOutOfBoundsException.class, () -> members.getInt(members.size()));
+		for (int iteration = 0; iteration < 32; iteration++) {
+			bind(words, iteration % 2 == 0 ? 3 : 10, iteration % 2 == 0 ? 7 : 2);
+			assertEquals(reference(words), NativeRegistrySnapshot.networkTags(access, WORDS));
+		}
+		System.gc();
+		assertEquals(expected, old, "old payloads retain their original native generation");
+		assertEquals(members, slice, "a retained sublist pins its owner too");
+		FriendlyByteBuf actualWire = new FriendlyByteBuf(Unpooled.buffer());
+		FriendlyByteBuf expectedWire = new FriendlyByteBuf(Unpooled.buffer());
+		try {
+			actualWire.writeMap(old, FriendlyByteBuf::writeResourceLocation, FriendlyByteBuf::writeIntIdList);
+			expectedWire.writeMap(expected, FriendlyByteBuf::writeResourceLocation, FriendlyByteBuf::writeIntIdList);
+			assertEquals(expectedWire, actualWire, "native views preserve wire order, repeated IDs and primitive iteration");
+			assertTrue(actualWire.isReadable());
+		} finally {
+			actualWire.release();
+			expectedWire.release();
+		}
 	}
 }

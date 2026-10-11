@@ -15,6 +15,7 @@
 mod limits;
 mod shaders;
 mod model;
+pub(crate) mod template;
 mod validation;
 mod prepare;
 mod program;

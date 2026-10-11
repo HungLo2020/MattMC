@@ -21,6 +21,20 @@ public class Frustum implements ViewportProvider {
 	private double camX;
 	private double camY;
 	private double camZ;
+	private float[] nativeEntityMatrix;
+	private net.minecraft.world.entity.NativeEntityGeometry queriedEntityWorld;
+	private long entityQueryRevision,entityQueryStamp;
+
+	/** Query all retained stock bounds once, then use read-only per-component flags. */
+	public boolean isVisibleEntity(net.minecraft.world.entity.NativeEntityGeometry.Body body) {
+		var world=body.world();
+		if(queriedEntityWorld!=world || entityQueryRevision!=world.revision() || entityQueryStamp!=world.queryStamp()) {
+			if(nativeEntityMatrix==null)nativeEntityMatrix=this.matrix.get(new float[16]);
+			entityQueryStamp=world.query(nativeEntityMatrix,this.camX,this.camY,this.camZ);
+			entityQueryRevision=world.queryRevision();queriedEntityWorld=world;
+		}
+		return body.visible();
+	}
 
 	public Frustum(Matrix4f matrix4f, Matrix4f matrix4f2) {
 		this.calculateFrustum(matrix4f, matrix4f2);
@@ -43,6 +57,7 @@ public class Frustum implements ViewportProvider {
 	}
 
 	public Frustum offset(float f) {
+		this.queriedEntityWorld=null;
 		this.camX = this.camX + this.viewVector.x * f;
 		this.camY = this.camY + this.viewVector.y * f;
 		this.camZ = this.camZ + this.viewVector.z * f;
@@ -50,6 +65,7 @@ public class Frustum implements ViewportProvider {
 	}
 
 	public Frustum offsetToFullyIncludeCameraCube(int i) {
+		this.queriedEntityWorld=null;
 		double d = Math.floor(this.camX / i) * i;
 		double e = Math.floor(this.camY / i) * i;
 		double f = Math.floor(this.camZ / i) * i;
@@ -89,6 +105,7 @@ public class Frustum implements ViewportProvider {
 	}
 
 	public void prepare(double d, double e, double f) {
+		this.queriedEntityWorld=null;
 		this.camX = d;
 		this.camY = e;
 		this.camZ = f;

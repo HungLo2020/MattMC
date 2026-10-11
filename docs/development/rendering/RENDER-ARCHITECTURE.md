@@ -359,6 +359,12 @@ The graph's needs-build/urgent marks are node bits; visible slots use visit
 stamps and animated-sprite lists are interned. These bookkeeping changes do not
 move world/entity semantics or resource-reload publication into the graph.
 
+The separate local [entity geometry owner](../world/entities/RUST-ENTITY-GEOMETRY.md)
+now supplies ordinary camera frustum flags from retained position/bounds
+components. Bounds preparation moves to mutations; immutable compatibility
+captures preserve hook and leash callback ordering. Custom policies retain
+their original route. Runtime/performance acceptance is pending.
+
 The whole-frame drained receipt describes the camera traversal, rather than
 every loaded section. An offscreen block update keeps its rebuild mark but
 does not invalidate that receipt; when the camera visits it, the ordinary build
@@ -475,13 +481,20 @@ rather than treated as a requirement to use the historical reference save.
   height and checks without an active frame search bypass this additional
   rejection. The hook declares that it does not affect the shadow pass; Java
   still extracts retained entities and their geometry.
+  Ordinary semantic extraction does not query section readiness for an unused
+  local diagnostic value. Falling-block observers still query it, and custom
+  renderer/world classes retain their callback order. Loading-gate and shadow
+  eligibility readiness checks retain their existing behavior.
 - Without a shader pack, block entities are extracted as Frozen's Sodium does
   (`RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity`): Rust lists the
   visited built sections with culled block entities, then every built section
   with global ones in first-build order. Moving pistons arrive the same way.
   Shader frames still scan every loaded chunk in range, because the shadow pass
   takes its block entities from that list; unavailable-search cases also keep
-  the fallback. The author reports vanilla A/B 455→516 FPS; no dedicated
+  the fallback. [Loaded-range selection](../world/chunk-loading/RUST-CLIENT-RANGES.md)
+  now comes directly from Rust's residency index, through mutation-checked CPU
+  pages instead of a Java coordinate lookup grid. Custom bindings keep live
+  getters. The author reports historical vanilla A/B 455→516 FPS; no dedicated
   block-entity-selection regression was added in this interval. See [the route gate](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/minecraft/client/renderer/LevelRenderer.java#L2051-L2064).
 
 Keep the graph's behaviour identical to Frozen: its unit tests in
@@ -890,11 +903,19 @@ changes invalidate them. Pending command uses still prevent eviction.
 
 Flat and standard 3D GUI items both carry a raster identity (`GuiItemCacheRecord`)
 from their topology cache key. Static items reuse their raster. Standard-foil
-items are marked animated: they re-raster each frame, but their cached quads
-keep stable identity (encoded once into persistent native memory), and the
+items are marked animated: they re-raster each frame, but their cached geometry
+keeps stable native identity. Flat items reuse persistent encoded geometry;
+cached standard 3D items use the ABI 80 template owner described below. The
 foil clock is refreshed per frame (`withCurrentFoil`) and applied on the GPU as
 a per-draw UV transform. Foil and plain variants of one model use distinct
 identities, so they never share pixels.
+
+ABI 80 [GUI item templates](RUST-GUI-ITEM-TEMPLATES.md) retain cached standard
+3D material layers, resolved authored poses and geometry in a bounded Rust CPU
+owner. Java sends one item placement/cache reference plus source-layer foil
+facts, and Rust expands owned frontend requests. Animated/uncached models keep
+live extraction. This local handoff has not yet passed runtime/performance
+acceptance; its CPU template lease does not own GPU resources or presentation.
 
 GUI mesh geometry is content-keyed (raster key plus geometry fingerprint) and
 stays resident across frames: a draw re-uses a range once an accepted

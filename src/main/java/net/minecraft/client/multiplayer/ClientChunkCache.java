@@ -106,6 +106,38 @@ public class ClientChunkCache extends ChunkSource {
 		return this.level;
 	}
 
+	/** Visit loaded chunks in the original z/x order, observing mutations between callbacks. */
+	public void forEachLoadedChunkInRange(int centerX, int centerZ, int radius, Consumer<LevelChunk> consumer) {
+		if (radius < 0) throw new IllegalArgumentException("Negative chunk radius");
+		int minX=Math.subtractExact(centerX,radius), maxX=Math.addExact(centerX,radius);
+		int minZ=Math.subtractExact(centerZ,radius), maxZ=Math.addExact(centerZ,radius);
+		int x=minX, z=minZ;
+		Storage selected=null;
+		NativeClientResidency.Range range=null;
+		try {
+			while (true) {
+				Storage current=this.storage;
+				if (current!=selected) {
+					if (range!=null) range.close();
+					selected=current;
+					range=getClass()==ClientChunkCache.class && current.nativeResidency!=null
+						? current.nativeResidency.range(minX,maxX,minZ,maxZ) : null;
+				}
+				int slot=range==null ? -2 : range.next(x,z);
+				if (slot==-1) break;
+				LevelChunk chunk;
+				if (slot>=0) {
+					x=range.x; z=range.z;
+					chunk=current.getChunk(slot);
+					if (!isValidChunk(chunk,x,z)) chunk=null;
+				} else chunk=this.getChunk(x,z,ChunkStatus.FULL,false);
+				if (chunk!=null) consumer.accept(chunk);
+				if (x==maxX) { if (z==maxZ) break; x=minX; z++; }
+				else x++;
+			}
+		} finally { if (range!=null) range.close(); }
+	}
+
 	public void replaceBiomes(int i, int j, FriendlyByteBuf friendlyByteBuf) {
 		if (!this.storage.inRange(i, j)) {
 			LOGGER.warn("Ignoring chunk since it's not in the view range: {}, {}", i, j);
@@ -292,7 +324,7 @@ public class ClientChunkCache extends ChunkSource {
 
 		void replace(int i, @Nullable LevelChunk levelChunk) {
 			LevelChunk levelChunk2 = this.chunks.getAndSet(i, levelChunk);
-            long id = this.nativeResidency == null ? 0 : this.nativeResidency.publish(i, levelChunk != null);
+            long id = this.nativeResidency == null ? 0 : this.nativeResidency.publish(i, levelChunk);
 			if (levelChunk2 != null) {
 				if (this.nativeResidency == null) this.chunkCount--;
 				ChunkPos oldPos = levelChunk2.getPos();

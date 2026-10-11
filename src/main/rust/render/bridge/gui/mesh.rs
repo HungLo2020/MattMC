@@ -51,7 +51,29 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
     // per-batch limits alone would otherwise allow their product to exceed a
     // safe frame-sized allocation.
     let mut payload_bytes = 0_u64;
+    let mut expanded_count = 0usize;
+    let mut templates = Vec::with_capacity(batches.len());
     for batch in batches {
+        validate_item_size::<FfiGuiMeshBatchRequest>(batch.byte_size, "GUI mesh batch")?;
+        if batch.gui_width != gui_width || batch.gui_height != gui_height || gui_width <= 0 || gui_height <= 0 {
+            return Err(GalError::ffi(StatusCode::InvalidArgument, "GUI mesh batch extent must match its frame"));
+        }
+        if batch.native_item_template != 0 {
+            super::item_templates::validate_instance(batch)?;
+            let owner = super::item_templates::resolve(batch.native_item_template)?;
+            if batch.item_layer_foils.count != owner.source_layers() as u64 {
+                return Err(GalError::ffi(StatusCode::InvalidArgument, "GUI template foil layer count differs"));
+            }
+            read_slice(batch.item_layer_foils, false, "GUI item layer foils")?;
+            payload_bytes = payload_bytes.saturating_add(owner.geometry_bytes());
+            expanded_count = expanded_count.saturating_add(owner.batch_count());
+            templates.push(Some(owner));
+        } else {
+        if batch.item_layer_foils.count != 0 || !batch.item_layer_foils.ptr.is_null() {
+            return Err(GalError::ffi(StatusCode::InvalidArgument, "inline GUI mesh has template foil facts"));
+        }
+        templates.push(None);
+        expanded_count = expanded_count.saturating_add(1);
         let vertices = read_slice(batch.vertices, true, "GUI mesh vertices")?;
         let indices = read_slice(batch.indices, true, "GUI mesh indices")?;
         if vertices.len() > GUI_MESH_MAX_VERTICES || indices.len() > GUI_MESH_MAX_INDICES {
@@ -68,6 +90,10 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             .saturating_add(
                 (indices.len() as u64).saturating_mul(std::mem::size_of::<u32>() as u64),
             );
+        }
+        if expanded_count > GUI_MESH_MAX_BATCHES {
+            return Err(GalError::ffi(StatusCode::LengthOverflow, "expanded GUI item count exceeds frame capacity"));
+        }
         if payload_bytes > GUI_MESH_MAX_FRAME_PAYLOAD_BYTES {
             return Err(GalError::ffi(
                 StatusCode::LengthOverflow,
@@ -78,12 +104,20 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             ));
         }
     }
-    let mut owned = Vec::with_capacity(batches.len());
+    let mut owned = Vec::with_capacity(expanded_count);
+    let mut decoded_payload = 0u64;
     // Per owned batch: its persistent identity, and whether its geometry
     // checks can be skipped (decoded earlier and validated in the same state).
-    let mut persistent_keys: Vec<Option<PersistentGeometryKey>> = Vec::with_capacity(batches.len());
-    let mut validated_states: Vec<Option<bool>> = Vec::with_capacity(batches.len());
-    for batch in batches {
+    let mut persistent_keys: Vec<Option<PersistentGeometryKey>> = Vec::with_capacity(expanded_count);
+    let mut validated_states: Vec<Option<bool>> = Vec::with_capacity(expanded_count);
+    for (batch, template) in batches.iter().zip(&templates) {
+        if let Some(owner) = template {
+            let start = owned.len();
+            super::item_templates::append(batch, owner, &mut owned, &mut decoded_payload)?;
+            persistent_keys.resize(owned.len(), None);
+            validated_states.extend(owned[start..].iter().map(|batch| Some(batch.block_item_raster.is_some())));
+            continue;
+        }
         validate_item_size::<FfiGuiMeshBatchRequest>(batch.byte_size, "GUI mesh batch")?;
         // reserved0 bit 0: persistent caller geometry; upper bits: its store generation.
         let persistent_flag = batch.reserved0 & 1 != 0;
@@ -127,6 +161,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
         };
         let vertices = read_slice(batch.vertices, true, "GUI mesh vertices")?;
         let indices = read_slice(batch.indices, true, "GUI mesh indices")?;
+        decoded_payload += std::mem::size_of_val(vertices) as u64 + std::mem::size_of_val(indices) as u64;
         if vertices.len() > GUI_MESH_MAX_VERTICES || indices.len() > GUI_MESH_MAX_INDICES {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,

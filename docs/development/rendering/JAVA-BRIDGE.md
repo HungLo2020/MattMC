@@ -47,9 +47,18 @@ exact measurement window and cleanup checks pass. Receipt:
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** the current whole-frame ABI is **79**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **80**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
+
+## Native GUI item templates
+
+ABI 80 separately adds [GUI item template instances](RUST-GUI-ITEM-TEMPLATES.md):
+batch struct 97 appends CPU template identity and source-layer foil facts at
+fields 42/43; struct 118 defines a foil fact. Registration copies semantic inputs,
+and decoding acquires immutable CPU geometry before asynchronous submission.
+Templates and inline batch semantics are mutually exclusive. GPU ownership and
+the existing presentation route are unchanged.
 
 ## Native terrain selection frames
 
@@ -568,7 +577,7 @@ Color-owner transport was introduced in private compact meshing header 4
 literal-provider rows; zero-owner literal tensors remain for compatibility
 fixtures. Sharing is per resolver within each section capture. That color
 transport left the then-current whole-frame ABI 74 unchanged; the current ABI
-is 79. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
+is 80. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
 for construction, sealing, lifetime and provider compatibility.
 
 Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
@@ -579,7 +588,7 @@ Java retains contextual predicates/shade and model admission. Those standalone
 CPU calls left compact header 4 and the then-current whole-frame ABI 78 unchanged. The
 later [native face policy](RUST-TERRAIN-CULLING.md) adds private compact header5
 for direct mesher admission; it left whole-frame ABI 78 unchanged. ABI 79’s
-terrain-selection change is a separate contract.
+terrain-selection change and ABI 80's GUI templates are separate contracts.
 Unsupported/debug containers retain their original CPU compatibility
 path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.
 

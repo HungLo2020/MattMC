@@ -151,6 +151,18 @@ pub struct FfiGuiMeshBatchRequest {
     /// Immutable CPU transform owner. Mode 0 uses the inline matrix, 1 right, 2 left.
     pub native_item_transform: u64,
     pub native_item_transform_mode: u32,
+    /// Positive immutable CPU template identity, never an address or GPU handle.
+    pub native_item_template: u64,
+    pub item_layer_foils: FfiSlice<FfiGuiItemLayerFoil>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiItemLayerFoil {
+    pub mode: u32,
+    pub clock_millis: u64,
+    pub speed: f64,
+    pub strength: f32,
 }
 
 #[repr(C)]

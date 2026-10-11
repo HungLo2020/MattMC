@@ -11,12 +11,14 @@ struct View {
     z: AtomicI32,
     radius: i32,
     fingerprint: AtomicU64,
+    revision: AtomicU64,
 }
 struct State {
     policy: Residency,
     owners: Box<[Option<Arc<Chunk>>]>,
     serial: u64,
     escaped: bool,
+    range: range::RangeIndex,
 }
 struct NativeSource<'a> { owner:Option<&'a Chunk>,position:(i32,i32),min:i32,count:usize }
 impl Source for NativeSource<'_> {
@@ -38,8 +40,9 @@ impl World {
 pub extern "C" fn mattmc_client_residency_create(radius: i32) -> *mut World {
     let Some(policy) = Residency::new(radius) else { return std::ptr::null_mut(); };
     let owners = (0..policy.slots.len()).map(|_|None).collect::<Vec<_>>().into_boxed_slice();
-    Box::into_raw(Box::new(World {view: View {count:AtomicI32::new(0),x:AtomicI32::new(0),z:AtomicI32::new(0),radius,fingerprint:AtomicU64::new(0)},
-        state:Mutex::new(State {policy,owners,serial:0,escaped:false})}))
+    let range = range::RangeIndex::new(policy.slots.len());
+    Box::into_raw(Box::new(World {view: View {count:AtomicI32::new(0),x:AtomicI32::new(0),z:AtomicI32::new(0),radius,fingerprint:AtomicU64::new(0),revision:AtomicU64::new(0)},
+        state:Mutex::new(State {policy,owners,serial:0,escaped:false,range})}))
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_client_residency_release(world: *mut World) {
@@ -63,9 +66,9 @@ pub unsafe extern "C" fn mattmc_client_residency_change(world: *const World, act
     let Some(world)=world.as_ref() else {return -1;};
     let mut state=world.state.lock().unwrap_or_else(|e|e.into_inner());
     let result=match action {
-        0|1 => {
+        0|1|5 => {
             if index<0 || index as usize>=state.policy.slots.len() {return -1;}
-            let id=if action==0 && a!=0 {
+            let id=if action==5 || action==0 && a!=0 {
                 if state.serial==i64::MAX as u64 {return -1;}
                 state.serial+=1;state.serial
             } else {0};
@@ -76,7 +79,32 @@ pub unsafe extern "C" fn mattmc_client_residency_change(world: *const World, act
         4 => {state.policy.position_changed((a,b));0},
         _=>return -1,
     };
+    if action==0 || action==1 || action==5 {
+        let indexed=result!=0 && (action!=5 || state.policy.index(a,b)==index as usize);
+        state.range.publish(index as usize, indexed, if action==5 {Some((a,b))} else {None});
+    }
+    if action==0 || action==1 || action==3 || action==5 {
+        world.view.revision.fetch_add(1,Ordering::Release);
+    }
     world.project(&state);result
+}
+/// Borrowed page of physical indices and immutable stock coordinates. The
+/// page revision must be checked between external callbacks; no lock/borrow
+/// crosses a callback. No Java object address or GPU handle is retained.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_client_residency_range(world:*const World,
+    min_x:i32,max_x:i32,min_z:i32,max_z:i32,cursor_x:i32,cursor_z:i32,
+    output:*mut i64,length:i32) -> i32 {
+    let Some(world)=world.as_ref() else {return -1;};
+    if output.is_null() || output as usize%8!=0 || !(5..=194).contains(&length)
+        || (length-2)%3!=0 || min_x>max_x || min_z>max_z
+        || cursor_x<min_x || cursor_x>max_x || cursor_z<min_z || cursor_z>max_z {return -1;}
+    let state=world.state.lock().unwrap_or_else(|e|e.into_inner());
+    let buffer=std::slice::from_raw_parts_mut(output,length as usize);
+    let Some(count)=state.range.page(&state.policy,[min_x,max_x,min_z,max_z],(cursor_x,cursor_z),&mut buffer[2..]) else {return -2;};
+    buffer[0]=count as i64;
+    buffer[1]=world.view.revision.load(Ordering::Acquire) as i64;
+    count as i32
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_client_residency_empty(world:*const World, key:u64, empty:i32) -> i32 {

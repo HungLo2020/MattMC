@@ -4,6 +4,8 @@
   callable boundaries, failure prefixes and actual Frozen queue replay.
 - [Rust client chunk residency](RUST-CLIENT-RESIDENCY.md): native window and empty
   membership policy, retained counter scans, callback boundaries and Frozen replay.
+- [Retained client chunk ranges](RUST-CLIENT-RANGES.md): direct block-entity and
+  piston scan consumers, bounded pages and callback mutation checks.
 - [Rust player chunk distances](RUST-PLAYER-DISTANCE.md): native-owned natural
   spawn and player-ticket distance graphs, replay contracts and verification.
 - [Rust simulation distance](RUST-SIMULATION-DISTANCE.md): native-owned simulation

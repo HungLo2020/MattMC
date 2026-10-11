@@ -122,7 +122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 79;
+	public static final int ABI_VERSION = 80;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -640,6 +640,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
     private net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pipelinedWorldItemPoses = new net.vulkanic.world.NativeItemLayerTransform.WorldPose[0];
     private NativeDhCloudGroupState[] pipelinedCloudOwners = new NativeDhCloudGroupState[0];
     private net.vulkanic.world.NativeItemLayerTransform.Capture[] pipelinedItemTransforms = new net.vulkanic.world.NativeItemLayerTransform.Capture[0];
+    private NativeGuiItemTemplate[] pipelinedItemTemplates = new NativeGuiItemTemplate[0];
 
 	public PresentedFrame presentFrame(long frameId, long correlationId, long waitSubmissionId) {
 		MemorySegment request = Struct.FRAME_PRESENT.allocate(arena);
@@ -808,10 +809,34 @@ public final class VulkanicGalBridge implements AutoCloseable {
         int index=0;
         for (var batch : batches) if (batch.nativeTransform != null) pipelinedItemTransforms[index++]=batch.nativeTransform;
         Arrays.fill(pipelinedItemTransforms,index,pipelinedItemTransforms.length,null);
+        count = 0;
+        for (var batch : batches) if (batch.nativeTemplate != null) count++;
+        if (pipelinedItemTemplates.length < count) pipelinedItemTemplates = new NativeGuiItemTemplate[count];
+        index = 0;
+        for (var batch : batches) if (batch.nativeTemplate != null) pipelinedItemTemplates[index++] = batch.nativeTemplate;
+        Arrays.fill(pipelinedItemTemplates, index, pipelinedItemTemplates.length, null);
     }
 
 	private MemorySegment encodeGuiMeshBatches(List<GuiMeshBatchRecord> batches) {
-		MemorySegment batchArray = Struct.GUI_MESH_BATCH_REQUEST.array(arena, batches.size());
+		return encodeGuiMeshBatches(arena, batches, this);
+	}
+
+    /** CPU-only registration, independent of the context and its in-flight arena. */
+    public static NativeGuiItemTemplate createGuiItemTemplate(List<GuiMeshBatchRecord> batches, int[] selectors, int sourceLayers) {
+        batches = List.copyOf(batches);
+        if (batches.isEmpty() || batches.size() != selectors.length || sourceLayers <= 0 || sourceLayers > 16_384
+            || batches.stream().anyMatch(batch -> batch.nativeTemplate != null))
+            throw new IllegalArgumentException("invalid GUI item template membership");
+        try (Arena input = Arena.ofConfined()) {
+            return NativeGuiItemTemplate.create(encodeGuiMeshBatches(input, batches, null), batches.size(), selectors.clone(), sourceLayers,
+                batches.stream().mapToLong(batch -> batch.vertices.size()).sum(),
+                batches.stream().mapToLong(batch -> batch.indices.size()).sum(),
+                batches.stream().mapToLong(batch -> batch.assetId).distinct().toArray());
+        } finally { Reference.reachabilityFence(batches); }
+    }
+
+    static MemorySegment encodeGuiMeshBatches(Arena targetArena, List<GuiMeshBatchRecord> batches, VulkanicGalBridge geometryStore) {
+		MemorySegment batchArray = Struct.GUI_MESH_BATCH_REQUEST.array(targetArena, batches.size());
 		for (int i = 0; i < batches.size(); i++) {
 			GuiMeshBatchRecord batch = batches.get(i);
 			// These arrays and lists were defensively copied by their record constructors.
@@ -820,11 +845,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			// avoids manufacturing a clone for every component written to the FFI stream.
 			List<GuiMeshVertexRecord> vertexRecords = batch.vertices;
 			List<Integer> indexRecords = batch.indices;
-			PackedGuiMeshTopology persistent = persistentGuiMeshTopology(batch, vertexRecords, indexRecords);
+			PackedGuiMeshTopology persistent = geometryStore == null || batch.nativeTemplate != null ? null
+                : geometryStore.persistentGuiMeshTopology(batch, vertexRecords, indexRecords);
 			MemorySegment vertices = persistent == null
-				? encodeGuiMeshVertices(arena, vertexRecords) : persistent.vertices();
+				? vertexRecords.isEmpty() ? MemorySegment.NULL : encodeGuiMeshVertices(targetArena, vertexRecords) : persistent.vertices();
 			MemorySegment indices = persistent == null
-				? encodeGuiMeshIndices(arena, indexRecords) : persistent.indices();
+				? indexRecords.isEmpty() ? MemorySegment.NULL : encodeGuiMeshIndices(targetArena, indexRecords) : persistent.indices();
 			MemorySegment item = Abi.item(batchArray, Struct.GUI_MESH_BATCH_REQUEST, i);
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 0, Struct.GUI_MESH_BATCH_REQUEST.byteSize());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 1, batch.stratum());
@@ -836,8 +862,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_MESH_BATCH_REQUEST.setFloat(item, 7, batch.alphaCutoff());
 			// Bit 0: persistent (immutable for this store generation) geometry.
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 8, persistent == null ? 0
-				: 1 | ((persistentGuiMeshTopologyGeneration & 0x3fff_ffff) << 1));
-			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(9) + component * 4L, batch.nativeTransform == null ? batch.modelTransform[component] : 0.0F);
+				: 1 | ((geometryStore.persistentGuiMeshTopologyGeneration & 0x3fff_ffff) << 1));
+			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(9) + component * 4L, batch.nativeTransform == null && batch.nativeTemplate == null ? batch.modelTransform[component] : 0.0F);
 			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(10) + component * 4L, batch.guiPose[component]);
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 11, batch.left());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 12, batch.top());
@@ -877,6 +903,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 39, cache == null ? 0 : cache.animated() ? 2 : 1);
 			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 40, batch.nativeTransform == null ? 0 : batch.nativeTransform.ownerAddress());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 41, batch.nativeTransform == null ? 0 : batch.nativeTransform.wireMode());
+            Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 42, batch.nativeTemplate == null ? 0 : batch.nativeTemplate.identity());
+            StandardItemFoilRecord[] layerFoils = batch.layerFoils;
+            MemorySegment facts = layerFoils == null ? MemorySegment.NULL : Struct.GUI_ITEM_LAYER_FOIL.array(targetArena, layerFoils.length);
+            if (layerFoils != null) for (int layer = 0; layer < layerFoils.length; layer++) {
+                var fact = Abi.item(facts, Struct.GUI_ITEM_LAYER_FOIL, layer);
+                var value = layerFoils[layer];
+                Struct.GUI_ITEM_LAYER_FOIL.setInt(fact, 0, value == null ? 0 : value.kind().wireValue());
+                Struct.GUI_ITEM_LAYER_FOIL.setLong(fact, 1, value == null ? 0 : value.clockMillis());
+                fact.set(ValueLayout.JAVA_DOUBLE, Struct.GUI_ITEM_LAYER_FOIL.offset(2), value == null ? 0.0 : value.speed());
+                Struct.GUI_ITEM_LAYER_FOIL.setFloat(fact, 3, value == null ? 0.0F : value.strength());
+            }
+            Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 43, facts, layerFoils == null ? 0 : layerFoils.length);
 			double[] bounds = block == null ? null : block.modelBounds;
 			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_DOUBLE,
 				Struct.GUI_MESH_BATCH_REQUEST.offset(36) + component * 8L, bounds == null ? 0.0 : bounds[component]);
@@ -2279,6 +2317,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
             if (!requestHandedOff) {
                 Arrays.fill(pipelinedCloudOwners,null);
                     Arrays.fill(pipelinedItemTransforms,null);
+                    Arrays.fill(pipelinedItemTemplates,null);
                     Arrays.fill(pipelinedWorldItemPoses,null);
 				frameArena.close();
 			}
@@ -2637,6 +2676,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					pipelinedRequestArena = null;
                     Arrays.fill(pipelinedCloudOwners,null);
                     Arrays.fill(pipelinedItemTransforms,null);
+                    Arrays.fill(pipelinedItemTemplates,null);
                     Arrays.fill(pipelinedWorldItemPoses,null);
 				}
 			}
@@ -5426,6 +5466,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			pipelinedRequestArena = null;
                     Arrays.fill(pipelinedCloudOwners,null);
                     Arrays.fill(pipelinedItemTransforms,null);
+                    Arrays.fill(pipelinedItemTemplates,null);
                     Arrays.fill(pipelinedWorldItemPoses,null);
 		}
 		queuedFrameCount = 0;
@@ -6155,8 +6196,32 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int clipMode, int clipLeft, int clipTop, int clipWidth, int clipHeight,
 		List<GuiMeshVertexRecord> vertices, List<Integer> indices, StandardItemFoilRecord itemFoil, int itemRasterScale,
 		GuiDecalFoilRecord decalFoil, GuiBlockItemRasterRecord blockItemRaster, GuiItemCacheRecord itemCache,
-		net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform
+		net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform,
+        NativeGuiItemTemplate nativeTemplate, StandardItemFoilRecord[] layerFoils
 	) {
+        public GuiMeshBatchRecord(
+            int stratum, int layerIndex, int materialMode, int lightingMode, long assetId, long sequence,
+            float alphaCutoff, float[] modelTransform, float[] guiPose,
+            int left, int top, int right, int bottom, int guiWidth, int guiHeight,
+            int renderWidth, int renderHeight, int guardPixels,
+            int clipMode, int clipLeft, int clipTop, int clipWidth, int clipHeight,
+            List<GuiMeshVertexRecord> vertices, List<Integer> indices, StandardItemFoilRecord itemFoil,
+            int itemRasterScale, GuiDecalFoilRecord decalFoil, GuiBlockItemRasterRecord blockItemRaster,
+            GuiItemCacheRecord itemCache, net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform
+        ) {
+            this(stratum, layerIndex, materialMode, lightingMode, assetId, sequence, alphaCutoff, modelTransform, guiPose,
+                left, top, right, bottom, guiWidth, guiHeight, renderWidth, renderHeight, guardPixels,
+                clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale,
+                decalFoil, blockItemRaster, itemCache, nativeTransform, null, null);
+        }
+
+        public static GuiMeshBatchRecord nativeItem(NativeGuiItemTemplate template, StandardItemFoilRecord[] foils,
+            int stratum, long sequence, float[] pose, int left, int top, int right, int bottom, int width, int height,
+            int clipMode, int clipLeft, int clipTop, int clipWidth, int clipHeight, GuiItemCacheRecord cache) {
+            return new GuiMeshBatchRecord(stratum, 0, 0, 0, 0, sequence, 0, null, pose,
+                left, top, right, bottom, width, height, 0, 0, 0, clipMode, clipLeft, clipTop, clipWidth, clipHeight,
+                List.of(), List.of(), null, 0, null, null, cache, null, Objects.requireNonNull(template), foils);
+        }
 		public GuiMeshBatchRecord(
 		int stratum, int layerIndex, int materialMode, int lightingMode, long assetId, long sequence,
 		float alphaCutoff, float[] modelTransform, float[] guiPose,
@@ -6284,6 +6349,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public GuiMeshBatchRecord {
+            if (nativeTemplate != null) {
+                nativeTemplate.identity();
+                if (layerFoils == null || layerFoils.length != nativeTemplate.sourceLayers()
+                    || layerIndex != 0 || materialMode != 0 || lightingMode != 0 || assetId != 0 || alphaCutoff != 0
+                    || modelTransform != null || nativeTransform != null || renderWidth != 0 || renderHeight != 0 || guardPixels != 0
+                    || !vertices.isEmpty() || !indices.isEmpty() || itemFoil != null || itemRasterScale != 0
+                    || decalFoil != null || blockItemRaster != null)
+                    throw new IllegalArgumentException("GUI template conflicts with inline mesh semantics");
+                if (itemCache != null && !itemCache.animated())
+                    for (var foil : layerFoils) if (foil != null) throw new IllegalArgumentException("static item cache cannot contain animated foil");
+                layerFoils = layerFoils.clone();
+            } else {
+                if (layerFoils != null) throw new IllegalArgumentException("inline GUI mesh has template foil facts");
             if (nativeTransform != null && modelTransform != null)
                 throw new IllegalArgumentException("native GUI pose conflicts with matrix projection");
 			if (itemCache != null && (itemRasterScale == 0 && blockItemRaster == null
@@ -6325,6 +6403,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				&& lightingMode != GUI_MESH_LIGHTING_OVERSIZED_ITEM && lightingMode != GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT) || !Float.isFinite(alphaCutoff)
 				|| guiWidth <= 0 || guiHeight <= 0 || (itemRasterScale == 0 && blockItemRaster == null && (renderWidth <= guardPixels * 2 || renderHeight <= guardPixels * 2))
 				|| left >= right || top >= bottom) throw new IllegalArgumentException("invalid semantic GUI mesh batch");
+            }
+            if (guiWidth <= 0 || guiHeight <= 0 || left >= right || top >= bottom)
+                throw new IllegalArgumentException("invalid GUI item placement");
 			if (clipMode == 0) {
 				if (clipLeft != 0 || clipTop != 0 || clipWidth != 0 || clipHeight != 0) throw new IllegalArgumentException("disabled GUI mesh clip must be zero");
 			} else if (clipMode != 1 || clipLeft < 0 || clipTop < 0 || clipWidth < 0 || clipHeight < 0
@@ -6332,19 +6413,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				throw new IllegalArgumentException("invalid GUI mesh clip rectangle");
 			}
 			if (!TRUSTED_COPY.get()) {
-				if (nativeTransform == null) modelTransform = checkedFiniteCopy(modelTransform, 16, "GUI mesh model transform");
+				if (nativeTransform == null && nativeTemplate == null) modelTransform = checkedFiniteCopy(modelTransform, 16, "GUI mesh model transform");
 				else if (modelTransform != null) throw new IllegalArgumentException("native GUI pose conflicts with matrix projection");
 				guiPose = checkedFiniteCopy(guiPose, 6, "GUI mesh GUI pose");
 				vertices = vertices instanceof PackedGuiMeshVertices ? vertices : List.copyOf(vertices);
 				indices = indices instanceof PackedGuiMeshIndices ? indices : List.copyOf(indices);
 			}
-			if (vertices.isEmpty() || indices.isEmpty()) throw new IllegalArgumentException("GUI mesh batch requires geometry");
+			if (nativeTemplate == null && (vertices.isEmpty() || indices.isEmpty())) throw new IllegalArgumentException("GUI mesh batch requires geometry");
 			if (indices instanceof PackedGuiMeshIndices packed) packed.validateVertexCount(vertices.size());
 			else for (int index : indices) if (index < 0 || index >= vertices.size()) throw new IllegalArgumentException("GUI mesh index out of range");
 		}
 
-		@Override public float[] modelTransform() { return nativeTransform == null ? this.modelTransform.clone() : nativeTransform.modelTransform(); }
+		@Override public float[] modelTransform() { return nativeTemplate != null ? null : nativeTransform == null ? this.modelTransform.clone() : nativeTransform.modelTransform(); }
 		@Override public float[] guiPose() { return this.guiPose.clone(); }
+        @Override public StandardItemFoilRecord[] layerFoils() { return layerFoils == null ? null : layerFoils.clone(); }
 
 		public GuiMeshBatchRecord withSequence(long value) {
 			// Sequencing changes only ordering metadata. These arrays and immutable
@@ -6355,7 +6437,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, value,
 					alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
 					renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight,
-					vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, itemCache, nativeTransform);
+					vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, itemCache, nativeTransform, nativeTemplate, layerFoils);
 			} finally {
 				TRUSTED_COPY.set(false);
 			}
@@ -6364,20 +6446,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public GuiMeshBatchRecord withItemFoil(StandardItemFoilRecord value) {
 			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
 				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
-				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, value, itemRasterScale, decalFoil, blockItemRaster, itemCache, nativeTransform);
+				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, value, itemRasterScale, decalFoil, blockItemRaster, itemCache, nativeTransform, nativeTemplate, layerFoils);
 		}
 
 		public GuiMeshBatchRecord withDecalFoil(GuiDecalFoilRecord value) {
 			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
 				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
-				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale, value, blockItemRaster, itemCache, nativeTransform);
+				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale, value, blockItemRaster, itemCache, nativeTransform, nativeTemplate, layerFoils);
 		}
 
 		public GuiMeshBatchRecord withItemCache(GuiItemCacheRecord value) {
 			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
 				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
 				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight,
-				vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, value, nativeTransform);
+				vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, value, nativeTransform, nativeTemplate, layerFoils);
 		}
 
 		/** Input vertices retain ORIGINAL model-space normals when this layout is present. */
@@ -6385,7 +6467,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Objects.requireNonNull(value, "block item layout");
 			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
 				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
-				0, 0, 0, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale, decalFoil, value, itemCache, nativeTransform);
+				0, 0, 0, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale, decalFoil, value, itemCache, nativeTransform, nativeTemplate, layerFoils);
 		}
 	}
 
@@ -8673,7 +8755,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			ATLAS_ANIMATION_ASSET_UPDATE(104),
 			GUI_ATLAS_REFERENCE(105),
 			GUI_ATLAS_REFERENCE_UPDATE(106),
-			GUI_ITEM_RASTER_LAYER(107);
+			GUI_ITEM_RASTER_LAYER(107),
+			GUI_ITEM_LAYER_FOIL(118);
 
 		private final int id;
 		private final int byteSize;

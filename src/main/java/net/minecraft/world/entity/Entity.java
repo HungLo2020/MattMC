@@ -216,6 +216,8 @@ public abstract class Entity
 	public float yRotO;
 	public float xRotO;
 	private AABB bb = INITIAL_AABB;
+	@Nullable private NativeEntityGeometry.Body nativeGeometry;
+	private boolean nativeStandardBounds=true;
 	private boolean onGround;
 	public boolean horizontalCollision;
 	public boolean verticalCollision;
@@ -300,6 +302,7 @@ public abstract class Entity
 		this.position = Vec3.ZERO;
 		this.blockPosition = BlockPos.ZERO;
 		this.chunkPosition = ChunkPos.ZERO;
+		this.nativeGeometry=(level==null ? new NativeEntityGeometry() : level.nativeEntityGeometry()).create(0.0,0.0,0.0,INITIAL_AABB);
 		SynchedEntityData.Builder builder = new SynchedEntityData.Builder(this);
 		builder.define(DATA_SHARED_FLAGS_ID, (byte)0);
 		builder.define(DATA_AIR_SUPPLY_ID, this.getMaxAirSupply());
@@ -3293,7 +3296,14 @@ public abstract class Entity
 	}
 
 	public final void setBoundingBox(AABB aABB) {
+		if(this.nativeGeometry!=null && aABB!=null)this.nativeGeometry.bounds(aABB);
+		this.nativeStandardBounds=aABB!=null && aABB.getClass()==AABB.class;
 		this.bb = aABB;
+	}
+
+	/** Primary immutable-coordinate CPU component, suitable for stock culling only. */
+	@Nullable public final NativeEntityGeometry.Body nativeCullingGeometry() {
+		return this.nativeStandardBounds ? this.nativeGeometry : null;
 	}
 
 	public final float getEyeHeight(Pose pose) {
@@ -3706,15 +3716,16 @@ public abstract class Entity
 	}
 
 	public final void setPosRaw(double d, double e, double f) {
-		if (this.position.x != d || this.position.y != e || this.position.z != f) {
+		int changes=this.nativeGeometry==null ? -1 : this.nativeGeometry.move(d,e,f);
+		if (changes>=0 ? (changes & 1)!=0 : this.position.x != d || this.position.y != e || this.position.z != f) {
 			this.position = new Vec3(d, e, f);
-			int i = Mth.floor(d);
-			int j = Mth.floor(e);
-			int k = Mth.floor(f);
-			if (i != this.blockPosition.getX() || j != this.blockPosition.getY() || k != this.blockPosition.getZ()) {
+			int i = changes<0 ? Mth.floor(d) : this.nativeGeometry.blockX();
+			int j = changes<0 ? Mth.floor(e) : this.nativeGeometry.blockY();
+			int k = changes<0 ? Mth.floor(f) : this.nativeGeometry.blockZ();
+			if (changes>=0 ? (changes & 2)!=0 : i != this.blockPosition.getX() || j != this.blockPosition.getY() || k != this.blockPosition.getZ()) {
 				this.blockPosition = new BlockPos(i, j, k);
 				this.inBlockState = null;
-				if (SectionPos.blockToSectionCoord(i) != this.chunkPosition.x || SectionPos.blockToSectionCoord(k) != this.chunkPosition.z) {
+				if (changes>=0 ? (changes & 4)!=0 : SectionPos.blockToSectionCoord(i) != this.chunkPosition.x || SectionPos.blockToSectionCoord(k) != this.chunkPosition.z) {
 					this.chunkPosition = new ChunkPos(this.blockPosition);
 				}
 			}
@@ -3884,6 +3895,7 @@ public abstract class Entity
 	}
 
 	protected void setLevel(Level level) {
+		if(this.nativeGeometry!=null)this.nativeGeometry.transfer(level==null ? new NativeEntityGeometry() : level.nativeEntityGeometry());
 		this.level = level;
 	}
 

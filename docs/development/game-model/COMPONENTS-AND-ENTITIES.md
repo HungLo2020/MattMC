@@ -1,6 +1,12 @@
 # Components and entities (proposal)
 
-> Proposal; not implemented. See the [game model index](index.md).
+> General component model remains proposed. The local
+> [entity geometry slice](../world/entities/RUST-ENTITY-GEOMETRY.md) implements
+> primary position/bounds and ordinary camera queries. The local
+> [ticking membership slice](../world/entities/RUST-ENTITY-ORDER.md) owns
+> client/server ordering and snapshots; Java still executes behavior callbacks.
+> Production verification of the new slice is pending.
+> See the [game model index](index.md).
 
 ## The model
 
@@ -97,6 +103,8 @@ system scheduling.
 
 ## Scope
 
-Entities are kept high-level for now. Blocks, block states and items come
-first. AI (goals and brains), synchronised data and entity networking are
-designed when entity migration starts.
+The first entity slice moves live position/bounds producers and their camera
+consumer together. Ticking membership and snapshot order now have a local Rust
+owner, while Java still orchestrates ticks and invokes behavior callbacks.
+AI (goals and brains), synchronised data, entity networking, anchored entities
+and the complete simulation loop need their own migration and verification.

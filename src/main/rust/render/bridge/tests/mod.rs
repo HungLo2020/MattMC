@@ -1090,6 +1090,8 @@ fn gui_mesh_batch_request(
         item_cache_mode: 0,
         native_item_transform: 0,
         native_item_transform_mode: 0,
+        native_item_template: 0,
+        item_layer_foils: FfiSlice { ptr: std::ptr::null(), count: 0 },
         decal_foil_mode: 0,
         decal_model_pose: [0.; 16],
         decal_normal_pose: [0.; 9],
@@ -1192,7 +1194,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         mesh_vertex.field_offsets[2]
     );
     let mesh_batch = crate::render::bridge::layout::layout_for_struct(97).expect("GUI mesh batch layout");
-    assert_eq!(42, mesh_batch.field_count);
+    assert_eq!(44, mesh_batch.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_identity) as u32,
         mesh_batch.field_offsets[38]
@@ -6695,6 +6697,7 @@ fn shader_pack_asset_ffi_rejects_malformed_file_records() {
 }
 
 mod gal_abi;
+mod gui_item_templates;
 
 #[test]
 fn indexed_map_ffi_copies_indices_and_bounds_expanded_residency() {

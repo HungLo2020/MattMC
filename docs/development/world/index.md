@@ -1,5 +1,8 @@
 # World systems
 
+- [Entity world state](entities/index.md): retained position/bounds components,
+  ordinary camera queries and compatibility verification.
+
 - [World physics](physics/index.md): collision-grid Boolean joins, merged boxes,
   rotations/reflections and parity checks.
 - [Chunk storage](chunk/index.md): ordered biome/block scans, palette loading,

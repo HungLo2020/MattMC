@@ -619,7 +619,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 item_cache_identity,
                 item_cache_mode,
                 native_item_transform,
-                native_item_transform_mode
+                native_item_transform_mode,
+                native_item_template,
+                item_layer_foils
             ]
         ),
         91 => layout!(
@@ -1657,6 +1659,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             FfiDhGenericGroupInstance,
             [group_id, generation, origin, packed_light, flags, shading, cloud_state, cloud_pose_epoch]
         ),
+        118 => layout!(118, FfiGuiItemLayerFoil, [mode, clock_millis, speed, strength]),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,

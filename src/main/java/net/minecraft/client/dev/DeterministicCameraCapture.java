@@ -1922,7 +1922,10 @@ public final class DeterministicCameraCapture {
 				captureCurrentPoseInternally(minecraft);
 			} else {
 				try {
-					if (!GraphicsAuditBlockDisplayFixture.readyForCapture(minecraft)) {
+					if (!GraphicsAuditBlockDisplayFixture.readyForCapture(minecraft)
+						|| !GraphicsAuditGuiFoilTiming.readyForCapture()
+						|| !GraphicsAuditEquipmentFoilTiming.readyForCapture(poseIndex)
+						|| !GraphicsAuditWolfInputs.readyForCapture(minecraft, poseIndex)) {
 						// The pose is already settled. Observe the next normally
 						// rendered frame, not every eighth frame of an animation.
 						// Discard this candidate's readback and arm a fresh one so

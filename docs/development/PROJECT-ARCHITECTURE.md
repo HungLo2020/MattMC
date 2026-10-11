@@ -191,8 +191,19 @@ custom getter order retain their contracts.
 [Client residency](world/chunk-loading/RUST-CLIENT-RESIDENCY.md) in
 `world/level/client_residency/` owns logical slots, counts, center, position
 fingerprints and empty membership, using retained counters for ordinary scans.
-Java retains atomic chunk references, reference-CAS facts, ring/range reads,
+The [range index](world/chunk-loading/RUST-CLIENT-RANGES.md) now selects loaded
+stock chunks for block-entity and moving-piston scans through bounded pages;
+mutations invalidate unread entries between callbacks.
+Java retains atomic chunk references, reference-CAS facts, scalar ring/range reads,
 radius relocation and callback delivery. This is partial client-world ownership.
+
+The local [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
+retains primary position/bounds components per world and queries them directly
+for ordinary camera culling. The local [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md)
+in `world/level/entity_order/` retains client/server insertion order and immutable
+tick snapshots. Java keeps immutable API projections, object bindings, hooks,
+behavior callbacks and tick/extraction orchestration. These slices are under
+verification; general entity components and complete tick ownership remain unfinished.
 
 At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/mod.rs),
 DH world CPU ownership also includes columns, mutable full-data recipients,
@@ -489,7 +500,7 @@ Important current subdirectories:
 - `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
 - `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).
 - `render/worldrender/`: the world renderer ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/README.md)). `terrain/staging.rs` retains assembled vertices by mesh key and generation until asset acceptance or discard. `terrain/publication.rs` owns published section-layer identities and changed rows, synchronized directly into the Rust section graph. Java still registers/removes those identities, coordinates asset acceptance and resource-reload swaps, and supplies build/sort/atlas inputs. Ordinary opaque/cutout terrain uses shared page resource sets; per-mesh bindings are created only when needed outside that path, and section/material keys reuse resident geometry for the same mesh generation and vertex ABI. See [render resource preparation](rendering/RENDER-ARCHITECTURE.md), [terrain publication](rendering/JAVA-BRIDGE.md#terrain-publication-registry) and [terrain intake](rendering/JAVA-BRIDGE.md#terrain-layer-intake) for the ownership, copy and lifetime limits.
-- `render/guirender/`: the GUI renderer: sprites, quads, item meshes and rasters, the panorama and GUI post effects ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/README.md)).
+- `render/guirender/`: the GUI renderer: sprites, quads, item meshes and rasters, the panorama and GUI post effects ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/README.md)). Local ABI 80 [GUI item templates](rendering/RUST-GUI-ITEM-TEMPLATES.md) retain cached standard 3D render inputs in Rust and replace per-quad Java frame records; hardware/performance acceptance is pending.
 - `render/bridge/`: the Java FFI bridge: the `mattmc_vulkanic_gal_*` C ABI, wire records, decoding and the context registry. It is the only code that creates GALs and chooses their backend ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/README.md)).
 
 ### `assets/`
@@ -588,7 +599,9 @@ reference-CAS facts, projects ring reads, orchestrates relocation, and delivers
 compatibility callbacks. Exact Frozen CPU replay is supplemental evidence;
 the [release-separated runtime record](rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
 now includes bounded author-reported lifecycle/images and settled timings.
-The latest aggregate timing gate fails; broad temporal/streaming and long-memory
+The earlier linked aggregate timing gate fails; the subsequent
+[DH visibility checkpoint](rendering/RUST-DH-VISIBILITY.md) records a passing
+settled matrix for its own native image. Broad temporal/streaming and long-memory
 acceptance remain open.
 
 The local [DH change-hash producer](world/chunk/RUST-DH-CHANGE-HASH.md) owns

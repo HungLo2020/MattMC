@@ -86,6 +86,13 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class Level implements LevelAccessor, AutoCloseable {
+    private net.minecraft.world.entity.NativeEntityGeometry nativeEntityGeometry;
+
+    /** Shared primary component owner; Java keeps object identities and callbacks. */
+    public final synchronized net.minecraft.world.entity.NativeEntityGeometry nativeEntityGeometry() {
+        if(this.nativeEntityGeometry==null)this.nativeEntityGeometry=new net.minecraft.world.entity.NativeEntityGeometry();
+        return this.nativeEntityGeometry;
+    }
 	public static final Codec<ResourceKey<Level>> RESOURCE_KEY_CODEC = ResourceKey.codec(Registries.DIMENSION);
 	public static final ResourceKey<Level> OVERWORLD = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("overworld"));
 	public static final ResourceKey<Level> NETHER = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("the_nether"));

@@ -4,6 +4,7 @@
 //! world lock, and resume only afterwards. See the Frozen operation corpus.
 mod empty_set;
 mod ffi;
+mod range;
 use empty_set::EmptySet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

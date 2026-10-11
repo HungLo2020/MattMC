@@ -1078,35 +1078,57 @@ public final class RustGalGuiItemRenderer {
 			requestLayerOrder);
 		int estimatedBatchCount = 0;
 		for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) estimatedBatchCount += layer.quads().size();
-		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>(Math.max(estimatedBatchCount, 1));
-		int batchLayerIndex = 0;
-		for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
-				GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
-				float[] modelTransform = layer.modelTransformOwned();
-				for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
-					List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
-						? quad.bridgeVertices() : quad.bridgeFoilVertices();
-					batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
-						requestLayerOrder, batchLayerIndex++,
-						guiMaterialMode(layer.materialMode()),
-						// Ordinary inventory light space; Rust owns the light vectors.
-						layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), token.sequence(),
-						(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
-							|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
-						modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
-						guiWidth, guiHeight, 0, 0, 0,
-						clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
-						clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
-						vertices, QUAD_INDICES,
-						layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache, layer.nativeTransform()
-					));
-				}
-		}
-		if (batches.isEmpty()) return List.of();
+        var slot = mesh.template();
+        var template = slot == null ? null : slot.owner();
+        List<VulkanicGalBridge.GuiMeshBatchRecord> batches;
+        if (template == null) {
+            batches = new ArrayList<>(Math.max(estimatedBatchCount, 1));
+            int[] selectors = slot != null && slot.canRetain() ? new int[estimatedBatchCount] : null;
+            if (selectors != null) java.util.Arrays.fill(selectors, -1);
+			int batchLayerIndex = 0;
+			for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
+					GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
+					float[] modelTransform = layer.modelTransformOwned();
+					for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
+						List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
+							? quad.bridgeVertices() : quad.bridgeFoilVertices();
+                        if (selectors != null && layer.itemFoil() != null) selectors[batchLayerIndex] = layerIndex;
+						batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
+							requestLayerOrder, batchLayerIndex++,
+							guiMaterialMode(layer.materialMode()),
+							// Ordinary inventory light space; Rust owns the light vectors.
+							layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), token.sequence(),
+							(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
+								|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
+							modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
+							guiWidth, guiHeight, 0, 0, 0,
+							clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
+							clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
+							vertices, QUAD_INDICES,
+							layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache, layer.nativeTransform()
+						));
+					}
+			}
+			if (batches.isEmpty()) return List.of();
+            if (selectors != null) template = slot.retain(batches, selectors, mesh.layers().size());
+        } else {
+            batches = List.of();
+        }
+        if (template != null) {
+            GraphicsFrameBenchmark.recordCounterSample("gui.item-template.instances", 1L);
+            GraphicsFrameBenchmark.recordCounterSample("gui.item-template.expanded-batches", template.batchCount());
+            var foils = new VulkanicGalBridge.StandardItemFoilRecord[mesh.layers().size()];
+            for (int layer = 0; layer < foils.length; layer++) foils[layer] = mesh.layers().get(layer).itemFoil();
+            batches = List.of(VulkanicGalBridge.GuiMeshBatchRecord.nativeItem(template, foils,
+                requestLayerOrder, token.sequence(), guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
+                guiWidth, guiHeight, clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
+                clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(), itemCache));
+        }
+
 		RustGalFrameCoordinator.publishReservedGuiMeshItemRequest(token, batches);
 		mesh.sources().forEach(GuiItemTextureSource::stage);
-		for (var batch : batches) {
-			var foil = batch.itemFoil();
+		for (var layer : mesh.layers()) {
+			var foil = layer.itemFoil();
 			if (foil != null) {
 				net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeSemanticClock(
 					item.x(), item.y(), foil.clockMillis(), foil.speed(), foil.strength());
@@ -1122,7 +1144,7 @@ public final class RustGalGuiItemRenderer {
 				for (BakedQuad face : layer.quads()) net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
 			});
 		}
-		recordDiagnostic("mesh-accepted-layers=" + batches.size());
+		recordDiagnostic("mesh-accepted-layers=" + estimatedBatchCount);
 		return List.of(new RustGalGuiElementRenderState(
 			token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.standard3d", -1, -1.0F, GuiFillDirection.NONE,
 			mesh.left(), mesh.top(), mesh.right() - mesh.left(), mesh.bottom() - mesh.top(), guiWidth, guiHeight

@@ -1,7 +1,6 @@
 package net.minecraft.core;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntImmutableList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -41,8 +40,8 @@ import org.jetbrains.annotations.Nullable;
  * elements, IDs and the rest carry over in Rust. Each publish is a new
  * generation, and queries name the generation they expect. Registry
  * synchronization asks Rust which elements a client already knows and
- * which IDs each network tag holds; Java keeps decoded answers until the
- * registry they came from changes.
+ * which IDs each network tag holds; Java keeps immutable CPU views until the
+ * registry they came from changes. Queued payloads pin their original IDs.
  */
 public final class NativeRegistrySnapshot {
 	private static final Cleaner CLEANER = Cleaner.create();
@@ -67,8 +66,6 @@ public final class NativeRegistrySnapshot {
 		ValueLayout.ADDRESS, ValueLayout.JAVA_LONG);
 	private static final MethodHandle KNOWN = handle("registry_known_elements", ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS);
-	private static final MethodHandle TAGS = handle("registry_tags", ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS);
 	private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_registry_release",
 		FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT));
 	private static final MethodHandle BUFFER_FREE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_buffer_free",
@@ -99,8 +96,6 @@ public final class NativeRegistrySnapshot {
 		final List<List<ResourceLocation>> tagNames;
 		/** The member IDs last sent per tag, to send only what changed. */
 		final List<int[][]> sentIds;
-		/** Decoded lists of the previous generation per tag (aligned with `sentIds`), reused when unchanged. */
-		final List<IntList[]> decodedLists;
 		/** Java's reason a registry's tags cannot go over the network, or null. */
 		final String[] unserializable;
 		final List<Map<ResourceLocation, IntList>> networkTags;
@@ -116,7 +111,6 @@ public final class NativeRegistrySnapshot {
 			int size = registries.size();
 			this.tagNames = new ArrayList<>(Collections.nCopies(size, null));
 			this.sentIds = new ArrayList<>(Collections.nCopies(size, null));
-			this.decodedLists = new ArrayList<>(Collections.nCopies(size, null));
 			this.unserializable = new String[size];
 			this.networkTags = new ArrayList<>(Collections.nCopies(size, null));
 			this.knownElements = new ArrayList<>(size);
@@ -280,14 +274,12 @@ public final class NativeRegistrySnapshot {
 	 * Writes the registry at `index`'s tags (see `read_tags` in
 	 * `content/registry/ffi.rs`): unchanged members and names refer to the
 	 * previously sent tags. Returns the slot update to apply once Rust accepts
-	 * the publish, keeping the decoded lists of unchanged tags for reuse.
+	 * the publish. Network lists borrow the accepted Rust generation's storage.
 	 */
 	private static Runnable writeTags(Writer writer, Slot slot, int index, Walk walk) {
 		List<ResourceLocation> names = walk.names();
 		int[][] sent = slot.sentIds.get(index);
 		boolean sameNames = sent != null && names.equals(slot.tagNames.get(index));
-		IntList[] decoded = slot.decodedLists.get(index);
-		IntList[] reusable = new IntList[names.size()];
 		writer.u32(sameNames ? 0 : 1);
 		writer.u32(names.size());
 		for (int tag = 0; tag < names.size(); tag++) {
@@ -295,7 +287,6 @@ public final class NativeRegistrySnapshot {
 			int[] members = walk.ids()[tag];
 			if (earlier >= 0 && members == sent[earlier]) {
 				writer.u32(PREVIOUS | earlier);
-				reusable[tag] = decoded != null ? decoded[earlier] : null;
 				continue;
 			}
 			writer.u32(members.length);
@@ -319,7 +310,6 @@ public final class NativeRegistrySnapshot {
 		return () -> {
 			slot.tagNames.set(index, sentNames);
 			slot.sentIds.set(index, walk.ids());
-			slot.decodedLists.set(index, reusable);
 			slot.unserializable[index] = walk.unserializable();
 			slot.networkTags.set(index, null);
 		};
@@ -415,7 +405,7 @@ public final class NativeRegistrySnapshot {
 		return throwable instanceof IllegalStateException state ? state : new IllegalStateException("Registry snapshot query failed", throwable);
 	}
 
-	private static void check(ResourceKey<? extends Registry<?>> registry, long status) {
+	static void check(ResourceKey<? extends Registry<?>> registry, long status) {
 		if (status != 0L) {
 			throw new IllegalStateException(
 				status == STALE ? "Registry snapshot generation retired during a query" : "Registry snapshot has no registry " + registry.location()
@@ -511,52 +501,16 @@ public final class NativeRegistrySnapshot {
 		}
 	}
 
-	/** Whether a kept list still holds Rust's members (Rust stays the source). */
-	private static boolean matches(IntList list, int[] ids, int from, int count) {
-		if (list.size() != count) {
-			return false;
-		}
-		for (int member = 0; member < count; member++) {
-			if (list.getInt(member) != ids[from + member]) {
-				return false;
-			}
-		}
-		return true;
-	}
-
 	private static Map<ResourceLocation, IntList> decodeTags(Slot slot, int index, ResourceKey<? extends Registry<?>> registry) {
 		List<ResourceLocation> names = slot.tagNames.get(index);
+		if (names.isEmpty()) {
+			return Map.of();
+		}
 		Map<ResourceLocation, IntList> tags = new HashMap<>();
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment pointer = arena.allocate(ValueLayout.ADDRESS);
-			MemorySegment length = arena.allocate(ValueLayout.JAVA_LONG);
-			check(registry, (long)TAGS.invokeExact(slot.context, slot.generation, index, pointer, length));
-			long size = length.get(ValueLayout.JAVA_LONG, 0);
-			MemorySegment buffer = pointer.get(ValueLayout.ADDRESS, 0).reinterpret(size);
-			int[] ids = new int[(int)(size / 4)];
-			try {
-				MemorySegment.copy(buffer, ValueLayout.JAVA_INT_UNALIGNED, 0, ids, 0, ids.length);
-			} finally {
-				BUFFER_FREE.invokeExact(buffer, size);
-			}
-			IntList[] lists = slot.decodedLists.get(index);
-			int at = 0;
-			for (int tag = 0; tag < names.size(); tag++) {
-				int count = ids[at];
-				IntList list = lists[tag];
-				if (list == null || !matches(list, ids, at + 1, count)) {
-					list = new IntImmutableList(ids, at + 1, count);
-					lists[tag] = list;
-				}
-				// Insertion in publish order keeps Java's payload iteration order.
-				tags.put(names.get(tag), list);
-				at += 1 + count;
-			}
-			if (at != ids.length || size % 4 != 0) {
-				throw new IllegalStateException("Registry snapshot tags of " + registry.location() + " do not match their names");
-			}
-		} catch (Throwable throwable) {
-			throw failure(throwable);
+		IntList[] lists = NativeRegistryTagView.acquire(slot.context, slot.generation, index, registry, names.size());
+		for (int tag = 0; tag < names.size(); tag++) {
+			// Insertion in publish order keeps Java's payload iteration order.
+			tags.put(names.get(tag), lists[tag]);
 		}
 		return Collections.unmodifiableMap(tags);
 	}

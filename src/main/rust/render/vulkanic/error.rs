@@ -36,6 +36,8 @@ pub enum StatusCode {
     GenerationExhausted = -12,
     /// The backend lacks a capability the request needs.
     UnsupportedFeature = -13,
+    /// A bounded retained CPU store cannot admit another owner.
+    ResourceLimit = -14,
 }
 
 /// Which part of the GAL reported an error; values are part of the C ABI.

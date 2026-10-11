@@ -92,7 +92,7 @@ public final class GuiItemMeshSemanticCollector {
 				if (asset != null && sources.stream().noneMatch(existing -> existing.assetId() == asset.assetId()))
 					sources.add(new GuiItemTextureSource.Raw(asset));
 			}
-			topology = new CachedTopology(layers, sources, atlasUses, blockRaster);
+			topology = new CachedTopology(layers, sources, atlasUses, blockRaster, new TemplateSlot());
 			// Standard foil's frame clock is refreshed on every reuse below; the
 			// cached quads (and their resident geometry) stay shared.
 			boolean reusable = cacheKey != null;
@@ -113,7 +113,8 @@ public final class GuiItemMeshSemanticCollector {
 		return CollectionResult.accepted(new GuiItemMesh(
 			item.name(), item.x(), item.y(), left, top, right, bottom,
 			new float[] {item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()},
-			withCurrentFoil(topology.layers()), topology.sources(), topology.atlasUses(), topology.blockRaster()
+			withCurrentFoil(topology.layers()), topology.sources(), topology.atlasUses(), topology.blockRaster(),
+            stableTopology ? topology.template() : null
 		), stableTopology);
 	}
 
@@ -151,7 +152,7 @@ public final class GuiItemMeshSemanticCollector {
 		List<GuiItemMeshLayer> layers,
 		List<GuiItemTextureSource> sources,
 		List<GuiItemAtlasUse> atlasUses,
-		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockRaster
+		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockRaster, TemplateSlot template
 	) {
 		private CachedTopology {
 			layers = List.copyOf(layers);
@@ -159,6 +160,22 @@ public final class GuiItemMeshSemanticCollector {
 			atlasUses = List.copyOf(atlasUses);
 		}
 	}
+
+    /** Topology lifetime only; Rust retains the registered rendering input. */
+    static final class TemplateSlot {
+        private net.vulkanic.bridge.NativeGuiItemTemplate owner;
+        private boolean declined;
+        synchronized net.vulkanic.bridge.NativeGuiItemTemplate owner() { return owner; }
+        synchronized boolean canRetain() { return !declined; }
+        synchronized net.vulkanic.bridge.NativeGuiItemTemplate retain(
+            List<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord> batches, int[] selectors, int layers) {
+            if (owner == null && !declined) {
+                owner = net.vulkanic.bridge.VulkanicGalBridge.createGuiItemTemplate(batches, selectors, layers);
+                declined = owner == null;
+            }
+            return owner;
+        }
+    }
 
 	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, List<GuiItemMeshLayer> output,
 		List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses) {
@@ -347,8 +364,14 @@ public final class GuiItemMeshSemanticCollector {
 		String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
 		float[] guiPose,
 		List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses,
-		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster
+		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster,
+        TemplateSlot template
 	) {
+        public GuiItemMesh(String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
+            float[] guiPose, List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses,
+            net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster) {
+            this(itemIdentity, itemX, itemY, left, top, right, bottom, guiPose, layers, sources, atlasUses, blockItemRaster, null);
+        }
 		public GuiItemMesh(
 			String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
 			float[] guiPose, List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources,

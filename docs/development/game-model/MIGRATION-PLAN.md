@@ -78,8 +78,25 @@ Follow the owner boundary relevant to the next change:
 - **Client residency:** [native window bookkeeping](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md)
   owns logical slots, counts, center, position fingerprints and empty membership.
   Ordinary empty scans read retained counters and stop before each Java callback.
-  Java keeps atomic chunk references, ring/range reads, radius relocation and
+  [Loaded-range selection](../world/chunk-loading/RUST-CLIENT-RANGES.md) now
+  indexes stock coordinates incrementally and feeds block-entity/piston scans
+  through callback-validated pages. Java keeps atomic chunk references,
+  scalar ring/range reads, radius relocation and
   callback delivery; public empty-set escape transfers membership to Java.
+- **Entity world state:** the local [geometry slice](../world/entities/RUST-ENTITY-GEOMETRY.md)
+  owns primary position/bounds, coordinate-change policy and ordinary camera
+  queries in a per-world generational store. Java keeps immutable API projections,
+  callbacks and ordered extraction. The local
+  [ticking-membership owner](../world/entities/RUST-ENTITY-ORDER.md) now connects
+  client/server membership and snapshot traversal to Rust; behavior callbacks
+  and simulation orchestration remain Java, and production verification is pending.
+  After accepting these slices, move
+  active/despawn membership and section associations onto the same primary owner,
+  then migrate motion/collision producers and their consumers. AI, synchronized
+  data and networking need separate behavior and realistic performance checks.
+  The geometry slice's full suites/oracles and settled hardware checks pass;
+  the integrated gameplay matrix still misses vanilla p99. See the
+  [current performance boundary](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
 - **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),
   [section color fields](../world/biome/RUST-SECTION-COLORS.md),
   [live light layers](../world/lighting/RUST-LIVE-LAYERS.md) and the

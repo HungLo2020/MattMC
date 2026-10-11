@@ -75,7 +75,29 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 		} else if (!this.affectedByCulling(entity)) {
 			return true;
 		} else {
-			AABB aABB = this.getBoundingBoxForCulling(entity).inflate(0.5);
+			// Keep renderer/equipment callbacks before admission. Living renderers
+			// normally return this same immutable box; derived boxes retain their route.
+			AABB suppliedBounds = this.getBoundingBoxForCulling(entity);
+			var geometry=entity.nativeCullingGeometry();
+			var hooks=HookRegistry.getEntityRendererHooks();
+			boolean stockHooks=hooks.isEmpty() || hooks.size()==1 && hooks.getFirst().getClass()==net.vulkanic.world.RustGalEntityCullingHook.class;
+			if(geometry!=null && suppliedBounds==entity.getBoundingBox() && frustum.getClass()==Frustum.class && stockHooks) {
+				AABB bounds=geometry.cullingBounds();
+				if(!hooks.isEmpty() && Boolean.FALSE.equals(hooks.getFirst().onEntityFrustumCheck(this,entity,frustum,bounds)))return false;
+				boolean visible=entity.nativeCullingGeometry()==geometry && geometry.cullingBounds()==bounds
+					? frustum.isVisibleEntity(geometry) : frustum.isVisible(bounds);
+				if(visible)return true;
+				// Preserve original leash callbacks and renderer-specific holder bounds.
+				if(entity instanceof Leashable leashable) {
+					Entity holder=leashable.getLeashHolder();
+					if(holder!=null) {
+						AABB holderBounds=this.entityRenderDispatcher.getRenderer(holder).getBoundingBoxForCulling(holder);
+						return frustum.isVisible(holderBounds) || frustum.isVisible(bounds.minmax(holderBounds));
+					}
+				}
+				return false;
+			}
+			AABB aABB = suppliedBounds.inflate(0.5);
 			if (aABB.hasNaN() || aABB.getSize() == 0.0) {
 				aABB = new AABB(entity.getX() - 2.0, entity.getY() - 2.0, entity.getZ() - 2.0, entity.getX() + 2.0, entity.getY() + 2.0, entity.getZ() + 2.0);
 			}

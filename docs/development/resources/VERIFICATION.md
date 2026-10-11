@@ -100,6 +100,92 @@ rebound registry, as Frozen does, and then
 publishes the changed tags to Rust and decodes them. The first retag after
 publishing is one cold sample per run; it is reported, not gated.
 
+## Local integrated checkpoint and profiling
+
+The local `6673fac82` worktree with client-range/entity/GUI migrations builds
+release `e81fc916`. Serial Rust passes 2,649 tests (three ignored); Java executes
+2,001 tests (two skipped). Refreshed Frozen entity/range replays and all
+Current/native/Frozen/protected-prompt source guards pass. The fresh resource
+comparison uses five pairs, nine iterations and `--max-ratio 1.0`: all ten runs
+produce identical 89,630-line records, but performance acceptance fails only
+retagging (Current/Frozen 3.506/3.461 ms, ratio 1.013). The other eight warm
+median floors pass. Cold retagging is 6.084/4.712 ms and remains reported,
+ungated evidence. Receipts: `build/native-gui-item-templates-integrated/`.
+This is not combined client/server, GUI, gameplay/FPS or reload acceptance.
+
+For Linux CPU diagnostics, reuse that completed corpus with the paired
+[retag profiler](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/resources/ProfileResourceRetags.py):
+
+```sh
+python3 DevUtils/tests/resources/ProfileResourceRetags.py \
+  --verification build/native-gui-item-templates-integrated/resource-replay \
+  --output build/native-gui-item-templates-integrated/retag-profiles-v3 \
+  --java-home /path/to/jdk25 --profiler /path/to/asprof
+```
+
+The helper repeats the shared observer's actual registry loading, pending-tag
+loading, rebind and sync calls in fresh Current/Frozen JVMs. It samples each
+live process for 15 seconds and preserves collapsed stacks, native mappings,
+process identities and source/native guards. The observer’s existing `-- reload`
+label marks the sampling start, excluding initial registry setup and sync
+warm-up. Separate pending-tag loading from retag/sync stacks; both remain in
+the sampled phase. The earlier whole-call profiles include setup/sync and remain
+retained separately. The corrected phase-marker pair passes with clean process,
+source and native guards. Current snapshot publication/scanning accounts for
+401/289 overlapping samples of 15,436, and decoding for 76. These counts do not
+normalize per operation or prove the 1.3% cause. They identify the Java
+scan/native republish/Java decode boundary for further ownership work.
+Profiler timings cannot replace the five-pair gate.
+
+The next local candidate replaces copied network member lists with
+[immutable native views](TAGS-AND-REGISTRIES.md#registry-identity-snapshot).
+Release `a99b6f8d` builds; four focused Rust controls and two Java integration
+tests pass, including pointer identity, retirement, last-owner release,
+immutable duplicate/empty members, queued maps/sublists through 32 reloads and
+GC, and primitive packet wire ordering. The fresh full serial Rust suite also
+passes 2,651 tests (three ignored, zero failures). Full Java executes 2,002
+tests with two skips and no failures; Frozen entity/range replays pass, as do
+all source/native/Frozen/prompt guards and the wiki check.
+
+The fresh five-pair, nine-iteration resource replay passes the unchanged
+aggregate ratio-of-medians gate at `--max-ratio 1.0`; all ten runs produce
+identical 89,630-line records. Warm timings in milliseconds:
+
+| Timing | Current | Frozen | Ratio |
+| --- | --- | --- | --- |
+| Client list + read | 410.944 | 435.161 | 0.944 |
+| Client lookups | 58.285 | 73.045 | 0.798 |
+| Server list + read | 75.216 | 109.824 | 0.685 |
+| Server lookups | 25.639 | 34.682 | 0.739 |
+| Client manager | 0.875 | 1.086 | 0.806 |
+| Server manager | 0.413 | 0.549 | 0.752 |
+| Tag loading | 19.769 | 26.028 | 0.760 |
+| Registry sync | 2.621 | 2.970 | 0.882 |
+| Retag + sync | 3.751 | 5.603 | 0.670 |
+
+Retag paired ratios are 0.621, 1.153, 0.686, 0.664 and 0.688; one pair is
+slower, although the predeclared aggregate gate passes. Cold retag remains
+ungated and slower: 5.952/4.532 ms (1.313×). Current warm retag is also higher
+than the preceding candidate's 3.506 ms, while Frozen's median changed
+substantially. These separate fresh-JVM comparisons do not establish an
+isolated speedup or resolve cold-path cost. Keep both completed candidates;
+do not discard unfavorable pairs. Further holder/publication ownership and
+real reload/network/gameplay evaluation remain required.
+Receipts: `build/native-registry-tag-views/`. Corrected GUI reload comparisons pass plain items and static foil, but moving
+foil initially selected the wrong animation phase. The repaired route now passes
+all four fresh GUI pairs with source/native guards; exact capture evidence is in [GUI templates](../rendering/RUST-GUI-ITEM-TEMPLATES.md#current-integrated-gui-capture-boundary).
+At native `a99b6f8d`, the integrated runtime passes seven lifecycles and two settled world pairs,
+with zero VUIDs and source/native/Frozen/prepared-input guards passing.
+The allocation diagnostic also passes its guards. All 20 gameplay timing runs
+finished cleanly; all median FPS floors and three p99 floors pass, but vanilla
+p99 fails at 3.357/3.123 ms Current/Frozen. See the
+[complete integrated matrix](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+The newer combined `c487f375` checkpoint refreshes the full CPU suites, actual
+Frozen geometry/range/ticking replays and live lifecycle/world checks. Its
+20-run gameplay matrix still misses only vanilla p99; it does not repeat
+these resource timings. These checks do not establish first-frame,
+sustained-streaming or long-memory acceptance.
+
 ## Limits
 
 The [final integrity check](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/DevUtils/tests/resources/VerifyResourceStacks.py#L159-L162)

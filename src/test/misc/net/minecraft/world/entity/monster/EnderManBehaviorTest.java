@@ -402,6 +402,7 @@ class EnderManBehaviorTest {
     }
 
     private static void configureLevel(Level level) {
+        when(level.nativeEntityGeometry()).thenCallRealMethod();
         when(level.enabledFeatures()).thenReturn(FeatureFlags.DEFAULT_FLAGS);
         when(level.registryAccess()).thenReturn(registries);
         when(level.damageSources()).thenReturn(damageSources);
