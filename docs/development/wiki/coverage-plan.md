@@ -3203,3 +3203,10 @@ Linked the verified [#777 quad ownership review](https://github.com/HungLo2020/M
 See the [#777 ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6107119728)
 and [#709 evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6107121390);
 both issues remain open. The independent review inspected committed fixture bytes and source assertions, not runtime implementation execution. Both source commits and all incoming author evidence remain preserved.
+
+
+## Batch 395: Root crop yields and practical harvest controls
+
+- Expanded the existing Carrot/Potato/Beetroot owner with exact Fortune I–III ranges, the nonuniform bonus-roll distribution, replanting costs and the difference between breaking and MattMC reset harvesting. Preserved separate Poisonous Potato odds, mature Beetroot count and immature planting-item drops.
+- Clarified main-hand fallback versus hoe loot context, secondary-use dispatch, the block-drop rule and Beetroot Bone Meal consumption when the age increment is zero. Rechecked current native age defaults/tick eligibility while retaining the original review and citations.
+- One substantive player owner plus monthly/checkpoint records; no new page, item-route rewrite, source synchronization or gameplay implementation. Source/loot inspection and strict documentation checks do not establish in-game yield, growth timing or interaction acceptance.
