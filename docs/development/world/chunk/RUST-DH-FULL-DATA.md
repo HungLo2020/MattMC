@@ -1,9 +1,16 @@
 # Rust DH full-data columns
 
 The subsequent [retained source table](RUST-DH-SOURCE-TABLE.md) owns the live
-column references in Rust and feeds cached tint directly. It preserves primary
-point storage and list identity across writes; source orchestration, metadata
-bytes and persistence remain transitional Java work.
+column references in Rust and feeds cached tint directly. Rust retains point
+ownership while Java list identity survives writes; growth and detachment may
+change the backing storage. Source orchestration, metadata
+bytes and persistence remain transitional Java work. At
+[`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1),
+`FullDataSourceV2.close()` now closes that table in a `finally` path after its
+metadata-pool close. This releases table-owned leases; escaped readers retain
+their own leases and grouped allocations still have the separate GC lifetime
+described below. Source close is not a guarantee that every column allocation
+has been freed.
 
 Mutable full-data columns use Rust
 point vectors with direct CPU readers. Native producer columns detach on their
@@ -51,9 +58,9 @@ implementation-author reports, and this review did not rerun suites or clients.
 See the [current evidence checkpoint](../../rendering/GOAL-5-STATUS.md)
 for remaining runtime, performance and sustained-memory acceptance gates.
 
-Implementation: [point owner and occlusion](https://github.com/HungLo2020/MattMC/tree/5dcd25017197443df269f27193441a5580c6479a/src/main/rust/world/level/chunk/dh_columns),
-[CPU list](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnList.java)
-and [source consumer](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
+Implementation: [point owner and occlusion](https://github.com/HungLo2020/MattMC/tree/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns),
+[CPU list](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnList.java)
+and [source consumer](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
 The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.md).
 
 ## Constraints when changing this subsystem
@@ -91,12 +98,13 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
   remap table; it exports no point values. Custom/oversized inputs or enabled
   developer order validation retain per-column compatibility sequencing.
 - Demand-created empty lists from a full-data source share a
-  [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/5dcd25017197443df269f27193441a5580c6479a/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java).
+  [`NativeDhColumnGroup`](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhColumnGroup.java).
   Their mutable vectors register pointers under one automatic arena instead
   of creating one cleanup per vector. The source, grouped lists and retained
   segments keep that lifetime reachable; collection of the shared arena
   triggers the group's release callback. This is GC-driven release, not an
-  explicit source-close operation or a bounded release deadline.
+  explicit group-close operation or a bounded release deadline. The newer
+  source-table close releases its own leases separately.
 - Grouping follows `empty(group)` initialization and newly adopted vectors
   in the retained-source merge. Producer views and externally replaced lists
   do not automatically join a source's group;
@@ -213,6 +221,11 @@ Earlier release839ff128 misses vanilla p99 and DH median FPS. Neither old
 timings nor the supplemental oracle establish a speedup for this change.
 
 ## Grouped-column evidence
+
+This subsection records the earlier `5dcd2501` group-only change. The current
+source-table close and newly adopted merge-vector grouping are subsequent
+changes; they do not retroactively turn these measurements or two tests into
+verification of the newer lifetime paths.
 
 The [implementation commit](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a)
 reports 13.4 million phantom cleanables and about 2.2 GB of bookkeeping at

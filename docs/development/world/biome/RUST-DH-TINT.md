@@ -2,7 +2,7 @@
 
 The current implementation moves canonical DH block/biome tint-cache storage
 and cached neighborhood sampling into
-[`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/tint.rs).
+[`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/tint.rs).
 The normal tint getter reads the [retained Rust source table](../chunk/RUST-DH-SOURCE-TABLE.md)
 and material map directly. It exports no point arrays and builds no second source.
 Resolver callbacks and client registry/holder lookup remain Java. Custom wrappers,
@@ -10,7 +10,8 @@ nonempty Java columns, oversized spans and unsupported coordinates retain the
 original callback route. This is a CPU migration, not complete color rendering
 or server/client migration.
 
-Source reviewed at [`85475b61`](https://github.com/HungLo2020/MattMC/commit/85475b61defddd2da5e0d0a5f310093145a577d3).
+Current direct-source consumer reviewed at [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
+Earlier `007ebaef` timing and fixture reports below retain their historical scope.
 The execution counts and timings below, and the linked [hardware preflight](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures),
 are the author’s committed reports. This documentation review inspected implementation and test
 assertions; it did not rerun Java/Rust, benchmarks or clients, or inspect the
@@ -124,7 +125,7 @@ native image before each launch; those guards do not hash every Frozen/current
 classpath entry or independently establish its correspondence to source.
 No runtime, FPS, broad parity or sustained-memory acceptance follows.
 
-The [ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103285146)
+The [earlier ownership review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6103285146)
 independently decoded the committed fixtures: 288 neighborhoods with seven
 class pins and 8,296 point entries, plus 480 key operations across 32 histories,
 both ending exactly at EOF. This is fixture inspection, not a test rerun. The

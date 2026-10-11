@@ -1,8 +1,22 @@
 # Goal 5 rendering checkpoint
 
 **Goal 5 remains incomplete.** The current source review reaches
-[`5dcd2501`](https://github.com/HungLo2020/MattMC/commit/5dcd25017197443df269f27193441a5580c6479a).
-The latest follow-up groups the source-initialized mutable DH columns under
+[`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
+The latest [retained DH source table](../world/chunk/RUST-DH-SOURCE-TABLE.md)
+keeps primary column leases, hashes and copy proofs in Rust, with direct tint
+and same-detail consumers. Java still keeps lazy list identities, orchestration,
+metadata projections, persistence and compatibility callbacks. Source close
+now releases the table's leases; escaped readers and group-GC lifetime remain
+separate. The author reports 2,568 serial Rust passes/three ignored and 1,933
+Java cases reported/two skipped (1,931 executed). The synthetic repeated-update
+comparison **fails** at 102.18 versus 71.02 ms, or 1.439× Frozen. Earlier parallel
+X11/GLX `BadAccess` remains unresolved by a serial pass. These inspected reports
+provide no new gameplay, FPS, streaming or sustained-memory acceptance. See
+the [source-table review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6104462433)
+and [CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6104463092).
+
+The preceding `5dcd2501` follow-up
+grouped the source-initialized mutable DH columns under
 one automatic arena. [Its lifetime guide](../world/chunk/RUST-DH-FULL-DATA.md#grouped-column-evidence)
 distinguishes grouped initialization from producer/replacement owners and
 retained-reader lifetime. The author reports improved forced-crash delay and

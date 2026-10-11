@@ -9,7 +9,8 @@ review did not inspect their original files or rerun cleanup.
 
 ## Lossless validation archival: 2026-10-10
 
-The current cleanup archived 253 large JSON diagnostics from fourteen completed
+The [implementation author’s record](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/docs/development/rendering/ARTIFACT-STORAGE.md)
+reports archiving 253 large JSON diagnostics from fourteen completed
 October9 validation scopes. Each adjacent `.gz` was decompressed and its SHA256
 verified before removing the original. Actual free space increased21.08GiB;
 workspace paths, saves, screenshots, profile captures and the open investigations

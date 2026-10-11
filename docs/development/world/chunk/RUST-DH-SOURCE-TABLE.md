@@ -7,10 +7,15 @@ the migration. Stock tint calls no longer stage 9, 25 or 49 point descriptors,
 copy them across the boundary, or repeat the neighborhood plan in Java.
 Material IDs, point vectors and the table remain ordinary CPU data.
 
-Implementation: [source table](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/source.rs),
-[column leases](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/mutable.rs),
-[direct tint consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/tint.rs)
-and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhSource.java).
+Implementation: [source table](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/source.rs),
+[column leases](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/mutable.rs),
+[direct tint consumer](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/tint.rs)
+and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhSource.java).
+
+Source reviewed at [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
+The suite counts and timings below are implementation-author reports. This
+documentation review inspected source/test assertions, but reran no Java/Rust,
+client or benchmark checks and did not inspect untracked execution receipts.
 
 ## Ownership and mutation
 
@@ -37,10 +42,12 @@ and [temporary Java bindings](https://github.com/HungLo2020/MattMC/blob/master/s
   publication always copies because its recipient can differ from the source
   table that was prepared.
 - Immutable producer and parent points use typed Rust shared ownership. Binding
-  a source retains its existing allocation; it does not copy points. First writes
-  detach the same column into independent vector storage and release the former
-  producer lease. Java readers refresh their CPU views after growth or detachment.
-- Lazy source lists and newly adopted same-detail vectors share the source's
+  a source retains its existing allocation; it does not copy points. Writes
+  detach immutable spans without changing Java list identity. Clearing a
+  nonempty immutable list can install a new empty primary allocation; it need
+  not preserve the old allocation identity. Java readers refresh CPU views
+  after growth, detachment or replacement.
+- Lazy source lists and newly adopted retained-source merge vectors share the source's
   `NativeDhColumnGroup` automatic arena. First materialization of a grouped
   empty list retains that group. Immutable producer/parent spans retain their
   independent leases; replacement lists retain their original lifetime. One
@@ -112,8 +119,8 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-The combined tree based on upstream `d4400d33e`, including its audio policy
-and grouped lifetimes, passes the serial full Rust library suite: 2,568 passed,
+The author reports that the combined tree based on upstream `d4400d33e`,
+including audio policy and grouped lifetimes, passes the serial full Rust suite: 2,568 passed,
 three ignored, zero failures. Full Java reports 1,933 tests, two skips and zero
 failures/errors across 346 suites (1,931 executed). All six workers mapped release
 `86f20f9b`. Source/native/compiled-class/Frozen/fixture/protected-prompt guards
@@ -130,7 +137,7 @@ remains. A serial pass does not fix that race. An obsolete Java private
 hash-field assertion initially failed; its corrected control checks public
 hash behavior and preserves detached-owner checks. Initial failures are retained.
 
-Fresh synthetic CPU measurements use six alternating AB/BA pairs per workload,
+The author’s synthetic CPU measurements use six alternating AB/BA pairs per workload,
 identical compiled drivers, matching checksums and five warmup rounds at the
 measured operation count in every JVM. Builds, tests, observers, profiling and
 source hashing run outside timing windows. Medians:
@@ -146,7 +153,9 @@ source hashing run outside timing windows. Medians:
 | Tint radius 3, detail 7 | 50,000 | 20.34 | 41.84 | 0.486 |
 | Tint radius 3, detail 8 | 500,000 | 3.03 | 3.32 | 0.914 |
 
-Creation and all six tint cases pass scoped elapsed-time comparison. Repeated
+Creation and all six tint cases have author-reported Current medians below
+Frozen in these synthetic scenarios; detail 8 uses the unsmoothed tint-cache
+route. These ratios are not isolated renderer or server gains. Repeated
 same-detail updates **fail** scoped performance parity: 1.439× Frozen. Primary
 hash reuse, exact copy proofs and fused traversal improve earlier candidates,
 but that gap still needs profiling and further migration. This intermediate
@@ -154,7 +163,7 @@ ownership batch does not establish whole-game performance acceptance.
 Generation/compression storage, uniformity, orchestration, persistence and
 parent/occlusion transport remain work; move direct consumers with their owners.
 
-Use `DevUtils/tests/world/chunk/VerifyDhSource.py` with JDK25, the isolated
+Use [`VerifyDhSource.py`](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/DevUtils/tests/world/chunk/VerifyDhSource.py) with JDK25, the isolated
 Frozen/current classpath files, `--native-dir build/rust/native`, a fresh
 `--output` directory and `--mode create` or `merge`. The identical compiled
 workload runs five warmup rounds per JVM and alternates AB/BA; use six pairs for
@@ -163,3 +172,19 @@ builds, tests, profiling and source hashing outside timing windows.
 Receipts are retained in `build/native-dh-source-owner/`; failed initial builds
 remain there. Supplemental CPU fixtures and timing do not establish gameplay,
 FPS, sustained streaming or long-running host/GPU memory acceptance.
+
+The source benchmark uses a synthetic 4,096-column input with four points per
+column. Create mode includes hashing and close; merge mode changes the first
+input point, updates the target and hashes it each operation. The script checks
+exit/result shape, matching checksums and the native image before each run,
+but only records a timing ratio: no speed threshold controls its exit status.
+It initially hashes the compiled driver inputs, not every Frozen/current
+classpath entry. Warmup and measured rounds are separate CLI options; setting
+them equal is protocol guidance, not a constraint enforced by the script.
+Broader before/after source and Frozen integrity checks are
+author-reported receipt evidence, not additional checks implied by this command.
+
+The [ownership/lifetime review](https://github.com/HungLo2020/MattMC/issues/777#issuecomment-6104462433)
+and [reported CPU evidence review](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6104463092)
+retain these compatibility, grouped-adoption and acceptance limits. Both issues
+remain open; this documentation review ran no suites or runtime workloads.

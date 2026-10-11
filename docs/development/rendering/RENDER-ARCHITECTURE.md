@@ -144,9 +144,12 @@ DH render-column ledger and GPU resources. Preserve section-local snapshot timin
 and caller exclusion; no whole-world transaction or runtime/performance acceptance
 is implied by the ownership change.
 
-[Cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md) now keep canonical
-colors and admitted cached sampling in Rust over existing column/material owners.
-Resolver-driven traversal and unsupported inputs keep Java callback semantics.
+[Cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md) keep canonical
+colors and admitted cached sampling in Rust. The [retained source table](../world/chunk/RUST-DH-SOURCE-TABLE.md)
+now supplies primary columns directly to tint and same-detail updates, avoiding
+normal per-neighborhood Java descriptor staging. Source-table lease release is
+separate from escaped-reader/group lifetime. Resolver-driven traversal and
+unsupported inputs keep Java callback semantics.
 
 [Map images](../game-model/MAP-COLORS.md) similarly cross as indexed CPU colors;
 Rust expands ordinary RGBA textures and owns native map material policy. The

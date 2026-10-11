@@ -16,16 +16,23 @@ Base-state hashing also reads the retained Rust table.
 The parent producer and complete occlusion pass are documented in
 [full-data columns](RUST-DH-FULL-DATA.md). Complete Java removal remains open.
 
-Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are
-implementation-author reports, and this review did not rerun suites or clients.
-See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-retained-world-and-dh-reduction-cpu-checkpoint)
+Current direct-source path reviewed at [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1).
+The earlier `5de23173a` release results below remain historical
+implementation-author reports; this review reran no suites or clients.
+See the [current evidence checkpoint](../../rendering/GOAL-5-STATUS.md)
 for remaining runtime, performance and sustained-memory acceptance gates.
 
-Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
-[CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
-[ordinary source consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
+Implementation: [merge policy and publication](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/same_detail.rs),
+[CPU bridge](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/net/minecraft/world/level/chunk/NativeDhSameDetailMerge.java),
+[ordinary source consumer](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/java/com/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2.java).
 
 ## Lifetime and compatibility rules
+
+Prepared merge batches now have explicit `close()`. The source caller closes
+the batch in `finally` when it has published no non-null contributor footprint;
+this is a conservative publication flag, not a reachability test. Contributor
+readers keep the batch lifetime. This does not establish
+a GC release deadline or permit closing a batch while those readers are live.
 
 - Keep caller exclusion across preparation and publication. Prepared source
   spans are borrowed native CPU data, not a source snapshot or a transaction.
@@ -36,7 +43,8 @@ Implementation: [merge policy and publication](https://github.com/HungLo2020/Mat
 - The direct route reuses source-owned identity proofs until structural binding
   changes. Point growth cannot change primary identity. Preparation rejects
   duplicate recipient identities and any source/recipient primary alias.
-  Direct commit checks the recipient structural version again before mutation;
+  Direct commit rechecks source/recipient structural versions and the target
+  remap stamp before mutation;
   distinct Rust-owned vectors cannot overlap. Compatibility descriptor commits
   retain their explicit allocation-overlap and identity checks.
 - Preserve existing recipient list identity and vector capacity. Null recipients
@@ -60,8 +68,10 @@ Implementation: [merge policy and publication](https://github.com/HungLo2020/Mat
   the original per-column route before point publication. That route retains
   custom callbacks and the successful prefix when a later update throws.
   Developer order validation also keeps its original sequencing.
-- Scratch buffers and identity tables are bounded per calling thread; tables
-  are cleared in `finally`. The prepared owner retains bounded metadata and
+- Compatibility scratch buffers and identity maps are bounded per calling
+  thread; the maps clear in `finally`. Retained-source identity proofs instead
+  live with the source until structural invalidation or close, with at most
+  4,096 identities. The prepared owner retains bounded metadata and
   footprints while readers exist. Validate total retention in sustained runtime
   memory checks before claiming resource acceptance.
 
@@ -75,7 +85,7 @@ CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./
 python3 DevUtils/RunWiki.py check
 ```
 
-The [Frozen recorder](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/GenerateFrozenDhSameDetailOracle.java)
+The [Frozen recorder](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/DevUtils/tests/world/chunk/GenerateFrozenDhSameDetailOracle.java)
 checks Frozen's compiled source identity and invokes its actual private
 same-detail update. DHM1 records 48 cases: 16 synthetic cases cover all 65,536
 signed generation pairs, and 32 use saved point sources. Each has two updates. It records full points/metadata,
