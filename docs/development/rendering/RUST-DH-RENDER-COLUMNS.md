@@ -7,8 +7,9 @@ point buffer, construct reducer nodes, sort links or repeat reduction policy.
 Full-data conversion still performs contextual block-color callbacks in Java.
 [Cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md) use retained
 native column/material inputs and Rust cache storage, with recorded Frozen CPU
-replay and scoped timing verification. Face construction, greedy merging and
-final packet construction also remain.
+replay and scoped timing verification. Face construction and final packet
+construction also remain. The ordinary [DH quad builder](RUST-DH-QUADS.md)
+now owns quad storage and greedy policy in Rust; subclasses retain Java compatibility.
 This is backend-independent CPU render policy, with no GPU handles or presenter.
 
 Source reviewed at [`5de23173a`](https://github.com/HungLo2020/MattMC/commit/5de23173ae5b61fb17887589d4dff69a6b17fc77) on 2026-10-10; the release results below are

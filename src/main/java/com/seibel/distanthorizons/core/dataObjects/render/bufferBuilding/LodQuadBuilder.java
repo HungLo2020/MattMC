@@ -24,7 +24,7 @@ import org.lwjgl.system.MemoryUtil;
  *
  * Note: the magic number 6 you see throughout this method represents the number of sides on a cube.
  */
-public class LodQuadBuilder
+public class LodQuadBuilder implements AutoCloseable
 {
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
@@ -33,6 +33,7 @@ public class LodQuadBuilder
 	@SuppressWarnings("unchecked")
 	private final ArrayList<BufferQuad>[] transparentQuads = (ArrayList<BufferQuad>[]) new ArrayList[6];
 	
+	private final NativeDhQuadBuilder nativeQuads;
 	private final boolean doTransparency;
 	private final IClientLevelWrapper clientLevelWrapper;
 	
@@ -129,10 +130,13 @@ public class LodQuadBuilder
 	public LodQuadBuilder(boolean doTransparency, IClientLevelWrapper clientLevelWrapper)
 	{
 		this.doTransparency = doTransparency;
+		this.nativeQuads = getClass() == LodQuadBuilder.class ? new NativeDhQuadBuilder(doTransparency) : null;
 		for (int i = 0; i < 6; i++)
 		{
-			this.opaqueQuads[i] = new ArrayList<>();
-			this.transparentQuads[i] = new ArrayList<>();
+			if (nativeQuads == null) {
+				this.opaqueQuads[i] = new ArrayList<>();
+				this.transparentQuads[i] = new ArrayList<>();
+			}
 		}
 		
 		this.clientLevelWrapper = clientLevelWrapper;
@@ -175,6 +179,8 @@ public class LodQuadBuilder
 	/** Bounded source-side evidence for copied material provenance. */
 	public SemanticQuadCoverage semanticQuadCoverage()
 	{
+		if (nativeQuads != null) return new SemanticQuadCoverage(nativeQuads.count(2), nativeQuads.count(3), nativeQuads.count(4),
+			nativeQuads.count(5), nativeQuads.count(6), nativeQuads.count(7));
 		return new SemanticQuadCoverage(
 			this.emittedKnownSemanticQuads,
 			this.emittedMixedSemanticQuads,
@@ -228,6 +234,11 @@ public class LodQuadBuilder
 		}
 		
 		
+		if (nativeQuads != null) {
+			nativeQuads.add(dir, x, y, z, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId, skyLight, blockLight,
+				semanticMaterialId, semanticVariantState, semanticVariantPosition, true);
+			return;
+		}
 		ArrayList<BufferQuad> quadList;
 		if (this.shouldUseTransparentBuffer(color, irisBlockMaterialId))
 		{
@@ -280,6 +291,11 @@ public class LodQuadBuilder
 
 	public void addQuadUp(short minX, short maxY, short minZ, short widthEastWest, short widthNorthSouthOrUpDown, int color, byte irisBlockMaterialId, byte skylight, byte blocklight, int semanticMaterialId, byte semanticVariantState, long semanticVariantPosition) // TODO argument names are wrong
 	{
+		if (nativeQuads != null) {
+			nativeQuads.add(EDhDirection.UP, minX, maxY, minZ, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId, skylight, blocklight,
+				semanticMaterialId, semanticVariantState, semanticVariantPosition, false);
+			return;
+		}
 		boolean isTransparent = this.shouldUseTransparentBuffer(color, irisBlockMaterialId);
 		ArrayList<BufferQuad> quadList = isTransparent 
 				? this.transparentQuads[EDhDirection.UP.ordinal()] 
@@ -305,6 +321,11 @@ public class LodQuadBuilder
 
 	public void addQuadDown(short x, short y, short z, short width, short wz, int color, byte irisBlockMaterialId, byte skylight, byte blocklight, int semanticMaterialId, byte semanticVariantState, long semanticVariantPosition)
 	{
+		if (nativeQuads != null) {
+			nativeQuads.add(EDhDirection.DOWN, x, y, z, width, wz, color, irisBlockMaterialId, skylight, blocklight,
+				semanticMaterialId, semanticVariantState, semanticVariantPosition, false);
+			return;
+		}
 		ArrayList<BufferQuad> quadArray = this.shouldUseTransparentBuffer(color, irisBlockMaterialId)
 				? this.transparentQuads[EDhDirection.DOWN.ordinal()]
 				: this.opaqueQuads[EDhDirection.DOWN.ordinal()];
@@ -323,6 +344,7 @@ public class LodQuadBuilder
 	/** Uses Greedy meshing to merge this builder's Quads. */
 	public void mergeQuads()
 	{
+		if (nativeQuads != null) { nativeQuads.merge(); return; }
 		long mergeCount = 0; // can be used for debugging
 		long preQuadsCount = this.getCurrentOpaqueQuadsCount() + this.getCurrentTransparentQuadsCount();
 		if (preQuadsCount <= 1)
@@ -498,13 +520,22 @@ public class LodQuadBuilder
 	 * staging buffers: Rust owns the eventual GPU asset and the fixed-layout
 	 * bytes are the semantic boundary, not an OpenGL upload source.
 	 */
-	public SemanticVertexBufferBuild makeOpaqueRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER, quad -> true); }
-	public SemanticVertexBufferBuild makeTransparentRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER, quad -> true); }
-	public SemanticVertexBufferBuild makeTransparentUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
-	public SemanticVertexBufferBuild makeTransparentWaterUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
+	public SemanticVertexBufferBuild makeOpaqueRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(false, DEFAULT_DIRECTION_RENDER_ORDER), DEFAULT_DIRECTION_RENDER_ORDER, quad -> true); }
+	public SemanticVertexBufferBuild makeTransparentRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(true, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER), TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER, quad -> true); }
+	public SemanticVertexBufferBuild makeTransparentUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(true, TRANSPARENT_UP_DIRECTION_RENDER_ORDER), TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
+	public SemanticVertexBufferBuild makeTransparentWaterUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.quadsForPacket(true, TRANSPARENT_UP_DIRECTION_RENDER_ORDER), TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
+
+	/** Native rows are copied once for packet encoding; no persistent Java quad mirror. */
+	@SuppressWarnings("unchecked")
+	private List<BufferQuad>[] quadsForPacket(boolean transparent, int[] directions) {
+		if (nativeQuads == null) return transparent ? transparentQuads : opaqueQuads;
+		List<BufferQuad>[] result = (List<BufferQuad>[]) new List[6];
+		for (int direction : directions) result[direction] = nativeQuads.snapshot(transparent ? 1 : 0, direction);
+		return result;
+	}
 
 	private SemanticVertexBufferBuild makeSemanticVertexBufferBuild(
-		ArrayList<BufferQuad>[] quadList,
+		List<BufferQuad>[] quadList,
 		int[] directionRenderOrder,
 		Predicate<BufferQuad> quadFilter
 	) {
@@ -553,7 +584,7 @@ public class LodQuadBuilder
 	}
 
 	private static int countMatchingQuads(
-		ArrayList<BufferQuad>[] quadList,
+		List<BufferQuad>[] quadList,
 		int[] directionRenderOrder,
 		Predicate<BufferQuad> quadFilter
 	) {
@@ -884,12 +915,16 @@ public class LodQuadBuilder
 	
 	
 	
+	/** Release transient native topology after synchronous packet construction. */
+	@Override public void close() { if (nativeQuads != null) nativeQuads.close(); }
+
 	//=========//
 	// getters //
 	//=========//
 	
 	public int getCurrentOpaqueQuadsCount()
 	{
+		if (nativeQuads != null) return nativeQuads.count(0);
 		int i = 0;
 		for (ArrayList<BufferQuad> quadList : this.opaqueQuads)
 		{
@@ -900,6 +935,7 @@ public class LodQuadBuilder
 	}
 	public int getCurrentTransparentQuadsCount()
 	{
+		if (nativeQuads != null) return nativeQuads.count(1);
 		if (!this.doTransparency)
 		{
 			return 0;

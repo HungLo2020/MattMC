@@ -290,7 +290,8 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 						}
 						finally
 						{
-							// can only be closed after the data has been processed and uploaded to the GPU
+							// Packet construction is synchronous; the collector owns its copies.
+							lodQuadBuilder.close();
 							thisRenderSource.close();
 						}
 					});

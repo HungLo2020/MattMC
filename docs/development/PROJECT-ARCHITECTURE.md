@@ -200,6 +200,11 @@ contextual colors/material resolution, faces, greedy mesh assembly and final
 packets. The following release-specific records describe successive checkpoints;
 they do not verify the combined source's runtime or performance.
 
+Ordinary [DH quad builds](rendering/RUST-DH-QUADS.md) now retain directional
+quad storage, opacity admission, premerging and greedy policy in Rust. Java
+retains face production and final packet encoding, with contextual callbacks;
+subclass compatibility remains Java. This advances the reviewed checkpoint above.
+
 Admitted [DH height fields](world/chunk/RUST-DH-HEIGHTMAPS.md) in
 `world/level/chunk/dh_heightmaps/` scan live block owners and section counters
 using the bounded intrinsic collision catalog in `content/block/collision/`.

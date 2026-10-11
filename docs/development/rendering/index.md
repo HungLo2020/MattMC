@@ -13,6 +13,8 @@ each module there has a short README with its own file map.
   API overrides and direct pose consumption with bounded lifetime.
 - [Rust DH render columns](RUST-DH-RENDER-COLUMNS.md): compact-column reduction,
   water/material policy, borrowed storage and actual Frozen CPU replay.
+- [Rust DH quad builds](RUST-DH-QUADS.md): build-local quad storage, premerging,
+  greedy topology, semantic outcomes and Frozen verification.
 - [Native terrain face policy](RUST-TERRAIN-CULLING.md): direct retained-state
   culling, immutable geometry ownership and callback compatibility.
 - [Bulk Rust terrain lighting](RUST-TERRAIN-LIGHTING.md): direct retained light

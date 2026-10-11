@@ -7,6 +7,7 @@ pub mod shaderpack;
 pub mod chunk;
 pub(crate) mod dh_collector;
 pub(crate) mod dh_columns;
+pub(crate) mod dh_quads;
 pub mod vulkanic;
 pub(crate) mod clouds;
 pub(crate) mod items;
