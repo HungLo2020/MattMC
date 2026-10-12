@@ -78,6 +78,13 @@ public class ProtoChunk extends ChunkAccess {
 		this.fluidTicks = protoChunkTicks2;
 	}
 
+	/** Section-less base for {@link ImposterProtoChunk}, which reads its wrapped chunk's sections. */
+	ProtoChunk(ChunkPos chunkPos, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, @Nullable BlendingData blendingData) {
+		super(chunkPos, UpgradeData.EMPTY, levelHeightAccessor, palettedContainerFactory, 0L, null, blendingData, false);
+		this.blockTicks = new ProtoChunkTicks<>();
+		this.fluidTicks = new ProtoChunkTicks<>();
+	}
+
 	@Override
 	public TickContainerAccess<Block> getBlockTicks() {
 		return this.blockTicks;

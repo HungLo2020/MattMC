@@ -45,9 +45,9 @@ final class NativeLiveBlockSection {
     static NativeLiveBlockSection adoptOwned(MemorySegment pointer) {
         if (pointer.address() == 0) throw new IllegalStateException("Missing native live section");
         MemorySegment scoped;
-        try { scoped = pointer.asReadOnly().reinterpret(1, Arena.ofAuto(), p -> release(RELEASE, p)); }
+        // Callers pin the section by holding this segment, so it is the reclaimer's referent.
+        try { scoped = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(scoped, pointer, NativeReclaimer.LIVE_SECTION); }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
-        // Register the unique cleanup before allocating the Java projection.
         return new NativeLiveBlockSection(scoped);
     }
     private NativeLiveBlockSection(MemorySegment scoped) {
@@ -95,15 +95,14 @@ final class NativeLiveBlockSection {
         try {
             if ((int) VIEW.invokeExact(this.owner, h) != 0) throw new IllegalStateException("Invalid native section view");
             lease = h.getAtIndex(ValueLayout.ADDRESS, 5);
-            var arena = Arena.ofAuto();
             int bits = h.getAtIndex(ValueLayout.JAVA_INT, 0), requested = h.getAtIndex(ValueLayout.JAVA_INT, 1);
             boolean global = h.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
-            var words = h.getAtIndex(ValueLayout.ADDRESS, 2).asReadOnly().reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L, arena, null);
-            var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).asReadOnly().reinterpret((global ? 0 : bits == 0 ? 1 : (1 << bits) + (bits >= 5 ? 1 : 0)) * 4L, arena, null);
-            var count = h.getAtIndex(ValueLayout.ADDRESS, 4).asReadOnly().reinterpret(4, arena, null);
-            // Build every allocating projection before registering the single cleanup owner.
+            var words = h.getAtIndex(ValueLayout.ADDRESS, 2).reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L).asReadOnly();
+            var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).reinterpret((global ? 0 : bits == 0 ? 1 : (1 << bits) + (bits >= 5 ? 1 : 0)) * 4L).asReadOnly();
+            var count = h.getAtIndex(ValueLayout.ADDRESS, 4).reinterpret(4).asReadOnly();
+            // The view's segments are read only through the view, so the view pins its generation.
             var result = new View(bits, requested, global, words, palette, count);
-            result.pin = lease.asReadOnly().reinterpret(1, arena, p -> release(VIEW_RELEASE, p));
+            NativeReclaimer.register(result, lease, NativeReclaimer.LIVE_SECTION_VIEW);
             adopted = true;
             return result;
         } catch (RuntimeException | Error failure) { throw failure; }
@@ -115,7 +114,6 @@ final class NativeLiveBlockSection {
         final boolean global;
         final long mask;
         final MemorySegment words, palette, count;
-        private MemorySegment pin;
         View(int bits, int requested, boolean global, MemorySegment words, MemorySegment palette, MemorySegment count) {
             this.bits = bits; this.requested = requested; this.global = global; this.words = words; this.palette = palette; this.count = count;
             this.per = bits == 0 ? 0 : 64 / bits; this.mask = (1L << bits) - 1;

@@ -35,8 +35,9 @@ is a temporary CPU bridge, not a second authority.
   Failed recounts publish no counts. Network reads replace only the nonempty
   lane, before decoding blocks; failed block reads retain that changed lane.
 - The local [chunk-input migration](RUST-DH-CHUNK-INPUTS.md) makes counter owners
-  reference counted so native consumers retain them directly. Each automatic
-  arena cleanup releases its one ownership reference. Retained CPU views pin
+  reference counted so native consumers retain them directly. The [native
+  reclaimer](NATIVE-RECLAIMER.md) releases Java's one ownership reference once
+  the owner segment is unreachable. Retained CPU views pin
   it; mutation and generation downcalls fence their section/owner references.
   The packed word is an atomic counter snapshot, not an atomic combined read of
   block storage and counts; callers must retain the existing exclusion rules.

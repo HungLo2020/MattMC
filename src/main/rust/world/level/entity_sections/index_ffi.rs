@@ -298,6 +298,21 @@ pub unsafe extern "C" fn mattmc_section_index_chunk_cursor(
         head != 0,
     )
 }
+fn spatial(bounds: &[f64; 6]) -> Cursor {
+    Cursor {
+        head: 0,
+        end: 0,
+        spatial: Some(Spatial {
+            x: section(bounds[0] - 2.0),
+            min_y: section(bounds[1] - 4.0),
+            min_z: section(bounds[2] - 2.0),
+            max_x: section(bounds[3] + 2.0),
+            max_y: section(bounds[4] + 0.0),
+            max_z: section(bounds[5] + 2.0),
+            opened: false,
+        }),
+    }
+}
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_index_spatial_cursor(
     owner: *const c_void,
@@ -309,28 +324,39 @@ pub unsafe extern "C" fn mattmc_section_index_spatial_cursor(
     if bounds.is_null() {
         return std::ptr::null_mut();
     }
-    let b = &*bounds.cast::<[f64; 6]>();
-    let s = Spatial {
-        x: section(b[0] - 2.0),
-        min_y: section(b[1] - 4.0),
-        min_z: section(b[2] - 2.0),
-        max_x: section(b[3] + 2.0),
-        max_y: section(b[4] + 0.0),
-        max_z: section(b[5] + 2.0),
-        opened: false,
-    };
+    let c = spatial(&*bounds.cast::<[f64; 6]>());
+    let active = c.spatial.is_some_and(|s| s.x <= s.max_x);
     let mut d = o.data.lock().unwrap();
-    let active = s.x <= s.max_x;
-    lease(
-        o,
-        &mut d,
-        Cursor {
-            head: 0,
-            end: 0,
-            spatial: Some(s),
-        },
-        active,
-    )
+    lease(o, &mut d, c, active)
+}
+/// Reuses a closed cursor's lease for a new spatial search, so a hot query
+/// path allocates no lease (and Java no cleanup registration) per search.
+/// Returns 0, or -1 for a missing/open cursor or missing bounds.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_index_spatial_reopen(cursor: *mut c_void, bounds: *const f64) -> i32 {
+    let Some(l) = cursor.cast::<Lease>().as_mut() else {
+        return -1;
+    };
+    if bounds.is_null() {
+        return -1;
+    }
+    let c = spatial(&*bounds.cast::<[f64; 6]>());
+    let active = c.spatial.is_some_and(|s| s.x <= s.max_x);
+    let mut d = l.owner.data.lock().unwrap();
+    if d.cursors.contains_key(&l.id) {
+        return -1;
+    }
+    d.next = d
+        .next
+        .checked_add(1)
+        .expect("section cursor identity exhausted");
+    l.id = d.next;
+    d.cursors.insert(l.id, c);
+    l.view = CursorView {
+        active: i32::from(active),
+        ..Default::default()
+    };
+    0
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_index_cursor_view(cursor: *const c_void) -> *const c_void {
@@ -463,6 +489,28 @@ mod tests {
             assert_eq!(mattmc_section_index_cursor_next(cursor), 0);
             mattmc_section_index_cursor_release(cursor);
             assert!(weak.upgrade().is_none());
+        }
+    }
+    #[test]
+    fn reopened_spatial_cursor_searches_again_and_rejects_open_leases() {
+        unsafe {
+            let owner = mattmc_section_index_create();
+            insert(owner, encode(0, 0, 0));
+            let b = [1.0, 1.0, 1.0, 2.0, 2.0, 2.0];
+            let cursor = mattmc_section_index_spatial_cursor(owner, b.as_ptr());
+            assert_eq!(-1, mattmc_section_index_spatial_reopen(cursor, b.as_ptr()));
+            assert_eq!(mattmc_section_index_cursor_next(cursor), 1);
+            assert_eq!(mattmc_section_index_cursor_next(cursor), 0);
+            mattmc_section_index_cursor_close(cursor);
+            for _ in 0..2 {
+                assert_eq!(0, mattmc_section_index_spatial_reopen(cursor, b.as_ptr()));
+                assert_eq!(mattmc_section_index_cursor_next(cursor), 1);
+                assert_eq!((*cursor.cast::<Lease>()).view.key, encode(0, 0, 0));
+                mattmc_section_index_cursor_close(cursor);
+            }
+            assert!((*owner.cast::<Index>()).data.lock().unwrap().cursors.is_empty());
+            mattmc_section_index_cursor_release(cursor);
+            mattmc_section_index_release(owner);
         }
     }
     #[test]

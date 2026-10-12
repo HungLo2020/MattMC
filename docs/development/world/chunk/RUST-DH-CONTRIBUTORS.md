@@ -53,7 +53,8 @@ parent reduction and occlusion; its older verification does not accept this sour
   explicit value export. Never share a view of mutable source storage instead
   of capturing independent values.
 - Source replacement, world close or clearing a render column must not alter
-  readers already retained elsewhere. CPU leases release the native owner;
+  readers already retained elsewhere. CPU leases release the native owner through the
+  [native reclaimer](NATIVE-RECLAIMER.md) once no column holds it;
   there is no global footprint cache. A reader from the batched producer retains
   the whole quadrant's immutable point/footprint owner; include this retention
   in runtime memory checks. Existing source exclusion remains required.

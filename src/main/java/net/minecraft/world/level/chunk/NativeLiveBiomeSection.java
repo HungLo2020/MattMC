@@ -99,7 +99,8 @@ final class NativeLiveBiomeSection<T> {
         return new NativeLiveBiomeSection<>(pointer, binding);
     }
     private NativeLiveBiomeSection(MemorySegment pointer, Binding<T> binding, SingletonAliases<T> aliases) {
-        try { this.owner = pointer.asReadOnly().reinterpret(1, Arena.ofAuto(), p -> release(RELEASE, p)); }
+        // Callers pin the section by holding this segment, so it is the reclaimer's referent.
+        try { this.owner = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(this.owner, pointer, NativeReclaimer.LIVE_BIOME); }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
         this.binding = binding; this.view = loadView();
         if (view.bits == 0) {
@@ -138,7 +139,7 @@ final class NativeLiveBiomeSection<T> {
         } catch (Throwable failure) { throw failure(failure); }
     }
     private record View(int bits, int requested, boolean global, MemorySegment words,
-                        MemorySegment palette, MemorySegment count, MemorySegment pin) {
+                        MemorySegment palette, MemorySegment count) {
         int id(int index) {
             org.apache.commons.lang3.Validate.inclusiveBetween(0L, 63L, index);
             if (bits == 0) return (int) INT.getAcquire(palette, 0L);
@@ -152,15 +153,16 @@ final class NativeLiveBiomeSection<T> {
         var h = SCRATCH.get().header; MemorySegment lease = MemorySegment.NULL; boolean adopted = false;
         try {
             if ((int) VIEW.invokeExact(owner, h) != 0) throw new IllegalStateException("Invalid native biome view");
-            lease = h.getAtIndex(ValueLayout.ADDRESS, 5); var arena = Arena.ofAuto();
+            lease = h.getAtIndex(ValueLayout.ADDRESS, 5);
             int bits = h.getAtIndex(ValueLayout.JAVA_INT, 0), requested = h.getAtIndex(ValueLayout.JAVA_INT, 1);
             boolean global = h.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
-            var words = h.getAtIndex(ValueLayout.ADDRESS, 2).asReadOnly().reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L, arena, null);
-            var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).asReadOnly().reinterpret((global ? 0 : bits == 0 ? 1 : 1 << bits) * 4L, arena, null);
-            var count = h.getAtIndex(ValueLayout.ADDRESS, 4).asReadOnly().reinterpret(4, arena, null);
-            // Register one cleanup owner before allocating the final Java projection.
-            var pin = lease.asReadOnly().reinterpret(1, arena, p -> release(VIEW_RELEASE, p));
-            adopted = true; return new View(bits, requested, global, words, palette, count, pin);
+            var words = h.getAtIndex(ValueLayout.ADDRESS, 2).reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L).asReadOnly();
+            var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).reinterpret((global ? 0 : bits == 0 ? 1 : 1 << bits) * 4L).asReadOnly();
+            var count = h.getAtIndex(ValueLayout.ADDRESS, 4).reinterpret(4).asReadOnly();
+            // The view's segments are read only through the view, so the view pins its generation.
+            var view = new View(bits, requested, global, words, palette, count);
+            NativeReclaimer.register(view, lease, NativeReclaimer.LIVE_BIOME_VIEW);
+            adopted = true; return view;
         } catch (Throwable failure) { throw failure(failure); }
         finally { if (!adopted && lease.address() != 0) release(VIEW_RELEASE, lease); Reference.reachabilityFence(this); }
     }

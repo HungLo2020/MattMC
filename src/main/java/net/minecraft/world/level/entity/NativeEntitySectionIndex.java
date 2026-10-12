@@ -30,12 +30,15 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
     private static final MethodHandle CHUNKS=handle("chunks",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle CHUNK_CURSOR=handle("chunk_cursor",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle SPATIAL_CURSOR=handle("spatial_cursor",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle SPATIAL_REOPEN=handle("spatial_reopen",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_VIEW=handle("cursor_view",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_NEXT=handle("cursor_next",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_CLOSE=handle("cursor_close",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_RELEASE=handle("cursor_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final Arena scope;
     private final MemorySegment owner,count,change,bounds,pointer;
+    /** Closed spatial cursors, reopened instead of allocating a lease and cleanup per search. */
+    private final java.util.ArrayDeque<Cursor> idleSpatial=new java.util.ArrayDeque<>();
     private Object[] bindings=new Object[16];
     private long[] generations=new long[16];
     NativeEntitySectionIndex() {
@@ -102,13 +105,21 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
     Cursor spatialCursor(double minX,double minY,double minZ,double maxX,double maxY,double maxZ) {
         bounds.set(ValueLayout.JAVA_DOUBLE,0,minX);bounds.set(ValueLayout.JAVA_DOUBLE,8,minY);bounds.set(ValueLayout.JAVA_DOUBLE,16,minZ);
         bounds.set(ValueLayout.JAVA_DOUBLE,24,maxX);bounds.set(ValueLayout.JAVA_DOUBLE,32,maxY);bounds.set(ValueLayout.JAVA_DOUBLE,40,maxZ);
-        try {return new Cursor((MemorySegment)SPATIAL_CURSOR.invokeExact(owner,bounds));}
-        catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(this);}
+        try {
+            Cursor idle;
+            synchronized(idleSpatial){idle=idleSpatial.pollFirst();}
+            if(idle!=null){
+                if((int)SPATIAL_REOPEN.invokeExact(idle.handle,bounds)!=0)throw new IllegalStateException("Cannot reopen section cursor");
+                idle.open=true;return idle;
+            }
+            Cursor cursor=new Cursor((MemorySegment)SPATIAL_CURSOR.invokeExact(owner,bounds));cursor.pooled=true;return cursor;
+        }catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(this);}
     }
     private static IllegalArgumentException rangeFailure(long from,long to){return new IllegalArgumentException("Start element ("+from+") is larger than end element ("+to+")");}
     final class Cursor implements PrimitiveIterator.OfLong,AutoCloseable {
         private final Arena cursorScope;
         private final MemorySegment handle,view;
+        private boolean pooled,open=true;
         Cursor(MemorySegment p) {
             boolean attached=false;
             try {
@@ -131,6 +142,11 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
         EntitySection<T> section(){return object(view.get(ValueLayout.JAVA_LONG,24));}
         @Override public long nextLong(){if(!hasNext())throw new NoSuchElementException();if(!advance())throw new NoSuchElementException();return key();}
         @Override public void remove(){throw new UnsupportedOperationException();}
-        @Override public void close(){try{CURSOR_CLOSE.invokeExact(handle);}catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(NativeEntitySectionIndex.this);}}
+        @Override public void close(){
+            if(!open)return;
+            try{CURSOR_CLOSE.invokeExact(handle);}catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(NativeEntitySectionIndex.this);}
+            open=false;
+            if(pooled)synchronized(idleSpatial){if(idleSpatial.size()<8)idleSpatial.addFirst(this);}
+        }
     }
 }

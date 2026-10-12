@@ -31,6 +31,10 @@ candidate array, and no new crate or GPU handle crossing this boundary.
 - Native bindings are generational and retired promptly. Cursor leases retain
   the owner; explicit close removes their registrations. Automatic arenas
   release abandoned leases without a Java callback under the native mutex.
+- Closed spatial cursors return to a small per-index pool (up to 8), and
+  `mattmc_section_index_spatial_reopen` restarts one with new bounds, so entity
+  queries allocate no lease or arena per search. Reopening an open lease fails.
+  Nested searches take another pooled cursor or allocate one.
 - Thread links use an arena with reachability-based retirement rather than
   owning reference cycles. Unreachable retired slots are reused. Follow the
   existing world-thread mutation contract; this does not add concurrent APIs.

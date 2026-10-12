@@ -100,6 +100,37 @@ dependencies and 7–9 minutes for each `suite` target directory. A full
 - The Frozen Java reference is usually the slow side. Profile with
   `jcmd <pid> Thread.print` samples or JFR before cutting coverage.
 
+## Memory-protected runs
+
+On a machine shared with other applications, timing runs swap and become
+unreliable. [`RunProtected.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/tooling/RunProtected.py)
+runs a command in a systemd user scope inside `mattmctest.slice` with
+`MemoryLow` (default 8G): under pressure the kernel reclaims other
+applications before the test. It reports the machine's swap-in rate and memory
+stall during the run and warns when timings are unreliable:
+
+```sh
+python3 DevUtils/tests/tooling/RunProtected.py -- python3 DevUtils/PerfAudit/Gameplay.py ...
+python3 DevUtils/tests/tooling/RunProtected.py --fail-on-swap --report build/pressure.json -- ./gradlew test
+```
+
+Protection is capped by every ancestor cgroup, so each machine needs a one-time
+root setup (Linux with cgroup v2 and systemd). Only do this on a single-user
+desktop or laptop; on a server it would favor your login session over system
+services:
+
+```sh
+sudo systemctl set-property user.slice MemoryLow=10G
+sudo systemctl set-property user-1000.slice MemoryLow=10G
+sudo systemctl set-property user@1000.service MemoryLow=10G
+```
+
+Without it the tool runs unprotected and says so. A larger zstd zram also keeps
+evicted pages in compressed RAM instead of disk swap, for example
+`/etc/systemd/zram-generator.conf` with `[zram0]`, `zram-size = min(ram, 16384)`
+and `compression-algorithm = zstd`, plus `vm.swappiness = 150` and
+`vm.page-cluster = 0` in `/etc/sysctl.d/`; it takes effect after a reboot.
+
 ## Troubleshooting
 
 - *No tests found for given includes*: check the class name; tagged classes

@@ -66,6 +66,9 @@
 - [Rust loaded-section snapshots](RUST-SECTION-SNAPSHOTS.md): immutable native
   rebuild state, Java compatibility views, bulk halo reads and lifetime rules.
 
+- [Native section reclamation](NATIVE-RECLAIMER.md): batched phantom-reference
+  release of section, view, counter and contributor owners, referent rules and stats.
+
 - [Rust live block sections](RUST-LIVE-SECTIONS.md): authoritative packed storage,
   palette growth, CPU views, bulk consumers and remaining compatibility work.
 - [Live biome sections and color sampling](../biome/RUST-LIVE-BIOMES.md): admitted

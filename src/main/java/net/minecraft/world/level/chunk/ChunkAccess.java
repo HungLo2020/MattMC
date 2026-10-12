@@ -93,6 +93,20 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		@Nullable LevelChunkSection[] levelChunkSections,
 		@Nullable BlendingData blendingData
 	) {
+		this(chunkPos, upgradeData, levelHeightAccessor, palettedContainerFactory, l, levelChunkSections, blendingData, true);
+	}
+
+	/** {@code ownSections} false leaves every slot null for wrappers that never read their own sections. */
+	ChunkAccess(
+		ChunkPos chunkPos,
+		UpgradeData upgradeData,
+		LevelHeightAccessor levelHeightAccessor,
+		PalettedContainerFactory palettedContainerFactory,
+		long l,
+		@Nullable LevelChunkSection[] levelChunkSections,
+		@Nullable BlendingData blendingData,
+		boolean ownSections
+	) {
 		this.chunkPos = chunkPos;
 		this.upgradeData = upgradeData;
 		this.levelHeightAccessor = levelHeightAccessor;
@@ -109,7 +123,7 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 			}
 		}
 
-		replaceMissingSections(palettedContainerFactory, this.sections);
+		if (ownSections) replaceMissingSections(palettedContainerFactory, this.sections);
 	}
 
 	private static void replaceMissingSections(PalettedContainerFactory palettedContainerFactory, LevelChunkSection[] levelChunkSections) {

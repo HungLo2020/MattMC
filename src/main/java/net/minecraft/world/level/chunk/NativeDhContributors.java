@@ -26,16 +26,17 @@ public final class NativeDhContributors {
     private final MemorySegment owner;
     private final LongList[] columns = new LongList[4];
     private NativeDhContributors(MemorySegment pointer) {
-        var arena = Arena.ofAuto(); boolean attached = false;
+        boolean attached = false;
         try {
             var metadata = METADATA.get();
             if ((int) VIEW.invokeExact(pointer, metadata) != 1) throw new IllegalStateException("Invalid contributor owner");
-            owner = pointer.reinterpret(1, arena, NativeDhContributors::release); attached = true;
+            // Every column holds and fences this object, so it decides the native lifetime.
+            owner = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(this, pointer, NativeReclaimer.DH_CONTRIBUTORS); attached = true;
             for (int i = 0; i < 4; i++) {
                 long length = metadata.getAtIndex(ValueLayout.JAVA_LONG, i * 2L + 1);
                 if (length == -1) continue;
                 if (length < 0 || length > 4096) throw new IllegalStateException("Invalid contributor extent");
-                var points = metadata.getAtIndex(ValueLayout.ADDRESS, i * 2L).reinterpret(length * 8, arena, null).asReadOnly();
+                var points = metadata.getAtIndex(ValueLayout.ADDRESS, i * 2L).reinterpret(length * 8).asReadOnly();
                 columns[i] = new ReadOnlyColumn(this, points);
             }
         } catch (RuntimeException | Error e) { if (!attached) release(pointer); throw e; }
