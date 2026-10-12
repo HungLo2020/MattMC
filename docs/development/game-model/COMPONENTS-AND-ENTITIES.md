@@ -5,9 +5,11 @@
 > primary position/bounds and ordinary camera queries. The
 > [ticking membership slice](../world/entities/RUST-ENTITY-ORDER.md) owns
 > client/server ordering and snapshots; Java still executes behavior callbacks.
-> Removal state and camera retirement now extend the geometry owner. The slice
-> guides distinguish the earlier source-only review from fresh CPU/live checks
-> and a passing settled matrix. Broad gameplay and long-session memory
+> Removal reason storage and immediate camera retirement now extend the geometry
+> owner, with retained views, revival and world transfer. Java still executes
+> removal callbacks. The slice guides distinguish author-recorded CPU/live checks
+> and a passing settled matrix from this source-only review at `c1428dbc7`.
+> Broad gameplay and long-session memory
 > acceptance remain separate from implemented ownership.
 > See the [game model index](index.md).
 
@@ -107,7 +109,11 @@ system scheduling.
 ## Scope
 
 The first entity slice moves live position/bounds producers and their camera
-consumer together. Ticking membership and snapshot order now have a local Rust
-owner, while Java still orchestrates ticks and invokes behavior callbacks.
+consumer together. Removal retires dense camera membership immediately without
+waiting for the retained geometry lease to be collected; revival reindexes the
+same view in its current world. This membership is separate from ticking and
+section tracking. Ticking membership and snapshot order now have a local Rust
+owner, while Java still orchestrates ticks, removal side effects and behavior
+callbacks.
 AI (goals and brains), synchronised data, entity networking, anchored entities
 and the complete simulation loop need their own migration and verification.

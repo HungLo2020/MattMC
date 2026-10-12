@@ -207,7 +207,7 @@ at despawn while keeping primary geometry readable. The
 client/server insertion order and immutable tick snapshots. Java keeps API
 projections, object bindings, hooks, behavior callbacks and tick/extraction
 orchestration. The [current combined checkpoint](rendering/GOAL-5-STATUS.md#october-11-integrated-lifecyclemodel-checkpoint)
-records scoped CPU/lifecycle/image passes and passing settled FPS/p99 floors;
+records author-reported CPU/lifecycle/image passes and passing settled FPS/p99 floors;
 the preceding published ticking image missed vanilla p99. General entity
 components, complete tick ownership and broad/long-session acceptance remain unfinished.
 

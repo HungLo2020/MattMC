@@ -91,16 +91,15 @@ Follow the owner boundary relevant to the next change:
   callbacks and ordered extraction. The
   [ticking-membership owner](../world/entities/RUST-ENTITY-ORDER.md) now connects
   client/server membership and snapshot traversal to Rust; behavior callbacks
-  and simulation orchestration remain Java. Published geometry/ticking CPU/live
-  checks pass; the later removal-state/immediate-retirement slice extends the
-  geometry owner and passes fresh CPU/live checks and the settled four-mode
-  matrix. The preceding ticking image's vanilla-p99 miss remains historical;
+  and simulation orchestration remain Java. The author reports geometry/ticking
+  CPU/live passes; the later removal-state/immediate-retirement slice extends
+  the geometry owner with reported CPU/live passes and a passing settled
+  four-mode matrix. The preceding ticking image's vanilla-p99 miss remains historical;
   broad gameplay/streaming/memory acceptance remains open. Next move
   tracking admission and section associations onto the same primary owner,
   then migrate motion/collision producers and their consumers. AI, synchronized
   data and networking need separate behavior and realistic performance checks.
-  The geometry slice's full suites/oracles and settled hardware checks pass;
-  the latest settled matrix passes its floors, while broad acceptance remains open. See the
+  See the release-specific results and limits in the
   [current performance boundary](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
 - **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),
   [section color fields](../world/biome/RUST-SECTION-COLORS.md),

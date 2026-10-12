@@ -2,8 +2,10 @@
 
 Three drivers check this area: resource stacks, tags and registry sync
 against Frozen (this section through [Limits](#limits)); [atlases](#atlases)
-and [models](#models) against Reference for records and warnings, and Frozen
-for timing acceptance.
+and [models](#models) use Reference for records and warnings, and Frozen
+for timing acceptance. The current migration protocol selects unchanged Frozen
+for both roles; the original last-Java Reference protocol remains documented
+as historical diagnostic evidence.
 
 [`VerifyResourceStacks.py`](https://github.com/HungLo2020/MattMC/blob/398a00782007587c779264aaa62222036b8a9361/DevUtils/tests/resources/VerifyResourceStacks.py)
 runs the same observer,
@@ -235,9 +237,11 @@ look for resource, tag or registry errors in the log.
 
 ## Reference checkouts
 
-The atlas and model source references below are pinned to
+The original atlas/model protocol and historical reports below retain
 [`71762d602`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8).
-Their **Reference** is intended to retain the Java pipelines being replaced.
+Current driver controls and the model profiler were source-reviewed at
+[`c1428dbc`](https://github.com/HungLo2020/MattMC/commit/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42).
+The original **Reference** is intended to retain the Java pipelines being replaced.
 The caller selects that checkout, builds its classes and release native
 library independently, and passes `--reference` (default
 `build/reference-head`). For this migration, parent `f92ea29d` retains those
@@ -258,51 +262,64 @@ are required. Each observer reports the sorted middle iteration sample
 per-JVM samples and gates **Current/Frozen**, at `--max-ratio 1.10` by default.
 Reference timing ratios and individual round ratios are reported, not gated.
 
-Both explicitly skip Frozen before comparing records or warnings:
-[atlas comparison](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/textures/VerifyAtlases.py#L280-L317)
-and [model comparison](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/models/VerifyModels.py#L332-L370).
+Both still explicitly skip the role labelled `frozen` before comparing records
+or warnings at `c1428dbc`:
+[atlas comparison](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/textures/VerifyAtlases.py#L291-L319)
+and [model comparison](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/models/VerifyModels.py#L340-L369).
 `records_identical` therefore covers only the Reference and Current record
-texts. Frozen must still finish and emit one valid timing/hash receipt.
+texts. With unchanged Frozen selected as `--reference` as well as
+`--frozen-repo`, the compared Reference runs supply Frozen semantics; equality
+of the separately labelled Frozen runs is still not enforced. Frozen must
+still finish and emit one valid timing/hash receipt.
 Nonzero exits or command timeouts, missing/ambiguous receipts, compared record
 or warning mismatches, and aggregate timing ratios above the threshold fail
 the run. Logs and records remain in the output directory; mismatches add
 `mismatch.diff` or `warnings.diff`, and runtime failures are saved in
 `results.json` with `passed: false`.
 
-These new drivers record initial Git HEAD/status for each tree and hashes of
-the observer and driver sources. They do not record native-library hashes or
+These verification drivers record initial Git HEAD/status for each tree and
+hashes of the observer and driver sources. They do not record native-library hashes or
 verify the loaded native image, and perform no final source, resource,
 compiled-class or native-library integrity recheck. The stronger
 resource/profiler guards described earlier do not apply to these drivers.
-The historical numbers below are author
-reports, not fresh executions of `71762d602`; their ignored `build/` receipts
-were not inspected and no resource tests, native/game builds or benchmarks
-were repeated here.
+The controls added at `c1428dbc` do not strengthen that attestation. The model
+profiler has its own [limited guards](#model-profiling-guards).
+All measurements below are author reports associated with their named
+checkpoints, not fresh executions of the reviewed source. Ignored `build/`
+receipts were not inspected and no resource tests, native/game builds,
+profiling, benchmarks or game runs were repeated for this documentation review.
 
 ## Atlases
 
-[`VerifyAtlases.py`](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/textures/VerifyAtlases.py)
-runs [`AtlasReference.java`](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/textures/AtlasReference.java)
+[`VerifyAtlases.py`](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/textures/VerifyAtlases.py)
+runs [`AtlasReference.java`](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/textures/AtlasReference.java)
 on Reference, Current and Frozen in alternating fresh JVMs. Every known atlas
 is built by `SpriteLoader.loadAndStitch` over this checkout's resources: alone,
 with an edge-case fixture pack (PNG encodings, animation metadata errors,
 unstitch and paletted sources, filters, broken definitions, GUI metadata), and
 from a pack whose sprites allow four mip levels. Records hold sizes, mip
 levels, map order, placements, UVs, frames, flags, per-level pixel hashes and
-uploaded first-frame snapshots. All Reference/Current record texts must match
-the first Reference record. Each Current run's sorted WARN/ERROR first lines
+uploaded first-frame snapshots by default. All Reference/Current record texts
+must match the first Reference record. Each Current run's sorted WARN/ERROR first lines
 must match the first Reference warning list; later Reference warning lists
 are not separately checked. Stack traces and continuation lines are excluded.
 
 The [snapshot path](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/textures/AtlasReference.java#L220-L247)
 calls `TextureAtlas.upload` through a CPU semantic device, not a real GPU.
-Frozen lacks that device and skips snapshots; its entire record and warning
-list are excluded from parity checks. Reflective device installation failure
+Frozen lacks that device and skips snapshots; the `frozen`-labelled run
+remains excluded from parity checks. Reflective device installation failure
 also disables snapshots, while a null snapshot or reflective invocation
 failure can produce `snapshot none` or `snapshot failed` records. Matching
 record text alone does not separately require successful snapshots. Pixel
 and snapshot summaries use truncated hashes, and animation ticking is not
 observed.
+
+At `c1428dbc`, `--cpu-only`
+[disables semantic-device installation](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/textures/AtlasReference.java#L66-L75)
+and therefore snapshots on every side. Use it with Frozen in both baseline
+roles for the [current CPU comparison](ATLASES.md#frozen-comparison-for-the-migration-goal).
+It changes the observation scope, not the timing gate or native/source guards;
+it neither selects nor authenticates the Frozen reference for the caller.
 
 The [timed region](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/textures/AtlasReference.java#L85-L104)
 loads all known atlases in parallel over the plain resource stack and waits
@@ -319,10 +336,18 @@ Reference in every round and parallel atlas loading at 82.4 ms against
 Frozen's 115.5 ms (0.713; rounds 0.65–0.73) and Reference's 105.1 ms.
 The report does not identify Reference's commit or the native-library hashes.
 
+**Later pre-alpha-mask author report:** the
+[combined implementation page](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/docs/development/rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+records a separate CPU-only comparison with 8,375 identical record lines and
+Current/Frozen 55.014/66.562 ms, passing the strict aggregate floor. Its CPU-only
+scope differs from the historical 8,414-line snapshot protocol above. It
+predates the alpha-mask candidate and does not establish GPU upload parity or
+a fresh atlas timing result for combined native `9f372451`.
+
 ## Models
 
-[`VerifyModels.py`](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/models/VerifyModels.py)
-runs [`ModelReference.java`](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/models/ModelReference.java)
+[`VerifyModels.py`](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/models/VerifyModels.py)
+runs [`ModelReference.java`](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/models/ModelReference.java)
 the same way. It stitches every atlas (no upload), runs
 `ModelManager.reload` up to its preparation barrier, and records, alone and
 with two fixture packs: per block state the model class, particle,
@@ -350,10 +375,14 @@ front faces, unresolved texture reference lines, and group numbering (the
 partition is compared). WARN entries compare with their continuation lines;
 ERROR entries compare their header only, since Java's cause is a Gson or DFU
 exception with a stack trace. Every Reference/Current run's normalized
-warnings and record text must match the first Reference run; Frozen's are
-excluded from both comparisons.
+warnings and record text must match the first Reference run; the run labelled
+`frozen` is excluded from both comparisons. The current protocol chooses
+unchanged Frozen for the Reference role too, with matched fixture-only
+[`--jvm-arg=-XX:-OmitStackTraceInFastThrow`](MODELS.md#frozen-comparison-for-the-migration-goal)
+to preserve repeated invalid-fixture NPE details. It does not relax warning
+equality or change ordinary gameplay JVM settings.
 
-The [two timed regions](https://github.com/HungLo2020/MattMC/blob/71762d602195e0cc5ca29006a2bed1603b53eab8/DevUtils/tests/models/ModelReference.java#L111-L132)
+The [two timed regions](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/models/ModelReference.java#L124-L141)
 use only the plain resource stack, after plain/fixture recording passes and
 an untimed stitch of all atlases. `models_ns` times preparation with those
 precomputed atlases; `reload_ns` times fresh stitching of all atlases plus
@@ -376,6 +405,74 @@ timings are retained below.
 | --- | --- | --- | --- | --- | --- |
 | Model reload (atlases precomputed) | 138.0 ms | 150.2 ms | 152.9 ms | 0.919 | 0.73–1.06 |
 | Atlas + model reload | 224.2 ms | 285.2 ms | 252.8 ms | 0.786 | 0.76–0.91 |
+
+### Model profiling guards
+
+The Linux
+[`ProfileModels.py`](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/models/ProfileModels.py)
+diagnostic takes a corpus with `records_identical: true`, requires both baseline
+roles to point to the same Frozen root, and checks that Frozen still has the
+recorded HEAD and a clean worktree. It does not require `passed: true`, so a
+completed equality comparison that failed its timing floor can be profiled.
+Use the [paired profiling command](MODELS.md#diagnose-model-only-reload-cost).
+
+The helper compiles the current observer against the saved classpaths, reuses
+the corpus's JVM arguments and content, then runs Current and Frozen in turn.
+The [profile branch](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/models/ModelReference.java#L111-L123)
+records plain/fixture models, precomputes atlases and performs twenty untimed
+model-only reloads before writing its ready marker. It then runs 500 reloads;
+the helper requests a fifteen-second `itimer` sample at 1 ms intervals. Each
+profiler and JVM must exit zero; the helper waits for owned processes and
+terminates any left running on failure. These are CPU diagnostics, not timing
+gates or a new record/warning comparison.
+
+Before/after checks hash files selected under `src`, `DevUtils` and
+`build.gradle` in both trees and Current's native library. At readiness, the
+helper checks each PID/start time and saves its mappings, requiring Current's
+expected native path to be mapped. These guards do **not** match Current's
+source or native image back to the completed corpus, hash Frozen's native
+library, validate its mapped image, or seal reused compiled main classes,
+classpath dependencies and generated fixtures. They also do not inherit the
+retag profiler's protected-prompt guard or add a post-sample process-identity
+or full-duration assertion. Keep these limits separate from any additional
+guards reported by the implementation run.
+
+### Reported integrated model checkpoints
+
+The [incoming model page](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/docs/development/resources/MODELS.md#frozen-comparison-for-the-migration-goal)
+reports the following sequence; preserve the failed comparisons as well as the
+later pass:
+
+- The uncontrolled fixture run matched complete model records but failed
+  warning equality: Frozen emitted 200 helpful NPE messages and 1,132 bare
+  NPEs, while Current emitted all 1,332 details. The matched FastThrow control
+  above retains those details without changing Frozen source.
+- The integrated pre-mask `a48b6a65` corpus matched 67,433 record lines and
+  4,351 warnings under that control. Model-only preparation failed the strict
+  aggregate floor at Current/Frozen **83.237/71.367 ms**; atlas + model
+  preparation passed at **129.458/134.165 ms**. Paired profiling reportedly
+  passed its guards; 1,486 of Current's 26,984 samples included repeated
+  generated-item transparency reads. These samples locate work, not a measured
+  per-operation speedup.
+- The bounded [alpha-mask candidate](MODELS.md#performance) matched the records
+  and warnings in a fresh five-round comparison. Model-only
+  **76.915/79.069 ms** and atlas + model **128.454/135.543 ms** passed the strict
+  aggregate floors, but **three of five model-only paired ratios exceeded 1.0**.
+  Those pairs remain part of the evidence. Frozen's model median changed from
+  71.367 to 79.069 ms between the two runs, so the aggregate change does not
+  isolate the mask's effect.
+
+Combined native `9f372451` separately reports seven client lifecycles, two
+world pairs and four GUI pairs with zero VUIDs; twelve original images were
+reviewed across the world and GUI captures. Its twenty-run
+[settled gameplay matrix](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+passes all four average-FPS and all four p99 floors with normal gameplay JVM
+controls. That combined result does not isolate either integrated change's
+speedup or establish first-world-frame, sustained-streaming or long-session
+memory acceptance. Reported receipts are under
+`build/native-entity-lifecycle-model-integration/`, including
+`model-replay-alpha-mask/` and `alpha-mask-accepted/`; they were not inspected
+for this documentation review.
 
 **Limits:** neither driver uploads through a real GPU, applies the reload to a
 running client, renders, or exercises resource-pack switching in game. Check

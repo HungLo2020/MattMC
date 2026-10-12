@@ -4,7 +4,8 @@
 
 ## October 11 integrated lifecycle/model checkpoint
 
-Native `9f372451` combines upstream Rust atlas/model baking `71762d602`
+At published source [`c1428dbc`](https://github.com/HungLo2020/MattMC/commit/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42),
+the implementation author records native `9f372451` combining upstream Rust atlas/model baking `71762d602`
 with Rust-owned entity removal state, immediate camera-slot retirement and
 profile-backed bounded generated-item alpha masks. Retained entities stay
 readable and queryable; revival and world transfer preserve the primary view.
@@ -13,7 +14,7 @@ See the [entity guide](../world/entities/RUST-ENTITY-GEOMETRY.md) and
 Java still owns tracking/section admission, behavior, simulation orchestration,
 networking and startup; the Rust executable remains unfinished.
 
-Fresh suites pass 2,680 Rust tests (three ignored) and 2,005 executed
+The author reports combined suites passing 2,680 Rust tests (three ignored) and 2,005 executed
 Java/parity cases (two skipped). Actual unchanged Frozen geometry/removal,
 ticking and range comparisons pass 11,489/4,143/645 cases. The model comparison
 matches 67,433 record lines and 4,351 warnings; its model-only/full-reload
@@ -32,6 +33,14 @@ First shader-world-frame, first-turn nearby terrain, temporal, broad-gameplay,
 sustained-streaming and long-session memory acceptance remain open. Receipts:
 `build/native-entity-lifecycle-model-integration/`. Continue migrating live
 world producers and consumers after publishing this bounded batch.
+
+This documentation review inspected source and verification assertions; it did not
+rerun native/Java suites, benchmarks, lifecycle scenarios or untracked image
+receipts. Each named release retains its own reported verification scope.
+
+Verified reviews: [entity removal #770](https://github.com/HungLo2020/MattMC/issues/770#issuecomment-6116011133), [model preparation #771](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6116012506), [evidence #709](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6116013802). All three issues remain open.
+
+<a id="october-11-implementation-checkpoint"></a>
 
 ## Preceding geometry/ticking checkpoint
 
@@ -53,7 +62,7 @@ samples show less GUI batch allocation but do not isolate a per-frame speedup
 or explain p99. Those records remain in the
 [GUI](RUST-GUI-ITEM-TEMPLATES.md) and
 [resource](../resources/VERIFICATION.md) guides; they are not fresh GUI/resource
-measurements of `543a592f`.
+measurements of `543a592f` or `9f372451`.
 
 The prior documentation review at `696a25e3b` inspected source and assertions; it did not
 rerun these suites, benchmarks, lifecycles or untracked image receipts. These world/GUI/tag

@@ -90,8 +90,11 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
-The October 11 combined checkpoint uses native `9f372451` on atlas/model
-base `71762d602`. Rust owns primary entity removal state and immediate
+The implementation author records the October 11 combined checkpoint with
+native `9f372451`, published in
+[`c1428dbc`](https://github.com/HungLo2020/MattMC/commit/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42)
+on atlas/model base `71762d602`. This documentation review inspected source and
+assertions without rerunning these workloads or inspecting untracked raw receipts. Rust owns primary entity removal state and immediate
 camera-slot retirement, preserving retained views, explicit queries, revival
 and transfer. A profile-backed generated-item alpha mask avoids repeated
 transparency reads. Java tracking/section admission and broader simulation
@@ -160,9 +163,9 @@ retain them rather than replacing unfavorable results. Receipts:
 
 Subsequent source [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8)
 adds native atlas construction and model baking. Its [resource verification](../resources/VERIFICATION.md)
-records preparation/CPU workloads; it does not refresh this full-game matrix,
-lifecycle or image evidence. Do not carry this release's runtime pass/failure
-forward as verification of the later atlas/model integration.
+initially recorded preparation/CPU workloads. The current `9f372451` checkpoint
+above later adds combined lifecycle/image/timing evidence; the preceding
+`c487f375` runtime pass/failure still does not verify that later source.
 
 ### Historical tag-view/GUI checkpoint
 

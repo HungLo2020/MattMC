@@ -9,6 +9,8 @@ objects its consumers use (`SpriteContents`, `TextureAtlasSprite`,
 
 Source-reviewed at
 [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8).
+The CPU-only comparison control was source-reviewed at
+[`c1428dbc`](https://github.com/HungLo2020/MattMC/commit/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42).
 The [atlas verification record](VERIFICATION.md#atlases) is reported evidence;
 it does not establish a fresh GPU or live-reload acceptance of this source.
 
@@ -114,8 +116,16 @@ python3 DevUtils/tests/textures/VerifyAtlases.py --cpu-only \
   --output build/atlas-frozen-cpu --max-ratio 1.0 --pairs 5 --iterations 5
 ```
 
-This compares all CPU sizes, placements, UVs, frames, flags, metadata and mip
-pixels. It omits semantic-device snapshots on every side; Frozen cannot emit
-those snapshots. The separate historical Java pipeline is a diagnostic, not
-this goal's correctness baseline. Verify real upload/rendering with the existing
+This compares CPU record text for sizes, placements, UVs, frames, flags,
+metadata and per-level pixel hashes. The
+[`--cpu-only` control](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/textures/VerifyAtlases.py#L216-L251)
+omits semantic-device snapshots on every side; Frozen cannot emit those
+snapshots. The driver still skips the run labelled `frozen` for record/warning
+equality; using that same tree as `--reference` supplies the Frozen correctness
+baseline. The separate historical Java pipeline remains a diagnostic. Verify real upload/rendering with the existing
 Frozen OpenGL/current Vulkan lifecycle, world and GUI capture drivers.
+
+The author reports a separate pre-alpha-mask CPU comparison with 8,375 matching
+record lines and Current/Frozen 55.014/66.562 ms under the strict aggregate
+floor. See [the scoped report and driver limits](VERIFICATION.md#atlases).
+It is not a fresh execution of the combined image or GPU upload acceptance.

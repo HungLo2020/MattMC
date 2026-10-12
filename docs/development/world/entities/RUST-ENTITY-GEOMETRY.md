@@ -25,9 +25,9 @@ into their read-only CPU views; Java sends no entity/bounds array. Another
 frustum's query, a mutation or a camera offset invalidates cached results.
 Storage order does not replace Java's gameplay or extraction order.
 
-See the current [Rust owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_geometry/mod.rs),
-[CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/entity/NativeEntityGeometry.java)
-and [camera consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/renderer/entity/EntityRenderer.java).
+See source `c1428dbc7`: the [Rust owner](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/src/main/rust/world/level/entity_geometry/mod.rs),
+[CPU bridge](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/src/main/java/net/minecraft/world/entity/NativeEntityGeometry.java)
+and [camera consumer](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/src/main/java/net/minecraft/client/renderer/entity/EntityRenderer.java).
 These are CPU resources; GPU ownership remains entirely in Rust/GAL.
 
 ## Compatibility and lifetime
@@ -54,15 +54,29 @@ These are CPU resources; GPU ownership remains entirely in Rust/GAL.
 - The first nonnull removal retires the generational camera slot immediately.
   Retained leases keep primary geometry readable without remaining in the dense
   scan. Detached movement does not invalidate live camera results. Explicit
-  queries of detached bodies still execute Rust's ordinary culling policy.
+  queries of detached bodies still execute Rust's ordinary culling policy:
+  `Frustum.isVisibleEntity` checks `indexed()` and uses `queryOne`, rather than
+  the retained dense-query visibility flag. This does not restore membership.
 - Revival reindexes the same view in its current world. World transfer preserves
-  removal state and detached status. Callback order, repeated removals, exceptions
-  and null-reason behavior remain Java-compatible; no native lock spans callbacks.
+  removal state and detached status; transferring a removed body does not insert
+  it into either world's scan. Reindexing may reuse a slot with a new generation,
+  while the retained view identity stays unchanged.
+- Java's [removal callbacks](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/src/main/java/net/minecraft/world/entity/Entity.java)
+  run after the native transition: the retained reason controls `stopRiding`,
+  then passenger dismounts, `levelCallback.onRemove` and `onRemoval` run in order.
+  The last two receive the requested reason, even on a repeated removal that
+  retains an earlier reason. A thrown callback leaves the completed prefix in
+  place; callbacks may revive or remove again. No native lock spans callbacks.
+  With no retained reason, `setRemoved(null)` still throws before callbacks and
+  leaves camera membership intact. With a retained reason, a null request keeps
+  it and follows the same callback path with null as the requested argument.
 - Native leases retain their world independently of Java level identity.
   Scoped lease closure removes its slot. Production lease collection follows
   Java reachability, but dense membership no longer waits for GC after removal.
   Unspawned, nonremoved bodies still acquire slots at construction; tracking
   admission, section associations and other gameplay components remain work.
+  Camera membership is separate from the ordered ticking store and does not
+  itself migrate gameplay despawn behavior.
 - Queries and compatibility projections follow the existing world-thread
   contract. Atomic CPU fields do not make arbitrary concurrent Java entity
   mutation a supported snapshot API.
@@ -70,7 +84,10 @@ These are CPU resources; GPU ownership remains entirely in Rust/GAL.
 ## Verification
 
 The prior review at `f92ea29d` inspected source without rerunning workloads.
-The combined `9f372451` results below are fresh implementation verification.
+This reconciliation inspects source and verification drivers at `c1428dbc7`;
+it does not rerun workloads or independently inspect the runtime receipts.
+The results below are author-recorded, including the fresh combined
+implementation checks for native `9f372451` and the historical measurements.
 Use Linux x64, JDK25 and the release native library:
 
 ```sh
@@ -84,7 +101,7 @@ The oracle compiles the same driver separately against actual Frozen and
 Current classes. It records 11,489 movement/removal/callback and renderer culling cases,
 then checks Current against that output with source, class and native-image
 guards. It does not establish realistic runtime or performance parity.
-The [driver](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/DevUtils/tests/world/entity/VerifyEntityGeometry.java)
+The [driver](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/DevUtils/tests/world/entity/VerifyEntityGeometry.java)
 uses allocated entity fixtures and an explicit confined geometry scope. It
 does not exercise production automatic-scope reclamation; real unbound
 construction, transfer to a mocked `Level` and explicit closure have separate
@@ -92,8 +109,17 @@ integration controls.
 Its wrapper requires Frozen at `../MattMC_JavaPerfTesting/MattMC`, checks the
 recorded Frozen HEAD and protected prompt hash, and verifies the loaded image
 through `/proc/self/maps`.
-The added removal scenarios cover all first/repeated reasons, nulls, callback
-exceptions, reset during callbacks and overridden public reason getters.
+The 432 added removal sequences cover all first/repeated reasons, nulls,
+callback exceptions, reset during callbacks, overridden public reason getters,
+and explicit culling before and after revival. They use empty passenger lists
+and overridden dismount callbacks; they do not exercise a full mounted-entity
+lifecycle. Separate [native controls](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/src/main/rust/world/level/entity_geometry/tests.rs)
+inspect dense counts, slot reuse and stable view identity. The
+[Java integration controls](https://github.com/HungLo2020/MattMC/blob/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42/src/test/java/net/minecraft/world/entity/EntityGeometryIntegrationTest.java)
+also cover removal, detached mutation/query, transfer and revival using real
+unbound construction and a mocked destination level. These fixture checks do
+not establish production automatic-scope reclamation or a long-session memory
+bound.
 Earlier 11,057-case receipts do not verify the new lifecycle behavior.
 Full Rust tests run serially because the existing suite shares native driver
 state. Receipts belong in `build/native-entity-geometry/`; retain rejected checks.
