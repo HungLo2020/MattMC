@@ -17,6 +17,10 @@ Canonical section maps and sky metadata now use
 [Rust owner](RUST-LIVE-LAYERS.md); public mutable arrays and subclasses retain
 compatibility ownership.
 
+Canonical [block-light source production](RUST-BLOCK-LIGHT-SOURCES.md) now
+enumerates primary section owners and appends native work directly. Java keeps
+node checks and contextual chunk lookup; compatibility chunks retain callbacks.
+
 ## How a pass works
 
 1. Producers append position/entry pairs to retained Rust pending queues.

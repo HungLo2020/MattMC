@@ -148,6 +148,29 @@ impl StateReader<'_> {
         (0..self.generation.count.load(Ordering::Acquire) as usize)
             .all(|id| admitted(self.generation.palette[id].load(Ordering::Acquire)))
     }
+    /// Visit packed indices in Y/Z/X order, loading each word once. The owner
+    /// lock excludes palette growth; no temporary state array is constructed.
+    pub(crate) fn for_each_state(&self, mut visit: impl FnMut(usize, u32)) {
+        if let Some(state) = self.single {
+            for index in 0..ENTRIES { visit(index, state); }
+            return;
+        }
+        let generation = self.generation;
+        let per = 64 / generation.bits;
+        let mask = (1u64 << generation.bits) - 1;
+        let mut index = 0;
+        for word in generation.words.iter() {
+            let mut value = word.load(Ordering::Acquire);
+            for _ in 0..per.min(ENTRIES - index) {
+                let local = (value & mask) as usize;
+                let state = if generation.global { local as u32 }
+                    else { generation.palette[local].load(Ordering::Acquire) };
+                visit(index, state);
+                index += 1;
+                value >>= generation.bits;
+            }
+        }
+    }
 }
 impl Owner {
     pub(crate) fn read_stamp(&self) -> Option<ReadStamp> {

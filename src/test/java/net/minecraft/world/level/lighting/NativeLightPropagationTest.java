@@ -58,6 +58,7 @@ class NativeLightPropagationTest {
         int[] passes = {0};
         long before = NativeLightPropagation.PASSES.get(), rejected = NativeLightPropagation.REJECTED.get();
         long seeded = NativeLightPropagation.SEEDED.get();
+        long blockSeeded = NativeLightPropagation.BLOCK_SEEDED.get();
         lightAll(world, sides, seed, () -> assertSame(java, rust, "lighting pass " + passes[0]++));
         var random = new Random(seed);
         int minX = chunks.getFirst().getPos().getMinBlockX(), minZ = chunks.getFirst().getPos().getMinBlockZ();
@@ -73,6 +74,8 @@ class NativeLightPropagationTest {
         // Only the Rust side seeds sky sources natively: once per lit chunk.
         assertEquals(sky ? chunks.size() : 0, NativeLightPropagation.SEEDED.get() - seeded);
         assertEquals(rejected, NativeLightPropagation.REJECTED.get(), "No pass may fall back");
+        assertTrue(NativeLightPropagation.BLOCK_SEEDED.get() > blockSeeded,
+            "ordinary chunks must seed block sources directly from Rust owners");
         return rustPasses;
     }
 

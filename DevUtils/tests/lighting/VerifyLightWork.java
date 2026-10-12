@@ -163,6 +163,10 @@ public final class VerifyLightWork {
         if (nativePasses != null) {
             if (nativePasses.get() == 0 || rejected.get() != 0) throw new AssertionError("Native route not accepted");
             System.out.println("LIGHT_NATIVE_PASSES " + nativePasses.get());
+            Class<?> nativeType = Class.forName("net.minecraft.world.level.lighting.NativeLightPropagation");
+            long seeded = ((java.util.concurrent.atomic.AtomicLong) nativeType.getDeclaredField("BLOCK_SEEDED").get(null)).get();
+            if (seeded == 0) throw new AssertionError("Native block-source producer not exercised");
+            System.out.println("LIGHT_NATIVE_BLOCK_SEEDED " + seeded);
         }
     }
 }

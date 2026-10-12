@@ -114,6 +114,7 @@ public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage
 		this.setLightEnabled(chunkPos, true);
 		LightChunk lightChunk = this.chunkSource.getChunkForLighting(chunkPos.x, chunkPos.z);
 		if (lightChunk != null) {
+            if (NativeLightPropagation.seedBlockSources(lightChunk, this.lightWork)) return;
 			lightChunk.findBlockLightSources((blockPos, blockState) -> {
 				int i = blockState.getLightEmission();
 				this.enqueueIncrease(blockPos.asLong(), LightEngine.QueueEntry.increaseLightFromEmission(i, isEmptyShape(blockState)));

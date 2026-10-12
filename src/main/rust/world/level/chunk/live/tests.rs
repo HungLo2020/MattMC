@@ -4,6 +4,34 @@ fn single() -> Owner {
     Owner::load(0, 0, &[71], &[], 31809, 15).unwrap()
 }
 #[test]
+fn ordered_word_visits_match_scalar_reads_for_single_local_global_and_padding() {
+    for bits in [0usize, 4, 5, 6, 7, 8, 15] {
+        let palette: Vec<i32> = if bits == 15 { vec![] }
+            else if bits == 0 { vec![71] } else { vec![71, 72] };
+        let mut words = if bits == 0 { vec![] }
+            else { vec![0u64; ENTRIES.div_ceil(64 / bits)] };
+        if bits != 0 {
+            let per = 64 / bits;
+            for index in 0..ENTRIES {
+                let value = if bits == 15 { index as u64 } else { (index % 2) as u64 };
+                words[index / per] |= value << (index % per * bits);
+            }
+            // Unused last-word cells are not emitted by the visitor.
+            if ENTRIES % per != 0 {
+                *words.last_mut().unwrap() |= u64::MAX << (ENTRIES % per * bits);
+            }
+        }
+        let owner = Owner::load(bits, bits, &palette, &words, 31809, 15).unwrap();
+        owner.with_state_reader(|reader| {
+            let mut visited = 0;
+            reader.for_each_state(|index, state| {
+                assert_eq!(index, visited); assert_eq!(state, reader.get(index)); visited += 1;
+            });
+            assert_eq!(visited, ENTRIES);
+        });
+    }
+}
+#[test]
 fn live_growth_and_overwrites_match_stage_policy_word_for_word() {
     let live = single();
     let mut reference = Section::new(71, 15);

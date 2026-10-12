@@ -161,7 +161,7 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	}
 
 	private boolean sectionArrayEscaped;
-	private volatile NativeDhChunkInputs nativeDhInputs;
+	private volatile NativeChunkInputs nativeDhInputs;
 	private volatile NativeBiomeChunkInputs nativeBiomeInputs;
 
 	/** Independent biome admission; world color and columns share this binding. */
@@ -170,10 +170,10 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	}
 
 	/** Shared retained CPU bindings; validate escaped/replaced containers on each admission. */
-	NativeDhChunkInputs nativeDhSections() {
-		return this.nativeDhInputs = NativeDhChunkInputs.bind(this, this.nativeDhInputs);
+	NativeChunkInputs nativeDhSections() {
+		return this.nativeDhInputs = NativeChunkInputs.bind(this, this.nativeDhInputs);
 	}
-	NativeDhChunkInputs nativeDhColumnSections() {
+	NativeChunkInputs nativeDhColumnSections() {
 		var inputs = this.nativeDhSections();
 		return inputs == null ? null : (this.nativeDhInputs = inputs.bindBiomes(this));
 	}

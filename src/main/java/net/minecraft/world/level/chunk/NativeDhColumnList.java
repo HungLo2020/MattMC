@@ -122,6 +122,11 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     @Override public long set(int index, long value) { long old = getLong(index); write().set(index, value); return old; }
     @Override public void add(int index, long value) { ensureIndex(index); write().add(index, value); }
     @Override public long removeLong(int index) { long old = getLong(index); write().remove(index, index + 1); return old; }
+    @Override public void size(int count) {
+        // Preserve the inherited invalid-size exception and its removal prefix.
+        if (count < 0) { super.size(count); return; }
+        if (count != size()) write().resize(count);
+    }
     @Override public void clear() {
         if (mutable == null) { if (points.byteSize() != 0) detach(new NativeDhMutableColumn(MemorySegment.NULL, 0, group)); }
         else mutable.remove(0, size());

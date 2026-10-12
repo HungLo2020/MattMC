@@ -37,7 +37,7 @@ public final class NativeDhLighting {
         final MemorySegment descriptors=arena.allocate(9*48,8), order=arena.allocate(9,1), metadata=arena.allocate(10*8,8);
         final ChunkInput[] inputs=new ChunkInput[9];
         final ChunkWrapper[] wrappers=new ChunkWrapper[9];
-        final NativeDhChunkInputs[] sectionInputs=new NativeDhChunkInputs[9];
+        final NativeChunkInputs[] sectionInputs=new NativeChunkInputs[9];
     }
     private static final ThreadLocal<Scratch> SCRATCH=ThreadLocal.withInitial(Scratch::new);
     /** -1 declines without writes; normal output is a Frozen-compatible work count. */

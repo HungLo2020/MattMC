@@ -206,6 +206,19 @@ pub unsafe extern "C" fn mattmc_dh_column_add(owner: *mut Column, index: i32, va
     points.insert(index as usize, value); 1
 }
 
+/// Grow with zero-filled points or truncate in one operation. The caller pins
+/// and excludes the CPU owner; no Java callback or point export is involved.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_column_resize(owner: *mut Column, count: i32) -> i32 {
+    if owner.is_null() || count < 0 { return 0; }
+    if !Column::make_owned(owner) { return -1; }
+    let points = Column::points_mut(owner);
+    let count = count as usize;
+    if count > points.len() && points.try_reserve(count - points.len()).is_err() { return -1; }
+    points.resize(count, 0);
+    1
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_column_remove(owner: *mut Column, from: i32, to: i32) -> i32 {
     if owner.is_null() { return 0; }

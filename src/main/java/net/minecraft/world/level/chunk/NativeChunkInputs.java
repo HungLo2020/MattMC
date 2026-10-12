@@ -9,7 +9,7 @@ import net.minecraft.util.NativeLibraryLoader;
 import org.jetbrains.annotations.Nullable;
 
 /** Shared Rust bindings to mutable section owners; no copied block/counter data. */
-final class NativeDhChunkInputs {
+final class NativeChunkInputs {
     private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_inputs_create",
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_inputs_release",
@@ -30,28 +30,28 @@ final class NativeDhChunkInputs {
     private final MemorySegment[] counts;
     @Nullable private final NativeBiomeChunkInputs biomes;
     private final int minY;
-    private NativeDhChunkInputs(MemorySegment pointer, Scratch scratch, int count, int minY) {
+    private NativeChunkInputs(MemorySegment pointer, Scratch scratch, int count, int minY) {
         boolean attached = false;
         try {
             blocks = Arrays.copyOf(scratch.blocks, count);
             counts = Arrays.copyOf(scratch.counts, count);
             biomes = null;
             this.minY = minY;
-            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeDhChunkInputs::release);
+            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeChunkInputs::release);
             attached = true;
         } finally { if (!attached) release(pointer); }
     }
-    private NativeDhChunkInputs(MemorySegment pointer, NativeDhChunkInputs base, NativeBiomeChunkInputs biomes) {
+    private NativeChunkInputs(MemorySegment pointer, NativeChunkInputs base, NativeBiomeChunkInputs biomes) {
         boolean attached = false;
         try {
             blocks = base.blocks; counts = base.counts; minY = base.minY;
             this.biomes = biomes;
-            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeDhChunkInputs::release);
+            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeChunkInputs::release);
             attached = true;
         } finally { if (!attached) release(pointer); }
     }
     /** Biome compatibility admission remains exclusive to consumers needing it. */
-    @Nullable NativeDhChunkInputs bindBiomes(ChunkAccess chunk) {
+    @Nullable NativeChunkInputs bindBiomes(ChunkAccess chunk) {
         NativeBiomeChunkInputs binding;
         try { binding = chunk.nativeBiomeSections(null); }
         catch (NativeBiomeChunkInputs.CaptureFailure rejected) { return null; }
@@ -59,7 +59,7 @@ final class NativeDhChunkInputs {
         if (biomes == binding) return this;
         try {
             var pointer = (MemorySegment)WITH_BIOMES.invokeExact(owner, binding.stageOwner());
-            return pointer.address() == 0 ? null : new NativeDhChunkInputs(pointer, this, binding);
+            return pointer.address() == 0 ? null : new NativeChunkInputs(pointer, this, binding);
         } catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot bind native biome inputs", e); }
         finally { Reference.reachabilityFence(binding); Reference.reachabilityFence(this); }
@@ -70,7 +70,7 @@ final class NativeDhChunkInputs {
         catch (Throwable e) { throw new IllegalStateException("Cannot release chunk inputs", e); }
     }
     /** Immutable bindings publish through a volatile cache; original mutation exclusion still applies. */
-    @Nullable static NativeDhChunkInputs bind(ChunkAccess chunk, @Nullable NativeDhChunkInputs previous) {
+    @Nullable static NativeChunkInputs bind(ChunkAccess chunk, @Nullable NativeChunkInputs previous) {
         if (chunk.getClass() != ProtoChunk.class && chunk.getClass() != LevelChunk.class) return null;
         if (chunk instanceof LevelChunk level && level.getLevel().isDebug()) return null;
         int min = chunk.getMinY(), height = chunk.getHeight();
@@ -93,7 +93,7 @@ final class NativeDhChunkInputs {
                 scratch.pairs.setAtIndex(ValueLayout.ADDRESS, i * 2L + 1, scratch.counts[i]);
             }
             var pointer = (MemorySegment)CREATE.invokeExact(scratch.pairs, sections.length, min);
-            return pointer.address() == 0 ? null : new NativeDhChunkInputs(pointer, scratch, sections.length, min);
+            return pointer.address() == 0 ? null : new NativeChunkInputs(pointer, scratch, sections.length, min);
         } catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot bind native chunk inputs", e); }
         finally {

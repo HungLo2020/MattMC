@@ -62,7 +62,7 @@ class NativeBiomeWorldTest {
         var expected=NativeLiveBiomeSection.binding(NativeLiveBiomeSectionTest.strategy);
         world.range(0,0,3);world.replace(chunk);var first=chunk.nativeBiomeSections(expected);assertNotNull(first);
         var columns=chunk.nativeDhColumnSections();assertNotNull(columns);
-        Field attached=NativeDhChunkInputs.class.getDeclaredField("biomes");attached.setAccessible(true);assertSame(first,attached.get(columns));
+        Field attached=NativeChunkInputs.class.getDeclaredField("biomes");attached.setAccessible(true);assertSame(first,attached.get(columns));
         var position=new Vec3(1.5,1.5,1.5);var before=world.sample(position);assertNotNull(before);
         for(int i=0;i<8;i++){world.replace(chunk);assertSame(first,chunk.nativeBiomeSections(expected));assertSame(columns,chunk.nativeDhColumnSections());}
         @SuppressWarnings("unchecked") var values=(PalettedContainer<Holder<Biome>>)chunk.getSection(0).getBiomes();

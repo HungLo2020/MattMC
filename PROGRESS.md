@@ -52,6 +52,9 @@
 
 ## Next work and open acceptance
 
+- Verified combined block-light/DH-resize slice3c8e2d3d: retained section owners seed native queues directly; shared adapter renamed NativeChunkInputs. Rust2714/3ignored, Java2032/2skip and actual Frozen492/437089/54 native seeds pass. Seven lifecycle/two settled pairs pass,VUID0;11 originals/9 native identities reviewed. Hazy lifecycle views establish structural checks only.
+- Source-only8aaa5520 predecessor pairs: terrain12.6%/nether18.2% faster, edits unchanged. First DH matrix run failed RSS~12.4GiB/0 measured frames. Game-only JFR identified DH hydration/zero-appends; Rust bulk resize removes per-point Java/FFM construction. Weighted add/view-refresh allocation922->158MB; combined diagnostic RSS8.51/9.07GiB below guard. These variable-work profiles do not establish long memory bounds or isolated whole-game gains. Failed attempts retained.
+- Combined moving-camera comparison and matched20-run performance matrix are running. SUMMARY records the previous completedca8bf37a matrix until all new results are available. Guides: world/lighting/RUST-BLOCK-LIGHT-SOURCES.md and world/chunk/RUST-DH-FULL-DATA.md; receipts: build/native-light-seeds/combined/.
 - Continue migrating node/world-state producers with consumers; avoid Java packing followed by Rust reconstruction. Native work queues now replace that transfer in light propagation. Close and publish verified increments before starting another implementation batch.
 - Investigate measured native expansion/batching and remaining producer costs; small fog preparation times do not by themselves explain the DH gap.
 - First shader world frame, first-turn nearby regular-terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.

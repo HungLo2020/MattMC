@@ -14,6 +14,8 @@ final class NativeDhMutableColumn {
     private static final MethodHandle SHARED = call("shared", FunctionDescriptor.of(ValueLayout.ADDRESS,
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle OWN = call("make_owned", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    private static final MethodHandle RESIZE = call("resize", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = call("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle VIEW = call("view", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle SET = call("set", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
@@ -119,6 +121,16 @@ final class NativeDhMutableColumn {
         extentAddress=address;extentCount=(int)count;
     }
     int size() { return extentCount; }
+    void resize(int count) {
+        try {
+            int result = (int) RESIZE.invokeExact(owner, count);
+            if (result == -1) throw new OutOfMemoryError("Cannot resize native DH column");
+            if (result != 1) throw new IndexOutOfBoundsException(count);
+            refresh();
+        } catch (RuntimeException | Error e) { throw e; }
+        catch (Throwable e) { throw new IllegalStateException(e); }
+        finally { Reference.reachabilityFence(this); }
+    }
     void set(int index, long value) {
         try { if ((int) SET.invokeExact(owner, index, value) != 1) throw new IndexOutOfBoundsException(index); }
         catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }

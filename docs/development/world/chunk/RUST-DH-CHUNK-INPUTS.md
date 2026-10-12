@@ -1,6 +1,6 @@
-# Retained Rust DH chunk inputs
+# Retained Rust chunk inputs
 
-Height fields, emitter enumeration, the whole lighting pass and the column
+Height fields, emitter enumeration, ordinary block-light sources, the whole DH lighting pass and the column
 producer consume one retained Rust chunk input
 owner. Java caches compatibility identities on `ChunkAccess` and admits current
 containers; it no longer rebuilds section pointer tables for each consumer.
@@ -15,10 +15,14 @@ See the [current CPU checkpoint](../../rendering/GOAL-5-STATUS.md#october-10-ret
 for remaining runtime, performance and sustained-memory acceptance gates.
 
 Implementation: [input owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/inputs.rs),
-[transitional binding](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhChunkInputs.java)
+[transitional binding](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeChunkInputs.java)
 and [chunk admission](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/ChunkAccess.java).
 The existing save/load codec bridge `NativeChunkSections` is a separate,
 unchanged component; this input owner also admits canonical proto chunks.
+The adapter is now named `NativeChunkInputs` because ordinary lighting shares
+the same primary owners. The existing page URL and chunk cache are preserved;
+there is no second binding cache for the new
+[block-light producer](../lighting/RUST-BLOCK-LIGHT-SOURCES.md).
 
 ## Ownership and compatibility
 

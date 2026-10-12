@@ -5,6 +5,7 @@
 //! storage untouched and Java reruns the pass from the same queues.
 pub(crate) mod ffi;
 mod seed;
+mod sources;
 mod work;
 mod work_ffi;
 #[cfg(test)]

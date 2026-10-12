@@ -55,6 +55,13 @@ final class NativeLightPropagation {
     static final AtomicLong REJECTED = new AtomicLong();
     // Chunks whose sky sources Rust seeded.
     static final AtomicLong SEEDED = new AtomicLong();
+    static final AtomicLong BLOCK_SEEDED = new AtomicLong();
+
+    static boolean seedBlockSources(net.minecraft.world.level.chunk.LightChunk chunk, NativeLightQueues queues) {
+        if (!enabled || !net.minecraft.world.level.chunk.NativeLightSources.seed(chunk, queues)) return false;
+        BLOCK_SEEDED.incrementAndGet();
+        return true;
+    }
 
     static {
         try {

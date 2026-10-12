@@ -12,7 +12,7 @@
 - [Rust DH change hashes](RUST-DH-CHANGE-HASH.md): retained-input sampling,
   cached field semantics, mutable emitter boundaries and actual Frozen replay.
 
-- [Retained Rust DH chunk inputs](RUST-DH-CHUNK-INPUTS.md): shared authoritative
+- [Retained Rust chunk inputs](RUST-DH-CHUNK-INPUTS.md): shared authoritative
   block/counter/biome bindings, direct height/emitter/lighting/column/hash consumers
   and separate current runtime acceptance.
 

@@ -74,6 +74,27 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
 
 ## Constraints when changing this subsystem
 
+`NativeDhColumnList.size(int)` now hands positive resizing directly to Rust.
+It preserves existing points, zero-fills growth and truncates in one operation.
+Saved-source hydration through `ListUtil.clearAndSetSize` keeps list identities
+and its clear-before-resize order. Negative sizes retain the inherited Java
+removal/exception prefix. This removes per-point zero appends and repeated
+FFM view creation; it does not move compressed stream decoding out of Java.
+
+The local block-light producer batch exposed an intermittent DH RSS guard
+failure at about 12.4 GiB before measuring frames. Two diagnostic reruns
+completed below the guard; the game-only allocation profile identifies DH
+column hydration as the largest sampled FFM source, including about 922 MB
+weighted allocation below `NativeDhMutableColumn.add`/view refresh. These are
+allocation samples, not retained-byte totals or proof of a leak. Combined
+candidate `3c8e2d3d` passes full Rust and Java/parity suites, including resize
+identity/value/zero-fill/truncation controls. Two completed DH diagnostic
+sessions peak at 8.51/9.07 GiB below the guard. The game-only JFR weighted
+allocation below add/view refresh drops from 922 to 158 MB; variable background
+DH work makes this directional allocation evidence rather than a normalized
+speedup or retained-memory bound. The failed run and diagnostics remain in
+`build/native-light-seeds/`. Repeated runtime/performance acceptance is pending.
+
 - Preserve list object identity during mutation, iterator/sublist behavior,
   symmetric `LongList` equality, wrapped hashes and the successful mutation
   prefix when a later material ID is invalid. Self-insertion must read the old

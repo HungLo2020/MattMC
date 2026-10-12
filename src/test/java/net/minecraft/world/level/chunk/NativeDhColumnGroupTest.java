@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class NativeDhColumnGroupTest {
 	@Test
@@ -44,5 +45,23 @@ class NativeDhColumnGroupTest {
 		assertNotSame(first.stagePoints().scope(), second.stagePoints().scope());
 		assertEquals(LongArrayList.of(1L), first);
 		assertEquals(LongArrayList.of(2L), second);
+	}
+
+	@Test
+	void bulkResizePreservesValuesZerosIdentityAndInheritedNegativePrefix() {
+		var group = new NativeDhColumnGroup();
+		var column = NativeDhColumnList.empty(group);
+		column.add(11); column.add(12);
+		column.size(4096);
+		assertEquals(4096, column.size());
+		assertEquals(11, column.getLong(0)); assertEquals(12, column.getLong(1));
+		for (int i = 2; i < 4096; i++) assertEquals(0, column.getLong(i));
+		column.size(1); assertEquals(LongArrayList.of(11), column);
+		column.size(3); assertEquals(LongArrayList.of(11, 0, 0), column);
+		int hash = column.hashCode(); column.size(3); assertEquals(hash, column.hashCode());
+		com.seibel.distanthorizons.core.util.ListUtil.clearAndSetSize(column, 7);
+		assertEquals(LongArrayList.wrap(new long[7]), column);
+		assertThrows(IndexOutOfBoundsException.class, () -> column.size(-1));
+		assertEquals(0, column.size(), "the inherited negative resize removes its successful prefix");
 	}
 }

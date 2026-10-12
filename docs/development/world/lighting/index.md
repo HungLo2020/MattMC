@@ -22,5 +22,7 @@ contextual rendering callbacks.
   queues and sky-source seeding in Rust, section callbacks, parity and benchmarks.
 - [Rust light work ownership](RUST-LIGHT-WORK.md): retained pending queues,
   direct sky-seed handoff, callback admission and verification.
+- [Rust block-light sources](RUST-BLOCK-LIGHT-SOURCES.md): direct retained-section
+  enumeration and enqueueing, order, stale counters and compatibility.
 - [Rust leveled work queue](RUST-PRIORITY-QUEUE.md): the queue behind the Rust
   chunk/section distance graphs, its contracts and tests.

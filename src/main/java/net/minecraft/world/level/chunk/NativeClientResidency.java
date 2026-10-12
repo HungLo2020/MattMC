@@ -187,12 +187,12 @@ public final class NativeClientResidency {
         return chunk.getClass() == LevelChunk.class && chunk.getLevel() != null
             && chunk.getLevel().getClass() == ClientLevel.class && chunk.levelHeightAccessor == chunk.getLevel();
     }
-    @Nullable private static NativeDhChunkInputs inputs(LevelChunk chunk, LevelChunkSection[] sections) {
+    @Nullable private static NativeChunkInputs inputs(LevelChunk chunk, LevelChunkSection[] sections) {
         if (!stockGeometry(chunk) || chunk.getSectionsForRead() != sections) return null;
         for (var section : sections) if (section == null || section.getClass() != LevelChunkSection.class) return null;
         return chunk.nativeDhSections();
     }
-    private int scan(@Nullable NativeDhChunkInputs inputs, int index, long id, int x, int z, int min, int count, int cursor, int mode, MemorySegment result) {
+    private int scan(@Nullable NativeChunkInputs inputs, int index, long id, int x, int z, int min, int count, int cursor, int mode, MemorySegment result) {
         try {
             var pointer = inputs == null ? MemorySegment.NULL : inputs.stageOwner();
             int status = (int)SCAN.invokeExact(owner, pointer, index, id, x, z, min, count, cursor, mode, result);

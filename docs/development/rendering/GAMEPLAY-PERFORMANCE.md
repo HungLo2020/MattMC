@@ -88,6 +88,41 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Block-light sources and bulk DH resize
+
+The October 12 combined native `3c8e2d3d` enumerates ordinary block-light
+emitters directly from retained Rust section owners into native pending work.
+It also resizes DH saved columns in one Rust operation instead of constructing
+zero entries and refreshing Java FFM views one at a time. Java retains contextual
+node checks, orchestration and compressed stream decoding. See
+[block-light sources](../world/lighting/RUST-BLOCK-LIGHT-SOURCES.md) and
+[DH full-data constraints](../world/chunk/RUST-DH-FULL-DATA.md#constraints-when-changing-this-subsystem).
+
+The combined supported Rust suite passes 2,714 tests (three ignored); Java unit
+and parity suites pass 2,032 (two skipped). Actual unchanged Frozen matches
+492 lighting passes and 437,089 state rows; Current seeds 54 ordinary chunks
+natively. Seven lifecycle checks and settled vanilla/Iris+DH pairs pass with
+VUID zero. Eleven originals were reviewed and nine Current artifacts identify
+the combined native image. Hazy lifecycle views provide structural evidence
+only; settled pairs do not resolve first-turn gaps or shader world entry.
+
+Source-only predecessor pairs measured terrain 12.6% and nether 18.2% faster,
+with edits effectively unchanged. Those warmed lighting workloads verify
+`8aaa5520`, not a whole-game gain from the combined fix. Its first DH timing
+attempt exceeded the RSS guard near 12.4 GiB before measuring frames. That
+failed recording remains retained. Game-only JFR then identified per-element
+DH hydration as major FFM allocation churn. After bulk resize, sampled weighted
+allocation under add/view refresh drops from 922 to 158 MB, and two diagnostic
+DH sessions peak at 8.51/9.07 GiB below the guard. Variable background work
+prevents treating those recordings as a normalized speedup or retained-memory
+bound.
+
+The combined moving-camera comparison and predeclared matched 20-run matrix
+are in progress. `SUMMARY.md` continues to record the preceding completed
+matrix below; its performance figures do not verify this new native image.
+Receipts: `build/native-light-seeds/combined/`; rejected source-only RSS evidence
+and lighting microbenchmarks remain in `build/native-light-seeds/`.
+
 ## Local light-work checkpoint
 
 Native `ca8bf37a` retains pending light queues and consumes their inputs directly,
