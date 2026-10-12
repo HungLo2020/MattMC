@@ -21,8 +21,9 @@ entity arrays or native reconstruction of Java maps.
 
 Here “visible” means admitted to section-manager tracking, not passing the
 camera frustum. The ID/UUID lookup and live ordered enumeration are distinct
-from spatial section queries. Section keys, persistence's known-UUID set and load/visibility orchestration
-remain Java. Root and typed section arrays now use the
+from spatial section queries. The subsequent [section-key index](RUST-ENTITY-SECTION-INDEX.md) owns production coordinates and ordered queries; its guide separates passing
+CPU/scoped runtime checks from open performance and broader acceptance. Persistence's known-UUID set and
+load/visibility orchestration remain Java. Root and typed section arrays now use the
 [native membership owner](RUST-ENTITY-SECTIONS.md). Tracking is also distinct from the
 [geometry owner](RUST-ENTITY-GEOMETRY.md) and
 [ticking membership](RUST-ENTITY-ORDER.md). None of these CPU views carries

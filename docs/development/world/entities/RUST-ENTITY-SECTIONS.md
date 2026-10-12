@@ -3,9 +3,9 @@
 `ClassInstanceMultiMap` now stores its root and cached typed member arrays in
 the existing Rust library. Both client and server `EntitySection` producers
 and queries consume those arrays. Java retains class descriptors, behavior
-object bindings, and equality/type/bounds/consumer callbacks. The coordinate
-map, ordered section-key index, visibility and persistence orchestration remain
-Java and are subsequent migration work.
+object bindings, and equality/type/bounds/consumer callbacks. The subsequent [coordinate/index slice](RUST-ENTITY-SECTION-INDEX.md) owns production keys and coordinate
+queries with scoped verification and open performance limits. Visibility and persistence
+orchestration remain Java and are subsequent migration work.
 
 Implementation: [native member owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/entity_sections),
 [Java behavior bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/util/NativeClassInstanceStorage.java),

@@ -15,7 +15,7 @@
 - Rust owns DH material/point/metadata policy, topology, packet encoding and retained visibility. Java retains generation/retrieval scheduling and its generation tree.
 - Rust client residency/ranges own logical slots, coordinates and ordinary loaded-chunk selection; Java binds behavior objects and callbacks.
 - Rust entity geometry/removal/camera membership, ticking order/snapshots and visible ID/UUID tracking serve production client/server consumers.
-- Current section slice moves root/typed membership arrays into Rust; Java retains class descriptors/object bindings and callbacks. Section-coordinate maps, visibility and persistence known-UUID/load orchestration remain Java.
+- Current section slice moves root/typed membership arrays into Rust; Java retains class descriptors/object bindings and callbacks. The subsequent section-coordinate map/index is wired in current source and under verification; visibility and persistence known-UUID/load orchestration remain Java.
 - Rust owns texture atlases/model baking and ordinary GUI item templates. Java retains font/layout, behavior objects and remaining extraction/orchestration.
 - General simulation, networking, startup/platform and remaining frame-input producers are Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
 
@@ -25,7 +25,7 @@
 - Prior native9c9f085c reports all20 timing floors passing, Rust2685/3ignored and Java/parity2010/2skip. Its matrix uses older unmatched JVM controls and does not verify current6076262e. Details remain in rendering/GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint.
 - Integrated doc-only6b858d35b with targeted workflow stash4ed93c27; reconciled2 overlapping docs without changing source/native identities. Protected stashes remain untouched.
 
-## Current entity-section/DH checkpoint
+## Published membership/DH predecessor
 
 - Native6076262e: Rust owns production root/typed arrays, mutation counters and generational binding retirement. Quiet traversal reads native CPU views without rebuilding a Java primary list. Six Rust controls include10k retired-slot reuse cycles.
 - Final review repaired a genuine typed-toArray VM-error/destination-prefix mismatch. Expanded actual Frozen membership6123 and manager lookup4417 cases match with source/class/native guards. Earlier failed/pre-repair recordings remain in build/native-entity-sections/.
@@ -37,6 +37,12 @@
 - Current vanilla phase receipts show native mesh expansion/grouping around0.1ms median; first repeat is substantially slower than second. Investigate real producer/batching/streaming costs; do not replace failed repeats or change baseline behavior.
 - Guides: world/entities/RUST-ENTITY-SECTIONS.md, rendering/RUST-DH-VISIBILITY.md and rendering/GAMEPLAY-PERFORMANCE.md. Current receipts: build/native-entity-sections/dh-summary-candidate/; historical candidates/profile receipts retained separately.
 - Publish this correctness-verified migration checkpoint with the measured vanilla miss explicitly open. Next vertical slice: section-coordinate/index/visibility ownership and live frame-input costs; move producers/consumers together, removing duplicate Java packing/Rust reconstruction.
+
+## Current section-coordinate checkpoint
+
+- Production EntitySectionStorage is wired to a native physical hash map/threaded AVL index and coordinate queries. Java retains section behavior bindings and visibility/member callbacks; visibility/persistence orchestration still remains. Scoped runtime checks pass; broader and aggregate performance acceptance remain open.
+- Native168dd924 release and13 focused controls pass, including20k randomized AVL mutations/bounded retired-node reuse. Prior75156954 matches actual Frozen6693 with guards and15 Java integration tests pass after adding omitted fixture bootstrap. Spatial key/binding now returned together; numeric/null controls expanded. Full Rust2698/3ignored and Java/parity2022/2skip pass; expanded actual Frozen6721 and manager4417 match with source/class/native guards. Fixed-source controller49926 now runs7lifecycles/2worldpairs/cow-body-shadow and20 matched timings for168dd924. Seven lifecycles/2worldpairs/cow-body-shadow pass,VUID0;14 originals reviewed/10 Current identities match. All20 matched timings finish cleanly/all10 effective controls match/final source+native+Frozen+prompt+3input guards pass/no clients remain. Vanilla FPSFAIL0.75%, DH FPSFAIL6.41%; all p99/shader FPS floors pass. Aggregate performance remains unaccepted; no isolated cause/gain claimed.
+- Guide: docs/development/world/entities/RUST-ENTITY-SECTION-INDEX.md; receipts: build/native-section-index/. SUMMARY now records the complete168dd924 matrix and its open FPS misses.
 
 ## Open acceptance scope
 

@@ -88,9 +88,58 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Local section-coordinate checkpoint
+
+Native `168dd924` routes production client/server section-coordinate storage,
+ordered keys, chunk relations and coordinate queries through Rust. Java keeps
+section behavior bindings and visibility/membership callbacks. See the
+[ownership and compatibility guide](../world/entities/RUST-ENTITY-SECTION-INDEX.md).
+
+All twenty alternating exact 6,000-frame runs finish cleanly. All ten live
+heap/collector/JIT controls match, final source/native/Frozen/prompt/three
+prepared-input guards pass, and no clients remain. The controller exits 1 only
+at aggregate performance evaluation. Every scheduled repeat is retained.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Floors |
+| --- | --- | --- | --- |
+| Vanilla | 1324.95 / 1334.95 | 3.410 / 3.629 | FPS fails 0.75%; p99 passes |
+| Vanilla + DH | 811.80 / 867.40 | 3.142 / 4.774 | FPS fails 6.41%; p99 passes |
+| Shaders | 343.80 / 316.05 | 5.186 / 7.036 | Both pass |
+| Shaders + DH | 263.60 / 225.90 | 5.199 / 9.412 | Both pass |
+
+The fixed protocol uses 360 settle and 240 warmup frames, four DH repeats per
+side and two for every other mode. Current/Frozen variation, especially in DH,
+prevents attribution of an isolated migration gain or regression cause.
+Aggregate performance remains **failed**; further evidence-backed migration
+and optimization are required. This is a correctness checkpoint, not final
+performance or Java-removal acceptance.
+
+Combined suites pass 2,698 Rust tests (three ignored) and 2,022 executed
+Java/parity tests (two skipped). Actual unchanged Frozen matches all 6,721
+index cases and 4,417 manager cases with source/class/native guards. The first
+fixture attempt omitted registry bootstrap; its failure and the preceding
+6,693-case replay are retained. Numeric packing, nonfinite values, nulls,
+callback mutation and retained live streams are included in the final corpus.
+
+Seven lifecycle cases, two world comparisons and fixed cow body/shadow parity
+pass with zero VUIDs. Fourteen original images were individually reviewed and
+ten Current correctness native identities match. Small head orientation/shading
+differences are outside the body/shadow fixture's acceptance scope. These
+settled views do not establish first-frame/first-turn behavior, broad gameplay,
+sustained streaming or long-session memory bounds.
+
+Current phase receipts put entity traversal around 0.02–0.03ms median and DH
+render-list collection around 0.025–0.028ms, versus 1.09–1.16ms total DH GPU
+time. They select costs for further investigation, not a proved FPS cause;
+inclusive scopes must not be added as independent costs. Receipts:
+`build/native-section-index/candidate/` (`gameplay/performance.json`, mode
+repeats, `gameplay/final-guards.json`, `gameplay/effective-control-verification.json`,
+original-review records and `runtime-identities.json`), plus
+`build/native-section-index/current-phase-costs.json` and CPU replay logs.
+
 ## Local entity-section checkpoint
 
-Latest native `6076262e` includes Rust root/typed section membership, retained
+The preceding native `6076262e` includes Rust root/typed section membership, retained
 DH accepted-parent culling reuse and count-only admitted frame output. The
 benchmark matches actual heap/collector/JIT settings on unchanged Frozen.
 All twenty alternating exact 6,000-frame runs are clean; all live controls,

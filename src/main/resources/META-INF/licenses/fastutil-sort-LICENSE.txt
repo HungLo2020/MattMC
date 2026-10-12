@@ -1,4 +1,6 @@
-Fastutil 8.5.12 Arrays.quickSort adaptation in render/dh_columns/sort.rs
+Fastutil 8.5.12 adaptations:
+- Arrays.quickSort in render/dh_columns/sort.rs
+- Long2ObjectOpenHashMap and LongAVLTreeSet in world/level/entity_sections
 Copyright (C) 2002-2023 Sebastiano Vigna
 
 

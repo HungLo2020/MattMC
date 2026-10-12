@@ -4,3 +4,6 @@
 mod bindings;
 mod ffi;
 mod members;
+mod section_map;
+mod section_tree;
+mod index_ffi;

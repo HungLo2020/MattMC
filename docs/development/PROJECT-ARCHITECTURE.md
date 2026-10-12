@@ -210,8 +210,12 @@ stores root and typed arrays in `world/level/entity_sections/`; production
 client/server section consumers read native CPU views. Its CPU/Frozen,
 seven lifecycle and scoped world/entity comparisons pass. Performance acceptance
 remains open: the latest matched matrix passes DH and both shader modes,
-but vanilla misses FPS/p99 floors. Broader runtime scope remains open. Section-coordinate
-maps, visibility and persistence registration/load orchestration remain Java.
+but vanilla misses FPS/p99 floors. Broader runtime scope remains open. The
+subsequent [section-coordinate index](world/entities/RUST-ENTITY-SECTION-INDEX.md)
+owns production coordinates and ordered spatial queries. Its full suites,
+Frozen replays and scoped lifecycle/world/entity checks pass; its matched
+matrix still misses vanilla/DH FPS, so aggregate performance remains open. Visibility and persistence registration/
+load orchestration remain Java.
 Full parity and Java removal remain open.
 
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)

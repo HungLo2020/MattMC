@@ -8,5 +8,7 @@
   live ordered enumeration, callback boundaries and verification.
 - [Rust entity-section membership](RUST-ENTITY-SECTIONS.md): root/typed native
   member arrays, callback lifetime and Current/Frozen verification.
+- [Rust section-coordinate index](RUST-ENTITY-SECTION-INDEX.md): native primary
+  coordinate storage, live spatial cursors and mutation compatibility.
 - [Component model](../../game-model/COMPONENTS-AND-ENTITIES.md): the broader
   planned model, including deterministic ticks, anchored entities and persistence.
