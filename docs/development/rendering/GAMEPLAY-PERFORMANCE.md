@@ -1321,3 +1321,55 @@ FPS/p99 and DH p99. Keep those separate workloads and source identities.
 This documentation review inspected source and committed author records; it
 did not run clients, Java/Rust suites or profiles, or inspect the original
 runtime receipts.
+
+## Render-source storage checkpoint
+
+October 12 release `a9286e05` moves primary DH render-point and dense semantic
+storage into Rust, with direct reducer and interior-box consumers. See the
+[ownership and CPU measurements](RUST-DH-RENDER-SOURCE.md#cpu-checkpoint-october12).
+Seven lifecycle scenarios and three settled pairs pass on that image; these
+checks do not establish temporal completeness or bounded long-session memory.
+
+The predeclared rotating-coast protocol requests two 6,000-frame runs per side
+for vanilla, DH, shaders and their combination, interleaved Current/Frozen.
+Both clients use the same prepared world, 1–8 GiB ZGC heap, compact headers and
+JIT thresholds; live JVM controls are observed before measurement. The minimap
+is hidden. Profilers are excluded from timing. Source, class, native, Frozen,
+corpus and prepared-input hashes identify the comparison.
+
+The second Current DH attempt failed before timing with RSS 13.25 GiB and zero
+measured frames. DH was generating and no settled frame had been admitted.
+The earlier Current DH attempt completed at 821 FPS, p99 2.718ms, peak RSS 9.00 GiB.
+The failure remains preserved; a separately declared continuation fills the
+missing measured pair under identical controls and the unchanged RSS guard.
+This does not make the original 16-attempt protocol clean or resolve startup
+memory. The previous light-input release also had an unresolved startup peak.
+
+Receipts: `build/native-dh-render-source/gameplay/`; original attempts and
+failures: `artifacts/graphics-captures/validation/native-dh-render-source-perf-20261012/`.
+
+Completed timings on this image (two runs per side per mode):
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1322.30 / 1231.60 | 3.243 / 3.650 |
+| Vanilla + DH | 796.85 / 873.55 | 3.363 / 4.368 |
+| Shaders | 347.40 / 314.85 | 5.376 / 7.484 |
+| Shaders + DH | 264.00 / 226.95 | 6.492 / 9.940 |
+
+DH misses the FPS floor by 8.8%; the other FPS floors and all p99 floors pass.
+These 16 measured windows plus one failed startup are all retained. The recovery
+pair does not replace or erase that failure. Whole-game parity is incomplete;
+the CPU build gain is not an isolated FPS improvement. The migration removes
+Java storage/adapter work while leaving traversal and callback migration open.
+
+A separate game-only JFR/NMT diagnostic completed cleanly at 9.52 GiB RSS and
+therefore did not reproduce or explain the failed 13.25 GiB peak. Near the highest
+live diagnostic sample, RSS was 9.40 GiB, ZGC used 3.55 GiB with 5.31 GiB capacity,
+and NMT committed 6.08 GiB. These figures have different accounting scopes and
+cannot be subtracted to infer a leak. NMT omits third-party native allocations.
+The 6,858 allocation samples identify remaining DH empty-column wrappers,
+mutable-column adoption/refresh and render-source views as migration targets;
+sampling weights describe allocation, not retained ownership. JFR/NMT timings
+are excluded from the performance table. Receipts: `memory-summary.json`,
+`memory-live-samples.json` and `memory-game.jfr` under `build/native-dh-render-source/`.

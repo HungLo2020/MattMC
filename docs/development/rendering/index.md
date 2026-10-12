@@ -13,6 +13,8 @@ each module there has a short README with its own file map.
   API overrides and direct pose consumption with bounded lifetime.
 - [Rust DH render columns](RUST-DH-RENDER-COLUMNS.md): compact-column reduction,
   water/material policy, borrowed storage and actual Frozen CPU replay.
+- [Rust DH render-source storage](RUST-DH-RENDER-SOURCE.md): primary CPU points,
+  lazy semantic planes, direct reducer/box consumers and source lifetime.
 - [Rust DH quad builds](RUST-DH-QUADS.md): build-local quad storage, premerging,
   greedy topology, semantic outcomes and Frozen verification.
 - [Rust DH semantic packets](RUST-DH-PACKETS.md): native layer selection,

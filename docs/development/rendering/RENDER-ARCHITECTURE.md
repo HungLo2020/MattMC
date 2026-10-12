@@ -16,7 +16,7 @@ render/
 ├── shared/       helpers used by both renderers
 ├── scene/        wire and data vocabulary (constants, data types)
 ├── dh_collector/ DH column state, copied payloads, publication and frame admission
-├── dh_columns/   CPU render-column reduction, water/material policy and bounded scratch
+├── dh_columns/   primary CPU render sources, column reduction and bounded scratch
 ├── clouds/       CPU cloud motion/placement/culling owners; no GPU dependencies
 ├── fog/          CPU fog colors/ranges and water/rain transition histories
 ├── items/        authored item poses and world/hand composition; no GPU dependencies
@@ -144,6 +144,10 @@ Admitted DH world preparation includes native [height fields](../world/chunk/RUS
 [same-detail updates](../world/chunk/RUST-DH-SOURCE-UPDATES.md) and
 [change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md). The separate
 [render-column reduction](RUST-DH-RENDER-COLUMNS.md) consumes compact CPU storage.
+[Render-source points and dense semantics](RUST-DH-RENDER-SOURCE.md) now belong
+to Rust. Interior box production resolves four numeric windows from one scoped
+CPU owner; boundary neighbors retain borrowed spans. Java retains contextual
+color callbacks, sparse bindings and source traversal.
 Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
 generation/compression/uniformity and direct parent inputs. Java retains
 admission and wrapper/list identities, update orchestration,

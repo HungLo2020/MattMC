@@ -7,6 +7,23 @@ worlds as saves, even when their parent directory is named `cache`.
 Cleanup histories below are implementation-author reports; this documentation
 review did not inspect their original files or rerun cleanup.
 
+## Unused Rust caches and validation archival: 2026-10-12
+
+Removed the generated `src/main/rust/target` and `build/rust/target-tests`
+caches after confirming no tracked files or live process references. Free space
+increased36.45GiB; the primary `build/rust/target`, production native libraries
+and pinned predecessor controls remain. Use `CARGO_TARGET_DIR=build/rust/target`
+for suite tests to share the existing profile cache rather than recreating the
+retired duplicate trees.
+
+Losslessly archived19 large `graphics_audit_artifact.json` files in completed,
+successful historical validation roots. Each decompressed archive matched its
+original SHA256 before removing the plain file; payload reduction was2.14GiB.
+Screenshots, profiles, completion receipts and prepared inputs remain. Restore a
+plain artifact with `gzip -dk FILE.json.gz` for a consumer that requires it.
+Exact manifests and verification are in `build/native-dh-render-source/`:
+`cache-retention.json`, `validation-archive-plan.json` and `validation-archive.json`.
+
 ## Superseded profile videos: 2026-10-11
 
 Retired 56 `window-crop.nut` videos from seven completed October9 CPU/allocation

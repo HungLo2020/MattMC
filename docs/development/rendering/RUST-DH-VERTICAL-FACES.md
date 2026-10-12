@@ -42,7 +42,8 @@ and [box consumer](https://github.com/HungLo2020/MattMC/blob/b32fd91c847f3660beb
   can supply spans: its existing Java material-resolution lists remain, and
   the bridge allocates a bounded numeric projection once per box. This is not
   allocation-free construction.
-- Canonical exact `LongArrayList` windows and immutable JDK span lists admit.
+- Canonical exact `LongArrayList` windows,
+  [primary native render-source windows](RUST-DH-RENDER-SOURCE.md) and immutable JDK span lists admit.
   Custom getters, malformed extents, more than 4,096 points per neighbor or
   4,096 semantic spans, and subclasses
   retain the compatibility path. Bounds are checked

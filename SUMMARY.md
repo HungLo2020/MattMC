@@ -1,10 +1,10 @@
-# Latest Rust vs Frozen performance (2026-10-12; nativea6467e9d; light inputs)
+# Latest Rust vs Frozen performance (2026-10-12; native a9286e05; DH render sources)
 
 | Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1178.80 / 1162.10 | 3.752 / 4.111 |
-| Vanilla + DH | 803.15 / 669.25 | 3.116 / 6.331 |
-| Shaders | 348.40 / 316.40 | 4.791 / 7.003 |
-| Shaders + DH | 263.80 / 227.30 | 6.577 / 8.755 |
-All20 measured6000-frame runs clean; matched live JVM controls and source/native/class/Frozen/prompt/prepared-input/corpus guards pass. All FPS/p99 floors PASS in this scene; no isolated migration speedup claimed. Successful DH RSS8.88–9.20GiB,combined9.63/9.75GiB. Earlier DH startup RSS12.95GiB/0 frames failed and remains unroot-caused; memory bounding stays open.
-Rust2725/3ignored; Java2043/2skip; actual Frozen437089 rows/492 passes match with6 primary-owner probes. Seven lifecycle/three settled pairs pass,VUID0;13 retained originals/10 native identities reviewed after gate retention recovery. Complete lighting workload timings unchanged vs predecessor. Broad/temporal/streaming acceptance and Java removal remain open. [Results](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#direct-light-section-input-checkpoint).
+| Vanilla | 1322.30 / 1231.60 | 3.243 / 3.650 |
+| Vanilla + DH | 796.85 / 873.55 | 3.363 / 4.368 |
+| Shaders | 347.40 / 314.85 | 5.376 / 7.484 |
+| Shaders + DH | 264.00 / 226.95 | 6.492 / 9.940 |
+16 completed 6,000-frame windows, plus one retained DH startup failure (13.25 GiB RSS, zero measured frames). DH FPS misses Frozen by 8.8%; other FPS floors and all p99 floors pass. Matched JVM/source controls; no isolated migration FPS gain claimed.
+Rust 2,728 passed / 3 ignored; Java 2,046 passed / 2 skipped. Seven lifecycle and three settled pairs pass. Saved-source CPU build 51.1% faster Frozen, 2.6% slower predecessor; Java allocation 88.1% lower predecessor. Memory diagnosis reached 9.52 GiB without reproducing the failed peak. Temporal/streaming/memory acceptance and Java removal remain open. [Results](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#render-source-storage-checkpoint).

@@ -2,7 +2,6 @@ package net.vulkanic.world;
 
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.IColumnDataView;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
@@ -20,23 +19,24 @@ public final class NativeDhRenderReduction {
 
     /** False leaves destination untouched and retains original callback/exception sequencing. */
     public static boolean reduce(IColumnDataView source, int[] sourceMaterials, ColumnArrayView output, int[] outputMaterials) {
-        if (output.data.getClass() != LongArrayList.class || output.offset < 0 || output.size < 0 || output.size > LIMIT
+        if (!NativeDhRenderSource.canonical(output.data) || output.offset < 0 || output.size < 0 || output.size > LIMIT
             || output.offset > output.data.size() - output.size || (sourceMaterials == null) != (outputMaterials == null)) return false;
         MemorySegment input = MemorySegment.NULL;
         int count = 0;
         // The original ordinary zero-target path does not read the source.
         if (sourceMaterials != null || output.verticalSize > 0) {
-            if (!(source instanceof ColumnArrayView view) || view.data.getClass() != LongArrayList.class
+            if (!(source instanceof ColumnArrayView view) || !NativeDhRenderSource.canonical(view.data)
                 || view.offset < 0 || view.size < 0 || view.size > LIMIT || view.offset > view.data.size() - view.size) return false;
             count = view.size;
-            input = MemorySegment.ofArray(((LongArrayList)view.data).elements()).asSlice(view.offset * 8L, count * 8L);
+            input = NativeDhRenderSource.borrow(view.data, view.offset, count);
         }
         if (sourceMaterials != null && (sourceMaterials.length < count || outputMaterials.length < output.size)) return false;
-        var destination = MemorySegment.ofArray(((LongArrayList)output.data).elements()).asSlice(output.offset * 8L, output.size * 8L);
+        var destination = NativeDhRenderSource.borrow(output.data, output.offset, output.size);
         var materials = sourceMaterials == null ? MemorySegment.NULL : MemorySegment.ofArray(sourceMaterials);
         var resultMaterials = outputMaterials == null ? MemorySegment.NULL : MemorySegment.ofArray(outputMaterials);
         try { return (int)REDUCE.invokeExact(input, count, materials, output.verticalSize, destination, output.size, resultMaterials) == 1; }
         catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot reduce native DH render column", e); }
+        finally { java.lang.ref.Reference.reachabilityFence(source); java.lang.ref.Reference.reachabilityFence(output); }
     }
 }

@@ -2,5 +2,6 @@
 mod ffi;
 mod reduction;
 mod sort;
+pub(crate) mod source;
 #[cfg(test)]
 mod tests;

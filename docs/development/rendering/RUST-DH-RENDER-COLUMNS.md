@@ -5,6 +5,8 @@ Ordinary `RenderDataPointUtil.mergeMultiData` calls borrow existing canonical
 column storage and publish directly into the destination; Java does not pack a
 point buffer, construct reducer nodes, sort links or repeat reduction policy.
 Full-data conversion still performs contextual block-color callbacks in Java.
+[Primary render-source storage](RUST-DH-RENDER-SOURCE.md) now belongs to Rust;
+reduction borrows native source windows as well as temporary heap columns.
 [Cached DH tint neighborhoods](../world/biome/RUST-DH-TINT.md) use retained
 native column/material inputs and Rust cache storage, with recorded Frozen CPU
 replay and scoped timing verification. [Vertical face policy](RUST-DH-VERTICAL-FACES.md) now splits neighbor visibility,
@@ -44,8 +46,9 @@ and [ordinary consumer](https://github.com/HungLo2020/MattMC/blob/master/src/mai
   the original Java path delivers its callbacks and exceptions. Existing caller
   exclusion is still required; this does not create a concurrent transaction.
 - Admit the final `ColumnArrayView` class backed by exact `LongArrayList`
-  storage and bounded extents. The bridge uses `instanceof ColumnArrayView`
-  and an exact-class check for its backing list. Custom `IColumnDataView`
+  storage or the final `NativeDhRenderSource` adapter and bounded extents.
+  Borrowed native segments retain their source scope through the call.
+  Custom `IColumnDataView`
   implementations/lists, malformed extents and oversized input retain the original
   sequence. Ordinary zero-target output does not inspect the source. Semantic
   array validation remains before admission. Empty-view edge cases retain
@@ -62,7 +65,7 @@ and [ordinary consumer](https://github.com/HungLo2020/MattMC/blob/master/src/mai
 Use JDK25 and consistent release settings:
 
 ```sh
-CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml --locked --profile suite --lib render::dh_columns::
+CARGO_TARGET_DIR=build/rust/target cargo test --manifest-path src/main/rust/Cargo.toml --locked --profile suite --lib render::dh_columns::
 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release buildRustNative
 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release parityTest -x testRustNative --tests net.vulkanic.world.NativeDhRenderReductionTest
 python3 DevUtils/RunWiki.py check

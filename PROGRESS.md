@@ -12,7 +12,7 @@
 ## Current ownership and remaining migration
 
 - Rust owns renderer/GAL/presentation, terrain assembly/visibility, canonical block/biome sections, light fields and biome color windows.
-- Rust owns DH materials/topology/packets, retained visibility, primary points/metadata and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
+- Rust owns DH materials/topology/packets, retained visibility, primary full/render points and dense metadata, and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
 - Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index and manager residency serve production client/server consumers.
 - Java retains entity simulation, behavior callbacks, visibility transitions, persistence I/O and the loading inbox.
@@ -44,12 +44,28 @@
 ## Verified light-section input checkpoint
 
 - Removed ordinary live-section export into the Java callback buffer; Rust now captures/maps primary packed inputs directly into the existing pass snapshot. Typed CPU lease pins the owner; no mutable generation is retained across callbacks.
-- New regressions cover all palette widths/both engines and mutation-independent snapshots. Final Rust2725/3ignored and actual Frozen437089 rows/492 passes pass with all guards and six primary-owner probes. Java2043/2skip passes. Twelve predecessor/current timing runs match all checksums/guards: terrain18.785/18.787ms,edits10.589/10.569ms,nether6.878/6.874ms; effectively unchanged, no speedup claimed. Seven lifecycle cases pass with zero exceptions/panics/GAL failures; seven a6467e9d originals reviewed as structural only (haze). All three settled pairs pass,VUID0; both controllers complete normally. Thirteen originals/10 Current identities reviewed. Pre-timing guard exposed automatic retirement of the separate unpinned gate proof when pairs finished. Pair proof pinned; replacement gate passes all seven scenarios with pinning;13 current originals/10 identities reviewed and present. Old hashes/controller logs retained. Pre-timing integrity checked before starting measurement. First DH timing failed RSS12.95GiB/0 measured frames; retained. Current game-only JFR completes9.02GiB, published CPU-bridge control9.82GiB but shutdown RejectedExecutionException rejects it. Profiles emphasize DH arrays/adapters/segments, not a retained bound; peak remains unroot-caused. All20 completed6000-frame runs clean with matched live JVM controls/all guards; no clients. FPS Current/Frozen1178.80/1162.10,803.15/669.25,348.40/316.40,263.80/227.30; p99ms3.752/4.111,3.116/6.331,4.791/7.003,6.577/8.755. All floors PASS in this scene; no isolated gain or memory-bound claim. Saved-terrain JFR175 samples do not localize this boundary; source duplication confirmed, workload comparisons pending.
+- Rust2725/3ignored, Java2043/2skip and actual Frozen437089 rows/492 passes match; six primary-owner probes and all guards pass.
+- Twelve predecessor/current workload timings: terrain18.785/18.787ms,edits10.589/10.569ms,nether6.878/6.874ms. Effectively unchanged; no isolated speedup claimed.
+- Seven lifecycle cases and three settled pairs pass,VUID0;13 originals/10 Current identities reviewed. Gate haze proves structural behavior only. Unpinned first gate was automatically retired; pinned replacement proof passes and remains present.
+- All20 measured6000-frame runs clean with matched live JVM controls. Current/Frozen FPS1178.80/1162.10,803.15/669.25,348.40/316.40,263.80/227.30; p99ms3.752/4.111,3.116/6.331,4.791/7.003,6.577/8.755. All scene floors pass.
+- Earlier DH startup failed RSS12.95GiB/0 frames. Current game-only JFR completes9.02GiB; predecessor CPU-bridge control9.82GiB fails clean shutdown. Peak remains unroot-caused; sampled DH arrays/adapters are allocation evidence, not a retained-memory bound.
+
+## Render-source storage checkpoint
+
+- Rust owns primary DH render points and lazy dense semantic planes; reducer/box consumers borrow those spans directly. Java retains contextual callbacks, sparse bindings and traversal.
+- Conversion failures close partially built owners; scoped views invalidate safely on close. Frozen packed-height edge behavior is preserved.
+- Final full suites pass Rust2728/3ignored and Java2046/2skip. Complete saved-world point/geometry oracles match Frozen and predecessor; all guards pass. Seven lifecycle and three settled pairs pass,VUID0;13 originals reviewed.
+- Interior boxes now pass one scoped CPU source owner; Rust resolves/validates four windows, removing Java span construction and repeated source-scope acquisition.
+- CPU build Current/predecessor/Frozen321.42/313.36/657.63ms. Current is51.1% faster Frozen but2.6% slower predecessor. Heap allocation37.6/315.4/156.2MB per24-source batch;88.1% lower predecessor, not a total-memory bound.
+- Retired unused Rust caches after checking no live references:36.45GiB reclaimed; lossless archival of19 completed historical audit JSONs saved2.14GiB. Controls, originals and failures retained.
+- Current DH attempt2 failed during startup:RSS13.25GiB,0 measured frames, DH still generating. Earlier measured DH run821FPS,p99 2.718ms,peak9.00GiB. Failure retained; continuation completed the missing measured pair with unchanged guard.
+- Sixteen completed6000-frame windows plus one failed startup retained. Current/Frozen FPS1322.30/1231.60,796.85/873.55,347.40/314.85,264.00/226.95. DH FPS misses8.8%; other FPS/all p99 floors pass. See SUMMARY/table guide.
+- Game-only JFR/NMT diagnostic completes9.52GiB, not a peak reproduction.6,858 allocation samples identify empty/mutable DH column wrappers and render views; allocation weights do not prove retention. Preserve failure and profile.
 
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Profile/migrate DH render-source arrays and column-adapter producers/consumers highlighted by the memory recording; investigate startup RSS and shutdown rejection. Continue node/world-state ownership with adequate samples. Keep CPU hydration gains separate from whole-game measurements.
+- Profile remaining DH conversion traversal, sparse semantics and full-source lifetimes; migrate producers/consumers together. Investigate startup RSS and shutdown rejection. Continue node/world-state ownership with adequate samples. Keep CPU hydration gains separate from whole-game measurements.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.

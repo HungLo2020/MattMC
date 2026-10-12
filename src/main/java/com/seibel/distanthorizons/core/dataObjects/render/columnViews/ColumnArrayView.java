@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 
 import java.util.Arrays;
+import net.vulkanic.world.NativeDhRenderSource;
 import java.util.ConcurrentModificationException;
 
 public final class ColumnArrayView implements IColumnDataView
@@ -86,7 +87,8 @@ public final class ColumnArrayView implements IColumnDataView
 	{ return new ColumnArrayView(data, dataCount * verticalSize, offset + dataIndexStart * verticalSize, verticalSize); }
 	
 	public void fill(long value) {
-		if (data instanceof LongArrayList array) Arrays.fill(array.elements(), offset, offset + size, value);
+		if (data instanceof NativeDhRenderSource) NativeDhRenderSource.span(data, offset, size, 0, value);
+		else if (data instanceof LongArrayList array) Arrays.fill(array.elements(), offset, offset + size, value);
 		else for (int i = 0; i < size; i++) data.set(offset + i, value);
 	}
 	
@@ -100,6 +102,23 @@ public final class ColumnArrayView implements IColumnDataView
 		else if (source.dataCount() + outputDataIndexOffset > dataCount())
 		{
 			throw new IllegalArgumentException("dataIndexStart + source.dataCount() must be <= self.dataCount() to copy");
+		}
+		else if (source instanceof ColumnArrayView input && NativeDhRenderSource.canonical(input.data)
+			&& NativeDhRenderSource.canonical(data)
+			&& (data instanceof NativeDhRenderSource || input.data instanceof NativeDhRenderSource)
+			&& input.offset >= 0 && input.size >= 0 && input.offset <= input.data.size() - input.size
+			&& offset >= 0 && size >= 0 && offset <= data.size() - size)
+		{
+			if (source.verticalSize() == verticalSize)
+			{
+				NativeDhRenderSource.copy(input.data, input.offset, data, offset + outputDataIndexOffset * verticalSize, source.size());
+			}
+			else for (int column = 0; column < source.dataCount(); column++)
+			{
+				int start = offset + (outputDataIndexOffset + column) * verticalSize;
+				NativeDhRenderSource.copy(input.data, input.offset + column * input.verticalSize, data, start, input.verticalSize);
+				NativeDhRenderSource.span(data, start + input.verticalSize, verticalSize - input.verticalSize, 0, 0L);
+			}
 		}
 		else if (!(data instanceof LongArrayList))
 		{
@@ -211,7 +230,8 @@ public final class ColumnArrayView implements IColumnDataView
 	}
 	
 	
-	public int getDataHash() { return arrayHash(this.data, this.offset, this.size); }
+	public int getDataHash() { return data instanceof NativeDhRenderSource
+		? NativeDhRenderSource.span(data, offset, size, 1, 0L) : arrayHash(data, offset, size); }
 	private static int arrayHash(LongList a, int offset, int length)
 	{
 		if (a == null)

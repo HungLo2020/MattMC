@@ -37,6 +37,22 @@ class NativeDhRenderReductionTest {
                 else assertEquals(exception,assertThrows(RuntimeException.class,()->RenderDataPointUtil.mergeMultiData(source,consumer)).getClass().getName());
                 assertArrayEquals(expected,consumer.data.toLongArray(),"ordinary consumer "+name);
                 assertArrayEquals(points,source.data.toLongArray(),"source retained "+name);
+                // Replay the unchanged Frozen corpus with primary Rust spans,
+                // including mixed heap/native calls and native alias exclusion.
+                try(var nativeInput=new NativeDhRenderSource(Math.max(1,(count+4095)/4096));
+                    var nativeDestination=new NativeDhRenderSource(Math.max(1,(size+3+4095)/4096))) {
+                    for(int p=0;p<count;p++)nativeInput.set(p,points[p]);
+                    var retainedInput=new ColumnArrayView(nativeInput,count,0,count);
+                    for(int storage=0;storage<3;storage++) {
+                        for(int p=0;p<size+3;p++)nativeDestination.set(p,GUARD);
+                        var destination=storage==2?output(size,target):new ColumnArrayView(nativeDestination,size,1,target);
+                        assertEquals(exception.isEmpty(),NativeDhRenderReduction.reduce(storage==0?source:retainedInput,null,destination,null),"primary admission "+name);
+                        if(exception.isEmpty()) {
+                            long[] actual=new long[size+3];destination.data.getElements(0,actual,0,actual.length);
+                            assertArrayEquals(expected,actual,"primary storage "+storage+" "+name);
+                        }
+                    }
+                }
             }
             assertEquals(-1,in.read());
         }

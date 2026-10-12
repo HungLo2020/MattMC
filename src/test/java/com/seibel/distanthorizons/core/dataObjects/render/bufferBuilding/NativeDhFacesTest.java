@@ -69,8 +69,9 @@ class NativeDhFacesTest {
             Config.Client.Advanced.Graphics.Experimental.earthCurveRatio.setWithoutFiringEvents(0);
             Config.Client.Advanced.Debugging.showOverlappingQuadErrors.setWithoutFiringEvents(false);
         }
-        static void frozen() throws Exception {
-            try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(Probe.class.getResourceAsStream("/rendering/frozen-dh-faces.bin.gz"))))) {
+        static void frozen(boolean primary) throws Exception {
+            try(var storage=primary?new net.vulkanic.world.NativeDhRenderSource(5):null;
+                var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(Probe.class.getResourceAsStream("/rendering/frozen-dh-faces.bin.gz"))))) {
                 assertEquals(0x44484631,in.readInt());assertEquals(6,in.readInt());
                 for(int i=0;i<6;i++){in.readUTF();assertEquals(64,in.readUTF().length());}
                 int cases=in.readInt();assertEquals(3072,cases);
@@ -81,7 +82,11 @@ class NativeDhFacesTest {
                     for(int d=0;d<4;d++) {
                         same[d]=in.readBoolean();int n=in.readInt();if(n<0)continue;
                         long[] padded=new long[n+4];Arrays.fill(padded,0x12345678);for(int i=0;i<n;i++)padded[i+2]=in.readLong();
-                        neighbors[d]=new ColumnArrayView(new LongArrayList(padded),n,2,n);
+                        if(primary) {
+                            int base=d*4100;
+                            for(int i=0;i<padded.length;i++)storage.set(base+i,padded[i]);
+                            neighbors[d]=new ColumnArrayView(storage,n,base+2,n);
+                        } else neighbors[d]=new ColumnArrayView(new LongArrayList(padded),n,2,n);
                     }
                     failure=in.readInt();boolean merge=in.readBoolean();String expectedError=in.readUTF();
                     var wanted=new ArrayList<Integer>();int n=in.readInt();for(int i=0;i<n;i++)wanted.add(in.readInt());
@@ -236,6 +241,6 @@ class NativeDhFacesTest {
                 assertEquals(-1,in.read());
             }
         }
-        public static void main(String[] args) throws Exception {setup();frozen();controls();stockFactEntry();System.out.println("Frozen3072; semantic192; reentrant/custom/close controls pass");}
+        public static void main(String[] args) throws Exception {setup();frozen(false);frozen(true);controls();stockFactEntry();System.out.println("Frozen3072 x heap/native; semantic192; reentrant/custom/close controls pass");}
     }
 }

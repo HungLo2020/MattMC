@@ -100,37 +100,45 @@ public class FullDataToRenderDataTransformer
 		
 		
 		final ColumnRenderSource columnSource = ColumnRenderSource.createEmpty(pos, vertSize, levelWrapper.getMinHeight());
-		if (fullDataSource.isEmpty)
+		try
 		{
+			if (fullDataSource.isEmpty)
+			{
+				return columnSource;
+			}
+
+			columnSource.markNotEmpty();
+			int baseX = DhSectionPos.getMinCornerBlockX(pos);
+			int baseZ = DhSectionPos.getMinCornerBlockZ(pos);
+			boolean preserveSemanticMaterials =
+				net.vulkanic.world.DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired();
+
+			for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
+			{
+				for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
+				{
+					ColumnArrayView columnArrayView = columnSource.getVerticalDataPointView(x, z);
+					LongList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
+
+					updateOrReplaceRenderDataViewColumnWithFullDataColumn(
+							levelWrapper, fullDataSource, columnSource, x, z,
+							// bitshift is to account for LODs with a detail level greater than 0 so the block pos is correct
+							baseX + BitShiftUtil.pow(x,dataDetail), baseZ + BitShiftUtil.pow(z,dataDetail),
+							columnArrayView, dataColumn, preserveSemanticMaterials);
+				}
+			}
+
+			columnSource.fillDebugFlag(0, 0, ColumnRenderSource.WIDTH, ColumnRenderSource.WIDTH, ColumnRenderSource.DebugSourceFlag.FULL);
+
 			return columnSource;
 		}
-		
-		columnSource.markNotEmpty();
-		int baseX = DhSectionPos.getMinCornerBlockX(pos);
-		int baseZ = DhSectionPos.getMinCornerBlockZ(pos);
-		boolean preserveSemanticMaterials =
-			net.vulkanic.world.DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired();
-		
-		for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
+		catch (RuntimeException | Error failure)
 		{
-			for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
-			{
-				ColumnArrayView columnArrayView = columnSource.getVerticalDataPointView(x, z);
-				LongList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
-				
-				updateOrReplaceRenderDataViewColumnWithFullDataColumn(
-						levelWrapper, fullDataSource, columnSource, x, z,
-						// bitshift is to account for LODs with a detail level greater than 0 so the block pos is correct
-						baseX + BitShiftUtil.pow(x,dataDetail), baseZ + BitShiftUtil.pow(z,dataDetail), 
-						columnArrayView, dataColumn, preserveSemanticMaterials);
-			}
+			columnSource.close();
+			throw failure;
 		}
-		
-		columnSource.fillDebugFlag(0, 0, ColumnRenderSource.WIDTH, ColumnRenderSource.WIDTH, ColumnRenderSource.DebugSourceFlag.FULL);
-		
-		return columnSource;
 	}
-	
+
 	/** Updates the given {@link ColumnArrayView} to match the incoming Full data {@link LongList} */
 	public static void updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 			IClientLevelWrapper levelWrapper,

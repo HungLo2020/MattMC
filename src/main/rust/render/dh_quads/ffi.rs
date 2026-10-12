@@ -32,6 +32,52 @@ fn quad(geometry: u64, attributes: u64, color: u32, identity: i32, position: i64
     }
 }
 
+/// The common interior-column route retains one CPU source scope and resolves
+/// all four neighbors in Rust. Cross-source/heap neighbors use the span entry.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_box_add_source(
+    owner: *mut Builder,
+    geometry: u64,
+    attributes: u64,
+    color: u32,
+    identity: i32,
+    position: i64,
+    top: u64,
+    bottom: u64,
+    source: *const crate::render::dh_columns::source::Source,
+    north: u64,
+    south: u64,
+    west: u64,
+    east: u64,
+    cave_y: i32,
+    flags: u32,
+    spans: *const u64,
+    span_count: i32,
+    shade01: u64,
+    shade23: u64,
+    shade45: u64,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !aligned(source) {
+            return 0;
+        }
+        let source = &*source;
+        let (Ok(n), Ok(s), Ok(w), Ok(e)) = (
+            source.window(north),
+            source.window(south),
+            source.window(west),
+            source.window(east),
+        ) else {
+            return 0;
+        };
+        mattmc_dh_box_add(
+            owner, geometry, attributes, color, identity, position, top, bottom, n.0, n.1, s.0,
+            s.1, w.0, w.1, e.0, e.1, cave_y, flags, spans, span_count, shade01, shade23, shade45,
+        )
+    }))
+    .unwrap_or(0)
+}
+
 /// Whole box facts and four borrowed exact neighbor windows; no source pointer escapes.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_box_add(

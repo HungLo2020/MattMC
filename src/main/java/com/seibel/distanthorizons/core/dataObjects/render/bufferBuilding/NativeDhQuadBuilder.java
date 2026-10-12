@@ -4,7 +4,7 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
+import net.vulkanic.world.NativeDhRenderSource;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.Cleaner;
@@ -35,6 +35,12 @@ final class NativeDhQuadBuilder implements AutoCloseable {
         ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+    private static final MethodHandle BOX_SOURCE = bind("mattmc_dh_box_add_source", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
         ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
     private static final EDhDirection[] DIRECTIONS = EDhDirection.values();
@@ -98,14 +104,23 @@ final class NativeDhQuadBuilder implements AutoCloseable {
         }
     }
     private static boolean canonical(ColumnArrayView v) {
-        return v == null || v.data != null && v.data.getClass() == LongArrayList.class
+        return v == null || v.data != null && NativeDhRenderSource.canonical(v.data)
             && v.size >= 0 && v.size <= 4096 && v.offset >= 0 && v.offset <= v.data.size()-v.size;
     }
     private static MemorySegment borrow(ColumnArrayView v) {
         return v == null || v.size == 0 ? MemorySegment.NULL
-            : MemorySegment.ofArray(((LongArrayList)v.data).elements()).asSlice(v.offset*8L,v.size*8L);
+            : NativeDhRenderSource.borrow(v.data, v.offset, v.size);
     }
     private static int length(ColumnArrayView v) { return v == null ? -1 : v.size; }
+    private static NativeDhRenderSource commonSource(ColumnArrayView[] neighbors) {
+        NativeDhRenderSource common = null;
+        for (int d = 0; d < 4; d++) if (neighbors[d] != null) {
+            if (!(neighbors[d].data instanceof NativeDhRenderSource source) || common != null && common != source) return null;
+            common = source;
+        }
+        return common;
+    }
+    private static long window(ColumnArrayView v) { return v == null ? -1L : (v.offset & 0xffffffffL) | (long)v.size << 32; }
     /** Complete admission precedes native mutation. Replay shades are bounded immutable CPU facts. */
     boolean box(short width, short height, short x, short y, short z, int color, byte material,
         int identity, byte variant, long position, List<ColumnRenderSource.SemanticMaterialSpan> spans,
@@ -138,19 +153,26 @@ final class NativeDhQuadBuilder implements AutoCloseable {
             shade23=(Float.floatToRawIntBits(replayShades[2]) & 0xffffffffL) | (long)Float.floatToRawIntBits(replayShades[3])<<32;
             shade45=(Float.floatToRawIntBits(replayShades[4]) & 0xffffffffL) | (long)Float.floatToRawIntBits(replayShades[5])<<32;
         }
-        var north=borrow(neighbors[0]);var south=borrow(neighbors[1]);var west=borrow(neighbors[2]);var east=borrow(neighbors[3]);
+        var source=commonSource(neighbors);
         synchronized(lease) {
             if(lease.pointer.address()==0) return false;
             try {
-                int result=(int)BOX.invokeExact(pointer(),geometry,attributes,color,identity,position,top,bottom,
-                    north,length(neighbors[0]),south,length(neighbors[1]),west,length(neighbors[2]),east,length(neighbors[3]),
+                int result;
+                if(source!=null) result=(int)BOX_SOURCE.invokeExact(pointer(),geometry,attributes,color,identity,position,top,bottom,
+                    source.borrowOwner(),window(neighbors[0]),window(neighbors[1]),window(neighbors[2]),window(neighbors[3]),
                     caveY,flags,intervals,spanCount,shade01,shade23,shade45);
+                else {
+                    var north=borrow(neighbors[0]);var south=borrow(neighbors[1]);var west=borrow(neighbors[2]);var east=borrow(neighbors[3]);
+                    result=(int)BOX.invokeExact(pointer(),geometry,attributes,color,identity,position,top,bottom,
+                        north,length(neighbors[0]),south,length(neighbors[1]),west,length(neighbors[2]),east,length(neighbors[3]),
+                        caveY,flags,intervals,spanCount,shade01,shade23,shade45);
+                }
                 if(result==-2) throw new IllegalArgumentException("Size 0 quad!");
                 if(result==-3) throw new IllegalArgumentException("Negative sized quad!");
                 if(result!=1) throw new IllegalStateException("Native DH box admission failed");
                 return true;
             } catch(Throwable e) { throw failure(e); }
-            finally { Reference.reachabilityFence(this); }
+            finally { Reference.reachabilityFence(neighbors); Reference.reachabilityFence(this); }
         }
     }
     int count(int field) {

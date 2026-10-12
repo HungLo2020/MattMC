@@ -18,7 +18,10 @@ source identities. Complete box production owns horizontal visibility,
 fake-ocean geometry and stock shading from bounded CPU facts; verification is
 recorded in the face guide. [Vertical visibility/light and
 semantic splitting](RUST-DH-VERTICAL-FACES.md) now consume borrowed neighbor
-columns directly into this Rust owner. [Rust packet plans](RUST-DH-PACKETS.md) capture each selected
+columns directly into this Rust owner. [Primary render-source storage](RUST-DH-RENDER-SOURCE.md)
+lets interior builds resolve all four neighbors in Rust under one CPU source
+scope, preserving span admission for cross-source and heap inputs.
+[Rust packet plans](RUST-DH-PACKETS.md) capture each selected
 layer under the native lease lock before callbacks and encode the final bytes.
 The four packet methods remain separate captures, not one atomic snapshot of
 all builder lists. Ordinary encoding no longer reconstructs Java `BufferQuad`
@@ -58,7 +61,7 @@ and [builder](https://github.com/HungLo2020/MattMC/blob/f8feb3ff553242127e1e9533
 Use JDK25 and the same native release for all Java runs:
 
 ```sh
-CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml --locked --profile suite --lib render::dh_quads::
+CARGO_TARGET_DIR=build/rust/target cargo test --manifest-path src/main/rust/Cargo.toml --locked --profile suite --lib render::dh_quads::
 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release buildRustNative compileTestJava
 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeDhQuadBuilderTest' --tests '*NativeDhPacketPlanTest' --tests '*LodQuadBuilderLayerTest'
 python3 DevUtils/RunWiki.py check
