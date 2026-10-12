@@ -25,6 +25,7 @@ import java.io.*;
  */
 public class DhDataInputStream extends DataInputStream
 {
+    private final boolean codecByteArrayInput;
 	private static final ThreadLocal<ResettableArrayCache> LZMA_RESETTABLE_ARRAY_CACHE_GETTER = ThreadLocal.withInitial(() -> new ResettableArrayCache(new LzmaArrayCache()));
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
@@ -54,8 +55,13 @@ public class DhDataInputStream extends DataInputStream
 	}
 	private DhDataInputStream(ByteArrayInputStream stream, EDhApiDataCompressionMode compressionMode) throws IOException
 	{ 
-		super(warpStream(stream, compressionMode)); 
+		super(warpStream(stream, compressionMode));
+        codecByteArrayInput = compressionMode == EDhApiDataCompressionMode.UNCOMPRESSED
+            || compressionMode == EDhApiDataCompressionMode.Z_STD_BLOCK;
 	}
+    /** These exact private wrappers cannot fail midway through a byte-array
+     * read. Streaming decompressors retain readByte's original failure prefix. */
+    public boolean codecByteArrayInput() { return codecByteArrayInput; }
 	@SuppressWarnings("deprecation")
 	private static InputStream warpStream(ByteArrayInputStream stream, EDhApiDataCompressionMode compressionMode) throws IOException
 	{

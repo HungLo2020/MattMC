@@ -1,5 +1,9 @@
 # Rust DH source metadata
 
+Saved generation/compression/uniformity payloads now use the
+[direct native metadata codecs](RUST-DH-METADATA-CODEC.md). The measurements below
+remain historical for the earlier storage/merge ownership slice.
+
 Source reviewed at [`64db2b31`](https://github.com/HungLo2020/MattMC/commit/64db2b31690fdd62ca1b1968d1cf076f0fa09108).
 Suite counts, timings and untracked receipt descriptions below are
 implementation-author reports. This documentation review inspected source and

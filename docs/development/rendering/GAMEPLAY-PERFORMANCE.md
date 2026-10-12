@@ -118,6 +118,61 @@ An A/B on Current alone (native versus forced Java stars) gave 386/385 versus
 acceptance matrices below; DH and shaders were not measured. Receipts:
 `artifacts/performance/realworld-20261011/`.
 
+## DH metadata and bulk-IO checkpoint
+
+Native `691c0b95` owns saved generation/compression/uniformity payload policy
+against primary Rust metadata planes. Exact private byte-array streams use bulk
+input; streaming decompressors preserve error prefixes. Java retains compression,
+DTO orchestration, contributors and contextual material resolution. This build
+also integrates upstream `f1de16e11` sky/stars, identity-map and GUI changes.
+See the [metadata codec guide](../world/chunk/RUST-DH-METADATA-CODEC.md).
+
+Actual unchanged Frozen matches 606 metadata rows and 696,830 point rows,
+including real saved blobs, with all source/native/class/corpus guards intact.
+The observer exposed short-list backing-capacity/EOF behavior; the native fix
+consumes the fixed payload while preserving logical size and mutation prefixes.
+Full Rust passes 2,723 tests (three ignored); Java/parity passes 2,043 (two skipped).
+
+Two serial JVM runs per side over 24 real saved DTOs measure published
+predecessor/current/Frozen hydration medians of 78.73/43.62/41.51 ms. Current
+improves 44.6%, remaining 5.1% slower than Frozen. Initialization, metadata,
+point decoding and close are included; contextual material resolution is omitted.
+Checksums and source/native/class/predecessor/corpus guards match. The initial
+profile found 162/285 CPU samples in single-byte ByteArrayInputStream.read.
+The short post-change profile has only 28 CPU samples; it cannot quantify a
+new bottleneck or establish normalized allocation/retained-memory improvements.
+
+Seven lifecycle scenarios and vanilla/DH/Iris+DH settled pairs pass, VUID zero.
+All 13 originals and ten Current native identities were reviewed. Hazy gate
+images provide structural evidence only. The controller exited with signal143
+while producing the final comparison after both DH clients completed cleanly;
+the signal origin is unconfirmed. Existing harness post-processing recovered
+the report from byte-guarded original artifacts, without rerunning clients.
+The interruption and recovery receipts remain.
+
+All twenty predeclared alternating runs complete cleanly with exactly 6,000
+measured frames. Every live JVM's heap/GC/JIT controls match before measurement.
+Source/native/class/Frozen/prompt/prepared-input/corpus guards pass; no clients
+remain. All runs, including the variable DH results, enter the medians.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1317.80 / 1264.50 | 3.563 / 3.710 |
+| Vanilla + DH | 753.75 / 701.45 | 3.992 / 6.264 |
+| Shaders | 348.45 / 313.65 | 4.679 / 7.220 |
+| Shaders + DH | 264.55 / 225.95 | 6.270 / 8.842 |
+
+All FPS and p99 floors **PASS in this measured scope**. Current DH RSS is
+8.83–9.40 GiB; combined RSS is 9.00/9.15 GiB, below the guard. This integrated
+matrix does not isolate the metadata change's whole-game effect. The settled
+rotating scene hides the minimap and does not establish ordinary HUD performance,
+first-turn gaps/flicker, shader world entry, broad gameplay, sustained streaming
+or long memory. Java removal remains far from complete.
+
+Receipts: `build/native-dh-metadata-codec/`; the repeated hydration comparison
+is `benchmark-v2/results.json`, and every timing row is retained under
+`gameplay/`. Initial mismatch, build/setup and controller failures remain.
+
 ## DH saved-point codec checkpoint
 
 Native `94d74a8b` decodes legacy/current DH point payloads and encodes the current

@@ -17,6 +17,7 @@ mod tint;
 mod source;
 mod metadata;
 mod codec;
+mod metadata_codec;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

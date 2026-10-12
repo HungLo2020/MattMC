@@ -3,7 +3,9 @@
 Ordinary DH saved-source point payloads now stream through Rust directly against
 the [primary column table](RUST-DH-SOURCE-TABLE.md). Java retains compression
 wrappers, database/network DTO orchestration, material resolution and the
-separate generation/compression/uniformity/contributor payloads. There is no
+[metadata codec IO](RUST-DH-METADATA-CODEC.md) and contributor payload orchestration.
+Generation/compression/uniformity payload policy now runs against Rust planes;
+the verification results below describe the earlier point-codec checkpoint. There is no
 Java point array or per-point native get/set loop on the admitted route.
 
 Implementation: [codec](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/codec.rs),
@@ -27,6 +29,9 @@ and [IO bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/n
   before raising a decompressor error. It ignores a pending read-ahead error
   when the parser has already completed or diagnosed an earlier format error.
   No native callback holds a table or point borrow across Java IO.
+- Exact private uncompressed and Zstd-block byte-array streams now use bulk
+  reads. Streaming decompressors keep byte reads to preserve error prefixes;
+  see the [metadata/IO constraints](RUST-DH-METADATA-CODEC.md).
 - Java transfers at most 16 KiB of bytes per feed. Rust retains only parser state
   between feeds, never the byte-buffer pointer. Output likewise streams bounded
   byte spans. These byte bounds do not cap total source point storage.

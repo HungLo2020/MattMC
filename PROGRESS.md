@@ -2,69 +2,59 @@
 
 ## Goal and constraints
 
-- ACTIVE: remove all Java/JVM; one Rust library and executable with client/server modes. Final correctness/performance must match or improve on Frozen.
-- Work on master in this checkout; publish verified vertical slices incrementally. New crates require approval. Performance gaps guide further Rust migration.
-- Sole reference: unchanged Frozen OpenGL at ../MattMC_JavaPerfTesting/MattMC, HEAD7a4d181717dc0c7da9086f1a17687dfd522ce417.
+- ACTIVE: remove all Java/JVM; one Rust library and executable with client/server modes. Correctness/performance must match or improve on unchanged Frozen OpenGL.
+- Work on master in this checkout; publish verified vertical slices incrementally. New crates require approval. Performance gaps guide further Rust ownership work.
+- Frozen: ../MattMC_JavaPerfTesting/MattMC, HEAD7a4d181717dc0c7da9086f1a17687dfd522ce417. Never change its behavior or use Java Vulkan as a reference.
 - Rust/GAL owns GPU resources, ordering and presentation; one presenter. Transitional bridges carry bounded semantic CPU inputs.
 - Protect docs/STANDARD-COPILOT-PROMPTS.md (SHA c5695e9b). SUMMARY<=10 lines; PROGRESS<=100; ASSUMPTIONS stays concise.
-- Developer guides belong beside subsystems; drivers in DevUtils/tests/. Run Wiki check after documentation changes.
+- Practical developer guides belong beside subsystems; verification drivers in DevUtils/tests/. Run Wiki check after doc changes.
 
 ## Current ownership and remaining migration
 
 - Rust owns renderer/GAL/presentation, terrain assembly/visibility, canonical block/biome sections, light fields and biome color windows.
-- Rust owns DH materials/topology/packets and retained visibility; Java retains generation/retrieval scheduling and its generation tree.
+- Rust owns DH materials/topology/packets, retained visibility, primary points/metadata and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
 - Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index and manager residency serve production client/server consumers.
-- Java retains entity simulation, behavior callbacks, section visibility transitions, persistence I/O and the loading inbox.
-- The verified fog slice owns built-in numerical color/range policy, shared water transitions and per-environment rain history. Java retains ordered getters, environment priority/virtual dispatch, mutable hooks and final scalar projections.
-- Rust owns atlases/model baking and ordinary GUI item templates; Java retains font/layout and remaining frame-input extraction/orchestration.
+- Java retains entity simulation, behavior callbacks, visibility transitions, persistence I/O and the loading inbox.
+- Rust owns numerical fog policy, water transitions and rain history. Java retains ordered getters, environment dispatch/hooks and final scalar projections.
+- Rust owns atlases/model baking, ordinary GUI item templates and the star-field producer. Java retains font/layout and remaining frame-input extraction/orchestration.
 - General simulation, networking and startup/platform remain Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
 
-## Published checkpoints
+## Recent published checkpoints
 
-- c1428dbc7: removal/camera retirement and bounded alpha masks. d8e6b8f47: visible tracking and GUI text copies.
-- 0cea5de1d: root/typed entity-section membership and retained DH admitted identities. f54c1d754: section-coordinate map/index and spatial queries.
-- ae7f499b3: known UUID/chunk residency and persistence admission. Remote master and clean worktree were verified after each publication.
-- Historical matrices and qualifications remain in rendering/GAMEPLAY-PERFORMANCE.md; earlier unmatched JVM results do not verify later sources.
+- ae7f499b3: entity UUID/chunk residency and persistence admission. 1a977b9db: fog numerical policy.
+- 61805d6dc: retained light queues/sky seeds. 8e16a569c: direct block-light inputs and bulk DH column resizing. 7acbefd0f: matched performance/memory reports.
+- b6a0f89ca: primary Rust DH point codecs and lazy closed-source readers. Real24-DTO hydration improved29.4%; historical matrix still missed the DH FPS floor5.8%.
+- Integrated upstream f1de16e11 without conflicts: sky transforms/native stars, identity-map critical calls and GUI allocation changes.
+- Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
 
-## Verified light-work checkpoint
+## Verified metadata and bulk-IO checkpoint
 
-- Nativeca8bf37a owns pending propagation queues, journals inputs without copying and seeds canonical sky work directly. Java retains node checks, section orchestration and callbacks.
-- Frozen492 passes/437089 rows, full Rust2711/3ignored and Java2029/2skip pass. Predecessor pairs: terrain1.0%/nether7.5% faster, edits3.1% slower; the edit cost needs further producer/consumer work.
-- Seven lifecycle/two settled pairs and matching six-column flights pass,VUID0;17 originals reviewed/9 identities match. Hazy lifecycle views do not establish world-entry parity; endpoints do not resolve transient gaps.
-- All20 matched6000-frame timings clean; final source/native/class/Frozen/prompt/3input guards pass; no clients remain. Current/Frozen FPS:1286.70/1222.20,784.95/836.05,341.00/305.65,246.70/217.60. P99ms:3.597/3.564,3.251/4.907,4.986/8.140,7.258/10.453.
-- Aggregate FAIL: vanilla p99 misses0.93%, DH FPS6.11%; other floors pass. No isolated whole-game gain claimed. Guide: world/lighting/RUST-LIGHT-WORK.md; receipts: build/native-light-work/.
-- Release full-test debug-only cache assertion and capture-terminated Java parity attempt retained; supported Rust suite and sequential Java parity pass. Run Java suites separately from capture cleanup.
-
-## Published block-light and DH resize checkpoint (8e16a569c)
-
-- Remote master and clean worktree verified after publication. Native3c8e2d3d enumerates retained section owners directly into native work; shared adapter renamed NativeChunkInputs. Rust bulk resize removes per-point DH zero append/view construction.
-- Rust2714/3ignored, Java2032/2skip and actual Frozen492/437089/54 native seeds pass. Seven lifecycle/two settled pairs pass,VUID0;11 originals/9 native identities reviewed. Hazy lifecycle views establish structural checks only. Six-column flights reach matching F3 poses, including shared return overshoot;6 originals reviewed.
-- Source-only8aaa5520 predecessor pairs: terrain12.6%/nether18.2% faster, edits unchanged. First DH matrix failed RSS~12.4GiB/0 measured frames. Game-only JFR identifies DH hydration/zero-appends; weighted add/view-refresh allocation922->158MB after resize. Variable-work profiles do not isolate whole-game gains or retained-memory bounds. Failed attempts retained.
-- All20 exact6000-frame matched timings clean; every live JVM control identical; source/native/class/Frozen/prompt/3input guards pass; no clients remain. Current/Frozen FPS:1312.65/1208.70,742.00/808.40,351.20/315.50,260.80/217.35. P99ms:3.362/3.540,4.310/5.175,4.834/6.930,6.573/10.419.
-- Aggregate FAIL: DH FPS misses8.2%; other FPS/allp99 floors pass. Current DH RSS8.52–9.12GiB,combined9.53/9.92GiB below guard; sustained memory remains open. This historical matrix is retained in GAMEPLAY-PERFORMANCE.md. Guides: world/lighting/RUST-BLOCK-LIGHT-SOURCES.md and world/chunk/RUST-DH-FULL-DATA.md; receipts: build/native-light-seeds/combined/.
+- Native691c0b95 owns generation/compression/uniformity payload policy against primary planes. Private byte-array streams use bulk input; streaming decompressors preserve error prefixes.
+- Initial JFR found162/285 hydration CPU samples in single-byte ByteArrayInputStream.read. The later28-sample profile is too small to quantify a new bottleneck or normalized allocation improvement.
+- Actual Frozen exposed short-list backing-capacity/EOF-prefix mismatch. Fixed-payload native consumption and compatibility controls now preserve logical size and partial mutations.
+- Full Rust2723/3ignored and Java/parity2043/2skip pass. Actual Frozen606 metadata rows/303 cases and696830 point rows/170 cases match, including48 saved metadata and120 saved point blobs; all guards pass.
+- Real24-DTO predecessor/current/Frozen hydration78.73/43.62/41.51ms:44.6% faster predecessor, still5.1% slower Frozen. Checksums/source/native/class/predecessor/corpus guards pass; contextual material resolution omitted.
+- Seven lifecycle scenarios and vanilla/DH/Iris+DH settled pairs pass,VUID0. All13 originals/10 Current identities reviewed. Seven heavily hazy gate views establish structural evidence only.
+- Controller exited143 after both final DH clients completed clean captures; signal origin unconfirmed. Existing harness recovered the comparison from guarded originals without client rerun. Failure/recovery receipts retained.
+- All20 exact6000-frame runs clean; every live JVM control matches before measurement. Current/Frozen FPS1317.80/1264.50,753.75/701.45,348.45/313.65,264.55/225.95; p99ms3.563/3.710,3.992/6.264,4.679/7.220,6.270/8.842.
+- All FPS/p99 floors PASS in this measured scope. Integrated upstream sky/id-map/GUI changes are included; no isolated metadata whole-game gain claimed. DH RSS8.83–9.40GiB,combined9.00/9.15GiB below guard; long memory remains open.
+- Final source/native/class/Frozen/prompt, three prepared-input and saved-corpus guards pass; no clients remain. Guide: world/chunk/RUST-DH-METADATA-CODEC.md. Receipts: build/native-dh-metadata-codec/.
 
 ## Next work and open acceptance
 
-- Verified DH codec94d74a8b: Rust owns primary-column decoding/encoding and lazy closed-source leases. Java retains bounded byte IO/compression and DTO/material/sidecar orchestration.
-- Full Rust2718/3ignored, Java2036/2skip and actual Frozen696830 rows/170 cases pass, including120 saved blobs. Sentinel validation and Frozen negative-count compatibility fixed; initial/setup failures retained. Hydration oldCurrent/current/Frozen110.88/78.29/41.72ms:29.4% faster, still1.88xFrozen; no whole-game gain claimed.
-- Seven lifecycles and DH/Iris+DH pairs pass,VUID0;11 accepted originals/9 identities reviewed. Two setup-rejected images retained (missing main_depth; corrected pair passes). Hazy lifecycle captures establish structural checks only.
-- All20 exact6000-frame timings clean; every live JVM control identical; source/native/class/Frozen/prompt/prepared-input/saved-corpus guards pass; no clients remain. FPS Current/Frozen:1340.95/1216.60,743.50/789.60,347.60/316.05,261.70/225.95. P99ms:3.435/3.626,4.268/5.316,5.344/7.080,6.980/8.950.
-- Aggregate FAIL: DH FPS misses5.8%; other FPS/allp99 floors pass. RSS DH8.77–9.23GiB,combined9.89/10.40GiB under guard. Game-only profile9.54GiB clean; sampled native-segment971MB vs prior916MB with variable work/limited caller stacks. No overall allocation reduction or long-memory bound claimed; further native IO/scratch ownership work remains. Guide: world/chunk/RUST-DH-POINT-CODEC.md; receipts: build/native-dh-codec/.
-- Continue migrating node/world-state producers with consumers; avoid Java packing followed by Rust reconstruction. Native work queues now replace that transfer in light propagation. Close and publish verified increments before starting another implementation batch.
-- Investigate measured native expansion/batching and remaining producer costs; small fog preparation times do not by themselves explain the DH gap.
-- First shader world frame, first-turn nearby regular-terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
-- Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations.
-- Rain foreground coverage/visibility and Current-only waypoint chat differ despite passing initial-image tolerance. Whole weather/HUD parity is not established.
-- Strict leash width differs and predecessor control reproduces it. Some static reload/cow fixtures omit Current crosshair; moving/latest vanilla views show it. Body/shadow checks do not accept those defects.
+- Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
+- Profile remaining IO/scratch ownership and node/world-state producer costs with adequate samples. Keep CPU hydration gains separate from whole-game measurements.
+- First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
+- Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
+- Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.
+- Strict leash width differs; predecessor reproduces it. Some historical reload/cow fixtures omit Current crosshair; the latest vanilla coast shows it. That pose does not close all HUD defects.
 - Strict height-world teardown/closed-channel race and parallel Rust GLX BadAccess/poison remain unresolved; serial success does not fix them. The historical driver mismatch is resolved.
 
 ## Preservation and retention
 
-- Protected stashes:12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb. No new workflow stash was needed.
-- Stage reviewed paths explicitly; never force-push/reset/blanket-stage. Preserve incoming and local work together on upstream master.
-- Fog cleanup retired22 completed generated workspaces, preserving184 selected evidence hashes; rejected/failed weather scopes remain. Residency cleanup retired21/preserved151.
-- Prior manifests record~350GiB reclaimed caches plus21.08GiB archives,17.04GiB unused profiles and17.83GiB superseded videos with447 PNG/profile receipts retained.
-- Retire only recognized completed workspaces after clients exit. Preserve measurements/originals/profiles, failed/unknown/active/symlinked scopes, prepared inputs and open-defect worlds. Never clean during timing.
-- Combined light-source cleanup retires24 completed generated workspaces and reclaims2.60GiB. Original images/profiles and the failed source-only RSS recording remain. Selected1585 evidence hashes and the byte-verified full receipt are retained in build/native-light-seeds/combined/; all final guards pass again after cleanup.
-- DH codec cleanup retires21 completed generated workspaces, reclaiming2.29GiB;1550 selected evidence hashes preserved. All originals/profiles/failure receipts remain; final guards pass again after cleanup.
+- Protected stashes:12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb. No workflow stash needed.
+- Explicitly stage reviewed paths; never force-push/reset/blanket-stage. Preserve incoming and local work together on upstream master.
+- Prune only recognized completed generated copies after clients exit. Preserve measurements/originals/profiles, failures, unknown/active/symlinked scopes, prepared inputs and open-defect worlds. Never clean during timing.
+- Prior manifests record large cache/archive/video retirement. Latest point-codec cleanup retired21 completed copies/2.29GiB while preserving1550 selected evidence hashes and all originals/profiles/failures.
+- Metadata/IO cleanup retired29 completed copies, reclaiming3.11GiB;1387 selected evidence hashes unchanged. Interrupted final DH scope, all originals/profiles/per-frame diagnostics and protected inputs remain.

@@ -13,6 +13,7 @@ public final class NativeDhMetadataList extends AbstractByteList implements Rand
     private static final long serialVersionUID=1L;
     final NativeDhMetadata root;
     private final int kind;
+    int codecKind() { return kind; }
     private MemorySegment bytes;
     private int size;
     NativeDhMetadataList(NativeDhMetadata root, int kind) { this.root=root; this.kind=kind; refresh(); }

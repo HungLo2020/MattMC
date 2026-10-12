@@ -24,6 +24,7 @@ import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataOutputStre
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
+import it.unimi.dsi.fastutil.bytes.ByteList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
@@ -649,6 +650,7 @@ public class FullDataSourceV2DTO
 	{
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.encode(inputColumnGenStepByteArray, compressedOut)) return;
 			for (int i = 0; i < inputColumnGenStepByteArray.size(); i++)
 			{
 				compressedOut.writeByte(inputColumnGenStepByteArray.getByte(i));
@@ -659,9 +661,8 @@ public class FullDataSourceV2DTO
 	{
 		try(DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
-			byte[] values=outputByteArray.toByteArray();
-            try { compressedIn.readFully(values, 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH); }
-            finally { outputByteArray.setElements(0, values, 0, values.length); }
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decode(outputByteArray, compressedIn)) return;
+			readMetadataBytes(outputByteArray, compressedIn);
 		}
 		catch (EOFException e)
 		{
@@ -674,6 +675,7 @@ public class FullDataSourceV2DTO
 	{
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.encodeCompression(dataSource, compressedOut)) return;
 			for (int i = 0; i < dataSource.columnWorldCompressionMode.size(); i++)
 			{
 				compressedOut.write(dataSource.columnWorldCompressionMode.getByte(i));
@@ -689,9 +691,8 @@ public class FullDataSourceV2DTO
 	{
 		try(DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
-			byte[] values=outputByteArray.toByteArray();
-            try { compressedIn.readFully(values, 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH); }
-            finally { outputByteArray.setElements(0, values, 0, values.length); }
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decode(outputByteArray, compressedIn)) return;
+			readMetadataBytes(outputByteArray, compressedIn);
 		}
 		catch (EOFException e)
 		{
@@ -699,11 +700,27 @@ public class FullDataSourceV2DTO
 		}
 	}
 
+	/** Compatibility control: Frozen reads into retained backing capacity, even
+	 * after shrinking the logical list. Native metadata starts with that same
+	 * 4096-byte capacity; ordinary imports run directly in Rust above. */
+	private static void readMetadataBytes(ByteList output, DhDataInputStream input) throws IOException {
+		if (output instanceof ByteArrayList array) {
+			input.readFully(array.elements(), 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			return;
+		}
+		byte[] values = output.toByteArray();
+		if (output instanceof net.minecraft.world.level.chunk.NativeDhMetadataList && values.length < 4096)
+			values = java.util.Arrays.copyOf(values, 4096);
+		try { input.readFully(values, 0, 4096); }
+		finally { output.setElements(0, values, 0, output.size()); }
+	}
+
 	private static void readBlobToSemanticHorizontalUniformity(
 		ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 dataSource,
 		EDhApiDataCompressionMode compressionModeEnum
 	) throws IOException, DataCorruptedException {
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum)) {
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decodeUniformity(dataSource, compressedIn)) return;
 			byte[] ignoredCompressionModes = new byte[FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH];
 			compressedIn.readFully(ignoredCompressionModes, 0, ignoredCompressionModes.length);
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {

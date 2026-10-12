@@ -60,6 +60,7 @@ public final class NativeDhSource implements AutoCloseable {
     }
     public NativeDhMetadataList generation() { return metadata.generation; }
     public NativeDhMetadataList compression() { return metadata.compression; }
+    MemorySegment metadataOwner() { return metadata.owner; }
     public void initializeUniform(boolean value) { metadata.uniform.fill((byte)(value?1:0)); }
     public boolean uniform(int index) {
         java.util.Objects.checkIndex(index,4096);

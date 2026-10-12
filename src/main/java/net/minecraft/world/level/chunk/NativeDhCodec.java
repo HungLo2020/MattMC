@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataInputStream;
 import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataOutputStream;
 import java.io.IOException;
+import java.io.EOFException;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.Reference;
@@ -29,6 +30,21 @@ public final class NativeDhCodec {
     public static final AtomicLong DECODED = new AtomicLong(), ENCODED = new AtomicLong(), INITIALIZED = new AtomicLong();
     static volatile boolean enabled = !Boolean.getBoolean("mattmc.dh.javaCodec");
     private NativeDhCodec() {}
+    static final class Input {
+        final byte[] bytes = new byte[16384];
+        IOException pending;
+        int read(DhDataInputStream stream) throws IOException {
+            if (stream.codecByteArrayInput()) {
+                int count = stream.read(bytes, 0, bytes.length);
+                if (count < 0) { pending = new EOFException(); return 0; }
+                return count;
+            }
+            int count = 0;
+            try { while (count < bytes.length) { bytes[count] = stream.readByte(); count++; } }
+            catch (IOException e) { pending = e; }
+            return count;
+        }
+    }
     private static boolean stock(FullDataSourceV2 source) {
         return enabled && source.getClass() == FullDataSourceV2.class && source.nativeSource().isLive();
     }
@@ -56,20 +72,17 @@ public final class NativeDhCodec {
         try (var arena = Arena.ofConfined()) {
             owner = (MemorySegment)DECODER.invokeExact(source.stageOwner(), minX, maxX, minZ, maxZ, v1 ? 1 : 0, validate ? 1 : 0);
             if (owner.address() == 0) return false;
-            var bytes = new byte[16384]; var buffer = arena.allocate(bytes.length, 1);
+            var inputBytes = new Input(); var bytes = inputBytes.bytes; var buffer = arena.allocate(bytes.length, 1);
             var result = arena.allocate(32, 8); var projection = arena.allocate(4096 * 5 * 8L, 8);
-            IOException pending = null;
             try {
                 FEED.invokeExact(owner, buffer, 0, result);
                 while (result.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0) {
-                    int count = 0;
-                    try { while (count < bytes.length) { bytes[count] = stream.readByte(); count++; } }
-                    catch (IOException e) { pending = e; }
+                    int count = inputBytes.read(stream);
                     // readByte preserves the original decompressor exceptions. A
                     // pending error is raised only if the parser needs more bytes.
                     MemorySegment.copy(bytes, 0, buffer, ValueLayout.JAVA_BYTE, 0, count);
                     FEED.invokeExact(owner, buffer, count, result);
-                    if (result.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0 && pending != null) throw pending;
+                    if (result.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0 && inputBytes.pending != null) throw inputBytes.pending;
                 }
                 source.projectCodec(projection);
                 check(result, input);

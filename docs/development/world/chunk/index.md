@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Rust DH saved-metadata codecs](RUST-DH-METADATA-CODEC.md): primary-plane imports,
+  bounded IO, fixed payloads with variable logical extents and Frozen verification.
+
 - [Rust DH saved-point codecs](RUST-DH-POINT-CODEC.md): direct primary-column
   decoding/encoding, bounded byte IO, corruption prefixes and lazy closed readers.
 
