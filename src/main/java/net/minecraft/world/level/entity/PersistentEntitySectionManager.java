@@ -2,20 +2,14 @@ package net.minecraft.world.level.entity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Queues;
-import com.google.common.collect.Sets;
 import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.util.List;
 import java.util.Queue;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -31,15 +25,16 @@ import org.slf4j.Logger;
 
 public class PersistentEntitySectionManager<T extends EntityAccess> implements AutoCloseable {
 	static final Logger LOGGER = LogUtils.getLogger();
-	final Set<UUID> knownUuids = Sets.<UUID>newHashSet();
+	private final NativeEntityResidency residency = new NativeEntityResidency();
+	final NativeEntityResidency.KnownUuids knownUuids = this.residency.knownUuids;
 	final LevelCallback<T> callbacks;
 	private final EntityPersistentStorage<T> permanentStorage;
 	private final EntityLookup<T> visibleEntityStorage;
 	final EntitySectionStorage<T> sectionStorage;
 	private final LevelEntityGetter<T> entityGetter;
-	private final Long2ObjectMap<Visibility> chunkVisibility = new Long2ObjectOpenHashMap<>();
-	private final Long2ObjectMap<PersistentEntitySectionManager.ChunkLoadStatus> chunkLoadStatuses = new Long2ObjectOpenHashMap<>();
-	private final LongSet chunksToUnload = new LongOpenHashSet();
+	private final Long2ObjectMap<Visibility> chunkVisibility = this.residency.visibility();
+	private final Long2ObjectMap<PersistentEntitySectionManager.ChunkLoadStatus> chunkLoadStatuses = this.residency.loads();
+	private final LongSet chunksToUnload = this.residency.unloads();
 	private final Queue<ChunkEntities<T>> loadingInbox = Queues.<ChunkEntities<T>>newConcurrentLinkedQueue();
 
 	public PersistentEntitySectionManager(Class<T> class_, LevelCallback<T> levelCallback, EntityPersistentStorage<T> entityPersistentStorage) {
@@ -169,35 +164,31 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
 	}
 
 	private void ensureChunkQueuedForLoad(long l) {
-		PersistentEntitySectionManager.ChunkLoadStatus chunkLoadStatus = this.chunkLoadStatuses.get(l);
-		if (chunkLoadStatus == PersistentEntitySectionManager.ChunkLoadStatus.FRESH) {
+		if (this.residency.needsLoad(l)) {
 			this.requestChunkLoad(l);
 		}
 	}
 
 	private boolean storeChunkSections(long l, Consumer<T> consumer) {
 		PersistentEntitySectionManager.ChunkLoadStatus chunkLoadStatus = this.chunkLoadStatuses.get(l);
-		if (chunkLoadStatus == PersistentEntitySectionManager.ChunkLoadStatus.PENDING) {
+		if (NativeEntityResidency.storeAction(chunkLoadStatus, false) == 0) {
 			return false;
 		} else {
 			List<T> list = (List<T>)this.sectionStorage
 				.getExistingSectionsInChunk(l)
 				.flatMap(entitySection -> entitySection.getEntities().filter(EntityAccess::shouldBeSaved))
 				.collect(Collectors.toList());
-			if (list.isEmpty()) {
-				if (chunkLoadStatus == PersistentEntitySectionManager.ChunkLoadStatus.LOADED) {
-					this.permanentStorage.storeEntities(new ChunkEntities<>(new ChunkPos(l), ImmutableList.of()));
-				}
-
-				return true;
-			} else if (chunkLoadStatus == PersistentEntitySectionManager.ChunkLoadStatus.FRESH) {
-				this.requestChunkLoad(l);
-				return false;
-			} else {
-				this.permanentStorage.storeEntities(new ChunkEntities<>(new ChunkPos(l), list));
-				list.forEach(consumer);
-				return true;
-			}
+            int action=NativeEntityResidency.storeAction(chunkLoadStatus,list.isEmpty());
+            if(action==2) {
+                this.permanentStorage.storeEntities(new ChunkEntities<>(new ChunkPos(l),ImmutableList.of()));
+            } else if(action==3) {
+                this.requestChunkLoad(l);
+                return false;
+            } else if(action==4) {
+                this.permanentStorage.storeEntities(new ChunkEntities<>(new ChunkPos(l),list));
+                list.forEach(consumer);
+            }
+            return true;
 		}
 	}
 
@@ -226,7 +217,7 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
 	}
 
 	private void processUnloads() {
-		this.chunksToUnload.removeIf(l -> this.chunkVisibility.get(l) != Visibility.HIDDEN ? true : this.processChunkUnload(l));
+		this.chunksToUnload.removeIf(l -> this.residency.shouldUnload(l) ? this.processChunkUnload(l) : true);
 	}
 
 	public void processPendingLoads() {
@@ -245,11 +236,7 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
 	private LongSet getAllChunksToSave() {
 		LongSet longSet = this.sectionStorage.getAllChunksWithExistingSections();
 
-		for (Entry<PersistentEntitySectionManager.ChunkLoadStatus> entry : Long2ObjectMaps.fastIterable(this.chunkLoadStatuses)) {
-			if (entry.getValue() == PersistentEntitySectionManager.ChunkLoadStatus.LOADED) {
-				longSet.add(entry.getLongKey());
-			}
-		}
+		this.residency.addLoadedKeys(longSet);
 
 		return longSet;
 	}

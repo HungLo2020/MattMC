@@ -22,7 +22,7 @@ pub(super) struct SectionMap {
     zero: bool,
 }
 
-fn mix(key: i64) -> usize {
+pub(super) fn mix(key: i64) -> usize {
     let h = (key as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
     let h = h ^ (h >> 32);
     (h ^ (h >> 16)) as usize
@@ -40,6 +40,19 @@ impl Default for SectionMap {
 }
 
 impl SectionMap {
+    pub(super) fn len(&self) -> usize {
+        self.size
+    }
+    pub(super) fn put(&mut self, key: i64, token: u64) -> Result<u64, Bounds> {
+        match self.find(key) {
+            Ok(i) => Ok(std::mem::replace(&mut self.cells[i].token, token)),
+            Err(i) => {
+                let mut old = 0;
+                self.insert_at(i, key, token, &mut old)?;
+                Ok(old)
+            }
+        }
+    }
     fn max_fill(&self) -> usize {
         (self.n * 3 / 4).min(self.n - 1)
     }

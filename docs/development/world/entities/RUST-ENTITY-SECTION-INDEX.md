@@ -4,8 +4,10 @@ Current source routes production `EntitySectionStorage` through the existing
 Rust library for its primary coordinate map, ordered key index, chunk relations
 and spatial coordinate search. Both client and server section managers use
 that storage. Java retains section behavior bindings, initial visibility
-callbacks, and membership/visibility/consumer callbacks. Visibility and
-persistence orchestration remain further migration work.
+callbacks, and membership/visibility/consumer callbacks. The subsequent [residency owner](RUST-ENTITY-RESIDENCY.md) moves primary chunk
+residency and persistence admission into Rust with scoped verification.
+Section visibility transitions, behavior callbacks and persistence I/O remain
+further migration work.
 
 Implementation: [native owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_sections/index_ffi.rs),
 [physical map](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_sections/section_map.rs),

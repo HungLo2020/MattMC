@@ -88,6 +88,49 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Local entity-residency checkpoint
+
+Native `35b68379` moves production entity-manager known UUIDs, chunk
+visibility/load status and ticking/unload membership into Rust, together with
+initial client visibility and persistence admission decisions. Java retains
+behavior callbacks, persistence I/O and the loading inbox. See the
+[ownership and compatibility guide](../world/entities/RUST-ENTITY-RESIDENCY.md).
+
+All twenty alternating exact 6,000-frame runs finish cleanly; all ten live
+heap/collector/JIT controls match on every run. Final source/native/Frozen/prompt
+and three prepared-input guards pass, no clients remain, and the controller
+and aggregate performance evaluation exit successfully. Every scheduled repeat
+is retained: four DH repeats per side, two for every other mode, with 360
+settle and 240 warmup frames.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1316.75 / 1199.85 | 3.317 / 3.943 |
+| Vanilla + DH | 819.35 / 784.90 | 2.807 / 5.936 |
+| Shaders | 346.80 / 314.55 | 4.391 / 7.359 |
+| Shaders + DH | 258.60 / 225.55 | 6.685 / 9.325 |
+
+Both floors pass in every mode. These results cover the settled rotating
+real-world workload. Variation between sessions, especially Frozen DH, prevents
+attribution of an isolated residency speedup; earlier failed matrices below
+remain separate evidence. This does not establish startup, sustained streaming,
+broad gameplay or long-session memory acceptance.
+
+Full suites pass 2,703 Rust tests (three ignored) and 2,026 executed
+Java/parity tests (two skipped). Actual unchanged Frozen matches all 5,264
+residency, 6,721 index and 4,417 lookup cases with source/class/native guards.
+Seven lifecycle cases, two world comparisons and the cow body/shadow fixture
+pass with zero VUIDs. Fourteen original images were individually reviewed;
+ten Current correctness artifacts identify this exact native library. Minor
+head/shading and known HUD differences remain outside the body/shadow check.
+Settled views do not prove first-frame/first-turn behavior.
+
+Receipts: `build/native-entity-residency/candidate/`, including
+`gameplay/performance.json`, all mode repeats, `gameplay/final-guards.json`,
+`gameplay/effective-control-verification.json`, original-review records and
+`runtime-identities.json`; CPU replays and full-suite logs are in the parent
+directory. Java removal and broad rendering acceptance remain open.
+
 ## Local section-coordinate checkpoint
 
 Native `168dd924` routes production client/server section-coordinate storage,

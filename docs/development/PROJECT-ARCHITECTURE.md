@@ -214,8 +214,11 @@ but vanilla misses FPS/p99 floors. Broader runtime scope remains open. The
 subsequent [section-coordinate index](world/entities/RUST-ENTITY-SECTION-INDEX.md)
 owns production coordinates and ordered spatial queries. Its full suites,
 Frozen replays and scoped lifecycle/world/entity checks pass; its matched
-matrix still misses vanilla/DH FPS, so aggregate performance remains open. Visibility and persistence registration/
-load orchestration remain Java.
+matrix still misses vanilla/DH FPS, so aggregate performance remains open. The subsequent [entity residency slice](world/entities/RUST-ENTITY-RESIDENCY.md)
+owns primary UUID/chunk states and persistence admission in Rust. Full CPU
+suites, Frozen replays and scoped lifecycle/world/entity checks pass; every
+matched FPS/p99 floor passes in its settled rotating workload. Gameplay callbacks, persistence
+I/O and the loading inbox remain Java.
 Full parity and Java removal remain open.
 
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)

@@ -7,3 +7,6 @@ mod members;
 mod section_map;
 mod section_tree;
 mod index_ffi;
+mod residency_set;
+mod residency;
+mod residency_ffi;
