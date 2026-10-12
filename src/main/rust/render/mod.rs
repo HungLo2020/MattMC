@@ -11,3 +11,4 @@ pub(crate) mod dh_quads;
 pub mod vulkanic;
 pub(crate) mod clouds;
 pub(crate) mod items;
+pub(crate) mod fog;

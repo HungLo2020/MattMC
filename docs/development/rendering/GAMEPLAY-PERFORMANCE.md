@@ -88,6 +88,59 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Local fog-policy checkpoint
+
+Native `d64eb03a` routes built-in fog color/range calculations, shared underwater
+transition history and per-environment rain smoothing through Rust. Java retains
+ordered semantic getters, environment priority/virtual dispatch, mutable hooks
+and final scalar projections. See the [fog ownership guide](RUST-FOG-POLICY.md).
+
+All twenty alternating exact 6,000-frame runs finish cleanly. All ten live
+heap/collector/JIT controls match on every run, final source/native/Frozen/prompt
+and three prepared-input guards pass, and no clients remain. The resumed
+controller exits 1 only at aggregate performance evaluation. Every scheduled
+repeat is retained: four DH repeats per side, two for every other mode, with
+360 settle and 240 warmup frames.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1255.50 / 1225.65 | 3.654 / 3.543 |
+| Vanilla + DH | 727.60 / 801.55 | 4.758 / 5.098 |
+| Shaders | 345.50 / 317.75 | 4.800 / 7.195 |
+| Shaders + DH | 258.80 / 226.65 | 6.787 / 9.552 |
+
+Vanilla misses p99 by **3.15%**; DH misses FPS by **9.23%**. Remaining floors
+pass. Aggregate performance remains **failed**. This is a correctness-verified
+migration checkpoint, not final performance or Java-removal acceptance. These
+settled rotating workloads do not isolate a regression cause or migration gain.
+
+Recorded inclusive frame-begin preparation medians are 0.0091ms vanilla and
+0.0104ms DH, including shader-environment preparation at 0.0055/0.0064ms.
+Native mesh expansion/grouping is 0.100/0.111ms; total GPU time is
+0.516/1.164ms. These select costs for further investigation rather than prove a
+cause; inclusive scopes must not be added as independent costs.
+
+Full suites pass 2,707 Rust tests (three ignored) and 2,028 executed
+Java/parity tests (two skipped). Actual unchanged Frozen matches 11,778 fog
+producer cases with source/class/native guards. Review found and fixed missing
+per-channel masks for negative/oversized colors before this final comparison;
+earlier mismatches and observer setup failures are retained.
+
+Seven lifecycle cases, two world comparisons and cow body/shadow pass,VUID0.
+The rain comparison passes with four matching poses and a bounded 6,000-frame
+readiness allowance on both clients. Earlier local camera-schedule, readiness
+and argument-prefix failures remain separate evidence. All twenty-two accepted
+originals were reviewed and eleven Current correctness artifacts identify the
+native image. Background rain/fog agree closely, but foreground rain coverage
+and a Current-only chat overlay differ. The automated initial-image tolerance
+passes; whole HUD/foreground/weather parity is not established. Settled views
+do not prove first-frame/first-turn behavior, streaming or long-memory bounds.
+
+Receipts: `build/native-fog/candidate/`, including `gameplay/performance.json`,
+all mode repeats, `gameplay/final-guards.json`, effective-control verification,
+original-review records and `runtime-identities.json`. CPU replays/full-suite
+logs and `current-phase-costs.json` are in the parent directory.
+
 ## Local entity-residency checkpoint
 
 Native `35b68379` moves production entity-manager known UUIDs, chunk

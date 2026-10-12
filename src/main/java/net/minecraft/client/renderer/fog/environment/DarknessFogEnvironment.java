@@ -7,7 +7,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.util.Mth;
+import net.minecraft.client.renderer.fog.NativeFog;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -26,11 +26,8 @@ public class DarknessFogEnvironment extends MobEffectFogEnvironment {
 		if (entity instanceof LivingEntity livingEntity) {
 			MobEffectInstance mobEffectInstance = livingEntity.getEffect(this.getMobEffect());
 			if (mobEffectInstance != null) {
-				float g = Mth.lerp(mobEffectInstance.getBlendFactor(livingEntity, deltaTracker.getGameTimeDeltaPartialTick(false)), f, 15.0F);
-				fogData.environmentalStart = g * 0.75F;
-				fogData.environmentalEnd = g;
-				fogData.skyEnd = g;
-				fogData.cloudEnd = g;
+                float blend = mobEffectInstance.getBlendFactor(livingEntity, deltaTracker.getGameTimeDeltaPartialTick(false));
+                NativeFog.ranges(fogData, 5, f, blend, 0.0F, 0);
 			}
 		}
 	}
@@ -38,6 +35,6 @@ public class DarknessFogEnvironment extends MobEffectFogEnvironment {
 	@Override
 	public float getModifiedDarkness(LivingEntity livingEntity, float f, float g) {
 		MobEffectInstance mobEffectInstance = livingEntity.getEffect(this.getMobEffect());
-		return mobEffectInstance != null ? Math.max(mobEffectInstance.getBlendFactor(livingEntity, g), f) : f;
+		return mobEffectInstance != null ? NativeFog.effectDarkness(1, f, mobEffectInstance.getBlendFactor(livingEntity, g), false) : f;
 	}
 }

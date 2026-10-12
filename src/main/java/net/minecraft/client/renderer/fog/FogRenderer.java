@@ -123,27 +123,12 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		} else {
 			int j = fogEnvironment.getBaseColor(clientLevel, camera, i, g);
 			float h = clientLevel.getLevelData().voidDarknessOnsetRange();
-			float k = Mth.clamp((h + clientLevel.getMinY() - (float)camera.getPosition().y) / h, 0.0F, 1.0F);
+			float k = NativeFog.voidDarkness(h, clientLevel.getMinY(), camera.getPosition().y);
 			if (fogEnvironment2 != null) {
 				LivingEntity livingEntity = (LivingEntity)entity;
 				k = fogEnvironment2.getModifiedDarkness(livingEntity, k, f);
 			}
 
-			float l = ARGB.redFloat(j);
-			float m = ARGB.greenFloat(j);
-			float n = ARGB.blueFloat(j);
-			if (k > 0.0F && fogType != FogType.LAVA && fogType != FogType.POWDER_SNOW) {
-				float o = Mth.square(1.0F - k);
-				l *= o;
-				m *= o;
-				n *= o;
-			}
-
-			if (g > 0.0F) {
-				l = Mth.lerp(g, l, l * 0.7F);
-				m = Mth.lerp(g, m, m * 0.6F);
-				n = Mth.lerp(g, n, n * 0.6F);
-			}
 
 			float o;
 			if (fogType == FogType.WATER) {
@@ -160,14 +145,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 				o = 0.0F;
 			}
 
-			if (l != 0.0F && m != 0.0F && n != 0.0F) {
-				float p = 1.0F / Math.max(l, Math.max(m, n));
-				l = Mth.lerp(o, l, l * p);
-				m = Mth.lerp(o, m, m * p);
-				n = Mth.lerp(o, n, n * p);
-			}
-
-			Vector4f result = new Vector4f(l, m, n, 1.0F);
+			Vector4f result = NativeFog.finishColor(j, fogType.ordinal(), k, g, o);
 			if (updateLegacyIrisFogState) {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(result.x, result.y, result.z);
 			}
@@ -259,9 +237,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			}
 		}
 
-		float j = Mth.clamp(h / 10.0F, 4.0F, 64.0F);
-		fogData.renderDistanceStart = h - j;
-		fogData.renderDistanceEnd = h;
+        NativeFog.ranges(fogData, 7, h, 0.0F, 0.0F, 0);
 		
 		// DH: Cancel fog if configured
 		DhFogCancelState dhFogCancelState = getDhFogCancelState(camera, entity);

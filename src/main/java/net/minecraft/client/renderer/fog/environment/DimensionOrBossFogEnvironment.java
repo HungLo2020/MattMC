@@ -5,6 +5,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.NativeFog;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.material.FogType;
@@ -14,10 +15,7 @@ import org.jetbrains.annotations.Nullable;
 public class DimensionOrBossFogEnvironment extends AirBasedFogEnvironment {
 	@Override
 	public void setupFog(FogData fogData, Entity entity, BlockPos blockPos, ClientLevel clientLevel, float f, DeltaTracker deltaTracker) {
-		fogData.environmentalStart = f * 0.05F;
-		fogData.environmentalEnd = Math.min(f, 192.0F) * 0.5F;
-		fogData.skyEnd = fogData.environmentalEnd;
-		fogData.cloudEnd = fogData.environmentalEnd;
+        NativeFog.ranges(fogData, 3, f, 0.0F, 0.0F, 0);
 	}
 
 	@Override

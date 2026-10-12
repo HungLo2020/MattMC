@@ -18,6 +18,7 @@ render/
 ├── dh_collector/ DH column state, copied payloads, publication and frame admission
 ├── dh_columns/   CPU render-column reduction, water/material policy and bounded scratch
 ├── clouds/       CPU cloud motion/placement/culling owners; no GPU dependencies
+├── fog/          CPU fog colors/ranges and water/rain transition histories
 ├── items/        authored item poses and world/hand composition; no GPU dependencies
 ├── vulkanic/     VulkanicGAL: the graphics abstraction layer and its backends
 └── chunk/        native chunk meshing, render lists and sorting used by Java's chunk renderer
@@ -86,6 +87,12 @@ producer and transfer separately before moving ownership; preserve equivalent
 semantic inputs and generation/lifetime checks. Keep game-specific state in the
 renderer or its CPU source, and use VulkanicGAL for all GPU work. This does not
 authorize borrowed Java GPU state, a fallback renderer or another presenter.
+
+The [fog policy checkpoint](RUST-FOG-POLICY.md) moves built-in color/range
+calculations and water/rain transition state into a CPU module in `render/fog/`.
+Java still supplies ordered world/entity callbacks and projects mutable hook
+data. Its verification and remaining transport boundary are recorded separately
+from published rendering measurements.
 
 Current chunk CPU inputs have separate world owners: [live block sections](../world/chunk/RUST-LIVE-SECTIONS.md)
 own canonical storage/mutation, [section-local counters](../world/chunk/RUST-SECTION-COUNTERS.md)

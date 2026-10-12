@@ -28,6 +28,8 @@ each module there has a short README with its own file map.
   reads, contextual callback compatibility and local verification scope.
 - [Live biome color sampling](../world/biome/RUST-LIVE-BIOMES.md): direct raw sky/fog
   colors and generation-validated reuse, Java lifecycle events and bounded evidence.
+- [Rust fog policy](RUST-FOG-POLICY.md): candidate color/range policy, native
+  water/rain histories and ordered callback boundaries.
 - [Native item-layer preparation](RUST-ITEM-LAYERS.md): authored CPU poses,
   direct GUI/world/hand consumption and lazy mutable-mesh allocation.
 - [Rust GUI item templates](RUST-GUI-ITEM-TEMPLATES.md): retained semantic
