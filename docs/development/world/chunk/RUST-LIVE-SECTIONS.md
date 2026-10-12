@@ -39,8 +39,8 @@ lock, [`Generation::unpack`](https://github.com/HungLo2020/MattMC/blob/fc1d529db
 reads each packed word once and snapshots the local palette once; global storage
 uses IDs directly. Zero-width capture still reads its shared single value once.
 This changes capture preparation, not immutable snapshot ownership or the live
-CPU-view contract. Light propagation receives its existing packed section
-payload directly from that owner. Heightmap
+CPU-view contract. Light propagation now [captures directly into its native pass snapshot](../lighting/RUST-LIGHT-SECTION-INPUTS.md)
+under the owner lock, without an intermediate packed callback payload. Heightmap
 and skylight scans export a coherent native word/ID pair into reusable native
 scratch; they avoid constructing Java palettes/arrays for the handoff. Their
 existing Rust kernels and publication rules remain unchanged.

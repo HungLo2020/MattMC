@@ -3,6 +3,29 @@ use crate::world::level::levelgen::noise_fill::section::Section;
 fn single() -> Owner {
     Owner::load(0, 0, &[71], &[], 31809, 15).unwrap()
 }
+
+#[test]
+fn packed_reader_captures_values_without_pinning_mutable_generations() {
+    let owner = single(); let alias = owner.copy();
+    let captured = owner.with_state_reader(|reader| {
+        let captured = reader.get(0);
+        assert!(alias.read_single(72));
+        assert_eq!(reader.palette_states().collect::<Vec<_>>(), vec![captured]);
+        captured
+    });
+    assert_eq!(captured, 71);
+    assert_eq!(owner.with_state_reader(|reader| reader.get(0)), 72);
+    for i in 0..260 { owner.write(i, i as u32).unwrap(); }
+    let (bits, global, palette, words) = owner.with_state_reader(|reader|
+        (reader.packed_bits(), reader.global_palette(),
+         reader.palette_states().collect::<Vec<_>>(), reader.packed_words().collect::<Vec<_>>()));
+    assert!(global); assert_eq!(bits, 15); assert!(palette.is_empty());
+    let per = 64 / bits;
+    assert_eq!((words[12 / per] >> (12 % per * bits)) & ((1 << bits) - 1), 12);
+    owner.write(12, 999).unwrap();
+    assert_eq!((words[12 / per] >> (12 % per * bits)) & ((1 << bits) - 1), 12);
+    assert_eq!(owner.with_state_reader(|reader| reader.get(12)), 999);
+}
 #[test]
 fn ordered_word_visits_match_scalar_reads_for_single_local_global_and_padding() {
     for bits in [0usize, 4, 5, 6, 7, 8, 15] {

@@ -134,6 +134,25 @@ public final class VerifyLightWork {
                 out.println("scenario " + sky + " " + seed);
                 World world = new World(seed);
                 var engine = new LevelLightEngine(world, true, sky);
+                if (nativePasses != null) {
+                    // Exercise the ordinary primary-owner bridge, not only
+                    // compatibility full-state payloads, in every real engine world.
+                    var type = Class.forName("net.minecraft.world.level.chunk.NativeLightBlocks");
+                    var leaseType = Class.forName("net.minecraft.world.level.chunk.NativeLightBlocks$Lease");
+                    var lease = leaseType.getConstructor().newInstance();
+                    var chunk = world.chunks.values().iterator().next();
+                    int section = 0; while (chunk.getSection(section).hasOnlyAir()) section++;
+                    try (var arena = java.lang.foreign.Arena.ofConfined()) {
+                        var buffer = arena.allocate(type.getField("BUFFER").getInt(null), 8);
+                        int status = (int)type.getMethod("blocks", LightChunk.class, int.class, int.class, int.class,
+                            java.lang.foreign.MemorySegment.class, leaseType).invoke(null, chunk, chunk.getPos().x,
+                            section, chunk.getPos().z, buffer, lease);
+                        if (status != 0 || buffer.getAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, 0) != 4
+                            || buffer.get(java.lang.foreign.ValueLayout.JAVA_LONG, 8) == 0)
+                            throw new AssertionError("Primary light-section owner route not exercised");
+                    } finally { leaseType.getMethod("clear").invoke(lease); }
+                    System.out.println("LIGHT_PRIMARY_SECTION_INPUT " + sky + " " + seed);
+                }
                 var observer = new Observer();
                 for (var chunk : world.chunks.values()) {
                     for (int i = 0; i < 8; i++) if (!chunk.getSection(i).hasOnlyAir())

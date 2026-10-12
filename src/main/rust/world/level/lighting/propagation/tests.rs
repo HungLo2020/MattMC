@@ -26,6 +26,48 @@ fn tables() -> Tables {
     Tables { state_types: vec![0, 1], types: vec![air, stone], faces: 1, occludes: vec![0], air: 0 }
 }
 
+#[test]
+fn primary_owner_capture_matches_full_projection_for_all_palette_widths_and_both_engines() {
+    use crate::world::level::chunk::live::Owner;
+    struct Inputs { owner: Owner, types: Vec<u16>, live: bool }
+    impl Source for Inputs {
+        fn layer(&mut self, section: i64, layer: &mut [u8; LAYER]) -> Result<Option<bool>, Error> {
+            if section != section_pos(0, 0, 0) { return Ok(None); }
+            layer.fill(0); Ok(Some(true))
+        }
+        fn blocks(&mut self, _: i64) -> Result<Blocks<'_>, Error> {
+            Ok(if self.live { Blocks::Live(&self.owner) } else { Blocks::Full(&self.types) })
+        }
+    }
+    // State IDs deliberately differ from light-type IDs.
+    let mut tables = tables(); tables.state_types = vec![1, 0];
+    for bits in [0usize, 4, 5, 6, 7, 8, 15] {
+        let palette = if bits == 15 { vec![] } else if bits == 0 { vec![1] } else { vec![0, 1] };
+        let mut words = if bits == 0 { vec![] } else { vec![0u64; 4096usize.div_ceil(64 / bits)] };
+        for i in 0..4096 {
+            if bits == 0 { break; }
+            let state = usize::from(i % 17 != 0);
+            let per = 64 / bits; words[i / per] |= (state as u64) << (i % per * bits);
+        }
+        for sky in [false, true] {
+            let make = |live| {
+                let owner = Owner::load(bits, bits, &palette, &words, 2, 15).unwrap();
+                let types = owner.with_state_reader(|reader|
+                    (0..4096).map(|i| tables.state_type(reader.get(i) as u16)).collect());
+                Inputs { owner, types, live }
+            };
+            let mut direct = make(true); let mut projected = make(false);
+            let mut a = Engine::new(sky); let mut b = Engine::new(sky);
+            let increase = [block_pos(8, 8, 8), increase_from_emission(15, true) as i64];
+            let x = a.run(&tables, &mut direct, &[], &increase, 0).unwrap();
+            let y = b.run(&tables, &mut projected, &[], &increase, 0).unwrap();
+            assert_eq!(x.processed, y.processed, "bits={bits} sky={sky}");
+            assert_eq!(a.written().collect::<Vec<_>>(), b.written().collect::<Vec<_>>());
+            assert_eq!(a.affected(), b.affected());
+        }
+    }
+}
+
 fn level_at(engine: &Engine, pos: i64) -> Option<i32> {
     let key = section_of(pos);
     engine.written().find(|(k, _)| *k == key).map(|(_, layer)| {

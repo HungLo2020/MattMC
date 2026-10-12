@@ -118,6 +118,69 @@ An A/B on Current alone (native versus forced Java stars) gave 386/385 versus
 acceptance matrices below; DH and shaders were not measured. Receipts:
 `artifacts/performance/realworld-20261011/`.
 
+## Direct light-section input checkpoint
+
+Native `a6467e9d` captures light inputs directly from the primary Rust live block
+owner into the pass snapshot. Java pins a bounded CPU-owner descriptor; the
+intermediate packed callback projection and nested export downcall are removed
+from the ordinary route. Mutable generations are not retained across callbacks.
+See [ownership and verification](../world/lighting/RUST-LIGHT-SECTION-INPUTS.md).
+
+Full Rust passes2,725 tests (three ignored); Java/parity passes2,043 (two skipped).
+Actual unchanged Frozen matches437,089 rows/492 passes with source/native/class
+guards and six primary-owner descriptor probes. Regression tests cover every
+palette width, both light engines and zero-width shared-alias capture.
+
+Twelve serial JVM comparisons over complete production lighting workloads match
+checksums and source/native/class/predecessor/corpus guards. Predecessor/current
+medians: saved36-chunk terrain18.785/18.787 ms, self-reverting edits10.589/10.569 ms,
+generated Nether6.878/6.874 ms. Differences are below0.2%; no speedup is claimed.
+The pre-change JFR contains175 Java CPU samples without attributing the packed
+bridge as a hotspot. This is an ownership/data-path migration with effectively
+unchanged subsystem performance, not a demonstrated whole-game optimization.
+
+Seven lifecycle scenarios and vanilla/DH/Iris+DH settled pairs pass,VUID0.
+Thirteen originals and ten Current native identities were reviewed; seven hazy
+gate views establish structural evidence only. Splitting controllers exposed
+RunValidation's automatic latest-success retention: finishing pairs removed the
+unpinned gate folder. The pre-timing integrity guard caught it; pairs were pinned,
+the missing gate rerun/pinned, and all replacement originals reviewed before any
+measurement. Retired hashes/controller logs and recovery receipts remain.
+
+The first DH timing attempt failed the RSS guard at12.95 GiB during settling,
+with zero measured frames. It had entered the world and produced no crash/VUID.
+It is retained separately and never enters timing medians. A game-only JFR
+window completed cleanly at9.02 GiB. A trusted published CPU-bridge control using
+the same native/renderer completed a window at9.82 GiB but is unclean because of
+DH RejectedExecutionException at shutdown. Both allocation diagnostics remain;
+neither establishes a normalized allocation improvement or retained-memory bound.
+The startup peak remains unroot-caused. Sampled allocation emphasizes DH render
+source arrays, column adapters and native segment wrappers.
+
+The resumed DH sequence and remaining modes preserve the original workload,
+heap/GC/JIT controls, memory guard and frame requirements. All twenty completed
+6,000-frame measurements are clean; every live JVM's controls match before
+measurement. Source/native/class/Frozen/prompt/prepared-input/corpus guards pass;
+all samples and all predeclared repeats enter the medians; no clients remain.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1178.80 / 1162.10 | 3.752 / 4.111 |
+| Vanilla + DH | 803.15 / 669.25 | 3.116 / 6.331 |
+| Shaders | 348.40 / 316.40 | 4.791 / 7.003 |
+| Shaders + DH | 263.80 / 227.30 | 6.577 / 8.755 |
+
+All FPS/p99 floors **PASS in this measured scene**. Successful Current DH RSS
+is8.88–9.20 GiB and combined is9.63/9.75 GiB. The failed12.95 GiB startup attempt
+prevents claiming bounded memory. The rotating scene hides the minimap; it does
+not accept broad gameplay, first-turn terrain gaps/flicker, first shader world
+entry, sustained streaming or Java removal. No isolated migration gain is claimed.
+
+Receipts: `build/native-light-inputs/`; workload comparisons are in`benchmarks/`,
+all measured rows and the separate RSS failure are in`gameplay/`, and memory
+recordings/control hashes are retained. Active evidence is pinned before further
+validation invocations; only completed generated copies are eligible for cleanup.
+
 ## DH metadata and bulk-IO checkpoint
 
 Native `691c0b95` owns saved generation/compression/uniformity payload policy

@@ -1,5 +1,9 @@
 # Rust light propagation
 
+Ordinary live block sections now use [direct primary-owner capture](RUST-LIGHT-SECTION-INPUTS.md)
+instead of an intermediate packed callback payload. Historical measurements
+below remain scoped to the source versions they describe.
+
 [`propagation/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/lighting/propagation)
 runs the decrease and increase queues of `LightEngine.runLightUpdates()` for
 `BlockLightEngine` and `SkyLightEngine`. It also runs the per-section loop of

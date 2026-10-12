@@ -135,6 +135,17 @@ pub(crate) struct StateReader<'a> {
     single: Option<u32>,
 }
 impl StateReader<'_> {
+    /// Packed semantic reads stay inside `with_state_reader`'s owner lock.
+    /// Consumers can capture directly without an intermediate wire projection.
+    pub(crate) fn packed_bits(&self) -> usize { self.generation.bits }
+    pub(crate) fn global_palette(&self) -> bool { self.generation.global }
+    pub(crate) fn palette_states(&self) -> impl ExactSizeIterator<Item = u32> + '_ {
+        self.generation.palette[..self.generation.count.load(Ordering::Acquire) as usize]
+            .iter().map(|state| self.single.unwrap_or_else(|| state.load(Ordering::Acquire)))
+    }
+    pub(crate) fn packed_words(&self) -> impl ExactSizeIterator<Item = u64> + '_ {
+        self.generation.words.iter().map(|word| word.load(Ordering::Acquire))
+    }
     pub(crate) fn get(&self, index: usize) -> u32 {
         self.single.unwrap_or_else(|| self.generation.state(index))
     }

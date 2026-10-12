@@ -28,6 +28,12 @@ public final class NativeLightBlocks {
 
     private NativeLightBlocks() {}
 
+    /** One synchronous callback's CPU owner pin; contains no copied states. */
+    public static final class Lease {
+        @Nullable private NativeLiveBlockSection owner;
+        public void clear() { this.owner = null; }
+    }
+
     /** Header [light-on, default value or -1] then the bytes; -1 for layer subclasses. */
     public static int layer(DataLayer layer, boolean lightOn, MemorySegment buffer) {
         if (layer.getClass() != DataLayer.class) return -1;
@@ -62,9 +68,18 @@ public final class NativeLightBlocks {
 
     /** Header [kind, uniform state or bits, palette size] plus palette states,
      * packed words or one state per block. Kinds: 0 uniform, 1 local palette,
-     * 2 global state ids, 3 full. A null chunk reads as bedrock, like
+     * 2 global state ids, 3 full. The leased overload also supplies kind 4:
+     * a primary native CPU owner. A null chunk reads as bedrock, like
      * {@code LightEngine.getState}. Returns 0, or -1 for states Rust must not see. */
     public static int blocks(@Nullable LightChunk chunk, int sectionX, int sectionY, int sectionZ, MemorySegment buffer) {
+        return blocks(chunk, sectionX, sectionY, sectionZ, buffer, null);
+    }
+
+    /** Production bridge pins the primary CPU owner until Rust has captured
+     * its immutable pass input. The legacy overload exports packed bytes. */
+    public static int blocks(@Nullable LightChunk chunk, int sectionX, int sectionY, int sectionZ,
+                             MemorySegment buffer, @Nullable Lease lease) {
+        if (lease != null) lease.clear();
         if (chunk == null) return uniform(buffer, id(Blocks.BEDROCK.defaultBlockState()));
         ChunkAccess access = null;
         boolean proto = false;
@@ -83,7 +98,7 @@ public final class NativeLightBlocks {
                 if (index < 0 || index >= sections.length) {
                     return uniform(buffer, id((proto ? Blocks.VOID_AIR : Blocks.AIR).defaultBlockState()));
                 }
-                int packed = packed(sections[index], buffer);
+                int packed = packed(sections[index], buffer, lease);
                 if (packed != -2) return packed;
             }
         }
@@ -99,13 +114,19 @@ public final class NativeLightBlocks {
     }
 
     /** -2 when the section is not a modelled palette container. */
-    private static int packed(@Nullable LevelChunkSection section, MemorySegment buffer) {
+    private static int packed(@Nullable LevelChunkSection section, MemorySegment buffer, @Nullable Lease lease) {
         if (section == null || section.getClass() != LevelChunkSection.class) return -2;
         if (section.hasOnlyAir()) return uniform(buffer, id(Blocks.AIR.defaultBlockState()));
         var container = section.getStates();
         if (container.getClass() != PalettedContainer.class) return -2;
         var live = container.nativeLiveBlocks();
-        if (live != null) return live.light(buffer);
+        if (live != null) {
+            if (lease == null) return live.light(buffer);
+            lease.owner = live;
+            buffer.setAtIndex(ValueLayout.JAVA_INT, 0, 4);
+            buffer.set(ValueLayout.JAVA_LONG, 8, live.stageOwner().address());
+            return 0;
+        }
         var data = container.dataForNativeScan();
         var storage = data.storage();
         var palette = data.palette();

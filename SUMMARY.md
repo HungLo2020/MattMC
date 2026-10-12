@@ -1,10 +1,10 @@
-# Latest Rust vs Frozen performance (2026-10-12; native691c0b95; DH metadata/IO)
+# Latest Rust vs Frozen performance (2026-10-12; nativea6467e9d; light inputs)
 
 | Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1317.80 / 1264.50 | 3.563 / 3.710 |
-| Vanilla + DH | 753.75 / 701.45 | 3.992 / 6.264 |
-| Shaders | 348.45 / 313.65 | 4.679 / 7.220 |
-| Shaders + DH | 264.55 / 225.95 | 6.270 / 8.842 |
-All20 exact6000-frame runs clean; matched live JVM controls and source/native/class/Frozen/prompt/prepared-input/corpus guards pass. All FPS/p99 floors PASS in this scope. Integrated upstream sky/id-map/GUI changes included; no isolated whole-game gain claimed. RSS DH8.83–9.40GiB,combined9.00/9.15GiB below guard; long memory remains open.
-Rust2723/3ignored; Java2043/2skip; actual Frozen606 metadata/696830 point rows match. Seven lifecycles/three settled pairs pass,VUID0;13 originals/10 native identities reviewed. Controller143 recovery uses completed guarded captures; failure retained. Real24-DTO oldCurrent/current/Frozen78.73/43.62/41.51ms;44.6% faster old,still5.1% slower Frozen. Broad/temporal/streaming acceptance and Java removal remain open. [Results](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#dh-metadata-and-bulk-io-checkpoint).
+| Vanilla | 1178.80 / 1162.10 | 3.752 / 4.111 |
+| Vanilla + DH | 803.15 / 669.25 | 3.116 / 6.331 |
+| Shaders | 348.40 / 316.40 | 4.791 / 7.003 |
+| Shaders + DH | 263.80 / 227.30 | 6.577 / 8.755 |
+All20 measured6000-frame runs clean; matched live JVM controls and source/native/class/Frozen/prompt/prepared-input/corpus guards pass. All FPS/p99 floors PASS in this scene; no isolated migration speedup claimed. Successful DH RSS8.88–9.20GiB,combined9.63/9.75GiB. Earlier DH startup RSS12.95GiB/0 frames failed and remains unroot-caused; memory bounding stays open.
+Rust2725/3ignored; Java2043/2skip; actual Frozen437089 rows/492 passes match with6 primary-owner probes. Seven lifecycle/three settled pairs pass,VUID0;13 retained originals/10 native identities reviewed after gate retention recovery. Complete lighting workload timings unchanged vs predecessor. Broad/temporal/streaming acceptance and Java removal remain open. [Results](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#direct-light-section-input-checkpoint).

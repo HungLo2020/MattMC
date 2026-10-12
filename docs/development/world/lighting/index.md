@@ -20,6 +20,8 @@ contextual rendering callbacks.
   propagation handoffs, array compatibility and current verification scope.
 - [Rust light propagation](RUST-LIGHT-PROPAGATION.md): block and sky light
   queues and sky-source seeding in Rust, section callbacks, parity and benchmarks.
+- [Direct Rust light-section inputs](RUST-LIGHT-SECTION-INPUTS.md): primary-owner
+  capture, typed CPU leases and first-use snapshot compatibility.
 - [Rust light work ownership](RUST-LIGHT-WORK.md): retained pending queues,
   direct sky-seed handoff, callback admission and verification.
 - [Rust block-light sources](RUST-BLOCK-LIGHT-SOURCES.md): direct retained-section

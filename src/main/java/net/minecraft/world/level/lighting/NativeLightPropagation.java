@@ -161,6 +161,8 @@ final class NativeLightPropagation {
     private final LightEngine<?, ?> engine;
     // Keep the callback's CPU owner live until Rust has copied its generation.
     @Nullable private DataLayer borrowedLayer;
+    // Only the current callback's primary CPU owner, not a state/word mirror.
+    private final NativeLightBlocks.Lease borrowedBlocks = new NativeLightBlocks.Lease();
     @Nullable private byte[] compatibilityResult;
     private final Arena arena = Arena.ofAuto();
     private final MemorySegment out = arena.allocate(3 * 8L, 8);
@@ -215,6 +217,7 @@ final class NativeLightPropagation {
         finally {
             this.running = false;
             this.borrowedLayer = null;
+            this.borrowedBlocks.clear();
             if (previous == null) CURRENT.remove(); else CURRENT.set(previous);
             Reference.reachabilityFence(queues);
             Reference.reachabilityFence(this);
@@ -283,7 +286,8 @@ final class NativeLightPropagation {
                 return layer == null ? 0 : NativeLightBlocks.layer(layer, storage.lightOnInSection(section), buffer);
             }
             int x = SectionPos.x(section), z = SectionPos.z(section);
-            return NativeLightBlocks.blocks(current.engine.chunkSource.getChunkForLighting(x, z), x, SectionPos.y(section), z, buffer);
+            return NativeLightBlocks.blocks(current.engine.chunkSource.getChunkForLighting(x, z), x, SectionPos.y(section), z, buffer,
+                current.borrowedBlocks);
         } catch (Throwable error) {
             return -2;
         }

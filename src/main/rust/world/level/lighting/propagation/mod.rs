@@ -119,6 +119,9 @@ pub(crate) fn installed_tables() -> Option<&'static Tables> {
 
 /// A section's block states as Java's `LightChunk.getBlockState` sees them.
 pub(crate) enum Blocks<'a> {
+    /// Primary CPU owner pinned through the callback's direct native capture.
+    /// Its mutable generation is never retained by the pass.
+    Live(&'a crate::world::level::chunk::live::Owner),
     Uniform(u16),
     /// `SimpleBitStorage` words; `palette` maps ids to types, or `None` for
     /// global state ids.
@@ -505,6 +508,23 @@ impl Pass<'_> {
             let held = {
                 let e = &mut *self.engine;
                 match self.source.blocks(key)? {
+                    Blocks::Live(owner) => owner.with_state_reader(|reader| {
+                        let bits = reader.packed_bits();
+                        if bits == 0 {
+                            return Held::Uniform(self.tables.state_type(reader.get(0) as u16));
+                        }
+                        let global = reader.global_palette();
+                        let start = e.palettes.len();
+                        let palette = reader.palette_states();
+                        let len = palette.len();
+                        e.palettes.extend(palette.map(|id| self.tables.state_type(id as u16)));
+                        let word_start = e.words.len();
+                        let words = reader.packed_words();
+                        let word_len = words.len();
+                        e.words.extend(words);
+                        Held::Packed { bits: bits as u32, global, palette: start,
+                            palette_len: len, words: word_start, word_len }
+                    }),
                     Blocks::Uniform(t) => Held::Uniform(t),
                     Blocks::Packed { bits, palette, words } => {
                         if !(1..=32).contains(&bits) || words.len() != 4096usize.div_ceil(64 / bits as usize) {

@@ -10,7 +10,8 @@ use crate::world::level::lighting::layers::{Layer, ffi::{Projection, projection}
 pub(crate) type SectionCallback = unsafe extern "C" fn(i32, i64, *mut u8) -> i32;
 
 // Callback buffer: header ints, layer bytes, palette state ids, packed words,
-// full state ids. Rust maps the state ids to light types in place.
+// full state ids, or kind 4's primary CPU owner at byte 8. Rust maps legacy
+// state IDs in place; the owner path captures directly into the pass snapshot.
 const HEADER: usize = 0;
 const LAYER_AT: usize = 64;
 const PALETTE_AT: usize = LAYER_AT + LAYER;
@@ -96,6 +97,15 @@ impl Source for Callback<'_> {
             }
         };
         match kind {
+            4 => {
+                // Java pins this primary CPU owner until the synchronous
+                // capture finishes. No callback or owner borrow spans that read.
+                let owner = self.buffer[1] as *const crate::world::level::chunk::live::Owner;
+                if owner.is_null() || owner as usize % std::mem::align_of::<crate::world::level::chunk::live::Owner>() != 0 {
+                    return Err(Error::Callback);
+                }
+                Ok(Blocks::Live(unsafe { &*owner }))
+            }
             0 if (0..=u16::MAX as i32).contains(&a) => Ok(Blocks::Uniform(tables.state_type(a as u16))),
             1 | 2 if (1..=32).contains(&a) => {
                 let words = 4096usize.div_ceil(64 / a as usize);
