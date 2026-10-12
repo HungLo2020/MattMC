@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
 import artifact_retention
+from model_identity import matches_model_identity, combine_model_parts
 from capture_window import capture_window_size
 from dh_depth_coverage import CoverageEvidenceError, visible_extension_mask
 
@@ -15240,7 +15241,7 @@ def deterministic_world_mesh_model_capture_evidence(
         return (
             expected_semantic_identity is None
             or isinstance(record, dict)
-            and str(record.get("semanticModelIdentity") or "") == expected_semantic_identity
+            and matches_model_identity(record.get("semanticModelIdentity"), expected_semantic_identity)
         )
     if (
         expected_block is None
@@ -16245,7 +16246,7 @@ def deterministic_world_mesh_model_capture_evidence(
             isinstance(model, dict)
             and str(model.get("route") or "") == "rust-vulkan-whole-frame"
             and str(model.get("textureId") or "") == layer_texture
-            and str(model.get("semanticModelIdentity") or "") == layer_identity
+            and matches_model_identity(model.get("semanticModelIdentity"), layer_identity)
             and matches_expected_entity(model)
             and bool(model.get("projected")) and isinstance(model.get("screenBounds"), dict)
             and int(parse_number(model.get("sectionCount")) or 0) > 0
@@ -16259,7 +16260,7 @@ def deterministic_world_mesh_model_capture_evidence(
             and str(decision.get("textureId") or "") == layer_texture
             and str(model.get("route") or "") == "rust-vulkan-whole-frame"
             and str(model.get("textureId") or "") == layer_texture
-            and str(model.get("semanticModelIdentity") or "") == layer_identity
+            and matches_model_identity(model.get("semanticModelIdentity"), layer_identity)
             and matches_expected_entity(decision) and matches_expected_entity(model)
             and bool(model.get("projected")) and isinstance(model.get("screenBounds"), dict)
             and int(parse_number(model.get("sectionCount")) or 0) > 0
@@ -16315,7 +16316,7 @@ def deterministic_world_mesh_model_capture_evidence(
             saddle_modeled = any(
                 isinstance(model, dict) and model.get("route") == "rust-vulkan-whole-frame"
                 and model.get("textureId") == saddle_texture
-                and model.get("semanticModelIdentity") == layer_identity
+                and matches_model_identity(model.get("semanticModelIdentity"), layer_identity)
                 and matches_expected_entity(model) and bool(model.get("projected"))
                 and isinstance(model.get("screenBounds"), dict)
                 and int(parse_number(model.get("sectionCount")) or 0) > 0 for model in models
@@ -16325,7 +16326,7 @@ def deterministic_world_mesh_model_capture_evidence(
                 and decision.get("route") == "rust-vulkan-whole-frame"
                 and model.get("route") == "rust-vulkan-whole-frame"
                 and decision.get("textureId") == saddle_texture and model.get("textureId") == saddle_texture
-                and model.get("semanticModelIdentity") == layer_identity
+                and matches_model_identity(model.get("semanticModelIdentity"), layer_identity)
                 and matches_expected_entity(decision) and matches_expected_entity(model)
                 and bool(decision.get("rustSelected")) and bool(decision.get("rustQueued"))
                 and not bool(decision.get("javaDrawn")) and bool(model.get("projected"))
@@ -16366,7 +16367,7 @@ def deterministic_world_mesh_model_capture_evidence(
             wool_modeled = any(
                 isinstance(model, dict) and model.get("route") == "rust-vulkan-whole-frame"
                 and model.get("textureId") == wool_texture
-                and model.get("semanticModelIdentity") == wool_identity
+                and matches_model_identity(model.get("semanticModelIdentity"), wool_identity)
                 and matches_expected_entity(model) and bool(model.get("projected"))
                 and isinstance(model.get("screenBounds"), dict)
                 and int(parse_number(model.get("sectionCount")) or 0) > 0 for model in models
@@ -16376,7 +16377,7 @@ def deterministic_world_mesh_model_capture_evidence(
                 and decision.get("route") == "rust-vulkan-whole-frame"
                 and model.get("route") == "rust-vulkan-whole-frame"
                 and decision.get("textureId") == wool_texture and model.get("textureId") == wool_texture
-                and model.get("semanticModelIdentity") == wool_identity
+                and matches_model_identity(model.get("semanticModelIdentity"), wool_identity)
                 and matches_expected_entity(decision) and matches_expected_entity(model)
                 and bool(decision.get("rustSelected")) and bool(decision.get("rustQueued"))
                 and not bool(decision.get("javaDrawn")) and bool(model.get("projected"))
@@ -16433,7 +16434,7 @@ def deterministic_world_mesh_model_capture_evidence(
                 extra_modeled = any(
                     isinstance(model, dict) and model.get("route") == "rust-vulkan-whole-frame"
                     and model.get("textureId") == extra_texture
-                    and model.get("semanticModelIdentity") == extra_identity
+                    and matches_model_identity(model.get("semanticModelIdentity"), extra_identity)
                     and matches_expected_entity(model) and bool(model.get("projected"))
                     and isinstance(model.get("screenBounds"), dict)
                     and int(parse_number(model.get("sectionCount")) or 0) > 0 for model in models
@@ -16443,7 +16444,7 @@ def deterministic_world_mesh_model_capture_evidence(
                     and decision.get("route") == "rust-vulkan-whole-frame"
                     and model.get("route") == "rust-vulkan-whole-frame"
                     and decision.get("textureId") == extra_texture and model.get("textureId") == extra_texture
-                    and model.get("semanticModelIdentity") == extra_identity
+                    and matches_model_identity(model.get("semanticModelIdentity"), extra_identity)
                     and matches_expected_entity(decision) and matches_expected_entity(model)
                     and bool(decision.get("rustSelected")) and bool(decision.get("rustQueued"))
                     and not bool(decision.get("javaDrawn")) and bool(model.get("projected"))
@@ -16492,7 +16493,7 @@ def deterministic_world_mesh_model_capture_evidence(
                 extra_modeled = any(
                     isinstance(model, dict) and model.get("route") == "rust-vulkan-whole-frame"
                     and model.get("textureId") == extra_texture
-                    and model.get("semanticModelIdentity") == extra_identity
+                    and matches_model_identity(model.get("semanticModelIdentity"), extra_identity)
                     and matches_expected_entity(model) and bool(model.get("projected"))
                     and isinstance(model.get("screenBounds"), dict)
                     and int(parse_number(model.get("sectionCount")) or 0) > 0 for model in models)
@@ -16501,7 +16502,7 @@ def deterministic_world_mesh_model_capture_evidence(
                     and decision.get("route") == "rust-vulkan-whole-frame"
                     and model.get("route") == "rust-vulkan-whole-frame"
                     and decision.get("textureId") == extra_texture and model.get("textureId") == extra_texture
-                    and model.get("semanticModelIdentity") == extra_identity
+                    and matches_model_identity(model.get("semanticModelIdentity"), extra_identity)
                     and matches_expected_entity(decision) and matches_expected_entity(model)
                     and bool(decision.get("rustSelected")) and bool(decision.get("rustQueued"))
                     and not bool(decision.get("javaDrawn")) and bool(model.get("projected"))
@@ -16546,7 +16547,7 @@ def deterministic_world_mesh_model_capture_evidence(
             eyes_modeled = any(
                 isinstance(model, dict) and model.get("route") == "rust-vulkan-whole-frame"
                 and model.get("textureId") == eyes_texture
-                and model.get("semanticModelIdentity") == eyes_identity
+                and matches_model_identity(model.get("semanticModelIdentity"), eyes_identity)
                 and matches_expected_entity(model) and bool(model.get("projected"))
                 and isinstance(model.get("screenBounds"), dict)
                 and int(parse_number(model.get("sectionCount")) or 0) > 0
@@ -16557,7 +16558,7 @@ def deterministic_world_mesh_model_capture_evidence(
                 and decision.get("route") == "rust-vulkan-whole-frame"
                 and model.get("route") == "rust-vulkan-whole-frame"
                 and decision.get("textureId") == eyes_texture and model.get("textureId") == eyes_texture
-                and model.get("semanticModelIdentity") == eyes_identity
+                and matches_model_identity(model.get("semanticModelIdentity"), eyes_identity)
                 and matches_expected_entity(decision) and matches_expected_entity(model)
                 and bool(decision.get("rustSelected")) and bool(decision.get("rustQueued"))
                 and not bool(decision.get("javaDrawn")) and bool(model.get("projected"))
@@ -16709,7 +16710,7 @@ def deterministic_world_mesh_model_capture_evidence(
         nested_models = [model for model in models if isinstance(model, dict)
                          and model.get("route") == "rust-vulkan-whole-frame"
                          and model.get("textureId") == expected_texture
-                         and model.get("semanticModelIdentity") == "minecraft:pig"
+                         and matches_model_identity(model.get("semanticModelIdentity"), "minecraft:pig")
                          and int(parse_number(model.get("blockEntityId")) or -1) >= 0]
         if not nested_models:
             evidence.update({"checked": True, "status": "missing_spawner_block_entity_scope",
@@ -17042,10 +17043,16 @@ def deterministic_world_mesh_model_capture_evidence(
                         if closest_frame is not None
                         and int(parse_number(item.get("frameIndex")) or -999999) == closest_frame
                     ]
-                if len(closest_models) != 1:
+                part_inventory = {
+                    item["semanticModelIdentity"] for item in models
+                    if isinstance(item, dict) and matches_expected_model_texture(item)
+                    and matches_expected_entity(item) and matches_semantic_identity(item)
+                    and item.get("semanticModelIdentity") != expected_semantic_identity
+                }
+                model = combine_model_parts(closest_models, expected_semantic_identity, part_inventory)
+                if model is None:
                     crops.append({"capture_index": capture_index, "status": "duplicate_or_missing_expected_entity_mesh"})
                     continue
-                model = closest_models[0]
             receipt = next(
                 (
                     item

@@ -96,8 +96,12 @@ Follow the owner boundary relevant to the next change:
   the geometry owner with reported CPU/live passes and a passing settled
   four-mode matrix. The preceding ticking image's vanilla-p99 miss remains historical;
   broad gameplay/streaming/memory acceptance remains open. Next move
-  tracking admission and section associations onto the same primary owner,
-  then migrate motion/collision producers and their consumers. AI, synchronized
+  tracking admission and section associations onto the same primary owner.
+  The local [visible tracking registry](../world/entities/RUST-ENTITY-LOOKUP.md)
+  now owns ID/UUID entries and live ordered enumeration for client/server
+  consumers; its bounded CPU/runtime and four-mode timing checks pass. Section membership and
+  persistence admission remain Java. Then migrate motion/collision producers
+  and their consumers. AI, synchronized
   data and networking need separate behavior and realistic performance checks.
   See the release-specific results and limits in the
   [current performance boundary](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).

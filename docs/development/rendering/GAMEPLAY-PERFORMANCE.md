@@ -88,6 +88,90 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Local visible tracking checkpoint
+
+The October11 native `9c9f085c` checkpoint on base `cc929bd06` moves
+production visible ID/UUID maps and ordered enumeration into
+[Rust entity tracking](../world/entities/RUST-ENTITY-LOOKUP.md). It also removes
+profile-backed Java text layer/clipping record copies before the same inputs
+reach Rust. Font extraction/layout, behavior callbacks, section membership
+and persistence remain Java; no new ownership is claimed for the text cleanup.
+
+All twenty predeclared alternating runs complete cleanly: exactly6,000 frames,
+360 settle/240 warmup, four repeats per side for DH and two for other modes.
+No profiler or other game client ran during timing. Every repeat is retained.
+Final source/native/Frozen/prompt/three prepared-input guards pass.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+|---|---:|---:|
+| Vanilla | 1358.35 / 1155.90 | 3.049 / 3.109 |
+| Vanilla + DH | 803.60 / 704.00 | 3.360 / 5.739 |
+| Shaders | 346.25 / 316.50 | 5.508 / 6.757 |
+| Shaders + DH | 266.75 / 227.85 | 6.118 / 8.369 |
+
+**All four average-FPS and p99 floors pass.** Vanilla p99 margin is about1.9%.
+The preceding5.1% vanilla-tail miss remains below; this does not prove an
+isolated gain or root-cause repair, and some absolute medians/baselines moved.
+These are settled rotating scenes with hidden minimap, not broad gameplay,
+first shader-world-frame/first-turn, streaming or long-memory acceptance.
+
+Fresh full Rust2,685/three ignored and Java/parity2,010 executed/two skipped
+pass. Frozen lookup/manager4,417 is rerun after cleanup. Geometry11,489,
+order4,143 and range645 pass on the identical native and unchanged consumers.
+Seven fresh lifecycles, two world pairs and four GUI item pairs pass,VUID0;
+all twelve originals are individually reviewed and thirteen Current runtime
+identities match. The earlier strict body/shadow pair supplements tracking
+coverage; its ten originals remain retained.
+
+Leash width differs from Frozen, also seen with the published-registry
+Current control. Current crosshair is absent in some GUI reload fixtures,
+also in the published9f plain original, but present in the moving-foil pair.
+Hotbar item checks do not resolve full GUI/crosshair parity. Receipts:
+`build/native-entity-lookup/text-copy-candidate/` and the earlier rejected
+fixture/profile results under `build/native-entity-lookup/`.
+
+## Historical visible tracking before text-copy cleanup
+
+Local native `9c9f085c` on documentation base `cc929bd06` moves production
+client/server visible ID/UUID maps and live ordered enumeration into
+[Rust entity tracking](../world/entities/RUST-ENTITY-LOOKUP.md). Java behavior
+bindings and callbacks remain; section membership and persistence remain Java.
+
+All twenty predeclared alternating runs completed cleanly with the same
+6,000 measured frames, 360 settle/240 warmup and repeat counts as the published
+checkpoint below. No profiling or other game client ran during measurement.
+Final source/native/Frozen/prompt/three prepared-input guards pass.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+|---|---:|---:|
+| Vanilla | 1353.35 / 1174.75 | 3.190 / 3.035 **FAIL** |
+| Vanilla + DH | 860.65 / 727.30 | 2.400 / 5.234 |
+| Shaders | 344.10 / 318.40 | 4.868 / 6.550 |
+| Shaders + DH | 266.45 / 228.35 | 5.299 / 8.614 |
+
+All FPS floors and the other three p99 floors pass; **vanilla p99 misses
+5.1%, so the overall matrix fails**. Both Current vanilla repeats have higher
+p99 than their paired Frozen runs. Current's median is below its earlier
+published measurement, but Frozen's median also moved; neither an isolated
+migration regression nor its cause is proved. Do not rerun selectively or
+claim full performance acceptance. Paired15s warmed vanilla JFR profiles complete on guarded clients. First
+per-thread allocation samples carry large pre-recording weights and are
+excluded from scoped analysis. Repeated GUI text layer/clipping copies are
+visible in the remaining samples; local preparation now constructs final
+metadata once. The later verified cleanup checkpoint above is separate from this failed
+matrix. No isolated speedup or vanilla-tail cause is established;
+profiled measurements remain diagnostic only.
+
+Full Rust 2,685/three ignored and Java/parity 2,010 executed/two skipped pass;
+actual Frozen lookup/manager 4,417, geometry 11,489, order 4,143 and range 645
+replays pass with guards. Seven lifecycles, two settled world pairs and a
+strict cow body/shadow pair pass with zero VUIDs; fourteen accepted originals
+were reviewed. Equivalent leash inputs separately fail strict crop comparison:
+Current's near-camera leash is thinner, also seen in the published-registry
+Current control. The leash issue remains open; it is not accepted by the
+body/shadow or whole-image passes. These pre-cleanup results remain historical.
+Receipts: `build/native-entity-lookup/{gameplay,vanilla-jfr}/`.
+
 ## Current hardware evidence boundary
 
 The implementation author records the October 11 combined checkpoint with

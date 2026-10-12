@@ -199,6 +199,13 @@ mutations invalidate unread entries between callbacks.
 Java retains atomic chunk references, reference-CAS facts, scalar ring/range reads,
 radius relocation and callback delivery. This is partial client-world ownership.
 
+The local [visible tracking registry](world/entities/RUST-ENTITY-LOOKUP.md) in
+`world/level/entity_lookup/` owns primary visible ID/UUID entries, ordered
+enumeration and binding retirement for production client/server consumers.
+Java retains behavior references and callbacks. Bounded CPU/live/Frozen and
+four-mode timing checks pass; section membership and persistence registration/
+load orchestration remain Java. Full parity and Java removal remain open.
+
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
 retains primary position/bounds components per world and queries them directly
 for ordinary camera culling. Rust removal state retires camera membership

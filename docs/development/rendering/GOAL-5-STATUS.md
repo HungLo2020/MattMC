@@ -2,6 +2,29 @@
 
 **Goal 5 remains incomplete.**
 
+## October11 visible-tracking checkpoint
+
+[Rust entity lookup](../world/entities/RUST-ENTITY-LOOKUP.md) now owns primary
+visible ID/UUID maps and live ordered enumeration. Profile-backed Java text
+input copy cleanup retains the same Rust fields; font/layout ownership remains
+Java. Fresh Rust2,685/three ignored, Java/parity2,010 executed/two skipped and
+Frozen lookup4,417 pass. Seven lifecycles/two world/four GUI item pairs pass,
+VUID0; twelve originals reviewed/thirteen runtime identities match. All twenty
+fresh timings and final identity/input guards pass every FPS/p99 floor.
+See the [matrix and limits](GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint).
+No isolated gain or root-cause repair of the prior5.1% vanilla-tail miss is proved.
+
+Equivalent copied-cow inputs expose thinner near-camera leash geometry in
+Current, also seen with the published-registry control. The equivalent-leash
+run passes whole-image/shadow checks but fails strict model crop; no leash
+parity is accepted. All ten originals are reviewed; retain
+`build/native-entity-lookup/cow-v7-original-reviews.json`.
+Current crosshair is absent in plain/static/oversized GUI reload fixtures,
+also in the published9f plain original, but present in the moving-foil pair.
+Item layout/lighting/foil checks do not establish crosshair or full GUI parity;
+retain `build/native-entity-lookup/text-copy-candidate/gui-original-reviews.json`.
+Full Goal5 acceptance and Java removal remain open.
+
 ## October 11 integrated lifecycle/model checkpoint
 
 At published source [`c1428dbc`](https://github.com/HungLo2020/MattMC/commit/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42),

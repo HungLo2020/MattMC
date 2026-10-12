@@ -37,6 +37,27 @@ DH/capture fixes; no isolated total or FPS gain is established. Source/library,
 exact measurement window and cleanup checks pass. Receipt:
 `goal5/native-launch-policy-profile-20261009/current/allocation-comparison.json`.
 
+## GUI text input preparation
+
+[`RustGalGuiRenderer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
+still extracts semantic glyphs and copied font-atlas inputs in Java. Local
+text preparation now constructs each affine request with its final source
+layer and clipping fields, avoiding the subsequent layer-copy list and clip
+record copy. Rust's existing frontend receives the same ordered fields; this
+cleanup does not migrate font layout or GUI scheduling ownership.
+
+Preserve the glyph corner order (TL, BL, BR, TR), source-layer admission and
+asset publication after the complete request enters the scheduler. Invalid
+source-layer overflow still fails after glyph extraction at the existing
+admission point; do not move checked layer arithmetic ahead of callbacks.
+Use `RustGalGuiRendererTest`, `TextGlyphQuadTest`, real Frozen GUI/world
+captures and the [performance protocol](GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint).
+The paired warmed JFR at native `9c9f085c` identified the redundant copies;
+first per-thread allocation samples carried pre-recording weights and are
+excluded from the scoped analysis. Fresh CPU, lifecycle/world/GUI item and all twenty timing floors pass for
+the combined tracking/cleanup checkpoint; no isolated speedup or vanilla-tail
+cause is established. Full renderer parity and Java removal remain open.
+
 ## How the ABI stays in sync
 
 - **Records are `#[repr(C)]` structs** in [`bridge/abi/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi),

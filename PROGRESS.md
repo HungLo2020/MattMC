@@ -17,7 +17,7 @@
 - Client residency owns logical publication, counts, centers, fingerprints, empty membership and the local ordered coordinate index. Java binds chunk references/callbacks.
 - Local entity slice owns primary position/bounds and ordinary camera queries. Immutable Java projections and behavioral callbacks remain.
 - Local GUI slice retains ordinary cached 3D semantic layers in Rust and sends one placement/foil instance per item, removing per-quad Java records and repeated geometry encoding.
-- Next after this batch: explicit active/despawn/section membership and direct world/entity consumers. Ordered ticking membership is now connected to the production client/server consumers; CPU/live checks and latest settled floors pass; broad acceptance remains open. The earlier draft/Java-only control is not acceptance. Primary leases follow Java reachability; local removal-state work now retires dense camera membership immediately.
+- Active next slice: visible tracking registry, then section membership and direct world/entity consumers. Ordered ticking membership is now connected to the production client/server consumers; CPU/live checks and latest settled floors pass; broad acceptance remains open. The earlier draft/Java-only control is not acceptance. Primary leases follow Java reachability; local removal-state work now retires dense camera membership immediately.
 - General simulation, networking, platform/startup, file orchestration and remaining extraction are Java. src/main/rust/app/mod.rs is empty. Java removal is far from complete.
 
 ## Published checkpoints
@@ -61,6 +61,18 @@
 - Combined9f medianFPS C/F1313.65/1142.25,808.10/709.80,341.95/312.95,260.60/226.05; p99ms3.248/3.307,3.156/5.266,4.780/7.169,5.275/9.203 (vanilla/DH/shaders/combined). All floors pass; vanilla p99 margin~1.8%, no isolated gain or prior-tail cause proved. Receipts: native-entity-lifecycle-model-integration/alpha-mask-accepted/.
 
 - Final documentation-only696a25e3b integration preserved25 paths in cd828049, resolved6 overlapping pages with both ownership constraints/new results retained. All tested executable/native/Frozen/prompt identities unchanged; wiki2537pages/46indexes passes. Publication/recovery receipts: build/native-entity-lifecycle/publish/.
+
+## Active slice: visible entity tracking
+
+- Published c1428dbc7 (parent696a25e3b): Rust removal/camera retirement and bounded item alpha masks, all recorded CPU/live/Frozen/20timing floors pass; remote verified/worktree clean. Two workflow stashes dropped, protected stashes retained. Retired24 successful generated timing/GUI worlds, retaining40 timing artifacts and all12 reviewed originals.
+- New Rust entity_lookup owns primary visible ID/UUID maps, ordered table, physical iterator indices and binding retirement; EntityLookup production client/server consumers use it. Java keeps behavior references/getter/cast/logging callbacks; section membership and persistence known-UUID/load orchestration remain Java.
+- Full Rust2685/3ignored, Java2010executed/2skip and actual Frozen lookup/manager4417, geometry11489, ticking4143 and range645 pass with identity guards. Native9c9f085c passes7lifecycles/2worldpairs,VUID0;4 original reviews/9 identities match. Initial iterator-message defect fixed; failed fixtures retained.
+- Canonical per-part model observer now requires complete unique frame-correlated parts;3 controls/344 reference tests pass. Guarded published-registry control reproduces old observer failure. Frozen copied-fixture adapter supplies matching leash/player-pose input. Body/shadow strict pairPASS/10 originals reviewed; equivalent leash cropFAIL with thinner Current geometry, also seen in published-registry control. Failed15s finalization, older-JDK launch and observer attempts retained.
+- Integrated doc-only cc929bd06, preserving/verifying22 files in stash2639030a; no conflicts, two ownership pages auto-merged. Pending26-file manifest includes later text cleanup/docs. Protected stashes/prompt unchanged.
+- Paired warmed15s JFR identifies redundant text layer/clip copies after excluding first-per-thread startup allocation weights. Text inputs now construct final metadata once; font/layout ownership stays Java. Fresh full Rust2685/3ignored, focusedJava13, fullJava2010/2skip, Frozen lookup4417 and wiki2538/46 pass. No isolated speedup or p99 cause proved.
+- Controller79417 exits0:7lifecycles/2worldpairs/4GUIitempairs pass,VUID0;12 original reviews/13 native identities match. All20 fresh6000-frame timings clean/all FPS+p99 floors pass; final source/native/Frozen/prompt/three input guards pass; no clients remain. Ready for incremental publication. Native9c unchanged across text cleanup; sole executable delta GuiRenderer.
+- Latest C/F medians FPS1358.35/1155.90,803.60/704.00,346.25/316.50,266.75/227.85; p99ms3.049/3.109,3.360/5.739,5.508/6.757,6.118/8.369 (vanilla/DH/shaders/combined). Prior pre-cleanup vanilla p99FAIL5.1% retained. Crosshair missing in some reload fixtures (also published9f), present moving; leash width still differs. Full parity/memory/Java removal remain open.
+- Guide: world/entities/RUST-ENTITY-LOOKUP.md. Receipts: build/native-entity-lookup/. Publish this verified batch, then move section membership and its direct consumers into Rust.
 
 ## Remaining correctness and performance scope
 

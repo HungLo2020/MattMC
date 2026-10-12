@@ -8,3 +8,4 @@ pub(crate) mod client_residency;
 pub(crate) mod entity_geometry;
 pub(crate) mod chunk_tasks;
 pub(crate) mod entity_order;
+pub(crate) mod entity_lookup;
