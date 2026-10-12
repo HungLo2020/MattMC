@@ -27,20 +27,6 @@
 - ae7f499b3: known UUID/chunk residency and persistence admission. Remote master and clean worktree were verified after each publication.
 - Historical matrices and qualifications remain in rendering/GAMEPLAY-PERFORMANCE.md; earlier unmatched JVM results do not verify later sources.
 
-## Published fog checkpoint (1a977b9db)
-
-- Published to origin/master at 03:38 on 2026-10-12; remote master verified at this commit. The following results verify that published checkpoint, not the pending lighting changes.
-
-- Final release d64eb03a passes Rust2707/3ignored and Java/parity2028/2skip. Actual unchanged Frozen fog11778 matches with source/class/native guards.
-- Initial c17ef718 replay exposed989 negative/oversized air-color packing mismatches. Corrected per-channel masks and added a regression; earlier failed recordings/setup failures remain in build/native-fog/.
-- Seven lifecycles, two world pairs, cow body/shadow and rain pass,VUID0. All22 accepted originals individually reviewed;11 Current artifacts identify the final native image.
-- Rain needed matching4-pose schedules and6000-frame readiness on both clients. Rejected camera-schedule, normal rain-ramp timeout and local argument-prefix failures are retained separately.
-- All20 alternating6000-frame timings complete cleanly; all10 effective heap/GC/JIT controls match; final source/native/Frozen/prompt/3prepared-input guards pass; no clients remain.
-- Current/Frozen medians: vanilla1255.50/1225.65FPS,3.654/3.543ms p99; DH727.60/801.55FPS,4.758/5.098ms; shaders345.50/317.75FPS,4.800/7.195ms; combined258.80/226.65FPS,6.787/9.552ms.
-- Aggregate performance FAIL: vanilla p99 misses3.15%, DH FPS misses9.23%; remaining floors pass. No isolated regression cause or gain is attributed. SUMMARY records this full matrix.
-- Inclusive frame-begin~0.0091/0.0104ms vanilla/DH, shader-environment~0.0055/0.0064ms, mesh-expand~0.100/0.111ms, GPU~0.516/1.164ms. Do not sum inclusive scopes or infer a cause without controls.
-- Guide: rendering/RUST-FOG-POLICY.md. Receipts: build/native-fog/{frozen-policy-v4,candidate,current-phase-costs.json}; full-suite/build logs beside them.
-
 ## Verified light-work checkpoint
 
 - Nativeca8bf37a owns pending propagation queues, journals inputs without copying and seeds canonical sky work directly. Java retains node checks, section orchestration and callbacks.
@@ -50,11 +36,17 @@
 - Aggregate FAIL: vanilla p99 misses0.93%, DH FPS6.11%; other floors pass. No isolated whole-game gain claimed. Guide: world/lighting/RUST-LIGHT-WORK.md; receipts: build/native-light-work/.
 - Release full-test debug-only cache assertion and capture-terminated Java parity attempt retained; supported Rust suite and sequential Java parity pass. Run Java suites separately from capture cleanup.
 
+## Published block-light and DH resize checkpoint (8e16a569c)
+
+- Remote master and clean worktree verified after publication. Native3c8e2d3d enumerates retained section owners directly into native work; shared adapter renamed NativeChunkInputs. Rust bulk resize removes per-point DH zero append/view construction.
+- Rust2714/3ignored, Java2032/2skip and actual Frozen492/437089/54 native seeds pass. Seven lifecycle/two settled pairs pass,VUID0;11 originals/9 native identities reviewed. Hazy lifecycle views establish structural checks only. Six-column flights reach matching F3 poses, including shared return overshoot;6 originals reviewed.
+- Source-only8aaa5520 predecessor pairs: terrain12.6%/nether18.2% faster, edits unchanged. First DH matrix failed RSS~12.4GiB/0 measured frames. Game-only JFR identifies DH hydration/zero-appends; weighted add/view-refresh allocation922->158MB after resize. Variable-work profiles do not isolate whole-game gains or retained-memory bounds. Failed attempts retained.
+- All20 exact6000-frame matched timings clean; every live JVM control identical; source/native/class/Frozen/prompt/3input guards pass; no clients remain. Current/Frozen FPS:1312.65/1208.70,742.00/808.40,351.20/315.50,260.80/217.35. P99ms:3.362/3.540,4.310/5.175,4.834/6.930,6.573/10.419.
+- Aggregate FAIL: DH FPS misses8.2%; other FPS/allp99 floors pass. Current DH RSS8.52–9.12GiB,combined9.53/9.92GiB below guard; sustained memory remains open. SUMMARY records this full matrix. Guides: world/lighting/RUST-BLOCK-LIGHT-SOURCES.md and world/chunk/RUST-DH-FULL-DATA.md; receipts: build/native-light-seeds/combined/.
+
 ## Next work and open acceptance
 
-- Verified combined block-light/DH-resize slice3c8e2d3d: retained section owners seed native queues directly; shared adapter renamed NativeChunkInputs. Rust2714/3ignored, Java2032/2skip and actual Frozen492/437089/54 native seeds pass. Seven lifecycle/two settled pairs pass,VUID0;11 originals/9 native identities reviewed. Hazy lifecycle views establish structural checks only.
-- Source-only8aaa5520 predecessor pairs: terrain12.6%/nether18.2% faster, edits unchanged. First DH matrix run failed RSS~12.4GiB/0 measured frames. Game-only JFR identified DH hydration/zero-appends; Rust bulk resize removes per-point Java/FFM construction. Weighted add/view-refresh allocation922->158MB; combined diagnostic RSS8.51/9.07GiB below guard. These variable-work profiles do not establish long memory bounds or isolated whole-game gains. Failed attempts retained.
-- Combined moving-camera comparison and matched20-run performance matrix are running. SUMMARY records the previous completedca8bf37a matrix until all new results are available. Guides: world/lighting/RUST-BLOCK-LIGHT-SOURCES.md and world/chunk/RUST-DH-FULL-DATA.md; receipts: build/native-light-seeds/combined/.
+- Prioritize DH saved-source point decoding/encoding directly against primary native columns, moving its Java loops and per-point accesses together. Preserve formats, list/alias identity and corruption/exception prefixes; compression wrappers and contextual material resolution remain later work. The allocation profile proves hydration churn, not that this explains the entire FPS gap.
 - Continue migrating node/world-state producers with consumers; avoid Java packing followed by Rust reconstruction. Native work queues now replace that transfer in light propagation. Close and publish verified increments before starting another implementation batch.
 - Investigate measured native expansion/batching and remaining producer costs; small fog preparation times do not by themselves explain the DH gap.
 - First shader world frame, first-turn nearby regular-terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
@@ -70,3 +62,4 @@
 - Fog cleanup retired22 completed generated workspaces, preserving184 selected evidence hashes; rejected/failed weather scopes remain. Residency cleanup retired21/preserved151.
 - Prior manifests record~350GiB reclaimed caches plus21.08GiB archives,17.04GiB unused profiles and17.83GiB superseded videos with447 PNG/profile receipts retained.
 - Retire only recognized completed workspaces after clients exit. Preserve measurements/originals/profiles, failed/unknown/active/symlinked scopes, prepared inputs and open-defect worlds. Never clean during timing.
+- Combined light-source cleanup retires24 completed generated workspaces and reclaims2.60GiB. Original images/profiles and the failed source-only RSS recording remain. Selected1585 evidence hashes and the byte-verified full receipt are retained in build/native-light-seeds/combined/; all final guards pass again after cleanup.

@@ -108,8 +108,8 @@ only; settled pairs do not resolve first-turn gaps or shader world entry.
 
 Source-only predecessor pairs measured terrain 12.6% and nether 18.2% faster,
 with edits effectively unchanged. Those warmed lighting workloads verify
-`8aaa5520`, not a whole-game gain from the combined fix. Its first DH timing
-attempt exceeded the RSS guard near 12.4 GiB before measuring frames. That
+`8aaa5520`, not a whole-game gain from the combined fix. The source-only matrix's
+first DH run exceeded the RSS guard near 12.4 GiB before measuring frames. That
 failed recording remains retained. Game-only JFR then identified per-element
 DH hydration as major FFM allocation churn. After bulk resize, sampled weighted
 allocation under add/view refresh drops from 922 to 158 MB, and two diagnostic
@@ -117,9 +117,33 @@ DH sessions peak at 8.51/9.07 GiB below the guard. Variable background work
 prevents treating those recordings as a normalized speedup or retained-memory
 bound.
 
-The combined moving-camera comparison and predeclared matched 20-run matrix
-are in progress. `SUMMARY.md` continues to record the preceding completed
-matrix below; its performance figures do not verify this new native image.
+The combined ordinary flight pair crosses six X chunk columns. Recorded poses
+match on both clients: start 150.5/125/530.5, forward 55.867/125/505.150 and
+return 151.026/125/530.641. The return includes the same small overshoot; all
+six endpoint originals were reviewed. This does not establish absence of
+transient gaps or sustained streaming/memory behavior.
+
+All twenty predeclared alternating timings complete cleanly, with exactly
+6,000 measured frames each. Every live client has identical 1G/8G ZGC, compact
+headers, uncommit and tier thresholds verified before measurement. Final
+source/native/class/Frozen/prompt and three prepared-input guards pass, and no
+clients remain. The measured source/native image is unchanged by publication
+in `8e16a569c`.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1312.65 / 1208.70 | 3.362 / 3.540 |
+| Vanilla + DH | 742.00 / 808.40 | 4.310 / 5.175 |
+| Shaders | 351.20 / 315.50 | 4.834 / 6.930 |
+| Shaders + DH | 260.80 / 217.35 | 6.573 / 10.419 |
+
+Aggregate performance **FAIL**: DH FPS misses 8.2%; other FPS and all p99 floors
+pass. No isolated whole-game gain is attributed. Current DH peak RSS is
+8.52–9.12 GiB across four runs; combined peaks are 9.53/9.92 GiB, all below the
+guard. This settled rotating scene hides the minimap and does not establish
+ordinary visible-HUD performance, first-turn gaps/flicker, first shader world
+frame, broad rendering or long-session memory bounds.
+
 Receipts: `build/native-light-seeds/combined/`; rejected source-only RSS evidence
 and lighting microbenchmarks remain in `build/native-light-seeds/`.
 

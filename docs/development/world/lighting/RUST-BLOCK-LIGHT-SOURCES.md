@@ -59,43 +59,42 @@ Gradle wrappers; see [work-queue verification](RUST-LIGHT-WORK.md).
 
 ## Current verification
 
-Candidate `8aaa5520` passes 42 Rust lighting checks and the packed-word visitor
-control, plus 16 focused Java tests. Actual unchanged Frozen matches all 492
-passes and 437,089 state rows with source/native/class guards intact. Current
-seeds all 54 ordinary chunks directly in Rust. Two alternating JVM pairs against
-the published predecessor measure terrain 22.042/19.258 ms, edits
-10.737/10.695 ms and nether 8.406/6.879 ms (predecessor/candidate).
-Terrain improves 12.6% and nether 18.2%; edits are effectively unchanged.
-Checksums and compiled/native identity guards match. These are warmed lighting
-workloads, not whole-game or Frozen throughput claims.
-The source-only candidate's supported Rust suite passes 2,714 tests (three ignored), and Java unit
-and parity suites pass 2,031 (two skipped). Seven lifecycle cases and settled
-vanilla/Iris+DH pairs pass with zero validation errors and nine exact native
-identities. Eleven originals were reviewed; hazy lifecycle views establish
-structural checks only. Both ordinary flights cross six chunk columns and
-return to matching start positions, but forward endpoints differ by 0.54 blocks.
-All six endpoint originals were reviewed; this does not establish matching-pose
-pixels, absence of transient gaps or long-session memory bounds.
-The matched whole-game matrix stopped on its first DH run: the RSS guard
-triggered around 12.4 GiB before any measured frames. Diagnostic runs completed
-near 8.9 GiB, and the game-only allocation profile identifies per-point DH
-saved-column resizing/view construction as major FFM churn. A
-[native bulk-resize prerequisite](../chunk/RUST-DH-FULL-DATA.md#constraints-when-changing-this-subsystem)
-is now included in combined candidate `3c8e2d3d`. Its supported Rust suite
-passes 2,714 tests (three ignored), and Java unit/parity suites pass 2,032
-(two skipped). The actual Frozen observer still matches all 492 passes and
-437,089 state rows, with 54 native block-source admissions.
-Two completed DH diagnostic sessions stay below the RSS guard at 8.51/9.07 GiB.
-Game-only JFR weighted allocation below mutable-column add/view refresh drops
-from 922 to 158 MB. Background DH work varies between recordings; this is
-directional allocation evidence, not a retained-memory or normalized speedup
-claim. Earlier CPU/runtime results verify `8aaa5520`, not the combined memory
-fix. Combined runtime verification passes seven lifecycle cases and settled
-vanilla/Iris+DH comparisons with zero validation errors. All eleven originals
-were reviewed and nine Current artifacts identify `3c8e2d3d`. The lifecycle
-views remain heavily hazy and provide structural evidence only; the settled
-coastal pairs align with unchanged Frozen. Moving-camera and repeated whole-game
-performance checks are separate, ongoing acceptance work.
-Receipts:
-`build/native-light-seeds/`. These CPU results do not establish whole-game
-speedup, broad rendering parity or long-session memory acceptance.
+Combined native `3c8e2d3d`, published in `8e16a569c`, passes the supported
+Rust suite: 2,714 tests (three ignored). Java unit/parity suites pass 2,032
+(two skipped). Actual unchanged Frozen matches all 492 lighting passes and
+437,089 state rows with source/native/class guards intact; Current seeds 54
+ordinary chunks directly in Rust.
+
+Two alternating JVM pairs for source-only `8aaa5520` against its published
+predecessor measure terrain 22.042/19.258 ms, edits 10.737/10.695 ms and nether
+8.406/6.879 ms (predecessor/candidate). Terrain improves 12.6% and nether 18.2%;
+edits are effectively unchanged. Checksums and compiled/native identity guards
+match. These warmed lighting results do not isolate a whole-game gain from
+the combined candidate.
+
+The source-only whole-game matrix stopped on its first DH run at about
+12.4 GiB RSS before measuring frames. The failed recording remains retained.
+Game-only JFR identified per-point DH hydration/view creation as major FFM
+churn. After the [bulk-resize fix](../chunk/RUST-DH-FULL-DATA.md#constraints-when-changing-this-subsystem),
+weighted allocation under add/view refresh drops from 922 to 158 MB.
+Background DH work varies; this is directional allocation evidence, not a
+normalized speedup or retained-memory bound.
+
+Combined runtime verification passes seven lifecycle cases and settled
+vanilla/Iris+DH comparisons with zero validation errors. Eleven originals were
+reviewed and nine Current artifacts identify `3c8e2d3d`. Hazy lifecycle views
+provide structural evidence only; the settled coastal pairs align with Frozen.
+Both ordinary flights cross six X chunk columns and reach matching recorded
+poses, including a shared small return overshoot. All six endpoint originals
+were reviewed; endpoints do not resolve transient gaps or long-session memory.
+
+All twenty matched 6,000-frame timing runs complete cleanly with identical
+live JVM controls. All p99 floors and vanilla/shader/combined FPS floors pass;
+DH FPS remains 8.2% below Frozen, so aggregate performance acceptance fails.
+Four Current DH sessions peak at 8.52–9.12 GiB RSS; two shader+DH sessions peak
+at 9.53/9.92 GiB, all below the guard. Final source/native/class/Frozen/prompt
+and prepared-input guards pass, with no clients remaining. See the
+[complete matrix](../../rendering/GAMEPLAY-PERFORMANCE.md#block-light-sources-and-bulk-dh-resize).
+Receipts: `build/native-light-seeds/combined/`; source-only diagnostics and
+predecessor timings remain in `build/native-light-seeds/`. Broad rendering,
+first-world-frame, transient-gap and sustained-memory acceptance remain open.

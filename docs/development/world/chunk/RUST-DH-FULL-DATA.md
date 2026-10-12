@@ -93,7 +93,11 @@ sessions peak at 8.51/9.07 GiB below the guard. The game-only JFR weighted
 allocation below add/view refresh drops from 922 to 158 MB; variable background
 DH work makes this directional allocation evidence rather than a normalized
 speedup or retained-memory bound. The failed run and diagnostics remain in
-`build/native-light-seeds/`. Repeated runtime/performance acceptance is pending.
+`build/native-light-seeds/`. The final twenty matched timing runs complete cleanly.
+Four DH sessions peak at 8.52–9.12 GiB RSS and two shader+DH sessions at
+9.53/9.92 GiB, below the guard. DH FPS remains 8.2% below Frozen; other FPS
+and all p99 floors pass. These bounded workloads do not prove sustained-memory
+acceptance. See the [complete matrix](../../rendering/GAMEPLAY-PERFORMANCE.md#block-light-sources-and-bulk-dh-resize).
 
 - Preserve list object identity during mutation, iterator/sublist behavior,
   symmetric `LongList` equality, wrapped hashes and the successful mutation
