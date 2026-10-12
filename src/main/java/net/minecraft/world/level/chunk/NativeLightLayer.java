@@ -27,6 +27,10 @@ final class NativeLightLayer {
         "mattmc_light_sky_owned", FunctionDescriptor.of(ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS), Linker.Option.critical(true));
+    private static final MethodHandle SKY_QUEUED = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust",
+        "mattmc_light_sky_queued", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle INVALIDATE = handle("invalidate", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE_VIEW = handle("view_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
@@ -119,6 +123,15 @@ final class NativeLightLayer {
                 MemorySegment.ofArray(entries), MemorySegment.ofArray(output), changedView)); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
+    }
+    void seedSkyQueued(MemorySegment columns, int bottom, int minX, int minZ,
+            net.minecraft.world.level.lighting.NativeLightQueues queues, MemorySegment output) {
+        if (columns.byteSize() != 1280 * 4L || output.byteSize() != 3 * 4L)
+            throw new IllegalArgumentException("Invalid sky source spans");
+        try { updateView((int) SKY_QUEUED.invokeExact(owner, columns, bottom, minX, minZ,
+                queues.ownerForNativeCall(), output, changedView)); }
+        catch (Throwable failure) { throw rethrow(failure); }
+        finally { Reference.reachabilityFence(queues); Reference.reachabilityFence(this); }
     }
     void invalidate() {
         try { INVALIDATE.invokeExact(owner); }

@@ -177,6 +177,40 @@ pub unsafe extern "C" fn mattmc_light_run(handle: u64, tables: u64, decreases: *
     }
 }
 
+/// Consume retained inputs directly. The independent queue lease admits callback
+/// additions while this excluded engine owns its transaction journal.
+/// # Safety
+/// Engine/tables are live and excluded; owner is a live queue lease, callback
+/// follows the section contract, and out addresses three writable i64s.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_run_owned(handle: u64, tables: u64,
+    owner: *const std::ffi::c_void, lowest: i32, callback: Option<SectionCallback>, out: *mut i64) -> i32 {
+    let Some(call) = callback else { return -1; };
+    if handle == 0 || tables == 0 || owner.is_null() || out.is_null() { return -1; }
+    let queues = super::work::retain(owner.cast());
+    let inputs = queues.take();
+    if inputs.iter().any(|q| q.len() % 2 != 0) {
+        queues.finish(inputs, false); return -1;
+    }
+    let handle = &mut *(handle as *mut Handle);
+    let tables = &*(tables as *const Tables);
+    let mut source = Callback { call, buffer: &mut handle.buffer, tables };
+    handle.written_indices.clear();
+    let result = handle.engine.run_owned(tables, &mut source, inputs, lowest);
+    let inputs = handle.engine.input_journal();
+    queues.finish(inputs, result.is_err());
+    match result {
+        Ok(outcome) => {
+            handle.written_indices.extend(handle.engine.sections.iter().enumerate()
+                .filter_map(|(index, section)| section.written.then_some(index)));
+            *out = outcome.processed; *out.add(1) = handle.engine.written_count() as i64;
+            *out.add(2) = handle.engine.affected().len() as i64; 0
+        }
+        Err(Error::Unsupported) => -2,
+        Err(Error::Callback) => -3,
+    }
+}
+
 /// Copies the last pass's written sections (keys and 2048-byte layers) and
 /// affected sections. Returns 0, or -1 when the counts differ.
 /// # Safety
@@ -324,5 +358,40 @@ pub unsafe extern "C" fn mattmc_light_sky_owned(layer: *const Layer, columns: *c
     let changed = wrote && layer.install_bytes(bytes);
     *projection_out = if changed { projection(layer) } else { std::ptr::null_mut() };
     *out = pairs as i32; *out.add(1) = wrote as i32; *out.add(2) = below as i32;
+    0
+}
+
+/// Seed a retained layer straight into the increase queue. This ordinary
+/// downcall can allocate and lock; it never holds Java heap pointers or upcalls.
+/// # Safety
+/// Layer and queue leases are live; layer is excluded. Columns, out and view
+/// address 1280 i32s, three i32s and a pointer, respectively, and are disjoint.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_sky_queued(layer: *const Layer, columns: *const i32,
+    bottom: i32, min_x: i32, min_z: i32, owner: *const std::ffi::c_void,
+    out: *mut i32, projection_out: *mut *mut Projection) -> i32 {
+    if layer.is_null() || columns.is_null() || owner.is_null() || out.is_null()
+        || projection_out.is_null() || bottom % 16 != 0 { return -1; }
+    let layer = &*layer;
+    let view = layer.view();
+    let mut bytes = [0u8; LAYER];
+    if !view.copy_bytes_into(&mut bytes) {
+        if !(0..16).contains(&view.default_value()) { return -1; }
+        bytes.fill((view.default_value() * 17) as u8);
+    }
+    let queues = super::work::retain(owner.cast());
+    let mut pending = queues.data.lock().unwrap();
+    // The section emits at most 4096 pairs. Reject before any observable writes.
+    if pending[1].len() > i32::MAX as usize - 8192 { return -1; }
+    let columns = std::slice::from_raw_parts(columns, super::seed::COLUMNS);
+    let mut pairs = 0;
+    let (wrote, below) = super::seed::sky_section(&mut bytes, columns, bottom, min_x, min_z, &mut |pos, entry| {
+        pending[1].extend([pos, entry as i64]); pairs += 1;
+    });
+    queues.publish(&pending);
+    drop(pending);
+    let changed = wrote && layer.install_bytes(bytes);
+    *projection_out = if changed { projection(layer) } else { std::ptr::null_mut() };
+    *out = pairs; *out.add(1) = wrote as i32; *out.add(2) = below as i32;
     0
 }

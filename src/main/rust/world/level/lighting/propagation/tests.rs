@@ -70,6 +70,46 @@ fn reading_a_missing_section_is_rejected() {
     assert_eq!(engine.run(&tables(), &mut fake, &[], &increase, 0).err(), Some(Error::Unsupported));
 }
 
+#[test]
+fn retained_inputs_produce_the_same_layers_work_and_notifications() {
+    let layer = ([0; LAYER], true, 0);
+    let key = section_pos(0, 0, 0);
+    let mut copied = Fake { layers: Map::default(), callbacks: 0 };
+    let mut owned = Fake { layers: Map::default(), callbacks: 0 };
+    copied.layers.insert(key, layer); owned.layers.insert(key, layer);
+    let input = [block_pos(8, 8, 8), increase_from_emission(15, true) as i64,
+        block_pos(2, 2, 2), increase_from_emission(10, true) as i64];
+    let mut old = Engine::new(false); let mut new = Engine::new(false);
+    let a = old.run(&tables(), &mut copied, &[], &input, i32::MAX).unwrap();
+    let b = new.run_owned(&tables(), &mut owned,
+        [VecDeque::new(), VecDeque::from(input)], i32::MAX).unwrap();
+    assert_eq!(a.processed, b.processed);
+    assert_eq!(old.written().collect::<Vec<_>>(), new.written().collect::<Vec<_>>());
+    assert_eq!(old.affected(), new.affected());
+    assert_eq!(copied.callbacks, owned.callbacks);
+    assert_eq!(new.input_journal()[1], VecDeque::from(input));
+}
+
+#[test]
+fn a_failed_callback_preserves_inputs_and_its_separate_queue_additions() {
+    struct Failure<'a>(&'a work::Queues);
+    impl Source for Failure<'_> {
+        fn layer(&mut self, _: i64, _: &mut [u8; LAYER]) -> Result<Option<bool>, Error> {
+            self.0.data.lock().unwrap()[1].extend([99, 100]);
+            Err(Error::Callback)
+        }
+        fn blocks(&mut self, _: i64) -> Result<Blocks<'_>, Error> { unreachable!() }
+    }
+    let queues = work::Queues::default();
+    let input = [block_pos(8, 8, 8), increase_from_emission(15, true) as i64];
+    queues.data.lock().unwrap()[1].extend(input);
+    let mut engine = Engine::new(false);
+    assert_eq!(engine.run_owned(&tables(), &mut Failure(&queues), queues.take(), i32::MAX).err(), Some(Error::Callback));
+    queues.finish(engine.input_journal(), true);
+    assert_eq!(queues.data.lock().unwrap()[1], VecDeque::from([99, 100, input[0], input[1]]));
+    assert_eq!(engine.written_count(), 0);
+}
+
 
 #[test]
 fn sky_section_fills_above_sources_and_enqueues_edges() {

@@ -1,10 +1,10 @@
-# Latest Rust vs Frozen performance (2026-10-12; natived64eb03a; matched JVM)
+# Latest Rust vs Frozen performance (2026-10-12; nativeca8bf37a; matched JVM)
 
 | Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1255.50 / 1225.65 | 3.654 / 3.543 |
-| Vanilla + DH | 727.60 / 801.55 | 4.758 / 5.098 |
-| Shaders | 345.50 / 317.75 | 4.800 / 7.195 |
-| Shaders + DH | 258.80 / 226.65 | 6.787 / 9.552 |
-All20 exact6000-frame runs clean; live heap/GC/JIT controls identical; final source/native/Frozen/prompt/three input guards pass. Vanilla p99 misses3.15%, DH FPS misses9.23%; remaining floors pass. Aggregate performance FAIL; no isolated cause/gain claimed.
-Rust2707/3ignored; Java/parity2028/2skip; actual Frozen fog11778 matches. Seven lifecycles/two world/cow/rain comparisons pass,VUID0;22 accepted originals reviewed/11 identities match. Weather foreground/HUD, broad/temporal/streaming/memory acceptance and Java removal remain open. [Results](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#local-fog-policy-checkpoint).
+| Vanilla | 1286.70 / 1222.20 | 3.597 / 3.564 |
+| Vanilla + DH | 784.95 / 836.05 | 3.251 / 4.907 |
+| Shaders | 341.00 / 305.65 | 4.986 / 8.140 |
+| Shaders + DH | 246.70 / 217.60 | 7.258 / 10.453 |
+All20 exact6000-frame runs clean; live heap/GC/JIT controls identical; final source/native/class/Frozen/prompt/three input guards pass. Vanilla p99 misses0.93%, DH FPS misses6.11%; remaining floors pass. Aggregate performance FAIL; no isolated whole-game gain claimed.
+Rust2711/3ignored; Java2029/2skip; actual Frozen lighting492 passes/437089 state rows match. Seven lifecycles/two settled pairs/matching six-column flights pass,VUID0;17 originals reviewed. Hazy lifecycle views do not accept world entry; broad/temporal/streaming/memory acceptance and Java removal remain open. [Results](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#local-light-work-checkpoint).

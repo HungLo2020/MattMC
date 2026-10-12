@@ -19,8 +19,11 @@ compatibility ownership.
 
 ## How a pass works
 
-1. Java drains both queues into native memory. Rust replays the original
-   loops in the same order: every decrease, then every increase.
+1. Producers append position/entry pairs to retained Rust pending queues.
+   Rust takes those queues directly and runs every decrease, then every
+   increase. Original inputs remain in a transaction journal until admission
+   succeeds; there is no Java drain buffer or native input copy. See
+   [work ownership and verification](RUST-LIGHT-WORK.md).
 2. One callback function supplies two separately cached snapshots per section:
    the updating `DataLayer` (a pinned native CPU owner for canonical layers;
    bytes or a lazy default for compatibility layers) and
@@ -36,19 +39,24 @@ compatibility ownership.
    mutable-array targets use a bounded compatibility export. Java then adds
    `sectionsAffectedByLightUpdates` entries.
 4. Unsupported input or a failed section callback returns before propagation
-   writes are installed. Java restores both drained queues in their original
-   order and runs the original loops, which may complete or throw. This is a
+   writes are installed. Rust restores the original inputs after any new
+   callback additions, matching the former Java refill order. Java runs the
+   compatibility loops, which may complete or throw. This is a
    boundary around propagation writes, not a rollback of earlier `checkNode`
    work or callback side effects. Invalid ABI input (`-1`), downcall failures
    and result-transfer failures throw instead of replaying in Java; see the
    [current bridge status handling](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L204-L259).
    An installation error does not roll back sections already installed.
 
-Sky seeding runs one critical downcall per section. Canonical native owners
+Canonical sky seeding runs one ordinary downcall per section and appends its
+entries directly to the retained native increase queue. Its column inputs and
+output metadata use native CPU scratch memory; the call can lock and allocate.
+Canonical native owners
 retain lazy allocation until the loop writes; allocated layers update in place.
 Compatibility arrays use the original bounded heap-access downcall. Neither
-route invokes callbacks during the downcall. Java keeps the section iteration, `getDataLayerToWrite` and the
-`enqueueIncrease` calls, in the original order. A rejected sky-seeding call
+route invokes callbacks during the downcall. Java keeps the section iteration,
+`getDataLayerToWrite` and column extraction. Compatibility seeding still exports
+bounded entry pairs for Java to enqueue. A rejected sky-seeding call
 throws; it does not use the propagation pass's Java replay path.
 
 ## Constraints when changing this code
@@ -68,8 +76,10 @@ throws; it does not use the propagation pass's Java replay path.
   `getBlockState`. A null chunk reads as bedrock and blocks outside the build
   height read as air, as in `LightEngine.getState`.
 - Rust keeps no pointers into the propagation pass's Java inputs between calls.
-  Each engine has its own Rust handle and
-  callback buffer, and the engine's thread owns the pass.
+  Each engine has its own Rust handle, callback buffer and separate pending
+  queue owner. No queue lock spans a section callback. The engine's thread
+  owns the pass; the bridge excludes nested native use of that same handle.
+  This guard does not establish general concurrent/reentrant engine semantics.
 - `-Dmattmc.lighting.javaPropagation=true` keeps the Java loops.
   `NativeLightPropagation.setEnabled` toggles this in tests.
 

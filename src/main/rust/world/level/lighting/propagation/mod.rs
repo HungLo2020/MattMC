@@ -5,11 +5,14 @@
 //! storage untouched and Java reruns the pass from the same queues.
 pub(crate) mod ffi;
 mod seed;
+mod work;
+mod work_ffi;
 #[cfg(test)]
 mod tests;
 
 use crate::content::block::{BlockRegistry, StateFlags, StateId};
 use std::collections::{HashMap, VecDeque};
+use work::WorkQueue;
 use std::sync::OnceLock;
 use std::hash::{BuildHasherDefault, Hasher};
 
@@ -254,8 +257,8 @@ pub(crate) struct Engine {
     palettes: Vec<u16>,
     words: Vec<u64>,
     full: Vec<u16>,
-    decreases: VecDeque<(i64, u64)>,
-    increases: VecDeque<(i64, u64)>,
+    decreases: WorkQueue,
+    increases: WorkQueue,
     affected: Map<()>,
     affected_order: Vec<i64>,
     lowest: i32,
@@ -277,8 +280,8 @@ impl Engine {
             palettes: Vec::new(),
             words: Vec::new(),
             full: Vec::new(),
-            decreases: VecDeque::new(),
-            increases: VecDeque::new(),
+            decreases: WorkQueue::default(),
+            increases: WorkQueue::default(),
             affected: Map::default(),
             affected_order: Vec::new(),
             lowest: i32::MAX,
@@ -310,6 +313,22 @@ impl Engine {
         for pair in increases.chunks_exact(2) {
             self.increases.push_back((pair[0], pair[1] as u64));
         }
+        self.run_work(tables, source)
+    }
+
+    pub(super) fn run_owned(&mut self, tables: &Tables, source: &mut dyn Source,
+        inputs: [VecDeque<i64>; 2], lowest: i32) -> Result<Outcome, Error> {
+        self.reset(); self.lowest = lowest;
+        let [decreases, increases] = inputs;
+        self.decreases.adopt(decreases); self.increases.adopt(increases);
+        self.run_work(tables, source)
+    }
+
+    pub(super) fn input_journal(&mut self) -> [VecDeque<i64>; 2] {
+        [self.decreases.journal(), self.increases.journal()]
+    }
+
+    fn run_work(&mut self, tables: &Tables, source: &mut dyn Source) -> Result<Outcome, Error> {
         let mut pass = Pass { engine: self, tables, source };
         let mut processed = 0i64;
         while let Some((pos, entry)) = pass.engine.decreases.pop_front() {

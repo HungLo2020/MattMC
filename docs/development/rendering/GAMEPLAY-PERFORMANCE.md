@@ -88,6 +88,56 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Local light-work checkpoint
+
+Native `ca8bf37a` retains pending light queues and consumes their inputs directly,
+with a non-copying admission journal. Canonical sky seeding appends native work
+without exporting entries for Java to enqueue again. Java keeps node checking,
+section orchestration and contextual callbacks. See
+[light-work ownership](../world/lighting/RUST-LIGHT-WORK.md).
+
+The final supported Rust suite passes 2,711 tests (three ignored); Java unit and
+parity suites pass 2,029 (two skipped). Actual unchanged Frozen agrees on 492
+light-update passes and 437,089 full-state rows. Two alternating predecessor
+JVM pairs show terrain 1.0% and nether 7.5% faster, but edits 3.1% slower. These
+warmed subsystem results do not isolate whole-game gains. The preliminary
+compilation-overlapped timings are excluded.
+
+All seven lifecycle cases and settled vanilla/Iris+DH comparisons pass, with
+VUID zero and nine exact native identities. Eleven originals were reviewed;
+the lifecycle views are heavily hazy and provide structural evidence only.
+They do not establish coherent shader world-entry visuals. Ordinary Current
+and Frozen flights cross six X chunk columns from 150.5/125/530.5 to
+55.867/125/505.150 and return; all six endpoint originals were reviewed. The
+endpoints agree closely, but do not resolve transient gaps or long memory.
+
+Twenty predeclared alternating timings use exactly 6,000 measured frames:
+two repeats per side in vanilla, shaders and combined modes, four in DH.
+Every owned live JVM has matching 1G/8G ZGC, compact headers, uncommit and tier
+thresholds verified before measurement. All runs are clean; final source,
+compiled class, native, Frozen, prompt and three prepared-input guards pass.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1286.70 / 1222.20 | 3.597 / 3.564 |
+| Vanilla + DH | 784.95 / 836.05 | 3.251 / 4.907 |
+| Shaders | 341.00 / 305.65 | 4.986 / 8.140 |
+| Shaders + DH | 246.70 / 217.60 | 7.258 / 10.453 |
+
+Aggregate performance **FAIL**: vanilla p99 misses 0.93% and DH FPS misses 6.11%;
+remaining floors pass. These settled rotating real-world scenes do not accept
+ordinary visible-minimap performance, first-turn pop-in/flicker, first shader
+world frame, sustained streaming, broad rendering or long-session memory.
+No isolated whole-game improvement is attributed to this migration.
+
+The release-profile full test attempt hit an existing test expecting a debug-only
+lightmap-cache check; the supported `suite` profile passes. The first Java parity
+attempt was terminated while capture cleanup matched unrelated Gradle wrappers;
+the subsequent sequential parity run passes. Earlier attempts remain in
+`build/native-light-work/`, alongside oracle, full-suite, runtime, predecessor
+and final integrity receipts. Generated copies were retired after clients exited,
+with retained evidence hashes verified by `retention.json`.
+
 ## Local fog-policy checkpoint
 
 Native `d64eb03a` routes built-in fog color/range calculations, shared underwater

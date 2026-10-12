@@ -27,7 +27,9 @@
 - ae7f499b3: known UUID/chunk residency and persistence admission. Remote master and clean worktree were verified after each publication.
 - Historical matrices and qualifications remain in rendering/GAMEPLAY-PERFORMANCE.md; earlier unmatched JVM results do not verify later sources.
 
-## Verified fog checkpoint (ready to publish)
+## Published fog checkpoint (1a977b9db)
+
+- Published to origin/master at 03:38 on 2026-10-12; remote master verified at this commit. The following results verify that published checkpoint, not the pending lighting changes.
 
 - Final release d64eb03a passes Rust2707/3ignored and Java/parity2028/2skip. Actual unchanged Frozen fog11778 matches with source/class/native guards.
 - Initial c17ef718 replay exposed989 negative/oversized air-color packing mismatches. Corrected per-channel masks and added a regression; earlier failed recordings/setup failures remain in build/native-fog/.
@@ -39,9 +41,18 @@
 - Inclusive frame-begin~0.0091/0.0104ms vanilla/DH, shader-environment~0.0055/0.0064ms, mesh-expand~0.100/0.111ms, GPU~0.516/1.164ms. Do not sum inclusive scopes or infer a cause without controls.
 - Guide: rendering/RUST-FOG-POLICY.md. Receipts: build/native-fog/{frozen-policy-v4,candidate,current-phase-costs.json}; full-suite/build logs beside them.
 
+## Verified light-work checkpoint
+
+- Nativeca8bf37a owns pending propagation queues, journals inputs without copying and seeds canonical sky work directly. Java retains node checks, section orchestration and callbacks.
+- Frozen492 passes/437089 rows, full Rust2711/3ignored and Java2029/2skip pass. Predecessor pairs: terrain1.0%/nether7.5% faster, edits3.1% slower; the edit cost needs further producer/consumer work.
+- Seven lifecycle/two settled pairs and matching six-column flights pass,VUID0;17 originals reviewed/9 identities match. Hazy lifecycle views do not establish world-entry parity; endpoints do not resolve transient gaps.
+- All20 matched6000-frame timings clean; final source/native/class/Frozen/prompt/3input guards pass; no clients remain. Current/Frozen FPS:1286.70/1222.20,784.95/836.05,341.00/305.65,246.70/217.60. P99ms:3.597/3.564,3.251/4.907,4.986/8.140,7.258/10.453.
+- Aggregate FAIL: vanilla p99 misses0.93%, DH FPS6.11%; other floors pass. No isolated whole-game gain claimed. Guide: world/lighting/RUST-LIGHT-WORK.md; receipts: build/native-light-work/.
+- Release full-test debug-only cache assertion and capture-terminated Java parity attempt retained; supported Rust suite and sequential Java parity pass. Run Java suites separately from capture cleanup.
+
 ## Next work and open acceptance
 
-- Close this verified batch and push before expanding implementation. Continue live world-state and frame producers/consumers together; remove Java packing followed by Rust reconstruction.
+- Continue migrating node/world-state producers with consumers; avoid Java packing followed by Rust reconstruction. Native work queues now replace that transfer in light propagation. Close and publish verified increments before starting another implementation batch.
 - Investigate measured native expansion/batching and remaining producer costs; small fog preparation times do not by themselves explain the DH gap.
 - First shader world frame, first-turn nearby regular-terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations.

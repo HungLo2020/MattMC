@@ -88,6 +88,16 @@ public class DataLayer {
         return true;
     }
 
+    /** Seeds the canonical native work owner without exporting entry pairs. */
+    public boolean seedNativeSkyLightQueued(java.lang.foreign.MemorySegment columns, int bottom, int minX, int minZ,
+            net.minecraft.world.level.lighting.NativeLightQueues queues, java.lang.foreign.MemorySegment output) {
+        if (this.nativeLayer == null) return false;
+        var view = this.nativeLayer.view();
+        if (!view.allocated() && (view.rawDefault() < 0 || view.rawDefault() > 15)) return false;
+        this.nativeLayer.seedSkyQueued(columns, bottom, minX, minZ, queues, output);
+        return true;
+    }
+
 	// Compatibility array projection. Native consumers use the leased CPU view.
 	@Nullable
 	public byte[] dataForNativeLight() {

@@ -1,6 +1,5 @@
 package net.minecraft.world.level.lighting;
 
-import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -10,6 +9,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.ref.Cleaner;
+import java.lang.ref.Reference;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.NativeLibraryLoader;
@@ -31,9 +31,9 @@ final class NativeLightPropagation {
         FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_engine_release",
         FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
-    private static final MethodHandle RUN = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_run",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final MethodHandle RUN = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_run_owned",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle RESULTS = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_result_keys",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
@@ -90,11 +90,18 @@ final class NativeLightPropagation {
         private final byte[] scratch = new byte[2048];
         private final long[] entries = new long[8192];
         private final int[] out = new int[3];
+        private final Arena arena = Arena.ofAuto();
+        private final MemorySegment nativeColumns = arena.allocate(1280 * 4L, 4);
+        private final MemorySegment nativeOut = arena.allocate(3 * 4L, 4);
 
         /** One section: writes the layer like the original's {@code set} calls
          * and enqueues the same increases in the same order. Returns whether a
          * source lies below the section (the original's loop condition). */
         boolean section(SkyLightEngine engine, DataLayer layer, int bottom, int minX, int minZ) {
+            if (engine.getClass() == SkyLightEngine.class && layer.getClass() == DataLayer.class
+                    && layer.seedNativeSkyLightQueued(this.nativeColumns, bottom, minX, minZ, engine.lightWork, this.nativeOut)) {
+                return this.nativeOut.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
+            }
             if (layer.getClass() == DataLayer.class
                     && layer.seedNativeSkyLight(this.columns, bottom, minX, minZ, this.entries, this.out)) {
                 for (int i = 0; i < this.out[0]; i++) engine.enqueueIncrease(this.entries[2 * i], this.entries[2 * i + 1]);
@@ -137,6 +144,7 @@ final class NativeLightPropagation {
                 columns[1024 + i] = s == 15 ? east.getLowestSourceY(0, r) : center.getLowestSourceY(s + 1, r);
             }
         }
+        MemorySegment.copy(columns, 0, seed.nativeColumns, ValueLayout.JAVA_INT, 0, columns.length);
         SEEDED.incrementAndGet();
         return seed;
     }
@@ -149,8 +157,7 @@ final class NativeLightPropagation {
     @Nullable private byte[] compatibilityResult;
     private final Arena arena = Arena.ofAuto();
     private final MemorySegment out = arena.allocate(3 * 8L, 8);
-    private MemorySegment decreases = arena.allocate(512 * 8L, 8);
-    private MemorySegment increases = arena.allocate(512 * 8L, 8);
+    private boolean running;
 
     private NativeLightPropagation(long handle, boolean sky, LightEngine<?, ?> engine) {
         this.handle = handle;
@@ -188,45 +195,38 @@ final class NativeLightPropagation {
         }
     }
 
-    private MemorySegment drain(LongArrayFIFOQueue queue, MemorySegment into) {
-        int size = queue.size();
-        if (into.byteSize() < size * 8L) into = this.arena.allocate(Math.max(size, (int)(into.byteSize() / 4)) * 8L, 8);
-        for (int i = 0; i < size; i++) into.setAtIndex(ValueLayout.JAVA_LONG, i, queue.dequeueLong());
-        return into;
-    }
-
-    private static void refill(LongArrayFIFOQueue queue, MemorySegment from, int size) {
-        for (int i = 0; i < size; i++) queue.enqueue(from.getAtIndex(ValueLayout.JAVA_LONG, i));
-    }
-
     /** {@code propagateDecreases() + propagateIncreases()}, or -1 with the
      * queues and storage unchanged for the Java propagation. */
-    int run(LayerLightSectionStorage<?> storage, LongArrayFIFOQueue decreaseQueue, LongArrayFIFOQueue increaseQueue) {
-        if (!enabled || Tables.HANDLE == 0) return -1;
-        if (decreaseQueue.isEmpty() && increaseQueue.isEmpty()) return 0;
+    int run(LayerLightSectionStorage<?> storage, NativeLightQueues queues) {
+        if (this.running || !enabled || Tables.HANDLE == 0) return -1;
+        if (queues.isEmpty(0) && queues.isEmpty(1)) return 0;
         if (storage.getClass() != (this.sky ? SkyLightSectionStorage.class : BlockLightSectionStorage.class)) return -1;
-        int decreaseCount = decreaseQueue.size(), increaseCount = increaseQueue.size();
-        this.decreases = drain(decreaseQueue, this.decreases);
-        this.increases = drain(increaseQueue, this.increases);
+        NativeLightPropagation previous = CURRENT.get();
+        this.running = true;
+        CURRENT.set(this);
+        try { return runPass(storage, queues); }
+        finally {
+            this.running = false;
+            this.borrowedLayer = null;
+            if (previous == null) CURRENT.remove(); else CURRENT.set(previous);
+            Reference.reachabilityFence(queues);
+            Reference.reachabilityFence(this);
+        }
+    }
+
+    private int runPass(LayerLightSectionStorage<?> storage, NativeLightQueues queues) {
         int lowest = this.sky ? ((SkyLightSectionStorage)storage).getBottomSectionY() : Integer.MAX_VALUE;
         int status;
-        CURRENT.set(this);
         try {
-            status = (int)RUN.invokeExact(this.handle, Tables.HANDLE, this.decreases, decreaseCount, this.increases, increaseCount, lowest,
-                SECTION, this.out);
+            status = (int)RUN.invokeExact(this.handle, Tables.HANDLE, queues.ownerForNativeCall(), lowest, SECTION, this.out);
         } catch (RuntimeException | Error error) {
             throw error;
         } catch (Throwable error) {
             throw new IllegalStateException("Native light propagation failed", error);
-        } finally {
-            this.borrowedLayer = null;
-            CURRENT.remove();
         }
         if (status != 0) {
             if (status == -1) throw new IllegalStateException("Native light propagation rejected its input");
-            // Unsupported input or a failed callback: Java reruns the pass from the same queues.
-            refill(decreaseQueue, this.decreases, decreaseCount);
-            refill(increaseQueue, this.increases, increaseCount);
+            // Rust restores original inputs after any callback additions before replay.
             REJECTED.incrementAndGet();
             return -1;
         }
