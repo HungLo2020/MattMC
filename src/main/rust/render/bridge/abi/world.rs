@@ -288,6 +288,11 @@ pub struct FfiWorldBackgroundRequest {
     pub sky_end_flash_x_angle: f32,
     pub sky_end_flash_y_angle: f32,
     pub sky_color_argb: u32,
+    /// 1 when decoding expands the published star field (see
+    /// `bridge/world/stars.rs`) under `sky_star_transform`, the sky rotation
+    /// JOML stores column-major, instead of Java sending star quads.
+    pub sky_native_stars: u32,
+    pub sky_star_transform: [f32; 16],
 }
 
 /// Coarse, backend-neutral world and camera semantics for a future

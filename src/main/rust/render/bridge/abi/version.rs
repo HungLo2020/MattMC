@@ -134,7 +134,8 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v78 adds a retained identity manifest to incremental raw GUI image updates.
 /// v79 appends a bounded native CPU terrain-selection reference.
 /// v80 adds immutable GUI item template instances and source-layer foil facts.
-pub const FFI_ABI_VERSION: u32 = 80;
+/// v81 appends a native star field flag and sky rotation to the world background.
+pub const FFI_ABI_VERSION: u32 = 81;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

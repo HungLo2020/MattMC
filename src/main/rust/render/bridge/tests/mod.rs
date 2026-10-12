@@ -2123,6 +2123,8 @@ fn whole_frame_request(
             sky_end_flash_x_angle: 0.0,
             sky_end_flash_y_angle: 0.0,
             sky_color_argb: 0,
+            sky_native_stars: 0,
+            sky_star_transform: [0.0; 16],
         },
         world_segments: FfiSlice {
             ptr: segments.as_ptr(),

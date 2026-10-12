@@ -555,7 +555,14 @@ public final class RustGalGuiRawImageAssets {
 			// Dynamic textures and animated sprites create immutable snapshots.
 			// Some producers refresh those snapshots without changing a pixel; do
 			// not turn that into a new whole-cache native upload every frame.
-			if (STAGED_ASSETS.get(asset.assetId()) == asset || samePayload(staged, asset)) return;
+			if (staged == asset) return;
+			if (samePayload(staged, asset)) {
+				// Remember the equal snapshot so its later stages (the minimap
+				// mask restages the map image every frame) take the identity
+				// fast path instead of comparing every pixel again.
+				STAGED_ASSETS.put(asset.assetId(), asset);
+				return;
+			}
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 				RustGalFrameCoordinator.auditMessage("Rust GUI raw image changed identity=" + asset.identity
 					+ " asset_id=" + asset.assetId + " extent=" + asset.width + "x" + asset.height

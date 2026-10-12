@@ -15,8 +15,21 @@ public final class NativeDhIdMap {
         return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_id_map_" + name, signature);
     }
     private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.ADDRESS));
-    private static final MethodHandle ADD = handle("add", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    /** Critical: reads the serial texts straight from Java arrays, copying them only for a new entry. */
+    private static final MethodHandle ADD = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_id_map_add",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT), Linker.Option.critical(true));
+    /** Serial texts as UTF-16 arrays: block-state and biome strings are few and long-lived. */
+    private static final java.util.concurrent.ConcurrentHashMap<String, char[]> SERIAL_CHARS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static char[] serialChars(String serial) {
+        char[] chars = SERIAL_CHARS.get(serial);
+        if (chars == null) {
+            if (SERIAL_CHARS.size() >= 1 << 16) SERIAL_CHARS.clear();
+            chars = serial.toCharArray();
+            SERIAL_CHARS.put(serial, chars);
+        }
+        return chars;
+    }
     private static final MethodHandle MERGE = handle("merge", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle HASH = handle("hash", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
@@ -38,10 +51,10 @@ public final class NativeDhIdMap {
             && pair.biome.getClass() == BiomeWrapper.class && pair.blockState.getClass() == BlockStateWrapper.class;
     }
     public int add(BlockBiomeWrapperPair pair, int mode) {
-        try (var arena = Arena.ofConfined()) {
+        try {
             String biome = pair.biome.getSerialString(), state = pair.blockState.getSerialString();
-            var b = arena.allocateFrom(ValueLayout.JAVA_CHAR, biome.toCharArray());
-            var s = arena.allocateFrom(ValueLayout.JAVA_CHAR, state.toCharArray());
+            var b = MemorySegment.ofArray(serialChars(biome));
+            var s = MemorySegment.ofArray(serialChars(state));
             var wrapper = (BlockStateWrapper) pair.blockState;
             int stateId = wrapper == BlockStateWrapper.AIR ? 0 : wrapper.blockState == null ? -1 : Block.getId(wrapper.blockState);
             if (stateId >= 0 && wrapper != BlockStateWrapper.AIR && Block.stateById(stateId) != wrapper.blockState) stateId = -1;

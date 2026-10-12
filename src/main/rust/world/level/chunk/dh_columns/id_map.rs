@@ -14,26 +14,61 @@ impl std::ops::Deref for Entry { type Target = Key; fn deref(&self) -> &Key { &s
 pub struct Map {
     entries: Vec<Entry>,
     indexed: Vec<u8>,
-    lookup: HashMap<Arc<Key>, i32>,
+    /// By `lookup_key`, so a deduplicating add can find its entry without
+    /// copying the caller's text.
+    lookup: HashMap<Box<[u16]>, i32>,
     list_hash: i32,
+    scratch: Vec<u16>,
 }
 impl Default for Map {
-    fn default() -> Self { Self { entries: Vec::new(), indexed: Vec::new(), lookup: HashMap::new(), list_hash: 1 } }
+    fn default() -> Self { Self { entries: Vec::new(), indexed: Vec::new(), lookup: HashMap::new(), list_hash: 1, scratch: Vec::new() } }
+}
+/// One lookup key for a (biome, state) pair: the biome's length, then both texts.
+fn lookup_key(biome: &[u16], state: &[u16], out: &mut Vec<u16>) {
+    out.clear();
+    let length = biome.len() as u32;
+    out.extend_from_slice(&[length as u16, (length >> 16) as u16]);
+    out.extend_from_slice(biome);
+    out.extend_from_slice(state);
 }
 impl Map {
     pub(super) fn tint_biome(&self, index: usize) -> Option<&Arc<super::tint::Identity>> { self.entries.get(index)?.tint.as_ref() }
     fn new() -> Self { Self::default() }
     pub(super) fn state_ids(&self) -> impl ExactSizeIterator<Item = u32> + '_ { self.entries.iter().map(|entry| entry.state_id) }
     fn add(&mut self, entry: Entry, mode: i32) -> Result<i32, ()> {
-        if mode == 0 { if let Some(&id) = self.lookup.get(&entry.key) { return Ok(id); } }
+        let mut scratch = std::mem::take(&mut self.scratch);
+        lookup_key(&entry.biome, &entry.state, &mut scratch);
+        let result = self.add_keyed(entry, &scratch, mode);
+        self.scratch = scratch;
+        result
+    }
+    /// `add` for borrowed text: a deduplicated pair already present costs no allocation.
+    fn add_units(&mut self, biome: &[u16], state: &[u16], state_id: u32, mode: i32) -> Option<i32> {
+        let mut scratch = std::mem::take(&mut self.scratch);
+        lookup_key(biome, state, &mut scratch);
+        let found = if mode == 0 { self.lookup.get(&scratch[..]).copied() } else { None };
+        let result = match found {
+            Some(id) => Some(id),
+            None => owned(biome).zip(owned(state)).and_then(|(biome, state)| {
+                self.add_keyed(Entry { key: Arc::new(Key { biome, state }), state_id, tint: None }, &scratch, mode).ok()
+            }),
+        };
+        self.scratch = scratch;
+        result
+    }
+    fn add_keyed(&mut self, entry: Entry, lookup_key: &[u16], mode: i32) -> Result<i32, ()> {
+        if mode == 0 { if let Some(&id) = self.lookup.get(lookup_key) { return Ok(id); } }
         let id = i32::try_from(self.entries.len()).map_err(|_| ())?;
         self.entries.try_reserve(1).map_err(|_| ())?;
         self.indexed.try_reserve(1).map_err(|_| ())?;
         if mode != 2 { self.lookup.try_reserve(1).map_err(|_| ())?; }
         self.list_hash = self.list_hash.wrapping_mul(31).wrapping_add(entry.hash());
-        let key = entry.key.clone();
+        let key = if mode != 2 {
+            let mut key = Vec::new(); key.try_reserve_exact(lookup_key.len()).map_err(|_| ())?;
+            key.extend_from_slice(lookup_key); Some(key.into_boxed_slice())
+        } else { None };
         self.entries.push(entry); self.indexed.push(u8::from(mode != 2));
-        if mode != 2 { self.lookup.insert(key, id); }
+        if let Some(key) = key { self.lookup.insert(key, id); }
         Ok(id)
     }
     fn hash(&self, pos: u64) -> i32 {
@@ -48,9 +83,11 @@ impl Map {
         value
     }
 }
-unsafe fn text(pointer: *const u16, length: i32) -> Option<Box<[u16]>> {
+unsafe fn units<'a>(pointer: *const u16, length: i32) -> Option<&'a [u16]> {
     if length < 0 || length != 0 && (pointer.is_null() || pointer as usize % 2 != 0) { return None; }
-    let units = if length == 0 { &[] } else { slice::from_raw_parts(pointer, length as usize) };
+    Some(if length == 0 { &[] } else { slice::from_raw_parts(pointer, length as usize) })
+}
+fn owned(units: &[u16]) -> Option<Box<[u16]>> {
     let mut result = Vec::new(); result.try_reserve_exact(units.len()).ok()?;
     result.extend_from_slice(units); Some(result.into_boxed_slice())
 }
@@ -62,8 +99,8 @@ pub extern "C" fn mattmc_dh_id_map_create() -> *mut Map { Box::into_raw(Box::new
 pub unsafe extern "C" fn mattmc_dh_id_map_add(owner: *mut Map, biome: *const u16, biome_len: i32,
     state: *const u16, state_len: i32, state_id: u32, mode: i32) -> i32 {
     if owner.is_null() || !(0..=2).contains(&mode) { return -1; }
-    let (Some(biome), Some(state)) = (text(biome, biome_len), text(state, state_len)) else { return -2; };
-    (*owner).add(Entry { key: Arc::new(Key { biome, state }), state_id, tint: None }, mode).unwrap_or(-2)
+    let (Some(biome), Some(state)) = (units(biome, biome_len), units(state, state_len)) else { return -2; };
+    (*owner).add_units(biome, state, state_id, mode).unwrap_or(-2)
 }
 /// Returns the completed input prefix, including on allocation failure. Java
 /// publishes those bindings before reporting the failure; no stale ID escapes.

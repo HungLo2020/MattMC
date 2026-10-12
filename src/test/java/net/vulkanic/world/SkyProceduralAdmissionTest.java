@@ -95,6 +95,11 @@ class SkyProceduralAdmissionTest {
         state.starBrightness = 0.5F;
         state.rainBrightness = 1.0F;
         state.timeOfDay = 0.5F;
+        // This covers Java's star quads, used without a native star field.
+        var nativeStars = renderer.getDeclaredField("nativeStarField");
+        nativeStars.setAccessible(true);
+        int oldNativeStars = nativeStars.getInt(null);
+        nativeStars.setInt(null, -1);
         try {
             width.setInt(null, 1280);
             height.setInt(null, 720);
@@ -139,6 +144,160 @@ class SkyProceduralAdmissionTest {
                 assertEquals(RustGalWorldPrimitiveRenderer.WORLD_WINDING_CW, moon.winding());
                 assertEquals(RustGalWorldPrimitiveRenderer.CULL_BACK, moon.cullPolicy());
             }
+        } finally {
+            pending.subList(checkpoint, pending.size()).clear();
+            width.setInt(null, oldWidth);
+            height.setInt(null, oldHeight);
+            nativeStars.setInt(null, oldNativeStars);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void starFieldTableTransformsToJavasStarQuads() throws Exception {
+        var renderer = RustGalWorldPrimitiveRenderer.class;
+        var corners = (float[]) accessible(renderer.getDeclaredMethod("starCorners")).invoke(null);
+        assertEquals(780 * 12, corners.length, "the field keeps SkyRenderer's 780 stars");
+        var quads = renderer.getDeclaredField("PENDING_MATERIAL_QUADS");
+        quads.setAccessible(true);
+        var pending = (List<VulkanicGalBridge.WorldMaterialQuadRecord>) quads.get(null);
+        var emit = accessible(renderer.getDeclaredMethod("enqueueVanillaStarsLocked", SkyRenderState.class, org.joml.Matrix4f.class));
+        var width = renderer.getDeclaredField("pendingViewportWidth");
+        var height = renderer.getDeclaredField("pendingViewportHeight");
+        width.setAccessible(true);
+        height.setAccessible(true);
+        int oldWidth = width.getInt(null), oldHeight = height.getInt(null);
+        int checkpoint = pending.size();
+        var state = new SkyRenderState();
+        state.starBrightness = 0.75F;
+        var sky = new org.joml.Matrix4f().rotateY((float)-Math.PI / 2.0F).rotateX(0.37F * (float)(Math.PI * 2.0));
+        try {
+            width.setInt(null, 1280);
+            height.setInt(null, 720);
+            emit.invoke(null, state, sky);
+            var stars = pending.subList(checkpoint, pending.size());
+            assertEquals(780, stars.size());
+            // Rust's expansion: each corner through JOML transformPosition.
+            for (int star = 0; star < stars.size(); star++) {
+                var quad = stars.get(star);
+                float[] expected = new float[12];
+                for (int corner = 0; corner < 4; corner++) {
+                    int at = star * 12 + corner * 3;
+                    var position = sky.transformPosition(corners[at], corners[at + 1], corners[at + 2], new org.joml.Vector3f());
+                    expected[corner * 3] = position.x;
+                    expected[corner * 3 + 1] = position.y;
+                    expected[corner * 3 + 2] = position.z;
+                }
+                assertArrayEquals(expected, new float[]{quad.p0X(), quad.p0Y(), quad.p0Z(), quad.p1X(), quad.p1Y(), quad.p1Z(),
+                    quad.p2X(), quad.p2Y(), quad.p2Z(), quad.p3X(), quad.p3Y(), quad.p3Z()});
+                assertEquals(0xBFBFBFBF, quad.colorArgb(), "ARGB.colorFromFloat of the brightness");
+            }
+        } finally {
+            pending.subList(checkpoint, pending.size()).clear();
+            width.setInt(null, oldWidth);
+            height.setInt(null, oldHeight);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void publishedStarFieldSendsOnlyTheSkyRotation() throws Exception {
+        var renderer = RustGalWorldPrimitiveRenderer.class;
+        var nativeStars = renderer.getDeclaredField("nativeStarField");
+        var background = renderer.getDeclaredField("pendingBackground");
+        var quads = renderer.getDeclaredField("PENDING_MATERIAL_QUADS");
+        var width = renderer.getDeclaredField("pendingViewportWidth");
+        var height = renderer.getDeclaredField("pendingViewportHeight");
+        for (var field : List.of(nativeStars, background, quads, width, height)) {
+            field.setAccessible(true);
+        }
+        var pending = (List<VulkanicGalBridge.WorldMaterialQuadRecord>) quads.get(null);
+        var emit = accessible(renderer.getDeclaredMethod("enqueueVanillaCelestialQuadsLocked", SkyRenderState.class, Camera.class));
+        int oldNativeStars = nativeStars.getInt(null);
+        Object oldBackground = background.get(null);
+        int oldWidth = width.getInt(null), oldHeight = height.getInt(null);
+        int checkpoint = pending.size();
+        var state = new SkyRenderState();
+        state.starBrightness = 0.5F;
+        state.rainBrightness = 1.0F;
+        state.timeOfDay = 0.5F;
+        try {
+            width.setInt(null, 1280);
+            height.setInt(null, 720);
+            nativeStars.setInt(null, 1);
+            background.set(null, new VulkanicGalBridge.WorldBackgroundRecord(true, 0, 0, 0, 0, 1280, 720));
+            emit.invoke(null, state, new Camera());
+            assertEquals(2, pending.size() - checkpoint, "only the sun and moon remain Java quads");
+            var record = (VulkanicGalBridge.WorldBackgroundRecord) background.get(null);
+            assertTrue(record.skyNativeStars());
+            var sky = new org.joml.Matrix4f().rotateY((float)-Math.PI / 2.0F).rotateX(0.5F * (float)(Math.PI * 2.0));
+            assertArrayEquals(sky.get(new float[16]), record.skyStarTransform());
+        } finally {
+            pending.subList(checkpoint, pending.size()).clear();
+            nativeStars.setInt(null, oldNativeStars);
+            background.set(null, oldBackground);
+            width.setInt(null, oldWidth);
+            height.setInt(null, oldHeight);
+        }
+    }
+
+    private static java.lang.reflect.Method accessible(java.lang.reflect.Method method) {
+        method.setAccessible(true);
+        return method;
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void sunriseFanCopiesFrozensLocalRotationsWithoutCameraTransform() throws Exception {
+        var renderer = RustGalWorldPrimitiveRenderer.class;
+        var quads = renderer.getDeclaredField("PENDING_MATERIAL_QUADS");
+        quads.setAccessible(true);
+        var pending = (List<VulkanicGalBridge.WorldMaterialQuadRecord>) quads.get(null);
+        var emit = renderer.getDeclaredMethod("enqueueVanillaSunriseLocked", SkyRenderState.class, Camera.class);
+        emit.setAccessible(true);
+        var width = renderer.getDeclaredField("pendingViewportWidth");
+        var height = renderer.getDeclaredField("pendingViewportHeight");
+        width.setAccessible(true);
+        height.setAccessible(true);
+        int oldWidth = width.getInt(null), oldHeight = height.getInt(null);
+        int checkpoint = pending.size();
+        var state = new SkyRenderState();
+        state.isSunriseOrSunset = true;
+        state.sunAngle = 4.6F;
+        state.sunriseAndSunsetColor = net.minecraft.util.ARGB.color(180, 255, 120, 40);
+        try {
+            width.setInt(null, 1280);
+            height.setInt(null, 720);
+            emit.invoke(null, state, new Camera());
+            var fan = List.copyOf(pending.subList(checkpoint, pending.size()));
+            assertEquals(16, fan.size());
+            // SkyRenderer.renderSunriseAndSunset: a fresh PoseStack rotated
+            // X 90 and Z (sin(sunAngle) < 0 ? 180 : 0) + 90, scaled 1, 1, alpha.
+            float alpha = 180 / 255.0F;
+            var pose = new org.joml.Matrix4f()
+                .rotate(net.math.Axis.XP.rotationDegrees(90.0F))
+                .rotate(net.math.Axis.ZP.rotationDegrees(180.0F + 90.0F))
+                .scale(1.0F, 1.0F, alpha);
+            var center = pose.transformPosition(0.0F, 100.0F, 0.0F, new org.joml.Vector3f());
+            var ring = pose.transformPosition(0.0F, 120.0F, -40.0F, new org.joml.Vector3f());
+            var first = fan.getFirst();
+            assertEquals(center.x, first.p0X());
+            assertEquals(center.y, first.p0Y());
+            assertEquals(center.z, first.p0Z());
+            assertEquals(ring.x, first.p1X());
+            assertEquals(ring.y, first.p1Y());
+            assertEquals(ring.z, first.p1Z());
+            pending.subList(checkpoint, pending.size()).clear();
+            var camera = new Camera();
+            var position = Camera.class.getDeclaredMethod("setPosition", double.class, double.class, double.class);
+            var rotation = Camera.class.getDeclaredMethod("setRotation", float.class, float.class);
+            position.setAccessible(true);
+            rotation.setAccessible(true);
+            position.invoke(camera, 150.5, 101.62, 530.5);
+            rotation.invoke(camera, 105.0F, 10.0F);
+            emit.invoke(null, state, camera);
+            assertEquals(fan, pending.subList(checkpoint, pending.size()),
+                "the fan is camera-relative; the GAL view applies the camera rotation exactly once");
         } finally {
             pending.subList(checkpoint, pending.size()).clear();
             width.setInt(null, oldWidth);

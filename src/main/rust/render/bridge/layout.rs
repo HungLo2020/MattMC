@@ -952,7 +952,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 sky_end_flash_intensity,
                 sky_end_flash_x_angle,
                 sky_end_flash_y_angle,
-                sky_color_argb
+                sky_color_argb,
+                sky_native_stars,
+                sky_star_transform
             ]
         ),
         57 => layout!(57, FfiWorldCrackAssetPayload, [byte_size, stage, png_bytes]),

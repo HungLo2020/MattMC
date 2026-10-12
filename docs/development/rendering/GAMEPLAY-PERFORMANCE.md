@@ -88,6 +88,36 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Benchmark camera placement
+
+`GraphicsFrameBenchmark` snaps the player to its camera position once and then
+runs normal physics. In survival the player falls from the default
+(150.5, 100, 530.5); in the copied "New World" source it lands in water, so
+moving-camera timings there measure an underwater view on both sides. Place
+the camera at a standing spot with
+`--jvm-arg=-Dmattmc.dev.graphicsFrameBenchmark.camera{X,Y,Z}=...` (Frozen reads
+the same properties) and check the receipt's `cameraPath.initialPosition`.
+
+## Laptop real-world check
+
+Uncommitted work on `c1428dbc` (sky transform fix, Rust-owned star field, GUI
+raw-image staging and DH identity-map allocation fixes) against Frozen
+`7a4d1817`, October 11–12, on an i7-10750H / RTX 2070 laptop under memory
+pressure from other applications. Vanilla, 1280×720, render distance 10, the
+copied "New World" at its saved standing spot from sunset into night, moving
+camera, 6,000 measured frames per run, alternating sides:
+
+| Side | Average FPS | p99 ms |
+|---|---:|---:|
+| Current | 397.2 / 403.5 / 392.2 | 5.79 / 6.46 / 6.37 |
+| Frozen | 368.5 / 299.2 | 6.75 / 9.34 |
+
+An A/B on Current alone (native versus forced Java stars) gave 386/385 versus
+379/351 FPS and cut render-thread allocation from about 1,700 to 630 MB per
+6,000 frames. These are single-machine diagnostics, not the four-mode
+acceptance matrices below; DH and shaders were not measured. Receipts:
+`artifacts/performance/realworld-20261011/`.
+
 ## DH saved-point codec checkpoint
 
 Native `94d74a8b` decodes legacy/current DH point payloads and encodes the current

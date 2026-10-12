@@ -122,7 +122,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 80;
+	public static final int ABI_VERSION = 81;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -2352,6 +2352,24 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 19, worldBackground.skyEndFlashXAngle());
 		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 20, worldBackground.skyEndFlashYAngle());
 		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 21, worldBackground.skyColorArgb());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 22, worldBackground.skyNativeStars() ? 1 : 0);
+		float[] starTransform = worldBackground.skyNativeStars() ? worldBackground.skyStarTransform() : new float[16];
+		MemorySegment.copy(starTransform, 0, background, ValueLayout.JAVA_FLOAT_UNALIGNED,
+			Struct.WORLD_BACKGROUND_REQUEST.offset(23), 16);
+	}
+
+	/**
+	 * Publishes the star field's local corners (stars of four corners of three
+	 * floats) to Rust once. Returns whether Rust accepted it.
+	 */
+	public static boolean publishStarField(float[] corners) {
+		if (corners.length == 0 || corners.length % 12 != 0) {
+			throw new IllegalArgumentException("star field corners must hold whole stars");
+		}
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment segment = arena.allocateFrom(ValueLayout.JAVA_FLOAT, corners);
+			return Native.starFieldPublish(segment, corners.length / 12) == 0;
+		}
 	}
 
 	/** Writes one fixed sub-record of the whole-frame request (kept out of submitWorldFrame for C2). */
@@ -7666,8 +7684,45 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float skyEndFlashIntensity,
 		float skyEndFlashXAngle,
 		float skyEndFlashYAngle,
-		int skyColorArgb
+		int skyColorArgb,
+		boolean skyNativeStars,
+		@org.jetbrains.annotations.Nullable float[] skyStarTransform
 	) {
+		public WorldBackgroundRecord {
+			if (skyNativeStars && (skyStarTransform == null || skyStarTransform.length != 16)) {
+				throw new IllegalArgumentException("native stars require the 16-float sky rotation");
+			}
+		}
+
+		/** Without native stars: Java sends any star quads itself. */
+		public WorldBackgroundRecord(
+			boolean enabled, int skyType, int loadIntent, int storeIntent, int colorArgb, int viewportWidth, int viewportHeight,
+			boolean skyVisible, boolean skySunriseOrSunset, boolean skyDarkDisc, float skySunAngle, float skyTimeOfDay,
+			float skyRainBrightness, float skyStarBrightness, int skySunriseAndSunsetColorArgb, int skyMoonPhase,
+			float skyEndFlashIntensity, float skyEndFlashXAngle, float skyEndFlashYAngle, int skyColorArgb
+		) {
+			this(
+				enabled, skyType, loadIntent, storeIntent, colorArgb, viewportWidth, viewportHeight,
+				skyVisible, skySunriseOrSunset, skyDarkDisc, skySunAngle, skyTimeOfDay, skyRainBrightness, skyStarBrightness,
+				skySunriseAndSunsetColorArgb, skyMoonPhase, skyEndFlashIntensity, skyEndFlashXAngle, skyEndFlashYAngle, skyColorArgb,
+				false, null
+			);
+		}
+
+		/**
+		 * Asks Rust to expand its published star field (see
+		 * {@link VulkanicGalBridge#publishStarField}) under {@code skyRotation},
+		 * JOML's column-major sky matrix, in place of Java star quads.
+		 */
+		public WorldBackgroundRecord withNativeStars(float[] skyRotation) {
+			return new WorldBackgroundRecord(
+				enabled, skyType, loadIntent, storeIntent, colorArgb, viewportWidth, viewportHeight,
+				skyVisible, skySunriseOrSunset, skyDarkDisc, skySunAngle, skyTimeOfDay, skyRainBrightness, skyStarBrightness,
+				skySunriseAndSunsetColorArgb, skyMoonPhase, skyEndFlashIntensity, skyEndFlashXAngle, skyEndFlashYAngle, skyColorArgb,
+				true, skyRotation.clone()
+			);
+		}
+
 		/** Preserves the original clear-only constructor for existing routes. */
 		public WorldBackgroundRecord(
 			boolean enabled,
@@ -8500,6 +8555,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 		private static final MethodHandle MODEL_RIG_RELEASE = downcall("mattmc_vulkanic_world_model_rig_release",
 			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+		private static final MethodHandle STAR_FIELD_PUBLISH = downcall("mattmc_vulkanic_world_star_field_publish",
+			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 
 		private static final MethodHandle DH_GENERIC_GROUP_SET = downcall("mattmc_vulkanic_dh_generic_group_set",
 			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
@@ -8548,6 +8605,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) MODEL_RIG_REGISTER.invokeExact(rigId, nodes, count);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to register a Rust model rig", throwable);
+			}
+		}
+
+		static int starFieldPublish(MemorySegment corners, int count) {
+			try {
+				return (int) STAR_FIELD_PUBLISH.invokeExact(corners, count);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to publish the Rust star field", throwable);
 			}
 		}
 

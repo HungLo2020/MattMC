@@ -12,6 +12,7 @@ mod dh_generic_groups;
 mod environment;
 mod assets;
 mod background;
+mod stars;
 mod mesh_assets;
 mod entity_shadow_query;
 mod model_rigs;

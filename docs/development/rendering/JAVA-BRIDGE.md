@@ -75,9 +75,27 @@ retains the crosshair. Full renderer parity and Java removal remain open.
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** the current whole-frame ABI is **80**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **81**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
+
+## Vanilla sky semantics
+
+World material quads are camera-relative and the frame's view matrix carries
+the camera rotation, so sky geometry uses only Frozen's local `SkyRenderer`
+transforms on a fresh pose. Applying the camera translation or rotation again
+moved the sunrise/sunset fan and the End sky; [`SkyProceduralAdmissionTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/vulkanic/world/SkyProceduralAdmissionTest.java)
+pins the fan, dark disc and stars as camera-independent.
+
+ABI 81 moves the star field to Rust. `RustGalWorldPrimitiveRenderer` computes
+the 780 stars' local corners once with Frozen's arithmetic and publishes them
+(`mattmc_vulkanic_world_star_field_publish`); each night frame sets the world
+background's `sky_native_stars` and 16-float `sky_star_transform` (JOML's
+column-major sky rotation) instead of sending star quads. Decoding
+([`bridge/world/stars.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/stars.rs))
+inserts them after the sun and moon with JOML's `transformPosition` order.
+Java's own star quads remain the fallback when publishing fails;
+`-Dmattmc.dev.javaStarQuads=true` forces them for A/B checks.
 
 ## Native GUI item templates
 

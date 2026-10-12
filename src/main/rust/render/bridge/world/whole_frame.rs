@@ -1065,6 +1065,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             });
         }
     }
+    super::stars::expand_stars(&request.world_background, &background, &mut material_quads, max_material_quads)?;
     let mut decoded_dh_generic_boxes = decode_dh_generic_box_semantics(raw_dh_generic_boxes)?;
     decoded_dh_generic_boxes.extend(retained_dh_generic_boxes);
     if !raw_particles.is_empty() {

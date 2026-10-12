@@ -264,6 +264,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED = 0x54435554;
 	public static final int MATERIAL_ID_ENTITY_SHADOW = 0x5348444D;
 	public static final int MATERIAL_ID_SKY_STARS = 0x53544152;
+	/** `SkyRenderer.buildEndSky`'s vertex color. */
+	private static final int END_SKY_COLOR = -14145496;
 	public static final int MATERIAL_ID_SKY_DARK_DISC = 0x534B5944;
 	public static final int MATERIAL_ID_CELESTIAL = 0x43454C45;
 	public static final int MATERIAL_ID_GLINT_TEXTURED = 0x71E6A9B4;
@@ -3455,10 +3457,10 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static void enqueueEndSkyLocked(SkyRenderState state, Camera camera) {
-		Vec3 cameraPosition = camera.getPosition();
-		Matrix4f base = new Matrix4f()
-			.translate((float)cameraPosition.x, (float)cameraPosition.y, (float)cameraPosition.z)
-			.rotate(camera.rotation());
+		// Frame vertices are camera-relative and the frame's view matrix owns the
+		// camera rotation; Frozen draws the End sky box and flash with only their
+		// local transforms under the ModelView.
+		Matrix4f base = new Matrix4f();
 		for (int face = 0; face < 6; face++) {
 			Matrix4f faceTransform = new Matrix4f(base);
 			switch (face) {
@@ -3483,21 +3485,22 @@ public final class RustGalWorldPrimitiveRenderer {
 				CULL_NONE,
 				WORLD_TOPOLOGY_TRIANGLES,
 				WORLD_WINDING_CCW,
-				0xFFFFFFFF,
+				END_SKY_COLOR,
 				vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
 				vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
 				0.0F, 0.0F, 0.0F, 16.0F, 16.0F, 16.0F, 16.0F, 0.0F,
 				pendingViewportWidth, pendingViewportHeight,
 				MATERIAL_SOURCE_TEXTURED,
 				MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
-				0xFFFFFFFF,
+				END_SKY_COLOR,
 				LightTexture.FULL_BRIGHT
 			));
 		}
 		if (state.endFlashIntensity > 1.0E-5F && WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_END_FLASH)) {
+			// `SkyRenderer.renderEndFlash` on a fresh PoseStack.
 			Matrix4f flash = new Matrix4f(base)
-				.rotateY((180.0F - state.endFlashYAngle) * Mth.DEG_TO_RAD)
-				.rotateX((-90.0F - state.endFlashXAngle) * Mth.DEG_TO_RAD);
+				.rotate(net.math.Axis.YP.rotationDegrees(180.0F - state.endFlashYAngle))
+				.rotate(net.math.Axis.XP.rotationDegrees(-90.0F - state.endFlashXAngle));
 			appendCelestialQuadLocked(
 				flash,
 				100.0F,
@@ -3545,7 +3548,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		// Untextured sky geometry references Rust's private generated white
 		// resource. It must not depend on a Java atlas registration for it.
 		if (state.starBrightness > 0.0F) {
-			enqueueVanillaStarsLocked(state, skyTransform);
+			if (nativeStarFieldPublished()) {
+				// Rust expands its published star field after the sun and moon,
+				// as Frozen draws its static star buffer under this rotation.
+				pendingBackground = pendingBackground.withNativeStars(skyTransform.get(new float[16]));
+			} else {
+				enqueueVanillaStarsLocked(state, skyTransform);
+			}
 		}
 		if (state.isSunriseOrSunset
 			&& ARGB.alpha(state.sunriseAndSunsetColor) > 0) {
@@ -3595,13 +3604,13 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static void enqueueVanillaSunriseLocked(SkyRenderState state, Camera camera) {
 		int colorArgb = state.sunriseAndSunsetColor;
 		float alpha = ARGB.alpha(colorArgb) / 255.0F;
-		Vec3 cameraPosition = camera.getPosition();
-		float side = Mth.sin(state.sunAngle) < 0.0F ? (float)Math.PI : 0.0F;
+		// `SkyRenderer.renderSunriseAndSunset` on a fresh PoseStack: the fan's
+		// local rotations only. Frame vertices are camera-relative and the
+		// frame's view matrix owns the camera rotation.
+		float side = Mth.sin(state.sunAngle) < 0.0F ? 180.0F : 0.0F;
 		Matrix4f transform = new Matrix4f()
-			.translate((float)cameraPosition.x, (float)cameraPosition.y, (float)cameraPosition.z)
-			.rotate(camera.rotation())
-			.rotateX((float)Math.PI / 2.0F)
-			.rotateZ(side + (float)Math.PI / 2.0F)
+			.rotate(net.math.Axis.XP.rotationDegrees(90.0F))
+			.rotate(net.math.Axis.ZP.rotationDegrees(side + 90.0F))
 			.scale(1.0F, 1.0F, alpha);
 		int transparentColor = ARGB.color(0, ARGB.red(colorArgb), ARGB.green(colorArgb), ARGB.blue(colorArgb));
 		for (int index = 0; index < 16; index++) {
@@ -3637,11 +3646,22 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	/** Copies SkyRenderer's deterministic 1500-star distribution into bounded semantic quads. */
-	private static void enqueueVanillaStarsLocked(SkyRenderState state, Matrix4f skyTransform) {
+	/** 0 unknown, 1 published to Rust, -1 unavailable (Java sends star quads). */
+	private static int nativeStarField;
+	@Nullable
+	private static float[] starCorners;
+
+	/**
+	 * SkyRenderer's deterministic 1500-star distribution: each kept star's
+	 * four local corners (twelve floats), before the sky rotation.
+	 */
+	static float[] starCorners() {
+		if (starCorners != null) {
+			return starCorners;
+		}
 		RandomSource random = RandomSource.create(10842L);
-		float brightness = Mth.clamp(state.starBrightness, 0.0F, 1.0F);
-		int colorArgb = ARGB.colorFromFloat(brightness, brightness, brightness, brightness);
+		float[] corners = new float[1500 * 12];
+		int count = 0;
 		for (int index = 0; index < 1500; index++) {
 			float x = random.nextFloat() * 2.0F - 1.0F;
 			float y = random.nextFloat() * 2.0F - 1.0F;
@@ -3654,36 +3674,74 @@ public final class RustGalWorldPrimitiveRenderer {
 				Matrix3f orientation = new Matrix3f()
 					.rotateTowards(new Vector3f(direction).negate(), new Vector3f(0.0F, 1.0F, 0.0F))
 					.rotateZ(-roll);
-				Matrix4f transform = new Matrix4f(skyTransform);
-				float[] vertices = new float[12];
+				int at = count * 12;
 				Vector3f corner = new Vector3f(size, -size, 0.0F).mul(orientation).add(direction);
-				transformMaterialVertex(transform, corner.x, corner.y, corner.z, vertices, 0);
-				corner.set(size, size, 0.0F).mul(orientation).add(direction);
-				transformMaterialVertex(transform, corner.x, corner.y, corner.z, vertices, 3);
-				corner.set(-size, size, 0.0F).mul(orientation).add(direction);
-				transformMaterialVertex(transform, corner.x, corner.y, corner.z, vertices, 6);
-				corner.set(-size, -size, 0.0F).mul(orientation).add(direction);
-				transformMaterialVertex(transform, corner.x, corner.y, corner.z, vertices, 9);
-				PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
-					STRATUM_WORLD_MATERIAL,
-					MATERIAL_ID_SKY_STARS,
-					MATERIAL_TEXTURE_GENERATED_WHITE,
-					MATERIAL_MODE_TRANSLUCENT,
-					DEPTH_POLICY_TEST_NO_WRITE,
-					CULL_NONE,
-					WORLD_TOPOLOGY_TRIANGLES,
-					WORLD_WINDING_CCW,
-					colorArgb,
-					vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
-					vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
-					0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F, 0.0F, 1.0F,
-					pendingViewportWidth, pendingViewportHeight,
-					MATERIAL_SOURCE_TEXTURED,
-					MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
-					colorArgb,
-					LightTexture.FULL_BRIGHT
-				));
+				storeCorner(corner, corners, at);
+				storeCorner(corner.set(size, size, 0.0F).mul(orientation).add(direction), corners, at + 3);
+				storeCorner(corner.set(-size, size, 0.0F).mul(orientation).add(direction), corners, at + 6);
+				storeCorner(corner.set(-size, -size, 0.0F).mul(orientation).add(direction), corners, at + 9);
+				count++;
 			}
+		}
+		starCorners = Arrays.copyOf(corners, count * 12);
+		return starCorners;
+	}
+
+	private static void storeCorner(Vector3f corner, float[] corners, int at) {
+		corners[at] = corner.x;
+		corners[at + 1] = corner.y;
+		corners[at + 2] = corner.z;
+	}
+
+	/** Publishes the star field to Rust once; later frames send only its rotation. */
+	private static boolean nativeStarFieldPublished() {
+		if (nativeStarField == 0) {
+			boolean published;
+			if (Boolean.getBoolean("mattmc.dev.javaStarQuads")) {
+				// Diagnostic A/B control: keep Java's per-frame star quads.
+				published = false;
+			} else try {
+				published = VulkanicGalBridge.publishStarField(starCorners());
+			} catch (RuntimeException | LinkageError unavailable) {
+				published = false;
+			}
+			nativeStarField = published ? 1 : -1;
+			LOGGER.info(published ? "Published the {}-star field to Rust" : "Rust star field unavailable; Java sends {} star quads per frame",
+				starCorners().length / 12);
+		}
+		return nativeStarField == 1;
+	}
+
+	/** Java's star quads, for a native library without the star field. */
+	private static void enqueueVanillaStarsLocked(SkyRenderState state, Matrix4f skyTransform) {
+		float brightness = Mth.clamp(state.starBrightness, 0.0F, 1.0F);
+		int colorArgb = ARGB.colorFromFloat(brightness, brightness, brightness, brightness);
+		float[] corners = starCorners();
+		for (int at = 0; at < corners.length; at += 12) {
+			float[] vertices = new float[12];
+			transformMaterialVertex(skyTransform, corners[at], corners[at + 1], corners[at + 2], vertices, 0);
+			transformMaterialVertex(skyTransform, corners[at + 3], corners[at + 4], corners[at + 5], vertices, 3);
+			transformMaterialVertex(skyTransform, corners[at + 6], corners[at + 7], corners[at + 8], vertices, 6);
+			transformMaterialVertex(skyTransform, corners[at + 9], corners[at + 10], corners[at + 11], vertices, 9);
+			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
+				STRATUM_WORLD_MATERIAL,
+				MATERIAL_ID_SKY_STARS,
+				MATERIAL_TEXTURE_GENERATED_WHITE,
+				MATERIAL_MODE_TRANSLUCENT,
+				DEPTH_POLICY_TEST_NO_WRITE,
+				CULL_NONE,
+				WORLD_TOPOLOGY_TRIANGLES,
+				WORLD_WINDING_CCW,
+				colorArgb,
+				vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
+				vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
+				0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F, 0.0F, 1.0F,
+				pendingViewportWidth, pendingViewportHeight,
+				MATERIAL_SOURCE_TEXTURED,
+				MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
+				colorArgb,
+				LightTexture.FULL_BRIGHT
+			));
 		}
 	}
 
