@@ -220,11 +220,11 @@ public class FullDataSourceV2DTO
 		// data //
 		
 		// clear any old data so we can start fresh
-		for (int i = 0; i < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; i++)
-		{
-			@NotNull LongList array = dataSource.getColumn(i);
-			array.clear();
-			array.add(FullDataPointUtil.EMPTY_DATA_POINT);
+		if (!net.minecraft.world.level.chunk.NativeDhCodec.initialize(dataSource)) {
+			for (int i = 0; i < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; i++) {
+				@NotNull LongList array = dataSource.getColumn(i);
+				array.clear(); array.add(FullDataPointUtil.EMPTY_DATA_POINT);
+			}
 		}
 		
 		if (direction == null)
@@ -321,6 +321,8 @@ public class FullDataSourceV2DTO
 	{
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhCodec.decode(outputDataLongArray, compressedIn,
+				0, 64, 0, 64, true, VALIDATE_INPUT_DATAPOINTS)) return;
 			// read the data
 			int dataArrayLength = FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH;
 			for (int xz = 0; xz < dataArrayLength; xz++)
@@ -373,6 +375,8 @@ public class FullDataSourceV2DTO
 		
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhCodec.encode(inputDataArray, compressedOut,
+				minX, maxX, minZ, maxZ)) return;
 			// this method would be simpler if we allocated a bunch of temporary arrays,
 			// but we're trying to avoid garbage.
 			
@@ -517,6 +521,8 @@ public class FullDataSourceV2DTO
 		
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhCodec.decode(outputDataLongArray, compressedIn,
+				minX, maxX, minZ, maxZ, false, FullDataPointUtil.RUN_VALIDATION)) return;
 			// 1. column counts, preallocate
 			for (int x = minX; x < maxX; x++)
 			{

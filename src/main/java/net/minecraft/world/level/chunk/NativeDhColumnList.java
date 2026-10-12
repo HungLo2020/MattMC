@@ -75,7 +75,7 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     private Object writeReplace() { return new LongArrayList(this); }
     private MemorySegment data() { return mutable == null ? points : mutable.points(); }
     MemorySegment stagePoints() { return data(); }
-    @Override public int size() { return (int)(data().byteSize() / 8); }
+    @Override public int size() { return mutable == null ? (int)(points.byteSize() / 8) : mutable.size(); }
     @Override public long getLong(int index) {
         Objects.checkIndex(index, size());
         try { return data().getAtIndex(ValueLayout.JAVA_LONG, index); }
@@ -103,6 +103,17 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         if (mutable != null) mutable.acceptView(address, count);
     }
     /** Project a Rust table commit without restaging each native owner. */
+    MemorySegment codecOwner() { return mutable != null ? mutable.stageOwner() : sourceLease != null ? sourceLease.stageOwner() : MemorySegment.NULL; }
+    boolean codecAliases(NativeDhSource value) {
+        int count = source == value.weak ? 1 : 0;
+        if (aliases != null) for (var binding : aliases) if (binding.source == value.weak) count++;
+        return count > 1;
+    }
+    void acceptCodecView(long address, long count, boolean owned, MemorySegment replacement) {
+        if (replacement != null) detach(NativeDhMutableColumn.adoptOwner(replacement, group));
+        else if (owned && mutable == null) detach(sourceLease);
+        if (mutable != null) mutable.acceptCodecView(address, count);
+    }
     void acceptMergeView(long address, long count, boolean owned, MemorySegment replacement) {
         if (replacement != null) detach(NativeDhMutableColumn.adoptOwner(replacement, group));
         else if (owned && mutable == null) {
@@ -123,13 +134,11 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     @Override public void add(int index, long value) { ensureIndex(index); write().add(index, value); }
     @Override public long removeLong(int index) { long old = getLong(index); write().remove(index, index + 1); return old; }
     @Override public void size(int count) {
-        // Preserve the inherited invalid-size exception and its removal prefix.
-        if (count < 0) { super.size(count); return; }
         if (count != size()) write().resize(count);
     }
     @Override public void clear() {
         if (mutable == null) { if (points.byteSize() != 0) detach(new NativeDhMutableColumn(MemorySegment.NULL, 0, group)); }
-        else mutable.remove(0, size());
+        else mutable.remove(0, Math.max(0, size()));
     }
     @Override public void removeElements(int from, int to) { Objects.checkFromToIndex(from, to, size()); if (from != to) write().remove(from, to); }
     @Override public void addElements(int index, long[] array, int offset, int length) {

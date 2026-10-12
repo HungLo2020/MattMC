@@ -9,6 +9,13 @@ import net.minecraft.util.NativeLibraryLoader;
 
 /** List identity projections only; Rust retains the live primary column table. */
 public final class NativeDhSource implements AutoCloseable {
+    private static final MethodHandle CODEC_PROJECT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_codec_project",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle CLOSE_PROJECTION = handle("close_projection", FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle CLOSED_KIND = handle("closed_kind", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle CLOSED_COLUMN = handle("closed_column", FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle CLOSED_RELEASE = handle("closed_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private MemorySegment closedProjection;
     private static MethodHandle handle(String name, FunctionDescriptor type) {
         return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_" + name, type);
     }
@@ -75,7 +82,7 @@ public final class NativeDhSource implements AutoCloseable {
         int kind=kind(index);
         if(kind==0)return null;
         if(kind==2) {
-            var view=NativeDhMutableColumn.adopt(retainColumn(index),group);
+            var view=NativeDhMutableColumn.adopt(isLive() ? retainColumn(index) : retainClosedColumn(index),group);
             bindings[index]=view;view.attach(this,index);return view;
         }
         if(kind!=3)throw new IllegalStateException("Missing DH identity projection");
@@ -97,31 +104,61 @@ public final class NativeDhSource implements AutoCloseable {
         return bindings.clone();
     }
     private int kind(int index) {
-        if(!isLive())return (closedMissing[index/64]&(1L<<(index%64)))!=0?0:3;
+        if(!isLive()) {
+            if((closedMissing[index/64]&(1L<<(index%64)))!=0)return 0;
+            try{return (int)CLOSED_KIND.invokeExact(closedProjection,index);}
+            catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+            finally{Reference.reachabilityFence(this);}
+        }
         try {return (int)KIND.invokeExact(owner,index);}
         catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(this);}
     }
     public boolean isLive(){return !released.get();}
+    boolean codecWritable() {
+        if (!isLive()) return false;
+        for (var binding : bindings) {
+            if (binding != null && (!(binding instanceof NativeDhColumnList column) || column.codecAliases(this))) return false;
+        }
+        return true;
+    }
+    void projectCodec(MemorySegment scratch) throws Throwable {
+        int count = (int)CODEC_PROJECT.invokeExact(owner, scratch);
+        if (count < 0 || count > 4096) throw new IllegalStateException("Invalid DH codec projection");
+        for (int i = 0; i < count; i++) {
+            int at = i * 5;
+            int index = (int)scratch.getAtIndex(ValueLayout.JAVA_LONG, at);
+            if (!(bindings[index] instanceof NativeDhColumnList column)) continue;
+            long pointer = scratch.getAtIndex(ValueLayout.JAVA_LONG, at + 1);
+            var replacement = column.codecOwner().address() == pointer ? null : retainColumn(index);
+            column.acceptCodecView(scratch.getAtIndex(ValueLayout.JAVA_LONG, at + 2),
+                scratch.getAtIndex(ValueLayout.JAVA_LONG, at + 3), scratch.getAtIndex(ValueLayout.JAVA_LONG, at + 4) != 0, replacement);
+        }
+        Reference.reachabilityFence(this);
+    }
     @Override public void close() {
         if(!isLive())return;
         var masks=new long[128];
         try {
             if((int)MISSING.invokeExact(owner,MemorySegment.ofArray(masks))!=1)throw new IllegalStateException("Invalid DH source presence");
-            // Closed sources still expose native values. Retain unescaped
-            // vectors before table release, without constructing empty readers.
-            for(int word=0;word<64;word++) {
-                long bits=masks[64+word];
-                while(bits!=0) {
-                    int index=word*64+Long.numberOfTrailingZeros(bits);
-                    if(bindings[index]==null)getColumn(index);
-                    bits&=bits-1;
-                }
-            }
+            // Retain CPU leases in a lazy closed projection. No point
+            // copies or Java column readers are constructed during source close.
+            var pointer=(MemorySegment)CLOSE_PROJECTION.invokeExact(owner);
+            if(pointer.address()==0)throw new OutOfMemoryError("Closed DH source projection");
+            try { closedProjection=pointer.reinterpret(1,group.arena,NativeDhSource::releaseClosed); }
+            catch (RuntimeException | Error e) { releaseClosed(pointer); throw e; }
             closedMissing=java.util.Arrays.copyOf(masks,64);
             if(released.compareAndSet(false,true))release(owner);
         }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(this);}
+    }
+    private MemorySegment retainClosedColumn(int index) {
+        try{return (MemorySegment)CLOSED_COLUMN.invokeExact(closedProjection,index);}
+        catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);}
+    }
+    private static void releaseClosed(MemorySegment pointer) {
+        try{CLOSED_RELEASE.invokeExact(pointer);}catch(Throwable e){throw new IllegalStateException(e);}
     }
     /** -1 keeps custom/closed readers on the original validation sequence. */
     public int originalProducer(NativeDhColumns producer,long position,it.unimi.dsi.fastutil.bytes.ByteList generation,it.unimi.dsi.fastutil.bytes.ByteList compression){

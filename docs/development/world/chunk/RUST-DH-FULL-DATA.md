@@ -12,10 +12,13 @@ for compatibility inputs and its measurements are historical.
 At [`52664da4`](https://github.com/HungLo2020/MattMC/commit/52664da430edab005b09f64e2df29eaa79db95a1),
 `FullDataSourceV2.close()` closed the table in a `finally` path after its
 metadata-pool close. The metadata migration removes that pool registration;
-source close now materializes any unescaped native values as compatibility
-readers before releasing the table. Those readers and previously escaped ones retain independent
-leases and grouped allocations still have the separate GC lifetime described
-below. Source close does not guarantee that every column allocation is freed.
+source close now retains native column leases in a lazy closed compatibility
+owner, constructs readers only on demand and releases the live source table.
+Existing readers retain independent leases. Grouped allocations still have the
+separate GC lifetime described below; source close does not guarantee that all
+column storage is freed. See [saved-point codecs](RUST-DH-POINT-CODEC.md), which
+also move ordinary point decoding/encoding directly against the primary table.
+Compression wrappers, DTO orchestration and separate sidecars remain Java.
 
 Mutable full-data columns use Rust
 point vectors with direct CPU readers. Native producer columns detach on their
@@ -77,8 +80,9 @@ The immutable producer's earlier results belong to [DH columns](RUST-DH-COLUMNS.
 `NativeDhColumnList.size(int)` now hands positive resizing directly to Rust.
 It preserves existing points, zero-fills growth and truncates in one operation.
 Saved-source hydration through `ListUtil.clearAndSetSize` keeps list identities
-and its clear-before-resize order. Negative sizes retain the inherited Java
-removal/exception prefix. This removes per-point zero appends and repeated
+and its clear-before-resize order. Negative sizes now preserve Frozen’s invalid logical extent rather than the
+former native-list removal/exception prefix; native consumers decline that
+state. Clearing restores a valid empty list. See [point-codec verification](RUST-DH-POINT-CODEC.md). This removes per-point zero appends and repeated
 FFM view creation; it does not move compressed stream decoding out of Java.
 
 The local block-light producer batch exposed an intermittent DH RSS guard

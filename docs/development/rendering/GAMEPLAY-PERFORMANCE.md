@@ -88,6 +88,59 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## DH saved-point codec checkpoint
+
+Native `94d74a8b` decodes legacy/current DH point payloads and encodes the current
+format directly against the primary Rust column table. It also keeps closed
+source values in lazy native leases. Java retains bounded byte IO/compression,
+DTO orchestration, material resolution and sidecar codecs. See
+[saved-point ownership and verification](../world/chunk/RUST-DH-POINT-CODEC.md).
+
+Full Rust passes 2,718 tests (three ignored), Java/parity passes 2,036 (two
+skipped), and actual unchanged Frozen matches 696,830 rows across 170 cases,
+including 120 real saved blobs. The observer caught the former negative-count
+compatibility difference; the correction preserves Frozen's invalid logical
+size separately from every Rust slice. Current sentinel validation and initial
+observer-signature/setup failures remain recorded in `build/native-dh-codec/`.
+
+Two JVM runs per side over 24 real saved DTOs measure old Current/current/Frozen
+medians of 110.88/78.29/41.72 ms. This is 29.4% faster than the published Current
+predecessor and still 1.88× Frozen. Initialization, metadata, point decoding and
+close are included; contextual material resolution is omitted. Checksums and
+input guards match. This does not isolate a whole-game gain.
+
+Seven lifecycle checks and settled DH/Iris+DH comparisons pass,VUID zero.
+Eleven accepted originals and nine Current native images were reviewed. Hazy
+lifecycle views establish structural checks only. The first no-shader DH pair
+failed because required depth attachments were omitted; the corrected pair
+passes. Rejected originals and receipts are retained.
+
+All twenty predeclared alternating runs use exactly 6,000 measured frames and
+complete cleanly. Every live JVM's heap/GC/JIT controls match before measurement.
+Final source/native/class/Frozen/prompt, prepared-input and saved-corpus guards
+pass, with no clients remaining.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1340.95 / 1216.60 | 3.435 / 3.626 |
+| Vanilla + DH | 743.50 / 789.60 | 4.268 / 5.316 |
+| Shaders | 347.60 / 316.05 | 5.344 / 7.080 |
+| Shaders + DH | 261.70 / 225.95 | 6.980 / 8.950 |
+
+Aggregate performance **FAIL**: DH FPS misses 5.8%; other FPS and all p99 floors
+pass. Current DH RSS is 8.77–9.23 GiB and combined RSS is 9.89/10.40 GiB, below
+the guard. This settled rotating scene hides the minimap; it does not accept
+ordinary visible-HUD performance, first-turn gaps/flicker, shader world entry,
+broad gameplay, sustained streaming or long memory.
+
+The separate game-only allocation recording peaks at 9.54 GiB and completes
+cleanly. Sampled native-segment allocation is 971 MB versus 916 MB in the prior
+recording, with variable background work and incomplete caller attribution.
+It does not demonstrate an overall allocation reduction or retained-memory
+bound. Codec decode/encode stacks account for 134/27 MB weighted allocation;
+these samples identify further IO-boundary work, not the cause of the FPS gap.
+Receipts: `build/native-dh-codec/`.
+
 ## Block-light sources and bulk DH resize
 
 The October 12 combined native `3c8e2d3d` enumerates ordinary block-light

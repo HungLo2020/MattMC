@@ -59,17 +59,14 @@ client or benchmark checks and did not inspect untracked execution receipts.
   readers are demand-created, with independent primary leases and no point
   copy. Merge/culling projections refresh escaped readers only. Empty and null
   facts remain distinct even when neither has a Java object.
-- Source closure first retains unescaped native values for closed-source reader
-  compatibility, using missing-slot and native-slot bitsets rather than 4,096
-  Java kind queries. It materializes Java readers for previously unbound native
-  values before release; their leases can keep those allocations alive.
-  It then releases the Rust table and its primary leases immediately.
-  Retained Java column readers keep their own native leases and remain usable.
-  A closed source preserves a 512-byte presence snapshot for lazy empty/null
-  compatibility readers; this bitmap is not a bound on total retained memory.
-  There is no copied point array or live native table, but the source can now
-  retain compatibility readers and their grouped point leases.
-  Its native consumers decline to compatibility readers after closure.
+- Source closure now retains column leases in one native closed compatibility
+  owner, then releases the live table. It constructs no Java readers for
+  unescaped values. Later closed-source reads create independent leases on
+  demand; escaped readers remain usable and writable. A presence bitmap
+  preserves closed-source null/empty replacement. This is not a bound on total
+  retained memory: the closed source and grouped reader arenas can retain point
+  allocations until collection. No point array is copied. See
+  [saved-point codecs](RUST-DH-POINT-CODEC.md) for current verification.
 - Reference counts protect allocation lifetime, including arena cleanup on
   another thread. They do **not** permit simultaneous point reads and writes.
   Keep DH's existing caller exclusion throughout native calls, mutation, source
@@ -86,7 +83,9 @@ client or benchmark checks and did not inspect untracked execution receipts.
   private; internal structural writes must use this method.
   `columnReferences()` explicitly copies references for compatibility helpers;
   editing that returned array cannot replace source slots. Its lists remain live.
-  Persistence accesses columns directly without cloning the reference array.
+  Ordinary point persistence now streams directly against this table through the
+  [Rust codec](RUST-DH-POINT-CODEC.md); compatibility persistence accesses columns
+  without cloning the reference array.
 
 ## Consumer and compatibility constraints
 

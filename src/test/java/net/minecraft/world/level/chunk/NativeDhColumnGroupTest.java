@@ -48,7 +48,7 @@ class NativeDhColumnGroupTest {
 	}
 
 	@Test
-	void bulkResizePreservesValuesZerosIdentityAndInheritedNegativePrefix() {
+	void bulkResizePreservesValuesZerosIdentityAndFrozenNegativeSizeState() {
 		var group = new NativeDhColumnGroup();
 		var column = NativeDhColumnList.empty(group);
 		column.add(11); column.add(12);
@@ -61,7 +61,8 @@ class NativeDhColumnGroupTest {
 		int hash = column.hashCode(); column.size(3); assertEquals(hash, column.hashCode());
 		com.seibel.distanthorizons.core.util.ListUtil.clearAndSetSize(column, 7);
 		assertEquals(LongArrayList.wrap(new long[7]), column);
-		assertThrows(IndexOutOfBoundsException.class, () -> column.size(-1));
-		assertEquals(0, column.size(), "the inherited negative resize removes its successful prefix");
+		column.size(-1);assertEquals(-1, column.size());
+		assertThrows(ArrayIndexOutOfBoundsException.class, () -> column.size(2));
+		assertEquals(-1, column.size());column.clear();assertEquals(0, column.size());
 	}
 }

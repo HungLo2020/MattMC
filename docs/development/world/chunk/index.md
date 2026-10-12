@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Rust DH saved-point codecs](RUST-DH-POINT-CODEC.md): direct primary-column
+  decoding/encoding, bounded byte IO, corruption prefixes and lazy closed readers.
+
 - [Rust DH source occlusion](RUST-DH-SOURCE-OCCLUSION.md): owner-based admission,
   detachment, ordered culling and sparse CPU reader projection.
 

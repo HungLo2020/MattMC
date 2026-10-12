@@ -3,6 +3,34 @@
 use super::mutable::{Column, Lease};
 
 enum Entry { Missing, Empty, Unsupported, Native(Lease) }
+/// Closed compatibility values retain CPU leases, without a live source table,
+/// metadata, caches or eagerly constructed Java readers.
+pub(crate) struct Closed { columns: Option<Box<[Entry]>> }
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_close_projection(source: *mut Source) -> *mut Closed {
+    let Some(source)=source.as_mut() else{return std::ptr::null_mut();};
+    let columns=source.columns.as_ref().map(|columns|columns.iter().map(|entry|match entry {
+        Entry::Missing=>Entry::Missing,Entry::Empty=>Entry::Empty,Entry::Unsupported=>Entry::Unsupported,
+        Entry::Native(lease)=>Entry::Native(Lease::retain(lease.identity() as *mut Column)),
+    }).collect());
+    Box::into_raw(Box::new(Closed { columns }))
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_closed_kind(closed: *const Closed, index: i32) -> i32 {
+    let Some(closed)=closed.as_ref() else{return -1;};if !(0..4096).contains(&index){return -1;}
+    match closed.columns.as_ref().map(|c|&c[index as usize]) {
+        Some(Entry::Missing)=>0,None|Some(Entry::Empty)=>3,Some(Entry::Unsupported)=>1,Some(Entry::Native(_))=>2,
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_closed_column(closed: *const Closed, index: i32) -> *mut Column {
+    let Some(closed)=closed.as_ref() else{return std::ptr::null_mut();};if !(0..4096).contains(&index){return std::ptr::null_mut();}
+    match closed.columns.as_ref().map(|c|&c[index as usize]) {
+        Some(Entry::Native(lease))=>Lease::retain(lease.identity() as *mut Column).into_raw(),_=>std::ptr::null_mut(),
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_closed_release(closed: *mut Closed) {if !closed.is_null(){drop(Box::from_raw(closed));}}
 pub(crate) struct Source {
     pub(super) metadata: std::sync::Arc<super::metadata::Metadata>,
     columns: Option<Box<[Entry]>>, identities: Option<Vec<usize>>, version: u64,
@@ -11,6 +39,31 @@ pub(crate) struct Source {
     readers: [u64; 64],
 }
 impl Source {
+    /// Clear-before-resize is observable on allocation failure. Immutable spans
+    /// detach without copying points that the persistence decoder will discard.
+    pub(super) unsafe fn codec_reset(&mut self, index: usize, count: usize) -> bool {
+        let mut owner = self.owner(index);
+        if owner.is_null() || !(*owner).is_owned() {
+            if count == 0 && self.column(index).is_some_and(|p| p.is_empty()) { return true; }
+            self.adopt(index, Box::new(Column::new(Vec::new())));
+            owner = self.owner(index);
+        }
+        let points = Column::points_mut(owner);
+        points.clear();
+        if points.try_reserve(count).is_err() { return false; }
+        points.resize(count, 0);
+        true
+    }
+    pub(super) unsafe fn codec_set(&mut self, index: usize, point: usize, value: u64) {
+        Column::points_mut(self.owner(index))[point] = value;
+    }
+    pub(super) unsafe fn codec_len(&self,index:usize)->i64 {
+        let owner=self.owner(index);if owner.is_null(){0}else{(*owner).logical_len()}
+    }
+    pub(super) unsafe fn codec_negative(&mut self,index:usize,count:i32) {
+        if self.owner(index).is_null(){self.adopt(index,Box::new(Column::new(Vec::new())));}
+        (*self.owner(index)).negative_size(count);
+    }
     #[inline] pub(super) fn has_reader(&self,index:usize)->bool {self.readers[index/64]&(1u64<<(index%64))!=0}
     fn mark_reader(&mut self,index:usize,present:bool) {
         let bit=1u64<<(index%64);if present{self.readers[index/64]|=bit;}else{self.readers[index/64]&=!bit;}
@@ -81,7 +134,7 @@ impl Source {
         match columns.get(index)? {
             Entry::Missing | Entry::Empty => Some(&[]),
             Entry::Unsupported => None,
-            Entry::Native(lease) => Some(lease.points()),
+            Entry::Native(lease) => if (*(lease.identity() as *const Column)).invalid_size(){None}else{Some(lease.points())},
         }
     }
     #[inline] pub(super) fn present(&self, index: usize) -> bool { self.columns.as_ref().is_none_or(|columns| !matches!(columns[index], Entry::Missing)) }

@@ -17,6 +17,9 @@ pub(super) fn identity() -> u64 {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct CopyProof { source: u64, revision: u64, mapping: [u64; 2] }
 pub(crate) struct Column {
+    // Frozen LongArrayList accepts a negative logical size on corrupt input.
+    // Keep that compatibility state separate from every actual Rust slice.
+    invalid_len: Cell<i32>,
     points: Vec<u64>,
     backing: Option<Backing>,
     references: AtomicUsize,
@@ -29,7 +32,7 @@ pub(crate) struct Column {
 impl Column {
     #[inline] pub(super) fn is_owned(&self) -> bool { self.backing.is_none() }
     pub(crate) fn new(points: Vec<u64>) -> Self {
-        Self { points, backing: None, references: AtomicUsize::new(1), hash: AtomicU64::new(0),
+        Self { invalid_len: Cell::new(0), points, backing: None, references: AtomicUsize::new(1), hash: AtomicU64::new(0),
             maximum_id: Cell::new(0),
             identity: identity(), revision: Cell::new(0), copied: Cell::new(None) }
     }
@@ -44,12 +47,16 @@ impl Column {
             None => &self.points,
         }
     }
+    pub(super) fn logical_len(&self) -> i64 { if self.invalid_len.get()<0 {self.invalid_len.get() as i64}else{self.points().len() as i64} }
+    pub(super) fn invalid_size(&self) -> bool {self.invalid_len.get()<0}
+    pub(super) fn negative_size(&self, count:i32) {debug_assert!(count<0);self.invalid_len.set(count);}
     /// All mutable point access invalidates the primary hash. Callers exclude
     /// reads/writes and must detach immutable backing before using this method.
     /// Borrow only these fields: arena cleanup may touch the atomic refcount.
     #[inline]
     pub(crate) unsafe fn points_mut<'a>(owner: *mut Self) -> &'a mut Vec<u64> {
         debug_assert!((*owner).backing.is_none());
+        (*owner).invalid_len.set(0);
         (*owner).hash.store(0,Ordering::Relaxed);
         (*owner).maximum_id.set(0);
         (*owner).copied.set(None);
@@ -183,7 +190,7 @@ pub unsafe extern "C" fn mattmc_dh_column_release(owner: *mut Column) {
 pub unsafe extern "C" fn mattmc_dh_column_view(owner: *const Column, out: *mut usize) -> i32 {
     if owner.is_null() || out.is_null() || out as usize % std::mem::align_of::<usize>() != 0 { return 0; }
     let points = (*owner).points();
-    slice::from_raw_parts_mut(out, 2).copy_from_slice(&[points.as_ptr() as usize, points.len()]);
+    slice::from_raw_parts_mut(out, 2).copy_from_slice(&[points.as_ptr() as usize, (*owner).logical_len() as usize]);
     1
 }
 
@@ -210,9 +217,11 @@ pub unsafe extern "C" fn mattmc_dh_column_add(owner: *mut Column, index: i32, va
 /// and excludes the CPU owner; no Java callback or point export is involved.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_column_resize(owner: *mut Column, count: i32) -> i32 {
-    if owner.is_null() || count < 0 { return 0; }
+    if owner.is_null() { return 0; }
+    if count>=0 && (*owner).invalid_size() {return 2;}
     if !Column::make_owned(owner) { return -1; }
     let points = Column::points_mut(owner);
+    if count<0 {points.clear();(*owner).negative_size(count);return 1;}
     let count = count as usize;
     if count > points.len() && points.try_reserve(count - points.len()).is_err() { return -1; }
     points.resize(count, 0);

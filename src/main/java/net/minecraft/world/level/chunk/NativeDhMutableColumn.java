@@ -106,9 +106,9 @@ final class NativeDhMutableColumn {
         MemorySegment view = METADATA.get();
         if ((int) VIEW.invokeExact(owner, view) != 1) throw new IllegalStateException("Invalid DH column owner");
         long count = view.getAtIndex(ValueLayout.JAVA_LONG, 1);
-        if (count < 0 || count > Integer.MAX_VALUE) throw new IllegalStateException("DH column size");
+        if (count < Integer.MIN_VALUE || count > Integer.MAX_VALUE) throw new IllegalStateException("DH column size");
         long address=view.getAtIndex(ValueLayout.JAVA_LONG,0);
-        points = MemorySegment.ofAddress(address).reinterpret(count * 8, arena, null).asReadOnly();
+        points = MemorySegment.ofAddress(address).reinterpret(Math.max(0, count) * 8, arena, null).asReadOnly();
         extentAddress=address;extentCount=(int)count;
     }
     MemorySegment points() { return points; }
@@ -116,14 +116,19 @@ final class NativeDhMutableColumn {
     void acceptView(MemorySegment address, long count) { acceptView(address.address(), count); }
     void acceptView(long address, long count) {
         if (count < 0 || count > 4096) throw new IllegalStateException("Invalid DH occlusion extent");
+        acceptCodecView(address, count);
+    }
+    void acceptCodecView(long address, long count) {
+        if (count < Integer.MIN_VALUE || count > Integer.MAX_VALUE) throw new IllegalStateException("Invalid DH codec extent");
         if (extentAddress == address && extentCount == count) return;
-        points = MemorySegment.ofAddress(address).reinterpret(count * 8, arena, null).asReadOnly();
+        points = MemorySegment.ofAddress(address).reinterpret(Math.max(0, count) * 8, arena, null).asReadOnly();
         extentAddress=address;extentCount=(int)count;
     }
     int size() { return extentCount; }
     void resize(int count) {
         try {
             int result = (int) RESIZE.invokeExact(owner, count);
+            if (result == 2) throw new ArrayIndexOutOfBoundsException(extentCount);
             if (result == -1) throw new OutOfMemoryError("Cannot resize native DH column");
             if (result != 1) throw new IndexOutOfBoundsException(count);
             refresh();
