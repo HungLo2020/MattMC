@@ -40,6 +40,7 @@ class EntityGeometryIntegrationTest {
         @Override public boolean hurtServer(ServerLevel level,DamageSource source,float damage){return false;}
         @Override public boolean shouldRender(double x,double y,double z){events.add("distance");return true;}
         void transfer(Level level){setLevel(level);}
+        void revive(){unsetRemoved();}
     }
     static class Renderer extends EntityRenderer<Fixture,EntityRenderState> {
         Renderer(){super(mock(EntityRendererProvider.Context.class));}
@@ -87,6 +88,34 @@ class EntityGeometryIntegrationTest {
         entity.setBoundingBox(new AABB(-.2,-.2,-.2,.2,.2,.2));return entity;
     }
     @BeforeAll static void bootstrap(){SharedConstants.tryDetectVersion();Bootstrap.bootStrap();}
+    @Test void removalRetiresCameraMembershipWhileRetainedEntityStaysQueryable() {
+        var entity=new Fixture();entity.events=new ArrayList<>();
+        var body=entity.nativeCullingGeometry();var world=body.world();
+        entity.setBoundingBox(new AABB(-.2,-.2,-.2,.2,.2,.2));
+        var frustum=new Frustum(new Matrix4f(),new Matrix4f());
+        assertTrue(frustum.isVisibleEntity(body));assertEquals(1,world.count());
+        var reason=Entity.RemovalReason.UNLOADED_TO_CHUNK;
+        entity.setRemoved(reason);assertTrue(entity.isRemoved());assertSame(reason,entity.getRemovalReason());
+        assertEquals(0,world.count());assertFalse(body.indexed());assertTrue(frustum.isVisibleEntity(body));
+        long revision=world.revision();
+        entity.setPosRaw(100,0,0);entity.setBoundingBox(new AABB(99,0,0,101,1,1));
+        assertEquals(revision,world.revision());assertFalse(frustum.isVisibleEntity(body));
+        entity.setRemoved(Entity.RemovalReason.KILLED);assertSame(reason,entity.getRemovalReason());
+        var next=new NativeEntityGeometry();var level=mock(Level.class);when(level.nativeEntityGeometry()).thenReturn(next);
+        entity.transfer(level);assertEquals(0,next.count());assertFalse(body.indexed());
+        entity.revive();assertFalse(entity.isRemoved());assertNull(entity.getRemovalReason());
+        assertTrue(body.indexed());assertEquals(1,next.count());assertSame(body,entity.nativeCullingGeometry());
+        assertFalse(frustum.isVisibleEntity(body));
+        entity.setRemoved(Entity.RemovalReason.DISCARDED);assertEquals(0,next.count());
+    }
+    @Test void nullRemovalKeepsOriginalFailureAndDoesNotRetireMembership() {
+        var entity=new Fixture();var body=entity.nativeCullingGeometry();
+        assertThrows(NullPointerException.class,()->entity.setRemoved(null));
+        assertFalse(entity.isRemoved());assertNull(entity.getRemovalReason());assertEquals(1,body.world().count());
+        entity.setRemoved(Entity.RemovalReason.UNLOADED_TO_CHUNK);
+        assertDoesNotThrow(()->entity.setRemoved(null));
+        assertSame(Entity.RemovalReason.UNLOADED_TO_CHUNK,entity.getRemovalReason());assertEquals(0,body.world().count());
+    }
     @Test void actualConstructionWithoutLevelStillHasPrimaryComponents() {
         var entity=new Fixture();var body=entity.nativeCullingGeometry();assertNotNull(body);
         assertEquals(1,body.world().count());var oldWorld=body.world();

@@ -14,6 +14,8 @@ pub(crate) struct View {
     chunk: [AtomicI32; 2],
     visible: AtomicI32,
     revision: AtomicU64,
+    removal: AtomicI32,
+    indexed: AtomicI32,
 }
 impl View {
     fn new(position: [f64; 3], bounds: [f64; 6]) -> Self {
@@ -27,6 +29,8 @@ impl View {
             chunk: [block[0] >> 4, block[2] >> 4].map(AtomicI32::new),
             visible: AtomicI32::new(0),
             revision: AtomicU64::new(0),
+            removal: AtomicI32::new(0),
+            indexed: AtomicI32::new(1),
         }
     }
     fn position(&self) -> [f64; 3] {
@@ -235,7 +239,7 @@ impl World {
 }
 struct Binding {
     world: Arc<World>,
-    id: u64,
+    id: Option<u64>,
     view: Arc<View>,
 }
 pub(crate) struct Body {
@@ -249,7 +253,7 @@ impl Drop for Body {
             .store
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        if store.remove(binding.id) {
+        if binding.id.is_some_and(|id| store.remove(id)) {
             binding.world.publish(&store);
         }
     }
@@ -308,7 +312,7 @@ pub unsafe extern "C" fn mattmc_entity_geometry_create(
     Box::into_raw(Box::new(Body {
         binding: Mutex::new(Binding {
             world: Arc::from_raw(world),
-            id,
+            id: Some(id),
             view,
         }),
     }))
@@ -347,7 +351,7 @@ pub unsafe extern "C" fn mattmc_entity_geometry_change(
         .store
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    if store.index(binding.id).is_none() {
+    if binding.id.is_some_and(|id| store.index(id).is_none()) {
         return -1;
     }
     let flags = match mode {
@@ -361,7 +365,7 @@ pub unsafe extern "C" fn mattmc_entity_geometry_change(
         }
         _ => return -1,
     };
-    if flags != 0 {
+    if flags != 0 && binding.id.is_some() {
         binding.world.publish(&store);
     }
     flags
@@ -378,19 +382,19 @@ pub unsafe extern "C" fn mattmc_entity_geometry_transfer(
     if std::ptr::eq(Arc::as_ptr(&binding.world), world) {
         return 0;
     }
-    let mut next = w.store.lock().unwrap_or_else(|e| e.into_inner());
-    let Some(id) = next.insert(binding.view.clone()) else {
-        return -1;
-    };
-    w.publish(&next);
-    drop(next);
-    {
+    let next_id = if let Some(old_id) = binding.id {
+        let mut next = w.store.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(id) = next.insert(binding.view.clone()) else {
+            return -1;
+        };
+        w.publish(&next);
+        drop(next);
         let mut old = binding
             .world
             .store
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        if !old.remove(binding.id) {
+        if !old.remove(old_id) {
             drop(old);
             let mut rollback = w.store.lock().unwrap_or_else(|e| e.into_inner());
             rollback.remove(id);
@@ -398,11 +402,89 @@ pub unsafe extern "C" fn mattmc_entity_geometry_transfer(
             return -1;
         }
         binding.world.publish(&old);
-    }
+        Some(id)
+    } else {
+        None
+    };
     Arc::increment_strong_count(world);
     binding.world = Arc::from_raw(world);
-    binding.id = id;
+    binding.id = next_id;
     1
+}
+
+/// Primary removal reason and immediate camera-membership retirement. Code 0
+/// is Java null; codes 1..5 are the stable RemovalReason declaration order.
+/// Mode 0 preserves the first reason; mode 1 revives the same retained view.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_entity_geometry_lifecycle(
+    body: *const Body,
+    mode: i32,
+    reason: i32,
+) -> i32 {
+    let Some(body) = body.as_ref() else { return -1 };
+    if !(0..=5).contains(&reason) || !(0..=1).contains(&mode) {
+        return -1;
+    }
+    let mut binding = body.binding.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store = binding
+        .world
+        .store
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let old = binding.view.removal.load(Ordering::Relaxed);
+    let retained = if mode == 1 {
+        0
+    } else if old == 0 {
+        reason
+    } else {
+        old
+    };
+    let id = if retained != 0 {
+        if let Some(id) = binding.id {
+            store.remove(id);
+            binding.world.publish(&store);
+        }
+        None
+    } else if binding.id.is_none() {
+        let Some(id) = store.insert(binding.view.clone()) else {
+            return -1;
+        };
+        binding.world.publish(&store);
+        Some(id)
+    } else {
+        binding.id
+    };
+    binding.view.removal.store(retained, Ordering::Release);
+    binding
+        .view
+        .indexed
+        .store(i32::from(id.is_some()), Ordering::Release);
+    drop(store);
+    binding.id = id;
+    retained
+}
+
+/// Retired entities remain readable and explicitly queryable; they do not
+/// re-enter the dense camera scan or invalidate unrelated live query results.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_entity_geometry_query_one(
+    body: *const Body,
+    matrix: *const f32,
+    length: i32,
+    x: f64,
+    y: f64,
+    z: f64,
+) -> i32 {
+    let Some(body) = body.as_ref() else { return -1 };
+    if matrix.is_null() || matrix as usize % 4 != 0 || length != 16 {
+        return -1;
+    }
+    let binding = body.binding.lock().unwrap_or_else(|e| e.into_inner());
+    i32::from(visible(
+        &binding.view,
+        &planes(&*matrix.cast::<[f32; 16]>()),
+        [x, y, z],
+    ))
 }
 
 /// JOML 1.10.5 plane extraction and positive-corner test, with the same f32

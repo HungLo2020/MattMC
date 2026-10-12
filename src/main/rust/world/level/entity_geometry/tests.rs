@@ -1,9 +1,111 @@
 use super::*;
 
 #[test]
+fn retirement_retains_primary_views_and_revives_in_the_current_world() {
+    unsafe {
+        let a = mattmc_entity_geometry_world_create();
+        let b = mattmc_entity_geometry_world_create();
+        let body = mattmc_entity_geometry_create(a, 0., 0., 0., -0.2, -0.2, -0.2, 0.2, 0.2, 0.2);
+        let view = mattmc_entity_geometry_view(body);
+        assert_eq!(mattmc_entity_geometry_lifecycle(body, 0, 5), 5);
+        assert_eq!((*a).header.count.load(Ordering::Acquire), 0);
+        let revision = (*a).header.revision.load(Ordering::Acquire);
+        assert_eq!(
+            mattmc_entity_geometry_lifecycle(body, 0, 1),
+            5,
+            "First removal reason survives repeated callbacks"
+        );
+        assert_eq!((*a).header.revision.load(Ordering::Acquire), revision);
+        assert_eq!(
+            mattmc_entity_geometry_change(body, 0, 100., 0., 0., 0., 0., 0.),
+            7
+        );
+        assert_eq!(
+            (*a).header.revision.load(Ordering::Acquire),
+            revision,
+            "Retired movement does not invalidate live queries"
+        );
+        assert_eq!(mattmc_entity_geometry_view(body), view);
+        let matrix = [
+            1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+        ];
+        assert_eq!(
+            mattmc_entity_geometry_query_one(body, matrix.as_ptr(), 16, 0., 0., 0.),
+            1,
+            "Physical bounds do not translate with position alone"
+        );
+        assert_eq!(
+            mattmc_entity_geometry_change(body, 1, 99., -0.2, -0.2, 101., 0.2, 0.2),
+            1
+        );
+        assert_eq!(
+            mattmc_entity_geometry_query_one(body, matrix.as_ptr(), 16, 0., 0., 0.),
+            0
+        );
+        assert_eq!(mattmc_entity_geometry_transfer(body, b), 1);
+        assert_eq!((*b).header.count.load(Ordering::Acquire), 0);
+        assert_eq!(mattmc_entity_geometry_lifecycle(body, 1, 0), 0);
+        assert_eq!((*b).header.count.load(Ordering::Acquire), 1);
+        assert_eq!((*view).removal.load(Ordering::Acquire), 0);
+        assert_eq!((*view).indexed.load(Ordering::Acquire), 1);
+        assert_eq!(mattmc_entity_geometry_view(body), view);
+        mattmc_entity_geometry_release(body);
+        assert_eq!((*b).header.count.load(Ordering::Acquire), 0);
+        mattmc_entity_geometry_world_release(a);
+        mattmc_entity_geometry_world_release(b);
+    }
+}
+
+#[test]
+fn retained_removed_objects_do_not_accumulate_dense_camera_slots() {
+    unsafe {
+        let world = mattmc_entity_geometry_world_create();
+        let mut bodies = Vec::new();
+        for _ in 0..10_000 {
+            let body = mattmc_entity_geometry_create(world, 0., 0., 0., 0., 0., 0., 1., 1., 1.);
+            assert_eq!(mattmc_entity_geometry_lifecycle(body, 0, 2), 2);
+            bodies.push(body);
+        }
+        assert_eq!((*world).header.count.load(Ordering::Acquire), 0);
+        {
+            let store = (*world).store.lock().unwrap();
+            assert_eq!(store.slots.len(), 1);
+            assert!(store.dense.is_empty());
+        }
+        let first = mattmc_entity_geometry_view(bodies[0]);
+        assert_eq!((*first).removal.load(Ordering::Acquire), 2);
+        assert_eq!(mattmc_entity_geometry_lifecycle(bodies[0], 1, 0), 0);
+        assert_eq!((*world).header.count.load(Ordering::Acquire), 1);
+        for body in bodies {
+            mattmc_entity_geometry_release(body);
+        }
+        assert_eq!((*world).header.count.load(Ordering::Acquire), 0);
+        mattmc_entity_geometry_world_release(world);
+    }
+}
+
+#[test]
+fn null_reason_and_invalid_transitions_preserve_membership() {
+    unsafe {
+        let world = mattmc_entity_geometry_world_create();
+        let body = mattmc_entity_geometry_create(world, 0., 0., 0., 0., 0., 0., 1., 1., 1.);
+        let revision = (*world).header.revision.load(Ordering::Acquire);
+        assert_eq!(mattmc_entity_geometry_lifecycle(body, 0, 0), 0);
+        assert_eq!(mattmc_entity_geometry_lifecycle(body, 0, 6), -1);
+        assert_eq!(mattmc_entity_geometry_lifecycle(body, 2, 0), -1);
+        assert_eq!((*world).header.count.load(Ordering::Acquire), 1);
+        assert_eq!((*world).header.revision.load(Ordering::Acquire), revision);
+        mattmc_entity_geometry_release(body);
+        mattmc_entity_geometry_world_release(world);
+    }
+}
+
+#[test]
 fn java_cpu_view_layout_is_stable() {
     use std::mem::{offset_of, size_of};
-    assert_eq!(size_of::<View>(), 152);
+    assert_eq!(size_of::<View>(), 160);
+    assert_eq!(offset_of!(View, removal), 152);
+    assert_eq!(offset_of!(View, indexed), 156);
     assert_eq!(offset_of!(View, culling), 72);
     assert_eq!(offset_of!(View, block), 120);
     assert_eq!(offset_of!(View, chunk), 132);

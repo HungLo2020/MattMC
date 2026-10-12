@@ -104,9 +104,11 @@ arbitrary overlapping reloads.
 
 ## Performance
 
-The [verification driver](VERIFICATION.md#models) gates measured model reload
-time against Frozen; semantic comparison uses the last-Java Reference.
-Reported timings are not a new benchmark run for this documentation update.
+The [verification driver](VERIFICATION.md#models) defaults to the historical
+last-Java Reference for semantic comparison and Frozen for timing. For the
+migration goal, use unchanged Frozen for both roles as shown below. The
+combined `9f372451` results below are fresh measurements; earlier reports
+retain their original source and protocol identities.
 The important performance constraints are:
 
 - Generated items over large sprites (TACZ's 929×929 gun textures) dominate
@@ -120,7 +122,9 @@ The important performance constraints are:
 ## Working on it
 
 ```sh
-(cd src/main/rust && cargo test --lib -- assets::models core::dfu core::json)
+(cd src/main/rust && cargo test --lib assets::models)
+(cd src/main/rust && cargo test --lib core::dfu)
+(cd src/main/rust && cargo test --lib core::json)
 python3 DevUtils/tests/models/VerifyModels.py --output build/model-verification
 ```
 
@@ -132,3 +136,54 @@ Run it on both trees and diff the details to find a mismatch.
 means an item tree asks for a model its `resolveDependencies` did not
 report. `IllegalStateException` from `NativeResolvedModel.bakeTopGeometry`
 carries the geometry failure Rust recorded.
+
+## Frozen comparison for the migration goal
+
+Use unchanged Frozen for both baseline roles. Repeated invalid-fixture exceptions
+can trigger JVM fast-throw message elision: one observed Frozen run emitted 200
+helpful NPE messages and 1,132 bare NPEs, while Current emitted all 1,332 details.
+The complete model records matched. Retain exception details with the same JVM
+control on every side, rather than dropping warning comparisons:
+
+```sh
+python3 DevUtils/tests/models/VerifyModels.py \
+  --reference ../MattMC_JavaPerfTesting/MattMC \
+  --frozen-repo ../MattMC_JavaPerfTesting/MattMC \
+  --output build/models-frozen-details --max-ratio 1.0 --pairs 5 --iterations 5 \
+  --jvm-arg=-XX:-OmitStackTraceInFastThrow
+```
+
+This is a diagnostic protocol for the fixture reloads; it changes no Frozen
+source. Record the JVM arguments with timings. Ordinary gameplay comparisons
+keep their existing production JVM controls. The separate Java pipeline is a
+historical diagnostic, not this goal's correctness baseline.
+
+## Diagnose model-only reload cost
+
+Use a completed identical-record Frozen corpus with the paired CPU profiler:
+
+```sh
+python3 DevUtils/tests/models/ProfileModels.py \
+  --verification build/models-frozen-details --output build/models-cpu-profile \
+  --java-home /path/to/jdk25 --profiler /path/to/asprof
+```
+
+It samples fifteen seconds after twenty warm model-only reloads with atlases
+precomputed, records source/native/process guards and waits for each owned
+process to finish. These profiled runs do not replace the timing gate.
+
+The integrated `a48b6a65` corpus matches all 67,433 record lines and 4,351
+warnings under matched NPE-detail controls. Model-only cost misses the strict
+Frozen floor (83.237/71.367 ms), while full atlas/model reload passes
+(129.458/134.165 ms). Paired profiles pass their guards; Current includes 1,486
+of 26,984 samples in repeated generated-item transparency reads. The bounded
+Rust alpha mask passes a fresh five-round comparison: all records/warnings
+match, model-only 76.915/79.069 ms and full reload 128.454/135.543 ms pass
+the strict aggregate floors. Three individual model-only paired ratios exceed
+1.0; keep them. Frozen's median moved from 71.367 to 79.069 ms, so these
+separate runs do not isolate a speedup. Invalid frames retain per-access errors
+and first-seen span order remains unchanged. Seven client lifecycles, two reviewed world pairs and four GUI pairs/eight
+original reviews pass on combined native `9f372451`, with zero VUIDs.
+The fresh twenty-run gameplay matrix passes every FPS/p99 floor; see the
+[current matrix](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+for controls and limits. Receipts: `build/native-entity-lifecycle-model-integration/`.

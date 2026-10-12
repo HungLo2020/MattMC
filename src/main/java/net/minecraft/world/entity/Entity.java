@@ -225,8 +225,7 @@ public abstract class Entity
 	public boolean minorHorizontalCollision;
 	public boolean hurtMarked;
 	protected Vec3 stuckSpeedMultiplier = Vec3.ZERO;
-	@Nullable
-	private Entity.RemovalReason removalReason;
+	private static final Entity.RemovalReason[] REMOVAL_REASONS = Entity.RemovalReason.values();
 	public static final float DEFAULT_BB_WIDTH = 0.6F;
 	public static final float DEFAULT_BB_HEIGHT = 1.8F;
 	public float moveDist;
@@ -1898,7 +1897,7 @@ public abstract class Entity
 	}
 
 	public boolean saveAsPassenger(ValueOutput valueOutput) {
-		if (this.removalReason != null && !this.removalReason.shouldSave()) {
+		if (this.removalReason() != null && !this.removalReason().shouldSave()) {
 			return false;
 		} else {
 			String string = this.getEncodeId();
@@ -2855,7 +2854,7 @@ public abstract class Entity
 
 	public String toString() {
 		String string = this.level() == null ? "~NULL~" : this.level().toString();
-		return this.removalReason != null
+		return this.removalReason() != null
 			? String.format(
 				Locale.ROOT,
 				"%s['%s'/%d, l='%s', x=%.2f, y=%.2f, z=%.2f, removed=%s]",
@@ -2866,7 +2865,7 @@ public abstract class Entity
 				this.getX(),
 				this.getY(),
 				this.getZ(),
-				this.removalReason
+				this.removalReason()
 			)
 			: String.format(
 				Locale.ROOT,
@@ -3835,21 +3834,35 @@ public abstract class Entity
 
 	@Override
 	public final boolean isRemoved() {
-		return this.removalReason != null;
+		return this.nativeGeometry != null && this.nativeGeometry.removalReasonCode() != 0;
+	}
+
+	/** Internal reads preserve private-field semantics even when getRemovalReason is overridden. */
+	@Nullable
+	private Entity.RemovalReason removalReason() {
+		int code = this.nativeGeometry == null ? 0 : this.nativeGeometry.removalReasonCode();
+		return code == 0 ? null : REMOVAL_REASONS[code - 1];
+	}
+
+	private NativeEntityGeometry.Body lifecycleGeometry() {
+		if (this.nativeGeometry == null) {
+			// Construction-bypassing compatibility objects still acquire a Rust owner.
+			Vec3 pos = this.position == null ? Vec3.ZERO : this.position;
+			this.nativeGeometry = new NativeEntityGeometry().create(pos.x, pos.y, pos.z, this.bb == null ? INITIAL_AABB : this.bb);
+		}
+		return this.nativeGeometry;
 	}
 
 	@Nullable
 	public Entity.RemovalReason getRemovalReason() {
-		return this.removalReason;
+		return this.removalReason();
 	}
 
 	@Override
 	public final void setRemoved(Entity.RemovalReason removalReason) {
-		if (this.removalReason == null) {
-			this.removalReason = removalReason;
-		}
+		this.lifecycleGeometry().remove(removalReason == null ? 0 : removalReason.ordinal() + 1);
 
-		if (this.removalReason.shouldDestroy()) {
+		if (this.removalReason().shouldDestroy()) {
 			this.stopRiding();
 		}
 
@@ -3859,7 +3872,7 @@ public abstract class Entity
 	}
 
 	protected void unsetRemoved() {
-		this.removalReason = null;
+		if (this.nativeGeometry != null) this.nativeGeometry.revive();
 	}
 
 	@Override
@@ -3869,7 +3882,7 @@ public abstract class Entity
 
 	@Override
 	public boolean shouldBeSaved() {
-		if (this.removalReason != null && !this.removalReason.shouldSave()) {
+		if (this.removalReason() != null && !this.removalReason().shouldSave()) {
 			return false;
 		} else {
 			return this.isPassenger() ? false : !this.isVehicle() || !this.hasExactlyOnePlayerPassenger();

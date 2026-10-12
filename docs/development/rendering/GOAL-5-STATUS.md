@@ -2,50 +2,60 @@
 
 **Goal 5 remains incomplete.**
 
-## October 11 implementation checkpoint
+## October 11 integrated lifecycle/model checkpoint
 
-Source [`f92ea29d`](https://github.com/HungLo2020/MattMC/commit/f92ea29dde0199a9ea65006e216ac92570b3b02b), published above `6673fac82`, moves retained client chunk-range
-selection, primary entity geometry/camera queries, ticking membership/order,
-ordinary 3D GUI templates and immutable tag-member storage into Rust.
-Java still binds objects, invokes simulation/render callbacks and performs
-unmigrated behavior, networking and startup. The Rust executable is unfinished.
-See the [range](../world/chunk-loading/RUST-CLIENT-RANGES.md),
-[geometry](../world/entities/RUST-ENTITY-GEOMETRY.md),
-[ticking](../world/entities/RUST-ENTITY-ORDER.md),
-[GUI](RUST-GUI-ITEM-TEMPLATES.md) and
-[tag](../resources/TAGS-AND-REGISTRIES.md) guides.
+Native `9f372451` combines upstream Rust atlas/model baking `71762d602`
+with Rust-owned entity removal state, immediate camera-slot retirement and
+profile-backed bounded generated-item alpha masks. Retained entities stay
+readable and queryable; revival and world transfer preserve the primary view.
+See the [entity guide](../world/entities/RUST-ENTITY-GEOMETRY.md) and
+[model guide](../resources/MODELS.md) for ownership and verification controls.
+Java still owns tracking/section admission, behavior, simulation orchestration,
+networking and startup; the Rust executable remains unfinished.
 
-The implementation author reports native `c487f375` passing combined suites: 2,656 Rust tests with three
-ignored and 2,003 executed Java/parity cases with two skipped, zero failures.
-Actual unchanged Frozen comparisons pass 11,057 geometry cases, 645 range
-cases and 4,143 ticking-order cases. The latter expanded corpus exposed a
-pre-getter map-receiver regression in rejected `a9745542`; the repair preserves
-both physical map identities across getter-driven swaps. Failed evidence remains
-recorded in the ticking guide.
+Fresh suites pass 2,680 Rust tests (three ignored) and 2,005 executed
+Java/parity cases (two skipped). Actual unchanged Frozen geometry/removal,
+ticking and range comparisons pass 11,489/4,143/645 cases. The model comparison
+matches 67,433 record lines and 4,351 warnings; its model-only/full-reload
+aggregate timing floors pass under matched diagnostic NPE controls. Three
+individual model-only pairs are slower; no isolated speedup is proved.
+Seven live lifecycle cases, two settled world pairs and four GUI pairs pass
+with zero VUIDs. All twelve original images were reviewed; thirteen Current
+runtime artifacts identify the combined native image. All twenty alternating
+gameplay runs are clean and pass every average-FPS/p99 floor, with final
+source/native/Frozen/prompt/prepared-input guards. See the
+[current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+for exact values and workload limits. No isolated speedup or prior-tail cause
+is proved. The earlier `543a592f` matrix remains historical.
 
-The same author record reports seven live lifecycle cases and two settled world image pairs passing with zero
-VUIDs. All four original images were reviewed and nine Current artifacts identify
-this native image. All 20 alternating timing runs are clean and final identity/input guards pass.
-All median average-FPS floors and three p99 floors pass; vanilla p99 misses by
-4.8% (3.410/3.253 ms Current/Frozen). The complete matrix and limits are in
-[gameplay performance](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
-Receipts: `build/native-entity-order-receiver-fix/` and
-`build/native-entity-order/receiver-fixed-replay/`.
+First shader-world-frame, first-turn nearby terrain, temporal, broad-gameplay,
+sustained-streaming and long-session memory acceptance remain open. Receipts:
+`build/native-entity-lifecycle-model-integration/`. Continue migrating live
+world producers and consumers after publishing this bounded batch.
 
-Preceding `a99b6f8d` separately passes four GUI pairs/eight original reviews
+## Preceding geometry/ticking checkpoint
+
+Published `f92ea29dd`, with native `c487f375` on parent `6673fac82`, adds
+retained client ranges, primary geometry/camera queries, ticking membership,
+GUI semantic templates and immutable tag-member views. Its full CPU suites,
+actual Frozen comparisons and live lifecycle/image checks pass. The expanded
+4,143-case ticking corpus rejects pre-getter receiver capture in draft
+`a9745542`; the repair preserves both physical map identities. Failed evidence
+remains in the [ticking guide](../world/entities/RUST-ENTITY-ORDER.md).
+Its twenty clean timings miss only vanilla p99 by 4.8%; keep that
+[historical matrix](GAMEPLAY-PERFORMANCE.md#historical-ticking-owner-checkpoint).
+
+Earlier `a99b6f8d` separately passes four GUI pairs/eight original reviews
 after a capture-only readiness repair, without freezing clocks or changing
-tolerances. Its resource replay matches all ten 89,630-line records and passes
-nine warm aggregate floors; cold cost and one retag pair are slower. Allocation
-samples show less GUI batch allocation but do not isolate a per-frame speedup or
-explain p99. Those receipts remain in the subsystem guides; they are not fresh
-GUI/resource measurements of `c487f375`.
+tolerances. Its resource replay matches ten 89,630-line records and passes nine
+warm aggregate floors; cold cost and one retag pair are slower. Allocation
+samples show less GUI batch allocation but do not isolate a per-frame speedup
+or explain p99. Those records remain in the
+[GUI](RUST-GUI-ITEM-TEMPLATES.md) and
+[resource](../resources/VERIFICATION.md) guides; they are not fresh GUI/resource
+measurements of `543a592f`.
 
-Settled checks do not close first shader-world-frame, first-turn nearby terrain,
-temporal, broad-gameplay, sustained-streaming or long-session memory acceptance.
-The reboot resolved the historical graphics-driver mismatch; hardware testing
-runs normally. Continue profiling and migrating live world producers/consumers.
-
-The present documentation review inspected source and test assertions; it did not
+The prior documentation review at `696a25e3b` inspected source and assertions; it did not
 rerun these suites, benchmarks, lifecycles or untracked image receipts. These world/GUI/tag
 ownership slices are reviewed at `f92ea29d`; the named release images retain their
 separate author-reported verification windows.
@@ -62,8 +72,9 @@ moves [atlas construction](../resources/ATLASES.md) and
 [block/item model discovery and geometry baking](../resources/MODELS.md) into Rust.
 Java retains consumer objects, item definitions/model trees, state dispatch,
 special renderers and reload orchestration. Its [verification](../resources/VERIFICATION.md)
-uses scoped preparation/CPU comparisons, not a fresh full-game matrix or GPU
-reload acceptance. The `c487f375` rendering record above predates that source.
+originally used scoped preparation/CPU comparisons. The newer combined
+checkpoint above supplies fresh lifecycle, world/GUI and timing evidence;
+broad GPU reload acceptance remains open. The `c487f375` record predates it.
 The [atlas/model ownership review](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6114829418)
 keeps #771 open and distinguishes its Reference semantic gate from Frozen timing.
 
@@ -91,8 +102,8 @@ walk comparisons, seven lifecycle cases and two settled image pairs. At that pub
 [published visibility matrix](GAMEPLAY-PERFORMANCE.md#october-11-published-dh-visibility-checkpoint)
 for values, repeat counts and hidden-minimap/settling limits. The older
 `a15c0555` vanilla-p99 failure remains historical below; it is no longer the
-latest result for that published checkpoint. The newer combined matrix above
-retains its vanilla p99 failure.
+latest result for that published checkpoint. The historical ticking matrix retains its vanilla p99 failure; the later
+pre-atlas/model lifecycle matrix passed. Consult the current matrix above.
 
 This documentation review inspected source/assertions without rerunning suites,
 benchmarks or untracked captures. Generic-tree replay and separate lifecycle
@@ -108,7 +119,9 @@ both issues remain open.
 The historical, then-uncommitted [client-range/readiness candidate](../world/chunk-loading/RUST-CLIENT-RANGES.md)
 passes fresh CPU checks, seven lifecycle cases and two reviewed settled pairs.
 Its complete 20-run matrix is clean but fails vanilla p99 (Current 3.217 ms /
-Frozen 3.124 ms); all other FPS/p99 floors pass. This earlier release predates the published combined source above.
+Frozen 3.124 ms); all other FPS/p99 floors pass. It was an uncommitted
+candidate at measurement time and was later included in published `f92ea29dd`;
+these measurements retain their original native identity.
 Guarded allocation profiles identify repeated GUI batch and entity-bound producers,
 without establishing an isolated p99 cause. See the
 [historical client-range matrix](GAMEPLAY-PERFORMANCE.md#historical-client-rangereadiness-comparison).

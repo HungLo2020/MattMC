@@ -88,7 +88,9 @@ The `filter` source's regexes run in Java through an upcall
 ## Working on it
 
 ```sh
-(cd src/main/rust && cargo test --lib -- assets::textures core::json core::parallel)
+(cd src/main/rust && cargo test --lib assets::textures)
+(cd src/main/rust && cargo test --lib core::json)
+(cd src/main/rust && cargo test --lib core::parallel)
 python3 DevUtils/tests/textures/VerifyAtlases.py --output build/atlas-verification
 ```
 
@@ -100,3 +102,20 @@ fixture to `build_fixtures` for any new case before fixing it.
 library (`./gradlew buildRustNative`). Different warnings with identical
 records usually mean wording or ordering; the driver compares sorted
 WARN/ERROR first lines.
+
+## Frozen comparison for the migration goal
+
+Use unchanged Frozen for both baseline roles and compare CPU atlas records:
+
+```sh
+python3 DevUtils/tests/textures/VerifyAtlases.py --cpu-only \
+  --reference ../MattMC_JavaPerfTesting/MattMC \
+  --frozen-repo ../MattMC_JavaPerfTesting/MattMC \
+  --output build/atlas-frozen-cpu --max-ratio 1.0 --pairs 5 --iterations 5
+```
+
+This compares all CPU sizes, placements, UVs, frames, flags, metadata and mip
+pixels. It omits semantic-device snapshots on every side; Frozen cannot emit
+those snapshots. The separate historical Java pipeline is a diagnostic, not
+this goal's correctness baseline. Verify real upload/rendering with the existing
+Frozen OpenGL/current Vulkan lifecycle, world and GUI capture drivers.

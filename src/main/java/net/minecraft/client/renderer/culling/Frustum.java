@@ -27,9 +27,12 @@ public class Frustum implements ViewportProvider {
 
 	/** Query all retained stock bounds once, then use read-only per-component flags. */
 	public boolean isVisibleEntity(net.minecraft.world.entity.NativeEntityGeometry.Body body) {
+		if(nativeEntityMatrix==null)nativeEntityMatrix=this.matrix.get(new float[16]);
+		if(!body.indexed()) {
+			return body.queryOne(nativeEntityMatrix,camX,camY,camZ);
+		}
 		var world=body.world();
 		if(queriedEntityWorld!=world || entityQueryRevision!=world.revision() || entityQueryStamp!=world.queryStamp()) {
-			if(nativeEntityMatrix==null)nativeEntityMatrix=this.matrix.get(new float[16]);
 			entityQueryStamp=world.query(nativeEntityMatrix,this.camX,this.camY,this.camZ);
 			entityQueryRevision=world.queryRevision();queriedEntityWorld=world;
 		}

@@ -40,6 +40,32 @@ unsafe impl Send for Sprite {}
 unsafe impl Sync for Sprite {}
 
 impl Sprite {
+    /// Generated-item scans reuse a bounded alpha mask with a transparent
+    /// border. Validate the complete frame before reading ahead; malformed
+    /// frames keep the original per-access error prefix below.
+    fn alpha_border(&self, frame: i32) -> Option<Vec<u8>> {
+        if !self.frame_inside(frame) || self.width > i32::MAX as u32 || self.height > i32::MAX as u32 {
+            return None;
+        }
+        let stride = (self.width as usize).checked_add(2)?;
+        let size = stride.checked_mul((self.height as usize).checked_add(2)?)?;
+        if size > 4 * 1024 * 1024 { return None; }
+        let mut mask = Vec::new();
+        mask.try_reserve_exact(size).ok()?;
+        mask.resize(size, 1);
+        let (left, top) = if self.row_size == 0 { (0, 0) } else {
+            ((frame % self.row_size as i32) as usize * self.width as usize,
+             (frame / self.row_size as i32) as usize * self.height as usize)
+        };
+        for y in 0..self.height as usize {
+            let row = ((top + y) * self.sheet_width as usize + left) * 4 + 3;
+            for x in 0..self.width as usize {
+                mask[(y + 1) * stride + x + 1] = u8::from(unsafe { *self.sheet.add(row + x * 4) } == 0);
+            }
+        }
+        Some(mask)
+    }
+
     /// `SpriteContents.isTransparent(frame, x, y)`: alpha 0; `None` out of
     /// the sheet (Java throws).
     fn transparent(&self, frame: i32, x: i32, y: i32) -> Result<bool, Failure> {
@@ -563,20 +589,29 @@ fn spans(sprite: &Sprite) -> Result<Vec<Span>, Failure> {
         // Java reads the neighbours of transparent pixels too, which only
         // matters when a read can fail: a frame outside the sheet.
         let inside = sprite.frame_inside(frame);
+        let mask = sprite.alpha_border(frame);
+        let stride = width as usize + 2;
+        let transparent = |x: i32, y: i32| -> Result<bool, Failure> {
+            if let Some(mask) = &mask {
+                Ok(mask[(y + 1) as usize * stride + (x + 1) as usize] != 0)
+            } else {
+                transparent(frame, x, y)
+            }
+        };
         for y in 0..height {
             for x in 0..width {
-                if transparent(frame, x, y)? {
+                if transparent(x, y)? {
                     if !inside {
                         for facing in Facing::ALL {
                             let (dx, dy) = facing.offset();
-                            transparent(frame, x + dx, y + dy)?;
+                            transparent(x + dx, y + dy)?;
                         }
                     }
                     continue;
                 }
                 for (slot, facing) in Facing::ALL.into_iter().enumerate() {
                     let (dx, dy) = facing.offset();
-                    if transparent(frame, x + dx, y + dy)? {
+                    if transparent(x + dx, y + dy)? {
                         let anchor = if facing.horizontal() { y } else { x };
                         let along = if facing.horizontal() { x } else { y };
                         let entry = &mut index[slot][anchor as usize];

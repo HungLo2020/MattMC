@@ -112,6 +112,15 @@ public final class ModelReference {
 			observe("vanilla", plain, atlases, executor);
 			observe("fixtures", new MultiPackResourceManager(PackType.CLIENT_RESOURCES, withFixtures), atlases, executor);
 			Map<ResourceLocation, SpriteLoader.Preparations> stitched = stitchAll(plain, atlases, executor);
+			String profileReady = System.getProperty("mattmc.models.profile.ready");
+			if (profileReady != null) {
+				for (int warmup = 0; warmup < 20; warmup++) reload(plain, atlases, stitched, executor);
+				Files.writeString(Path.of(profileReady), "model-only reload ready\n");
+				for (int iteration = 0; iteration < iterations; iteration++) reload(plain, atlases, stitched, executor);
+				close(stitched);
+				System.out.println("MODEL_PROFILE cycles=" + iterations);
+				return;
+			}
 			List<Long> models = new ArrayList<>();
 			List<Long> full = new ArrayList<>();
 			for (int iteration = 0; iteration < iterations; iteration++) {

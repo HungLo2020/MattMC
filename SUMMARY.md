@@ -1,10 +1,10 @@
-# Rust vs Frozen performance (2026-10-11; native c487f375; settled rotating view)
+# Last measured Rust vs Frozen performance (2026-10-11; native 9f372451)
 
 | Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1351.75 / 1146.45 | 3.410 / 3.253 — FAIL |
-| Vanilla + DH | 833.00 / 712.00 | 2.815 / 5.481 |
-| Shaders | 352.65 / 312.65 | 4.756 / 7.181 |
-| Shaders + DH | 264.80 / 226.00 | 5.371 / 9.124 |
-All 20 alternating runs are clean: 6,000 frames, 360 settle/240 warmup; DH four repeats per side, others two. Identity/input guards pass. Rust: 2,656 passed/3 ignored; Java/parity: 2,003 executed/2 skipped. Frozen replays: 11,057 geometry/645 range/4,143 order cases; seven lifecycles/two reviewed image pairs pass, zero VUIDs.
-Vanilla p99 fails by 4.8%; all other FPS/p99 floors pass. First-frame/first-turn, streaming/memory, broad gameplay and Java removal remain unfinished. [Results and limits](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+| Vanilla | 1313.65 / 1142.25 | 3.248 / 3.307 |
+| Vanilla + DH | 808.10 / 709.80 | 3.156 / 5.266 |
+| Shaders | 341.95 / 312.95 | 4.780 / 7.169 |
+| Shaders + DH | 260.60 / 226.05 | 5.275 / 9.203 |
+All 20 alternating runs clean; all FPS/p99 floors and identity/input guards pass. Exact 6,000 frames, 360 settle/240 warmup; DH four repeats per side, others two. Combined Rust: 2,680 passed/3 ignored; Java/parity: 2,005 executed/2 skipped. Frozen replays: 11,489 geometry/removal, 645 range, 4,143 order; seven lifecycles, two world pairs and four GUI pairs/12 original reviews pass, zero VUIDs.
+Rust removal/camera retirement and bounded model alpha masks are verified on atlas/model base 71762d602. No isolated speedup or prior p99 cause proved. First-frame/first-turn, streaming/memory, broad gameplay and Java removal remain unfinished. [Results and limits](docs/development/rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).

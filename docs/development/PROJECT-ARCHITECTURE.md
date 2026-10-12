@@ -201,13 +201,15 @@ radius relocation and callback delivery. This is partial client-world ownership.
 
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
 retains primary position/bounds components per world and queries them directly
-for ordinary camera culling. The [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md)
-in `world/level/entity_order/` retains client/server insertion order and immutable
-tick snapshots. Java keeps immutable API projections, object bindings, hooks,
-behavior callbacks and tick/extraction orchestration. The source now connects
-these consumers; the [combined author checkpoint](rendering/GOAL-5-STATUS.md#october-11-implementation-checkpoint)
-records scoped CPU/lifecycle/image passes and a vanilla-p99 failure. General
-entity components, complete tick ownership and broader runtime acceptance remain unfinished.
+for ordinary camera culling. Rust removal state retires camera membership
+at despawn while keeping primary geometry readable. The
+[ticking membership owner](world/entities/RUST-ENTITY-ORDER.md) retains
+client/server insertion order and immutable tick snapshots. Java keeps API
+projections, object bindings, hooks, behavior callbacks and tick/extraction
+orchestration. The [current combined checkpoint](rendering/GOAL-5-STATUS.md#october-11-integrated-lifecyclemodel-checkpoint)
+records scoped CPU/lifecycle/image passes and passing settled FPS/p99 floors;
+the preceding published ticking image missed vanilla p99. General entity
+components, complete tick ownership and broad/long-session acceptance remain unfinished.
 
 At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/mod.rs),
 DH world CPU ownership also includes columns, mutable full-data recipients,

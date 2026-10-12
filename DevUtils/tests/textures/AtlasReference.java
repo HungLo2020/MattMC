@@ -72,7 +72,7 @@ public final class AtlasReference {
 		SharedConstants.tryDetectVersion();
 		Bootstrap.bootStrap();
 		ClientBootstrap.bootstrap();
-		snapshots = installSemanticDevice();
+		snapshots = !(args.length > 5 && args[5].equals("cpu-only")) && installSemanticDevice();
 		List<Atlas> atlases = knownAtlases();
 		PackResources vanilla = new VanillaPackResourcesBuilder()
 			.setMetadata(BuiltInMetadata.of())

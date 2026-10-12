@@ -38,7 +38,7 @@ def main():
     assert pins['frozen_head'] == '7a4d181717dc0c7da9086f1a17687dfd522ce417'
     assert pins['prompt'] == 'c5695e9bc559fb430bc3ee14721785a28c6de7e0f7cae7d70b2dad0f41cd94c5'
     result = {'pins': pins, 'passed': False, 'guards_pass': False,
-              'scope': 'Actual Frozen movement/callback prefixes and renderer culling;11057 cases, including primary-returning, mutating and derived bounds callbacks. Supplemental to gameplay.'}
+              'scope': 'Actual Frozen movement/removal/callback prefixes and renderer culling;11489 cases, including primary-returning, mutating and derived bounds callbacks. Supplemental to gameplay.'}
     receipt = output / 'results.json'
     receipt.write_text(json.dumps(result, indent=2) + '\n')
     env = os.environ.copy()
@@ -67,7 +67,7 @@ def main():
                 command += ['--enable-native-access=ALL-UNNAMED', '-Dmattmc.rust.natives.dir=' + str(native.parent)]
             command += ['-cp', str(target) + os.pathsep + classpaths[side], 'VerifyEntityGeometry', side, str(output / 'frozen-geometry.bin.gz')]
             outputs[side] = run(command, 'record-frozen.log' if side == 'frozen' else 'replay-native.log')
-            assert 'ENTITY_CASES 11057 ' in outputs[side]
+            assert 'ENTITY_CASES 11489 ' in outputs[side]
         images = {}
         for side, data in outputs.items():
             checked = {}
@@ -81,19 +81,19 @@ def main():
                 path = next(Path(base) / resource for base in classpaths[side].split(os.pathsep) if (Path(base) / resource).is_file())
                 assert path.is_relative_to(repo) and sha(path) == digest
                 checked[str(path)] = digest
-            assert len(checked) == 3
+            assert len(checked) == (5 if side == "current" else 3)
             images[side] = checked
         result['class_images'] = images
         result['driver_classes'] = {str(p.relative_to(output / 'oracle')): sha(p) for p in (output / 'oracle').rglob('*.class')}
         assert 'NATIVE_IMAGE ' + pins['native'] + ' ' + str(native) in outputs['current']
-        result.update(passed=True, fixture_sha256=sha(output / 'frozen-geometry.bin.gz'))
+        result.update(passed=True, cases=11489, fixture_sha256=sha(output / 'frozen-geometry.bin.gz'))
     finally:
         result['guards_pass'] = sources(ROOT) == pins['current'] and sources(FROZEN) == pins['frozen'] and sha(native) == pins['native'] and sha(ROOT / 'docs/STANDARD-COPILOT-PROMPTS.md') == pins['prompt']
         if 'class_images' in result:
             result['guards_pass'] &= all(sha(Path(p)) == digest for side in result['class_images'].values() for p, digest in side.items())
         receipt.write_text(json.dumps(result, indent=2) + '\n')
     assert result['passed'] and result['guards_pass']
-    print('Actual Frozen entity geometry11057 PASS;source/native/class guards PASS')
+    print('Actual Frozen entity geometry/removal11489 PASS;source/native/class guards PASS')
 
 
 if __name__ == '__main__':

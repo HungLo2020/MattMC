@@ -222,6 +222,7 @@ def main() -> None:
     parser.add_argument("--pairs", type=int, default=5, help="alternating fresh-JVM rounds (at least three)")
     parser.add_argument("--iterations", type=int, default=5, help="warm timing iterations per run")
     parser.add_argument("--max-ratio", type=float, default=1.10, help="largest allowed Current/Frozen timing median")
+    parser.add_argument("--cpu-only", action="store_true", help="compare CPU atlas records without semantic-device snapshots, including against Frozen")
     args = parser.parse_args()
     if args.pairs < 3:
         parser.error("At least three rounds are required")
@@ -245,6 +246,9 @@ def main() -> None:
               "trees": {side: identity(tree) for side, tree in trees.items()}, "rounds": [], "max_ratio": args.max_ratio,
               "observer_sha256": sha(OBSERVER), "driver_sha256": sha(Path(__file__)),
               "jvm_args": ["-Xms1g", "-Xmx6g", "-XX:+UseZGC", "-XX:+UseCompactObjectHeaders", "--enable-native-access=ALL-UNNAMED"]}
+    report["cpu_only"] = args.cpu_only
+    if args.cpu_only:
+        report["scope"] = report["scope"].replace("and uploaded first-frame snapshots", "without uploaded first-frame snapshots")
     result_path = out / "results.json"
 
     def save() -> None:
@@ -275,7 +279,8 @@ def main() -> None:
                 began = time.monotonic()
                 output = command([java, *report["jvm_args"], "-Dmattmc.rust.natives.dir=" + str(trees[side] / "build/rust/native"),
                                   "-cp", str(classes[side]) + os.pathsep + cp[side], "AtlasReference",
-                                  str(content), str(content / "packs"), str(content / "mip-packs"), str(record), str(args.iterations)],
+                                  str(content), str(content / "packs"), str(content / "mip-packs"), str(record), str(args.iterations),
+                                  *(["cpu-only"] if args.cpu_only else [])],
                                  out, out / f"round-{round_index + 1}-{side}.log", env)
                 found = ROW.findall(output)
                 if len(found) != 1:

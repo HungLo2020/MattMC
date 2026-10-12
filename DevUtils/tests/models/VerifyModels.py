@@ -272,6 +272,7 @@ def main() -> None:
     parser.add_argument("--pairs", type=int, default=5, help="alternating fresh-JVM rounds (at least three)")
     parser.add_argument("--iterations", type=int, default=5, help="warm timing iterations per run")
     parser.add_argument("--max-ratio", type=float, default=1.10, help="largest allowed Current/Frozen timing median")
+    parser.add_argument("--jvm-arg", action="append", default=[], help="additional matched JVM diagnostic/control argument on every side")
     args = parser.parse_args()
     if args.pairs < 3:
         parser.error("At least three rounds are required")
@@ -298,6 +299,7 @@ def main() -> None:
               "trees": {side: identity(tree) for side, tree in trees.items()}, "rounds": [], "max_ratio": args.max_ratio,
               "observer_sha256": sha(OBSERVER), "driver_sha256": sha(Path(__file__)),
               "jvm_args": ["-Xms1g", "-Xmx6g", "-XX:+UseZGC", "-XX:+UseCompactObjectHeaders", "--enable-native-access=ALL-UNNAMED"]}
+    report["jvm_args"].extend(args.jvm_arg)
     result_path = out / "results.json"
 
     def save() -> None:

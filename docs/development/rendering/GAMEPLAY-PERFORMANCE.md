@@ -90,48 +90,73 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Current hardware evidence boundary
 
-The implementation author records the October 11 combined checkpoint with native
-`c487f375`, developed above `6673fac82` and subsequently published in
-[`f92ea29d`](https://github.com/HungLo2020/MattMC/commit/f92ea29dde0199a9ea65006e216ac92570b3b02b).
-This documentation review inspected source/assertions without rerunning workloads
-or inspecting untracked raw receipts. It includes the [client-range index](../world/chunk-loading/RUST-CLIENT-RANGES.md),
-[entity geometry](../world/entities/RUST-ENTITY-GEOMETRY.md),
-[ticking membership](../world/entities/RUST-ENTITY-ORDER.md),
-[GUI templates](RUST-GUI-ITEM-TEMPLATES.md) and
-[immutable tag-member views](../resources/TAGS-AND-REGISTRIES.md).
+The October 11 combined checkpoint uses native `9f372451` on atlas/model
+base `71762d602`. Rust owns primary entity removal state and immediate
+camera-slot retirement, preserving retained views, explicit queries, revival
+and transfer. A profile-backed generated-item alpha mask avoids repeated
+transparency reads. Java tracking/section admission and broader simulation
+remain migration work; see the [entity guide](../world/entities/RUST-ENTITY-GEOMETRY.md)
+and [model guide](../resources/MODELS.md).
+
 All 20 predeclared alternating runs finished cleanly: exactly 6,000 measured
-frames each after 360 settle and 240 warmup frames, four repeats per side for
+frames after 360 settle and 240 warmup frames, four repeats per side for
 vanilla + DH and two per side for the other modes. No profiler or other game
 client ran during timing. Every repeat remains recorded.
 
-| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
-|---|---:|---:|---|
-| Vanilla | 1351.75 / 1146.45 | 3.410 / 3.253 | p99 fails |
-| Vanilla + DH | 833.00 / 712.00 | 2.815 / 5.481 | Both pass |
-| Shaders | 352.65 / 312.65 | 4.756 / 7.181 | Both pass |
-| Shaders + DH | 264.80 / 226.00 | 5.371 / 9.124 | Both pass |
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen |
+|---|---:|---:|
+| Vanilla | 1313.65 / 1142.25 | 3.248 / 3.307 |
+| Vanilla + DH | 808.10 / 709.80 | 3.156 / 5.266 |
+| Shaders | 341.95 / 312.95 | 4.780 / 7.169 |
+| Shaders + DH | 260.60 / 226.05 | 5.275 / 9.203 |
 
-**Aggregate performance fails only vanilla p99**, by 4.8%. All four median
-average-FPS floors pass. All source/native/Frozen/prompt/prepared-input guards
-and ten Current timing native identities pass; no clients remain. The
-controller exits 1 only at performance evaluation. Timing execution and the
-integrity checks succeed. This is a settled rotating scene with a hidden
-minimap, not startup, first-turn, ordinary-play, sustained-streaming or
-long-memory acceptance. These comparisons do not isolate a migration speedup
-or identify the vanilla p99 cause. The remaining miss guides further profiling
-and live world ownership work; the migration goal remains incomplete.
+**All four average-FPS and all four p99 floors pass.** Final source/native/
+Frozen/prompt/prepared-input guards and ten Current timing identities pass;
+no clients remain and the controller exits 0. Vanilla's p99 margin is about
+1.8%. These comparisons do not isolate either change's speedup or establish
+that the preceding p99 miss was root-caused and fixed. This is a settled
+rotating scene with a hidden minimap, not first-world-frame, first-turn,
+ordinary-play, sustained-streaming or long-session memory acceptance.
 
-Fresh combined suites pass 2,656 Rust tests (three ignored) and 2,003 executed
-Java/parity cases (two skipped), zero failures. Actual unchanged Frozen
-geometry/range/ticking comparisons pass 11,057/645/4,143 cases with
-source/class/native guards. Seven live lifecycles and two settled world pairs
-pass with zero VUIDs; all four originals were reviewed and nine Current runtime
-artifacts pin this native image.
+Fresh combined suites pass 2,680 Rust tests (three ignored) and 2,005 executed
+Java/parity cases (two skipped). Guarded actual Frozen geometry/removal,
+range and ticking comparisons pass 11,489/645/4,143 cases. Seven live
+lifecycles, two world pairs and four GUI pairs pass with zero VUIDs; all
+twelve original images were reviewed and thirteen Current runtime artifacts
+identify this image. GUI coverage includes plain, static/moving foil and
+oversized placement after world resource reload. The retained-despawn test
+proves camera-slot reuse, not real-session memory bounds.
 
-Receipts: `build/native-entity-order-receiver-fix/gameplay/{performance,final-guards}.json`,
-`cpu-results.json`, `runtime-original-review.json` and
-`build/native-entity-order/receiver-fixed-replay/`. Retain all repeats and the
-rejected pre-getter receiver comparison recorded in the ticking guide.
+The model corpus matches 67,433 lines and 4,351 warnings under matched
+fixture-only NPE-detail controls. Model-only/full-reload aggregate floors
+pass (76.915/79.069 and 128.454/135.543 ms); three individual model pairs
+are slower, and Frozen's median moved between runs. Ordinary gameplay
+retains normal JVM controls. The separate pre-alpha atlas CPU comparison
+matches 8,375 lines and passes 55.014/66.562 ms; it does not establish GPU
+upload parity. Neither result is an isolated speedup claim.
+
+Receipts: `build/native-entity-lifecycle-model-integration/alpha-mask-accepted/`
+(`gameplay/{performance,final-guards}.json`, `runtime-review.json`,
+`gui-review.json`), sibling `alpha-mask-*` CPU receipts and
+`model-replay-alpha-mask/`. Preserve every timing repeat and rejected candidate.
+
+### Historical pre-integration lifecycle checkpoint
+
+Native `543a592f` on `f92ea29dd` separately passes its twenty-run matrix:
+median FPS Current/Frozen 1366.65/1181.35, 876.60/701.70, 346.40/315.80 and
+265.25/226.40; p99 3.121/3.169, 2.307/5.288, 5.128/6.753 and 5.266/8.747 ms
+(vanilla/DH/shaders/combined). Its CPU/live checks pass. These measurements
+precede atlas/model integration and do not accept the newer image. Receipts:
+`build/native-entity-lifecycle/`.
+
+### Historical ticking-owner checkpoint
+
+Preceding native `c487f375`, published in `f92ea29dd`, passes CPU suites,
+actual Frozen comparisons and live lifecycle/image checks. Its twenty clean
+runs pass every average-FPS floor and three p99 floors, but miss vanilla p99
+by 4.8% (3.410/3.253 ms Current/Frozen). These were separately recorded runs;
+retain them rather than replacing unfavorable results. Receipts:
+`build/native-entity-order-receiver-fix/`.
 
 Subsequent source [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8)
 adds native atlas construction and model baking. Its [resource verification](../resources/VERIFICATION.md)
@@ -177,8 +202,9 @@ The implementation run on October 11 executes all 20 declared alternating
 comparisons on RTX3080Ti/NVIDIA `595.99.02`: 360 settle, 240 warmup and exactly
 6,000 measured frames, four repeats per side for vanilla + DH and two for each
 other mode. Every run is clean, and source/native/class/Frozen/prompt/prepared-input
-guards pass. The aggregate fails only vanilla p99; this candidate was uncommitted
-at the time of that report and predates the combined published source above.
+guards pass. The aggregate fails only vanilla p99. This was an uncommitted
+candidate at measurement time and was later included in published `f92ea29dd`;
+the earlier native image's measurements remain distinct from that publication.
 
 | Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Gate |
 |---|---:|---:|---|

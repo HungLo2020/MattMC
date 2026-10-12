@@ -22,7 +22,20 @@ import org.joml.Matrix4f;
 /** Runs each repository's actual movement and ordinary renderer policy separately. */
 public class VerifyEntityGeometry {
     static class Fixture extends Entity {
-        int moves;
+        int moves, lifeMode;
+        boolean overrideReason;
+        List<String> life;
+        void revive(){unsetRemoved();}
+        @Override public RemovalReason getRemovalReason(){return overrideReason ? RemovalReason.UNLOADED_TO_CHUNK : super.getRemovalReason();}
+        @Override public void stopRiding(){
+            life.add("stop:"+isRemoved()+":"+getRemovalReason());
+            if(lifeMode==1){lifeMode=0;revive();}
+            if(lifeMode==2)throw new IllegalStateException("stop");
+        }
+        @Override public void onRemoval(RemovalReason requested){
+            life.add("onRemoval:"+requested+":"+isRemoved()+":"+getRemovalReason());
+            if(lifeMode==3)throw new IllegalStateException("onRemoval");
+        }
         Fixture(){super(EntityType.PIG,null);}
         @Override protected void defineSynchedData(SynchedEntityData.Builder b){}
         @Override protected void readAdditionalSaveData(ValueInput input){}
@@ -62,6 +75,7 @@ public class VerifyEntityGeometry {
             public void onMove(){e.moves++;}
             public void onRemove(Entity.RemovalReason reason){}
         });
+        e.life=new ArrayList<>();field(e,"passengers",com.google.common.collect.ImmutableList.of());
         e.setBoundingBox(new AABB(-.2,-.2,-.2,.2,.2,.2));return e;
     }
     static void state(DataOutputStream out,Fixture e)throws IOException {
@@ -110,11 +124,48 @@ public class VerifyEntityGeometry {
                 out.writeBoolean(callback.shouldRender(entity,new Frustum(new Matrix4f(),new Matrix4f()),0,0,0));state(out,entity);cases++;
             }
         }
+        // Actual production lifecycle calls, including null/repeated reasons,
+        // private-state semantics under getter overrides and callback prefixes.
+        try(var scope=Arena.ofConfined();var out=new DataOutputStream(bytes)) {
+            var reasons=new Entity.RemovalReason[6];
+            System.arraycopy(Entity.RemovalReason.values(),0,reasons,1,5);
+            for(int first=0;first<6;first++)for(int second=0;second<6;second++)
+                for(int mode=0;mode<6;mode++)for(int override=0;override<2;override++) {
+                    var entity=fixture(current,owner,scope);entity.lifeMode=mode;entity.overrideReason=override!=0;
+                    field(entity,"levelCallback",new EntityInLevelCallback(){
+                        public void onMove(){}
+                        public void onRemove(Entity.RemovalReason requested){
+                            entity.life.add("callback:"+requested+":"+entity.isRemoved()+":"+entity.getRemovalReason());
+                            if(entity.lifeMode==4)throw new IllegalStateException("callback");
+                            if(entity.lifeMode==5){entity.lifeMode=0;entity.revive();entity.setRemoved(Entity.RemovalReason.DISCARDED);}
+                        }
+                    });
+                    for(int code:new int[]{first,second}) {
+                        String failure="none";
+                        try{entity.setRemoved(reasons[code]);}catch(RuntimeException caught){failure=caught.getClass().getName()+":"+(caught instanceof NullPointerException ? "null" : caught.getMessage());}
+                        out.writeUTF(failure);out.writeBoolean(entity.isRemoved());out.writeUTF(String.valueOf(entity.getRemovalReason()));out.writeBoolean(entity.shouldBeSaved());
+                        out.writeInt(entity.life.size());for(String event:entity.life)out.writeUTF(event);
+                    }
+                    var beforeRevival=(Renderer)allocate(Renderer.class);
+                    var detachedFrustum=new Frustum(new Matrix4f(),new Matrix4f());
+                    entity.setPosRaw(0,0,0);entity.setBoundingBox(new AABB(-.2,-.2,-.2,.2,.2,.2));
+                    out.writeBoolean(beforeRevival.shouldRender(entity,detachedFrustum,0,0,0));
+                    entity.setPosRaw(100,0,0);entity.setBoundingBox(new AABB(99,0,0,101,1,1));
+                    out.writeBoolean(beforeRevival.shouldRender(entity,detachedFrustum,0,0,0));
+                    entity.revive();out.writeBoolean(entity.isRemoved());out.writeUTF(String.valueOf(entity.getRemovalReason()));out.writeBoolean(entity.shouldBeSaved());
+                    entity.setPosRaw(0,0,0);entity.setBoundingBox(new AABB(-.2,-.2,-.2,.2,.2,.2));
+                    var renderer=(Renderer)allocate(Renderer.class);var frustum=new Frustum(new Matrix4f(),new Matrix4f());
+                    out.writeBoolean(renderer.shouldRender(entity,frustum,0,0,0));
+                    cases++;
+                }
+        }
         var fixture=Path.of(args[1]);
         if(current){try(var in=new GZIPInputStream(Files.newInputStream(fixture))){if(!Arrays.equals(bytes.toByteArray(),in.readAllBytes()))throw new AssertionError("Actual Frozen movement/culling outputs differ");}}
         else try(var out=new GZIPOutputStream(Files.newOutputStream(fixture))){bytes.writeTo(out);}
         System.out.println("ENTITY_CASES "+cases+" "+sha(bytes.toByteArray())+" PASS");
-        for(String name:List.of("net.minecraft.world.entity.Entity","net.minecraft.client.renderer.entity.EntityRenderer","net.minecraft.client.renderer.culling.Frustum")) {
+        var guardedClasses=new ArrayList<>(List.of("net.minecraft.world.entity.Entity","net.minecraft.client.renderer.entity.EntityRenderer","net.minecraft.client.renderer.culling.Frustum"));
+        if(current)guardedClasses.addAll(List.of("net.minecraft.world.entity.NativeEntityGeometry","net.minecraft.world.entity.NativeEntityGeometry$Body"));
+        for(String name:guardedClasses) {
             try(var in=Class.forName(name).getResourceAsStream("/"+name.replace('.','/')+".class")){System.out.println("CLASS "+name+" "+sha(in.readAllBytes()));}
         }
         if(current) {

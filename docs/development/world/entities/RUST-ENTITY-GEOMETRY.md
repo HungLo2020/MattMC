@@ -1,6 +1,8 @@
 # Rust entity geometry
 
-Rust owns primary free-entity geometry and ordinary camera queries. AI,
+Rust owns primary free-entity geometry, removal state and ordinary camera
+queries. Removal retires camera membership immediately while retaining readable
+geometry and callback behavior. AI,
 physics integration and networking remain in Java. The subsequent
 [ticking membership slice](RUST-ENTITY-ORDER.md) moves snapshot/order storage
 into Rust; Java still invokes simulation callbacks.
@@ -23,9 +25,9 @@ into their read-only CPU views; Java sends no entity/bounds array. Another
 frustum's query, a mutation or a camera offset invalidates cached results.
 Storage order does not replace Java's gameplay or extraction order.
 
-See source `f92ea29d`: the [Rust owner](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/rust/world/level/entity_geometry/mod.rs),
-[CPU bridge](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/world/entity/NativeEntityGeometry.java)
-and [camera consumer](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/src/main/java/net/minecraft/client/renderer/entity/EntityRenderer.java).
+See the current [Rust owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_geometry/mod.rs),
+[CPU bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/entity/NativeEntityGeometry.java)
+and [camera consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/client/renderer/entity/EntityRenderer.java).
 These are CPU resources; GPU ownership remains entirely in Rust/GAL.
 
 ## Compatibility and lifetime
@@ -45,20 +47,31 @@ These are CPU resources; GPU ownership remains entirely in Rust/GAL.
   an earlier hook veto returns immediately, as in the compatibility route.
 - Nested and throwing movement callbacks observe the committed position and
   compatibility projections. World transfer preserves the primary CPU view.
+- Removal reason storage and first-reason selection now belong to Rust.
+  Java's `RemovalReason` enum is a compatibility projection; its declaration
+  order maps to native codes 1–5, with 0 representing null. Internal reads
+  preserve private-field semantics when a subclass overrides the public getter.
+- The first nonnull removal retires the generational camera slot immediately.
+  Retained leases keep primary geometry readable without remaining in the dense
+  scan. Detached movement does not invalidate live camera results. Explicit
+  queries of detached bodies still execute Rust's ordinary culling policy.
+- Revival reindexes the same view in its current world. World transfer preserves
+  removal state and detached status. Callback order, repeated removals, exceptions
+  and null-reason behavior remain Java-compatible; no native lock spans callbacks.
 - Native leases retain their world independently of Java level identity.
-  Scoped lease closure removes its generational slot; production automatic
-  scopes follow Java entity reachability. Removed entities can remain in this
-  store until their leases are collected. Explicit geometry active/despawn
-  membership and other gameplay components remain future work.
+  Scoped lease closure removes its slot. Production lease collection follows
+  Java reachability, but dense membership no longer waits for GC after removal.
+  Unspawned, nonremoved bodies still acquire slots at construction; tracking
+  admission, section associations and other gameplay components remain work.
 - Queries and compatibility projections follow the existing world-thread
   contract. Atomic CPU fields do not make arbitrary concurrent Java entity
   mutation a supported snapshot API.
 
 ## Verification
 
-This documentation review inspected source and verification drivers at
-`f92ea29d`; the results below are author-recorded and were not independently
-rerun. Use Linux x64, JDK25 and the release native library:
+The prior review at `f92ea29d` inspected source without rerunning workloads.
+The combined `9f372451` results below are fresh implementation verification.
+Use Linux x64, JDK25 and the release native library:
 
 ```sh
 ./gradlew -PmattmcRustProfile=release test -x testRustNative \
@@ -68,7 +81,7 @@ python3 DevUtils/tests/world/entity/VerifyEntityGeometry.py
 ```
 
 The oracle compiles the same driver separately against actual Frozen and
-Current classes. It records 11,057 movement/callback and renderer culling cases,
+Current classes. It records 11,489 movement/removal/callback and renderer culling cases,
 then checks Current against that output with source, class and native-image
 guards. It does not establish realistic runtime or performance parity.
 The [driver](https://github.com/HungLo2020/MattMC/blob/f92ea29dde0199a9ea65006e216ac92570b3b02b/DevUtils/tests/world/entity/VerifyEntityGeometry.java)
@@ -79,8 +92,40 @@ integration controls.
 Its wrapper requires Frozen at `../MattMC_JavaPerfTesting/MattMC`, checks the
 recorded Frozen HEAD and protected prompt hash, and verifies the loaded image
 through `/proc/self/maps`.
+The added removal scenarios cover all first/repeated reasons, nulls, callback
+exceptions, reset during callbacks and overridden public reason getters.
+Earlier 11,057-case receipts do not verify the new lifecycle behavior.
 Full Rust tests run serially because the existing suite shares native driver
 state. Receipts belong in `build/native-entity-geometry/`; retain rejected checks.
+
+Current combined native `9f372451` on atlas/model base `71762d602` passes
+fresh full serial Rust (2,680 tests, three ignored) and Java/parity (2,005
+executed, two skipped), plus guarded actual Frozen geometry/removal, order
+and range comparisons (11,489/4,143/645 cases). Seven live lifecycles, two
+world pairs and four GUI pairs pass with zero VUIDs. All twelve original
+images were reviewed; thirteen Current runtime artifacts identify this image.
+The fresh twenty-run comparison passes every average-FPS/p99 floor with final
+source/native/Frozen/prompt/prepared-input guards. See the
+[current matrix](../../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+No isolated lifecycle speedup or real-session memory bound is established. Receipts:
+`build/native-entity-lifecycle-model-integration/alpha-mask-{cpu-results,geometry-replay,order-replay,range-replay}`
+and `alpha-mask-accepted/`.
+
+Historical pre-atlas/model lifecycle native `543a592f` passes fresh full serial Rust (2,659 tests,
+three ignored) and Java/parity (2,005 executed, two skipped), zero failures.
+All seven native geometry/lifetime controls pass, including 10,000 retained
+removed bodies sharing one reusable camera slot rather than accumulating dense
+entries. The actual Frozen geometry/removal replay passes 11,489 cases with
+five Current/three Frozen compiled-class guards and the loaded native image.
+Refreshed order/range comparisons also pass 4,143/645 cases. These CPU results
+do not establish real-world performance or long-session memory acceptance;
+seven live lifecycles and two settled image pairs pass with zero VUIDs. All
+four originals were reviewed; nine Current artifacts identify this native image.
+All twenty timing runs are clean and all four average-FPS/p99 floors pass, with
+source/native/Frozen/prompt/prepared-input guards. The narrow vanilla p99 margin
+does not isolate a speedup or resolve the preceding miss's cause. See the
+[current matrix](../../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+Receipts: `build/native-entity-lifecycle/{cpu-results,geometry-replay-v2,order-replay,range-replay}`.
 
 Historical initial-consumer release `a3c8a7fb` passes 2,631 Rust tests (three ignored), 1,992 Java tests
 (two skipped), and both the entity oracle and 645-case client-range oracle.

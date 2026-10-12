@@ -25,6 +25,10 @@ public final class NativeEntityGeometry {
         ValueLayout.JAVA_INT,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,
         ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE));
     private static final MethodHandle TRANSFER=handle("transfer",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle LIFECYCLE=handle("lifecycle",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
+    private static final MethodHandle QUERY_ONE=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_entity_geometry_query_one",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE),Linker.Option.critical(true));
     private static final MethodHandle QUERY=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_entity_geometry_query",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,
             ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE),Linker.Option.critical(true));
@@ -64,7 +68,7 @@ public final class NativeEntityGeometry {
             try {
                 var bodyView=(MemorySegment)VIEW.invokeExact(pointer);
                 var bodyOwner=pointer.reinterpret(1,scope,NativeEntityGeometry::releaseBody);attached=true;
-                return new Body(this,bodyOwner,bodyView.reinterpret(152,scope,null).asReadOnly());
+                return new Body(this,bodyOwner,bodyView.reinterpret(160,scope,null).asReadOnly());
             } finally {if(!attached)releaseBody(pointer);}
         } catch(Throwable failure) {throw failure(failure);}
         finally {Reference.reachabilityFence(this);}
@@ -106,6 +110,24 @@ public final class NativeEntityGeometry {
         public int chunkX(){return integer(132);}
         public int chunkZ(){return integer(136);}
         public boolean visible(){return integer(140)!=0;}
+        public int removalReasonCode(){return integer(152);}
+        public boolean indexed(){return integer(156)!=0;}
+        public void remove(int reason){lifecycle(0,reason);}
+        public void revive(){lifecycle(1,0);}
+        private void lifecycle(int mode,int reason) {
+            try {
+                int status=(int)LIFECYCLE.invokeExact(owner,mode,reason);
+                if(status<0)throw new IllegalStateException("Invalid entity lifecycle transition");
+            }catch(Throwable failure){throw failure(failure);}finally{Reference.reachabilityFence(this);}
+        }
+        public boolean queryOne(float[] matrix,double x,double y,double z) {
+            if(matrix.length!=16)throw new IllegalArgumentException("Culling matrix must have16 components");
+            try {
+                int status=(int)QUERY_ONE.invokeExact(owner,MemorySegment.ofArray(matrix),matrix.length,x,y,z);
+                if(status<0)throw new IllegalStateException("Invalid entity geometry query");
+                return status!=0;
+            }catch(Throwable failure){throw failure(failure);}finally{Reference.reachabilityFence(this);}
+        }
         /** Immutable compatibility projection; capture before hooks may mutate the owner. */
         public AABB cullingBounds() {
             long revision;

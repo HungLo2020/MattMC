@@ -5,8 +5,9 @@
 > primary position/bounds and ordinary camera queries. The
 > [ticking membership slice](../world/entities/RUST-ENTITY-ORDER.md) owns
 > client/server ordering and snapshots; Java still executes behavior callbacks.
-> The slice guides record scoped production CPU/runtime checks; this review did
-> not rerun them. Broader gameplay, performance and long-session memory
+> Removal state and camera retirement now extend the geometry owner. The slice
+> guides distinguish the earlier source-only review from fresh CPU/live checks
+> and a passing settled matrix. Broad gameplay and long-session memory
 > acceptance remain separate from implemented ownership.
 > See the [game model index](index.md).
 
