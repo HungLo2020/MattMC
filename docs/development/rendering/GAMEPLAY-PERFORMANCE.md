@@ -88,6 +88,131 @@ Keep system memory pressure and background processes comparable. Repeat and
 alternate clients before claiming a small improvement. Comparing an earlier
 busy-machine run to a later quiet run does not isolate an implementation change.
 
+## Local entity-section checkpoint
+
+Latest native `6076262e` includes Rust root/typed section membership, retained
+DH accepted-parent culling reuse and count-only admitted frame output. The
+benchmark matches actual heap/collector/JIT settings on unchanged Frozen.
+All twenty alternating exact 6,000-frame runs are clean; all live controls,
+source/native/Frozen/prompt and three prepared-input guards pass. No clients
+remain. The controller exits 1 only at aggregate performance evaluation.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Floors |
+| --- | --- | --- | --- |
+| Vanilla | 1263.55 / 1268.40 | 3.674 / 3.460 | FPS fails 0.38%; p99 fails 6.18% |
+| Vanilla + DH | 769.85 / 634.30 | 3.281 / 6.727 | Both pass |
+| Shaders | 349.80 / 315.70 | 5.034 / 7.169 | Both pass |
+| Shaders + DH | 269.00 / 226.60 | 5.276 / 9.146 | Both pass |
+
+The protocol retains 360 settle and 240 warmup frames, four DH repeats per
+side and two for every other mode. All scheduled repeats are included.
+Frozen's DH result moved substantially from the preceding comparison; this
+matrix establishes neither an isolated optimization gain nor a cause for the
+vanilla miss. Aggregate performance acceptance remains **failed**, and further
+profile-backed Rust migration/optimization is required. This is a correctness
+checkpoint, not completion of the performance or Java-removal goals.
+
+Combined suites pass 2,691 Rust tests (three ignored) and 2,018 executed
+Java/parity tests (two skipped). Actual Frozen membership 6,123, manager
+lookup 4,417 and DH traversal 1,280 cases match with identity guards.
+Seven lifecycle cases, two world pairs and the fixed cow body/shadow pair pass
+with zero VUIDs. Fourteen original images were individually reviewed and ten
+Current correctness runtime identities match. These settled views do not
+verify first-turn/first-frame behavior, streaming, broad gameplay or long-session
+memory. Receipts: `build/native-entity-sections/dh-summary-candidate/`, including
+`gameplay/performance.json`, `gameplay/final-guards.json`,
+`gameplay/effective-control-verification.json`, both original-review records
+and `runtime-identities.json`.
+
+The following records preserve **earlier candidates**, not verification of
+this newer native image.
+
+**Measurement limitation:** paired JFRs subsequently showed Current using G1
+with a1GiB initial heap and Frozen using ZGC with4GiB. Their launchers also
+select different JIT thresholds. Thus the raw matrix below is retained evidence,
+not a controlled renderer performance comparison or isolated regression proof.
+The frame-benchmark harness now supplies common `_JAVA_OPTIONS`:1GiB initial,
+8GiB maximum, ZGC on Linux/Windows, compact headers, ZUncommitDelay5 and
+tier thresholds100/600/300/700. Explicit VM overrides apply to both sides;
+gameplay-property precedence and Frozen source remain unchanged. The actual
+HotSpot test verifies equal effective settings despite conflicting launcher
+defaults. The corrected20-run matrix checks each owned client's live
+`VM.flags` checked before the warmup fence. Run
+`JAVA_HOME=/path/to/jdk25 python3 -m unittest discover -s DevUtils/tests/rendering -p test_benchmark_jvm_controls.py`
+to exercise those controls.
+
+The corrected matrix has now finished: all twenty exact6,000-frame runs are
+clean, all ten live VM controls match, final source/native/Frozen/prompt/three
+input guards pass and no clients remain at timing completion. The controller
+exits1 only at evaluation; vanilla p99 and DH FPS miss their floors.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Matched floors |
+| --- | --- | --- | --- |
+| Vanilla | 1337.60 / 1227.45 | 3.695 / 3.544 | FPS passes; p99 fails4.25% |
+| Vanilla + DH | 683.50 / 835.70 | 4.662 / 5.233 | FPS fails18.2%; p99 passes |
+| Shaders | 334.95 / 316.05 | 5.349 / 7.016 | Both pass |
+| Shaders + DH | 266.65 / 226.05 | 5.684 / 9.959 | Both pass |
+
+All scheduled repeats remain included; the protocol still uses360 settle,
+240 warmup and4 DH repeats per side versus2 for the other modes. Separate
+matched-control 15s vanilla/DH profiles completed sequentially after timing,
+with live flag guards for both clients. They selected retained-DH traversal
+and count-only output changes; native `6076262e` passes refreshed combined
+suites and Frozen CPU replays. Fresh gameplay and twenty matched timing runs
+are in progress. No isolated section-regression cause or accepted speedup
+is established yet. Corrected receipts:
+`build/native-entity-sections/matched-jvm-v3/gameplay/`, including
+`effective-control-verification.json` and the mode/all-run results.
+
+The following table retains the **older unmatched-control matrix**.
+
+The earlier section-membership candidate uses native `d4348edd`
+on top of documentation-only `6b858d35b`. Rust stores root/typed member arrays
+for production client/server section consumers; Java retains class descriptors,
+behavior bindings and callbacks. See the
+[ownership and verification guide](../world/entities/RUST-ENTITY-SECTIONS.md).
+Coordinate indexing and visibility remain subsequent migration work.
+
+All twenty predeclared alternating timings completed: 6,000 measured frames,
+360 settle and 240 warmup, four repeats per side for DH and two for each other
+mode. The same prepared worlds/pack and unchanged Frozen OpenGL `7a4d1817`
+were used. All runs are clean, all Current runtime native identities match,
+and final source/native/Frozen/prompt/three prepared-input guards pass.
+No clients remained at timing completion. No profiler or extra game client ran
+during timing; separate diagnostic clients start only after its controller ends.
+
+| Mode | Median FPS, Current / Frozen | Median p99 ms, Current / Frozen | Floors |
+| --- | --- | --- | --- |
+| Vanilla | 1319.75 / 1177.45 | 3.712 / 3.026 | FPS passes; p99 fails22.7% |
+| Vanilla + DH | 844.35 / 795.55 | 2.995 / 5.021 | Both pass |
+| Shaders | 353.80 / 319.45 | 5.262 / 6.233 | Both pass |
+| Shaders + DH | 260.10 / 228.70 | 6.336 / 8.064 | Both pass |
+
+The original controller exits1 at evaluation because vanilla p99 misses the required
+floor. Both Current vanilla repeats are retained (3.839 and3.586ms p99), as
+are both Frozen repeats (3.151 and2.900ms). This is not a passing performance
+checkpoint, an isolated regression attribution, or a reason to stop migration.
+Guarded paired15s vanilla JFR diagnostics complete separately with process/source/
+native guards. They exposed the GC-control mismatch above; total concurrent GC
+cycle duration must not be interpreted as a stop-the-world pause. Their timings
+do not replace these measurements or establish the cause of the raw p99 miss.
+
+Combined Rust2,691/three ignored and Java/parity2,016 executed/two skipped pass.
+Actual Frozen membership6,123 and manager4,417 cases match with identity guards.
+Seven lifecycle cases, two world pairs and a cow/body-shadow pair pass,VUID0;
+fourteen original images were individually reviewed and ten Current correctness
+runtime identities match. The cow comparison covers five fixed-view images per
+side, not general animation or leash acceptance. Initial pre-array-repair
+runtime evidence and its deliberate pre-timing controller cancellation remain.
+The array-projection compatibility repair was verified before this matrix.
+
+Receipts: `build/native-entity-sections/array-copy-candidate/gameplay/`
+(`performance.json`, mode repeats and `final-guards.json`),
+`world-original-reviews.json`, `cow-original-reviews.json` and
+`runtime-identities.json`. Source is unchanged during measurement/profiling.
+First-frame/first-turn defects, sustained streaming, broad gameplay and long
+host/GPU memory acceptance remain open. Those receipts describe that earlier source checkpoint.
+
 ## Local visible tracking checkpoint
 
 The implementation author reports the October 11 native `9c9f085c` checkpoint,

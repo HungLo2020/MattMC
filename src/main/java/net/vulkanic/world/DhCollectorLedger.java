@@ -411,6 +411,7 @@ final class DhCollectorLedger {
 
 	static final int VISIBLE_FRAME_ENABLED = 1;
 	static final int VISIBLE_FRAME_ADMIT = 2;
+	static final int VISIBLE_FRAME_SUMMARY = 4;
 
 	/** One frame's render list from the walk's first {@code count} (key,
 	 * generation) pairs: [unpublished, request failures, first failed key, its

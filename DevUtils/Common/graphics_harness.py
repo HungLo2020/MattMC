@@ -36191,6 +36191,26 @@ def validate_fixture_combinations(args: argparse.Namespace) -> None:
 
 
 
+def benchmark_java_options(existing: str, jvm_args: Sequence[str]) -> str:
+    """Give both frame-benchmark launchers identical heap, GC and JIT controls.
+
+    _JAVA_OPTIONS is processed after Gradle's client command-line flags. This
+    also controls old Frozen launchers without modifying their source. Keep
+    explicit VM overrides last, and leave gameplay properties' precedence alone.
+    """
+    inherited = shlex.split(existing)
+    explicit = [arg for arg in jvm_args if arg.startswith(("-XX:", "-Xms", "-Xmx"))]
+    overrides = [*inherited, *explicit]
+    gc = ["-XX:-UseG1GC", "-XX:-UseZGC"]
+    if not any(re.fullmatch(r"-XX:\+Use\w+GC", arg) for arg in overrides):
+        gc.append("-XX:+UseG1GC" if sys.platform == "darwin" else "-XX:+UseZGC")
+    defaults = [*gc, "-Xms1G", "-Xmx8G", "-XX:+UseCompactObjectHeaders",
+                "-XX:ZUncommitDelay=5", "-XX:Tier3InvocationThreshold=100",
+                "-XX:Tier4InvocationThreshold=600", "-XX:Tier4MinInvocationThreshold=300",
+                "-XX:Tier4CompileThreshold=700"]
+    return shlex.join([*defaults, *overrides])
+
+
 def benchmark_terrain_queue_options(backend: str, workload_profile: str, jvm_args: Sequence[str]) -> list[str]:
     """Terrain-queue readiness properties for a Current frame benchmark row.
 
@@ -38393,6 +38413,10 @@ def build_capture_command(
         # unavailable. RunDev already enables this for interactive launches.
         env["MATTMC_RUST_VULKAN_GPU_TIMESTAMPS"] = "true"
     if frame_benchmark_requested(args, tool_kind):
+        # Current captures otherwise force G1/1G while old Frozen uses ZGC/4G;
+        # comparing those defaults conflates renderer tails with JVM controls.
+        env["_JAVA_OPTIONS"] = benchmark_java_options(
+            env.get("_JAVA_OPTIONS", ""), getattr(args, "jvm_arg", []) or [])
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         if mode.backend == "rust-vulkan":
             # Frame benchmarks need the device-side duration in addition to

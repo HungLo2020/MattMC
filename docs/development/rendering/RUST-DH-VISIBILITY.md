@@ -7,7 +7,9 @@ publication, stable near-to-far ordering and segment admission. On the native
 route, per-frame culling input is six normalized frustum planes and world-height
 bounds, or no planes for `NeverCullFrustum`/disabled culling. Java does not walk nodes,
 construct candidate pairs or import generations again on that route. The
-collector still returns frame metadata and sorted column keys to Java.
+ordinary admitted collector returns frame metadata and the column count to Java;
+its ordered identities stay in Rust. Explicit inspection and exact-atlas
+per-column accounting retain full sorted-key output.
 
 Java still owns DH generation/retrieval scheduling, its generation tree and
 section wrappers. Mutation notifications connect that tree to the visibility
@@ -31,6 +33,13 @@ VulkanicGAL remains the sole GPU resource/submission/presentation owner.
   The [collector rechecks candidate generations](https://github.com/HungLo2020/MattMC/blob/65457ef80471487cbdb4ad566e23e9eca07912bc/src/main/rust/render/dh_collector/visibility.rs#L56-L64)
   against its current ledger.
   Java's existing collector lock still protects the collector/provenance handoff.
+- A frontier node already passed its immutable frame-plane intersection test
+  before insertion. Native traversal reuses that result instead of testing an
+  accepted parent again; rejected children retain their original ordering and
+  counters. The nine root offsets use the same fixed stable distance order.
+- `collectVisibleTreeSummary` is the production count/admission boundary;
+  `collectVisibleTree` preserves the full diagnostic result. Exact-atlas frames
+  export keys because their Java per-column callbacks still require them.
 - Tree close drops topology storage immediately. Late callbacks become no-ops;
   the small wrapper survives until its automatic FFM scope has no remaining users.
   No Java pointer or GPU handle is retained by the topology.
@@ -57,6 +66,25 @@ Source checked at `65457ef80471487cbdb4ad566e23e9eca07912bc`:
 and [FFM owner lifetime](https://github.com/HungLo2020/MattMC/blob/65457ef80471487cbdb4ad566e23e9eca07912bc/src/main/java/net/vulkanic/world/NativeDhVisibility.java).
 
 ## Verify
+
+The current source checkpoint is verified within the following scope: matched-JVM
+15s DH profiles put retained visibility collection in45 of75 sampled Current
+render stacks (39 leaf samples at the Java boundary). The native traversal now
+avoids duplicate accepted-parent tests and the ordinary admitted boundary no
+longer copies an entire key list into two Java arrays. This is a profile-selected
+implementation, not an isolated speedup or a root-cause claim for the full FPS
+gap. Native `6076262e` passes25 focused Rust and73 Java controls, including
+full-versus-summary admission and exact-atlas key retention. Actual unchanged
+Frozen matches all1,280 ordered walks/counters with source/class/native/driver
+guards. Refreshed combined suites pass 2,691 Rust tests (three ignored) and
+2,018 executed Java/parity tests (two skipped); membership and manager replays
+also pass against Frozen. Seven lifecycle checks, two world comparisons and
+the cow body/shadow pair pass with zero VUIDs; fourteen original images were
+individually reviewed and ten Current native identities match. Twenty matched
+timing runs complete with clean identities/health: DH and both shader modes
+pass both floors, while vanilla misses FPS by 0.38% and p99 by 6.18%. Aggregate
+performance remains unaccepted; see the [full matrix](GAMEPLAY-PERFORMANCE.md#local-entity-section-checkpoint). Candidate
+receipts: `build/native-entity-sections/` (`dh-summary-*`).
 
 Build Current with JDK25 and a release native library. The
 [oracle driver](https://github.com/HungLo2020/MattMC/blob/65457ef80471487cbdb4ad566e23e9eca07912bc/DevUtils/tests/rendering/VerifyDhVisibility.py)

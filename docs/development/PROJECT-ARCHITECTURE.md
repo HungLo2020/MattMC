@@ -202,10 +202,17 @@ radius relocation and callback delivery. This is partial client-world ownership.
 The [visible tracking registry](world/entities/RUST-ENTITY-LOOKUP.md) in
 `world/level/entity_lookup/` owns primary visible ID/UUID entries, ordered
 enumeration and binding retirement for production client/server consumers.
-Java retains behavior references and callbacks; section membership and persistence
-registration/load orchestration remain Java. The linked owner separates the
+Java retains behavior references and callbacks. The linked owner separates the
 author-recorded CPU, lifecycle and settled checks from the outstanding strict
-leash-crop and GUI crosshair differences. Full parity and Java removal remain open.
+leash-crop and GUI crosshair differences. The following
+[section-membership owner](world/entities/RUST-ENTITY-SECTIONS.md)
+stores root and typed arrays in `world/level/entity_sections/`; production
+client/server section consumers read native CPU views. Its CPU/Frozen,
+seven lifecycle and scoped world/entity comparisons pass. Performance acceptance
+remains open: the latest matched matrix passes DH and both shader modes,
+but vanilla misses FPS/p99 floors. Broader runtime scope remains open. Section-coordinate
+maps, visibility and persistence registration/load orchestration remain Java.
+Full parity and Java removal remain open.
 
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
 retains primary position/bounds components per world and queries them directly

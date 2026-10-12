@@ -2515,8 +2515,13 @@ public final class DistantHorizonsSemanticCollector {
 		boolean admitted,
 		VisibleColumnSegments segments,
 		int requestFailures,
-		String requestFailure
+		String requestFailure,
+		int columnCount
 	) {
+		public VisibleFrame(long[] nearToFar, int unpublished, boolean admitted,
+			VisibleColumnSegments segments, int requestFailures, String requestFailure) {
+			this(nearToFar, unpublished, admitted, segments, requestFailures, requestFailure, nearToFar.length);
+		}
 		public static final VisibleFrame EMPTY = new VisibleFrame(new long[0], 0, false, VisibleColumnSegments.EMPTY, 0, null);
 	}
 
@@ -2543,14 +2548,29 @@ public final class DistantHorizonsSemanticCollector {
     }
 
     public static VisibleFrame collectVisibleTree(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats) {
+        return collectVisibleTree(tree,planes,minY,maxY,stats,false);
+    }
+
+    /** Ordinary admitted frames retain ordered identities in Rust; Java needs only counts. */
+    public static VisibleFrame collectVisibleTreeSummary(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats) {
+        return collectVisibleTree(tree,planes,minY,maxY,stats,true);
+    }
+
+    private static VisibleFrame collectVisibleTree(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats,boolean summary) {
         boolean enabled=enabled();boolean admit=enabled&&!exactAtlasCoverageRequested();
-        int flags=(enabled?DhCollectorLedger.VISIBLE_FRAME_ENABLED:0)|(admit?DhCollectorLedger.VISIBLE_FRAME_ADMIT:0);
+        boolean compact=summary&&admit;
+        int flags=(enabled?DhCollectorLedger.VISIBLE_FRAME_ENABLED:0)|(admit?DhCollectorLedger.VISIBLE_FRAME_ADMIT:0)
+            |(compact?DhCollectorLedger.VISIBLE_FRAME_SUMMARY:0);
         long[] frame;
         synchronized(LOCK) {frame=DhCollectorLedger.visibleTree(tree,planes,minY,maxY,flags,stats);}
-        return visibleFrameResult(frame,admit);
+        return visibleFrameResult(frame,admit,compact);
     }
 
     private static VisibleFrame visibleFrameResult(long[] frame,boolean admit) {
+		return visibleFrameResult(frame, admit, false);
+	}
+
+	private static VisibleFrame visibleFrameResult(long[] frame,boolean admit,boolean summary) {
 		String requestFailure = null;
 		if (frame[1] > 0L) {
 			try {
@@ -2561,8 +2581,9 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		VisibleColumnSegments segments = new VisibleColumnSegments(
 			(int)frame[4], (int)(frame[5] + frame[6]), (int)frame[7]);
-		return new VisibleFrame(Arrays.copyOfRange(frame, 9, frame.length), (int)frame[0], admit, segments,
-			(int)frame[1], requestFailure);
+		return new VisibleFrame(summary ? VisibleFrame.EMPTY.nearToFar() : Arrays.copyOfRange(frame, 9, frame.length),
+			(int)frame[0], admit, segments, (int)frame[1], requestFailure,
+			summary ? Math.toIntExact(frame[9]) : frame.length - 9);
 	}
 
 	public static void recordRenderListVisibilityStats(

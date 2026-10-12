@@ -6,5 +6,7 @@
   membership, immutable tick snapshots and Java behavior bindings.
 - [Rust visible entity tracking](RUST-ENTITY-LOOKUP.md): primary ID/UUID maps,
   live ordered enumeration, callback boundaries and verification.
+- [Rust entity-section membership](RUST-ENTITY-SECTIONS.md): root/typed native
+  member arrays, callback lifetime and Current/Frozen verification.
 - [Component model](../../game-model/COMPONENTS-AND-ENTITIES.md): the broader
   planned model, including deterministic ticks, anchored entities and persistence.

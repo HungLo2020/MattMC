@@ -475,6 +475,49 @@ class DistantHorizonsSemanticCollectorTest {
 		assertVisibleFrameParity(false);
 	}
 
+	@Test
+	void admittedTreeSummaryRetainsNativeOrderingAndAllAdmissionEffects() {
+		String full = treeFrameOutcome(false, false);
+		DistantHorizonsSemanticCollector.resetForTest();
+		assertEquals(full, treeFrameOutcome(true, false));
+	}
+
+	@Test
+	void exactAtlasTreeSummaryStillExportsKeysForPerColumnCallbacks() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		String full = treeFrameOutcome(false, true);
+		DistantHorizonsSemanticCollector.resetForTest();
+		assertEquals(full, treeFrameOutcome(true, true));
+	}
+
+	private static String treeFrameOutcome(boolean summary, boolean exactAtlas) {
+		long[] keys = {DhSectionPos.encode((byte)6, 3, 0), DhSectionPos.encode((byte)6, 1, -1),
+			DhSectionPos.encode((byte)7, 0, 0), DhSectionPos.encode((byte)6, 1, 0),
+			DhSectionPos.encode((byte)6, 2, -1), DhSectionPos.encode((byte)6, -4, 5),
+			DhSectionPos.encode((byte)6, 1, -2)};
+		long[] walked = buildRenderListFixture(keys);
+		try (var tree = new NativeDhVisibility(12, 6, 8192, 96, -40)) {
+			for (int i=0;i<keys.length;i++) {
+				long token=tree.event(1,keys[i],1,0);
+				tree.state(keys[i],token,true,walked[i*2+1],1);
+			}
+			DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+			long[] stats=new long[4];
+			var frame=summary ? DistantHorizonsSemanticCollector.collectVisibleTreeSummary(tree,null,0,256,stats)
+				: DistantHorizonsSemanticCollector.collectVisibleTree(tree,null,0,256,stats);
+			assertEquals(!exactAtlas,frame.admitted());
+			assertTrue(frame.columnCount()>0);
+			assertEquals(summary&&!exactAtlas ? 0 : frame.columnCount(),frame.nearToFar().length);
+			var s=frame.segments();int[] counts={s.opaqueSegments(),s.transparentSegments(),s.waterSegments()};
+			if(!frame.admitted())for(long key:frame.nearToFar()) {
+				var c=DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(key);
+				counts[0]+=c.opaqueSegments();counts[1]+=c.transparentSegments();counts[2]+=c.waterSegments();
+			}
+			return "columns="+frame.columnCount()+" stats="+java.util.Arrays.toString(stats)+" "+
+				renderListOutcome(new long[0],frame.unpublished(),counts);
+		}
+	}
+
 	/** Exact-atlas coverage keeps Java's per-column admission after the call. */
 	@Test
 	void exactAtlasVisibleFrameMatchesThePerColumnRenderListCalls() {

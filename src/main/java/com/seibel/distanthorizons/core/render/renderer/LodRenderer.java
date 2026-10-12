@@ -103,7 +103,7 @@ public class LodRenderer
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.render-list");
 			DistantHorizonsSemanticCollector.VisibleFrame visibleFrame = buffers.getSemanticVisibleFrame();
 			long[] semanticColumns = visibleFrame.nearToFar();
-			if (semanticColumns.length == 0)
+			if (visibleFrame.columnCount() == 0)
 			{
 				DistantHorizonsSemanticCollector.recordRenderListObservation(0);
 				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("no-visible-columns", 0, 0, 0);
@@ -132,7 +132,7 @@ public class LodRenderer
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.asset-preflight");
 			net.vulkanic.gui.RustGalFrameCoordinator.flushPendingWorldLodAssetsForSemanticPreflight();
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.asset-preflight");
-			DistantHorizonsSemanticCollector.recordRenderListObservation(semanticColumns.length);
+			DistantHorizonsSemanticCollector.recordRenderListObservation(visibleFrame.columnCount());
 			if (opaqueSegments + transparentSegments + waterSegments == 0)
 			{
 				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(

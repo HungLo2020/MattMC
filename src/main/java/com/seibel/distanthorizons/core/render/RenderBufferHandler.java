@@ -161,7 +161,7 @@ public class RenderBufferHandler implements AutoCloseable
             && DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
             && (!enableFrustumCulling || frustum.getClass()==DhFrustumBounds.class || frustum.getClass()==NeverCullFrustum.class)) {
             DhFrustumBounds bounds=enableFrustumCulling && frustum.getClass()==DhFrustumBounds.class ? (DhFrustumBounds)frustum : null;
-            this.semanticVisibleFrame=DistantHorizonsSemanticCollector.collectVisibleTree(nativeTree,
+            this.semanticVisibleFrame=DistantHorizonsSemanticCollector.collectVisibleTreeSummary(nativeTree,
                 bounds==null?null:bounds.rustVisibilityPlanes(),bounds==null?0F:bounds.worldMinY,bounds==null?0F:bounds.worldMaxY,this.rustWalkStats);
             this.visibleBufferCount=0;this.culledBufferCount=(int)this.rustWalkStats[1];
             if(this.semanticVisibleFrame.requestFailures()>0) LOGGER.error("Error requesting publication of ["+this.semanticVisibleFrame.requestFailures()

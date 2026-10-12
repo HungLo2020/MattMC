@@ -408,10 +408,10 @@ pub unsafe extern "C" fn mattmc_dh_collector_visible_frame(walked: *const i64, c
     let raw = if count <= 0 { &[][..] } else { std::slice::from_raw_parts(walked, count as usize * 2) };
     let walked: Vec<(i64, i64)> = raw.chunks_exact(2).map(|w| (w[0], w[1])).collect();
     let frame = with(|l| l.collect_visible_frame(&walked, [center_x, center_z], flags & 1 != 0, flags & 2 != 0));
-    store_visible_result(frame)
+    store_visible_result(frame, false)
 }
 
-fn store_visible_result(frame: Option<Result<crate::render::dh_collector::RenderListFrame, Failure>>) -> i32 {
+fn store_visible_result(frame: Option<Result<crate::render::dh_collector::RenderListFrame, Failure>>, summary: bool) -> i32 {
     match frame {
         None => ERR_POISONED,
         Some(Err(failure)) => code(failure),
@@ -421,7 +421,13 @@ fn store_visible_result(frame: Option<Result<crate::render::dh_collector::Render
             let mut out = vec![frame.unpublished as i64, frame.request_failures as i64, failed_key, failed_code];
             out.extend([c.opaque, c.side, c.up, c.water].map(i64::from));
             out.push(frame.stale as i64);
-            out.extend(frame.sorted);
+            if summary {
+                // Admission, ordering and visibility identities stay in Rust.
+                // Java's ordinary consumer needs only the number of columns.
+                out.push(frame.sorted.len() as i64);
+            } else {
+                out.extend(frame.sorted);
+            }
             store_output(out)
         }
     }
@@ -856,7 +862,7 @@ pub unsafe extern "C" fn mattmc_dh_collector_visible_tree(
     } else {(Default::default(),[0,0])};
     drop(data);
     std::ptr::copy_nonoverlapping([walk.visited,walk.culled,walk.disabled,walk.missing].as_ptr(),stats,4);
-    store_visible_result(with(|l|l.collect_visible_frame(&walk.candidates,center,flags&1!=0,flags&2!=0)))
+    store_visible_result(with(|l|l.collect_visible_frame(&walk.candidates,center,flags&1!=0,flags&2!=0)), flags&4!=0 && flags&2!=0)
 }
 
 /// Explicit CPU inspection for verification, never the production admission input.

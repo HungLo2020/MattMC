@@ -208,14 +208,10 @@ impl Tree {
         let mut out = Walk::default();
         let cx = self.center[0] >> self.root;
         let cz = self.center[1] >> self.root;
-        let mut roots = Vec::new();
         // MovableGridRingList's stable squared-distance order, x then z ties.
-        for x in -1i32..=1 {
-            for z in -1i32..=1 {
-                roots.push((x, z));
-            }
-        }
-        roots.sort_by_key(|&(x, z)| x * x + z * z);
+        // This nine-element order is independent of the center and topology.
+        let roots = [(0, 0), (-1, 0), (0, -1), (0, 1), (1, 0),
+                     (-1, -1), (-1, 1), (1, -1), (1, 1)];
         let mut frontier = Vec::new();
         let mut next = Vec::new();
         for (x, z) in roots {
@@ -252,9 +248,12 @@ impl Tree {
                             out.candidates.push((node.key, node.generation));
                         }
                     }
-                    // Iterator tests each accepted parent again before adding
-                    // children. Preserve its culling counter, including null parents.
-                    if detail > self.leaf && !reject(i, &mut out) {
+                    // Every frontier node already passed reject on insertion.
+                    // The topology lock and immutable frame planes make that
+                    // result stable. Frozen's repeated accepted-parent test
+                    // cannot increment its culling counter; children still
+                    // receive their original test in the original order.
+                    if detail > self.leaf {
                         for child in node.children.into_iter().flatten() {
                             if !reject(child, &mut out) {
                                 next.push(child);
