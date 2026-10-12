@@ -90,14 +90,22 @@ busy-machine run to a later quiet run does not isolate an implementation change.
 
 ## Local visible tracking checkpoint
 
-The October11 native `9c9f085c` checkpoint on base `cc929bd06` moves
-production visible ID/UUID maps and ordered enumeration into
+The implementation author reports the October 11 native `9c9f085c` checkpoint,
+published in [`d8e6b8f4`](https://github.com/HungLo2020/MattMC/commit/d8e6b8f477b9c6f55aef3030260a3e2af4b10212)
+after documentation base `cc929bd06`. This source moves production visible
+ID/UUID maps and ordered enumeration into
 [Rust entity tracking](../world/entities/RUST-ENTITY-LOOKUP.md). It also removes
 profile-backed Java text layer/clipping record copies before the same inputs
 reach Rust. Font extraction/layout, behavior callbacks, section membership
 and persistence remain Java; no new ownership is claimed for the text cleanup.
+The native image is unchanged between the pre-cleanup and final matrices;
+`RustGalGuiRenderer` is the executable source delta. The reference remains
+unmodified Frozen OpenGL `7a4d181717dc0c7da9086f1a17687dfd522ce417`.
+This documentation review inspected pinned source and assertions only; it did
+not rerun native/Java suites, replay captures, or inspect untracked originals.
+All runtime results and original-image reviews below are author-reported.
 
-All twenty predeclared alternating runs complete cleanly: exactly6,000 frames,
+All twenty predeclared alternating runs complete cleanly: exactly 6,000 frames,
 360 settle/240 warmup, four repeats per side for DH and two for other modes.
 No profiler or other game client ran during timing. Every repeat is retained.
 Final source/native/Frozen/prompt/three prepared-input guards pass.
@@ -109,30 +117,46 @@ Final source/native/Frozen/prompt/three prepared-input guards pass.
 | Shaders | 346.25 / 316.50 | 5.508 / 6.757 |
 | Shaders + DH | 266.75 / 227.85 | 6.118 / 8.369 |
 
-**All four average-FPS and p99 floors pass.** Vanilla p99 margin is about1.9%.
-The preceding5.1% vanilla-tail miss remains below; this does not prove an
+**All four average-FPS and all four p99 floors pass.** Vanilla p99 margin is about 1.9%.
+The preceding 5.1% vanilla-tail miss remains below; this does not prove an
 isolated gain or root-cause repair, and some absolute medians/baselines moved.
 These are settled rotating scenes with hidden minimap, not broad gameplay,
 first shader-world-frame/first-turn, streaming or long-memory acceptance.
 
-Fresh full Rust2,685/three ignored and Java/parity2,010 executed/two skipped
-pass. Frozen lookup/manager4,417 is rerun after cleanup. Geometry11,489,
-order4,143 and range645 pass on the identical native and unchanged consumers.
-Seven fresh lifecycles, two world pairs and four GUI item pairs pass,VUID0;
+Fresh full Rust 2,685/three ignored and Java/parity 2,010 executed/two skipped
+pass. Frozen lookup/manager 4,417 is rerun after cleanup. Geometry 11,489,
+order 4,143 and range 645 pass on the identical native and unchanged consumers.
+Seven fresh lifecycles, two world pairs and four GUI item pairs pass, with zero VUIDs;
 all twelve originals are individually reviewed and thirteen Current runtime
 identities match. The earlier strict body/shadow pair supplements tracking
 coverage; its ten originals remain retained.
 
-Leash width differs from Frozen, also seen with the published-registry
-Current control. Current crosshair is absent in some GUI reload fixtures,
-also in the published9f plain original, but present in the moving-foil pair.
-Hotbar item checks do not resolve full GUI/crosshair parity. Receipts:
+Equivalent copied-cow inputs expose a thinner near-camera leash in Current,
+also seen with the published-registry Current control. This leash comparison
+passes whole-image/shadow checks but **fails the strict model crop**; the
+body/shadow result does not accept leash parity or establish its cause.
+Current crosshair is absent in plain/static/oversized GUI reload fixtures,
+also in the older published `9f372451` plain original, but present in the
+moving-foil pair. Hotbar item checks do not resolve full GUI/crosshair parity,
+and the controls do not isolate a cause. Receipts:
 `build/native-entity-lookup/text-copy-candidate/` and the earlier rejected
 fixture/profile results under `build/native-entity-lookup/`.
 
+The pinned [capture harness](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/DevUtils/Common/graphics_harness.py)
+and [model-identity helper](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/DevUtils/Common/model_identity.py)
+accept an exact family identity or that family plus `/part/root` or
+`/part/` followed by lowercase hex encoding valid UTF-8.
+For split crop aggregation, one frame must contain unique parts matching the
+inventory observed across matching captured records, consistent metadata and
+finite projected bounds. That inventory is not an independently authored
+expected topology, and an exact unsplit model bypasses split-set aggregation.
+These guards do not prove every expected model part was captured or establish
+blanket topology or visual parity.
+
 ## Historical visible tracking before text-copy cleanup
 
-Local native `9c9f085c` on documentation base `cc929bd06` moves production
+The author-reported pre-cleanup native `9c9f085c` checkpoint on documentation
+base `cc929bd06` moves production
 client/server visible ID/UUID maps and live ordered enumeration into
 [Rust entity tracking](../world/entities/RUST-ENTITY-LOOKUP.md). Java behavior
 bindings and callbacks remain; section membership and persistence remain Java.
@@ -172,7 +196,9 @@ Current control. The leash issue remains open; it is not accepted by the
 body/shadow or whole-image passes. These pre-cleanup results remain historical.
 Receipts: `build/native-entity-lookup/{gameplay,vanilla-jfr}/`.
 
-## Current hardware evidence boundary
+<a id="current-hardware-evidence-boundary"></a>
+
+## Historical integrated hardware evidence boundary
 
 The implementation author records the October 11 combined checkpoint with
 native `9f372451`, published in
@@ -247,7 +273,7 @@ retain them rather than replacing unfavorable results. Receipts:
 
 Subsequent source [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8)
 adds native atlas construction and model baking. Its [resource verification](../resources/VERIFICATION.md)
-initially recorded preparation/CPU workloads. The current `9f372451` checkpoint
+initially recorded preparation/CPU workloads. The historical `9f372451` checkpoint
 above later adds combined lifecycle/image/timing evidence; the preceding
 `c487f375` runtime pass/failure still does not verify that later source.
 

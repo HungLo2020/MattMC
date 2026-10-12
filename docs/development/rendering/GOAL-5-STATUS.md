@@ -2,30 +2,48 @@
 
 **Goal 5 remains incomplete.**
 
-## October11 visible-tracking checkpoint
+<a id="october11-visible-tracking-checkpoint"></a>
 
-[Rust entity lookup](../world/entities/RUST-ENTITY-LOOKUP.md) now owns primary
+## October 11 visible-tracking checkpoint
+
+At source [`d8e6b8f4`](https://github.com/HungLo2020/MattMC/commit/d8e6b8f477b9c6f55aef3030260a3e2af4b10212),
+following documentation base `cc929bd06`,
+[Rust entity lookup](../world/entities/RUST-ENTITY-LOOKUP.md) owns primary
 visible ID/UUID maps and live ordered enumeration. Profile-backed Java text
 input copy cleanup retains the same Rust fields; font/layout ownership remains
-Java. Fresh Rust2,685/three ignored, Java/parity2,010 executed/two skipped and
-Frozen lookup4,417 pass. Seven lifecycles/two world/four GUI item pairs pass,
-VUID0; twelve originals reviewed/thirteen runtime identities match. All twenty
-fresh timings and final identity/input guards pass every FPS/p99 floor.
+Java. The implementation author reports fresh Rust 2,685/three ignored,
+Java/parity 2,010 executed/two skipped and Frozen lookup 4,417 passing.
+Seven lifecycles/two world/four GUI item pairs pass with zero VUIDs; twelve
+originals reviewed/thirteen runtime identities match. All twenty fresh timings
+and final identity/input guards pass all eight FPS/p99 floors. Native
+`9c9f085c` is unchanged across the Java cleanup. Final vanilla p99 is
+3.049/3.109 ms Current/Frozen; the earlier same-native matrix remains a
+recorded failure at 3.190/3.035 ms. Frozen OpenGL remains the unmodified
+`7a4d181717dc0c7da9086f1a17687dfd522ce417` reference. This documentation review
+inspected source and assertions, without independently running native/Java
+suites, captures or replays, or viewing the untracked original images.
 See the [matrix and limits](GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint).
-No isolated gain or root-cause repair of the prior5.1% vanilla-tail miss is proved.
+No isolated gain or root-cause repair of the prior 5.1% vanilla-tail miss is proved.
 
 Equivalent copied-cow inputs expose thinner near-camera leash geometry in
 Current, also seen with the published-registry control. The equivalent-leash
 run passes whole-image/shadow checks but fails strict model crop; no leash
-parity is accepted. All ten originals are reviewed; retain
+parity is accepted. The author reports all ten originals reviewed; retain
 `build/native-entity-lookup/cow-v7-original-reviews.json`.
 Current crosshair is absent in plain/static/oversized GUI reload fixtures,
-also in the published9f plain original, but present in the moving-foil pair.
+also in the older published `9f372451` plain original, but present in the moving-foil pair.
 Item layout/lighting/foil checks do not establish crosshair or full GUI parity;
 retain `build/native-entity-lookup/text-copy-candidate/gui-original-reviews.json`.
-Full Goal5 acceptance and Java removal remain open.
+Full Goal 5 acceptance and Java removal remain open.
 
-## October 11 integrated lifecycle/model checkpoint
+The verified [visible-tracking review #770](https://github.com/HungLo2020/MattMC/issues/770#issuecomment-6117584477)
+and [evidence review #709](https://github.com/HungLo2020/MattMC/issues/709#issuecomment-6117585793)
+retain these boundaries; both issues remain open. These source reviews add no
+runtime execution or image replay.
+
+<a id="october-11-integrated-lifecyclemodel-checkpoint"></a>
+
+## Historical October 11 integrated lifecycle/model checkpoint
 
 At published source [`c1428dbc`](https://github.com/HungLo2020/MattMC/commit/c1428dbc7a1a0b190cb9e7bc2c5c849e99ec3f42),
 the implementation author records native `9f372451` combining upstream Rust atlas/model baking `71762d602`
@@ -34,7 +52,7 @@ profile-backed bounded generated-item alpha masks. Retained entities stay
 readable and queryable; revival and world transfer preserve the primary view.
 See the [entity guide](../world/entities/RUST-ENTITY-GEOMETRY.md) and
 [model guide](../resources/MODELS.md) for ownership and verification controls.
-Java still owns tracking/section admission, behavior, simulation orchestration,
+At that checkpoint Java still owns tracking/section admission, behavior, simulation orchestration,
 networking and startup; the Rust executable remains unfinished.
 
 The author reports combined suites passing 2,680 Rust tests (three ignored) and 2,005 executed
@@ -48,14 +66,14 @@ with zero VUIDs. All twelve original images were reviewed; thirteen Current
 runtime artifacts identify the combined native image. All twenty alternating
 gameplay runs are clean and pass every average-FPS/p99 floor, with final
 source/native/Frozen/prompt/prepared-input guards. See the
-[current matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
+[historical integrated matrix](GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary)
 for exact values and workload limits. No isolated speedup or prior-tail cause
 is proved. The earlier `543a592f` matrix remains historical.
 
 First shader-world-frame, first-turn nearby terrain, temporal, broad-gameplay,
 sustained-streaming and long-session memory acceptance remain open. Receipts:
-`build/native-entity-lifecycle-model-integration/`. Continue migrating live
-world producers and consumers after publishing this bounded batch.
+`build/native-entity-lifecycle-model-integration/`. The visible-tracking
+checkpoint above supersedes this ownership/timing boundary for newer source.
 
 This documentation review inspected source and verification assertions; it did not
 rerun native/Java suites, benchmarks, lifecycle scenarios or untracked image

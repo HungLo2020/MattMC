@@ -199,12 +199,13 @@ mutations invalidate unread entries between callbacks.
 Java retains atomic chunk references, reference-CAS facts, scalar ring/range reads,
 radius relocation and callback delivery. This is partial client-world ownership.
 
-The local [visible tracking registry](world/entities/RUST-ENTITY-LOOKUP.md) in
+The [visible tracking registry](world/entities/RUST-ENTITY-LOOKUP.md) in
 `world/level/entity_lookup/` owns primary visible ID/UUID entries, ordered
 enumeration and binding retirement for production client/server consumers.
-Java retains behavior references and callbacks. Bounded CPU/live/Frozen and
-four-mode timing checks pass; section membership and persistence registration/
-load orchestration remain Java. Full parity and Java removal remain open.
+Java retains behavior references and callbacks; section membership and persistence
+registration/load orchestration remain Java. The linked owner separates the
+author-recorded CPU, lifecycle and settled checks from the outstanding strict
+leash-crop and GUI crosshair differences. Full parity and Java removal remain open.
 
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
 retains primary position/bounds components per world and queries them directly
@@ -213,9 +214,11 @@ at despawn while keeping primary geometry readable. The
 [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md) retains
 client/server insertion order and immutable tick snapshots. Java keeps API
 projections, object bindings, hooks, behavior callbacks and tick/extraction
-orchestration. The [current combined checkpoint](rendering/GOAL-5-STATUS.md#october-11-integrated-lifecyclemodel-checkpoint)
-records author-reported CPU/lifecycle/image passes and passing settled FPS/p99 floors;
-the preceding published ticking image missed vanilla p99. General entity
+orchestration. The [latest visible-tracking checkpoint](rendering/GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint)
+records author-reported CPU/lifecycle and scoped image checks, with passing settled
+FPS/p99 floors after Java text-record cleanup. An earlier matrix on the same native
+image failed vanilla p99; baseline movement and the combined changes do not
+establish an isolated improvement or its cause. General entity
 components, complete tick ownership and broad/long-session acceptance remain unfinished.
 
 At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/mod.rs),

@@ -2,24 +2,27 @@
 
 The client and server section managers both use `EntityLookup`. Its primary
 ID map, UUID map, insertion order and binding retirement now live in
-[`world/level/entity_lookup/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/entity_lookup).
+[`world/level/entity_lookup/`](https://github.com/HungLo2020/MattMC/tree/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/rust/world/level/entity_lookup).
 Java keeps a behavior-object binding array and invokes existing callbacks.
 It no longer builds or maintains ID/UUID maps or an ordered entity copy.
-This is verified bounded tracking ownership, not complete world/entity or
-renderer parity.
+This is bounded tracking ownership, not the proposed general component store
+or complete world/entity or renderer parity. The source review below is pinned
+to `d8e6b8f4`; recorded runtime results have their own evidence boundary.
 
 ## Consumers and ownership
 
-[`EntityLookup`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/entity/EntityLookup.java)
-serves `LevelEntityGetterAdapter`, ordinary renderer enumeration, tracking and
+[`EntityLookup`](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/minecraft/world/level/entity/EntityLookup.java)
+serves [identity and enumeration queries](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/minecraft/world/level/entity/LevelEntityGetterAdapter.java), ordinary renderer enumeration, tracking and
 ID/UUID queries from both client and server. Quiet enumeration reads Rust's
 retained CPU rows directly through the read-only
-[`NativeEntityLookup`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/entity/NativeEntityLookup.java)
+[`NativeEntityLookup`](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/minecraft/world/level/entity/NativeEntityLookup.java)
 view. It remaps that view only after table replacement, without per-frame
 entity arrays or native reconstruction of Java maps.
 
-Section keys, typed section membership, persistence's known-UUID set and
-load/visibility orchestration remain Java. Those are subsequent migration
+Here “visible” means admitted to section-manager tracking, not passing the
+camera frustum. The ID/UUID lookup and live ordered enumeration are distinct
+from spatial section queries. Section keys, typed section membership,
+persistence's known-UUID set and load/visibility orchestration remain Java. Those are subsequent migration
 work. Tracking is also distinct from the
 [geometry owner](RUST-ENTITY-GEOMETRY.md) and
 [ticking membership](RUST-ENTITY-ORDER.md). None of these CPU views carries
@@ -32,7 +35,9 @@ native GPU handles; rendering resources remain owned by Rust/GAL.
   evaluation. Remove commits UUID removal before calling the ID getter.
 - ID and UUID entries are independent. ID replacement preserves order, while
   older UUID entries can still name the previous object. Null UUID and all-zero
-  UUID are distinct, and IDs retain the full signed 32-bit domain.
+  UUID are distinct, and IDs retain the full signed 32-bit domain. `count()`
+  reports UUID entries, not ID iteration length; a throwing ID getter can leave
+  a counted, UUID-addressable object without an ID entry.
 - Rust retains a pending binding during virtual ID evaluation. Nested removal,
   reinsertion or a throwing getter cannot invalidate the outer receiver. No
   native mutex spans a Java getter, cast, logger or consumer callback.
@@ -45,6 +50,19 @@ native GPU handles; rendering resources remain owned by Rust/GAL.
   immediately after their final native map/pending reference disappears.
 
 ## Verify and diagnose
+
+This reconciliation inspected production source and verification drivers at
+`d8e6b8f4`; it did not run runtime suites or independently inspect their receipts.
+The [native owner](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/rust/world/level/entity_lookup/mod.rs),
+[ordered table](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/rust/world/level/entity_lookup/id_table.rs)
+and [FFI](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/rust/world/level/entity_lookup/ffi.rs)
+establish the ownership and callback boundaries above. The
+[observer](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/DevUtils/tests/world/entity/VerifyEntityLookup.java),
+[guard wrapper](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/DevUtils/tests/world/entity/VerifyEntityLookup.py)
+and [integration controls](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/test/java/net/minecraft/world/level/entity/EntityLookupIntegrationTest.java)
+define the checked fixture scope, not evidence of a fresh pass in this review.
+Automatic-scope ownership in the bridge is not a measured production GC or
+long-session memory bound.
 
 Use Linux x64 and JDK25, with unchanged Frozen at
 `../MattMC_JavaPerfTesting/MattMC`:
@@ -67,14 +85,26 @@ cast callbacks also terminate otherwise cycling mutation prefixes. This
 synthetic CPU replay supplements real gameplay; it cannot establish runtime
 performance, visual parity or long-session memory behavior. The wrapper pins
 source, compiled classes, native library, Frozen HEAD and the protected prompt.
+It requires equal case counts of at least 4,100; the 4,417 count below is an
+author-recorded result. The observer normalizes `NullPointerException` messages
+to `"null"` while retaining exception classes and callback prefixes; other
+exception messages are recorded. Server fixtures use stub persistence with
+already-completed empty loads, not real disk I/O or asynchronous load races.
+
+## Author-recorded results and retained limits
+
+The results below are implementation-author records, preserved without a fresh
+runtime replay in this documentation review.
 
 Five native controls pass, including 10,000 tracking/removal cycles reusing
 one binding and table contraction after growth. The initial Frozen corpus
 differed at two iterator exception messages; a production no-message override
-repairs that behavior without normalizing the verifier. The initial Java
+repairs those messages in production rather than adding iterator-message
+normalization to the verifier. The initial Java
 manager fixtures required registry bootstrap, now added. Failures remain
-recorded. Five Java integration controls exercise actual client/server
-section-manager tracking and lifecycle callbacks. Retain failures under
+recorded. Of five Java integration controls, three cover getter/UUID/reentrant
+lookup behavior and two cover actual client/server section-manager tracking
+and lifecycle callbacks, with stub server persistence. Retain failures under
 `build/native-entity-lookup/`; native `9c9f085c` passes full Rust (2,685 tests, three ignored) and Java/parity
 (2,010 executed, two skipped). The actual Frozen lookup/client/server replay
 matches all 4,417 cases byte for byte with source/native/eight Current and six

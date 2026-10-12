@@ -7,8 +7,12 @@
 > client/server ordering and snapshots; Java still executes behavior callbacks.
 > Removal reason storage and immediate camera retirement now extend the geometry
 > owner, with retained views, revival and world transfer. Java still executes
-> removal callbacks. The slice guides distinguish author-recorded CPU/live checks
-> and a passing settled matrix from this source-only review at `c1428dbc7`.
+> removal callbacks. The [visible tracking slice](../world/entities/RUST-ENTITY-LOOKUP.md)
+> now owns ID/UUID maps, live ordered enumeration and binding retirement in Rust;
+> Java retains behavior-object bindings and section-manager orchestration.
+> These are separate owners, not a general component store. The slice guides
+> distinguish author-recorded CPU/live checks from this source-only review at
+> `d8e6b8f4`; no runtime suites were rerun for this reconciliation.
 > Broad gameplay and long-session memory
 > acceptance remain separate from implemented ownership.
 > See the [game model index](index.md).
@@ -114,6 +118,15 @@ waiting for the retained geometry lease to be collected; revival reindexes the
 same view in its current world. This membership is separate from ticking and
 section tracking. Ticking membership and snapshot order now have a local Rust
 owner, while Java still orchestrates ticks, removal side effects and behavior
-callbacks.
+callbacks. Visible tracking now has a separate
+[Rust registry](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/rust/world/level/entity_lookup/mod.rs)
+and [Java behavior-binding view](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/minecraft/world/level/entity/NativeEntityLookup.java).
+Its ID/UUID lookups and live insertion-order enumeration do not replace camera
+geometry, immutable tick snapshots or typed spatial section membership. Here
+“visible” means admitted to tracking, not passing a camera-frustum test. Section
+keys, typed membership, persistence's known-UUID set and load/visibility
+orchestration remain Java; the anchored-entity store described above is still
+proposed. See [tracking constraints and verification](../world/entities/RUST-ENTITY-LOOKUP.md).
+
 AI (goals and brains), synchronised data, entity networking, anchored entities
 and the complete simulation loop need their own migration and verification.

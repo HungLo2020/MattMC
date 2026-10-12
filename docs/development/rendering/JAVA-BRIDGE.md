@@ -39,9 +39,9 @@ exact measurement window and cleanup checks pass. Receipt:
 
 ## GUI text input preparation
 
-[`RustGalGuiRenderer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
-still extracts semantic glyphs and copied font-atlas inputs in Java. Local
-text preparation now constructs each affine request with its final source
+[`RustGalGuiRenderer` at `d8e6b8f4`](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
+still extracts semantic glyphs and copied font-atlas inputs in Java.
+Text preparation constructs each affine request with its final source
 layer and clipping fields, avoiding the subsequent layer-copy list and clip
 record copy. Rust's existing frontend receives the same ordered fields; this
 cleanup does not migrate font layout or GUI scheduling ownership.
@@ -54,9 +54,16 @@ Use `RustGalGuiRendererTest`, `TextGlyphQuadTest`, real Frozen GUI/world
 captures and the [performance protocol](GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint).
 The paired warmed JFR at native `9c9f085c` identified the redundant copies;
 first per-thread allocation samples carried pre-recording weights and are
-excluded from the scoped analysis. Fresh CPU, lifecycle/world/GUI item and all twenty timing floors pass for
-the combined tracking/cleanup checkpoint; no isolated speedup or vanilla-tail
-cause is established. Full renderer parity and Java removal remain open.
+excluded from the author's scoped analysis. The author reports fresh CPU and
+bounded lifecycle/world/GUI item checks passing, with all twenty timing runs
+clean and all eight aggregate FPS/p99 floors passing. Native `9c9f085c` is
+unchanged; the earlier same-native vanilla p99 failure remains historical.
+This documentation review inspected source only, without rerunning native/Java
+suites or viewing/replaying untracked captures. No isolated speedup or
+vanilla-tail cause is established. The thinner cow-leash strict-crop failure
+and missing crosshair in plain/static/oversized GUI fixtures remain open,
+including their published-registry/older plain-image controls; moving foil
+retains the crosshair. Full renderer parity and Java removal remain open.
 
 ## How the ABI stays in sync
 
