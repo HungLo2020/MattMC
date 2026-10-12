@@ -16,6 +16,7 @@ import net.minecraft.world.level.levelgen.placement.CaveSurface;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -66,7 +67,7 @@ class NativeSurfaceTest {
             new WorldGenerationContext(generator,LevelHeightAccessor.create(-64,384)));
     }
 
-    @Test void nativeRulesMatchJavaForExceptionalArithmeticBoundsAndLazyConditions() {
+    @Tag("slow") @Test void nativeRulesMatchJavaForExceptionalArithmeticBoundsAndLazyConditions() {
         var system=mock(SurfaceSystem.class); var randomState=mock(RandomState.class); var noise=mock(NoiseChunk.class);
         var secondary=new AtomicReference<>(0.0);
         when(system.getSurfaceDepth(anyInt(),anyInt())).thenReturn(3);

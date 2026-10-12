@@ -183,7 +183,7 @@ class NativeSurfaceChunkTest {
         assertEquals(12, pairs);
     }
 
-    @Test void syntheticColumnsAndCustomRulesMatchJavaStorage() throws Exception {
+    @Tag("slow") @Test void syntheticColumnsAndCustomRulesMatchJavaStorage() throws Exception {
         var registries = NativeNoiseFillTest.registries;
         var noises = registries.lookupOrThrow(Registries.NOISE);
         SurfaceRules.RuleSource sharedSteep = sharedSteep();

@@ -173,7 +173,7 @@ class NativeLoadingChunkTrackerTest {
         return probes.stream().mapToLong(Long::longValue).toArray();
     }
 
-    @Test void exhaustiveShortTicketHistories() {
+    @Tag("slow") @Test void exhaustiveShortTicketHistories() {
         // Every length-four history over two chunks: add/remove of load-only,
         // dual and simulation-only tickets, a one-node run, a full run and unloads.
         long[] chunks = {ChunkPos.asLong(0, 0), ChunkPos.asLong(3, 1)};

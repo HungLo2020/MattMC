@@ -132,7 +132,7 @@ class NativeChunkSectionsTest {
         };
     }
 
-    @Test void syntheticPalettesLightAndEmptySectionsEncodeIdentically(@TempDir Path dir) throws Exception {
+    @Tag("slow") @Test void syntheticPalettesLightAndEmptySectionsEncodeIdentically(@TempDir Path dir) throws Exception {
         var states = new ArrayList<BlockState>();
         for (int id = 0; id < Block.BLOCK_STATE_REGISTRY.size(); id++) states.add(Block.BLOCK_STATE_REGISTRY.byId(id));
         List<Holder<Biome>> biomes = new ArrayList<>(registries.lookupOrThrow(Registries.BIOME).listElements().toList());

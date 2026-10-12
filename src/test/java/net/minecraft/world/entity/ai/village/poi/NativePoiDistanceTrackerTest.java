@@ -84,7 +84,7 @@ class NativePoiDistanceTrackerTest {
         return probes.stream().mapToLong(Long::longValue).toArray();
     }
 
-    @Test void exhaustiveShortHistories() {
+    @Tag("slow") @Test void exhaustiveShortHistories() {
         // Every length-four history over two sections: centre on/off notifications,
         // an unchanged notification, a silent change plus tag reload, and runs.
         long[] sections = {SectionPos.asLong(0, 0, 0), SectionPos.asLong(2, 1, -1)};

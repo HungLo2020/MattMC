@@ -235,7 +235,7 @@ class NativePaletteResizeTest {
         assertFalse(NativePaletteResize.copy(owner, wide, fresh(owner, 9)));
     }
 
-    @Test void independentThreadsAndGcRetainNoPaletteValues() throws Exception {
+    @Tag("slow") @Test void independentThreadsAndGcRetainNoPaletteValues() throws Exception {
         var pool = Executors.newFixedThreadPool(4);
         try {
             var tasks = new ArrayList<Callable<Void>>();

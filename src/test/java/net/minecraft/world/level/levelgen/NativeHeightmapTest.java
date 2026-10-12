@@ -35,7 +35,7 @@ class NativeHeightmapTest {
         }
     }
 
-    @Test void everyTypeSubsetAndExistingRawBits() {
+    @Tag("slow") @Test void everyTypeSubsetAndExistingRawBits() {
         int cases = 0;
         for (var pattern : HeightmapFixtures.WORKLOADS) for (int seed = 0; seed < 8; seed++) {
             int minY = new int[]{-64,0,-2032,2032}[seed % 4];

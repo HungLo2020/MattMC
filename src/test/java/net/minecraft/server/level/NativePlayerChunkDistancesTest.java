@@ -208,7 +208,7 @@ class NativePlayerChunkDistancesTest {
         }
     }
 
-    @Test void seededWalksMatchAcrossEdgePositions() {
+    @Tag("slow") @Test void seededWalksMatchAcrossEdgePositions() {
         long[] anchors = {
             ChunkPos.asLong(0, 0), ChunkPos.asLong(-40, 77), ChunkPos.asLong(Integer.MAX_VALUE, Integer.MIN_VALUE),
             ChunkPos.asLong(1875066, 1875060), ChunkPos.INVALID_CHUNK_POS

@@ -1,25 +1,48 @@
 # Running tests quickly
 
-Pick the narrowest command that covers your change. Full-suite runs are for
-milestones and the [validation driver](../rendering/RENDER-VERIFICATION.md#one-command-validation).
-The task/profile behavior below is source-reviewed at
-[`f8620676`](https://github.com/HungLo2020/MattMC/commit/f86206767dadde696adfed4e04c5ee97cd0d0885); timing
-observations are the implementation author's reports, not independent results
-from this documentation review.
+Pick the narrowest command that covers your change. While iterating, run the
+tests for what you changed. Run the full suites (`check`) for milestones,
+cross-cutting changes and the
+[validation driver](../rendering/RENDER-VERIFICATION.md#one-command-validation).
+Profile and timing notes further down describe their recorded configurations.
 
 | Goal | Command |
 | --- | --- |
-| One Rust test while editing | `(cd src/main/rust && cargo test --locked --lib <name>)` |
+| Tests for the uncommitted change | `python3 DevUtils/tests/tooling/RunAffectedTests.py` |
+| One Rust test or module while editing | `(cd src/main/rust && cargo test --locked --lib <name-or-module>)` |
 | Whole Rust suite | `(cd src/main/rust && cargo test --locked --profile suite --lib -- --test-threads=4)` |
-| One Java class | `./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeHeightmapTest'` |
+| One Java class | `./gradlew -PmattmcRustProfile=release test --tests '*NativeHeightmapTest'` |
+| One Java package | `./gradlew -PmattmcRustProfile=release test --tests 'net.minecraft.world.level.chunk.*'` |
 | Ordinary Java suite | `./gradlew -PmattmcRustProfile=release test -x testRustNative` |
 | Large parity workloads | `./gradlew -PmattmcRustProfile=release parityTest -x testRustNative` |
-| Both Java suites and Rust checks | `./gradlew -PmattmcRustProfile=release check` |
+| Exhaustive and corpus cases | `./gradlew -PmattmcRustProfile=release slowTest -x testRustNative` |
+| All Java tiers and Rust checks | `./gradlew -PmattmcRustProfile=release check` |
 
 Commands with `-x testRustNative` assume the intended Rust checks were completed
-separately. `check` runs the ordinary and tagged Java suites and their native
-check dependency; it does not run the separate `performanceTest` task or the
-client lifecycle, Frozen image and ordinary-gameplay protocols.
+separately. A `--tests`-filtered Java run skips `testRustNative` on its own.
+`check` runs all three Java tiers and their native check dependency. It does
+not run the separate `performanceTest` task or the client lifecycle, Frozen
+image and ordinary-gameplay protocols.
+
+## Affected tests
+
+[`RunAffectedTests.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/tooling/RunAffectedTests.py)
+reads `git diff --name-only <base>` plus untracked files (default base `HEAD`)
+and runs:
+
+- the `cargo test` modules of the changed `.rs` files (`mod.rs` and `tests.rs`
+  select their directory's module), in the `suite` profile with four threads.
+- the Java packages of the changed classes, plus the packages that mirror a
+  changed Rust module's path (Rust `world/level/chunk` selects
+  `net.minecraft.world.level.chunk.*`), through a filtered `test`.
+
+Changes to `lib.rs`, `Cargo.toml`, `Cargo.lock` or `build.rs` select the whole
+Rust suite. Changes to Gradle build files select the whole ordinary Java suite.
+Flags: `--dry-run` prints the selection, `--files PATH...` selects from given
+paths instead of git, `--base origin/master` covers
+unpushed commits, `--java-only`/`--rust-only` limit the run, and
+`--include-slow` adds slow cases. It doesn't run callers in other packages, so
+run `check` before publishing a change whose effects cross packages.
 
 ## Rust profiles
 
@@ -36,28 +59,37 @@ See [Cargo.toml](https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfe
 
 ## Java test tasks
 
-- `test` skips classes tagged `@Tag("parity")` and runs in parallel JVMs.
-- `parityTest` runs only the tagged classes, also in parallel JVMs.
-- `check` runs both. The rendering validation driver also runs both when
-  `--all-java-tests` is selected.
-- An explicit `--tests` filter on `test` also selects tagged classes, so
-  per-slice commands in subsystem docs keep working. The existing
+The tiers are selected by JUnit tag:
+
+- `test` skips `@Tag("parity")` classes and `@Tag("slow")` cases, and runs in parallel JVMs.
+- `parityTest` runs the parity-tagged classes without their slow cases.
+- `slowTest` runs only slow-tagged cases. Most are single exhaustive or
+  corpus-sized methods inside parity classes.
+- `check` runs all three. The rendering validation driver runs `test` and
+  `parityTest` when `--all-java-tests` is selected; run `slowTest` alongside it
+  for the complete Java suite.
+- A `--tests` filter applies to the task named just before it on the command
+  line, so in `test parityTest --tests X` only `parityTest` is filtered and
+  `test` runs everything it normally does. A filtered task also selects matching
+  parity classes, so per-slice commands in subsystem docs keep working, but it
+  still skips slow cases unless you pass `-PmattmcSlowTests=true`. The existing
   `*PerformanceTest`/`*Benchmark` class exclusions still apply to `test`.
 - `-PmattmcTestForks=N` sets the fork count (default: up to 3, one per four
   cores). Each fork has a maximum 2 GB Java heap; lower the fork count on a
   machine short of memory.
 
-The current validation driver's `--all-java-tests` removes its `--tests`
-patterns and runs both `test` and `parityTest`. Collect results from both
-`build/test-results/test/` and `build/test-results/parityTest/`; the ordinary
-task alone is not the full Java suite. Explicitly filtered runs can still
-select matching tagged classes.
+Collect results from `build/test-results/test/`, `parityTest/` and `slowTest/`;
+no single task is the full Java suite.
 
 Tag a class `parity` when it runs a large Frozen-vs-Rust workload (roughly
 10 s or more). Keep fast parity checks untagged so ordinary runs still cover
-each migrated system.
+each migrated system. Tag a single method `slow` when it takes about 20 s or
+more because it enumerates a state space or a large corpus. Keep at least one
+faster test of the same behavior outside the slow tier.
 
-`testRustNative`, which every Java test task depends on, writes
+`testRustNative`, which every unfiltered Java test task depends on, runs the
+whole Rust suite serially (`--test-threads=1`, for the process-global
+OpenAL/EGL/Vulkan tests) and writes
 `build/rust/testRustNative.stamp` after a passing run. Gradle skips it while
 the crate, `src/main/resources` and `DevUtils/tests/rendering/fixtures` are
 unchanged and the recorded output remains up to date. Reusing the stamp is not
@@ -133,8 +165,9 @@ and `compression-algorithm = zstd`, plus `vm.swappiness = 150` and
 
 ## Troubleshooting
 
-- *No tests found for given includes*: check the class name; tagged classes
-  are still found through `--tests`.
+- *No tests found for given includes*: check the class name and which task the
+  `--tests` follows. Parity classes are found through `--tests`. A class whose
+  only tests are slow-tagged needs `-PmattmcSlowTests=true` or `slowTest`.
 - A failure that appears only with several forks usually means the test
   depends on state another class set up in the same JVM. Make the class set
   up its own fixtures; run with `-PmattmcTestForks=1` to confirm.

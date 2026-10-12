@@ -133,7 +133,7 @@ class NativeBiomeSearchTest {
         System.out.println("BIOME_SEARCH_PARITY horizontal=" + searches + " found=" + found);
     }
 
-    @Test void closestSearchesMatchJava() {
+    @Tag("slow") @Test void closestSearchesMatchJava() {
         var random = new Random(77);
         int searches = 0, found = 0;
         for (World world : worlds()) {

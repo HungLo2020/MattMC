@@ -13,6 +13,16 @@ supply a matched Frozen comparison or acceptance verdict. An ordinary driver's
 the requested observation finished and passed its state/health checks; the
 driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 
+## Iteration and acceptance runs
+
+A single gameplay run takes 5–8 minutes, and the full protocol repeats each
+mode per side (four DH repeats, two for each other mode). While iterating on a
+change, run one interleaved Current and Frozen pair in the mode you changed. Run the
+full repeated protocol
+only for the final numbers you record here. For DH, use a small-radius source
+from [`PrepareSmallDhSource.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/rendering/PrepareSmallDhSource.py),
+because a 128-chunk radius makes each client regenerate LODs for the whole run.
+
 ## Run the ordinary comparison
 
 Build release first, then run on Linux/X11 with a JDK 25 installation:

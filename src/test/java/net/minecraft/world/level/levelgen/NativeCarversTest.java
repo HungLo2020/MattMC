@@ -84,7 +84,7 @@ class NativeCarversTest {
         NativeNoiseFillTest.compare(java, candidate, context);
     }
 
-    @Test void nativeCarversMatchJavaForEveryVanillaSetting() {
+    @Tag("slow") @Test void nativeCarversMatchJavaForEveryVanillaSetting() {
         ChunkPos[] positions = {new ChunkPos(0, 0), new ChunkPos(-1, 3), new ChunkPos(37, -91), new ChunkPos(-6250, 4321)};
         long before = NativeCarvers.CHUNKS.get(), topBefore = NativeCarvers.TOP_CALLS.get();
         int pairs = 0;

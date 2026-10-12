@@ -6,12 +6,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeBlockRegistryReadinessTest {
-    @Test void earlyQueryDoesNotPermanentlyDisableRegistry(@TempDir Path directory) throws Exception {
+    @Tag("slow") @Test void earlyQueryDoesNotPermanentlyDisableRegistry(@TempDir Path directory) throws Exception {
         // Other suites may already have bootstrapped this worker. Exercise the
         // lifecycle in a fresh JVM using the worker's exact classes/dependencies.
         var paths=new LinkedHashSet<String>();
