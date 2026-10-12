@@ -104,6 +104,9 @@ public final class NativeDhSource implements AutoCloseable {
         for(int i=0;i<4096;i++)getColumn(i);
         return bindings.clone();
     }
+    LongList boundColumn(int index) { return bindings[index]; }
+    /** One scoped Rust reader for a synchronous conversion, without list escapes. */
+    public NativeDhConversionReader conversionReader() { return new NativeDhConversionReader(this); }
     private int kind(int index) {
         if(!isLive()) {
             if((closedMissing[index/64]&(1L<<(index%64)))!=0)return 0;

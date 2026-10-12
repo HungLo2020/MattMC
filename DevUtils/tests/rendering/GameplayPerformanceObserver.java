@@ -227,7 +227,9 @@ public final class GameplayPerformanceObserver {
                 Thread.sleep(1000);
             }
         } catch (Throwable error) {
-            try { Files.writeString(output.resolve("observer.error"), error.toString()); } catch (Exception ignored) { }
+            try (var errors = new PrintWriter(Files.newBufferedWriter(output.resolve("observer.error")))) {
+                error.printStackTrace(errors);
+            } catch (Exception ignored) { }
         }
     }
 }

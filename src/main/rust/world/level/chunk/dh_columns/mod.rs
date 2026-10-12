@@ -18,6 +18,7 @@ mod source;
 mod metadata;
 mod codec;
 mod metadata_codec;
+mod reader;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

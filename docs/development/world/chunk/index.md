@@ -1,5 +1,8 @@
 # Chunk storage
 
+- [Rust DH conversion readers](RUST-DH-CONVERSION-READERS.md): scoped primary-column
+  reads without persistent Java column wrappers during render conversion.
+
 - [Rust DH saved-metadata codecs](RUST-DH-METADATA-CODEC.md): primary-plane imports,
   bounded IO, fixed payloads with variable logical extents and Frozen verification.
 

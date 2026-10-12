@@ -100,7 +100,8 @@ public class FullDataToRenderDataTransformer
 		
 		
 		final ColumnRenderSource columnSource = ColumnRenderSource.createEmpty(pos, vertSize, levelWrapper.getMinHeight());
-		try
+		try (var reader = fullDataSource.getClass() == FullDataSourceV2.class
+			? fullDataSource.nativeSource().conversionReader() : null)
 		{
 			if (fullDataSource.isEmpty)
 			{
@@ -118,7 +119,8 @@ public class FullDataToRenderDataTransformer
 				for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
 				{
 					ColumnArrayView columnArrayView = columnSource.getVerticalDataPointView(x, z);
-					LongList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
+					LongList dataColumn = reader == null ? fullDataSource.getColumnAtRelPos(x, z)
+						: reader.column(x * FullDataSourceV2.WIDTH + z);
 
 					updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 							levelWrapper, fullDataSource, columnSource, x, z,

@@ -1,6 +1,8 @@
 # Rust DH render-source storage
 
-Ordinary DH conversion writes render points into a Rust CPU owner. Reduction
+Ordinary DH conversion writes render points into a Rust CPU owner.
+[Scoped full-data readers](../world/chunk/RUST-DH-CONVERSION-READERS.md) consume
+primary input columns without materializing persistent Java list adapters. Reduction
 and neighbor-box production borrow its stable point spans directly. Java does
 not keep a mirrored point array or repack native points for these consumers.
 Interior box builds pass one scoped source owner and four numeric windows;

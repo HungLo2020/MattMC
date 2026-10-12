@@ -1373,3 +1373,29 @@ mutable-column adoption/refresh and render-source views as migration targets;
 sampling weights describe allocation, not retained ownership. JFR/NMT timings
 are excluded from the performance table. Receipts: `memory-summary.json`,
 `memory-live-samples.json` and `memory-game.jfr` under `build/native-dh-render-source/`.
+
+## Conversion reader checkpoint
+
+October12 native `bbd8fc84` uses a scoped Rust column reader during ordinary DH
+render conversion. [CPU measurements and ownership](../world/chunk/RUST-DH-CONVERSION-READERS.md)
+record 78.9% less Java allocation than public-reader traversal, with no isolated
+FPS improvement claimed. Three settled vanilla/DH/shader-DH pairs pass on this
+image; the previous four-mode FPS table still describes native `a9286e05`.
+
+The ordinary DH/no-shader comparison used the same prepared Origin source,
+visible minimap, 1920×1080, distance12 and 30-second entry/standing/travel phases.
+Current lost input focus before completing travel. Frozen's observer reported
+`InvocationTargetException` before measurement. Both attempts remain failed;
+partial displayed FPS counters are not accepted comparative frame timings.
+Native identity remained unchanged and bounded cleanup left no clients.
+
+The observer now records the complete exception stack and nested cause on
+failure. A separate Frozen-only diagnostic with five-second phases completed
+entry, standing and travel without reproducing the exception. It does not
+supply a matched Current comparison or explain the original failure. Frozen
+source remains unchanged. Ordinary gameplay, startup memory and sustained
+streaming acceptance remain open.
+
+Receipts: `build/native-dh-conversion-reader/ordinary-*.json`; originals:
+`artifacts/graphics-captures/ordinary-native-dh-conversion-reader-20261012/`
+and `artifacts/graphics-captures/ordinary-native-dh-conversion-reader-frozen-diagnostic-20261012/`.

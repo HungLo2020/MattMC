@@ -2,7 +2,8 @@
 
 Rust retains the live 64×64 full-data column table and cached tint reads it
 directly. Present-empty columns initially need no Java readers; list identity
-projections materialize on demand. Java keeps source orchestration during
+projections materialize on demand. [Scoped conversion readers](RUST-DH-CONVERSION-READERS.md)
+avoid those persistent projections during ordinary render conversion. Java keeps source orchestration during
 the migration. Stock tint calls no longer stage 9, 25 or 49 point descriptors,
 copy them across the boundary, or repeat the neighborhood plan in Java.
 Material IDs, point vectors and the table remain ordinary CPU data.

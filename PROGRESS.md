@@ -62,6 +62,16 @@
 - Sixteen completed6000-frame windows plus one failed startup retained. Current/Frozen FPS1322.30/1231.60,796.85/873.55,347.40/314.85,264.00/226.95. DH FPS misses8.8%; other FPS/all p99 floors pass. See SUMMARY/table guide.
 - Game-only JFR/NMT diagnostic completes9.52GiB, not a peak reproduction.6,858 allocation samples identify empty/mutable DH column wrappers and render views; allocation weights do not prove retention. Preserve failure and profile.
 
+## Conversion-reader checkpoint
+
+- Replaced ordinary per-column Java identity projection during render conversion with one scoped Rust column lease; custom/escaped inputs retain their public path. Production callbacks/arithmetic still Java.
+- Two new Rust and23 focused Java tests pass, including nested readers, source replacement/closure and no persistent Java bindings.
+- First24-saved-source hydration/read/close comparison: Current57.89ms, public-reader control56.24ms, Frozen44.04ms; exact point checksums and source/class/native/corpus guards pass. Java allocation7.14/33.85/4.21MB. CPU floor fails; original attempt retained.
+- Off-heap scalar result candidate56.59/57.20/46.14ms (Current/public/Frozen), heap7.14/33.85/4.21MB. CPU still22.6% slower Frozen;78.9% less Java allocation than control. Full Java/parity2049/2skip and51 Rust DH tests pass. Three settled pairs pass,VUID0;6 originals reviewed.
+- Removed direct-span experiment:55.84ms but15.00MB heap and broader invalidation machinery. Source hashes exactly match simpler candidate. Receipts/predecessor: build/native-dh-conversion-reader/. SUMMARY describes published a9286e05, not this candidate.
+
+- Ordinary paired gameplay failed: Current lost focus before travel; Frozen observer failed reflection before timing. Preserved both, added full error stacks; short Frozen diagnostic passes but does not reproduce/explain failure. No accepted new FPS. World unload/reload and resource reload pass with zero failures.
+
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
