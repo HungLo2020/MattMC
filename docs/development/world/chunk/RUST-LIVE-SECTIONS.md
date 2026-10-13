@@ -70,9 +70,11 @@ improvement. A native executable and complete Java removal remain unfinished.
   mutation and bulk exports; it never calls Java. A generation's atomic words
   and palette entries support CPU readers while writes are admitted. Publishing
   a palette entry precedes publishing its packed index.
-- A retained view pins its generation with a separate `Arc` lease. The `View`
-  object is the [native reclaimer](NATIVE-RECLAIMER.md) referent, and the
-  owner segment pins the section. Growth publishes a new view; old readers stay valid. No global
+- A `View` holds its section's owner segment, and the owner pins its current
+  generation, so a view needs no registration of its own. When growth replaces
+  a generation, the next view call returns the replaced generations as one
+  lease, registered with the [native reclaimer](NATIVE-RECLAIMER.md) against the
+  previous view, which readers may still hold. Growth publishes a new view; old readers stay valid. No global
   section registry/cache or extra GPU handles are introduced. Reclamation follows
   GC; retained generations consume memory until their readers disappear.
 - Preserve the original single-palette alias: zero-width copies share their

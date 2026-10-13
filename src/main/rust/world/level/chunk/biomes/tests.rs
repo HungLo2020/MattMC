@@ -203,13 +203,22 @@ fn production_cpu_boundary_releases_owner_without_invalidating_retained_generati
         assert!(!owner.is_null());
         let mut header = [0u64; 6];
         assert_eq!(ffi::mattmc_live_biome_view(owner, header.as_mut_ptr()), 0);
-        let view = header[5] as *const Generation;
+        assert_eq!(header[5], 0, "the owner pins its current generation; no lease");
+        // A Java reader of that first view reads this generation.
+        let view = (*owner).lease();
         let copy = ffi::mattmc_live_biome_copy(owner);
         assert!(!copy.is_null());
         assert_eq!(ffi::mattmc_live_biome_read_single(copy, 7), 0);
-        assert_eq!((*view).value(0), 7);
+        assert_eq!(view.value(0), 7);
         assert_eq!(ffi::mattmc_live_biome_write(owner, 0, 9), (1i64 << 32) | 7);
-        assert_eq!((*view).value(0), 7);
+        assert_eq!(view.value(0), 7);
+        // Growth retired the first generation; the next view hands it to Java.
+        assert_eq!(ffi::mattmc_live_biome_view(owner, header.as_mut_ptr()), 0);
+        let retired = header[5] as *const Vec<Arc<Generation>>;
+        assert!(!retired.is_null());
+        assert!(Arc::ptr_eq(&(&*retired)[0], &view));
+        assert_eq!(ffi::mattmc_live_biome_view(owner, header.as_mut_ptr()), 0);
+        assert_eq!(header[5], 0, "each retired generation is handed out once");
         let mut output_words = [0u64; 16];
         let mut output_palette = [0u32; 8];
         let mut output_header = [0u32; 4];
@@ -227,7 +236,8 @@ fn production_cpu_boundary_releases_owner_without_invalidating_retained_generati
         assert_eq!(ffi::mattmc_live_biome_write(owner, 1, 4), -1);
         ffi::mattmc_live_biome_release(owner);
         ffi::mattmc_live_biome_release(copy);
-        assert_eq!((*view).value(0), 7);
-        ffi::mattmc_live_biome_view_release(view);
+        assert_eq!(view.value(0), 7);
+        ffi::mattmc_live_biome_view_release(retired);
+        assert_eq!(Arc::strong_count(&view), 1, "only this reader still holds the generation");
     }
 }

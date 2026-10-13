@@ -2,8 +2,9 @@
 
 Chunk-section native objects that are created at a high rate are freed by a
 batched phantom-reference reclaimer, not by one automatic FFM arena each.
-This covers live block sections and their views, live biome sections and their
-views, section counters and DH contributor snapshots.
+This covers live block and biome sections, their retired view generations,
+section counters, DH contributor snapshots (one per column and one batch per
+saved sidecar) and the block snapshots the terrain mesher captures.
 
 - Java: [`NativeReclaimer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeReclaimer.java)
 - Rust: [`reclaim.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/reclaim.rs)
@@ -25,14 +26,41 @@ releases dead objects in batches of up to 1,024 per downcall.
   plain global segments (`reinterpret(n).asReadOnly()`) from the pointer. Those
   segments do not keep anything alive. Only the registered referent does.
 - Section owners register their owner segment, and callers pin a section by
-  holding it. Views register the `View` object itself, and every read through
-  a view fences it with `Reference.reachabilityFence`.
+  holding it. A `View` holds that owner segment, so a reachable view keeps the
+  owner and its current generation alive; views register nothing. When palette
+  growth replaces a generation, the next view call returns the replaced
+  generations, registered against the previous view, which readers may still
+  hold. Every read through a view fences it with `Reference.reachabilityFence`.
   `NativeDhContributors` registers itself, and each column holds and fences it.
 - A downcall that receives a raw address taken from a reclaimer-owned segment
   must keep the referent reachable until the call returns.
 - Adding a kind needs a code in both `NativeReclaimer` and `reclaim.rs`, and a
-  release export that drops exactly one reference. An unknown kind stops the
+  release export that drops exactly one reference. Kinds 1–8 are: block
+  section, retired block views, biome section, retired biome views, counters,
+  contributor snapshot, saved contributor batch, block snapshot. An unknown kind stops the
   batch, and Java logs the leaked count.
+
+## Chunk slabs
+
+`ChunkAccess.replaceMissingSections` creates a chunk's missing fresh sections
+through one [`NativeChunkSlab`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeChunkSlab.java)
+call (Rust `world/level/chunk/slab.rs`) when two or more are missing. The slab
+holds each section's block owner, biome owner and counters. Java's segments
+for all of them carry one automatic arena's scope, so holding any of them keeps
+the slab alive, FFM enforces that, and the slab is released once, when none is
+reachable. Each item is still an ordinary `Arc` owner, so Rust consumers that
+retain one (chunk inputs, residency, stages) outlive the slab safely.
+
+The sections match `new LevelChunkSection(factory)` exactly: single-value
+native containers of the factory's defaults, created with the arguments
+`adopt` uses, and zeroed counters. A factory or strategy that `adopt` would
+decline keeps the one-by-one path. Copies, generation installs and network
+reads replace items with ordinary owners. By code inspection, a DH-generated
+section used to make about eleven registrations: five when created, two for
+the native block install and four for the biome fill. It now makes about two,
+plus one slab per chunk. `-Dmattmc.chunk.sectionSlabs=false`
+restores the one-by-one path for control runs. `NativeChunkSlab.created()`
+counts slabs.
 
 ## Pressure collections
 

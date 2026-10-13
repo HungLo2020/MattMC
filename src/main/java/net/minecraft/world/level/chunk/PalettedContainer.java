@@ -49,6 +49,9 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 	NativeLiveBlockSection nativeLiveBlocks() { return this.nativeBlocks; }
 
+	/** Whether Rust currently owns this biome container's storage (no side effects). */
+	public boolean isNativeBiomeOwned() { return this.nativeBiomes != null; }
+
 	private Data<T> readData() {
 		for (;;) {
 			var live = this.nativeBlocks;
@@ -245,6 +248,19 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		this.data = new PalettedContainer.Data<>(configuration, bitStorage, configuration.createPalette(this.strategy, entries));
 		this.nativeBlocks = null;
 		this.adoptNative();
+	}
+
+	/** The value {@link #recreate()} seeds its new container with. */
+	T recreateSeed() { return this.currentPaletteValue(0); }
+
+	/** A new container in the state {@code recreate()} followed by
+	 * {@link #installGenerated} leaves, without the intermediate container. */
+	PalettedContainer<T> generated(int requestedBits, List<T> entries, long[] raw) {
+		Configuration configuration = this.strategy.getConfigurationForBitCount(requestedBits);
+		BitStorage bitStorage = configuration.bitsInMemory() == 0
+			? new ZeroBitStorage(this.strategy.entryCount())
+			: new SimpleBitStorage(configuration.bitsInMemory(), this.strategy.entryCount(), raw);
+		return new PalettedContainer<>(this.strategy, configuration, bitStorage, configuration.createPalette(this.strategy, entries));
 	}
 
 	/** Canonical stage result already constructed and owned entirely in Rust. */

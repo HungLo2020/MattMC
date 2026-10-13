@@ -10,3 +10,4 @@ pub(crate) mod stage_transfer;
 pub(crate) mod biomes;
 pub(crate) mod inputs;
 pub(crate) mod reclaim;
+pub(crate) mod slab;

@@ -28,6 +28,9 @@
 - [Rust DH material maps](RUST-DH-MATERIAL-MAPS.md): ordered native identity/index
   ownership, bulk remapping, duplicate/import policy and compatibility bindings.
 
+- [Rust DH sky light](RUST-DH-SKY-LIGHT.md): data-source sky light baked in one
+  Rust pass over the primary column table, with Java's exact visit order.
+
 - [Rust DH source updates](RUST-DH-SOURCE-UPDATES.md): complete same-detail merge
   policy, direct recipient publication, borrowed inputs and compatibility gates.
 

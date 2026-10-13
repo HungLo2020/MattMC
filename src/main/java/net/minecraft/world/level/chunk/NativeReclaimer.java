@@ -42,7 +42,9 @@ final class NativeReclaimer {
     static final byte LIVE_BIOME_VIEW = 4;
     static final byte SECTION_COUNTERS = 5;
     static final byte DH_CONTRIBUTORS = 6;
-    private static final int KINDS = 7;
+    static final byte DH_CONTRIBUTOR_BATCH = 7;
+    static final byte SECTION_SNAPSHOT = 8;
+    private static final int KINDS = 9;
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int BATCH = 1024;

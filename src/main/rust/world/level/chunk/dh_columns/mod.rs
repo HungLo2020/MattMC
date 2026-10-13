@@ -19,6 +19,7 @@ mod metadata;
 mod codec;
 mod metadata_codec;
 pub(crate) mod reader;
+mod sky;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

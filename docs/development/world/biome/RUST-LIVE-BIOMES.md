@@ -147,6 +147,13 @@ python3 DevUtils/tests/world/biome/VerifyBiomeQueries.py --java-home /path/to/jd
   Repeated network reads and later copies must preserve that shared palette.
   Serialization and generic enumeration still use
   temporary compatibility projections.
+- Section views follow the [live block section rule](../chunk/RUST-LIVE-SECTIONS.md):
+  a view pins its owner, and only generations replaced by growth are registered,
+  against the previous view. Fresh chunk sections share one
+  [chunk slab](../chunk/NATIVE-RECLAIMER.md#chunk-slabs). A native biome fill
+  builds its final container once (`PalettedContainer.generated`) instead of a
+  recreated container that is replaced at once, and reads its seed without
+  building one.
 - Native residency follows the existing client storage, including hidden
   out-of-range chunks. Sampling applies the current view range and height clamp;
   missing chunks use the world's Plains biome. A loaded compatibility chunk

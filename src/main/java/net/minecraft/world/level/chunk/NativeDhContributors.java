@@ -116,6 +116,50 @@ public final class NativeDhContributors {
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(input); Reference.reachabilityFence(remap); }
     }
+    private static final MethodHandle DECODE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_contributors_decode",
+        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+        Linker.Option.critical(true));
+    private static final ThreadLocal<long[]> DECODE_CELLS = ThreadLocal.withInitial(() -> new long[4096 * 9]);
+    /** Every cell of one saved sidecar shares this owner; any retained view pins it. */
+    private static final class SavedBatch {}
+    /** Receives one decoded cell (x-major index) with its four columns. */
+    @FunctionalInterface public interface SavedCellSink { void accept(int cell, LongList[] columns); }
+    /** Saved-sidecar stop statuses; see {@link #decodeSaved}. */
+    public static final int SAVED_COMPLETE = 0, SAVED_END_OF_INPUT = 1, SAVED_OVER_BOUND = 2;
+
+    /**
+     * Decodes a whole decompressed V4 contributor sidecar in Rust into one
+     * batch owner, and passes each completed present cell to {@code sink} in
+     * saved order. Returns {@code [status, value]}: {@link #SAVED_COMPLETE},
+     * {@link #SAVED_END_OF_INPUT}, or {@link #SAVED_OVER_BOUND} with the
+     * offending size. Cells before the stop are still delivered, as the Java
+     * reader applies them before it throws.
+     */
+    public static int[] decodeSaved(byte[] bytes, int offset, int length, SavedCellSink sink) {
+        java.util.Objects.checkFromIndexSize(offset, length, bytes.length);
+        long[] cells = DECODE_CELLS.get();
+        long[] result = new long[3];
+        MemorySegment pointer;
+        try {
+            pointer = (MemorySegment) DECODE.invokeExact(MemorySegment.ofArray(bytes).asSlice(offset, length), length,
+                MemorySegment.ofArray(cells), MemorySegment.ofArray(result));
+        } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
+        int status = (int) result[0], count = (int) result[1];
+        if (status == 3) throw new OutOfMemoryError("Cannot decode DH contributor sidecar");
+        if (status < 0 || status > 2 || count < 0 || count > 4096 || (count > 0) != (pointer.address() != 0))
+            throw new IllegalStateException("Invalid DH contributor sidecar decode");
+        if (count > 0) {
+            var batch = new SavedBatch();
+            NativeReclaimer.register(batch, pointer, NativeReclaimer.DH_CONTRIBUTOR_BATCH);
+            var descriptors = MemorySegment.ofArray(cells);
+            for (int row = 0; row < count; row++) {
+                int cell = (int) cells[row * 9];
+                sink.accept(cell, fromDescriptors(batch, descriptors.asSlice((row * 9L + 1) * 8, 64)));
+            }
+            Reference.reachabilityFence(batch);
+        }
+        return new int[] {status, (int) result[2]};
+    }
     private static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); } catch (Throwable e) { throw new IllegalStateException(e); }
     }

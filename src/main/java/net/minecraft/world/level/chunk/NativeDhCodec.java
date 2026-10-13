@@ -24,11 +24,16 @@ public final class NativeDhCodec {
     private static final MethodHandle ENCODER = handle("encoder", FunctionDescriptor.of(ValueLayout.ADDRESS,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle FEED = handle("feed", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    /** Same export, reading a heap slice in place (byte-array streams only). */
+    private static final MethodHandle FEED_HEAP = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_codec_feed",
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS), Linker.Option.critical(true));
     private static final MethodHandle NEXT = handle("next", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MethodHandle DECODER_RELEASE = handle("decoder_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle ENCODER_RELEASE = handle("encoder_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     public static final AtomicLong DECODED = new AtomicLong(), ENCODED = new AtomicLong(), INITIALIZED = new AtomicLong();
     static volatile boolean enabled = !Boolean.getBoolean("mattmc.dh.javaCodec");
+    /** False under {@code -Dmattmc.dh.javaCodec=true}, which keeps every DH codec stage in Java. */
+    public static boolean nativeEnabled() { return enabled; }
     private NativeDhCodec() {}
     static final class Input {
         final byte[] bytes = new byte[16384];
@@ -72,9 +77,22 @@ public final class NativeDhCodec {
         try (var arena = Arena.ofConfined()) {
             owner = (MemorySegment)DECODER.invokeExact(source.stageOwner(), minX, maxX, minZ, maxZ, v1 ? 1 : 0, validate ? 1 : 0);
             if (owner.address() == 0) return false;
-            var inputBytes = new Input(); var bytes = inputBytes.bytes; var buffer = arena.allocate(bytes.length, 1);
             var result = arena.allocate(32, 8); var projection = arena.allocate(4096 * 5 * 8L, 8);
             try {
+                if (stream.codecByteArrayInput()) {
+                    // The whole decompressed remainder in one call, read in place.
+                    // A byte-array stream ends exactly where the chunked reader would.
+                    int position = stream.codecPosition(), count = stream.codecLimit() - position;
+                    var bytes = MemorySegment.ofArray(stream.codecArray()).asSlice(position, count);
+                    FEED_HEAP.invokeExact(owner, MemorySegment.ofArray(new byte[0]), 0, result);
+                    if (result.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0) FEED_HEAP.invokeExact(owner, bytes, count, result);
+                    stream.codecSeek(position + count);
+                    if (result.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0) throw new EOFException();
+                    source.projectCodec(projection);
+                    check(result, input);
+                    DECODED.incrementAndGet(); return true;
+                }
+                var inputBytes = new Input(); var bytes = inputBytes.bytes; var buffer = arena.allocate(bytes.length, 1);
                 FEED.invokeExact(owner, buffer, 0, result);
                 while (result.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0) {
                     int count = inputBytes.read(stream);

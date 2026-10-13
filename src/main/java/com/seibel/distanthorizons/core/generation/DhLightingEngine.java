@@ -430,6 +430,24 @@ public class DhLightingEngine
 	/** @author BuilderB0y */
 	public void bakeDataSourceSkyLight(FullDataSourceV2 dataSource, int maxSkyLight)
 	{
+		// One Rust pass over the primary column table (dh_columns/sky.rs).
+		// Subclasses, custom mappings and unsupported columns keep this Java bake.
+		if (dataSource.getClass() == FullDataSourceV2.class && !net.minecraft.world.level.chunk.NativeDhSkyLight.JAVA_ONLY)
+		{
+			try (var policy = net.minecraft.world.level.chunk.NativeDhMaterials.create(dataSource.mapping))
+			{
+				if (net.minecraft.world.level.chunk.NativeDhSkyLight.tryBake(policy, dataSource.nativeSource(), dataSource.mapping.size(), maxSkyLight))
+				{
+					return;
+				}
+			}
+		}
+		this.bakeDataSourceSkyLightInJava(dataSource, maxSkyLight);
+	}
+	
+	/** The original Java bake: the compatibility route and the native bake's reference. */
+	public void bakeDataSourceSkyLightInJava(FullDataSourceV2 dataSource, int maxSkyLight)
+	{
 		// create a cache of all the IDs which are completely transparent.
 		// FullDataPointIdMap is thread-safe with locks, and is also a map lookup,
 		// and both of these things add a bit of overhead which is not necessary

@@ -25,11 +25,18 @@ Contributor payloads and contextual material resolution remain Java migration wo
 - Encoding follows each metadata list's logical size. Compression output appends
   the fixed normalized uniformity plane. Custom lists/sources retain compatibility
   traversal before any native mutation.
-- IO uses at most 16 KiB per feed/output. Exact private uncompressed and already
-  decompressed Zstd-block byte-array streams use bulk reads. Streaming LZ4, XZ
+- Exact private uncompressed and already decompressed Zstd-block byte-array
+  streams are read in place: their whole remaining decompressed array is fed to
+  Rust in one critical call, and the stream position moves to its end, as the
+  bulk reads did. Other output uses at most 16 KiB per call. Streaming LZ4, XZ
   and Zstd retain byte reads so decompressor failures preserve their exact prefix.
   Read-ahead stays inside private DTO streams; completion ignores unused bytes
   and pending errors beyond the completed payload.
+- For V3+ rows in those two modes, the compression blob is decompressed once:
+  the compression plane is read, then the stream rewinds so the uniformity
+  reader rereads the same bytes. Each plane keeps its own failure (a short
+  compression plane is `DataCorruptedException`, a short uniformity plane a raw
+  `EOFException`).
 - `-Dmattmc.dh.javaCodec=true` selects transitional Java codec controls. These
   controls retain Frozen's backing-capacity read behavior; they are verification
   support, not the final runtime architecture.

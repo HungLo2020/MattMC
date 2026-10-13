@@ -18,6 +18,9 @@ public final class NativeDhMetadataCodec {
     }
     private static final MethodHandle DECODER=handle("decoder",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle FEED=handle("feed",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    /** Same export, reading a heap slice in place (byte-array streams only). */
+    private static final MethodHandle FEED_HEAP=net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_dh_metadata_feed",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT),Linker.Option.critical(true));
     private static final MethodHandle DECODER_RELEASE=handle("decoder_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle ENCODER=handle("encoder",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
     private static final MethodHandle NEXT=handle("next",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
@@ -36,6 +39,16 @@ public final class NativeDhMetadataCodec {
         MemorySegment owner=MemorySegment.NULL;
         try(var arena=Arena.ofConfined()) {
             owner=(MemorySegment)DECODER.invokeExact(metadata,kind);if(owner.address()==0)return false;
+            if(stream.codecByteArrayInput()) {
+                // The whole decompressed remainder in one call, read in place.
+                int position=stream.codecPosition(),count=stream.codecLimit()-position;
+                int status=(int)FEED_HEAP.invokeExact(owner,MemorySegment.ofArray(new byte[0]),0);
+                if(status==0)status=(int)FEED_HEAP.invokeExact(owner,MemorySegment.ofArray(stream.codecArray()).asSlice(position,count),count);
+                stream.codecSeek(position+count);
+                if(status==0)throw new java.io.EOFException();
+                if(status!=1)throw new IllegalStateException("Invalid DH metadata decode status: "+status);
+                DECODED.incrementAndGet();return true;
+            }
             var input=new NativeDhCodec.Input();var buffer=arena.allocate(input.bytes.length,1);
             int status=(int)FEED.invokeExact(owner,buffer,0);
             while(status==0) {

@@ -47,13 +47,17 @@ pub unsafe extern "C" fn mattmc_live_section_copy(owner: *const Owner) -> *mut O
         .map_or(std::ptr::null_mut(), |o| Arc::into_raw(Arc::new(o.copy())).cast_mut())
 }
 /// Writes [bits, requested, global, word count, word pointer, palette pointer,
-/// count pointer, lease pointer] into 48 bytes. Lease pins a complete generation.
+/// count pointer, retired lease] into 48 bytes. The owner pins the current
+/// generation, so a view needs only the owner. The retired lease (or 0) pins
+/// the generations replaced since the previous view: Java releases it with
+/// that previous view, which readers may still hold.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_live_section_view(owner: *const Owner, output: *mut u64) -> i32 {
     if owner.is_null() || output.is_null() || output as usize % 8 != 0 {
         return -1;
     }
-    let s = (*owner).state.lock().unwrap();
+    let mut s = (*owner).state.lock().unwrap();
+    let retired = if s.retired.is_empty() { 0 } else { Box::into_raw(Box::new(std::mem::take(&mut s.retired))) as u64 };
     let g = &s.generation;
     let header = output.cast::<u32>();
     *header = g.bits as u32;
@@ -63,13 +67,14 @@ pub unsafe extern "C" fn mattmc_live_section_view(owner: *const Owner, output: *
     *output.add(2) = g.words.as_ptr() as u64;
     *output.add(3) = g.palette.as_ptr() as u64;
     *output.add(4) = &g.count as *const AtomicU32 as u64;
-    *output.add(5) = Arc::into_raw(g.clone()) as u64;
+    *output.add(5) = retired;
     0
 }
+/// Release one retired lease from `mattmc_live_section_view`.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_live_section_view_release(view: *const u8) {
     if !view.is_null() {
-        drop(Arc::from_raw(view.cast::<Generation>()));
+        drop(Box::from_raw(view.cast::<Vec<Arc<Generation>>>().cast_mut()));
     }
 }
 /// -1 invalid. Low32 old canonical ID, bit32 generation changed. Caller publishes

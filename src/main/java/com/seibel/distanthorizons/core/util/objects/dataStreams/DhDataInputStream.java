@@ -44,11 +44,11 @@ public class DhDataInputStream extends DataInputStream
 		ByteArrayInputStream byteArrayInputStream;
 		if (compressionMode == EDhApiDataCompressionMode.Z_STD_BLOCK)
 		{
-			byteArrayInputStream = new ByteArrayInputStream(Zstd.decompress(byteArray));
+			byteArrayInputStream = new CodecBytes(Zstd.decompress(byteArray));
 		}
 		else
 		{
-			byteArrayInputStream = new ByteArrayInputStream(byteArray);
+			byteArrayInputStream = new CodecBytes(byteArray);
 		}
 		
 		return new DhDataInputStream(byteArrayInputStream, compressionMode);
@@ -58,7 +58,28 @@ public class DhDataInputStream extends DataInputStream
 		super(warpStream(stream, compressionMode));
         codecByteArrayInput = compressionMode == EDhApiDataCompressionMode.UNCOMPRESSED
             || compressionMode == EDhApiDataCompressionMode.Z_STD_BLOCK;
+        codecBytes = codecByteArrayInput && stream instanceof CodecBytes bytes ? bytes : null;
 	}
+    /** The decompressed bytes of a byte-array stream, readable in place by native decoders. */
+    private static final class CodecBytes extends ByteArrayInputStream {
+        CodecBytes(byte[] bytes) { super(bytes); }
+        byte[] array() { return this.buf; }
+        int position() { return this.pos; }
+        int limit() { return this.count; }
+        void seek(int position) { java.util.Objects.checkIndex(position, this.count + 1); this.pos = position; }
+    }
+    private final CodecBytes codecBytes;
+    /** For {@link #codecByteArrayInput()} streams: the whole decompressed array, read in place.
+     * {@link DataInputStream} keeps no read-ahead, so the position below is exact. */
+    public byte[] codecArray() { return this.codec().array(); }
+    public int codecPosition() { return this.codec().position(); }
+    public int codecLimit() { return this.codec().limit(); }
+    /** Moves the read position, as a native decoder consumes or a rereader rewinds. */
+    public void codecSeek(int position) { this.codec().seek(position); }
+    private CodecBytes codec() {
+        if (this.codecBytes == null) throw new IllegalStateException("Not a byte-array DH stream");
+        return this.codecBytes;
+    }
     /** These exact private wrappers cannot fail midway through a byte-array
      * read. Streaming decompressors retain readByte's original failure prefix. */
     public boolean codecByteArrayInput() { return codecByteArrayInput; }

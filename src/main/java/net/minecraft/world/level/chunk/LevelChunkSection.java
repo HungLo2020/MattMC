@@ -33,6 +33,13 @@ public class LevelChunkSection {
 		this.recalcBlockCounts();
 	}
 
+	/** A fresh section whose native storage is a chunk slab's item ({@link NativeChunkSlab}). */
+	LevelChunkSection(NativeSectionCounters counters, PalettedContainer<BlockState> states, PalettedContainer<Holder<Biome>> biomes) {
+		this.counters = counters;
+		this.states = states;
+		this.installBiomeContainer(biomes);
+	}
+
 	public LevelChunkSection(PalettedContainerFactory palettedContainerFactory) {
 		this.counters = new NativeSectionCounters(0);
 		this.states = palettedContainerFactory.createForBlockStates();
@@ -153,14 +160,22 @@ public class LevelChunkSection {
 
 	/** The value {@code recreate()} starts the new biome container with. */
 	public Holder<Biome> generatedBiomeSeed() {
+		// recreate() seeds a fresh single-value container with this value; read it without building one.
+		if (this.biomes.getClass() == PalettedContainer.class) return ((PalettedContainer<Holder<Biome>>)this.biomes).recreateSeed();
 		return this.biomes.recreate().get(0, 0, 0);
 	}
 
 	/** Installs a native biome fill: the container {@code fillBiomesFromNoise}'s
 	 * 64 writes into {@code recreate()} produce. */
 	public void installGeneratedBiomes(int requestedBits, List<Holder<Biome>> palette, long[] raw) {
-		PalettedContainer<Holder<Biome>> container = this.biomes.recreate();
-		container.installGenerated(requestedBits, palette, raw);
+		PalettedContainer<Holder<Biome>> container;
+		if (this.biomes.getClass() == PalettedContainer.class) {
+			// The container recreate() plus installGenerated() produce, built once.
+			container = ((PalettedContainer<Holder<Biome>>)this.biomes).generated(requestedBits, palette, raw);
+		} else {
+			container = this.biomes.recreate();
+			container.installGenerated(requestedBits, palette, raw);
+		}
 		this.installBiomeContainer(container);
 	}
 

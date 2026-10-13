@@ -34,8 +34,14 @@ public final class NativeBlockSectionSnapshot {
         boolean inUse;
     }
 
-    private NativeBlockSectionSnapshot(MemorySegment owner, Arena arena) {
+    /** {@code arena} null: the batched native reclaimer frees the box once this snapshot is unreachable. */
+    private NativeBlockSectionSnapshot(MemorySegment owner, @Nullable Arena arena) {
         try {
+            if (arena == null) {
+                this.states = owner.reinterpret(4096 * 2).asReadOnly();
+                NativeReclaimer.register(this, owner, NativeReclaimer.SECTION_SNAPSHOT);
+                return;
+            }
             // Allocate the read-only wrapper before arena adoption, so a failed
             // wrapper allocation cannot leave both cleanup and this catch owning the box.
             this.states = owner.asReadOnly().reinterpret(4096 * 2, arena, NativeBlockSectionSnapshot::release);
@@ -45,7 +51,7 @@ public final class NativeBlockSectionSnapshot {
         }
     }
 
-    static NativeBlockSectionSnapshot adopt(MemorySegment owner, Arena arena) {
+    static NativeBlockSectionSnapshot adopt(MemorySegment owner, @Nullable Arena arena) {
         if (owner.address() == 0) throw new IllegalStateException("Missing native section capture");
         return new NativeBlockSectionSnapshot(owner, arena);
     }
@@ -55,12 +61,13 @@ public final class NativeBlockSectionSnapshot {
         catch (Throwable failure) { throw new IllegalStateException("Cannot release native block capture", failure); }
     }
 
+    /** A snapshot freed through the batched reclaimer, without an arena or cleaner per capture. */
     public static @Nullable NativeBlockSectionSnapshot capture(PalettedContainer<BlockState> source) {
-        return capture(source, Arena.ofAuto());
+        return capture(source, null);
     }
 
     // The caller uses the same exclusion rules as PalettedContainer.copy(). Only immutable data escapes.
-    static @Nullable NativeBlockSectionSnapshot capture(PalettedContainer<BlockState> source, Arena lifetime) {
+    static @Nullable NativeBlockSectionSnapshot capture(PalettedContainer<BlockState> source, @Nullable Arena lifetime) {
         if (source.getClass() != PalettedContainer.class) return null;
         var live = source.nativeLiveBlocks();
         if (live != null) return live.snapshot(lifetime);
@@ -100,7 +107,8 @@ public final class NativeBlockSectionSnapshot {
     }
 
     public int stateId(int index) {
-        return Short.toUnsignedInt(this.states.getAtIndex(ValueLayout.JAVA_SHORT, index));
+        try { return Short.toUnsignedInt(this.states.getAtIndex(ValueLayout.JAVA_SHORT, index)); }
+        finally { Reference.reachabilityFence(this); }
     }
 
     public BlockState state(int index) {

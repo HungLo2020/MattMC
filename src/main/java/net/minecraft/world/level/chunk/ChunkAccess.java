@@ -127,9 +127,14 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	}
 
 	private static void replaceMissingSections(PalettedContainerFactory palettedContainerFactory, LevelChunkSection[] levelChunkSections) {
+		int missing = 0;
+		for (LevelChunkSection section : levelChunkSections) if (section == null) missing++;
+		// One native slab for the chunk's fresh sections; same sections, one owner.
+		LevelChunkSection[] fresh = missing > 1 ? NativeChunkSlab.fresh(palettedContainerFactory, missing) : null;
+		int next = 0;
 		for (int i = 0; i < levelChunkSections.length; i++) {
 			if (levelChunkSections[i] == null) {
-				levelChunkSections[i] = new LevelChunkSection(palettedContainerFactory);
+				levelChunkSections[i] = fresh != null ? fresh[next++] : new LevelChunkSection(palettedContainerFactory);
 			}
 		}
 	}

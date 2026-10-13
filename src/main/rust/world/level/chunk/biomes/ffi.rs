@@ -60,10 +60,13 @@ pub unsafe extern "C" fn mattmc_live_biome_view(owner: *const Owner, output: *mu
     if owner.is_null() || output.is_null() || output as usize % 8 != 0 {
         return -1;
     }
-    let state = (*owner).state.lock().unwrap();
+    let mut state = (*owner).state.lock().unwrap();
     if !(*owner).is_valid() {
         return -1;
     }
+    // As for live block sections: the owner pins the current generation; the
+    // lease pins only generations replaced since Java's previous view.
+    let retired = if state.retired.is_empty() { 0 } else { Box::into_raw(Box::new(std::mem::take(&mut state.retired))) as u64 };
     let g = &state.generation;
     let header = output.cast::<u32>();
     *header = g.bits as u32;
@@ -73,15 +76,15 @@ pub unsafe extern "C" fn mattmc_live_biome_view(owner: *const Owner, output: *mu
     *output.add(2) = g.words.as_ptr() as u64;
     *output.add(3) = g.palette.as_ptr() as u64;
     *output.add(4) = &g.count as *const AtomicU32 as u64;
-    *output.add(5) = Arc::into_raw(Arc::clone(g)) as u64;
+    *output.add(5) = retired;
     0
 }
 /// # Safety
 /// One unique view lease previously returned by view; no active readers.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_live_biome_view_release(lease: *const Generation) {
+pub unsafe extern "C" fn mattmc_live_biome_view_release(lease: *const Vec<Arc<Generation>>) {
     if !lease.is_null() {
-        drop(Arc::from_raw(lease));
+        drop(Box::from_raw(lease.cast_mut()));
     }
 }
 /// # Safety

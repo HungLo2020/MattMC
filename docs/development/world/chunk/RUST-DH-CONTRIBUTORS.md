@@ -52,6 +52,15 @@ parent reduction and occlusion; its older verification does not accept this sour
   independent mutable `LongArrayList` copies, and Java serialization remains an
   explicit value export. Never share a view of mutable source storage instead
   of capturing independent values.
+- Saved V4 sidecars decode in Rust (`mattmc_dh_contributors_decode`) into one
+  batch owner per row, for uncompressed and Zstd-block rows. Each present cell
+  gets `fromDescriptors` views of that batch, so the same-detail merge and
+  parent code see ordinary snapshots. The decoder keeps the Java reader's
+  rules: cells x-major, any nonzero presence byte, negative sizes null, sizes
+  over 256 `DataCorruptedException("Semantic contributor column exceeds bound: N")`,
+  a short blob `DataCorruptedException(EOFException)`, and cells before a
+  failure applied. Streaming LZ4, XZ and Zstd rows and `-Dmattmc.dh.javaCodec=true`
+  keep the Java reader.
 - Source replacement, world close or clearing a render column must not alter
   readers already retained elsewhere. CPU leases release the native owner through the
   [native reclaimer](NATIVE-RECLAIMER.md) once no column holds it;

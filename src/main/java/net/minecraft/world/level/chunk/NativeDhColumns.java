@@ -90,11 +90,7 @@ public final class NativeDhColumns {
                 var q = sections.biome(s);
                 if (biomeValues == null) {
                     biomeValues = q.binding.values;
-                    if (biomeValues.size() != registry.size()) return null;
-                    for (int id = 0; id < biomeValues.size(); id++) {
-                        var holder = biomeValues.get(id);
-                        if (registry.getId(holder.value()) != id) return null;
-                    }
+                    if (!matchesRegistry(biomeValues, registry)) return null;
                 } else if (biomeValues != q.binding.values) return null;
             }
             var pos = chunk.getPos();
@@ -105,6 +101,20 @@ public final class NativeDhColumns {
         catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot build native DH columns", e); }
         finally { Reference.reachabilityFence(sections); Reference.reachabilityFence(input); }
+    }
+    /** The last binding proven to match its registry; both are fixed after load. */
+    private record Validated(java.lang.ref.WeakReference<List<Holder<Biome>>> values, java.lang.ref.WeakReference<Object> registry) {}
+    private static volatile Validated validated;
+    /** Every chunk shares one biome binding; verify its registry order once, not per chunk. */
+    private static boolean matchesRegistry(List<Holder<Biome>> values, net.minecraft.core.Registry<Biome> registry) {
+        var proof = validated;
+        if (proof != null && proof.values().get() == values && proof.registry().get() == registry) return true;
+        if (values.size() != registry.size()) return false;
+        for (int id = 0; id < values.size(); id++) {
+            if (registry.getId(values.get(id).value()) != id) return false;
+        }
+        validated = new Validated(new java.lang.ref.WeakReference<>(values), new java.lang.ref.WeakReference<>(registry));
+        return true;
     }
     MemorySegment stageSourceOwner() { return owner; }
     public long position() { return pos; }

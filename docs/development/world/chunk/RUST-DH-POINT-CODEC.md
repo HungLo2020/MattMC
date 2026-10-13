@@ -32,8 +32,9 @@ and [IO bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/n
 - Exact private uncompressed and Zstd-block byte-array streams now use bulk
   reads. Streaming decompressors keep byte reads to preserve error prefixes;
   see the [metadata/IO constraints](RUST-DH-METADATA-CODEC.md).
-- Java transfers at most 16 KiB of bytes per feed. Rust retains only parser state
-  between feeds, never the byte-buffer pointer. Output likewise streams bounded
+- Byte-array streams feed their whole remaining decompressed array in one
+  critical call, read in place. Streaming decompressors feed at most 16 KiB per
+  call. Rust retains only parser state between feeds, never the byte-buffer pointer. Output likewise streams bounded
   byte spans. These byte bounds do not cap total source point storage.
 - Keep DH's original mutation exclusion and pin the source throughout decoding,
   encoding and escaped-reader projection. Reader extents refresh on completion

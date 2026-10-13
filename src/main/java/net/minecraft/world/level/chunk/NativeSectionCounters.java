@@ -27,6 +27,11 @@ final class NativeSectionCounters {
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot create section counters", failure); }
     }
+    /** A slab item: {@code scoped} carries the slab arena's scope, which keeps the item alive. */
+    NativeSectionCounters(MemorySegment scoped, boolean borrowed) {
+        if (!borrowed || scoped.byteSize() != 8) throw new IllegalArgumentException("Slab counters");
+        this.owner = scoped.asReadOnly();
+    }
     private static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); }
         catch (Throwable failure) { throw new IllegalStateException("Cannot release section counters", failure); }

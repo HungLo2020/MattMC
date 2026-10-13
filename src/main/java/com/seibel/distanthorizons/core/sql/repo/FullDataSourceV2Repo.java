@@ -789,6 +789,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 	// helper methods //
 	//================//
 	
+	private static final ThreadLocal<byte[]> PUT_ALL_BYTES_BUFFER = ThreadLocal.withInitial(() -> new byte[16384]);
 	private static ByteArrayList putAllBytes(@Nullable InputStream inputStream, @Nullable ByteArrayList existingArrayList) throws IOException
 	{
 		if (existingArrayList == null)
@@ -805,11 +806,11 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		{
 			if (inputStream != null)
 			{
-				int nextByte = inputStream.read();
-				while (nextByte != -1)
+				// Bulk copy into the pooled list; the bytes and their order are unchanged.
+				byte[] buffer = PUT_ALL_BYTES_BUFFER.get();
+				for (int count = inputStream.read(buffer); count != -1; count = inputStream.read(buffer))
 				{
-					existingArrayList.add((byte) nextByte);
-					nextByte = inputStream.read();
+					existingArrayList.addElements(existingArrayList.size(), buffer, 0, count);
 				}
 			}
 		}

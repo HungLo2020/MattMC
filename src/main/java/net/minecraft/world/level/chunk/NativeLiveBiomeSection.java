@@ -99,14 +99,37 @@ final class NativeLiveBiomeSection<T> {
         return new NativeLiveBiomeSection<>(pointer, binding);
     }
     private NativeLiveBiomeSection(MemorySegment pointer, Binding<T> binding, SingletonAliases<T> aliases) {
-        // Callers pin the section by holding this segment, so it is the reclaimer's referent.
-        try { this.owner = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(this.owner, pointer, NativeReclaimer.LIVE_BIOME); }
+        this(registered(pointer), binding, aliases, true);
+    }
+    // Callers pin the section by holding this segment, so it is the reclaimer's referent.
+    private static MemorySegment registered(MemorySegment pointer) {
+        MemorySegment owner;
+        try { owner = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(owner, pointer, NativeReclaimer.LIVE_BIOME); }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
-        this.binding = binding; this.view = loadView();
+        return owner;
+    }
+    private NativeLiveBiomeSection(MemorySegment owner, Binding<T> binding, SingletonAliases<T> aliases, boolean ignored) {
+        this.owner = owner;
+        this.binding = binding; this.view = loadView(null);
         if (view.bits == 0) {
             singleton = aliases == null ? new SingletonAliases<>() : aliases;
             singleton.add(this);
         }
+    }
+    /** A slab item: {@code scoped} carries the slab arena's scope, which keeps the item alive. */
+    static <T> NativeLiveBiomeSection<T> adoptBorrowed(MemorySegment scoped, Binding<T> binding) {
+        return new NativeLiveBiomeSection<>(scoped.asReadOnly(), binding, null, true);
+    }
+    /** Arguments of {@code mattmc_live_biome_create} for a fresh single-value container,
+     * {@code [biome id, requested bits, limit, global bits]}, or null when {@link #adopt} would decline it. */
+    static <T> int @Nullable [] freshParameters(Strategy<T> strategy, T value) {
+        var binding = binding(strategy);
+        if (binding == null) return null;
+        var fresh = strategy.getConfigurationForBitCount(0);
+        if (fresh.bitsInMemory() != 0) return null;
+        int id = binding.id(value);
+        if (id < 0) return null;
+        return new int[] {id, fresh.bitsInStorage(), binding.values.size(), strategy.getConfigurationForBitCount(32).bitsInMemory()};
     }
     private static void release(MethodHandle method, MemorySegment pointer) {
         try { method.invokeExact(pointer); }
@@ -138,7 +161,8 @@ final class NativeLiveBiomeSection<T> {
             return pointer.address() == 0 ? null : new NativeLiveBiomeSection<>(pointer, binding);
         } catch (Throwable failure) { throw failure(failure); }
     }
-    private record View(int bits, int requested, boolean global, MemorySegment words,
+    /** {@code pin} is the owner segment: a reachable view keeps the owner, and so its generation, alive. */
+    private record View(MemorySegment pin, int bits, int requested, boolean global, MemorySegment words,
                         MemorySegment palette, MemorySegment count) {
         int id(int index) {
             org.apache.commons.lang3.Validate.inclusiveBetween(0L, 63L, index);
@@ -149,7 +173,9 @@ final class NativeLiveBiomeSection<T> {
             return global ? id : (int) INT.getAcquire(palette, id * 4L);
         }
     }
-    private View loadView() {
+    /** As {@code NativeLiveBlockSection.loadView}: only generations replaced since
+     * {@code previous} need a registration, against that previous view. */
+    private View loadView(@Nullable View previous) {
         var h = SCRATCH.get().header; MemorySegment lease = MemorySegment.NULL; boolean adopted = false;
         try {
             if ((int) VIEW.invokeExact(owner, h) != 0) throw new IllegalStateException("Invalid native biome view");
@@ -159,9 +185,8 @@ final class NativeLiveBiomeSection<T> {
             var words = h.getAtIndex(ValueLayout.ADDRESS, 2).reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L).asReadOnly();
             var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).reinterpret((global ? 0 : bits == 0 ? 1 : 1 << bits) * 4L).asReadOnly();
             var count = h.getAtIndex(ValueLayout.ADDRESS, 4).reinterpret(4).asReadOnly();
-            // The view's segments are read only through the view, so the view pins its generation.
-            var view = new View(bits, requested, global, words, palette, count);
-            NativeReclaimer.register(view, lease, NativeReclaimer.LIVE_BIOME_VIEW);
+            var view = new View(owner, bits, requested, global, words, palette, count);
+            if (lease.address() != 0) NativeReclaimer.register(previous != null ? previous : view, lease, NativeReclaimer.LIVE_BIOME_VIEW);
             adopted = true; return view;
         } catch (Throwable failure) { throw failure(failure); }
         finally { if (!adopted && lease.address() != 0) release(VIEW_RELEASE, lease); Reference.reachabilityFence(this); }
@@ -183,7 +208,7 @@ final class NativeLiveBiomeSection<T> {
         try {
             long result = (long) WRITE.invokeExact(owner, index, id);
             if (result < 0) throw new IllegalArgumentException("Invalid native biome write");
-            if (result >>> 32 != 0) { view = loadView(); if (view.bits != 0) singleton = null; }
+            if (result >>> 32 != 0) { view = loadView(view); if (view.bits != 0) singleton = null; }
             return binding.values.get((int) result);
         } catch (Throwable failure) { throw failure(failure); }
         finally { Reference.reachabilityFence(this); }

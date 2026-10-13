@@ -88,6 +88,8 @@ impl Generation {
 }
 struct State {
     generation: Arc<Generation>,
+    /// Generations replaced since Java last loaded a view; see `live::State`.
+    retired: Vec<Arc<Generation>>,
 }
 pub struct Owner {
     state: Mutex<State>,
@@ -136,7 +138,7 @@ impl Owner {
         }
         let generation = Arc::new(Generation::new(bits, requested, global, palette, words));
         Some(Self {
-            state: Mutex::new(State { generation }),
+            state: Mutex::new(State { generation, retired: Vec::new() }),
             limit,
             global_bits,
             valid: AtomicBool::new(true),
@@ -176,7 +178,7 @@ impl Owner {
             ))
         };
         Self {
-            state: Mutex::new(State { generation }),
+            state: Mutex::new(State { generation, retired: Vec::new() }),
             limit: self.limit,
             global_bits: self.global_bits,
             valid: AtomicBool::new(self.is_valid()),
@@ -279,7 +281,8 @@ impl Owner {
         };
         let next = Arc::new(Generation::new(bits, requested, global, &palette, &words));
         next.set(index, local);
-        state.generation = next;
+        let previous = std::mem::replace(&mut state.generation, next);
+        state.retired.push(previous);
         Some((old, true))
     }
     pub fn snapshot(&self) -> (Arc<Generation>, [u32; CELLS], u64) {

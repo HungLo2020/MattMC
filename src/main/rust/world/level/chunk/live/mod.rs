@@ -109,6 +109,9 @@ impl Generation {
 struct State {
     generation: Arc<Generation>,
     ids: HashMap<u32, u32>,
+    /// Generations replaced since Java last loaded a view. Java's previous
+    /// view may still be read, so `view` hands these to Java to pin with it.
+    retired: Vec<Arc<Generation>>,
 }
 pub struct Owner {
     state: Mutex<State>,
@@ -253,7 +256,7 @@ impl Owner {
         }
         let generation = Arc::new(Generation::new(bits, requested, global, &entries, words));
         Some(Self {
-            state: Mutex::new(State { generation, ids }),
+            state: Mutex::new(State { generation, ids, retired: Vec::new() }),
             limit,
             global_bits,
         })
@@ -268,6 +271,7 @@ impl Owner {
                 state: Mutex::new(State {
                     generation: g.clone(),
                     ids: guard.ids.clone(),
+                    retired: Vec::new(),
                 }),
                 limit: self.limit,
                 global_bits: self.global_bits,
@@ -287,6 +291,7 @@ impl Owner {
                     &words,
                 )),
                 ids: guard.ids.clone(),
+                retired: Vec::new(),
             }),
             limit: self.limit,
             global_bits: self.global_bits,
@@ -409,7 +414,8 @@ impl Owner {
             new_bits, requested, global, &entries, &packed,
         ));
         next.set(index, id);
-        s.generation = next;
+        let previous = std::mem::replace(&mut s.generation, next);
+        s.retired.push(previous);
         s.ids = ids;
         Some((old, true))
     }

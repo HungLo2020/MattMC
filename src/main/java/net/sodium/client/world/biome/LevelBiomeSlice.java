@@ -55,7 +55,7 @@ public class LevelBiomeSlice {
 
     private void copySectionBiomeData(ChunkRenderContext context, int sectionX, int sectionY, int sectionZ, Holder<Biome> defaultBiome) {
         var section = context.getSections()[LevelSlice.getLocalSectionIndex(sectionX, sectionY, sectionZ)];
-        var biomeData = section.getBiomeData();
+        boolean hasBiomes = section.hasBiomes();
 
         for (int relCellX = 0; relCellX < 4; relCellX++) {
             for (int relCellY = 0; relCellY < 4; relCellY++) {
@@ -66,10 +66,10 @@ public class LevelBiomeSlice {
 
                     var idx = dataArrayIndex(cellX, cellY, cellZ);
 
-                    if (biomeData == null) {
+                    if (!hasBiomes) {
                         this.biomes[idx] = defaultBiome;
                     } else {
-                        this.biomes[idx] = biomeData.get(relCellX, relCellY, relCellZ);
+                        this.biomes[idx] = section.getBiome(relCellX, relCellY, relCellZ);
                     }
                 }
             }

@@ -58,6 +58,9 @@ Implementation: [whole producer](https://github.com/HungLo2020/MattMC/tree/maste
 - Admit stock factories/wrappers, ready biome stages and canonical registered
   owners only. Event subscribers, public wrapper-cache overrides, custom worlds,
   unsupported states and mutable lighting storage keep the original callbacks.
+- The biome binding's order is checked against the level's biome registry once
+  per binding and registry (both are fixed after load), not for every chunk.
+  The proof is held weakly, so it never keeps a closed world alive.
 - Internal full-data columns use `LongList`, including direct native views.
   They must not subclass `LongArrayList`: fastutil's equality/comparison methods
   access another concrete list's backing array directly. Constructors, DTOs,

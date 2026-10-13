@@ -52,7 +52,21 @@ final class NativeLiveBlockSection {
     }
     private NativeLiveBlockSection(MemorySegment scoped) {
         this.owner = scoped;
-        this.view = loadView();
+        this.view = loadView(null);
+    }
+    /** A slab item: {@code scoped} carries the slab arena's scope, which keeps the item alive. */
+    static NativeLiveBlockSection adoptBorrowed(MemorySegment scoped) { return new NativeLiveBlockSection(scoped.asReadOnly()); }
+    /** Arguments of {@code mattmc_live_section_create} for a fresh single-value container,
+     * {@code [state, requested bits, registry size, global bits]}, or null when
+     * {@link #adopt} would decline it. */
+    static int @Nullable [] freshParameters(Strategy<BlockState> strategy, BlockState value) {
+        if (strategy.getClass() != BLOCK_STRATEGY || strategy.globalMap() != Block.BLOCK_STATE_REGISTRY
+                || Block.BLOCK_STATE_REGISTRY.size() > 65535 || value == null || value.getClass() != BlockState.class) return null;
+        var fresh = strategy.getConfigurationForBitCount(0);
+        if (fresh.bitsInMemory() != 0) return null;
+        int id = Block.getId(value);
+        if (Block.BLOCK_STATE_REGISTRY.byId(id) != value) return null;
+        return new int[] {id, fresh.bitsInStorage(), Block.BLOCK_STATE_REGISTRY.size(), strategy.getConfigurationForBitCount(32).bitsInMemory()};
     }
     MemorySegment stageOwner() { return this.owner; }
     private static void release(MethodHandle handle, MemorySegment pointer) {
@@ -88,7 +102,13 @@ final class NativeLiveBlockSection {
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot adopt native live section", failure); }
     }
-    private View loadView() {
+    /**
+     * The owner pins its current generation, and each view pins the owner, so
+     * a view needs no registration of its own. After growth, Rust returns the
+     * replaced generations; {@code previous}, which readers may still hold,
+     * keeps them alive.
+     */
+    private View loadView(@Nullable View previous) {
         var h = SCRATCH.get().header;
         MemorySegment lease = MemorySegment.NULL;
         boolean adopted = false;
@@ -100,9 +120,8 @@ final class NativeLiveBlockSection {
             var words = h.getAtIndex(ValueLayout.ADDRESS, 2).reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L).asReadOnly();
             var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).reinterpret((global ? 0 : bits == 0 ? 1 : (1 << bits) + (bits >= 5 ? 1 : 0)) * 4L).asReadOnly();
             var count = h.getAtIndex(ValueLayout.ADDRESS, 4).reinterpret(4).asReadOnly();
-            // The view's segments are read only through the view, so the view pins its generation.
-            var result = new View(bits, requested, global, words, palette, count);
-            NativeReclaimer.register(result, lease, NativeReclaimer.LIVE_SECTION_VIEW);
+            var result = new View(this.owner, bits, requested, global, words, palette, count);
+            if (lease.address() != 0) NativeReclaimer.register(previous != null ? previous : result, lease, NativeReclaimer.LIVE_SECTION_VIEW);
             adopted = true;
             return result;
         } catch (RuntimeException | Error failure) { throw failure; }
@@ -114,7 +133,10 @@ final class NativeLiveBlockSection {
         final boolean global;
         final long mask;
         final MemorySegment words, palette, count;
-        View(int bits, int requested, boolean global, MemorySegment words, MemorySegment palette, MemorySegment count) {
+        /** The owner segment: a reachable view keeps the owner, and so its generation, alive. */
+        @SuppressWarnings("unused") private final MemorySegment pin;
+        View(MemorySegment pin, int bits, int requested, boolean global, MemorySegment words, MemorySegment palette, MemorySegment count) {
+            this.pin = pin;
             this.bits = bits; this.requested = requested; this.global = global; this.words = words; this.palette = palette; this.count = count;
             this.per = bits == 0 ? 0 : 64 / bits; this.mask = (1L << bits) - 1;
             int[] params = bits == 0 ? new int[3] : SimpleBitStorage.nativeCellParameters(bits);
@@ -164,7 +186,7 @@ final class NativeLiveBlockSection {
             if (old == id) return old;
             long result = (long)WRITE.invokeExact(this.owner, index, id);
             if (result < 0) throw new IllegalArgumentException("Invalid native section write");
-            if ((result >>> 32) != 0) this.view = loadView();
+            if ((result >>> 32) != 0) this.view = loadView(current);
             return (int)result;
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot mutate native live section", failure); }
@@ -180,7 +202,7 @@ final class NativeLiveBlockSection {
             long result = (long)WRITE_COUNTS.invokeExact(this.owner, counters.owner(), index, id);
             if (result == -2) return -1;
             if (result < 0) throw new IllegalArgumentException("Invalid native section/count write");
-            if ((result >>> 32) != 0) this.view = loadView();
+            if ((result >>> 32) != 0) this.view = loadView(current);
             return (int)result;
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot mutate native section counters", failure); }
@@ -206,7 +228,7 @@ final class NativeLiveBlockSection {
         catch (Throwable failure) { throw new IllegalStateException("Cannot copy native live section", failure); }
         finally { Reference.reachabilityFence(this); }
     }
-    NativeBlockSectionSnapshot snapshot(Arena arena) {
+    NativeBlockSectionSnapshot snapshot(@Nullable Arena arena) {
         try { return NativeBlockSectionSnapshot.adopt((MemorySegment)SNAPSHOT.invokeExact(this.owner), arena); }
         catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot snapshot native live section", failure); }

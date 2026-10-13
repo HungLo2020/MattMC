@@ -45,11 +45,19 @@ exact centre and an entirely native/empty neighbourhood within the slice volume.
 
 ## Lifetime and bounds
 
-A capture's automatic FFM arena releases its Rust allocation only after the CPU
-view becomes unreachable. Cache eviction does not invalidate queued rebuilds;
+A production capture is freed through the [native reclaimer](NATIVE-RECLAIMER.md)
+(kind `SECTION_SNAPSHOT`) once the snapshot object is unreachable; every read
+fences it. Tests may pass an explicit arena instead. Cache eviction does not invalidate queued rebuilds;
 those rebuilds retain their captures. The bulk call fences its owner array so GC
 cannot reclaim borrowed pointers during native access. No mutable native view is
 exposed. Explicitly scoped arenas are used only by tests.
+
+Native biome sections are captured as their 64 cells, read through the live
+view on the render thread when the capture is taken (`ClonedChunkSection.getBiome`).
+That is the same moment the former container copy was taken, so later reads
+return the same values without a native owner copy per capture. Non-native
+biome containers are still copied. A chunk with no block entities skips the
+block-entity scan entirely.
 
 Reset clears all **27** section slots, including captures, model data, lights and
 block-entity references. The former three-slot loop retained unrelated sections

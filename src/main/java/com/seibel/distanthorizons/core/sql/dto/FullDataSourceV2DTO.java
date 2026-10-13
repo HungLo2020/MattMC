@@ -231,11 +231,19 @@ public class FullDataSourceV2DTO
 		if (direction == null)
 		{
 			readBlobToGenerationSteps(this.compressedColumnGenStepByteArray, dataSource.columnGenerationSteps, compressionModeEnum);
-			readBlobToWorldCompressionMode(this.compressedWorldCompressionModeByteArray, dataSource.columnWorldCompressionMode, compressionModeEnum);
-			if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST) {
-				readBlobToSemanticHorizontalUniformity(
-					this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum
-				);
+			if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST && codecByteArrayMode(compressionModeEnum))
+			{
+				// One decompression for both planes of this blob.
+				readBlobToWorldCompressionModeAndUniformity(this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum);
+			}
+			else
+			{
+				readBlobToWorldCompressionMode(this.compressedWorldCompressionModeByteArray, dataSource.columnWorldCompressionMode, compressionModeEnum);
+				if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST) {
+					readBlobToSemanticHorizontalUniformity(
+						this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum
+					);
+				}
 			}
 			if (this.dataFormatVersion >= DATA_FORMAT.V4_LATEST) {
 				readSemanticHorizontalContributorsFromBlob(
@@ -720,14 +728,43 @@ public class FullDataSourceV2DTO
 		EDhApiDataCompressionMode compressionModeEnum
 	) throws IOException, DataCorruptedException {
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum)) {
-			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decodeUniformity(dataSource, compressedIn)) return;
-			byte[] ignoredCompressionModes = new byte[FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH];
-			compressedIn.readFully(ignoredCompressionModes, 0, ignoredCompressionModes.length);
-			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {
-				for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
-					dataSource.setSemanticHorizontalUniformity(x, z, compressedIn.readUnsignedByte() != 0);
-				}
+			readSemanticHorizontalUniformity(compressedIn, dataSource);
+		}
+	}
+	/** Reads the uniformity plane from a stream positioned at the start of the compression blob. */
+	private static void readSemanticHorizontalUniformity(DhDataInputStream compressedIn, FullDataSourceV2 dataSource) throws IOException {
+		if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decodeUniformity(dataSource, compressedIn)) return;
+		byte[] ignoredCompressionModes = new byte[FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH];
+		compressedIn.readFully(ignoredCompressionModes, 0, ignoredCompressionModes.length);
+		for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {
+			for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
+				dataSource.setSemanticHorizontalUniformity(x, z, compressedIn.readUnsignedByte() != 0);
 			}
+		}
+	}
+	/** Modes whose streams hold the whole decompressed blob in an array. */
+	private static boolean codecByteArrayMode(EDhApiDataCompressionMode mode)
+	{ return mode == EDhApiDataCompressionMode.UNCOMPRESSED || mode == EDhApiDataCompressionMode.Z_STD_BLOCK; }
+	/**
+	 * {@link #readBlobToWorldCompressionMode} then {@link #readBlobToSemanticHorizontalUniformity}
+	 * over one decompression: the uniformity reader rereads the same bytes from
+	 * the start. Each plane keeps its own failure: a short compression plane is
+	 * {@link DataCorruptedException}, a short uniformity plane a raw {@link EOFException}.
+	 */
+	private static void readBlobToWorldCompressionModeAndUniformity(
+		ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 dataSource,
+		EDhApiDataCompressionMode compressionModeEnum
+	) throws IOException, DataCorruptedException {
+		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum)) {
+			int start = compressedIn.codecPosition();
+			try {
+				if (!net.minecraft.world.level.chunk.NativeDhMetadataCodec.decode(dataSource.columnWorldCompressionMode, compressedIn))
+					readMetadataBytes(dataSource.columnWorldCompressionMode, compressedIn);
+			} catch (EOFException e) {
+				throw new DataCorruptedException(e);
+			}
+			compressedIn.codecSeek(start);
+			readSemanticHorizontalUniformity(compressedIn, dataSource);
 		}
 	}
 
@@ -752,6 +789,16 @@ public class FullDataSourceV2DTO
 		ByteArrayList input, FullDataSourceV2 dataSource, EDhApiDataCompressionMode compressionMode
 	) throws IOException, DataCorruptedException {
 		try (DhDataInputStream in = DhDataInputStream.create(input, compressionMode)) {
+			if (in.codecByteArrayInput() && net.minecraft.world.level.chunk.NativeDhCodec.nativeEnabled()) {
+				// One Rust pass into one batch owner; cells before a failure are applied, as below.
+				int position = in.codecPosition();
+				int[] stop = net.minecraft.world.level.chunk.NativeDhContributors.decodeSaved(in.codecArray(), position, in.codecLimit() - position,
+					(cell, columns) -> dataSource.setSemanticHorizontalContributors(cell / FullDataSourceV2.WIDTH, cell % FullDataSourceV2.WIDTH, columns));
+				if (stop[0] == net.minecraft.world.level.chunk.NativeDhContributors.SAVED_END_OF_INPUT) throw new EOFException();
+				if (stop[0] == net.minecraft.world.level.chunk.NativeDhContributors.SAVED_OVER_BOUND)
+					throw new DataCorruptedException("Semantic contributor column exceeds bound: " + stop[1]);
+				return;
+			}
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
 				if (!in.readBoolean()) continue;
 				LongList[] contributors = new LongList[4];
