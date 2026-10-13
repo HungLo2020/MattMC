@@ -4,7 +4,7 @@
 
 ## October 13 current source and runtime scope
 
-The reviewed source is [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f),
+The reviewed source is [`233003c8`](https://github.com/HungLo2020/MattMC/commit/233003c84602ae62b7b67e6be53f71ae1b235327),
 following the preserved shadow, entity and world-owner checkpoints below.
 [Rust particle frames](RUST-PARTICLE-FRAMES.md) now own capture buffers,
 independent CPU snapshots and material-order transport; Java still owns
@@ -12,7 +12,18 @@ simulation, interpolation, hooks and texture admission. The later
 [Rust-only DH render build](RUST-DH-RENDER-BUILD.md) removes ordinary Java
 column traversal, geometry and quad/packet fallback paths. Contextual callbacks,
 diagnostic sidecars and asynchronous lifecycle orchestration remain Java.
-Neither change completes the Java-free application target.
+[Cached flat GUI items](RUST-FLAT-ITEM-FRAMES.md) now retain geometry and authored
+transforms in Rust, with Java model/cache admission and resource publication
+remaining. These slices do not complete the Java-free application target.
+
+The latest four-mode author checkpoint `e491d123` passes all FPS floors in one
+6,000-frame pair per mode, but shader p99 fails at 10.358 / 7.998 ms and
+shader+DH at 13.331 / 9.910 ms (Current / Frozen). Its reported full check,
+GUI cases and scoped lifecycle/image controls do not close broad visual,
+streaming or memory acceptance. See the owner guide for failed attempts and
+same-build controls. The subsequent [native tint conversion](RUST-DH-RENDER-BUILD.md#tinted-colors)
+has separate prior-Current CPU/laptop evidence; it has no new four-mode Frozen
+matrix here. The particle record below is historical.
 
 The particle implementation author reports native `6dc8870e`, Rust 2,790/three
 ignored and Java 2,141/two skipped. Two clean 6,000-frame vanilla pairs and one

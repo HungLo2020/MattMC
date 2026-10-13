@@ -15,14 +15,39 @@ driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 
 ## October 13 current evidence boundary
 
-Source [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f)
-adds Rust-only DH render builds after the particle migration in
-[`f505bbbd`](https://github.com/HungLo2020/MattMC/commit/f505bbbd13bafcbec60e88170c6424668abe127e).
-The [root summary at this source](https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/SUMMARY.md)
-still reports the **particle native `6dc8870e` checkpoint**, not a new
-four-mode measurement of the later DH integration. Runtime results below are
-repository-author reports; this documentation review inspected source, drivers
-and tests without replaying clients or inspecting untracked runtime receipts.
+Source [`6af38fa3`](https://github.com/HungLo2020/MattMC/commit/6af38fa321799dd2b1e730317f4963a7e7e1cc1f)
+adds [cached flat GUI item ownership](RUST-FLAT-ITEM-FRAMES.md) after the
+particle and Rust-only DH build migrations. The latest four-mode author-recorded native
+`e491d123` comparison has one clean 6,000-frame pair per mode: **all FPS floors
+pass, but both shader p99 floors fail**. Runtime results here are repository-author
+reports; this documentation review did not replay suites, clients or untracked
+runtime artifacts.
+
+| Mode | FPS, Current / Frozen | p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1273.1 / 1205.4 | 3.508 / 3.910 |
+| Vanilla + DH | 786.1 / 622.0 | 5.314 / 6.564 |
+| Shaders | 350.2 / 307.7 | 10.358 / 7.998 |
+| Shaders + DH | 276.4 / 223.2 | 13.331 / 9.910 |
+
+Saved inputs and recorded JVM controls match, while live entity counts differ.
+The [owner's integrated checkpoint](RUST-FLAT-ITEM-FRAMES.md#integrated-frozen-gameplay-checkpoint)
+keeps the original receipts and a separate same-build retained/inline diagnosis.
+That internal comparison does not establish an isolated gameplay gain or close
+Frozen shader tail-latency acceptance. The earlier `c10ca3c2` failures and
+`6dc8870e` particle pass remain historical; neither accepts the later integration.
+Eight GUI cases, two settled image pairs, two completion modes and three lifecycle
+cases are reported passing on the integrated build. Hazy lifecycle images support
+structural presentation only; first-turn terrain, shader entry, sustained streaming
+and long-session memory remain open.
+
+The later [`233003c8` tint conversion](https://github.com/HungLo2020/MattMC/commit/233003c84602ae62b7b67e6be53f71ae1b235327)
+is integrated after this four-mode checkpoint. Its
+[separate measurements](RUST-DH-RENDER-BUILD.md#measured-results-tinted-colors-2026-10-13)
+compare preceding Current `c357b63cd`, not Frozen: the small-DH moving workload
+reports 111.6 / 110.9 FPS but 45.8 / 42.2 ms p99, with wide spread and
+1.5–4.4 GB of swap. These runs do not replace the four-mode table or establish
+no regression under matched broad acceptance.
 
 ### Particle checkpoint: native `6dc8870e`
 

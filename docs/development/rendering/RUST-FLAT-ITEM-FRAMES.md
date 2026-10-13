@@ -25,13 +25,19 @@ registry, memory budget and submission lifetime.
   decal-layout semantics and uses the current frame's clock.
 - The bounded topology cache retains a native lease. Frame decoding acquires
   shared ownership; eviction/reload cannot invalidate an already decoded frame.
-  Java model/texture callbacks retain their existing order.
+  Java model/texture callbacks retain their existing order. The cache budget is
+  not a bound on all surviving in-flight geometry. Java submission pins prevent
+  collection; they do not make an explicitly closed owner usable.
 - Retention-capacity rejection keeps that entry on the existing inline semantic
   path. Invalid inputs throw. No renderer or Java GPU fallback is introduced.
 - Atlas publication must visit all retained template assets, including foil.
   Capture diagnostics must observe the template's foil facts.
 
 ## Verification
+
+The runtime and timing receipts below are implementation-author reports. This
+documentation review inspected source and test definitions without rerunning
+them or independently replaying the untracked captures.
 
 Fresh paired 30-second gameplay JFRs at `f505bbbd1` completed with
 source/native/Frozen guards. The Current flat-item producer carries about
@@ -63,6 +69,11 @@ Each sample instantiates 128 frames of nine items:
 | Plain, two layers | 0.0565 / 0.3553 | 488,448 / 2,386,944 |
 | Standard foil, four layers | 0.0582 / 0.7271 | 534,528 / 4,626,432 |
 | Special foil, four layers | 0.0582 / 0.8950 | 534,528 / 5,935,104 |
+
+The benchmark accepts an inline result when no native template is admitted;
+its ownership checks are conditional on a nonnull owner. The separate Java
+regression requires native admission and retired Java geometry. A timing result
+alone therefore does not prove that the retained route ran.
 
 This isolates cached instantiation and placement consumption. Model resolution,
 encoding, native expansion and GPU work are excluded. The prior Java producer

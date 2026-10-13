@@ -27,7 +27,8 @@ Java entry points:
 [`ColumnRenderBufferBuilder`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnRenderBufferBuilder.java)
 (per-build settings).
 
-Source reviewed at [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f). The measurements below are implementation-author reports;
+Section-build ownership was reviewed at [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f),
+with tint conversion added at [`233003c8`](https://github.com/HungLo2020/MattMC/commit/233003c84602ae62b7b67e6be53f71ae1b235327). The measurements below are implementation-author reports;
 this documentation reconciliation inspected source and test assertions without
 rerunning suites, benchmarks or clients. The earlier
 [particle runtime matrix](RUST-PARTICLE-FRAMES.md#runtime-evidence) predates this
@@ -78,6 +79,8 @@ conversion does exactly that in Rust
 - Anything that changes a state's route bumps the color generation
   (`NativeDhConversionScope.colorsChanged`): color-cache clears, and states
   joining `ClientBlockStateColorCache`'s broken or needs-level sets.
+- Native tint admission excludes semantic builds and non-stock level wrappers;
+  their contextual color path remains Java.
 - Tests set `RenderColumnConversionContext.nativeTint` to false to compare with
   Java's per-point colors.
 
@@ -135,7 +138,9 @@ conversion does exactly that in Rust
   whole-source conversion bridge and its material cache.
 - `NativeDhTintConversionTest` (parity) converts recorded terrain with warm tint
   caches through the native tint route and through Java's per-point colors, at
-  blend radii 0, 1 and 3, and requires equal packets. `NativeDhTintTest` replays
+  blend radii 0, 1 and 3, and requires equal packet-byte/material-ID checksums.
+  Its base colors and biome tints are seeded controls, not real-client resolver
+  coverage; the checksum exclusions below apply. `NativeDhTintTest` replays
   Frozen's cached-neighborhood fixture through the Rust source blend.
 
 **Whole pipeline, across builds.** `VerifyDhSource.py --mode render` converts,
@@ -151,7 +156,9 @@ python3 DevUtils/tests/world/chunk/VerifyDhSource.py --mode render --java "$JAVA
 ```
 
 The runner checks the selected native file before each launch and rejects
-nonmatching checksums by default. `--per-side-checksums` deliberately relaxes
+nonmatching checksums by default. The render checksum does not include the
+identity table or variant state/position sidecars; equality is not a complete
+semantic-publication oracle. `--per-side-checksums` deliberately relaxes
 cross-side equality; it must not be used as parity evidence. The runner records
 a ratio but has no slower-than-baseline exit gate. Its initial driver hashes
 and native checks do not by themselves establish final source/class-image or
@@ -228,5 +235,6 @@ The rows after the first ran two pairs of two rounds each.
 **Gameplay** (small DH fixture, moving camera, 6,000 frames, four alternating
 runs per side, medians): baseline 110.9 FPS, 6.39 ms median frame, 42.2 ms
 p99; Current 111.6 FPS, 6.05 ms, 45.8 ms. Both sides spread widely (median frame
-5.64–8.65 ms) with 1.5–4.4 GB of swap in every run, so this shows no regression
-rather than a measured gain. Runs: `artifacts/performance/realworld-20261011/dhab6-*`.
+5.64–8.65 ms) with 1.5–4.4 GB of swap in every run, so this does not establish a measured gain or absence of regression. The
+Current p99 median is higher; these swapped laptop runs are not matched
+Frozen acceptance. Runs: `artifacts/performance/realworld-20261011/dhab6-*`.
