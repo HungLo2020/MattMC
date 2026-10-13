@@ -39,6 +39,31 @@ class NativeBlockCollisionScanTest {
         return new Fixture(chunk,section,world);
     }
     private static Cursor3D cursor() {var c=new Cursor3D(0,0,0,4,2,2);assertTrue(c.advance());return c;}
+    @Test void generationWrapperReadBorrowsKeepLiveCollisionBindingsButMutableAccessInvalidates() throws Exception {
+        var f=fixture();var wrapper=mock(ImposterProtoChunk.class,CALLS_REAL_METHODS);
+        set(ImposterProtoChunk.class,wrapper,"wrapped",f.chunk);
+        var inputs=f.chunk.nativeCollisionSections(false);assertNotNull(inputs);
+        assertSame(f.chunk.getSectionsForRead(),wrapper.getSectionsForRead());
+        assertFalse(f.chunk.hasEscapedSectionArray());
+        assertSame(inputs,f.chunk.nativeCollisionSections(false));
+        var listener=mock(Runnable.class);f.chunk.setNativeSectionArrayEscapeListener(listener);
+        var replacement=new LevelChunkSection(new PalettedContainer<>(Blocks.STONE.defaultBlockState(),Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY)),null);
+        replacement.recalcBlockCounts();wrapper.getSections()[0]=replacement;
+        verify(listener).run();assertTrue(f.chunk.hasEscapedSectionArray());
+        assertNotSame(inputs,f.chunk.nativeCollisionSections(false));
+        assertEquals(22,prefix(f.chunk,cursor(),new AABB(2.1,1.1,1.1,2.9,1.9,1.9),new BlockPos.MutableBlockPos()));
+    }
+    private static class CustomWrapper extends ImposterProtoChunk {
+        CustomWrapper(LevelChunk chunk) {super(chunk,false);}
+        LevelChunkSection[] custom;
+        @Override public LevelChunkSection[] getSections() {return custom;}
+    }
+    @Test void customGenerationWrapperRetainsOriginalGetterDispatch() {
+        var wrapper=mock(CustomWrapper.class,CALLS_REAL_METHODS);
+        wrapper.custom=new LevelChunkSection[0];
+        assertSame(wrapper.custom,wrapper.getSectionsForRead());
+        verify(wrapper).getSections();
+    }
     private static int prefix(LevelChunk chunk, Cursor3D cursor, AABB box, BlockPos.MutableBlockPos position) {
         return (int)(NativeBlockCollisionScan.next(chunk,cursor,box,position) >>> 32);
     }

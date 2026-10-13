@@ -216,9 +216,9 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		return this.sections;
 	}
 
-	/** Borrow for synchronous reads only. Never replace slots or retain a mutable alias. */
+	/** Borrow section identities synchronously. Never replace slots or retain the array. */
 	public LevelChunkSection[] getSectionsForRead() {
-		return this.getClass() == LevelChunk.class ? this.sections : this.getSections();
+		return this.getClass() == LevelChunk.class || this.getClass() == ProtoChunk.class ? this.sections : this.getSections();
 	}
 
 	public LevelChunkSection getSection(int i) {

@@ -2,9 +2,9 @@
 
 | Mode | FPS, Current / Frozen | p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1246.70 / 1213.60 | 3.474 / 3.935 |
-| Vanilla + DH | 802.90 / 661.10 | 3.877 / 6.265 |
-| Shaders | 360.10 / 319.10 | 4.225 / 7.146 |
-| Shaders + DH | 280.30 / 227.90 | 5.742 / 8.583 |
-Native6ba548a6: one fresh6000-frame pair/mode; all scoped FPS/p99 floors pass. Inputs/JVM controls match; live entity counts differ. Single pairs do not establish an isolated/sustained gain. Two settled pairs/three lifecycles pass,VUID0; hazy gates are structural only. Long-memory acceptance remains open.
-Entity collection: Rust2783/Java2126/Frozen6886 pass. All-hit CPU41.84/67.65/26.31ms Current/prior consumer/Frozen; Java heap6.52/18.78/18.87MB per4096queries. Frozen CPU gaps remain. [Report](docs/development/world/entities/RUST-ENTITY-COLLECTION.md). Broad Java migration remains unfinished.
+| Vanilla | 1280.50 / 1241.00 | 3.180 / 3.675 |
+| Vanilla + DH | 815.40 / 684.40 | 3.793 / 6.812 |
+| Shaders | 352.30 / 313.80 | 5.221 / 7.619 |
+| Shaders + DH | 277.80 / 226.20 | 6.003 / 9.620 |
+Native03026814: one6000-frame pair/mode passes all scoped FPS/p99 floors. Inputs/JVM controls match; live entity counts differ. Two settled pairs/three lifecycles pass,VUID0; hazy images structural only. Current peak RSS5.18–8.46GiB; sustained performance/memory acceptance remains open.
+Rust2784/Java2130, Frozen24 generation/231212 collision/600 tick cases pass. Collision CPU83.32/79.52ms Current/Frozen; Java heap34.25/75.23MB per65536queries. CPU gap4.8%. [Report](docs/development/world/levelgen/RUST-STAGE-HANDOFF.md). Broad Java migration remains unfinished.

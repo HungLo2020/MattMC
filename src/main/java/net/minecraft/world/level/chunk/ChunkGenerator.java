@@ -319,7 +319,7 @@ public abstract class ChunkGenerator {
 			ChunkPos.rangeClosed(sectionPos.chunk(), 1).forEach(chunkPosx -> {
 				ChunkAccess chunkAccessx = worldGenLevel.getChunk(chunkPosx.x, chunkPosx.z);
 
-				for (LevelChunkSection levelChunkSection : chunkAccessx.getSections()) {
+				for (LevelChunkSection levelChunkSection : chunkAccessx.getSectionsForRead()) {
 					levelChunkSection.getBiomes().getAll(set::add);
 				}
 			});

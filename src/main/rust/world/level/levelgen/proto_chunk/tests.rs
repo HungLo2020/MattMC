@@ -5,6 +5,33 @@ use crate::world::level::levelgen::noise_fill::section::pack;
 static FLAGS: [u8; 3] = [FLAG_AIR | FLAG_AIR_BLOCK, FLAG_BLOCKS_MOTION, FLAG_AIR];
 
 #[test]
+fn retained_capture_owns_snapshot_and_preserves_aliased_section_local_counts() {
+    use crate::world::level::chunk::{counters, inputs, live};
+    use std::sync::Arc;
+    let block = Arc::new(live::Owner::load(0, 0, &[1], &[], 3, 15).unwrap());
+    let low = Arc::new(counters::Owner::new(0));
+    let high = Arc::new(counters::Owner::new(4096));
+    let p = Arc::as_ptr(&block) as usize;
+    let pairs = [p, Arc::as_ptr(&low) as usize, p, Arc::as_ptr(&high) as usize];
+    let owner = unsafe { inputs::mattmc_chunk_inputs_create(pairs.as_ptr(), 2, -16) };
+    assert!(!owner.is_null());
+    let heights = pack(&[32; 256], ceil_log2(33));
+    let stage = ffi::capture_retained(unsafe { &*owner }, 15, &FLAGS, &heights, &heights).unwrap_or_else(|e| panic!("capture status {e}"));
+    assert_eq!(stage.get(0, -16, 0), -2); // Shared blocks do not imply shared counters.
+    assert_eq!(stage.get(0, 0, 0), 1);
+    block.write(0, 2).unwrap();
+    high.set([0, 0, 0]);
+    assert_eq!(stage.get(0, 0, 0), 1);
+    let next = ffi::capture_retained(unsafe { &*owner }, 15, &FLAGS, &heights, &heights).unwrap_or_else(|e| panic!("capture status {e}"));
+    assert_eq!(next.get(0, 0, 0), -2);
+    assert_eq!(ffi::capture_retained(unsafe { &*owner }, 14, &FLAGS, &heights, &heights).err(), Some(u64::MAX));
+    assert_eq!(ffi::capture_retained(unsafe { &*owner }, 15, &FLAGS, &[], &heights).err(), Some(0));
+    unsafe { inputs::mattmc_chunk_inputs_release(owner); }
+    drop(block); drop(low); drop(high);
+    assert_eq!(stage.get(0, 0, 0), 1); // Captures retain no input-owner lifetime.
+}
+
+#[test]
 fn heightmap_scan_reads_only_air_sections_as_air() {
     let heights = pack(&[16; 256], ceil_log2(49));
     let sections = vec![

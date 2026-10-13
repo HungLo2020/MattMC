@@ -37,6 +37,51 @@ class NativeStageHandoffTest {
             field.setAccessible(true); return field.get(source);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
+    @Test void retainedCapturesKeepStructuralAuthorityAndReadReplacedOwners() throws Exception {
+        var chunk = fresh();
+        var field = net.minecraft.world.level.chunk.ChunkAccess.class.getDeclaredField("nativeDhInputs");
+        field.setAccessible(true);
+        try (var stage = NativeProtoChunk.create(chunk)) { assertNotNull(stage); }
+        Object first = field.get(chunk); assertNotNull(first);
+        try (var stage = NativeProtoChunk.create(chunk)) { assertNotNull(stage); }
+        assertSame(first, field.get(chunk));
+        assertFalse(chunk.hasEscapedSectionArray());
+        chunk.getSection(0).installGenerated(0, List.of(Blocks.STONE.defaultBlockState()), new long[0], 4096, 0, 0);
+        try (var stage = NativeProtoChunk.create(chunk)) {
+            assertNotNull(stage);
+            assertSame(Blocks.STONE.defaultBlockState(), stage.get(new BlockPos.MutableBlockPos(0, -8, 0), -8));
+            assertNotSame(first, field.get(chunk));
+        }
+        assertFalse(chunk.hasEscapedSectionArray());
+        var replacement = new net.minecraft.world.level.chunk.LevelChunkSection(PalettedContainerFactory.create(NativeNoiseFillTest.registries));
+        replacement.setBlockState(0, 8, 0, Blocks.BEDROCK.defaultBlockState());
+        chunk.getSections()[0] = replacement;
+        try (var stage = NativeProtoChunk.create(chunk)) {
+            assertNotNull(stage);
+            assertSame(Blocks.BEDROCK.defaultBlockState(), stage.get(new BlockPos.MutableBlockPos(0, -8, 0), -8));
+        }
+    }
+    @Test void customHeightProvidersKeepTheOriginalCaptureAdmission() throws Exception {
+        var calls = new java.util.ArrayList<String>();
+        var height = new LevelHeightAccessor() {
+            @Override public int getMinY() {calls.add("min");return -16;}
+            @Override public int getHeight() {calls.add("height");return 32;}
+        };
+        var chunk = new ProtoChunk(new ChunkPos(0, 0), UpgradeData.EMPTY, height,
+            PalettedContainerFactory.create(NativeNoiseFillTest.registries), null);
+        chunk.setPersistedStatus(ChunkStatus.NOISE);
+        chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
+        chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
+        chunk.getSection(0).setBlockState(0, 8, 0, Blocks.STONE.defaultBlockState());
+        calls.clear();
+        try (var stage = NativeProtoChunk.create(chunk)) {
+            assertNotNull(stage);
+            assertSame(Blocks.STONE.defaultBlockState(), stage.get(new BlockPos.MutableBlockPos(0, -8, 0), -8));
+        }
+        assertEquals(List.of("min", "height", "min", "height"), calls);
+        var field = net.minecraft.world.level.chunk.ChunkAccess.class.getDeclaredField("nativeDhInputs");
+        field.setAccessible(true); assertNull(field.get(chunk));
+    }
     @Test void importedInputsAreIsolatedAndInstalledOwnersOutliveTheirStage() {
         var chunk = fresh(); var section = chunk.getSection(0); var container = section.getStates();
         section.setBlockState(0, 8, 0, Blocks.STONE.defaultBlockState());

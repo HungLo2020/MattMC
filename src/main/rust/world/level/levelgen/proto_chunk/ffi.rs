@@ -1,6 +1,47 @@
 use super::ProtoStorage;
 use crate::world::level::levelgen::noise_fill::FLAG_FLUID;
 
+/// Capture directly from the retained chunk directory. The stage owns isolated
+/// packed snapshots; neither section pointers nor mutable owners escape into it.
+/// # Safety
+/// `chunk` is a live retained input owner. Heightmap spans are aligned and live
+/// for this call, and the caller excludes concurrent generation mutation.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_proto_chunk_create_retained(
+    chunk: *const crate::world::level::chunk::inputs::Chunk,
+    global_bits: i32,
+    surface: *const i64,
+    floor: *const i64,
+    heightmap_words: i32,
+) -> u64 {
+    let Some(flags) = crate::world::level::levelgen::noise_fill::installed_state_flags() else { return 0 };
+    if chunk.is_null() || chunk as usize % std::mem::align_of::<crate::world::level::chunk::inputs::Chunk>() != 0
+        || surface.is_null() || floor.is_null() || surface as usize % 8 != 0 || floor as usize % 8 != 0
+        || heightmap_words <= 0 { return 0; }
+    let a = std::slice::from_raw_parts(surface, heightmap_words as usize);
+    let b = std::slice::from_raw_parts(floor, heightmap_words as usize);
+    capture_retained(&*chunk, global_bits as u32, flags, a, b)
+        .map_or_else(|status| status, |storage| Box::into_raw(Box::new(storage)) as u64)
+}
+
+pub(super) fn capture_retained(
+    chunk: &crate::world::level::chunk::inputs::Chunk,
+    global_bits: u32,
+    flags: &'static [u8],
+    surface: &[i64],
+    floor: &[i64],
+) -> Result<ProtoStorage, u64> {
+    let source = crate::world::level::chunk::inputs::Sections::Retained(chunk);
+    let mut sections = Vec::with_capacity(source.len());
+    for index in 0..source.len() {
+        let Some(section) = source.block(index).stage_with_counts(source.counter(index).unwrap(), flags.len() as u32, global_bits)
+            else { return Err(u64::MAX); };
+        sections.push(section);
+    }
+    ProtoStorage::new(chunk.min_y, source.len() as i32 * 16, sections, global_bits, flags, surface, floor)
+        .map_err(|_| 0)
+}
+
 /// Capture canonical live section inputs entirely within Rust. Counters and
 /// heightmaps preserve the original Java stage snapshot; no owner is retained.
 /// # Safety

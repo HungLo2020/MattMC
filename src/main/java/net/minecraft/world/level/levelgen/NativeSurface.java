@@ -291,7 +291,7 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         if (count <= 0) return;
         capacity(count); Arrays.fill(output, 0, count, -1);
         int defaultFlag = defaultBlock.isAir() ? 0 : !defaultBlock.getFluidState().isEmpty() ? 1 : 3;
-        var sections = chunk.getSections();
+        var sections = chunk.getSectionsForRead();
         for (int y = 0; y < count;) {
             int absolute = minY + y;
             int end = Math.min(count, y + 16 - (absolute & 15));

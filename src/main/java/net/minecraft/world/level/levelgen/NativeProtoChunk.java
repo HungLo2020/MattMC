@@ -72,7 +72,7 @@ final class NativeProtoChunk implements AutoCloseable {
             || !chunk.hasPrimedHeightmap(Heightmap.Types.WORLD_SURFACE_WG) || !chunk.hasPrimedHeightmap(Heightmap.Types.OCEAN_FLOOR_WG)) {
             return null;
         }
-        LevelChunkSection[] sections = chunk.getSections();
+        LevelChunkSection[] sections = chunk.getSectionsForRead();
         int minY = chunk.getMinY(), height = chunk.getHeight();
         if (sections.length == 0 || sections.length * 16 != height) return null;
         long[] surface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG).getRawData();
@@ -204,7 +204,7 @@ final class NativeProtoChunk implements AutoCloseable {
             int[] info = null;
             int[] palette = null;
             long[] raw = null;
-            LevelChunkSection[] sections = this.chunk.getSections();
+            LevelChunkSection[] sections = this.chunk.getSectionsForRead();
             for (int index = 0; index < sections.length; index++) {
                 int nativeResult = NativeGenerationSections.installProto(sections[index], this.handle, index);
                 if (nativeResult == 0 || nativeResult == 1) continue;

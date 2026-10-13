@@ -12,9 +12,22 @@ import net.minecraft.world.level.block.Block;
 /** CPU-only native stage/live-storage handoff. No palette/word Java mirror. */
 public final class NativeGenerationSections {
     private NativeGenerationSections() {}
+    private static final Class<?> FIXED_HEIGHT = net.minecraft.world.level.LevelHeightAccessor.create(0, 16).getClass();
+    private static boolean retainedAdmission(ChunkAccess chunk) {
+        if (chunk.getClass() != ProtoChunk.class && chunk.getClass() != LevelChunk.class) return false;
+        // Binding admission reads height earlier than the legacy snapshot call.
+        // Custom height providers keep their original ordered callback sequence.
+        var height = chunk.levelHeightAccessor;
+        return height != null && (height.getClass() == FIXED_HEIGHT
+            || height.getClass() == net.minecraft.server.level.ServerLevel.class
+            || height.getClass() == net.minecraft.client.multiplayer.ClientLevel.class);
+    }
     private static final MethodHandle CREATE_PROTO = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_proto_chunk_create_live_counters",
             FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle CREATE_RETAINED = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_proto_chunk_create_retained",
+            FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static MethodHandle result(String name) {
         // These ordinary calls may allocate/lock; never use critical heap access.
@@ -31,8 +44,22 @@ public final class NativeGenerationSections {
      * of these pointers. The caller releases the stage with its existing API. */
     public static long createProto(ChunkAccess chunk, long[] surface, long[] floor) {
         if (surface.length != floor.length || surface.length == 0) return 0;
-        var sections = chunk.getSections();
+        var sections = chunk.getSectionsForRead();
         if (sections.length == 0 || sections.length > 256) return -1;
+        // One retained CPU owner supplies all block/counter bindings to Rust.
+        // Admission rereads replaced palettes; no per-stage pointer/pin arrays.
+        if (retainedAdmission(chunk)) {
+            var inputs = chunk.nativeDhSections();
+            if (inputs != null) {
+                try (var arena = Arena.ofConfined()) {
+                    var a = arena.allocateFrom(ValueLayout.JAVA_LONG, surface);
+                    var b = arena.allocateFrom(ValueLayout.JAVA_LONG, floor);
+                    return (long)CREATE_RETAINED.invokeExact(inputs.stageOwner(), sections[0].generatedGlobalPaletteBits(), a, b, surface.length);
+                } catch (RuntimeException | Error failure) { throw failure; }
+                catch (Throwable failure) { throw new IllegalStateException("Cannot capture retained generation inputs", failure); }
+                finally { Reference.reachabilityFence(inputs); Reference.reachabilityFence(chunk); }
+            }
+        }
         // Pin exactly the borrowed owners/views, even if a caller later replaces an array entry.
         var owners = new Object[sections.length * 2];
         try (var arena = Arena.ofConfined()) {

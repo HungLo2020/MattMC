@@ -6,6 +6,14 @@ owner. Java caches compatibility identities on `ChunkAccess` and admits current
 containers; it no longer rebuilds section pointer tables for each consumer.
 This is CPU world ownership, with no rendering/GPU handle or global chunk cache.
 
+Canonical [generation-stage snapshots](../levelgen/RUST-STAGE-HANDOFF.md) also
+consume this retained owner directly. Java no longer builds a section-pointer
+table for each canonical SURFACE/CARVERS capture. Generation read borrows,
+including exact imposter wrappers, preserve structural authority; explicit mutable
+array access and custom getter dispatch retain compatibility revalidation.
+The 2026-10-13 follow-up passes full unit, scoped Frozen and four-mode runtime
+checks. See the stage guide for the remaining component CPU and memory gaps.
+
 The [DH change-hash producer](RUST-DH-CHANGE-HASH.md) also reads these
 bindings directly, retaining cached height/emitter semantics and current counters.
 
@@ -114,7 +122,7 @@ verification is required before accepting this image.
 This follows the retained chunk/neighborhood preparation observed in the earlier
 Current travel profile; it is not an isolated speedup claim. Measure initial
 binding cost, admission loops, allocation, GC/native retention and sustained
-streaming against Frozen on the [reportedly restored driver](../../rendering/RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures). Additional strong owner
+streaming against Frozen using the [render verification workflow](../../rendering/RENDER-VERIFICATION.md). Additional strong owner
 leases and per-chunk compatibility references need long-session memory checks.
 Java orchestration, general world simulation and the executable remain migration
 work. Historical renderer timings do not verify this release.

@@ -95,6 +95,12 @@ public class ImposterProtoChunk extends ProtoChunk {
 	}
 
 	@Override
+	public LevelChunkSection[] getSectionsForRead() {
+		// Subclasses may override the original getter; preserve their dispatch.
+		return this.getClass() == ImposterProtoChunk.class ? this.wrapped.getSectionsForRead() : this.getSections();
+	}
+
+	@Override
 	public void setHeightmap(Heightmap.Types types, long[] ls) {
 	}
 

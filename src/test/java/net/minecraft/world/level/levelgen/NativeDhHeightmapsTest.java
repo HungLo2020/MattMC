@@ -157,7 +157,7 @@ class NativeDhHeightmapsTest {
             escapes.incrementAndGet();
         });
         var first = NativeDhHeightmaps.build(source); assertNotNull(first);
-        assertTrue(escapes.get() > 0);
+        assertEquals(0, escapes.get(), "Read admission must not escape ordinary proto-chunk sections");
         var original = chunkInputs(source); assertNotNull(original);
         long address = chunkInputAddress(original);
         assertEquals(address, chunkInputAddress(chunkInputs(source)), "Bindings are reused without rebuilding pointer tables");
@@ -172,6 +172,7 @@ class NativeDhHeightmapsTest {
         assertEquals(0, first.solid(0, 0));
         source.getSections()[0] = new LevelChunkSection(new PalettedContainer<>(Blocks.STONE.defaultBlockState(),
             Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY)), null);
+        assertEquals(1, escapes.get(), "Explicit mutable access still publishes escape before replacement");
         var replaced = NativeDhHeightmaps.build(source); assertNotNull(replaced); assertEquals(15, replaced.solid(0, 0));
         assertNotEquals(address, chunkInputAddress(chunkInputs(source)), "Escaped arrays are revalidated before publication");
         assertEquals(1, raw.count(), "Emitter outputs retain their original independent enumeration");

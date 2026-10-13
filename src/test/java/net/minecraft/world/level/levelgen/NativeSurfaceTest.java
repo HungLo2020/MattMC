@@ -110,7 +110,7 @@ class NativeSurfaceTest {
         var section=mock(net.minecraft.world.level.chunk.LevelChunkSection.class);
         var blocks=new net.minecraft.world.level.block.state.BlockState[16];java.util.Arrays.fill(blocks,Blocks.STONE.defaultBlockState());
         when(chunk.getMinY()).thenReturn(0);
-        when(chunk.getSections()).thenReturn(new net.minecraft.world.level.chunk.LevelChunkSection[]{section});
+        when(chunk.getSectionsForRead()).thenReturn(new net.minecraft.world.level.chunk.LevelChunkSection[]{section});
         when(chunk.getSectionIndex(anyInt())).thenAnswer(i->(int)i.getArgument(0)>>4);
         when(section.getBlockState(anyInt(),anyInt(),anyInt())).thenAnswer(i->blocks[(int)i.getArgument(1)]);
         when(chunk.getHeight(any(),anyInt(),anyInt())).thenAnswer(i->{
