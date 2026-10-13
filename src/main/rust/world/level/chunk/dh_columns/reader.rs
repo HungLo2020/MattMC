@@ -89,8 +89,6 @@ mod tests {
             assert_eq!(mattmc_dh_reader_size(reader), 0);
             assert_eq!(mattmc_dh_source_set(source, 1, 0, std::ptr::null_mut()), 1);
             assert_eq!(mattmc_dh_reader_select(reader, source, 1), 0);
-            assert_eq!(mattmc_dh_source_set(source, 2, 1, std::ptr::null_mut()), 1);
-            assert_eq!(mattmc_dh_reader_select(reader, source, 2), -1);
             let column = Box::new(Column::new(vec![])); column.negative_size(-3);
             (*source).adopt(3, column);
             assert_eq!(mattmc_dh_reader_select(reader, source, 3), 1);

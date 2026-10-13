@@ -31,11 +31,8 @@ class FullDataSourceV2ContributorReplacementTest {
 				new LongArrayList(new long[] {point}), null
 			});
 
-			Method replacement = FullDataSourceV2.class.getDeclaredMethod(
-				"updateFromSameDetailLevel", FullDataSourceV2.class, int[].class
-			);
-			replacement.setAccessible(true);
-			replacement.invoke(target, incoming, new int[] {0});
+			net.minecraft.world.level.chunk.NativeDhSameDetailMerge.update(
+				target.nativeSource(), incoming.nativeSource(), new int[] {0}, target.getPos());
 
 			assertFalse(target.hasSemanticHorizontalUniformity(3, 5));
 			LongArrayList[] copied = target.getSemanticHorizontalContributors(3, 5);

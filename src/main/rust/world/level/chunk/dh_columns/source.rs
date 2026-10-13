@@ -1,26 +1,38 @@
 //! Authoritative retained DH column references. No point mirror or Java owner.
 //! Point access/replacement keeps DH's existing caller exclusion requirement.
-use super::mutable::{Column, Lease};
+use super::{contributors::Snapshot, mutable::{Column, Lease}};
+use std::sync::Arc;
 
-enum Entry { Missing, Empty, Unsupported, Native(Lease) }
-/// Closed compatibility values retain CPU leases, without a live source table,
-/// metadata, caches or eagerly constructed Java readers.
-pub(crate) struct Closed { columns: Option<Box<[Entry]>> }
+enum Entry { Missing, Empty, Native(Lease) }
+/// A source's retained four-column semantic footprints, one optional cell each.
+pub(super) type Footprints = Option<Box<[Option<Arc<Snapshot>>]>>;
+/// Closed compatibility values retain CPU leases and footprints, without a
+/// live source table, metadata, caches or eagerly constructed Java readers.
+pub(crate) struct Closed { columns: Option<Box<[Entry]>>, footprints: Footprints }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_source_close_projection(source: *mut Source) -> *mut Closed {
     let Some(source)=source.as_mut() else{return std::ptr::null_mut();};
     let columns=source.columns.as_ref().map(|columns|columns.iter().map(|entry|match entry {
-        Entry::Missing=>Entry::Missing,Entry::Empty=>Entry::Empty,Entry::Unsupported=>Entry::Unsupported,
+        Entry::Missing=>Entry::Missing,Entry::Empty=>Entry::Empty,
         Entry::Native(lease)=>Entry::Native(Lease::retain(lease.identity() as *mut Column)),
     }).collect());
-    Box::into_raw(Box::new(Closed { columns }))
+    Box::into_raw(Box::new(Closed { columns, footprints: source.footprints.clone() }))
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_source_closed_kind(closed: *const Closed, index: i32) -> i32 {
     let Some(closed)=closed.as_ref() else{return -1;};if !(0..4096).contains(&index){return -1;}
     match closed.columns.as_ref().map(|c|&c[index as usize]) {
-        Some(Entry::Missing)=>0,None|Some(Entry::Empty)=>3,Some(Entry::Unsupported)=>1,Some(Entry::Native(_))=>2,
+        Some(Entry::Missing)=>0,None|Some(Entry::Empty)=>3,Some(Entry::Native(_))=>2,
     }
+}
+/// A closed source's footprint at `index`, retained for the caller, or null.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_closed_footprint(closed: *const Closed, index: i32) -> *const Snapshot {
+    let Some(closed)=closed.as_ref() else{return std::ptr::null();};if !(0..4096).contains(&index){return std::ptr::null();}
+    footprint_lease(&closed.footprints, index as usize)
+}
+fn footprint_lease(footprints: &Footprints, index: usize) -> *const Snapshot {
+    footprints.as_ref().and_then(|cells| cells[index].clone()).map_or(std::ptr::null(), Arc::into_raw)
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_source_closed_column(closed: *const Closed, index: i32) -> *mut Column {
@@ -37,8 +49,23 @@ pub(crate) struct Source {
     identity: u64, remap: Vec<i32>, remap_revision: u64, remap_cached: bool,
     disjoint: Option<[u64; 3]>,
     readers: [u64; 64],
+    footprints: Footprints, footprint_count: usize,
 }
 impl Source {
+    pub(super) fn footprint(&self, index: usize) -> Option<&Arc<Snapshot>> {
+        self.footprints.as_ref().and_then(|cells| cells[index].as_ref())
+    }
+    pub(super) fn footprint_count(&self) -> usize { self.footprint_count }
+    /// Install or remove one cell's footprint, keeping the count and the Java
+    /// presence plane (metadata plane 3) in step.
+    pub(super) fn set_footprint(&mut self, index: usize, value: Option<Arc<Snapshot>>) {
+        if value.is_none() && self.footprints.is_none() { return; }
+        let cells = self.footprints.get_or_insert_with(|| (0..4096).map(|_| None).collect());
+        let (old, new) = (cells[index].is_some(), value.is_some());
+        cells[index] = value;
+        self.footprint_count = self.footprint_count + usize::from(new) - usize::from(old);
+        unsafe { self.metadata.plane_mut(3)[index] = i8::from(new); }
+    }
     /// Clear-before-resize is observable on allocation failure. Immutable spans
     /// detach without copying points that the persistence decoder will discard.
     pub(super) unsafe fn codec_reset(&mut self, index: usize, count: usize) -> bool {
@@ -68,6 +95,21 @@ impl Source {
     fn mark_reader(&mut self,index:usize,present:bool) {
         let bit=1u64<<(index%64);if present{self.readers[index/64]|=bit;}else{self.readers[index/64]&=!bit;}
     }
+    /// Replace a column with new points (an empty one needs no vector) and its
+    /// known list hash. The old column's Java reader, if any, keeps its own
+    /// lease; Java drops that binding, so the reader mark is cleared.
+    pub(super) fn replace(&mut self, index: usize, points: Vec<u64>, hash: i32) {
+        if points.is_empty() {
+            self.columns.get_or_insert_with(||(0..4096).map(|_|Entry::Empty).collect())[index] = Entry::Empty;
+            self.identities = None;
+            self.version = self.version.checked_add(1).unwrap_or_else(|| std::process::abort());
+        } else {
+            let column = Box::new(Column::new(points));
+            unsafe { Column::publish_hash(&*column as *const Column as *mut Column, hash); }
+            self.adopt(index, column);
+        }
+        self.mark_reader(index, false);
+    }
     /// Transfer a newly committed vector directly into the authoritative table.
     /// No Java reader or second point allocation is required for publication.
     pub(super) fn adopt(&mut self, index: usize, column: Box<Column>) {
@@ -79,7 +121,6 @@ impl Source {
     pub(super) unsafe fn bounded_column_hash(&self,index:usize,work:&mut usize)->Option<i32> {
         match self.columns.as_ref().map(|columns| &columns[index]) {
             Some(Entry::Missing)=>Some(0), None|Some(Entry::Empty)=>Some(1),
-            Some(Entry::Unsupported)=>None,
             Some(Entry::Native(lease))=> {
                 let column=&*(lease.identity() as *const Column);
                 let count=column.points().len();*work+=count;
@@ -133,7 +174,6 @@ impl Source {
         let Some(columns)=&self.columns else{return Some(&[]);};
         match columns.get(index)? {
             Entry::Missing | Entry::Empty => Some(&[]),
-            Entry::Unsupported => None,
             Entry::Native(lease) => if (*(lease.identity() as *const Column)).invalid_size(){None}else{Some(lease.points())},
         }
     }
@@ -145,16 +185,17 @@ impl Source {
 #[no_mangle]
 pub extern "C" fn mattmc_dh_source_create() -> *mut Source {
     Box::into_raw(Box::new(Source { metadata: std::sync::Arc::new(super::metadata::Metadata::new()), columns: None, identities: None, version: 0,
-        identity: super::mutable::identity(), remap: Vec::new(), remap_revision: 0, remap_cached: false, disjoint:None,readers:[0;64] }))
+        identity: super::mutable::identity(), remap: Vec::new(), remap_revision: 0, remap_cached: false, disjoint:None,readers:[0;64],
+        footprints: None, footprint_count: 0 }))
 }
-/// Empty/null facts, unsupported callback input, or a retained primary column.
+/// Empty/null facts or a retained primary column. Java copies every other list
+/// into a native column before binding it, so no Java-held binding exists.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_source_set(source: *mut Source, index: i32, kind: i32, column: *mut Column) -> i32 {
     if source.is_null() || !(0..4096).contains(&index) { return 0; }
     let entry = match kind {
         0 if column.is_null() => Entry::Missing,
         3 if column.is_null() => Entry::Empty,
-        1 if column.is_null() => Entry::Unsupported,
         2 if !column.is_null() && column as usize % std::mem::align_of::<Column>() == 0 => Entry::Native(Lease::retain(column)),
         _ => return 0,
     };
@@ -172,7 +213,7 @@ pub unsafe extern "C" fn mattmc_dh_source_release(source: *mut Source) {
 pub unsafe extern "C" fn mattmc_dh_source_kind(source: *const Source,index: i32)->i32 {
     let Some(source)=source.as_ref() else {return -1;};
     if !(0..4096).contains(&index){return -1;}
-    match source.columns.as_ref().map(|columns| &columns[index as usize]) {Some(Entry::Missing)=>0,None|Some(Entry::Empty)=>3,Some(Entry::Unsupported)=>1,Some(Entry::Native(_))=>2}
+    match source.columns.as_ref().map(|columns| &columns[index as usize]) {Some(Entry::Missing)=>0,None|Some(Entry::Empty)=>3,Some(Entry::Native(_))=>2}
 }
 /// Independent CPU lease for a demand-created reader. The caller adopts or
 /// releases this reference; source closure cannot invalidate the reader.
@@ -216,13 +257,11 @@ pub unsafe extern "C" fn mattmc_dh_source_reader_masks(source:*const Source,outp
     1
 }
 /// Verify the immutable producer hash without constructing empty Java lists.
-/// Unsupported readers decline to the original Java validation sequence.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_source_original(source:*const Source,producer:*const super::Columns,
     pos:u64,generation:*const i8,compression:*const i8)->i32 {
     let (Some(source),Some(producer_ref))=(source.as_ref(),producer.as_ref()) else{return -1;};
     if generation.is_null()||compression.is_null(){return -1;}
-    if source.columns.as_ref().is_some_and(|columns|columns.iter().any(|c|matches!(c,Entry::Unsupported))){return -1;}
     if pos!=producer_ref.pos{return 0;}
     let (ox,oz)=((producer_ref.chunk_x&3) as usize*16,(producer_ref.chunk_z&3) as usize*16);
     for x in 0..64 {for z in 0..64 {
@@ -262,6 +301,85 @@ pub unsafe extern "C" fn mattmc_dh_source_hash(source: *const Source, pos: u64,
     1
 }
 
+/// Replace one cell's footprint with a capture of four spans (count -1 is a
+/// null column), each clipped to `limit` points. Count 0 for every span with
+/// null pointers is valid. Returns 1, or 0 for malformed input.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_footprint_set(source: *mut Source, index: i32,
+    spans: *const usize, limit: i32) -> i32 {
+    let Some(source)=source.as_mut() else{return 0;};
+    if !(0..4096).contains(&index) || spans.is_null() || spans as usize % 8 != 0 || !(0..=4096).contains(&limit) { return 0; }
+    let raw = std::slice::from_raw_parts(spans, 8);
+    let mut columns = [None; 4];
+    for i in 0..4 {
+        let (pointer, count) = (raw[i * 2], raw[i * 2 + 1] as isize);
+        if count == -1 { continue; }
+        if count < 0 || count != 0 && (pointer == 0 || pointer % 8 != 0) { return 0; }
+        columns[i] = Some(if count == 0 { &[][..] } else { std::slice::from_raw_parts(pointer as *const u64, count as usize) });
+    }
+    let Some(snapshot) = super::contributors::capture(columns, None, limit as usize) else { return 0; };
+    source.set_footprint(index as usize, Some(Arc::new(snapshot))); 1
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_footprint_clear(source: *mut Source, index: i32) -> i32 {
+    let Some(source)=source.as_mut() else{return 0;};
+    if !(0..4096).contains(&index) { return 0; }
+    source.set_footprint(index as usize, None); 1
+}
+/// The footprint at `index`, retained for the caller (released through
+/// `mattmc_dh_contributors_release`), or null when the cell has none.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_footprint(source: *const Source, index: i32) -> *const Snapshot {
+    let Some(source)=source.as_ref() else{return std::ptr::null();};
+    if !(0..4096).contains(&index) { return std::ptr::null(); }
+    footprint_lease(&source.footprints, index as usize)
+}
+/// Decode a whole decompressed V4 contributor sidecar into this source's
+/// footprints, in saved order. `result` receives `[status, value]` as
+/// `mattmc_dh_contributors_decode` reports it; cells before a stop are applied.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_footprints_decode(source: *mut Source, bytes: *const u8, len: i32, result: *mut i64) -> i32 {
+    let Some(source)=source.as_mut() else{return 0;};
+    if len < 0 || len > 0 && bytes.is_null() || result.is_null() || result as usize % 8 != 0 { return 0; }
+    let input = if len == 0 { &[][..] } else { std::slice::from_raw_parts(bytes, len as usize) };
+    let result = std::slice::from_raw_parts_mut(result, 2);
+    let mut points = Vec::new();
+    let Ok((cells, status, value)) = super::contributors::parse(input, &mut points) else {
+        result.copy_from_slice(&[3, 0]); return 1;
+    };
+    for (cell, columns) in cells {
+        let spans = columns.map(|c| c.map(|(start, n)| &points[start..start + n]));
+        let Some(snapshot) = super::contributors::capture(spans, None, 4096) else { result.copy_from_slice(&[3, 0]); return 1; };
+        source.set_footprint(cell, Some(Arc::new(snapshot)));
+    }
+    result.copy_from_slice(&[status as i64, value as i64]); 1
+}
+/// The complete base-data hash (`FullDataSourceV2.generateHashCode`), with no
+/// point budget. Tagged: bit 32 set on success; 0 when a column has an
+/// invalid (negative) logical size, whose Java hash cannot complete.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_source_hash_full(source: *const Source, pos: u64) -> u64 {
+    let Some(source) = source.as_ref() else { return 0; };
+    full_hash(&source.columns, &source.metadata, pos)
+}
+unsafe fn full_hash(columns: &Option<Box<[Entry]>>, metadata: &super::metadata::Metadata, pos: u64) -> u64 {
+    fn fold(hash:i32,value:i32)->i32{hash.wrapping_mul(31).wrapping_add(value)}
+    let (generation, compression) = (metadata.plane(0), metadata.plane(1));
+    let (mut data, mut steps, mut modes) = (1i32, 1i32, 1i32);
+    for i in 0..4096 {
+        let column = match columns.as_ref().map(|columns| &columns[i]) {
+            Some(Entry::Missing) => 0, None | Some(Entry::Empty) => 1,
+            Some(Entry::Native(lease)) => {
+                let column = &*(lease.identity() as *const Column);
+                if column.invalid_size() { return 0; }
+                column.hash()
+            }
+        };
+        data = fold(data, column); steps = fold(steps, generation[i] as i32); modes = fold(modes, compression[i] as i32);
+    }
+    let hash = fold((pos ^ pos >> 32) as i32, data).wrapping_mul(17).wrapping_add(steps).wrapping_mul(43).wrapping_add(modes);
+    (1u64 << 32) | hash as u32 as u64
+}
 #[cfg(test)] mod tests {
     use super::*;
     use super::super::mutable::*;
@@ -298,10 +416,9 @@ pub unsafe extern "C" fn mattmc_dh_source_hash(source: *const Source, pos: u64,
             assert_eq!(mattmc_dh_source_set(a, 0, 0, std::ptr::null_mut()), 1);
             mattmc_dh_source_release(a);
             assert_eq!((*b).column(0).unwrap()[0], 7);
-            assert_eq!(mattmc_dh_source_set(b, 0, 1, std::ptr::null_mut()), 1);
-            assert!((*b).column(0).is_none());
+            assert_eq!(mattmc_dh_source_set(b, 0, 1, std::ptr::null_mut()), 0, "no Java-held binding kind exists");
             assert_eq!(mattmc_dh_source_set(b, 0, 9, std::ptr::null_mut()), 0);
-            assert!((*b).column(0).is_none());
+            assert_eq!((*b).column(0).unwrap()[0], 7, "a rejected binding changes nothing");
             mattmc_dh_source_release(b);
         }
     }
@@ -319,8 +436,6 @@ pub unsafe extern "C" fn mattmc_dh_source_hash(source: *const Source, pos: u64,
             assert_eq!(mattmc_dh_source_set(source,0,0,std::ptr::null_mut()),1);
             assert_eq!((*source).identities(),[column as usize]);
             let bytes=vec![-128i8;4096]; let mut output=12345;
-            assert_eq!(mattmc_dh_source_set(source,1,1,std::ptr::null_mut()),1);
-            assert_eq!(mattmc_dh_source_hash(source,6,bytes.as_ptr(),bytes.as_ptr(),&mut output),0); assert_eq!(output,12345);
             let oversized=mattmc_dh_column_create(vec![0u64;4097].as_ptr(),4097);
             assert_eq!(mattmc_dh_source_set(source,1,2,oversized),1);
             assert_eq!(mattmc_dh_source_hash(source,6,bytes.as_ptr(),bytes.as_ptr(),&mut output),0); assert_eq!(output,12345);

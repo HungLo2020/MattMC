@@ -1,5 +1,11 @@
 # Rust DH source metadata
 
+> **Current state:** the [Rust-owned DH full-data source](RUST-DH-SOURCE.md)
+> supersedes this page's descriptions of Java fallback, compatibility,
+> descriptor and decline routes, Java-held lists, resizable metadata and the
+> Java footprint map; those no longer exist. Ownership details and historical
+> results below remain as recorded.
+
 Saved generation/compression/uniformity payloads now use the
 [direct native metadata codecs](RUST-DH-METADATA-CODEC.md). The measurements below
 remain historical for the earlier storage/merge ownership slice.

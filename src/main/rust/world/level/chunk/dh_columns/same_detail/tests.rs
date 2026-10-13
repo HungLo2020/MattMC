@@ -178,9 +178,10 @@ fn fused_hash_decline_finishes_metadata_and_invalid_output_leaves_planes_untouch
         let aliased=(*target).metadata.plane_mut(0).as_mut_ptr().cast::<u64>();
         assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,6,aliased),-1);
         for plane in 0..3 {assert!((*target).metadata.plane(plane).iter().all(|&v|v==0));}
-        // An unsupported earlier cell prevents bounded hashing, but may not
+        // An oversized earlier cell prevents bounded hashing, but may not
         // interrupt publication of the last admitted column's metadata.
-        assert_eq!(mattmc_dh_source_set(target,0,1,ptr::null_mut()),1);
+        let oversized=mattmc_dh_column_create(vec![0u64;4097].as_ptr(),4097);
+        assert_eq!(mattmc_dh_source_set(target,0,2,oversized),1);mattmc_dh_column_release(oversized);
         let mut tagged=99u64;
         assert_eq!(mattmc_dh_same_detail_metadata_owned_hash(&*merge,target,6,&mut tagged),1);
         assert_eq!(tagged,0);

@@ -1133,7 +1133,8 @@ def validate_repository_root(root: Path, label: str, source: str) -> None:
         raise SystemExit(f"{label} repository path from {source} does not exist: {root}")
     if not ((root / "gradlew").is_file() or (root / "gradlew.bat").is_file()):
         raise SystemExit(f"{label} repository path from {source} is missing a Gradle wrapper: {root}")
-    if not (root / ".git").is_dir():
+    # A linked worktree has a .git file pointing at its repository.
+    if not (root / ".git").exists():
         raise SystemExit(f"{label} repository path from {source} is missing .git: {root}")
 
 

@@ -773,7 +773,7 @@ public class FullDataSourceV2DTO
 	) throws IOException {
 		try (DhDataOutputStream out = DhDataOutputStream.create(compressionMode, output)) {
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
-				LongList[] contributors = dataSource.getSemanticHorizontalContributors(x, z);
+				LongList[] contributors = dataSource.getRetainedSemanticHorizontalContributors(x, z);
 				out.writeBoolean(contributors != null);
 				if (contributors == null) continue;
 				for (LongList column : contributors) {
@@ -790,12 +790,11 @@ public class FullDataSourceV2DTO
 	) throws IOException, DataCorruptedException {
 		try (DhDataInputStream in = DhDataInputStream.create(input, compressionMode)) {
 			if (in.codecByteArrayInput() && net.minecraft.world.level.chunk.NativeDhCodec.nativeEnabled()) {
-				// One Rust pass into one batch owner; cells before a failure are applied, as below.
+				// One Rust pass straight into the source; cells before a failure are applied, as below.
 				int position = in.codecPosition();
-				int[] stop = net.minecraft.world.level.chunk.NativeDhContributors.decodeSaved(in.codecArray(), position, in.codecLimit() - position,
-					(cell, columns) -> dataSource.setSemanticHorizontalContributors(cell / FullDataSourceV2.WIDTH, cell % FullDataSourceV2.WIDTH, columns));
-				if (stop[0] == net.minecraft.world.level.chunk.NativeDhContributors.SAVED_END_OF_INPUT) throw new EOFException();
-				if (stop[0] == net.minecraft.world.level.chunk.NativeDhContributors.SAVED_OVER_BOUND)
+				int[] stop = dataSource.nativeSource().decodeFootprints(in.codecArray(), position, in.codecLimit() - position);
+				if (stop[0] == 1) throw new EOFException();
+				if (stop[0] == 2)
 					throw new DataCorruptedException("Semantic contributor column exceeds bound: " + stop[1]);
 				return;
 			}

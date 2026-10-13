@@ -23,9 +23,10 @@ class NativeDhMetadataCodecTest {
     private static final Method WRITE_COMP=method("writeWorldCompressionModeToBlob",FullDataSourceV2.class,ByteArrayList.class,EDhApiDataCompressionMode.class);
     private static FullDataSourceV2 empty(){return FullDataSourceV2.createEmpty(DhSectionPos.encode((byte)6,0,0));}
     private static String outcome(Method method,Object...args) {try{method.invoke(null,args);return "ok";}catch(InvocationTargetException e){var c=e.getCause();return c.getClass().getName()+":"+c.getMessage();}catch(Exception e){throw new AssertionError(e);}}
-    @Test void nativePlanesMatchOriginalIoAcrossLengthsSignedBytesAndEofPrefixes() throws Exception {
-        for(int length:new int[]{0,1,4095,4096,4100})for(int cut:new int[]{0,1,137,4095,4096})try(var rust=empty()) {
-            var java = new ByteArrayList(4096);java.size(length);rust.columnGenerationSteps.size(length);
+    @Test void nativePlanesMatchOriginalIoAcrossSignedBytesAndEofPrefixes() throws Exception {
+        // Planes have exactly one value per column; cuts exercise every EOF prefix.
+        for(int length:new int[]{4096})for(int cut:new int[]{0,1,137,4095,4096})try(var rust=empty()) {
+            var java = new ByteArrayList(4096);java.size(length);
             for(int i=0;i<length;i++){java.set(i,(byte)77);rust.columnGenerationSteps.set(i,(byte)77);}
             var bytes=new byte[cut];for(int i=0;i<cut;i++)bytes[i]=(byte)(i*61);
             var blob=ByteArrayList.wrap(bytes);

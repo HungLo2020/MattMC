@@ -100,7 +100,7 @@ class NativeDhContributorsTest {
                     assertTrue(NativeDhContributors.isSnapshot(footprint), "Actual ordinary parent produced native footprints");
                     for (var reader : footprint) if (reader != null) {
                         var owner = reader.getClass().getDeclaredField("owner"); owner.setAccessible(true);
-                        assertInstanceOf(NativeDhParentColumns.class, owner.get(reader), "Ordinary parent uses the quadrant owner, with no per-cell native captures");
+                        assertInstanceOf(NativeDhContributors.class, owner.get(reader), "Ordinary parent footprints are Rust-owned snapshots");
                     }
                     var render = ColumnRenderSource.createEmpty(parent.getPos(), 1, 0); render.setSemanticHorizontalContributors(0, 0, footprint);
                     var received = render.getRetainedSemanticHorizontalContributors(0, 0);
@@ -143,95 +143,106 @@ class NativeDhContributorsTest {
                 org.mockito.Mockito.verify(watched, org.mockito.Mockito.times(1)).getRetainedSemanticHorizontalContributors(x, z);
                 org.mockito.Mockito.verify(watched, org.mockito.Mockito.never()).getSemanticHorizontalContributors(x, z);
                 var received = render.getRetainedSemanticHorizontalContributors(x, z);
-                assertNotNull(received); for (int i = 0; i < 4; i++) assertSame(expected[i], received[i]);
+                // Each read returns fresh views over the same Rust snapshot.
+                assertNotNull(received); for (int i = 0; i < 4; i++) assertEquals(expected[i], received[i]);
             }
         } finally { compression.setWithoutFiringEvents(previous); }
     }
-    @Test void quadrantSemanticProducerMatchesOriginalPredicateAndEveryAdmittedFootprint() throws Exception {
-        var predicate = FullDataSourceV2.class.getDeclaredMethod("semanticallyUniformTwoByTwo",
-            FullDataSourceV2.class, int.class, int.class, int[].class);
-        predicate.setAccessible(true);
+    /** Frozen's {@code semanticallyUniformTwoByTwo}, as the reference for the Rust predicate. */
+    private static boolean frozenUniform(FullDataSourceV2 source, int x, int z, int[] remap) {
+        for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++) {
+            int index = FullDataSourceV2.relativePosToIndex(x + dx, z + dz);
+            if (source.columnWorldCompressionMode.getByte(index) != EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
+                || !source.hasSemanticHorizontalUniformity(x + dx, z + dz)) return false;
+        }
+        LongList reference = source.getColumnAtRelPos(x, z);
+        for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++) {
+            LongList other = source.getColumnAtRelPos(x + dx, z + dz);
+            if (reference == null || other == null) { if (reference != other) return false; continue; }
+            if (reference.size() != other.size()) return false;
+            for (int i = 0; i < reference.size(); i++) {
+                long a = reference.getLong(i), b = other.getLong(i);
+                if (FullDataPointUtil.getBottomY(a) != FullDataPointUtil.getBottomY(b) || FullDataPointUtil.getHeight(a) != FullDataPointUtil.getHeight(b)) return false;
+                int left = FullDataPointUtil.getId(a), right = FullDataPointUtil.getId(b);
+                if (left < 0 || left >= remap.length || right < 0 || right >= remap.length || remap[left] != remap[right]) return false;
+            }
+        }
+        return true;
+    }
+    private static int[] offsets(FullDataSourceV2 parent, FullDataSourceV2 child) {
+        long childZero = DhSectionPos.getChildByIndex(parent.getPos(), 0);
+        return new int[]{DhSectionPos.getX(child.getPos()) == DhSectionPos.getX(childZero) ? 0 : 32,
+            DhSectionPos.getZ(child.getPos()) == DhSectionPos.getZ(childZero) ? 0 : 32};
+    }
+    @Test void parentUniformityMatchesFrozenPredicateAndEveryAdmittedFootprintIsRemapped() throws Exception {
+        var compression = Config.Common.LodBuilding.worldCompression; var previous = compression.get();
+        compression.setWithoutFiringEvents(EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
         int admitted = 0, uniformCount = 0;
-        for (int test = 0; test < 32; test++) {
-            try (var source = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(test));
-                 var materials = NativeDhMaterials.create(source.mapping)) {
-                var columns = new LongList[4096]; var proofs = new boolean[4096];
-                for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) {
-                    columns[x * 64 + z] = source.getColumnAtRelPos(x, z);
-                    proofs[x * 64 + z] = source.hasSemanticHorizontalUniformity(x, z);
-                }
-                int[] map = java.util.stream.IntStream.range(0, source.mapping.size()).map(i -> source.mapping.size() - 1 - i).toArray();
-                var parent = NativeDhParentColumns.build(materials, columns, map, source.columnWorldCompressionMode.toByteArray(), proofs, new boolean[1024], 0);
-                assertNotNull(parent);
-                for (int x = 0; x < 64; x += 2) for (int z = 0; z < 64; z += 2) {
-                    boolean expected = (boolean) predicate.invoke(null, source, x, z, map);
-                    assertEquals(expected, parent.isUniform(x / 2, z / 2), "case " + test + " cell " + x + "," + z);
-                    var footprint = parent.contributors(x / 2, z / 2);
-                    if (expected) { uniformCount++; assertNull(footprint); continue; }
-                    admitted++; assertNotNull(footprint); assertTrue(NativeDhContributors.isSnapshot(footprint));
-                    for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++) {
-                        var input = source.getColumnAtRelPos(x + dx, z + dz); var output = footprint[dx * 2 + dz];
-                        if (input == null) { assertNull(output); continue; }
-                        assertEquals(Math.min(256, input.size()), output.size());
-                        for (int i = 0; i < output.size(); i++) assertEquals(FullDataPointUtil.remap(map, input.getLong(i)), output.getLong(i));
+        try {
+            for (int test = 0; test < 32; test++) {
+                try (var source = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(test));
+                     var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
+                    // A reversed parent mapping makes the remap non-identity.
+                    for (int id = source.mapping.size() - 1; id >= 0; id--)
+                        parent.mapping.addIfNotPresentAndGetId(source.mapping.getBiomeWrapper(id), source.mapping.getBlockStateWrapper(id));
+                    int[] map = parent.mapping.mergeAndReturnRemappedEntityIds(source.mapping);
+                    parent.updateFromDataSource(source);
+                    int[] at = offsets(parent, source);
+                    for (int x = 0; x < 64; x += 2) for (int z = 0; z < 64; z += 2) {
+                        boolean expected = frozenUniform(source, x, z, map);
+                        int px = at[0] + x / 2, pz = at[1] + z / 2;
+                        assertEquals(expected, parent.hasSemanticHorizontalUniformity(px, pz), "case " + test + " cell " + x + "," + z);
+                        var footprint = parent.getRetainedSemanticHorizontalContributors(px, pz);
+                        if (expected) { uniformCount++; assertNull(footprint); continue; }
+                        admitted++; assertNotNull(footprint); assertTrue(NativeDhContributors.isSnapshot(footprint));
+                        for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++) {
+                            var input = source.getColumnAtRelPos(x + dx, z + dz); var output = footprint[dx * 2 + dz];
+                            if (input == null) { assertNull(output); continue; }
+                            assertEquals(Math.min(256, input.size()), output.size());
+                            for (int i = 0; i < output.size(); i++) assertEquals(FullDataPointUtil.remap(map, input.getLong(i)), output.getLong(i));
+                        }
                     }
                 }
             }
-        }
+        } finally { compression.setWithoutFiringEvents(previous); }
         assertTrue(admitted > 1000); assertTrue(uniformCount > 0);
     }
-    @Test void nativeQuadrantAdmissionPreservesCapacityAndReplacementOrder() {
+    @Test void parentFootprintAdmissionPreservesCapacityAndReplacementOrder() {
         try (var source = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(1));
-             var materials = NativeDhMaterials.create(source.mapping)) {
-            var columns = new LongList[4096];
-            for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) columns[x * 64 + z] = source.getColumnAtRelPos(x, z);
-            int[] map = java.util.stream.IntStream.range(0, source.mapping.size()).toArray();
-            var existing = new boolean[1024]; existing[1] = true;
-            var parent = NativeDhParentColumns.build(materials, columns, map, new byte[4096], new boolean[4096], existing, 1024);
-            assertNotNull(parent); assertNull(parent.contributors(0, 0)); assertNotNull(parent.contributors(0, 1)); assertNull(parent.contributors(0, 2));
-            var retained = parent.contributors(0, 1); var expected = new LongArrayList(retained[0]);
-            assertNull(NativeDhParentColumns.build(materials, columns, map, new byte[4096], new boolean[4096], existing, 0), "Inconsistent membership facts decline");
+             var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
+            for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) source.setSemanticHorizontalUniformity(x, z, false);
+            int[] at = offsets(parent, source);
+            LongList[] filler = {new LongArrayList(new long[]{0}), null, null, null};
+            // 1023 footprints outside the quadrant plus one at its cell (0, 1): the table is full.
+            int placed = 0;
+            for (int x = 0; x < 64 && placed < 1023; x++) for (int z = 0; z < 64 && placed < 1023; z++) {
+                boolean inQuadrant = x >= at[0] && x < at[0] + 32 && z >= at[1] && z < at[1] + 32;
+                if (!inQuadrant) { parent.setSemanticHorizontalContributors(x, z, filler); placed++; }
+            }
+            parent.setSemanticHorizontalContributors(at[0], at[1] + 1, filler);
+            assertTrue(parent.updateFromDataSource(source));
+            assertNull(parent.getSemanticHorizontalContributors(at[0], at[1]), "full: the first cell gets none");
+            var retained = parent.getRetainedSemanticHorizontalContributors(at[0], at[1] + 1);
+            assertNotNull(retained, "a cell that releases its old footprint may take a new one");
+            assertNull(parent.getSemanticHorizontalContributors(at[0], at[1] + 2));
+            var expected = new LongArrayList(retained[0]);
             source.getColumnAtRelPos(0, 2).clear();
             assertEquals(expected, retained[0], "Independent immutable values survive source mutation");
             assertThrows(UnsupportedOperationException.class, () -> retained[0].add(0, 7));
         }
     }
-
-    @Test void nativeQuadrantDistinguishesNullFromEmptyAndDeclinesMalformedFacts() {
-        try (var source = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(1));
-             var materials = NativeDhMaterials.create(source.mapping)) {
-            var columns = new LongList[4096]; java.util.Arrays.fill(columns, NativeDhColumnList.empty()); columns[0] = null;
-            var proofs = new boolean[4096]; java.util.Arrays.fill(proofs, true);
-            int[] map = java.util.stream.IntStream.range(0, source.mapping.size()).toArray();
-            var parent = NativeDhParentColumns.build(materials, columns, map, new byte[4096], proofs, null, 0);
-            assertNotNull(parent); assertFalse(parent.isUniform(0, 0)); assertTrue(parent.isUniform(0, 1));
-            var footprint = parent.contributors(0, 0); assertNotNull(footprint); assertNull(footprint[0]);
+    @Test void parentFootprintsDistinguishMissingFromEmptyColumns() {
+        var compression = Config.Common.LodBuilding.worldCompression; var previous = compression.get();
+        compression.setWithoutFiringEvents(EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
+        try (var source = FullDataSourceV2.createEmpty(DhSectionPos.encode(DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL, 0, 0));
+             var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
+            source.mapping.addIfNotPresentAndGetId(NativeDhColumnsTest.occlusionBiome(0), com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper.AIR);
+            source.setColumn(0, null);
+            parent.updateFromDataSource(source);
+            assertFalse(parent.hasSemanticHorizontalUniformity(0, 0)); assertTrue(parent.hasSemanticHorizontalUniformity(0, 1));
+            var footprint = parent.getSemanticHorizontalContributors(0, 0); assertNotNull(footprint); assertNull(footprint[0]);
             for (int i = 1; i < 4; i++) { assertNotNull(footprint[i]); assertTrue(footprint[i].isEmpty()); }
-            assertNull(parent.contributors(0, 1));
-            assertNull(NativeDhParentColumns.build(materials, columns, map, new byte[4095], proofs, null, 0));
-            assertNull(NativeDhParentColumns.build(materials, columns, map, new byte[4096], new boolean[4095], null, 0));
-            assertNull(NativeDhParentColumns.build(materials, columns, map, new byte[4096], proofs, new boolean[1023], 0));
-        }
+            assertNull(parent.getSemanticHorizontalContributors(0, 1));
+        } finally { compression.setWithoutFiringEvents(previous); }
     }
-    @Test void resizedPublicCompressionListRetainsOriginalExceptionAndSuccessfulUpdatePrefix() {
-        try (var source = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(1));
-             var legacy = FullDataSourceV2.createNative(NativeDhColumnsTest.savedNativeColumns(1));
-             var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()));
-             var expected = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
-            legacy.setColumn(0, new LongArrayList(legacy.getColumn(0))); // Force the original per-group Java path.
-            source.columnWorldCompressionMode.size(4095); legacy.columnWorldCompressionMode.size(4095);
-            var actualError = assertThrows(IndexOutOfBoundsException.class, () -> parent.updateFromDataSource(source));
-            var expectedError = assertThrows(IndexOutOfBoundsException.class, () -> expected.updateFromDataSource(legacy));
-            assertEquals(expectedError.getClass(), actualError.getClass()); assertEquals(expectedError.getMessage(), actualError.getMessage());
-            assertEquals(expected.columnGenerationSteps, parent.columnGenerationSteps);
-            assertEquals(expected.columnWorldCompressionMode, parent.columnWorldCompressionMode);
-            assertEquals(expected.mapping.size(), parent.mapping.size());
-            for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) {
-                assertEquals(expected.getColumnAtRelPos(x, z), parent.getColumnAtRelPos(x, z));
-                assertEquals(expected.hasSemanticHorizontalUniformity(x, z), parent.hasSemanticHorizontalUniformity(x, z));
-                assertArrayEquals(expected.getSemanticHorizontalContributors(x, z), parent.getSemanticHorizontalContributors(x, z));
-            }
-        }
-    }
-
 }

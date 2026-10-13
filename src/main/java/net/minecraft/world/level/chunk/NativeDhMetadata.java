@@ -14,15 +14,13 @@ final class NativeDhMetadata {
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle VIEW = handle("view", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle EDIT = handle("edit", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-        ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_BYTE));
     private static final MethodHandle HASH = handle("hash", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     final Arena arena = Arena.ofAuto();
     final MemorySegment owner;
     final NativeDhMetadataList generation, compression;
-    final MemorySegment uniform;
+    /** Uniformity, and the Rust-maintained footprint presence plane (read-only to Java). */
+    final MemorySegment uniform, footprints;
     NativeDhMetadata(MemorySegment source) {
         MemorySegment pointer = MemorySegment.NULL; boolean attached = false;
         try {
@@ -32,6 +30,7 @@ final class NativeDhMetadata {
             generation = new NativeDhMetadataList(this, 0);
             compression = new NativeDhMetadataList(this, 1);
             uniform = view(2);
+            footprints = view(3).asReadOnly();
         } catch (RuntimeException | Error e) { if (!attached && pointer.address()!=0) release(pointer); throw e; }
         catch (Throwable e) { if (!attached && pointer.address()!=0) release(pointer); throw new IllegalStateException(e); }
     }
@@ -42,14 +41,6 @@ final class NativeDhMetadata {
             long count=out.getAtIndex(ValueLayout.JAVA_LONG,1);
             if(count<0||count>Integer.MAX_VALUE)throw new IllegalStateException("DH metadata extent");
             return out.getAtIndex(ValueLayout.ADDRESS,0).reinterpret(count,arena,null);
-        } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
-        finally { Reference.reachabilityFence(this); }
-    }
-    void edit(int kind, int operation, int index, int count, MemorySegment data, byte value) {
-        try {
-            int result=(int)EDIT.invokeExact(owner,kind,operation,index,count,data,value);
-            if(result==-1)throw new OutOfMemoryError("Cannot resize DH metadata");
-            if(result!=1)throw new IndexOutOfBoundsException("Invalid DH metadata edit");
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(this); }
     }

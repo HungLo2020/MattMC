@@ -26,8 +26,6 @@ final class NativeDhMutableColumn {
     private static final MethodHandle HASH = call("hash", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle CACHED_HASH = call("cached_hash", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS), Linker.Option.critical(false));
     private static final MethodHandle OWNER_HASH = call("owner_hash", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle CULL = call("cull", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    private static final MethodHandle REDUCE = call("reduce", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final ThreadLocal<MemorySegment> METADATA = ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(16, 8));
     private final Arena arena;
     /** Keeps a grouped column's owner (and its single cleanup) reachable. */
@@ -88,17 +86,6 @@ final class NativeDhMutableColumn {
         return NativeDhColumnList.fromOwned(new NativeDhMutableColumn(pointer, group));
     }
     NativeDhColumnGroup group() { return group; }
-    static NativeDhColumnList reduce(NativeDhMaterials policy) {
-        try {
-            int result = (int) REDUCE.invokeExact(policy.neighbors, policy.owner, policy.result);
-            if (result == 0) return null;
-            if (result == 1) return NativeDhColumnList.empty();
-            MemorySegment pointer = policy.result.get(ValueLayout.ADDRESS, 0);
-            if (result != 2 || pointer.address() == 0) throw new IllegalStateException("Invalid native DH reduction result");
-            return NativeDhColumnList.fromOwned(new NativeDhMutableColumn(pointer));
-        } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
-        finally { Reference.reachabilityFence(policy); }
-    }
     static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); } catch (Throwable e) { throw new IllegalStateException(e); }
     }
@@ -170,11 +157,6 @@ final class NativeDhMutableColumn {
             if (failed >= 0) com.seibel.distanthorizons.core.util.FullDataPointUtil.remap(ids, points.getAtIndex(ValueLayout.JAVA_LONG, failed));
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(this); }
-    }
-    int cull(NativeDhMaterials policy) {
-        try { int result = (int) CULL.invokeExact(owner, policy.neighbors, policy.owner); if (result == 2) refresh(); return result; }
-        catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
-        finally { Reference.reachabilityFence(this); Reference.reachabilityFence(policy); }
     }
     static int hash(MemorySegment points, int count) {
         try { return (int) HASH.invokeExact(points, count); }

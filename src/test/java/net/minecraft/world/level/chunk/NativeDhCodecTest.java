@@ -97,11 +97,13 @@ class NativeDhCodecTest {
         var late=source.getColumn(2);assertEquals(0,late.getLong(0));late.add(7);assertEquals(2,late.size());assertSame(late,source.getColumn(2));
         source.setColumn(2,null);assertNull(source.getColumn(2));source.close();
     }
-    @Test void aliasesAndCustomListsKeepCompatibilityAdmission() throws Exception {
+    @Test void boundListsAreNeverSharedSoTheCodecAlwaysAdmitsTheSource() throws Exception {
         try(var source=empty()) {
             var same=source.getColumn(0);source.setColumn(1,same);
-            assertFalse(NativeDhCodec.initialize(source));
-            source.setColumn(1,it.unimi.dsi.fastutil.longs.LongArrayList.of(11));assertFalse(NativeDhCodec.initialize(source));
+            assertNotSame(same,source.getColumn(1),"binding a bound list binds a native copy");
+            assertTrue(NativeDhCodec.initialize(source));
+            source.setColumn(1,it.unimi.dsi.fastutil.longs.LongArrayList.of(11));
+            assertInstanceOf(NativeDhColumnList.class,source.getColumn(1));assertTrue(NativeDhCodec.initialize(source));
         }
     }
 }

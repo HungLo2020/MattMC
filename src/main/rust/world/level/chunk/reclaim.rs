@@ -13,7 +13,7 @@ pub(crate) const LIVE_BIOME: u8 = 3;
 pub(crate) const LIVE_BIOME_VIEW: u8 = 4;
 pub(crate) const SECTION_COUNTERS: u8 = 5;
 pub(crate) const DH_CONTRIBUTORS: u8 = 6;
-pub(crate) const DH_CONTRIBUTOR_BATCH: u8 = 7;
+// Kind 7 (saved contributor batches) is retired; saved footprints decode into their source.
 pub(crate) const SECTION_SNAPSHOT: u8 = 8;
 pub(crate) const LIGHT_LAYER: u8 = 9;
 pub(crate) const LIGHT_VIEW: u8 = 10;
@@ -33,7 +33,6 @@ extern "C" {
     fn mattmc_live_biome_view_release(lease: *const c_void);
     fn mattmc_section_counters_release(owner: *mut c_void);
     fn mattmc_dh_contributors_release(owner: *mut c_void);
-    fn mattmc_dh_contributor_batch_release(owner: *mut c_void);
     fn mattmc_chunk_snapshot_release(states: *mut c_void);
     fn mattmc_light_layer_release(layer: *mut c_void);
     fn mattmc_light_layer_view_release(view: *mut c_void);
@@ -66,7 +65,6 @@ pub unsafe extern "C" fn mattmc_native_release_batch(kinds: *const u8, pointers:
             LIVE_BIOME_VIEW => mattmc_live_biome_view_release(pointer),
             SECTION_COUNTERS => mattmc_section_counters_release(pointer),
             DH_CONTRIBUTORS => mattmc_dh_contributors_release(pointer),
-            DH_CONTRIBUTOR_BATCH => mattmc_dh_contributor_batch_release(pointer),
             SECTION_SNAPSHOT => mattmc_chunk_snapshot_release(pointer),
             LIGHT_LAYER => mattmc_light_layer_release(pointer),
             LIGHT_VIEW => mattmc_light_layer_view_release(pointer),

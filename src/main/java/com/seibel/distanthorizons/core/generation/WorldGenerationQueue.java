@@ -3,8 +3,6 @@ package com.seibel.distanthorizons.core.generation;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
-import com.seibel.distanthorizons.api.objects.data.DhApiChunk;
-import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.generation.tasks.IWorldGenTaskTracker;
@@ -24,7 +22,6 @@ import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.util.LodUtil.AssertFailureException;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
-import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.util.objects.RollingAverage;
 import com.seibel.distanthorizons.core.util.objects.UncheckedInterruptedException;
 import com.seibel.distanthorizons.core.util.LodUtil;
@@ -479,84 +476,11 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 					}
 				);
 			}
-			case API_CHUNKS: 
-			{
-				return this.generator.generateApiChunks(
-					chunkPosMin.getX(), chunkPosMin.getZ(),
-					generationRequestChunkWidthCount,
-					targetDataDetail,
-					generatorMode,
-					ThreadPoolUtil.getWorldGenExecutor(),
-					(DhApiChunk dataPoints) ->
-					{
-						try(FullDataSourceV2 dataSource = LodDataBuilder.createFromApiChunkData(dataPoints, this.generator.runApiValidation()))
-						{
-							dataSourceConsumer.accept(dataSource);
-						}
-						catch (DataCorruptedException | IllegalArgumentException e)
-						{
-							LOGGER.error("World generator returned a corrupt chunk. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-							Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-						}
-						catch (ClassCastException e)
-						{
-							LOGGER.error("World generator return type incorrect. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-							Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-						}
-					}
-				);
-			}
-			case API_DATA_SOURCES:
-			{
-				// done to reduce GC overhead
-				FullDataSourceV2 pooledDataSource = FullDataSourceV2.createEmpty(requestPos);
-				// set here so the API user doesn't have to pass in this value anywhere themselves
-				pooledDataSource.setRunApiChunkValidation(this.generator.runApiValidation());
-				
-				// only apply to children if we aren't at the bottom of the tree
-				
-				pooledDataSource.applyToChildren = DhSectionPos.getDetailLevel(pooledDataSource.getPos()) > DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
-				pooledDataSource.applyToParent = DhSectionPos.getDetailLevel(pooledDataSource.getPos()) < DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL + 12;
-				
-				
-				return this.generator.generateLod(
-						chunkPosMin.getX(), chunkPosMin.getZ(),
-						DhSectionPos.getX(requestPos), DhSectionPos.getZ(requestPos),
-						(byte) (DhSectionPos.getDetailLevel(requestPos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL),
-						pooledDataSource,
-						generatorMode,
-						ThreadPoolUtil.getWorldGenExecutor(),
-						(IDhApiFullDataSource apiDataSource) ->
-						{
-							try
-							{
-								FullDataSourceV2 fullDataSource = (FullDataSourceV2) apiDataSource;
-								try
-								{
-									dataSourceConsumer.accept(fullDataSource);
-								}
-								finally
-								{
-									fullDataSource.close();
-								}
-							}
-							catch (IllegalArgumentException e)
-							{
-								LOGGER.error("World generator returned a corrupt data source. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-								Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-							}
-							catch (ClassCastException e)
-							{
-								LOGGER.error("World generator return type incorrect. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-								Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-							}
-						}
-				);
-			}
 			default: 
 			{
+				// Only the built-in generator (vanilla chunks) exists; there are no API generators.
 				Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-				throw new AssertFailureException("Unknown return type: " + returnType);
+				throw new AssertFailureException("Unsupported world generator return type: " + returnType);
 			}
 		}
 	}

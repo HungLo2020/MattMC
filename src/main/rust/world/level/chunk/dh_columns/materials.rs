@@ -36,6 +36,17 @@ pub unsafe extern "C" fn mattmc_dh_materials_from_map(map: *const super::id_map:
     let Some(map) = map.as_ref() else { return std::ptr::null_mut(); };
     build(map.state_ids()).map_or(std::ptr::null_mut(), |m| Box::into_raw(Box::new(m)))
 }
+/// Facts read by Java from each mapping entry's wrapper (`getOpacity`, `isAir`,
+/// `isLiquid`), three bytes per ID. Used when the mapping holds no registered
+/// block states (before the block catalog is installed).
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_materials_from_facts(facts: *const u8, count: i32) -> *mut Materials {
+    if count <= 0 || facts.is_null() { return std::ptr::null_mut(); }
+    let raw = std::slice::from_raw_parts(facts, count as usize * 3);
+    let facts: Box<[Fact]> = raw.chunks_exact(3)
+        .map(|f| Fact { opacity: f[0], air: f[1] != 0, liquid: f[2] != 0 }).collect();
+    Box::into_raw(Box::new(Materials(facts)))
+}
 /// Private CPU view for consumer/lifetime verification: pointer and count of three-byte facts.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_materials_view(owner: *const Materials, output: *mut usize) -> i32 {

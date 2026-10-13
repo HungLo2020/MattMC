@@ -38,6 +38,9 @@ public final class DhSourceVerification {
         for(int i=0;i<rounds;i++) {
             if(mode.equals("create")) {
                 try(var source=FullDataSourceV2.createEmpty(6)) { checksum+=source.hashCode(); }
+            } else if(mode.equals("downsample")) {
+                // A fresh child each round, so every round writes all 4096 cells.
+                try(var child=FullDataSourceV2.createEmpty(6)) { checksum+=child.updateFromDataSource(input)?1:0; checksum+=child.hashCode(); }
             } else {
                 // Existing authoritative points change before each complete update.
                 changedColumn.set(0,FullDataPointUtil.encode(0,8,24,(byte)(i&15),(byte)15));
@@ -48,7 +51,12 @@ public final class DhSourceVerification {
         return checksum;
     }
     public static void main(String[] args) throws Exception {
-        String mode=args[2];if(!mode.equals("create")&&!mode.equals("merge")&&!mode.equals("cull"))throw new IllegalArgumentException(mode);
+        String mode=args[2];
+        if(!java.util.Set.of("create","merge","cull","parent","downsample").contains(mode))throw new IllegalArgumentException(mode);
+        // parent: the 64x64 block-detail input reduces into its parent's quadrant.
+        // downsample: a parent-detail input projects onto a block-detail child.
+        long inputPos=mode.equals("downsample") ? com.seibel.distanthorizons.core.pos.DhSectionPos.getParentPos(6) : 6;
+        long targetPos=mode.equals("parent") ? com.seibel.distanthorizons.core.pos.DhSectionPos.getParentPos(6) : 6;
         net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();
         SingletonInjector.INSTANCE.bind(IWrapperFactory.class,WrapperFactory.INSTANCE);
         var shared=(IMinecraftSharedWrapper)Proxy.newProxyInstance(IMinecraftSharedWrapper.class.getClassLoader(),new Class<?>[]{IMinecraftSharedWrapper.class},(p,m,a)->switch(m.getName()){
@@ -56,7 +64,7 @@ public final class DhSourceVerification {
         SingletonInjector.INSTANCE.bind(IMinecraftSharedWrapper.class,shared);
         Config.Common.LodBuilding.worldCompression.setWithoutFiringEvents(mode.equals("cull")
             ? EDhApiWorldCompressionMode.VISUALLY_EQUAL : EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
-        try(var input=FullDataSourceV2.createEmpty(6);var target=FullDataSourceV2.createEmpty(6)) {
+        try(var input=FullDataSourceV2.createEmpty(inputPos);var target=FullDataSourceV2.createEmpty(targetPos)) {
             input.mapping.addIfNotPresentAndGetId(biome(),mode.equals("cull")
                 ? stone()
                 : BlockStateWrapper.AIR);

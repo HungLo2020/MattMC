@@ -7,7 +7,11 @@ import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import net.minecraft.util.NativeLibraryLoader;
 
-/** List identity projections only; Rust retains the live primary column table. */
+/**
+ * The Rust DH full-data source: its column table, metadata planes and semantic
+ * footprints, and every source update. Java holds only list identity
+ * projections of columns, created on demand, and footprint views.
+ */
 public final class NativeDhSource implements AutoCloseable {
     private static final MethodHandle CODEC_PROJECT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_codec_project",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
@@ -15,13 +19,22 @@ public final class NativeDhSource implements AutoCloseable {
     private static final MethodHandle CLOSED_KIND = handle("closed_kind", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle CLOSED_COLUMN = handle("closed_column", FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle CLOSED_RELEASE = handle("closed_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle CLOSED_FOOTPRINT = handle("closed_footprint", FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle FOOTPRINT = handle("footprint", FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle FOOTPRINT_SET = handle("footprint_set", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT), Linker.Option.critical(true));
+    private static final MethodHandle FOOTPRINT_CLEAR = handle("footprint_clear", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle FOOTPRINTS_DECODE = handle("footprints_decode", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS), Linker.Option.critical(true));
+    private static final MethodHandle UPDATE_PARENT = handle("update_parent", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
+    private static final MethodHandle DOWNSAMPLE = handle("downsample", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle HASH_FULL = handle("hash_full", FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG));
     private MemorySegment closedProjection;
-    private static MethodHandle handle(String name, FunctionDescriptor type) {
-        return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_" + name, type);
+    private static MethodHandle handle(String name, FunctionDescriptor type, Linker.Option... options) {
+        return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_" + name, type, options);
     }
-    private static final MethodHandle HASH = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_hash",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
-    private static final ThreadLocal<MemorySegment> HASH_RESULT=ThreadLocal.withInitial(()->Arena.ofAuto().allocate(4,4));
     private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.ADDRESS));
     private static final MethodHandle SET = handle("set", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
@@ -58,6 +71,8 @@ public final class NativeDhSource implements AutoCloseable {
         } catch (RuntimeException | Error e) { if (!attached && pointer.address() != 0) release(pointer); throw e; }
         catch (Throwable e) { if (!attached && pointer.address() != 0) release(pointer); throw new IllegalStateException(e); }
     }
+    /** Footprint cell limit of one source update ({@code MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS}). */
+    public static final int FOOTPRINT_POINTS = 256;
     public NativeDhMetadataList generation() { return metadata.generation; }
     public NativeDhMetadataList compression() { return metadata.compression; }
     MemorySegment metadataOwner() { return metadata.owner; }
@@ -100,6 +115,149 @@ public final class NativeDhSource implements AutoCloseable {
         catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally {Reference.reachabilityFence(this);}
     }
+    /** True when the cell has a footprint: one read of the Rust-maintained presence plane. */
+    public boolean hasFootprint(int index) {
+        java.util.Objects.checkIndex(index,4096);
+        try { return metadata.footprints.get(ValueLayout.JAVA_BYTE,index)!=0; }
+        finally { Reference.reachabilityFence(metadata); }
+    }
+    /**
+     * Read-only views of footprints already read, so repeated reads (render
+     * conversion, persistence) create no new views. Every operation that can
+     * change footprints in Rust drops it.
+     */
+    private LongList[][] footprintViews;
+    void footprintsChanged() { footprintViews = null; }
+    /** The cell's footprint as four read-only views (null entries are null columns), or null. */
+    public LongList[] footprint(int index) {
+        if(!hasFootprint(index))return null;
+        var views=footprintViews;
+        if(views!=null&&views[index]!=null)return views[index].clone();
+        LongList[] adopted;
+        try {
+            var pointer=isLive() ? (MemorySegment)FOOTPRINT.invokeExact(owner,index) : (MemorySegment)CLOSED_FOOTPRINT.invokeExact(closedProjection,index);
+            if(pointer.address()==0)return null;
+            adopted=NativeDhContributors.adopt(pointer);
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);}
+        if(views==null)footprintViews=views=new LongList[4096][];
+        views[index]=adopted;
+        return adopted.clone();
+    }
+    /** Replace the cell's footprint with a copy of {@code columns}, each clipped to {@link #FOOTPRINT_POINTS}; null clears it. */
+    public void setFootprint(int index, LongList[] columns) {
+        java.util.Objects.checkIndex(index,4096);
+        if(!isLive())throw new IllegalStateException("Closed DH source");
+        footprintsChanged();
+        try {
+            if(columns==null){if((int)FOOTPRINT_CLEAR.invokeExact(owner,index)!=1)throw new IllegalStateException("Invalid DH footprint");return;}
+            if(columns.length!=4)throw new IllegalArgumentException("DH footprints have four columns");
+            long[] spans=new long[8];Object[] pins=new Object[4];
+            try(var arena=Arena.ofConfined()) {
+                for(int i=0;i<4;i++) {
+                    if(columns[i]==null){spans[i*2+1]=-1;continue;}
+                    var points=NativeDhContributors.points(columns[i],arena);pins[i]=points;
+                    spans[i*2]=points.address();spans[i*2+1]=points.byteSize()/8;
+                }
+                if((int)FOOTPRINT_SET.invokeExact(owner,index,MemorySegment.ofArray(spans),FOOTPRINT_POINTS)!=1)
+                    throw new IllegalStateException("Invalid DH footprint");
+            } finally {Reference.reachabilityFence(pins);Reference.reachabilityFence(columns);}
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);}
+    }
+    /**
+     * Decode a decompressed V4 footprint sidecar straight into this source.
+     * Returns {@code [status, value]}: 0 complete, 1 end of input, 2 a column
+     * over the saved bound (value is its size). Cells before a stop are applied.
+     */
+    public int[] decodeFootprints(byte[] bytes, int offset, int length) {
+        java.util.Objects.checkFromIndexSize(offset,length,bytes.length);
+        if(!isLive())throw new IllegalStateException("Closed DH source");
+        footprintsChanged();
+        long[] result=new long[2];
+        try {
+            if((int)FOOTPRINTS_DECODE.invokeExact(owner,MemorySegment.ofArray(bytes).asSlice(offset,length),length,MemorySegment.ofArray(result))!=1)
+                throw new IllegalStateException("Invalid DH footprint sidecar decode");
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);}
+        if(result[0]==3)throw new OutOfMemoryError("Cannot decode DH footprint sidecar");
+        return new int[]{(int)result[0],(int)result[1]};
+    }
+    /**
+     * Reduce the one-detail-finer {@code input} into this source's quadrant at
+     * cell offset ({@code offsetX}, {@code offsetZ}). One Rust call commits
+     * metadata, uniformity, footprints and columns; returns whether point data changed.
+     */
+    public boolean updateParent(NativeDhSource input, NativeDhMaterials materials, int[] remap, int offsetX, int offsetZ) {
+        footprintsChanged();
+        long[] out=new long[3];int result;
+        // A whole quadrant runs for milliseconds: an ordinary (non-critical) call over native scratch.
+        try(var arena=Arena.ofConfined()) {
+            var output=arena.allocate(ValueLayout.JAVA_LONG,3);
+            result=(int)UPDATE_PARENT.invokeExact(stageOwner(),input.stageOwner(),materials.owner,arena.allocateFrom(ValueLayout.JAVA_INT,remap),remap.length,
+                offsetX,offsetZ,output);
+            MemorySegment.copy(output,ValueLayout.JAVA_LONG,0,out,0,3);
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);Reference.reachabilityFence(input);Reference.reachabilityFence(materials);}
+        // Every quadrant column was replaced: escaped readers keep their old leases.
+        for(int x=offsetX;x<offsetX+32;x++)for(int z=offsetZ;z<offsetZ+32;z++)unbind(x*64+z);
+        return finish(result,out);
+    }
+    /**
+     * Project the one-detail-coarser {@code input} onto this source, whose
+     * cells are the input quadrant at cell offset ({@code offsetX}, {@code offsetZ}).
+     * Returns whether any column was written.
+     */
+    public boolean downsample(NativeDhSource input, int[] remap, int offsetX, int offsetZ) {
+        footprintsChanged();
+        long[] out=new long[3];long[] replaced=new long[64];int result;
+        try(var arena=Arena.ofConfined()) {
+            var output=arena.allocate(ValueLayout.JAVA_LONG,3);var written=arena.allocate(ValueLayout.JAVA_LONG,64);
+            result=(int)DOWNSAMPLE.invokeExact(stageOwner(),input.stageOwner(),arena.allocateFrom(ValueLayout.JAVA_INT,remap),remap.length,
+                offsetX,offsetZ,output,written);
+            MemorySegment.copy(output,ValueLayout.JAVA_LONG,0,out,0,3);
+            MemorySegment.copy(written,ValueLayout.JAVA_LONG,0,replaced,0,64);
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);Reference.reachabilityFence(input);}
+        for(int i=0;i<4096;i++)if((replaced[i/64]&(1L<<(i%64)))!=0)unbind(i);
+        return finish(result,out);
+    }
+    private void unbind(int index) {
+        var previous=bindings[index];
+        if(previous==null)return;
+        bindings[index]=null;
+        if(previous instanceof NativeDhColumnList old)old.detach(this,index);
+    }
+    private static boolean finish(int result, long[] out) {
+        if(result==1)return out[0]!=0;
+        if(result==-1) {
+            int value=(int)out[2];
+            switch((int)out[1]) {
+                case 1 -> throw new IndexOutOfBoundsException("DH full-data ID ["+value+"] has no mapping entry");
+                case 2 -> throw new IndexOutOfBoundsException("DH full-data ID ["+value+"] is outside the remapped IDs");
+                case 3 -> throw new IllegalStateException("DH full-data column ["+value+"] has an invalid size");
+                default -> {}
+            }
+        }
+        throw new IllegalStateException("Invalid DH source update arguments");
+    }
+    /**
+     * The complete base-data hash, or an exception for an invalid (negative-size) column.
+     * A closed source has no table: its escaped readers may still change, so it
+     * is hashed over those readers, exactly as {@code generateHashCode} defines.
+     */
+    public int hash(long position) {
+        if(!isLive()) {
+            int result=31*Long.hashCode(position)+java.util.Arrays.deepHashCode(columnReferences());
+            return 43*(17*result+metadata.generation.hashCode())+metadata.compression.hashCode();
+        }
+        long tagged;
+        try{tagged=(long)HASH_FULL.invokeExact(owner,position);}
+        catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally{Reference.reachabilityFence(this);}
+        if((tagged>>>32)==0)throw new IllegalStateException("DH full-data column has an invalid size");
+        return (int)tagged;
+    }
     public LongList[] columnReferences() {
         for(int i=0;i<4096;i++)getColumn(i);
         return bindings.clone();
@@ -122,7 +280,7 @@ public final class NativeDhSource implements AutoCloseable {
     boolean codecWritable() {
         if (!isLive()) return false;
         for (var binding : bindings) {
-            if (binding != null && (!(binding instanceof NativeDhColumnList column) || column.codecAliases(this))) return false;
+            if (binding instanceof NativeDhColumnList column && column.codecAliases(this)) return false;
         }
         return true;
     }
@@ -172,16 +330,23 @@ public final class NativeDhSource implements AutoCloseable {
         catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
         finally{Reference.reachabilityFence(this);Reference.reachabilityFence(producer);}
     }
+    /**
+     * Bind {@code column} to the cell. Rust owns every bound column: any other
+     * list, or a native list already bound to a cell, is bound as a native
+     * copy, so a column is never shared between cells. Null makes the cell missing.
+     */
     public void setColumn(int index, LongList column) {
         java.util.Objects.checkIndex(index, bindings.length);
         if (bindings[index] == column && (column!=null || kind(index)==0)) return;
         var previous = bindings[index];
-        if (column instanceof NativeDhColumnList nativeColumn) {
-            var lease = nativeColumn.stageSourceOwner();
+        NativeDhColumnList bound = null;
+        if (column != null) {
+            bound = column instanceof NativeDhColumnList nativeColumn && !nativeColumn.isBound() ? nativeColumn : NativeDhColumnList.copyOf(column, group);
+            var lease = bound.stageSourceOwner();
             publish(index, lease.address() == 0 ? 3 : 2, lease);
-            nativeColumn.attach(this, index);
-        } else publish(index, column == null ? 0 : 1, MemorySegment.NULL);
-        bindings[index] = column;
+            bound.attach(this, index);
+        } else publish(index, 0, MemorySegment.NULL);
+        bindings[index] = bound;
         if (previous instanceof NativeDhColumnList old) old.detach(this, index);
     }
     void materialized(int index, NativeDhColumnList column, MemorySegment lease) {
@@ -192,16 +357,6 @@ public final class NativeDhSource implements AutoCloseable {
         try { if ((int) SET.invokeExact(owner, index, kind, column) != 1) throw new IllegalStateException("DH source binding"); }
         catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(this); Reference.reachabilityFence(column); }
-    }
-    public long tryHash(long position,it.unimi.dsi.fastutil.bytes.ByteList generation,it.unimi.dsi.fastutil.bytes.ByteList compression){
-        if(!isLive()||!NativeDhMetadataList.supported(generation)||!NativeDhMetadataList.supported(compression)
-            ||generation.size()!=4096||compression.size()!=4096)return 0;
-        var result=HASH_RESULT.get();
-        try{
-            if((int)HASH.invokeExact(owner,position,NativeDhMetadataList.borrow(generation),NativeDhMetadataList.borrow(compression),result)!=1)return 0;
-            return (1L<<32)|(result.get(ValueLayout.JAVA_INT,0)&0xffffffffL);
-        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
-        finally{Reference.reachabilityFence(this);}
     }
     NativeDhColumnGroup group() { return group; }
     public MemorySegment stageOwner() { if(!isLive())throw new IllegalStateException("Closed DH source");return owner; }

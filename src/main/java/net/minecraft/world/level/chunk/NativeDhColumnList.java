@@ -35,6 +35,18 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
     static NativeDhColumnList fromOwned(NativeDhMutableColumn column) {
         var view = empty(column.group()); view.mutable = column; return view;
     }
+    /** True while some live source cell binds this list. */
+    boolean isBound() {
+        if (source != null && source.get() != null) return true;
+        if (aliases != null) for (var binding : aliases) if (binding.source.get() != null) return true;
+        return false;
+    }
+    /** An independent native copy of {@code values}, whose storage joins {@code group}. */
+    static NativeDhColumnList copyOf(it.unimi.dsi.fastutil.longs.LongList values, NativeDhColumnGroup group) {
+        var copy = empty(group);
+        if (!values.isEmpty()) copy.addAll(0, values);
+        return copy;
+    }
     void attach(NativeDhSource value, int index) {
         if (source != null && source.get() == null) source = null;
         if (aliases != null) { aliases.removeIf(b -> b.source.get() == null); if (aliases.isEmpty()) aliases = null; }
@@ -60,14 +72,12 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         if (sourceLease == null) {
             if (points.byteSize() == 0 && owner == null && source == null && aliases == null) return MemorySegment.NULL;
             sourceLease = owner instanceof NativeDhColumns producer ? producer.sharedColumn(points)
-                : owner instanceof NativeDhParentColumns parent ? parent.sharedColumn(points)
                 : new NativeDhMutableColumn(points, size(), group);
             publishLease();
         }
         return sourceLease.stageOwner();
     }
     public boolean isOriginalProducerView() { return owner instanceof NativeDhColumns && mutable == null; }
-    public boolean isOriginalParentView() { return owner instanceof NativeDhParentColumns && mutable == null; }
     boolean isOriginal(NativeDhColumns source, long address, long length) {
         return mutable == null && owner == source && points.address() == address && points.byteSize() == length;
     }
@@ -170,35 +180,6 @@ public final class NativeDhColumnList extends AbstractLongList implements Random
         finally { Reference.reachabilityFence(this); }
     }
     public void remapIds(int[] ids) { write().remap(ids); }
-    /** Complete 2x2 producer over existing native CPU point views. */
-    public static NativeDhColumnList tryReduce(NativeDhMaterials policy, it.unimi.dsi.fastutil.longs.LongList[] inputs) {
-        if (policy == null || inputs.length != 4) return null;
-        for (var input : inputs) if (input != null && !(input instanceof NativeDhColumnList)) return null;
-        try {
-            for (int i = 0; i < 4; i++) {
-                var input = (NativeDhColumnList) inputs[i];
-                policy.neighbors.setAtIndex(ValueLayout.ADDRESS, i * 2L, input == null ? MemorySegment.NULL : input.data());
-                policy.neighbors.setAtIndex(ValueLayout.JAVA_LONG, i * 2L + 1, input == null ? 0L : (long) input.size());
-            }
-            return NativeDhMutableColumn.reduce(policy);
-        } finally { Reference.reachabilityFence(inputs); }
-    }
-    /** Borrow CPU views directly; shared center/neighbor list aliases keep Java semantics. */
-    public boolean tryCull(NativeDhMaterials policy, it.unimi.dsi.fastutil.longs.LongList posX,
-                           it.unimi.dsi.fastutil.longs.LongList negX, it.unimi.dsi.fastutil.longs.LongList posZ,
-                           it.unimi.dsi.fastutil.longs.LongList negZ) {
-        if (policy == null || !(posX instanceof NativeDhColumnList a) || !(negX instanceof NativeDhColumnList b)
-            || !(posZ instanceof NativeDhColumnList c) || !(negZ instanceof NativeDhColumnList d)
-            || this == a || this == b || this == c || this == d) return false;
-        try {
-            NativeDhColumnList[] columns = {a, b, c, d};
-            for (int i = 0; i < 4; i++) {
-                policy.neighbors.setAtIndex(ValueLayout.ADDRESS, i * 2L, columns[i].data());
-                policy.neighbors.setAtIndex(ValueLayout.JAVA_LONG, i * 2L + 1, columns[i].size());
-            }
-            return write().cull(policy) != 0;
-        } finally { Reference.reachabilityFence(a); Reference.reachabilityFence(b); Reference.reachabilityFence(c); Reference.reachabilityFence(d); Reference.reachabilityFence(this); }
-    }
     @Override public void getElements(int from, long[] array, int offset, int length) {
         Objects.checkFromIndexSize(offset, length, array.length); Objects.checkFromIndexSize(from, length, size());
         try { MemorySegment.copy(data(), ValueLayout.JAVA_LONG, from * 8L, array, offset, length); }

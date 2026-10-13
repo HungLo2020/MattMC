@@ -8,7 +8,7 @@ import java.lang.ref.Reference;
 import java.util.Objects;
 import java.util.RandomAccess;
 
-/** Temporary Java identity view; authoritative metadata values and list edits live in Rust. */
+/** Fixed-size Java view of a Rust metadata plane: values are read and written in place. */
 public final class NativeDhMetadataList extends AbstractByteList implements RandomAccess, java.io.Serializable {
     private static final long serialVersionUID=1L;
     final NativeDhMetadata root;
@@ -18,6 +18,11 @@ public final class NativeDhMetadataList extends AbstractByteList implements Rand
     private int size;
     NativeDhMetadataList(NativeDhMetadata root, int kind) { this.root=root; this.kind=kind; refresh(); }
     private void refresh() { bytes=root.view(kind); size=(int)bytes.byteSize(); }
+    /** Replace every value; {@code values} has one byte per column. */
+    public void setAll(byte[] values) {
+        if(values.length!=size)throw new IllegalArgumentException("DH metadata needs "+size+" values");
+        setElements(0,values,0,size);
+    }
     @Override public int size() { return size; }
     @Override public byte getByte(int index) {
         Objects.checkIndex(index,size);
@@ -28,41 +33,15 @@ public final class NativeDhMetadataList extends AbstractByteList implements Rand
         try { bytes.set(ValueLayout.JAVA_BYTE,index,value); return previous; }
         finally { Reference.reachabilityFence(root); }
     }
-    @Override public void size(int count) {
-        if(count<0)throw new IllegalArgumentException("Negative DH metadata size");
-        root.edit(kind,0,0,count,MemorySegment.NULL,(byte)0);refresh();
-    }
-    @Override public void clear() { size(0); }
-    @Override public void add(int index, byte value) {
-        ensureIndex(index);root.edit(kind,1,index,1,MemorySegment.NULL,value);refresh();
-    }
-    @Override public byte removeByte(int index) {
-        byte previous=getByte(index);removeElements(index,index+1);return previous;
-    }
-    @Override public void removeElements(int from, int to) {
-        Objects.checkFromToIndex(from,to,size);
-        if(from!=to){root.edit(kind,3,from,to-from,MemorySegment.NULL,(byte)0);refresh();}
-    }
-    @Override public void addElements(int index, byte[] values, int offset, int count) {
-        ensureIndex(index);Objects.checkFromIndexSize(offset,count,values.length);
-        if(count==0)return;
-        try(var scratch=Arena.ofConfined()) {
-            var input=scratch.allocate(count);
-            MemorySegment.copy(MemorySegment.ofArray(values),offset,input,0,count);
-            root.edit(kind,2,index,count,input,(byte)0);refresh();
-        }
-    }
-    @Override public boolean addAll(int index, it.unimi.dsi.fastutil.bytes.ByteCollection values) {
-        ensureIndex(index);
-        // Freeze list inputs before a resize can invalidate a self/sublist reader.
-        if(values instanceof ByteList) {
-            byte[] input=values.toByteArray();addElements(index,input);return input.length!=0;
-        }
-        return super.addAll(index,values);
-    }
-    @Override public boolean addAll(int index, java.util.Collection<? extends Byte> values) {
-        if(values instanceof it.unimi.dsi.fastutil.bytes.ByteCollection bytes)return addAll(index,bytes);
-        return super.addAll(index,values);
+    /** The plane has one byte per source cell; its size never changes. */
+    @Override public void size(int count) { if(count!=size)throw fixed(); }
+    @Override public void clear() { throw fixed(); }
+    @Override public void add(int index, byte value) { throw fixed(); }
+    @Override public byte removeByte(int index) { throw fixed(); }
+    @Override public void removeElements(int from, int to) { if(from!=to)throw fixed(); }
+    @Override public void addElements(int index, byte[] values, int offset, int count) { if(count!=0)throw fixed(); }
+    private static UnsupportedOperationException fixed() {
+        return new UnsupportedOperationException("DH metadata has exactly one value per column");
     }
     @Override public void getElements(int from, byte[] output, int offset, int count) {
         Objects.checkFromIndexSize(from,count,size);Objects.checkFromIndexSize(offset,count,output.length);

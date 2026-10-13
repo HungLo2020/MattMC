@@ -28,6 +28,11 @@ fn reader_extents(source:&super::source::Source,output:&mut [usize]) {
     output[0]=kept;
 }
 
+/// Result codes: 1 culled, -1 allocation failure (detached extents published),
+/// -2 two slots share one column (never bound by Java), -3 a point's material
+/// ID has no mapping entry (Java's culler throws), 0 malformed arguments.
+/// A column with an invalid (negative) logical size iterates as empty.
+unsafe fn column(source: &super::source::Source, i: usize) -> &[u64] { source.column(i).unwrap_or(&[]) }
 unsafe fn owned_pass(source: *mut super::source::Source, policy: *const Materials,
     output: *mut usize, mut detach: impl FnMut(*mut Column) -> bool,readers_only:bool) -> i32 {
     let (Some(source), Some(policy)) = (source.as_mut(), policy.as_ref()) else { return 0; };
@@ -35,11 +40,10 @@ unsafe fn owned_pass(source: *mut super::source::Source, policy: *const Material
     // The cached primary identity proof includes immutable backing leases.
     // Distinct immutable leases may share producer points: detach each center
     // before mutation, so those shared spans never alias mutable storage.
-    if source.identities().windows(2).any(|p| p[0] == p[1]) { return 0; }
+    if source.identities().windows(2).any(|p| p[0] == p[1]) { return -2; }
     let mut owned = true;
     for i in 0..4096 {
-        let Some(points) = source.column(i) else { return 0; };
-        if points.len() > 4096 || points.iter().any(|p| *p as u32 as usize >= policy.0.len()) { return 0; }
+        if column(source, i).iter().any(|p| *p as u32 as usize >= policy.0.len()) { return -3; }
         let owner = source.owner(i);
         if !owner.is_null() && !(*owner).is_owned() { owned = false; }
     }
@@ -50,8 +54,8 @@ unsafe fn owned_pass(source: *mut super::source::Source, policy: *const Material
     if owned {
         for x in 1..63 { for z in 1..63 {
             let i = x * 64 + z;
-            if source.column(i).unwrap().len() <= 1 { continue; }
-            let adjacent = [i + 64, i - 64, i + 1, i - 1].map(|n| source.column(n).unwrap());
+            if column(source, i).len() <= 1 { continue; }
+            let adjacent = [i + 64, i - 64, i + 1, i - 1].map(|n| column(source, n));
             if adjacent.iter().any(|c| c.is_empty()) { continue; }
             let owner = source.owner(i);
             // Every ID was admitted above. Removal and packed height/bottom
@@ -67,8 +71,8 @@ unsafe fn owned_pass(source: *mut super::source::Source, policy: *const Material
     }
     for x in 1..63 { for z in 1..63 {
         let i = x * 64 + z;
-        if source.column(i).unwrap().len() <= 1
-            || [i + 64, i - 64, i + 1, i - 1].iter().any(|&n| source.column(n).unwrap().is_empty()) { continue; }
+        if column(source, i).len() <= 1
+            || [i + 64, i - 64, i + 1, i - 1].iter().any(|&n| column(source, n).is_empty()) { continue; }
         let owner = source.owner(i);
         if !detach(owner) {if readers_only{reader_extents(source,output);} return -1; }
         let row = 1 + output[0] * 3;
@@ -80,7 +84,7 @@ unsafe fn owned_pass(source: *mut super::source::Source, policy: *const Material
     // and read each neighbor's current values after earlier center removals.
     for row in 0..output[0] {
         let row = 1 + row * 3; let i = output[row]; let owner = source.owner(i);
-        let adjacent = [i + 64, i - 64, i + 1, i - 1].map(|n| source.column(n).unwrap());
+        let adjacent = [i + 64, i - 64, i + 1, i - 1].map(|n| column(source, n));
         cull(Column::points_mut(owner), adjacent, &|p| policy.0.get_unchecked(p as u32 as usize).opacity < 16);
         let points = (*owner).points();
         output[row + 1] = points.as_ptr() as usize; output[row + 2] = points.len();
@@ -224,7 +228,7 @@ mod tests {
         }
     }
     #[test]
-    fn owned_aliases_custom_rows_bad_ids_and_oversized_columns_decline_without_mutation() {
+    fn owned_aliases_and_bad_ids_fail_without_mutation_and_oversized_columns_cull() {
         use super::super::{source::*, mutable::*};
         unsafe {
             let source=mattmc_dh_source_create();
@@ -233,17 +237,15 @@ mod tests {
             let mut output=vec![99usize;1+4096*3];
             assert_eq!(mattmc_dh_source_set(source,65,2,c),1);
             assert_eq!(mattmc_dh_source_set(source,66,2,c),1);
-            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),0);
-            assert_eq!(mattmc_dh_source_set(source,66,1,std::ptr::null_mut()),1);
-            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),0);
+            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),-2,"a shared column is an error");
             assert_eq!(mattmc_dh_source_set(source,66,0,std::ptr::null_mut()),1);
             let bad=mattmc_dh_column_create([1u64].as_ptr(),1);
             assert_eq!(mattmc_dh_source_set(source,4095,2,bad),1);
-            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),0);
+            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),-3,"an unmapped ID is an error");
             assert_eq!((*c).points(),[3u64<<32,1u64<<32]);assert!(output.iter().all(|&p|p==99));
-            Column::points_mut(bad).resize(4097,0);
-            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),0);
-            assert!(output.iter().all(|&p|p==99));
+            // Columns larger than 4096 points are ordinary input.
+            Column::points_mut(bad).clear(); Column::points_mut(bad).resize(4097,0);
+            assert_eq!(mattmc_dh_source_cull(source,&policy,output.as_mut_ptr()),1);
             mattmc_dh_source_release(source);mattmc_dh_column_release(c);mattmc_dh_column_release(bad);
         }
     }

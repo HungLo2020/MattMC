@@ -269,29 +269,40 @@ fn all_32768_parent_reductions_match_actual_frozen_production_columns() {
         }
         let columns: Vec<Vec<u64>> = (0..4096).map(|_| { let n = r.i(); (0..n).map(|_| r.long()).collect() }).collect();
         let materials = super::materials::Materials(facts.clone().into_boxed_slice());
-        let inputs: Vec<_> = columns.iter().map(Vec::as_slice).collect();
         let identity: Vec<_> = (0..count).collect();
-        let quadrant = super::parent::build(&inputs, &materials, &identity).unwrap();
+        // The production parent update over a real source table, not a reducer alone.
+        let (child, parent) = unsafe { (super::source::mattmc_dh_source_create(), super::source::mattmc_dh_source_create()) };
+        unsafe {
+            for (index, points) in columns.iter().enumerate() {
+                let column = super::mutable::mattmc_dh_column_create(points.as_ptr(), points.len() as i32);
+                assert_eq!(super::source::mattmc_dh_source_set(child, index as i32, 2, column), 1);
+                super::mutable::mattmc_dh_column_release(column);
+            }
+            super::parent::update_parent(&mut *parent, &*child, &materials, &identity, (0, 0)).unwrap();
+        }
         for x in (0..64).step_by(2) { for z in (0..64).step_by(2) {
             let index = x * 64 + z;
             let output = super::reduction::reduce([&columns[index], &columns[index + 1], &columns[index + 64], &columns[index + 65]], &facts).unwrap();
-            assert_eq!(quadrant.column(x / 2 * 32 + z / 2), output, "{name} native quadrant {x},{z}");
+            assert_eq!(unsafe { (*parent).column(x / 2 * 64 + z / 2).unwrap() }, &output[..], "{name} production parent {x},{z}");
             assert_eq!(r.i() as usize, output.len(), "{name} {x},{z}");
             for &point in &output { assert_eq!(r.long(), point, "{name} {x},{z}"); }
             nonempty += usize::from(!output.is_empty());
         }}
+        unsafe { super::source::mattmc_dh_source_release(child); super::source::mattmc_dh_source_release(parent); }
     }
     assert!(nonempty > 1000); assert_eq!(r.1, r.0.len());
 }
 
 #[test]
-fn parent_reduction_declines_unencodable_output_and_invalid_ids_before_publication() {
-    use super::{materials::Fact, reduction::reduce};
+fn parent_reduction_masks_like_release_encode_and_checks_only_sampled_ids() {
+    use super::{materials::Fact, reduction::{reduce, MissingId}};
     let facts = [Fact { opacity: 16, air: false, liquid: false }];
+    // A full-height merge overflows the 12-bit height field: Java's release
+    // encode masks it rather than rejecting the point.
     let full_world = [encode(0, 2048, 2048, 0, 0), encode(0, 2048, 0, 0, 0)];
-    assert!(reduce([&full_world; 4], &facts).is_none());
-    assert!(reduce([&[encode(1, 1, 0, 0, 0)]; 4], &facts).is_none());
-    assert!(reduce([&[encode(0, 0, 1, 0, 0)]; 4], &facts).is_none());
-    assert_eq!(reduce([&[]; 4], &facts), Some(Vec::new()));
-    assert_eq!(reduce([&[0]; 4], &facts), Some(Vec::new()));
+    assert_eq!(reduce([&full_world; 4], &facts), Ok(vec![encode(0, 0, 0, 0, 0)]));
+    assert_eq!(reduce([&[encode(1, 1, 0, 0, 0)]; 4], &facts), Err(MissingId(1)), "a sampled unmapped ID fails like Java");
+    assert_eq!(reduce([&[encode(0, 0, 1, 0, 0)]; 4], &facts), Ok(Vec::new()), "zero-height points add one edge only");
+    assert_eq!(reduce([&[]; 4], &facts), Ok(Vec::new()));
+    assert_eq!(reduce([&[0]; 4], &facts), Ok(Vec::new()));
 }

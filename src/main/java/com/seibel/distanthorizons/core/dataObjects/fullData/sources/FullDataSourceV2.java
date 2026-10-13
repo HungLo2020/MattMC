@@ -2,129 +2,74 @@ package com.seibel.distanthorizons.core.dataObjects.fullData.sources;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiWorldCompressionMode;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
-import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
-import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
-import com.seibel.distanthorizons.core.dataObjects.transformers.FullDataOcclusionCuller;
 import com.seibel.distanthorizons.core.dataObjects.transformers.LodDataBuilder;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
-import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhLodPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.sql.dto.util.FullDataMinMaxPosUtil;
 import com.seibel.distanthorizons.core.util.*;
-import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.coreapi.ModInfo;
 import it.unimi.dsi.fastutil.bytes.ByteList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import net.minecraft.world.level.chunk.NativeDhColumnGroup;
+import net.minecraft.world.level.chunk.NativeDhColumns;
+import net.minecraft.world.level.chunk.NativeDhMaterials;
+import net.minecraft.world.level.chunk.NativeDhOcclusionPass;
+import net.minecraft.world.level.chunk.NativeDhSameDetailMerge;
+import net.minecraft.world.level.chunk.NativeDhSource;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 /**
- * This data source contains every datapoint over its given {@link DhSectionPos}. <br><br>
- * 
+ * Every datapoint over one {@link DhSectionPos}: a handle over the Rust source
+ * table ({@link NativeDhSource}), which owns the columns, the generation,
+ * compression and uniformity planes, the semantic footprints, and every
+ * update (same-detail merges, parent reduction, downsampling, culling, hashing).
+ * Java keeps the material mapping, the source flags and list views of columns.
+ *
  * @see FullDataPointUtil
  * @see FullDataSourceV1
  */
-public class FullDataSourceV2 
-		implements IDhApiFullDataSource, AutoCloseable
+public class FullDataSourceV2 implements AutoCloseable
 {
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
-	/** useful for debugging, but can slow down update operations quite a bit due to being called so often. */
-	private static final boolean RUN_UPDATE_DEV_VALIDATION = false;
-	/** 
-	 * If the data column order isn't correct
-	 * block lighting may appear broken 
-	 * and/or certain detail level LODs may not appear at all. 
-	 */
-	private static final boolean RUN_DATA_ORDER_VALIDATION = ModInfo.IS_DEV_BUILD;
-	
 	/** measured in data columns */
 	public static final int WIDTH = 64;
 	/** how many chunks wide this datasource is at detail level 0. */
 	public static final int NUMB_OF_CHUNKS_WIDE = WIDTH / LodUtil.CHUNK_WIDTH;
-	
-	
-	
-	
+	/** Hard bound for each copied contributor column in the semantic sidecar. */
+	public static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS = NativeDhSource.FOOTPRINT_POINTS;
+
 	private int cachedHashCode = 0;
-	
 	private final long pos;
-	
-	
+
 	public final FullDataPointIdMap mapping;
-	private net.minecraft.world.level.chunk.NativeDhColumns nativeOriginalColumns;
+	private NativeDhColumns nativeOriginalColumns;
 	/** One arena for all of this source's mutable native columns (see NativeDhColumnGroup). */
-	private final net.minecraft.world.level.chunk.NativeDhColumnGroup nativeColumnGroup =
-		new net.minecraft.world.level.chunk.NativeDhColumnGroup();
-	
-	
+	private final NativeDhColumnGroup nativeColumnGroup = new NativeDhColumnGroup();
+
 	public long lastModifiedUnixDateTime;
 	public long createdUnixDateTime;
-	
-	/** 
-	 * stores how far each column has been generated should start with {@link EDhApiWorldGenerationStep#EMPTY}
-	 *
+
+	/**
+	 * How far each column has been generated, one value per column (fixed size).
 	 * @see EDhApiWorldGenerationStep
 	 */
 	public final ByteList columnGenerationSteps;
-	/** 
-	 * stores what world compression was used for each column.
-	 *
+	/**
+	 * The world compression used for each column, one value per column (fixed size).
 	 * @see EDhApiWorldCompressionMode
 	 */
 	public final ByteList columnWorldCompressionMode;
-	
-	/** 
-	 * stored x/z, y <br>
-	 * The y data should be sorted from top to bottom
-	 */
-	private final LongList[] dataPoints;
-	private final net.minecraft.world.level.chunk.NativeDhSource nativeSource;
-	/**
-	 * Bounded raw contributor columns retained for heterogeneous 2x2 reductions.
-	 * These are gameplay data only; the renderer must resolve identities and
-	 * geometry from them rather than treating one reduced sprite as authoritative.
-	 */
-	private final java.util.Map<Integer, LongList[]> semanticHorizontalContributors = new java.util.HashMap<>();
-	private static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS = 1024;
-	/** Hard bound for each copied contributor column in the semantic sidecar. */
-	public static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS = 256;
 
-	private static LongList[] remapHorizontalContributors(
-		LongList[] sourceContributors, int[] remappedIds)
-	{
-		if (sourceContributors == null || sourceContributors.length != 4) return null;
-		LongList[] nativeSnapshot = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(
-			sourceContributors, remappedIds, MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
-		if (nativeSnapshot != null) return nativeSnapshot;
-		LongArrayList[] copied = new LongArrayList[4];
-		for (int index = 0; index < copied.length; index++) {
-			LongList source = sourceContributors[index];
-			if (source == null) continue;
-			LongArrayList column = new LongArrayList(
-				Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS));
-			for (int point = 0; point < Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS); point++) {
-				column.add(FullDataPointUtil.remap(remappedIds, source.getLong(point)));
-			}
-			copied[index] = column;
-		}
-		return copied;
-	}
-	
+	/** Demand-created list views of the Rust columns (y sorted top to bottom). */
+	private final LongList[] dataPoints;
+	private final NativeDhSource nativeSource;
+
 	public boolean isEmpty;
 	/** Will be null if we don't want to update this value in the DB */
 	@Nullable
@@ -132,18 +77,15 @@ public class FullDataSourceV2
 	/** Will be null if we don't want to update this value in the DB */
 	@Nullable
 	public Boolean applyToChildren = null;
-	
-	/** should only be used by methods exposed via the DH API */
-	private boolean runApiChunkValidation = false;
-	
-	
-	
+
+
+
 	//==============//
 	// constructors //
 	//==============//
-	
+
 	public static FullDataSourceV2 createFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper) { return LodDataBuilder.createFromChunk(levelWrapper, chunkWrapper); }
-	
+
 	public static FullDataSourceV2 createFromLegacyDataSourceV1(FullDataSourceV1 legacyData)
 	{
 		if (FullDataSourceV1.WIDTH != WIDTH)
@@ -153,8 +95,8 @@ public class FullDataSourceV2
 					"Data sources have different data point widths and no converter is present. " +
 					"input width ["+ FullDataSourceV1.WIDTH+"], recipient width ["+WIDTH+"].");
 		}
-		
-		
+
+
 		// Note: this logic only works if the data point data is the same between both versions
 		byte[] columnGenerationSteps = new byte[WIDTH * WIDTH];
 		byte[] columnWorldCompressionMode = new byte[WIDTH * WIDTH];
@@ -168,39 +110,39 @@ public class FullDataSourceV2
 				{
 					int index = relativePosToIndex(x, z);
 					LongList newDataColumn = new LongArrayList(legacyDataColumn);
-					
-					
+
+
 					// convert the data point format
 					boolean columnHasNonAirBlock = false;
 					for (int i = 0; i < legacyDataColumn.length; i++)
 					{
 						long dataPoint = legacyDataColumn[i];
-						
+
 						boolean isAir = legacyData.mapping.getBlockStateWrapper(FullDataPointUtil.getId(dataPoint)).isAir();
 						byte blockLight = (byte) FullDataPointUtil.getBlockLight(dataPoint);
-						
+
 						if (isAir)
 						{
 							// air shouldn't have any light, otherwise down sampling will look weird
 							blockLight = 0;
 						}
-						
+
 						dataPoint = FullDataPointUtil.setBlockLight(dataPoint, blockLight);
 						newDataColumn.set(i, dataPoint);
-						
-						
+
+
 						// check if this datapoint is air
 						if (!columnHasNonAirBlock && !isAir)
 						{
 							columnHasNonAirBlock = true;
 						}
 					}
-					
-					
+
+
 					// save the converted data point
 					ensureDataColumnOrder(newDataColumn);
 					dataPoints[index] = newDataColumn;
-					
+
 					// the old data sources didn't have a generation step written down
 					// if the column has any data points, assume it's fully generated, otherwise assume it's empty
 					columnGenerationSteps[index] = (columnHasNonAirBlock ? EDhApiWorldGenerationStep.LIGHT.value : EDhApiWorldGenerationStep.EMPTY.value);
@@ -208,13 +150,13 @@ public class FullDataSourceV2
 				}
 			}
 		}
-		
+
 		FullDataSourceV2 fullDataSource = FullDataSourceV2.createWithData(legacyData.getPos(), legacyData.mapping, dataPoints, columnGenerationSteps, columnWorldCompressionMode);
 		return fullDataSource;
 	}
-	
+
 	/** Adopt retained CPU columns without constructing Java point arrays. */
-	public static FullDataSourceV2 createNative(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	public static FullDataSourceV2 createNative(NativeDhColumns columns)
 	{
 		var mapping = FullDataPointIdMap.fromNative(columns);
 		var source = new FullDataSourceV2(columns.position(), mapping, null, null, null, false);
@@ -232,75 +174,58 @@ public class FullDataSourceV2
 
 	public static FullDataSourceV2 createEmpty(long pos)
 	{
-		return new FullDataSourceV2(
-				pos, new FullDataPointIdMap(pos),
-				// data points, genSteps, and columnCompression are all null since
-				// nothing has been generated yet.
-				// Using the default value of all 0's is adequate
-				null,
-				null, null,
-				true);
+		// data points, genSteps, and columnCompression all start empty/zero
+		// since nothing has been generated yet.
+		return new FullDataSourceV2(pos, new FullDataPointIdMap(pos), null, null, null, true);
 	}
-	
+
+	/** Columns are copied into the source; null entries stay present and empty. Metadata arrays have one value per column. */
 	public static FullDataSourceV2 createWithData(long pos, FullDataPointIdMap mapping, LongList[] data, byte[] columnGenerationStep, byte[] columnWorldCompressionMode)
 	{ return new FullDataSourceV2(pos, mapping, data, columnGenerationStep, columnWorldCompressionMode, false); }
-	
+
 	private FullDataSourceV2(
 			long pos,
 			FullDataPointIdMap mapping, @Nullable LongList[] data,
 			byte @Nullable [] columnGenerationSteps, byte @Nullable [] columnWorldCompressionMode,
 			boolean empty)
 	{
-		
 		LodUtil.assertTrue(data == null || data.length == WIDTH * WIDTH);
-		
-		
-		
+
 		this.pos = pos;
 		this.mapping = mapping;
 		this.isEmpty = empty;
-		
-		
-		// Temporary Java identities over the retained Rust source table.
-		this.dataPoints = new LongList[WIDTH * WIDTH];
-		this.nativeSource = new net.minecraft.world.level.chunk.NativeDhSource(this.dataPoints, this.nativeColumnGroup);
-        this.nativeSource.initializeUniform(DhSectionPos.getDetailLevel(pos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL);
-        this.columnGenerationSteps = this.nativeSource.generation();
-        this.columnWorldCompressionMode = this.nativeSource.compression();
 
-		// use incoming data if present
+		this.dataPoints = new LongList[WIDTH * WIDTH];
+		this.nativeSource = new NativeDhSource(this.dataPoints, this.nativeColumnGroup);
+		this.nativeSource.initializeUniform(DhSectionPos.getDetailLevel(pos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL);
+		this.columnGenerationSteps = this.nativeSource.generation();
+		this.columnWorldCompressionMode = this.nativeSource.compression();
+
 		if (data != null)
 		{
 			for (int i = 0; i < WIDTH * WIDTH; i++)
 			{
-				this.getColumn(i).addAll(data[i]);
+				if (data[i] != null && !data[i].isEmpty()) this.setColumn(i, data[i]);
 			}
 		}
-		
-        if (columnGenerationSteps != null) {
-            this.columnGenerationSteps.clear(); this.columnGenerationSteps.addElements(0, columnGenerationSteps);
-        }
-        if (columnWorldCompressionMode != null) {
-            this.columnWorldCompressionMode.clear(); this.columnWorldCompressionMode.addElements(0, columnWorldCompressionMode);
-        }
+		if (columnGenerationSteps != null) this.nativeSource.generation().setAll(columnGenerationSteps);
+		if (columnWorldCompressionMode != null) this.nativeSource.compression().setAll(columnWorldCompressionMode);
 	}
-	
-	
-	
+
+
+
 	//=========//
 	// getters //
 	//=========//
-	
-    @Override public void close() {
-        this.nativeSource.close();
-    }
-    /** Stable compatibility list identity; point storage belongs to Rust. */
-    public LongList getColumn(int index) { return this.nativeSource.getColumn(index); }
-    /** Structural replacement publishes its retained CPU lease to Rust. */
-    public void setColumn(int index, LongList column) { this.nativeSource.setColumn(index, column); }
-    /** Explicit structural escape: list identities are retained, table edits use setColumn. */
-    public LongList[] columnReferences() { return this.nativeSource.columnReferences(); }
-    public net.minecraft.world.level.chunk.NativeDhSource nativeSource() { return this.nativeSource; }
+
+	@Override public void close() { this.nativeSource.close(); }
+	/** Stable list view of a Rust column; null for a missing column. */
+	public LongList getColumn(int index) { return this.nativeSource.getColumn(index); }
+	/** Bind a column; see {@link NativeDhSource#setColumn}. */
+	public void setColumn(int index, LongList column) { this.nativeSource.setColumn(index, column); }
+	/** Views of every column, creating any missing views; editing the array cannot replace cells. */
+	public LongList[] columnReferences() { return this.nativeSource.columnReferences(); }
+	public NativeDhSource nativeSource() { return this.nativeSource; }
 
 	public LongList getColumnAtRelPos(int relX, int relZ) throws IndexOutOfBoundsException
 	{ return this.getColumn(relativePosToIndex(relX, relZ)); }
@@ -309,137 +234,90 @@ public class FullDataSourceV2
 	public boolean hasSemanticHorizontalUniformity(int relX, int relZ)
 	{ return this.nativeSource.uniform(relativePosToIndex(relX, relZ)); }
 
-	/** Returns a defensive copy of the bounded source footprint, or null when unavailable. */
+	/** A copy of the cell's bounded footprint, or null when it has none. */
 	public LongArrayList[] getSemanticHorizontalContributors(int relX, int relZ)
 	{
-		LongList[] contributors = this.semanticHorizontalContributors.get(relativePosToIndex(relX, relZ));
+		LongList[] contributors = this.nativeSource.footprint(relativePosToIndex(relX, relZ));
 		if (contributors == null) return null;
 		LongArrayList[] copy = new LongArrayList[contributors.length];
 		for (int i = 0; i < contributors.length; i++)
 		{
-			copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i].subList(0,
-				Math.min(contributors[i].size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
+			copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i]);
 		}
 		return copy;
 	}
 
-	/** Retained immutable CPU views for internal consumers; legacy inputs return defensive copies. */
+	/** Read-only views of the cell's footprint, retained independently of this source, or null. */
 	public LongList[] getRetainedSemanticHorizontalContributors(int relX, int relZ)
-	{
-		LongList[] columns = this.semanticHorizontalContributors.get(relativePosToIndex(relX, relZ));
-		return net.minecraft.world.level.chunk.NativeDhContributors.isSnapshot(columns)
-			? columns.clone() : this.getSemanticHorizontalContributors(relX, relZ);
-	}
+	{ return this.nativeSource.footprint(relativePosToIndex(relX, relZ)); }
 
-	/** Rehydrates a bounded contributor footprint from the DTO semantic sidecar. */
+	/** Rehydrates a bounded contributor footprint (four columns), or clears it. */
 	public void setSemanticHorizontalContributors(int relX, int relZ, LongList[] contributors)
 	{
-		int index = relativePosToIndex(relX, relZ);
-		if (contributors == null || contributors.length != 4)
-		{
-			this.semanticHorizontalContributors.remove(index);
-			return;
-		}
-		LongList[] nativeSnapshot = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(
-			contributors, null, MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
-		if (nativeSnapshot != null)
-		{
-			this.semanticHorizontalContributors.put(index, nativeSnapshot);
-			return;
-		}
-		LongArrayList[] copy = new LongArrayList[4];
-		for (int i = 0; i < 4; i++) copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i].subList(0,
-			Math.min(contributors[i].size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
-		this.semanticHorizontalContributors.put(index, copy);
+		this.nativeSource.setFootprint(relativePosToIndex(relX, relZ),
+			contributors == null || contributors.length != 4 ? null : contributors);
 	}
 
 	public void setSemanticHorizontalUniformity(int relX, int relZ, boolean uniform)
 	{ this.nativeSource.uniform(relativePosToIndex(relX, relZ), uniform); }
-	
-	@Nullable
-	public LongList tryGetColumnAtRelPos(int relX, int relZ)
-	{
-		int index = tryGetRelativePosToIndex(relX, relZ);
-		if (index == -1)
-		{
-			return null;
-		}
-		
-		return this.getColumn(index);
-	}
-	
-	/** 
-	 * returns {@link FullDataPointUtil#EMPTY_DATA_POINT} if the given {@link DhBlockPos}
+
+	/**
+	 * returns {@link FullDataPointUtil#EMPTY_DATA_POINT} if the given block position
 	 * is outside this data source's boundaries.
 	 */
 	public long getDataPointAtBlockPos(int blockPosX, int blockPosY, int blockPosZ, int levelMinY)
 	{
 		DhLodPos requestedPos = new DhLodPos(LodUtil.BLOCK_DETAIL_LEVEL, blockPosX, blockPosZ);
-		
+
 		// stop if the requested blockPos is outside this datasource
 		{
-			// get the detail levels for this request
 			byte requestedDetailLevel = requestedPos.detailLevel;
 			byte requestedSectionDetailLevel = (byte) (requestedDetailLevel + DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL);
-	
-			// get the positions for this request
 			long sectionPos = requestedPos.getSectionPosWithSectionDetailLevel(requestedSectionDetailLevel);
 			if (!DhSectionPos.contains(this.pos, sectionPos))
 			{
 				return FullDataPointUtil.EMPTY_DATA_POINT;
 			}
 		}
-		
-		
+
 		// get the relative data source position
 		byte requestDetailLevel = (byte) (DhSectionPos.getDetailLevel(this.pos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL);
 		DhLodPos relativePos = requestedPos.getDhSectionRelativePositionForDetailLevel(requestDetailLevel);
-		
-		// get the data column
+
 		LongList dataColumn = this.getColumnAtRelPos(relativePos.x, relativePos.z);
 		if (dataColumn == null)
 		{
 			return FullDataPointUtil.EMPTY_DATA_POINT;
 		}
-		
-		
+
 		// search for a datapoint that contains the given block y position
 		int relBlockPosY = blockPosY - levelMinY;
-		long dataPoint;
 		for (int i = 0; i < dataColumn.size(); i++)
 		{
-			dataPoint = dataColumn.getLong(i);
-			
-			// we are looking for a specific datapoint,
-			// don't look at null ones
+			long dataPoint = dataColumn.getLong(i);
 			if (dataPoint == FullDataPointUtil.EMPTY_DATA_POINT)
 			{
 				continue;
 			}
-			
-			
-			
+
 			int bottomY = FullDataPointUtil.getBottomY(dataPoint);
-			int height = FullDataPointUtil.getHeight(dataPoint);
-			int topY = bottomY + height;
-			
-			// does this datapoint contain the requested Y position? 
-			if (bottomY <= relBlockPosY
-				&& relBlockPosY < topY) // blockPositions start from the bottom of the block, thus "<=" for bottomY, just "<" for topY
+			int topY = bottomY + FullDataPointUtil.getHeight(dataPoint);
+			// blockPositions start from the bottom of the block, thus "<=" for bottomY, just "<" for topY
+			if (bottomY <= relBlockPosY && relBlockPosY < topY)
 			{
 				return dataPoint;
 			}
 		}
-		
+
 		return FullDataPointUtil.EMPTY_DATA_POINT;
 	}
-	
-	
-	
+
+
+
 	//==========//
 	// updating //
 	//==========//
-	
+
 	public boolean updateFromDataSource(@NotNull FullDataSourceV2 inputDataSource)
 	{
 		// don't try updating if the input is empty
@@ -447,22 +325,22 @@ public class FullDataSourceV2
 		{
 			return false;
 		}
-		
-		
+
 		byte thisDetailLevel = DhSectionPos.getDetailLevel(this.pos);
 		byte inputDetailLevel = DhSectionPos.getDetailLevel(inputDataSource.pos);
-		
-		
+
 		// determine the mapping changes necessary for the input to map onto this datasource
 		int[] remappedIds = this.mapping.mergeAndReturnRemappedEntityIds(inputDataSource.mapping);
-		
+
 		boolean dataChanged;
-		long preparedHash=0;
+		long preparedHash = 0;
 		if (inputDetailLevel == thisDetailLevel)
 		{
-			var update=this.updateSameDetailWithHash(inputDataSource, remappedIds);
-            dataChanged=update.changed();preparedHash=update.hash();
-			
+			var update = NativeDhSameDetailMerge.update(this.nativeSource, inputDataSource.nativeSource, remappedIds, this.pos);
+			if (update.metadataUpdated()) this.isEmpty = false;
+			dataChanged = update.changed();
+			preparedHash = update.hash();
+
 			// same detail level, propagate parent/children update flags from input
 			if (this.applyToParent != null || inputDataSource.applyToParent != null)
 			{
@@ -472,7 +350,7 @@ public class FullDataSourceV2
 						// don't propagate past the top of the tree
 						&& (DhSectionPos.getDetailLevel(this.pos) < FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL);
 			}
-			
+
 			// null check to prevent setting a flag we don't want to save in the DB
 			if (this.applyToChildren != null || inputDataSource.applyToChildren != null)
 			{
@@ -485,20 +363,18 @@ public class FullDataSourceV2
 		else if (inputDetailLevel + 1 == thisDetailLevel)
 		{
 			dataChanged = this.updateFromOneBelowDetailLevel(inputDataSource, remappedIds);
-			
+
 			// propagating up, parent will need changes
 			this.applyToParent =
 					dataChanged
 					&& (BoolUtil.falseIfNull(this.applyToParent) || BoolUtil.falseIfNull(inputDataSource.applyToParent))
 					&& (DhSectionPos.getDetailLevel(this.pos) < FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL);
-			
 		}
 		else if (inputDetailLevel - 1 == thisDetailLevel)
 		{
 			dataChanged = this.downsampleFromOneAboveDetailLevel(inputDataSource, remappedIds);
-			
+
 			// propagating down, children will need changes
-			
 			this.applyToChildren =
 					dataChanged
 					&& (BoolUtil.falseIfNull(this.applyToChildren) || BoolUtil.falseIfNull(inputDataSource.applyToChildren))
@@ -507,19 +383,15 @@ public class FullDataSourceV2
 		else
 		{
 			// other detail levels aren't supported since it would be more difficult to maintain
-			// and would lead to edge cases that don't necessarily need to be supported 
+			// and would lead to edge cases that don't necessarily need to be supported
 			// (IE what do you do when the input is smaller than a single datapoint in the receiving data source?)
 			// instead it's better to just percolate the updates up
 			throw new UnsupportedOperationException("Unsupported data source update. Expected input detail level of ["+(thisDetailLevel-1)+"], ["+thisDetailLevel+"], or ["+(thisDetailLevel+1)+"], received detail level ["+inputDetailLevel+"].");
 		}
-		
-		
-		
-		
-		
+
 		return this.finishUpdate(dataChanged, preparedHash);
 	}
-	
+
 	/** After any merge: cull hidden points and refresh the hash when points changed. */
 	private boolean finishUpdate(boolean dataChanged, long preparedHash)
 	{
@@ -529,60 +401,41 @@ public class FullDataSourceV2
 			boolean cullHiddenBlocks = (worldCompressionMode != EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
 			if (cullHiddenBlocks)
 			{
-				try (var nativePolicy = net.minecraft.world.level.chunk.NativeDhMaterials.create(this.mapping))
+				try (var nativePolicy = NativeDhMaterials.create(this.mapping))
 				{
-				if (this.getClass() != FullDataSourceV2.class
-					|| (!net.minecraft.world.level.chunk.NativeDhOcclusionPass.tryCull(nativePolicy, this.nativeSource)
-						&& !net.minecraft.world.level.chunk.NativeDhOcclusionPass.tryCull(nativePolicy, this.columnReferences())))
-				{
-				for (int x = 0; x < WIDTH; x++)
-				{
-					for (int z = 0; z < WIDTH; z++)
-					{
-						LongList dataColumn = this.getColumnAtRelPos(x, z);
-						if (dataColumn != null
-							&& dataColumn.size() > 1)
-						{
-							FullDataOcclusionCuller.cullHiddenDatapointsInColumn(this, x, z, nativePolicy);
-						}
-					}
-				}
-				}
+					if (nativePolicy != null) NativeDhOcclusionPass.cull(nativePolicy, this.nativeSource);
 				}
 			}
-			
-			
+
 			// update the hash code
-            if(!cullHiddenBlocks && (preparedHash>>>32)!=0)this.cachedHashCode=(int)preparedHash;
-            else this.generateHashCode();
+			if (!cullHiddenBlocks && (preparedHash >>> 32) != 0) this.cachedHashCode = (int) preparedHash;
+			else this.generateHashCode();
 		}
-		
+
 		return dataChanged;
 	}
-	
+
 	/**
 	 * {@link #updateFromDataSource} for a generated chunk's native columns, without a
 	 * producer data source (no producer table, mapping or ID map). It follows the
-	 * same-detail owned route exactly: remap, merge, the input's parent/children
+	 * same-detail route exactly: remap, merge, the input's parent/children
 	 * flags (a producer's {@code applyToParent} is true and {@code applyToChildren}
 	 * null), then culling and hashing. Returns false, with only the idempotent
-	 * mapping merge done, when that route does not apply; the caller then merges
-	 * {@link #createNative} through {@link #updateFromDataSource}.
+	 * mapping merge done, when this source is not the producer's block-detail
+	 * section; the caller then merges {@link #createNative} through {@link #updateFromDataSource}.
 	 */
-	public boolean updateFromNativeColumns(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	public boolean updateFromNativeColumns(NativeDhColumns columns)
 	{
-		if (RUN_DATA_ORDER_VALIDATION || this.getClass() != FullDataSourceV2.class || this.pos != columns.position()
+		if (this.pos != columns.position()
 			|| DhSectionPos.getDetailLevel(this.pos) != DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL
-			|| !this.semanticHorizontalContributors.isEmpty() || !this.nativeSource.isLive())
+			|| !this.nativeSource.isLive())
 		{
 			return false;
 		}
 		// An empty producer mapping changes nothing, as in updateFromDataSource.
 		if (columns.materialCount() == 0) return true;
 		int[] remappedIds = this.mapping.mergeAndReturnRemappedEntityIds(columns);
-		var update = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.updateOwnedFromColumns(
-			this.nativeSource, columns, this.dataPoints, remappedIds, this.pos);
-		if (update == null) return false;
+		var update = NativeDhSameDetailMerge.updateFromColumns(this.nativeSource, columns, remappedIds, this.pos);
 		if (update.metadataUpdated()) this.isEmpty = false;
 		this.applyToParent = DhSectionPos.getDetailLevel(this.pos) < FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL;
 		if (this.applyToChildren != null)
@@ -593,769 +446,33 @@ public class FullDataSourceV2
 		this.finishUpdate(update.changed(), update.hash());
 		return true;
 	}
-	
-	private boolean updateFromSameDetailLevel(FullDataSourceV2 inputDataSource, int[] remappedIds)
-	{ return this.updateSameDetailWithHash(inputDataSource,remappedIds).changed(); }
-    private record SameDetailUpdate(boolean changed,long hash) {}
-    private SameDetailUpdate updateSameDetailWithHash(FullDataSourceV2 inputDataSource,int[] remappedIds)
-	{
-		// both data sources should have the same detail level
-		if (DhSectionPos.getDetailLevel(inputDataSource.pos) != DhSectionPos.getDetailLevel(this.pos))
-		{
-			throw new IllegalArgumentException("Both data sources must have the same detail level. Expected ["+ DhSectionPos.getDetailLevel(this.pos)+"], received ["+ DhSectionPos.getDetailLevel(inputDataSource.pos)+"].");
-		}
-		
-		// copy over everything from the input data source into this one
-		// provided there is data to copy and the world generation step is the same or more complete
-		if (!RUN_DATA_ORDER_VALIDATION && this.getClass() == FullDataSourceV2.class
-			&& inputDataSource.getClass() == FullDataSourceV2.class)
-		{
-			if(this.semanticHorizontalContributors.isEmpty() && inputDataSource.semanticHorizontalContributors.isEmpty()) {
-                var update=net.minecraft.world.level.chunk.NativeDhSameDetailMerge.updateOwnedWithoutFootprints(
-                    this.nativeSource,inputDataSource.nativeSource,this.dataPoints,remappedIds,this.pos);
-                if(update!=null) {
-                    if(update.metadataUpdated())this.isEmpty=false;
-                    return new SameDetailUpdate(update.changed(),update.hash());
-                }
-            }
-			var nativeMerge = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.prepareOwned(
-                this.nativeSource,inputDataSource.nativeSource,this.semanticHorizontalContributors,
-                inputDataSource.semanticHorizontalContributors,remappedIds);
-            if (nativeMerge == null) nativeMerge = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.prepare(
-				this.columnReferences(), inputDataSource.columnReferences(), this.columnGenerationSteps, this.columnWorldCompressionMode, inputDataSource.columnGenerationSteps,
-				inputDataSource.columnWorldCompressionMode, inputDataSource.nativeSource.uniformSnapshot(),
-				this.semanticHorizontalContributors, inputDataSource.semanticHorizontalContributors, remappedIds);
-			if (nativeMerge != null)
-			{
-                boolean retained = false;
-                try {
-				nativeMerge.commit(this.dataPoints, this.nativeSource);
-                var publication=nativeMerge.publishMetadataWithHash(this.nativeSource,this.pos);
-                if (publication.updated()) this.isEmpty=false;
-                for(int action=0;action<nativeMerge.footprintActionCount();action++) {
-                    int index=nativeMerge.footprintAction(action);
-                    this.semanticHorizontalContributors.remove(index);
-                    LongList[] footprint=nativeMerge.contributors(index);
-                    if(footprint!=null){retained=true;this.semanticHorizontalContributors.put(index,footprint);}
-                }
-				return new SameDetailUpdate(nativeMerge.changed(),publication.hash());
-                } finally { if(!retained)nativeMerge.close(); }
-			}
-		}
-		boolean dataChanged = false;
-		for (int x = 0; x < WIDTH; x++)
-		{
-			for (int z = 0; z < WIDTH; z++)
-			{
-				int index = relativePosToIndex(x, z);
-				LongList inputDataArray = inputDataSource.getColumn(index);
-				if (inputDataArray == null)
-				{
-					continue;
-				}
-				
-				
-				
-				byte thisGenState = this.columnGenerationSteps.getByte(index);
-				byte inputGenState = inputDataSource.columnGenerationSteps.getByte(index);
-				
-				
-				// determine if this column should be updated
-				boolean genStateAllowsUpdating = false;
-				// if the input is downsampled, we only want to replace empty or downsampled values
-				if (inputGenState == EDhApiWorldGenerationStep.DOWN_SAMPLED.value
-					&&
-					(
-						thisGenState == EDhApiWorldGenerationStep.EMPTY.value
-						|| thisGenState == EDhApiWorldGenerationStep.DOWN_SAMPLED.value
-					))
-				{
-					genStateAllowsUpdating = true;
-				}
-				// if the input is any other non-empty value,
-				// replace anything that is less-complete
-				else if (inputGenState != EDhApiWorldGenerationStep.EMPTY.value
-					&& thisGenState <= inputGenState)
-				{
-					// don't apply less-complete generation data
-					genStateAllowsUpdating = true;
-				}
-				
-				if (!genStateAllowsUpdating)
-				{
-					continue;
-				}
-				
-				
-				
-				// check if the data changed
-				if (this.getColumn(index) == null)
-				{
-					// no data was present previously
-					this.setColumn(index, new LongArrayList(inputDataArray));
-					dataChanged = true;
-				}
-				else if (this.getColumn(index).size() != inputDataArray.size())
-				{
-					// data is present, but the size is different
-					dataChanged = true;
-				}
-				
-				int oldDataHash = 0;
-				if (!dataChanged)
-				{
-					// some old data existed with the same length,
-					// we'll have to compare the caches
-					oldDataHash = this.getColumn(index).hashCode();
-				}
-				
-				
-				// copy over the new data
-				this.getColumn(index).clear();
-				this.getColumn(index).addAll(inputDataArray);
-				this.remapDataColumn(index, remappedIds);
-				
-				if (RUN_DATA_ORDER_VALIDATION)
-				{
-					throwIfDataColumnInWrongOrder(inputDataSource.pos, this.getColumn(index));
-				}
-				
-				
-				
-				if (!dataChanged)
-				{
-					// check if the identical length data column hashes are the same
-					// hashes need to be compared after the ID's have been remapped otherwise the ID's won't match even if the data is the same
-					if (oldDataHash != this.getColumn(index).hashCode())
-					{
-						// the hashes are different, something was changed
-						dataChanged = true;
-					}
-				}
-				
-				
-				this.columnGenerationSteps.set(index, inputGenState);
-				// always overwrite the compression mode since we're replacing this column
-				this.columnWorldCompressionMode.set(index, inputDataSource.columnWorldCompressionMode.getByte(index));
-				this.nativeSource.uniform(index, inputDataSource.nativeSource.uniform(index));
-				this.semanticHorizontalContributors.remove(index);
-				if (!this.nativeSource.uniform(index)
-					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
-				{
-					LongList[] contributors = remapHorizontalContributors(
-						inputDataSource.semanticHorizontalContributors.get(index), remappedIds);
-					if (contributors != null) this.semanticHorizontalContributors.put(index, contributors);
-				}
-				this.isEmpty = false;
-			}
-		}
-		
-		return new SameDetailUpdate(dataChanged,0);
-	}
-	
+
+	/** 2x2 input cells reduce into each cell of this source's matching quadrant, in Rust. */
 	private boolean updateFromOneBelowDetailLevel(FullDataSourceV2 inputDataSource, int[] remappedIds)
 	{
 		if (DhSectionPos.getDetailLevel(inputDataSource.pos) + 1 != DhSectionPos.getDetailLevel(this.pos))
 		{
 			throw new IllegalArgumentException("Input data source must be exactly 1 detail level below this data source. Expected [" + (DhSectionPos.getDetailLevel(this.pos) - 1) + "], received [" + DhSectionPos.getDetailLevel(inputDataSource.pos) + "].");
 		}
-		
-		// input is one detail level lower (higher detail)
-		// so 2x2 input data points will be converted into 1 recipient data point
-		
-		
-		// determine where in the input data source should be written to
-		// since the input is one detail level below it will be one of this position's 4 children
+
+		// the input is one of this position's 4 children
 		int minChildXPos = DhSectionPos.getX(DhSectionPos.getChildByIndex(this.pos, 0));
 		int recipientOffsetX = (DhSectionPos.getX(inputDataSource.pos) == minChildXPos) ? 0 : (WIDTH / 2);
 		int minChildZPos = DhSectionPos.getZ(DhSectionPos.getChildByIndex(this.pos, 0));
 		int recipientOffsetZ = (DhSectionPos.getZ(inputDataSource.pos) == minChildZPos) ? 0 : (WIDTH / 2);
-		
-		
-		
-		// merge the input's data points
-		// into this data source's
-		boolean dataChanged = false;
-		try (var nativeMaterials = net.minecraft.world.level.chunk.NativeDhMaterials.create(inputDataSource.mapping))
+
+		boolean dataChanged;
+		try (var materials = NativeDhMaterials.create(inputDataSource.mapping))
 		{
-			boolean[] previousFootprints = new boolean[1024];
-			for (int x = 0; x < WIDTH / 2; x++) for (int z = 0; z < WIDTH / 2; z++)
-				previousFootprints[x * 32 + z] = this.semanticHorizontalContributors.containsKey(
-					relativePosToIndex(x + recipientOffsetX, z + recipientOffsetZ));
-			var nativeParent = RUN_DATA_ORDER_VALIDATION || inputDataSource.columnWorldCompressionMode.size() != WIDTH * WIDTH
-				|| inputDataSource.columnGenerationSteps.size() != WIDTH * WIDTH ? null
-				: net.minecraft.world.level.chunk.NativeDhParentColumns.buildSource(nativeMaterials,inputDataSource.nativeSource,remappedIds,
-                    previousFootprints,this.semanticHorizontalContributors.size());
-			for (int x = 0; x < WIDTH; x += 2)
-			{
-				for (int z = 0; z < WIDTH; z += 2)
-				{
-					int recipientX = (x / 2) + recipientOffsetX;
-					int recipientZ = (z / 2) + recipientOffsetZ;
-					int recipientIndex = relativePosToIndex(recipientX, recipientZ);
-
-
-					// world gen //
-					byte inputGenStep = nativeParent == null
-						? determineMinWorldGenStepForTwoByTwoColumn(inputDataSource.columnGenerationSteps, x, z)
-						: nativeParent.generationStep(x / 2, z / 2);
-					this.columnGenerationSteps.set(recipientIndex, inputGenStep);
-
-
-					// world compression //
-					byte worldCompressionMode = nativeParent == null
-						? determineHighestWorldCompressionForTwoByTwoColumn(inputDataSource.columnWorldCompressionMode, x, z)
-						: nativeParent.compressionMode(x / 2, z / 2);
-					this.columnWorldCompressionMode.set(recipientIndex, worldCompressionMode);
-
-
-
-					// data points //
-					LongList mergedInputDataArray = nativeParent == null
-						? mergeInputTwoByTwoDataColumn(inputDataSource, x, z, nativeMaterials)
-						: nativeParent.column(x / 2, z / 2);
-					int targetIndex = recipientIndex;
-					this.nativeSource.uniform(targetIndex, nativeParent == null
-						? semanticallyUniformTwoByTwo(inputDataSource, x, z, remappedIds)
-						: nativeParent.isUniform(x / 2, z / 2));
-					this.semanticHorizontalContributors.remove(targetIndex);
-					if (!this.nativeSource.uniform(targetIndex)
-						&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
-					{
-						LongList[] contributors = nativeParent == null ? null : nativeParent.contributors(x / 2, z / 2);
-						if (nativeParent == null)
-						{
-							LongList[] inputs = new LongList[4];
-							for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++)
-								inputs[dx * 2 + dz] = inputDataSource.getColumn(relativePosToIndex(x + dx, z + dz));
-							contributors = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(
-								inputs, remappedIds, MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
-						}
-						if (contributors == null)
-						{
-							contributors = new LongArrayList[4];
-							int contributor = 0;
-							for (int dx = 0; dx < 2; dx++)
-							{
-								for (int dz = 0; dz < 2; dz++)
-								{
-									LongList source = inputDataSource.getColumn(relativePosToIndex(x + dx, z + dz));
-									if (source == null)
-									{
-										contributors[contributor++] = null;
-										continue;
-									}
-									LongArrayList copied = new LongArrayList(source.subList(0,
-										Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
-									for (int point = 0; point < copied.size(); point++)
-									{
-										copied.set(point, FullDataPointUtil.remap(remappedIds, copied.getLong(point)));
-									}
-									contributors[contributor++] = copied;
-								}
-							}
-						}
-						this.semanticHorizontalContributors.put(targetIndex, contributors);
-					}
-
-					// check if the data changed
-					if (this.getColumn(recipientIndex) == null)
-					{
-						// no data was present previously
-						dataChanged = true;
-					}
-					else if (this.getColumn(recipientIndex).size() != mergedInputDataArray.size())
-					{
-						// data is present, but the size is different
-						dataChanged = true;
-					}
-
-					int oldDataHash = 0;
-					if (!dataChanged)
-					{
-						// some old data existed with the same length,
-						// we'll have to compare the caches
-						oldDataHash = this.getColumn(recipientIndex).hashCode();
-					}
-
-
-					this.setColumn(recipientIndex, mergedInputDataArray);
-					if (nativeParent == null) this.remapDataColumn(recipientIndex, remappedIds);
-
-					if (RUN_DATA_ORDER_VALIDATION)
-					{
-						throwIfDataColumnInWrongOrder(inputDataSource.pos, this.getColumn(recipientIndex));
-					}
-
-
-
-					if (!dataChanged)
-					{
-						// check if the identical length data column hashes are the same
-						// hashes need to be compared after the ID's have been remapped otherwise the ID's won't match even if the data is the same
-						if (oldDataHash != this.getColumn(recipientIndex).hashCode())
-						{
-							// the hashes are different, something was changed
-							dataChanged = true;
-						}
-					}
-
-					this.isEmpty = false;
-				}
-			}
-
-
+			dataChanged = this.nativeSource.updateParent(inputDataSource.nativeSource, materials, remappedIds, recipientOffsetX, recipientOffsetZ);
 		}
+		this.isEmpty = false;
 		return dataChanged;
 	}
-	/** 
-	 * The minimum value is used because we don't want to accidentally record that
-	 * something was generated when it wasn't.
-	 */
-	private static byte determineMinWorldGenStepForTwoByTwoColumn(ByteList columnGenerationSteps, int relX, int relZ)
-	{
-		// TODO merge similar logic with determineHighestWorldCompressionForTwoByTwoColumn
-		byte minWorldGenStepValue = Byte.MAX_VALUE;
-		for (int x = 0; x < 2; x++)
-		{
-			for (int z = 0; z < 2; z++)
-			{
-				int index = relativePosToIndex(x + relX, z + relZ);
-				byte worldGenStepValue = columnGenerationSteps.getByte(index);
-				minWorldGenStepValue = (byte) Math.min(minWorldGenStepValue, worldGenStepValue);
-			}
-		}
-		return minWorldGenStepValue;
-	}
-	/** 
-	 * The minimum value is used because we don't want to accidentally record that
-	 * something was generated when it wasn't.
-	 */
-	private static byte determineHighestWorldCompressionForTwoByTwoColumn(ByteList columnCompressionMode, int relX, int relZ)
-	{
-		// TODO merge similar logic with determineMinWorldGenStepForTwoByTwoColumn
-		byte minWorldGenStepValue = Byte.MIN_VALUE;
-		for (int x = 0; x < 2; x++)
-		{
-			for (int z = 0; z < 2; z++)
-			{
-				int index = relativePosToIndex(x + relX, z + relZ);
-				byte worldGenStepValue = columnCompressionMode.getByte(index);
-				minWorldGenStepValue = (byte) Math.max(minWorldGenStepValue, worldGenStepValue);
-			}
-		}
-		return minWorldGenStepValue;
-	}
-	private static LongList mergeInputTwoByTwoDataColumn(FullDataSourceV2 inputDataSource, int x, int z)
-	{
-		try (var nativeMaterials = net.minecraft.world.level.chunk.NativeDhMaterials.create(inputDataSource.mapping))
-		{
-			return mergeInputTwoByTwoDataColumn(inputDataSource, x, z, nativeMaterials);
-		}
-	}
-	private static LongList mergeInputTwoByTwoDataColumn(FullDataSourceV2 inputDataSource, int x, int z,
-			net.minecraft.world.level.chunk.NativeDhMaterials nativeMaterials)
-	{
-		
-		
-		//=========================//
-		// get the 4 input columns //
-		//=========================//
-		
-		LongList[] inputColumns = new LongList[4];
-		int colIndex = 0;
-		for (int inputX = x; inputX < x + 2; inputX++)
-		{
-			for (int inputZ = z; inputZ < z + 2; inputZ++, colIndex++)
-			{
-				inputColumns[colIndex] = inputDataSource.getColumn(relativePosToIndex(inputX, inputZ));
-				if (inputColumns[colIndex] != null 
-					&& RUN_DATA_ORDER_VALIDATION)
-				{
-					throwIfDataColumnInWrongOrder(inputDataSource.pos, inputColumns[colIndex]);
-				}
-			}
-		}
-		
-		
-		
-		var nativeColumn = net.minecraft.world.level.chunk.NativeDhColumnList.tryReduce(
-			nativeMaterials, inputColumns);
-		if (nativeColumn != null) return nativeColumn;
-		LongList newColumnList = new LongArrayList();
-
-		//========================================//
-		// find all y levels where changes happen //
-		//========================================//
-		
-		IntArrayList yTransitions = new IntArrayList();
-		for (int i = 0; i < 4; i++)
-		{
-			if (inputColumns[i] == null 
-				|| inputColumns[i].isEmpty())
-			{
-				continue;
-			}
-			
-			for (int j = 0; j < inputColumns[i].size(); j++)
-			{
-				long datapoint = inputColumns[i].getLong(j);
-				int minY = FullDataPointUtil.getBottomY(datapoint);
-				int maxY = minY + FullDataPointUtil.getHeight(datapoint);
-				
-				if (!yTransitions.contains(minY))
-				{
-					yTransitions.add(minY);
-				}
-				
-				if (!yTransitions.contains(maxY))
-				{
-					yTransitions.add(maxY);
-				}
-			}
-		}
-		
-		// can happen if the columns are empty
-		if (yTransitions.isEmpty())
-		{
-			return newColumnList;
-		}
-		
-		// sort the transitions from bottom to top // TODO
-		yTransitions.sort(null);
-		
-		// create index trackers for each column, 
-		// starting with the top-most datapoint
-		int[] currentIndices = new int[4];
-		for (int i = 0; i < 4; i++)
-		{
-			if (inputColumns[i] != null 
-				&& !inputColumns[i].isEmpty())
-			{
-				currentIndices[i] = inputColumns[i].size() - 1;
-			}
-			else
-			{
-				currentIndices[i] = -1;
-			}
-		}
-		
-		
-		
-		//=======================//
-		// process each Y change //
-		//=======================//
-		
-		int lastId = 0;
-		byte lastBlockLight = 0;
-		byte lastSkyLight = 0;
-		int currentMinY = yTransitions.getInt(0);
-		int accumulatedHeight = 0;
-		
-		int[] mergeIds = new int[4];
-		int[] mergeBlockLights = new int[4];
-		int[] mergeSkyLights = new int[4];
-		
-		for (int yIndex = 0; yIndex < yTransitions.size() - 1; yIndex++)
-		{
-			int sliceMinY = yTransitions.getInt(yIndex);
-			int sliceMaxY = yTransitions.getInt(yIndex + 1);
-			int sliceHeight = sliceMaxY - sliceMinY;
-			
-			// Sample at the midpoint of this slice
-			int sampleY = sliceMinY + (sliceHeight / 2);
-			
-			// Get data from each column at this Y level
-			Arrays.fill(mergeIds, 0);
-			Arrays.fill(mergeBlockLights, 0);
-			Arrays.fill(mergeSkyLights, 0);
-			
-			for (int i = 0; i < 4; i++)
-			{
-				// skip columns that are empty or where we have already reached the bottom
-				if (currentIndices[i] == -1)
-				{
-					continue;
-				}
-				
-				
-				LongList column = inputColumns[i];
-				if (column == null)
-				{
-					continue;
-				}
-				
-				// move the index down if we've passed the current datapoint
-				while (currentIndices[i] >= 0)
-				{
-					long datapoint = column.getLong(currentIndices[i]);
-					int inputMinY = FullDataPointUtil.getBottomY(datapoint);
-					int inputMaxY = inputMinY + FullDataPointUtil.getHeight(datapoint);
-					
-					if (sampleY >= inputMaxY)
-					{
-						// Sample point is above this datapoint, move to next (lower) one
-						currentIndices[i]--;
-					}
-					else if (sampleY >= inputMinY 
-							&& sampleY < inputMaxY)
-					{
-						// Sample point is within this datapoint
-						mergeIds[i] = FullDataPointUtil.getId(datapoint);
-						mergeBlockLights[i] = FullDataPointUtil.getBlockLight(datapoint);
-						mergeSkyLights[i] = FullDataPointUtil.getSkyLight(datapoint);
-						break;
-					}
-					else
-					{
-						// Sample point is below this datapoint
-						break;
-					}
-				}
-			}
-			
-			
-			
-			// Determine merged values for this slice
-			int id = determineMostCommonValueInColumnSlice(mergeIds, inputDataSource.mapping);
-			byte blockLight = (byte) determineAverageValueInColumnSlice(mergeBlockLights);
-			byte skyLight = (byte) determineAverageValueInColumnSlice(mergeSkyLights);
-			
-			// Check if we need to start a new datapoint
-			if (accumulatedHeight == 0)
-			{
-				// first datapoint
-				lastId = id;
-				lastBlockLight = blockLight;
-				lastSkyLight = skyLight;
-				currentMinY = sliceMinY;
-				accumulatedHeight = sliceHeight;
-			}
-			else if (id != lastId 
-					|| blockLight != lastBlockLight 
-					|| skyLight != lastSkyLight)
-			{
-				// the data changed, create a new datapoint
-				try
-				{
-					long datapoint = FullDataPointUtil.encode(lastId, accumulatedHeight, currentMinY, lastBlockLight, lastSkyLight);
-					newColumnList.add(datapoint);
-				}
-				catch (DataCorruptedException e)
-				{
-					LOGGER.warn("Skipping corrupt datapoint for pos ["+DhSectionPos.toString(inputDataSource.pos)+"] at relative position ["+x+","+z+"] with data: ID["+lastId+"], Height["+accumulatedHeight+"], minY["+currentMinY+"], lastBlockLight["+lastBlockLight+"], lastSkyLight["+lastSkyLight+"].");
-				}
-				
-				// start the next datapoint
-				lastId = id;
-				lastBlockLight = blockLight;
-				lastSkyLight = skyLight;
-				currentMinY = sliceMinY;
-				accumulatedHeight = sliceHeight;
-			}
-			else
-			{
-				// this datapoint is the same as the last one, 
-				// just extend it's height
-				accumulatedHeight += sliceHeight;
-			}
-		}
-		
-		
-		// add the final datapoint if needed
-		if (accumulatedHeight > 0)
-		{
-			try
-			{
-				newColumnList.add(FullDataPointUtil.encode(lastId, accumulatedHeight, currentMinY, lastBlockLight, lastSkyLight));
-			}
-			catch (DataCorruptedException e)
-			{
-				LOGGER.warn("Skipping corrupt datapoint for pos ["+DhSectionPos.toString(inputDataSource.pos)+"] at relative position ["+x+","+z+"] with data: ID["+lastId+"], Height["+accumulatedHeight+"], minY["+currentMinY+"], lastBlockLight["+lastBlockLight+"], lastSkyLight["+lastSkyLight+"].");
-			}
-		}
-		
-		
-		// confirm the array is in the correct order
-		ensureDataColumnOrder(newColumnList);
-		
-		return newColumnList;
-	}
 
 	/**
-	 * Proves that a coarser cell's four horizontal contributors have the same
-	 * semantic column. Raw packed IDs are remapped before comparison because
-	 * parent and child data sources own independent mapping tables. Lighting is
-	 * intentionally ignored: it affects shading, not atlas/material identity.
-	 */
-	private static boolean semanticallyUniformTwoByTwo(
-		FullDataSourceV2 source, int x, int z, int[] remappedIds
-	) {
-		if (x < 0 || z < 0 || x + 1 >= WIDTH || z + 1 >= WIDTH) return false;
-		int referenceIndex = relativePosToIndex(x, z);
-		if (source.columnWorldCompressionMode.getByte(referenceIndex)
-			!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
-			|| !source.nativeSource.uniform(referenceIndex)) {
-			return false;
-		}
-		LongList reference = source.getColumn(referenceIndex);
-		for (int dx = 0; dx < 2; dx++) {
-			for (int dz = 0; dz < 2; dz++) {
-				int index = relativePosToIndex(x + dx, z + dz);
-				if (source.columnWorldCompressionMode.getByte(index)
-					!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
-					|| !source.nativeSource.uniform(index)
-					|| !semanticDataColumnEquals(reference, source.getColumn(index), remappedIds)) {
-					return false;
-				}
-			}
-		}
-		return true;
-	}
-
-	private static boolean semanticDataColumnEquals(
-		LongList left, LongList right, int[] remappedIds
-	) {
-		if (left == null || right == null) return left == right;
-		if (left.size() != right.size()) return false;
-		for (int index = 0; index < left.size(); index++) {
-			long leftPoint = left.getLong(index);
-			long rightPoint = right.getLong(index);
-			if (FullDataPointUtil.getBottomY(leftPoint) != FullDataPointUtil.getBottomY(rightPoint)
-				|| FullDataPointUtil.getHeight(leftPoint) != FullDataPointUtil.getHeight(rightPoint)) {
-				return false;
-			}
-			int leftId = FullDataPointUtil.getId(leftPoint);
-			int rightId = FullDataPointUtil.getId(rightPoint);
-			if (leftId < 0 || leftId >= remappedIds.length || rightId < 0 || rightId >= remappedIds.length
-				|| remappedIds[leftId] != remappedIds[rightId]) {
-				return false;
-			}
-		}
-		return true;
-	}
-	/**
-	 * Only update the ID once it's been added to this data source.
-	 * Updating the incoming data source will cause issues if it is applied 
-	 * to anything else due to multiple remapping.
-	 */
-	private void remapDataColumn(int dataPointIndex, int[] remappedIds)
-	{
-		LongList dataColumn = this.getColumn(dataPointIndex);
-		if (dataColumn instanceof net.minecraft.world.level.chunk.NativeDhColumnList nativeColumn)
-		{
-			nativeColumn.remapIds(remappedIds);
-			return;
-		}
-		for (int i = 0; i < dataColumn.size(); i++)
-		{
-			dataColumn.set(i, FullDataPointUtil.remap(remappedIds, dataColumn.getLong(i)));
-		}
-	}
-	/** @param mapping can be included to ignore air ID's, otherwise all 4 values are treated equally */
-	private static int determineMostCommonValueInColumnSlice(int[] sliceArray, @Nullable FullDataPointIdMap mapping)
-	{
-		if (RUN_UPDATE_DEV_VALIDATION)
-		{
-			LodUtil.assertTrue(sliceArray.length == 4, "Column Slice should only contain 4 values.");
-		}
-		
-		int value0 = sliceArray[0];
-		int count0 = 0;
-		int value1 = sliceArray[1];
-		int count1 = 0;
-		int value2 = sliceArray[2];
-		int count2 = 0;
-		int value3 = sliceArray[3];
-		int count3 = 0; 
-		
-		// count the occurrences of each value
-		for (int i = 0; i < 4; i++)
-		{
-			int value = sliceArray[i];
-			if (mapping != null && mapping.getBlockStateWrapper(value).isAir())
-			{
-				// always overwrite air to prevent holes in hollow structures
-				continue;
-			}
-			
-			if (value == value0)
-			{
-				count0++;
-			}
-			else if (value == value1)
-			{
-				count1++;
-			}
-			else if (value == value2)
-			{
-				count2++;
-			}
-			else
-			{
-				count3++;
-			}
-		}
-		
-		// return the most common occurrence
-		int maxCount = Math.max(count0, Math.max(count1, Math.max(count2, count3)));
-		if (maxCount == count0)
-		// if the max count is 1 then we'll just go with the first column
-		{
-			return selectWaterValueForColumnSlice(sliceArray, mapping, value0);
-		}
-		else if (maxCount == count1)
-		{
-			return selectWaterValueForColumnSlice(sliceArray, mapping, value1);
-		}
-		else if (maxCount == count2)
-		{
-			return selectWaterValueForColumnSlice(sliceArray, mapping, value2);
-		}
-		else
-		{
-			return selectWaterValueForColumnSlice(sliceArray, mapping, value3);
-		}
-	}
-	private static int selectWaterValueForColumnSlice(int[] sliceArray, @Nullable FullDataPointIdMap mapping, int fallbackValue)
-	{
-		if (mapping == null)
-		{
-			return fallbackValue;
-		}
-
-		for (int value : sliceArray)
-		{
-			if (mapping.getBlockStateWrapper(value).isLiquid())
-			{
-				return value;
-			}
-		}
-		
-		return fallbackValue;
-	}
-	private static int determineAverageValueInColumnSlice(int[] sliceArray)
-	{
-		if (RUN_UPDATE_DEV_VALIDATION)
-		{
-			LodUtil.assertTrue(sliceArray.length == 4, "Column Slice should only contain 4 values.");
-		}
-		
-		
-		int value = 0;
-		for (int i = 0; i < 4; i++)
-		{
-			value += sliceArray[i];
-		}
-		
-		value /= 4;
-		return value;
-	}
-	
-	/** 
-	 * Only downsamples into a given column if this data source doesn't
-	 * already contain data in that column.
-	 * This is done to prevent accidentally downsampling onto already present higher-detail data.
+	 * Projects the coarser input onto this source in Rust, writing only columns
+	 * that hold no data yet so higher-detail data is never overwritten.
 	 */
 	public boolean downsampleFromOneAboveDetailLevel(FullDataSourceV2 inputDataSource, int[] remappedIds)
 	{
@@ -1363,122 +480,24 @@ public class FullDataSourceV2
 		{
 			throw new IllegalArgumentException("Input data source must be exactly 1 detail level above this data source. Expected [" + (DhSectionPos.getDetailLevel(this.pos) - 1) + "], received [" + DhSectionPos.getDetailLevel(inputDataSource.pos) + "].");
 		}
-		
-		// input is one detail level higher (lower detail)
-		// so 1x1 input data points will be converted into 2x2 recipient data point
-		
-		
-		// determine where in this data source should be read from
-		// since the input is one detail level above this will be one of input position's 4 children
+
+		// this source is one of the input position's 4 children
 		int minParentXPos = DhSectionPos.getX(DhSectionPos.getChildByIndex(inputDataSource.pos, 0));
 		int inputOffsetX = (DhSectionPos.getX(this.pos) == minParentXPos) ? 0 : (WIDTH / 2);
 		int minParentZPos = DhSectionPos.getZ(DhSectionPos.getChildByIndex(inputDataSource.pos, 0));
 		int inputOffsetZ = (DhSectionPos.getZ(this.pos) == minParentZPos) ? 0 : (WIDTH / 2);
-		
-		
-		
-		// merge the input's data points
-		// into this data source's
-		boolean dataChanged = false;
-		for (int x = 0; x < WIDTH; x++)
-		{
-			for (int z = 0; z < WIDTH; z++)
-			{
-				// recipient index is 1-to-1
-				int recipientIndex = relativePosToIndex(x, z);
-				
-				int inputX = (x / 2) + inputOffsetX;
-				int inputZ = (z / 2) + inputOffsetZ;
-				int inputIndex = relativePosToIndex(inputX, inputZ);
-				
-				
-				// world gen //
-				
-				// a separate generation step needs to be used so can replace
-				// this data with higher-quality data when it is available
-				byte inputGenStep = EDhApiWorldGenerationStep.DOWN_SAMPLED.value;
-				this.columnGenerationSteps.set(recipientIndex, inputGenStep);
-				
-				
-				// world compression //
-				// The recipient cell is a 2x2 projection of the input cell at
-				// inputIndex. Reading recipientIndex here desynchronizes the
-				// compression policy from the data column (and, near child-section
-				// offsets, can mark a semantically uniform source as non-uniform).
-				byte worldCompressionMode = inputDataSource.columnWorldCompressionMode.getByte(inputIndex);
-				this.columnWorldCompressionMode.set(recipientIndex, worldCompressionMode);
-				/*
-				 * A coarse cell is only safe for exact Rust material lookup when the
-				 * complete 2x2 source footprint agrees.  Inheriting the bit from the
-				 * first child alone could label a heterogeneous cell as uniform and
-				 * make the renderer guess one texture for several source columns.
-				 */
-				// One coarse input cell projects onto four recipient cells. The
-				// recipient footprint is therefore the mapped input cell itself;
-				// requiring a second 2x2 input footprint incorrectly discarded
-				// uniform provenance at every detail-level boundary.
-				this.nativeSource.uniform(recipientIndex, inputDataSource.nativeSource.uniform(inputIndex)
-						&& inputDataSource.columnWorldCompressionMode.getByte(inputIndex)
-							== EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value);
-				this.semanticHorizontalContributors.remove(recipientIndex);
-				if (!this.nativeSource.uniform(recipientIndex)
-					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
-				{
-					LongList[] contributors = remapHorizontalContributors(
-						inputDataSource.semanticHorizontalContributors.get(inputIndex), remappedIds);
-					if (contributors != null) this.semanticHorizontalContributors.put(recipientIndex, contributors);
-				}
-				
-				
-				
-				// data points //
-				
-				// check if this column should be downsampled
-				boolean downSampleColumn;
-				if (this.getColumn(recipientIndex) == null)
-				{
-					downSampleColumn = true;
-				}
-				else
-				{
-					downSampleColumn = true; // assume empty until we find non-empty data
-					for (long dataPoint : this.getColumn(recipientIndex))
-					{
-						if (dataPoint != FullDataPointUtil.EMPTY_DATA_POINT)
-						{
-							downSampleColumn = false;
-							break;
-						}
-					}
-				}
-				
-				if (downSampleColumn)
-				{
-					LongList inputDataArray = inputDataSource.getColumn(inputIndex);
-					this.setColumn(recipientIndex, inputDataArray);
-					this.remapDataColumn(recipientIndex, remappedIds);
-					
-					if (RUN_DATA_ORDER_VALIDATION)
-					{
-						throwIfDataColumnInWrongOrder(inputDataSource.pos, this.getColumn(recipientIndex));
-					}
-					
-					dataChanged = true;
-				}
-				
-				this.isEmpty = false;
-			}
-		}
-		
+
+		boolean dataChanged = this.nativeSource.downsample(inputDataSource.nativeSource, remappedIds, inputOffsetX, inputOffsetZ);
+		this.isEmpty = false;
 		return dataChanged;
 	}
 
-	
-	
+
+
 	//===================//
 	// adjacent clearing //
 	//===================//
-	
+
 	/** Removes any non-adjacent data from the given direction. */
 	public void clearAllNonAdjData(EDhDirection direction)
 	{
@@ -1487,7 +506,7 @@ public class FullDataSourceV2
 		int maxX = FullDataMinMaxPosUtil.getAdjMaxX(encodedMinMaxPos);
 		int minZ = FullDataMinMaxPosUtil.getAdjMinZ(encodedMinMaxPos);
 		int maxZ = FullDataMinMaxPosUtil.getAdjMaxZ(encodedMinMaxPos);
-		
+
 		for (int relX = 0; relX < FullDataSourceV2.WIDTH; relX++)
 		{
 			for (int relZ = 0; relZ < FullDataSourceV2.WIDTH; relZ++)
@@ -1498,24 +517,25 @@ public class FullDataSourceV2
 				{
 					continue;
 				}
-				
+
 				LongList dataColumn = this.getColumnAtRelPos(relX, relZ);
 				dataColumn.clear();
 				dataColumn.add(FullDataPointUtil.EMPTY_DATA_POINT);
 			}
 		}
 	}
-	
-	
+
+
+
 	//================//
 	// helper methods //
 	//================//
-	
-	/** 
+
+	/**
 	 * Usually this should just be used internally, but there may be instances
 	 * where the raw data arrays are available without the data source object.
-	 * 	 
-	 * @return -1 if given an out-of-bounds relative position 
+	 *
+	 * @return -1 if given an out-of-bounds relative position
 	 */
 	public static int tryGetRelativePosToIndex(int relX, int relZ)
 	{
@@ -1524,52 +544,25 @@ public class FullDataSourceV2
 		{
 			return -1;
 		}
-		
+
 		return (relX * WIDTH) + relZ;
 	}
-	
-	/** 
+
+	/**
 	 * Usually this should just be used internally, but there may be instances
 	 * where the raw data arrays are available without the data source object.
 	 */
 	public static int relativePosToIndex(int relX, int relZ) throws IndexOutOfBoundsException
-	{ 
+	{
 		int index = tryGetRelativePosToIndex(relX, relZ);
 		if (index < 0)
 		{
 			throw new IndexOutOfBoundsException("Relative data source positions must be between [0] (inclusive) and ["+WIDTH+"] (exclusive) the relative pos: ["+relX+","+relZ+"] is outside those boundaries.");
 		}
-		
-		return index; 
+
+		return index;
 	}
-	
-	/** 
-	 * Throws an exception if the given
-	 * full data column array is in the wrong order
-	 * IE if the first data point is the lowest and the last data point is the highest.
-	 * Data columns should be in reverse order, IE the first data point should be the highest data point.
-	 * 
-	 * @see FullDataSourceV2#dataPoints
-	 */
-	public static void throwIfDataColumnInWrongOrder(long pos, LongList dataArray) throws IllegalStateException
-	{
-		if (dataArray.size() < 2)
-		{
-			return;
-		}
-		
-		long firstDataPoint = dataArray.getLong(0);
-		int firstBottomY = FullDataPointUtil.getBottomY(firstDataPoint);
-		
-		long lastDataPoint = dataArray.getLong(dataArray.size() - 1);
-		int lastBottomY = FullDataPointUtil.getBottomY(lastDataPoint);
-		
-		if (firstBottomY < lastBottomY)
-		{
-			throw new IllegalStateException("Incorrect data point order at pos: ["+ DhSectionPos.toString(pos)+"], first datapoint bottom Y ["+firstBottomY+"], last datapoint bottom Y ["+lastBottomY+"].");
-		}
-	}
-	
+
 	/**
 	 * Ensures the given data column is in the correct Y order, specifically
 	 * top-to-bottom.
@@ -1580,19 +573,14 @@ public class FullDataSourceV2
 		{
 			return;
 		}
-		
-		long firstDataPoint = dataColumn.getLong(0);
-		int firstBottomY = FullDataPointUtil.getBottomY(firstDataPoint);
-		
-		long lastDataPoint = dataColumn.getLong(dataColumn.size() - 1);
-		int lastBottomY = FullDataPointUtil.getBottomY(lastDataPoint);
-		
+
+		int firstBottomY = FullDataPointUtil.getBottomY(dataColumn.getLong(0));
+		int lastBottomY = FullDataPointUtil.getBottomY(dataColumn.getLong(dataColumn.size() - 1));
 		if (firstBottomY < lastBottomY)
 		{
 			// reverse the array so index 0 is the highest,
 			// this is necessary for later logic
-			// source: https://stackoverflow.com/questions/2137755/how-do-i-reverse-an-int-array-in-java
-			for(int i = 0; i < dataColumn.size() / 2; i++)
+			for (int i = 0; i < dataColumn.size() / 2; i++)
 			{
 				long temp = dataColumn.getLong(i);
 				dataColumn.set(i, dataColumn.getLong(dataColumn.size() - i - 1));
@@ -1600,17 +588,17 @@ public class FullDataSourceV2
 			}
 		}
 	}
-	
-	
-	
+
+
+
 	//=====================//
 	// setters and getters //
 	//=====================//
-	
+
 	public long getPos() { return this.pos; }
-	
+
 	public byte getDataDetailLevel() { return (byte) (DhSectionPos.getDetailLevel(this.pos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL); }
-	
+
 	public void setSingleColumn(LongList longArray, int relX, int relZ, EDhApiWorldGenerationStep worldGenStep, EDhApiWorldCompressionMode worldCompressionMode)
 	{
 		int index = relativePosToIndex(relX, relZ);
@@ -1619,89 +607,20 @@ public class FullDataSourceV2
 		this.columnWorldCompressionMode.set(index, worldCompressionMode.value);
 		this.nativeSource.uniform(index, DhSectionPos.getDetailLevel(this.pos)
 			== DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL);
-		this.semanticHorizontalContributors.remove(index);
-		
-		
-		if (RUN_UPDATE_DEV_VALIDATION)
-		{
-			// validate the incoming ID's
-			int maxValidId = this.mapping.getMaxValidId();
-			for (int i = 0; i < longArray.size(); i++)
-			{
-				long dataPoint = longArray.getLong(i);
-				int id = FullDataPointUtil.getId(dataPoint);
-				if (id > maxValidId)
-				{
-					LodUtil.assertNotReach("Column set with higher than possible ID. ID [" + id + "], max valid ID [" + maxValidId + "].");
-				}
-			}
-		}
+		this.nativeSource.setFootprint(index, null);
 	}
-	
-	
-	
-	//=============//
-	// API methods //
-	//=============//
-	
-	public void setRunApiChunkValidation(boolean runValidation) { this.runApiChunkValidation = runValidation; }
-	
-	@Override
-	public int getWidthInDataColumns() { return WIDTH; }
-	
-	@Override
-	public List<DhApiTerrainDataPoint> setApiDataPointColumn(int relX, int relZ, List<DhApiTerrainDataPoint> columnDataPoints) 
-				throws IndexOutOfBoundsException, IllegalArgumentException
-	{
-		try
-		{
-			LodDataBuilder.putListInTopDownOrder(columnDataPoints);
-			if (this.runApiChunkValidation)
-			{
-				LodDataBuilder.validateOrThrowApiDataColumn(columnDataPoints);
-			}
-			
-			LongList packedDataPoints = LodDataBuilder.convertApiDataPointListToPackedLongArray(columnDataPoints, this, 0, true);
-			
-			// TODO there should be an "unknown" compression and generation step, or be defined via the datapoints
-			this.setSingleColumn(packedDataPoints, relX, relZ, EDhApiWorldGenerationStep.SURFACE, EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
-			
-			return columnDataPoints;
-		}
-		catch (DataCorruptedException e)
-		{
-			throw new IllegalArgumentException(e.getMessage(), e);
-		}
-	}
-	
-	@Override 
-	public List<DhApiTerrainDataPoint> getApiDataPointColumn(int relX, int relZ) throws IndexOutOfBoundsException
-	{
-		LongList dataColumn = this.getColumnAtRelPos(relX, relZ);
-		
-		ArrayList<DhApiTerrainDataPoint> apiList = new ArrayList<>();
-		for (int i = 0; i < dataColumn.size(); i++)
-		{
-			long datapoint = dataColumn.getLong(i);
-			
-			DhApiTerrainDataPoint apiDataPoint = DhApiTerrainDataPointUtil.createApiDatapoint(0, this.mapping, DhSectionPos.getDetailLevel(this.pos), datapoint);
-			apiList.add(apiDataPoint);
-		}
-		
-		return apiList;
-	}
-	
-	
-	
+
+
+
 	//================//
 	// base overrides //
 	//================//
-	
+
 	@Override
 	public String toString() { return DhSectionPos.toString(this.pos); }
-	
+
 	/** Only includes the base data in this object, not the mapping */
-	@Override 
+	@Override
 	public int hashCode()
 	{
 		if (this.cachedHashCode == 0)
@@ -1713,51 +632,25 @@ public class FullDataSourceV2
 	private void generateHashCode()
 	{
 		var nativeColumns = this.nativeOriginalColumns;
-		if (nativeColumns != null && this.hasOriginalNativeColumns(nativeColumns))
+		if (nativeColumns != null && this.nativeSource.isLive()
+			&& this.nativeSource.originalProducer(nativeColumns, this.pos, this.columnGenerationSteps, this.columnWorldCompressionMode) == 1)
 		{
+			// Still exactly the producer's columns: its immutable hash applies.
 			this.cachedHashCode = nativeColumns.sourceHash();
 			return;
 		}
 		this.nativeOriginalColumns = null;
-        long nativeHash=this.nativeSource.tryHash(this.pos,this.columnGenerationSteps,this.columnWorldCompressionMode);
-        if((nativeHash>>>32)!=0){this.cachedHashCode=(int)nativeHash;return;}
-		int result = DhSectionPos.hashCode(this.pos);
-		result = 31 * result + Arrays.deepHashCode(this.columnReferences());
-		result = 17 * result + this.columnGenerationSteps.hashCode();
-		result = 43 * result + this.columnWorldCompressionMode.hashCode();
-		
-		this.cachedHashCode = result;
+		this.cachedHashCode = this.nativeSource.hash(this.pos);
 	}
-	/** Public arrays/list mutations must never reuse the immutable native hash. */
-	private boolean hasOriginalNativeColumns(net.minecraft.world.level.chunk.NativeDhColumns columns)
-	{
-        int original=this.nativeSource.originalProducer(columns,this.pos,this.columnGenerationSteps,this.columnWorldCompressionMode);
-        if(original>=0)return original==1;
-		if (this.pos != columns.position() || this.columnGenerationSteps.size() != WIDTH * WIDTH
-			|| this.columnWorldCompressionMode.size() != WIDTH * WIDTH) return false;
-		int ox = columns.offsetX(), oz = columns.offsetZ();
-		for (int x = 0; x < WIDTH; x++) for (int z = 0; z < WIDTH; z++)
-		{
-			int index = relativePosToIndex(x, z); var list = this.getColumn(index);
-			boolean occupied = x >= ox && x < ox + 16 && z >= oz && z < oz + 16;
-			if (occupied ? !columns.ownsOriginalColumn(list, x - ox, z - oz)
-                : list == null || (list.getClass() != LongArrayList.class
-                    && list.getClass() != net.minecraft.world.level.chunk.NativeDhColumnList.class) || !list.isEmpty()) return false;
-			if (this.columnGenerationSteps.getByte(index) != (occupied ? EDhApiWorldGenerationStep.LIGHT.value : 0)
-				|| this.columnWorldCompressionMode.getByte(index) != (occupied ? (byte)columns.compression() : 0)) return false;
-		}
-		return true;
-	}
-	
-	@Override 
+
+	@Override
 	public boolean equals(Object obj)
 	{
-		if (!(obj instanceof FullDataSourceV2))
+		if (!(obj instanceof FullDataSourceV2 other))
 		{
 			return false;
 		}
-		FullDataSourceV2 other = (FullDataSourceV2) obj;
-		
+
 		if (other.pos != this.pos)
 		{
 			return false;
@@ -1770,7 +663,5 @@ public class FullDataSourceV2
 			return other.hashCode() == this.hashCode();
 		}
 	}
-	
-	
-	
+
 }

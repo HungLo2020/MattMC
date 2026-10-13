@@ -1,5 +1,11 @@
 # Retained Rust DH source columns
 
+> **Current state:** the [Rust-owned DH full-data source](RUST-DH-SOURCE.md)
+> supersedes this page's descriptions of Java fallback, compatibility,
+> descriptor and decline routes, Java-held lists, resizable metadata and the
+> Java footprint map; those no longer exist. Ownership details and historical
+> results below remain as recorded.
+
 Rust retains the live 64×64 full-data column table and cached tint reads it
 directly. Present-empty columns initially need no Java readers; list identity
 projections materialize on demand. [Scoped conversion readers](RUST-DH-CONVERSION-READERS.md)

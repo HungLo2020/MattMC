@@ -24,17 +24,18 @@ class NativeDhConversionReaderTest {
             assertThrows(IllegalStateException.class, () -> reader.column(0));
         }
     }
-    @Test void escapedCustomMissingAndClosedColumnsPreservePublicIdentity() {
+    @Test void escapedCopiedMissingAndClosedColumnsPreservePublicIdentity() {
         var source = source();
         try (var reader = source.nativeSource().conversionReader()) {
             var escaped = source.getColumn(1); escaped.add(17);
-            var custom = LongArrayList.of(23); source.setColumn(2, custom);
+            source.setColumn(2, LongArrayList.of(23)); var bound = source.getColumn(2);
+            assertInstanceOf(NativeDhColumnList.class, bound, "a Java list is bound as a native copy");
             source.setColumn(3, null);
-            assertSame(escaped, reader.column(1)); assertSame(custom, reader.column(2));
+            assertSame(escaped, reader.column(1)); assertSame(bound, reader.column(2)); assertEquals(LongArrayList.of(23), bound);
             assertNull(reader.column(3)); assertEquals(0, reader.column(4).size());
             assertNull(source.nativeSource().boundColumn(4));
             source.close();
-            assertSame(escaped, reader.column(1)); assertSame(custom, reader.column(2));
+            assertSame(escaped, reader.column(1)); assertSame(bound, reader.column(2));
             assertNull(reader.column(3));
         } finally { source.close(); }
     }

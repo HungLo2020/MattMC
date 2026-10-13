@@ -3,13 +3,14 @@
 use std::{cell::UnsafeCell, sync::Arc};
 
 pub(crate) struct Metadata {
-    planes: [UnsafeCell<Vec<i8>>; 3],
+    /// Generation, compression, uniformity, footprint presence (Rust-maintained).
+    planes: [UnsafeCell<Vec<i8>>; 4],
 }
 impl Metadata {
     pub(super) fn new() -> Self {
         Self { planes: std::array::from_fn(|_| UnsafeCell::new(vec![0; 4096])) }
     }
-    /// No borrowed plane may survive a resize, point update or caller write.
+    /// Planes have exactly one value per column. No borrowed plane may survive a point update or caller write.
     pub(super) unsafe fn plane(&self, kind: usize) -> &[i8] {
         &*self.planes[kind].get()
     }
@@ -31,38 +32,9 @@ pub unsafe extern "C" fn mattmc_dh_metadata_release(owner: *const Metadata) {
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_metadata_view(owner: *const Metadata, kind: i32, out: *mut usize) -> i32 {
     let Some(owner) = owner.as_ref() else { return 0; };
-    if !(0..3).contains(&kind) || out.is_null() || out as usize % std::mem::align_of::<usize>() != 0 { return 0; }
+    if !(0..4).contains(&kind) || out.is_null() || out as usize % std::mem::align_of::<usize>() != 0 { return 0; }
     let plane = owner.plane(kind as usize);
     out.write(plane.as_ptr() as usize); out.add(1).write(plane.len()); 1
-}
-// Resizing/insertion/removal belongs to Rust. Uniformity has a fixed extent.
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_metadata_edit(owner: *const Metadata, kind: i32, op: i32,
-    index: i32, count: i32, data: *const i8, value: i8) -> i32 {
-    let Some(owner) = owner.as_ref() else { return 0; };
-    if !(0..2).contains(&kind) || index < 0 || count < 0 { return 0; }
-    let plane = owner.plane_mut(kind as usize);
-    let (index, count) = (index as usize, count as usize);
-    match op {
-        0 => {
-            if plane.try_reserve(count.saturating_sub(plane.len())).is_err() { return -1; }
-            plane.resize(count, 0);
-        },
-        1 | 2 => {
-            let count = if op == 1 { 1 } else { count };
-            if index > plane.len() || plane.len().checked_add(count).is_none_or(|n| n > i32::MAX as usize)
-                || op == 2 && count != 0 && data.is_null() { return 0; }
-            if plane.try_reserve(count).is_err() { return -1; }
-            if op == 1 { plane.insert(index, value); }
-            else if count != 0 { plane.splice(index..index, std::slice::from_raw_parts(data, count).iter().copied()); }
-        },
-        3 => {
-            if index.checked_add(count).is_none_or(|end| end > plane.len()) { return 0; }
-            plane.drain(index..index + count);
-        },
-        _ => return 0,
-    }
-    1
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_metadata_hash(owner: *const Metadata, kind: i32) -> i32 {
@@ -93,26 +65,6 @@ mod tests {
             assert!(weak.upgrade().is_some());
             mattmc_dh_metadata_release(metadata);
             assert!(weak.upgrade().is_none());
-        }
-    }
-    #[test]
-    fn edits_preserve_prefixes_zero_growth_and_decline_invalid_uniform_or_ranges() {
-        unsafe {
-            let metadata = Metadata::new();
-            metadata.plane_mut(0)[0..3].copy_from_slice(&[-128, -1, 127]);
-            assert_eq!(mattmc_dh_metadata_edit(&metadata,0,0,0,2,std::ptr::null(),0),1);
-            assert_eq!(metadata.plane(0),[-128,-1]);
-            assert!(!metadata.canonical());
-            assert_eq!(mattmc_dh_metadata_edit(&metadata,0,0,0,4,std::ptr::null(),0),1);
-            assert_eq!(metadata.plane(0),[-128,-1,0,0]);
-            assert_eq!(mattmc_dh_metadata_edit(&metadata,0,2,1,3,[1i8,2,3].as_ptr(),0),1);
-            assert_eq!(metadata.plane(0),[-128,1,2,3,-1,0,0]);
-            assert_eq!(mattmc_dh_metadata_edit(&metadata,0,3,1,3,std::ptr::null(),0),1);
-            assert_eq!(metadata.plane(0),[-128,-1,0,0]);
-            assert_eq!(mattmc_dh_metadata_edit(&metadata,0,3,1,20,std::ptr::null(),0),0);
-            assert_eq!(metadata.plane(0),[-128,-1,0,0]);
-            assert_eq!(mattmc_dh_metadata_edit(&metadata,2,0,0,0,std::ptr::null(),0),0);
-            assert_eq!(metadata.plane(2).len(),4096);
         }
     }
 }

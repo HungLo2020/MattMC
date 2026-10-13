@@ -1,13 +1,13 @@
 //! Mutable DH column storage. Java holds CPU leases, never a mirrored point array.
 //! Callers retain the original DH exclusion rules; views expire on mutation.
 use std::{cell::Cell, slice, sync::{Arc, atomic::{AtomicU64, AtomicUsize, Ordering}}};
-use super::{Columns, parent::ParentColumns};
+use super::Columns;
 
 // Shared ownership does not add concurrent mutation: every point access remains
 // under DH's original source/list exclusion. Leases hold raw pointers, never
 // persistent Rust references. Atomic counts allow arena cleaners to release a
 // different lease safely, without freeing an allocation still used by a source.
-enum Backing { Producer(Arc<Columns>, usize, usize), Parent(Arc<ParentColumns>, usize, usize) }
+enum Backing { Producer(Arc<Columns>, usize, usize) }
 static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 pub(super) fn identity() -> u64 {
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -43,7 +43,6 @@ impl Column {
     pub(crate) fn points(&self) -> &[u64] {
         match &self.backing {
             Some(Backing::Producer(owner, first, count)) => &owner.points[*first..*first + *count],
-            Some(Backing::Parent(owner, first, count)) => &owner.points[*first..*first + *count],
             None => &self.points,
         }
     }
@@ -149,12 +148,6 @@ pub unsafe extern "C" fn mattmc_dh_column_shared(kind: i32, owner: *const (), fi
             if end > (&(*owner).points).len() { return std::ptr::null_mut(); }
             Arc::increment_strong_count(owner);
             Backing::Producer(Arc::from_raw(owner), first, count)
-        },
-        1 => {
-            let owner = owner.cast::<ParentColumns>();
-            if end > (&(*owner).points).len() { return std::ptr::null_mut(); }
-            Arc::increment_strong_count(owner);
-            Backing::Parent(Arc::from_raw(owner), first, count)
         },
         _ => return std::ptr::null_mut(),
     };

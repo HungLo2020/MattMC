@@ -369,23 +369,27 @@ public class DistantHorizonsLodWaterReductionTest {
         return mapping;
     }
 
+    /** The parent cell's material when four one-point child columns hold {@code ids}, through the Rust parent update. */
     private static int selectParentSliceId(int[] ids, FullDataPointIdMap mapping) throws Exception {
-        Method method = FullDataSourceV2.class.getDeclaredMethod(
-            "determineMostCommonValueInColumnSlice",
-            int[].class,
-            FullDataPointIdMap.class);
-        method.setAccessible(true);
-        return (Integer) method.invoke(null, ids, mapping);
+        LongArrayList[] columns = emptyFullDataColumns();
+        for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++)
+            columns[FullDataSourceV2.relativePosToIndex(x, z)].add(FullDataPointUtil.encode(ids[x * 2 + z], 4, 60, (byte) 0, (byte) 15));
+        LongArrayList merged = mergeParentColumn(FullDataSourceV2.createWithData(0, mapping, columns,
+            fullDataGenerationSteps(), fullDataCompressionModes()), 0, 0);
+        assertEquals(1, merged.size());
+        return FullDataPointUtil.getId(merged.getLong(0));
     }
 
+    /** The parent column reduced from the child cells (x..x+1, z..z+1), through the Rust parent update. */
     private static LongArrayList mergeParentColumn(FullDataSourceV2 source, int x, int z) throws Exception {
-        Method method = FullDataSourceV2.class.getDeclaredMethod(
-            "mergeInputTwoByTwoDataColumn",
-            FullDataSourceV2.class,
-            int.class,
-            int.class);
-        method.setAccessible(true);
-        return (LongArrayList) method.invoke(null, source, x, z);
+        try (source; var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
+            // An empty parent mapping takes the child's IDs in order, so the remap is the identity.
+            parent.updateFromDataSource(source);
+            long childZero = DhSectionPos.getChildByIndex(parent.getPos(), 0);
+            int ox = DhSectionPos.getX(source.getPos()) == DhSectionPos.getX(childZero) ? 0 : 32;
+            int oz = DhSectionPos.getZ(source.getPos()) == DhSectionPos.getZ(childZero) ? 0 : 32;
+            return new LongArrayList(parent.getColumnAtRelPos(ox + x / 2, oz + z / 2));
+        }
     }
 
     private enum TestBiome implements IBiomeWrapper {

@@ -1,13 +1,8 @@
 package com.seibel.distanthorizons.core.dataObjects.transformers;
 
-import java.util.Collections;
-import java.util.List;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiWorldCompressionMode;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent;
-import com.seibel.distanthorizons.api.objects.data.DhApiChunk;
-import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
@@ -15,7 +10,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
@@ -23,7 +17,6 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWr
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -36,12 +29,6 @@ public class LodDataBuilder
 	private static final IBlockStateWrapper AIR = WRAPPER_FACTORY.getAirBlockStateWrapper();
 	
 	private static boolean getTopErrorLogged = false;
-	private static boolean hasChunkProcessingSubscribers()
-	{
-		var handlers = ApiEventInjector.INSTANCE.getAll(DhApiChunkProcessingEvent.class);
-		for (int index = 0; index < handlers.size(); index++) if (handlers.get(index) != null) return true;
-		return false;
-	}
 	
 	
 	
@@ -50,36 +37,24 @@ public class LodDataBuilder
 	//============//
 	
 	/**
-	 * The chunk's columns built natively, or null when the native producer does
-	 * not apply: a custom factory or wrapper, chunk-processing subscribers (which
-	 * may override the semantic inputs), or inputs the producer declines.
+	 * The chunk's columns built natively, or null when the native producer
+	 * declines its inputs (for example biomes not yet generated).
 	 */
 	@Nullable
 	public static net.minecraft.world.level.chunk.NativeDhColumns nativeColumnsFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper)
 	{
 		// only block lighting is needed here, sky lighting is populated at the data source stage
 		LodUtil.assertTrue(chunkWrapper.isDhBlockLightingCorrect(), "Provided chunk's DH Block lighting hasn't been baked.");
-		if (WRAPPER_FACTORY != com.seibel.distanthorizons.common.wrappers.WrapperFactory.INSTANCE
-			|| chunkWrapper.getClass() != com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper.class
-			|| hasChunkProcessingSubscribers())
-		{
-			return null;
-		}
-		var columns = net.minecraft.world.level.chunk.NativeDhColumns.build(levelWrapper,
-			(com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper)chunkWrapper,
+		if (!(chunkWrapper instanceof com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper wrapper)) return null;
+		return net.minecraft.world.level.chunk.NativeDhColumns.build(levelWrapper, wrapper,
 			Config.Common.LodBuilding.worldCompression.get().value);
-		return columns != null && !hasChunkProcessingSubscribers() ? columns : null;
 	}
 	
 	public static FullDataSourceV2 createFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper)
 	{
-		// Native policy can bypass voxel callbacks only for the stock factory and
-		// when no chunk-processing subscriber can override the semantic inputs.
 		var columns = nativeColumnsFromChunk(levelWrapper, chunkWrapper);
 		if (columns != null) return FullDataSourceV2.createNative(columns);
 		
-		int chunkPosX = chunkWrapper.getChunkPos().getX();
-		int chunkPosZ = chunkWrapper.getChunkPos().getZ();
 		
 		int sectionPosX = getXOrZSectionPosFromChunkPos(chunkWrapper.getChunkPos().getX());
 		int sectionPosZ = getXOrZSectionPosFromChunkPos(chunkWrapper.getChunkPos().getZ());
@@ -133,9 +108,6 @@ public class LodDataBuilder
 		{
 			IMutableBlockPosWrapper mcBlockPos = chunkWrapper.getMutableBlockPosWrapper();
 			IBlockStateWrapper previousBlockState = null;
-			
-			DhApiChunkProcessingEvent.EventParam mutableChunkProcessedEventParam 
-					= new DhApiChunkProcessingEvent.EventParam(levelWrapper, chunkPosX, chunkPosZ);
 			
 			int minBuildHeight = chunkWrapper.getMinNonEmptyHeight();
 			int exclusiveMaxBuildHeight = chunkWrapper.getExclusiveMaxBuildHeight();
@@ -227,27 +199,6 @@ public class LodDataBuilder
 									&& currentBlockState.getOpacity() != LodUtil.BLOCK_FULLY_OPAQUE;
 							
 							
-							// check for API overrides
-							{
-								mutableChunkProcessedEventParam.updateForPosition(relBlockX, y, relBlockZ, newBlockState, newBiome);
-								ApiEventInjector.INSTANCE.fireAllEvents(DhApiChunkProcessingEvent.class, mutableChunkProcessedEventParam);
-								
-								// did the API user override this block?
-								if (mutableChunkProcessedEventParam.getBlockOverride() != null)
-								{
-									// API users shouldn't be creating their own IBlockStateWrapper objects
-									newBlockState = (IBlockStateWrapper)mutableChunkProcessedEventParam.getBlockOverride();
-								}
-								
-								// did the API user override this biome?
-								if (mutableChunkProcessedEventParam.getBiomeOverride() != null)
-								{
-									// API users shouldn't be creating their own IBlockStateWrapper objects
-									newBiome = (IBiomeWrapper) mutableChunkProcessedEventParam.getBiomeOverride();
-								}
-							}
-							
-							
 							longs.add(FullDataPointUtil.encode(mappedId, lastY - y, y + 1 - inclusiveMinBuildHeight, blockLight, skyLight));
 							currentBiome = newBiome;
 							currentBlockState = newBlockState;
@@ -283,233 +234,6 @@ public class LodDataBuilder
 		}
 		
 		return dataSource;
-	}
-	
-	
-	
-	/** @throws ClassCastException if an API user returns the wrong object type(s) */
-	public static FullDataSourceV2 createFromApiChunkData(DhApiChunk apiChunk, boolean runAdditionalValidation) throws ClassCastException, DataCorruptedException, IllegalArgumentException
-	{
-		// get the section position
-		int sectionPosX = getXOrZSectionPosFromChunkPos(apiChunk.chunkPosX);
-		int sectionPosZ = getXOrZSectionPosFromChunkPos(apiChunk.chunkPosZ);
-		long pos = DhSectionPos.encode(DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL, sectionPosX, sectionPosZ);
-		
-		// Fast modulo calculation using bitwise AND since NUMB_OF_CHUNKS_WIDE is a power of 2 (4)
-		// For any number n: n & (2^k - 1) is equivalent to Math.floorMod(n, 2^k)
-		// Original: Math.floorMod(x, 4) - Handles negative numbers, gives non-negative result in range [0,3]
-		// Bitwise: x & (4-1) - Also gives non-negative result in range [0,3]
-		// Example: -5 & 3 = 3, which equals Math.floorMod(-5, 4) = 3
-		int relSourceBlockX = (apiChunk.chunkPosX & (FullDataSourceV2.NUMB_OF_CHUNKS_WIDE - 1)) * LodUtil.CHUNK_WIDTH;
-		int relSourceBlockZ = (apiChunk.chunkPosZ & (FullDataSourceV2.NUMB_OF_CHUNKS_WIDE - 1)) * LodUtil.CHUNK_WIDTH;
-		
-		FullDataSourceV2 dataSource = FullDataSourceV2.createEmpty(pos);
-		for (int relBlockZ = 0; relBlockZ < LodUtil.CHUNK_WIDTH; relBlockZ++)
-		{
-			for (int relBlockX = 0; relBlockX < LodUtil.CHUNK_WIDTH; relBlockX++)
-			{
-				List<DhApiTerrainDataPoint> columnDataPoints = apiChunk.getDataPoints(relBlockX, relBlockZ);
-				
-				// mark the data source as non-empty if we find any non-air blocks
-				if (dataSource.isEmpty)
-				{
-					for (int i = 0; i < columnDataPoints.size(); i++)
-					{
-						DhApiTerrainDataPoint dataPoint = columnDataPoints.get(i);
-						if (dataPoint.blockStateWrapper != null
-							&& !dataPoint.blockStateWrapper.isAir())
-						{
-							dataSource.isEmpty = false;
-							break;
-						}
-					}
-				}
-				
-				LodDataBuilder.putListInTopDownOrder(columnDataPoints);
-				if (runAdditionalValidation)
-				{
-					validateOrThrowApiDataColumn(columnDataPoints);
-				}
-				
-				LongArrayList packedDataPoints = convertApiDataPointListToPackedLongArray(columnDataPoints, dataSource, apiChunk.bottomYBlockPos, runAdditionalValidation);
-				
-				// TODO add the ability for API users to define a different compression mode
-				//  or add a "unkown" compression mode
-				dataSource.setSingleColumn(
-						packedDataPoints,
-						relBlockX + relSourceBlockX, relBlockZ + relSourceBlockZ,
-						EDhApiWorldGenerationStep.LIGHT, EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
-			}
-		}
-		return dataSource;
-	}
-	
-	
-	
-	//================//
-	// public helpers //
-	//================//
-	
-	/** @see FullDataPointUtil */
-	public static LongArrayList convertApiDataPointListToPackedLongArray(
-			@Nullable List<DhApiTerrainDataPoint> topDownColumnDataPoints, FullDataSourceV2 dataSource,
-			int bottomYBlockPos, boolean runAdditionalValidation) throws DataCorruptedException
-	{
-		if (topDownColumnDataPoints == null 
-			|| topDownColumnDataPoints.size() == 0)
-		{
-			return new LongArrayList(0);
-		}
-		
-		
-		
-		// array to store data
-		int size = topDownColumnDataPoints.size();
-		LongArrayList packedDataPoints = new LongArrayList(size);
-		packedDataPoints.clear();
-		
-		
-		if (runAdditionalValidation)
-		{
-			// check for missing data
-			int lastTopY = Integer.MAX_VALUE;
-			for (int i = 0; i < size; i++)
-			{
-				DhApiTerrainDataPoint apiDataPoint = topDownColumnDataPoints.get(i);
-				
-				if (lastTopY != apiDataPoint.topYBlockPos
-					// the first index won't have a lastTopY value
-					&& i != 0)
-				{
-					throw new DataCorruptedException("LOD data has a gap between ["+lastTopY+"] and ["+apiDataPoint.bottomYBlockPos+"]. Empty areas should be filled with air datapoints so light propagates correctly.");
-				}
-				lastTopY = apiDataPoint.bottomYBlockPos;
-			}
-		}
-		
-		
-		// go through data from top down
-		long lastDataPoint = FullDataPointUtil.EMPTY_DATA_POINT;
-		for (int i = 0; i < size; i++)
-		{
-			DhApiTerrainDataPoint apiDataPoint = topDownColumnDataPoints.get(i);
-			
-			int thisId = dataSource.mapping.addIfNotPresentAndGetId(
-					(IBiomeWrapper) (apiDataPoint.biomeWrapper),
-					(IBlockStateWrapper) (apiDataPoint.blockStateWrapper)
-			);
-			int thisHeight = (apiDataPoint.topYBlockPos - apiDataPoint.bottomYBlockPos);
-			
-			int lastId = FullDataPointUtil.getId(lastDataPoint);
-			byte lastBlockLight = (byte)FullDataPointUtil.getBlockLight(lastDataPoint);
-			byte lastSkyLight = (byte)FullDataPointUtil.getSkyLight(lastDataPoint);
-			
-			
-			// if the ID and light are the same, merge the height
-			if (thisId == lastId
-				&& apiDataPoint.blockLightLevel == lastBlockLight
-				&& apiDataPoint.skyLightLevel == lastSkyLight
-				// the first index should always be added to the list
-				&& i != 0 )
-			{
-				// add adjacent height
-				int lastHeight = FullDataPointUtil.getHeight(lastDataPoint);
-				int newHeight = (lastHeight + thisHeight);
-				lastDataPoint = FullDataPointUtil.setHeight(lastDataPoint, newHeight);
-				
-				// subtract bottom Y
-				int lastBottomY = FullDataPointUtil.getBottomY(lastDataPoint);
-				int newBottomY = lastBottomY - thisHeight;
-				lastDataPoint = FullDataPointUtil.setBottomY(lastDataPoint, newBottomY);
-				 
-				packedDataPoints.set(packedDataPoints.size()-1, lastDataPoint);
-			}
-			else
-			{
-				// data changed, create a new datapoint
-				long dataPoint = FullDataPointUtil.encode(
-					thisId,
-					thisHeight,
-					apiDataPoint.bottomYBlockPos - bottomYBlockPos,
-					(byte) (apiDataPoint.blockLightLevel),
-					(byte) (apiDataPoint.skyLightLevel)
-				);
-				lastDataPoint = dataPoint;
-				packedDataPoints.add(dataPoint);
-			}
-		}
-		
-		return packedDataPoints;
-	}
-	
-	public static void putListInTopDownOrder(List<DhApiTerrainDataPoint> dataPoints)
-	{
-		// order doesn't need to be checked if there is 0 or 1 items
-		if (dataPoints.size() > 1)
-		{
-			// DH expects datapoints to be in a top-down order
-			DhApiTerrainDataPoint first = dataPoints.get(0);
-			DhApiTerrainDataPoint last = dataPoints.get(dataPoints.size() - 1);
-			if (first.bottomYBlockPos < last.bottomYBlockPos)
-			{
-				// flip the array if it's in bottom-up order
-				Collections.reverse(dataPoints);
-			}
-			
-		}
-	}
-	
-	public static void validateOrThrowApiDataColumn(List<DhApiTerrainDataPoint> dataPoints) throws IllegalArgumentException
-	{
-		// check that each datapoint is valid
-		int lastBottomYPos = Integer.MIN_VALUE;
-		for (int i = 0; i < dataPoints.size(); i++) // standard for-loop used instead of an enhanced for-loop to slightly reduce GC overhead due to iterator allocation
-		{
-			DhApiTerrainDataPoint dataPoint = dataPoints.get(i);
-			
-			if (dataPoint == null)
-			{
-				throw new IllegalArgumentException("Datapoint: ["+i+"] is null DhApiTerrainDataPoints are not allowed. If you want to represent empty terrain, please use AIR.");
-			}
-			
-			if (dataPoint.detailLevel != 0)
-			{
-				throw new IllegalArgumentException("Datapoint: ["+i+"] has the wrong detail level ["+dataPoint.detailLevel+"], all data points must be block sized; IE their detail level must be [0].");
-			}
-			
-			
-			
-			int bottomYPos = dataPoint.bottomYBlockPos;
-			int topYPos = dataPoint.topYBlockPos;
-			int height = (dataPoint.topYBlockPos - dataPoint.bottomYBlockPos);
-			
-			// is the datapoint right side up?
-			if (bottomYPos > topYPos)
-			{
-				throw new IllegalArgumentException("Datapoint: ["+i+"] is upside down. Top Pos: ["+topYPos+"], bottom pos: ["+bottomYPos+"].");
-			}
-			// valid height?
-			if (height <= 0 || height >= RenderDataPointUtil.MAX_WORLD_Y_SIZE)
-			{
-				throw new IllegalArgumentException("Datapoint: ["+i+"] has invalid height. Height must be in the range [1 - "+RenderDataPointUtil.MAX_WORLD_Y_SIZE+"] (inclusive).");
-			}
-			
-			// is this datapoint overlapping the last one?
-			if (lastBottomYPos > topYPos)
-			{
-				throw new IllegalArgumentException("DhApiTerrainDataPoint ["+i+"] is overlapping with the last datapoint, this top Y: ["+topYPos+"], lastBottomYPos: ["+lastBottomYPos+"].");
-			}
-			// is there a gap between the last datapoint?
-			if (topYPos != lastBottomYPos
-					&& lastBottomYPos != Integer.MIN_VALUE)
-			{
-				throw new IllegalArgumentException("DhApiTerrainDataPoint ["+i+"] has a gap between it and index ["+(i-1)+"]. Empty spaces should be filled by air, otherwise DH's downsampling won't calculate lighting correctly.");
-			}
-			
-			
-			lastBottomYPos = bottomYPos;
-		}
-		
 	}
 	
 	

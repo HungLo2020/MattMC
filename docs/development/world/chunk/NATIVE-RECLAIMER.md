@@ -46,7 +46,7 @@ releases dead objects in batches of up to 1,024 per downcall.
 - Adding a kind needs a code in both `NativeReclaimer` and `reclaim.rs`, and a
   release export that drops exactly one reference. Kinds 1–17 are: block
   section, retired block views, biome section, retired biome views, counters,
-  contributor snapshot, saved contributor batch, block snapshot, light layer,
+  contributor snapshot, (7: retired saved contributor batch; saved footprints now decode into their source), block snapshot, light layer,
   light view, DH heightmaps, DH emitter sources, DH light field, chunk inputs,
   chunk biome inputs, light map, light map view. An unknown kind stops the
   batch, and Java logs the leaked count.

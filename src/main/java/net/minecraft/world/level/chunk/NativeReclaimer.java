@@ -42,7 +42,7 @@ public final class NativeReclaimer {
     static final byte LIVE_BIOME_VIEW = 4;
     static final byte SECTION_COUNTERS = 5;
     static final byte DH_CONTRIBUTORS = 6;
-    static final byte DH_CONTRIBUTOR_BATCH = 7;
+    // Kind 7 (saved contributor batches) is retired.
     static final byte SECTION_SNAPSHOT = 8;
     static final byte LIGHT_LAYER = 9;
     static final byte LIGHT_VIEW = 10;

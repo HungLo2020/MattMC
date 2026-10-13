@@ -1,5 +1,7 @@
 # Chunk storage
 
+- [Rust-owned DH full-data source](RUST-DH-SOURCE.md): current ownership of the
+  whole source in Rust, its update calls, rules and removed compatibility paths.
 - [Rust DH conversion readers](RUST-DH-CONVERSION-READERS.md): scoped primary-column
   reads without persistent Java column wrappers during render conversion.
 

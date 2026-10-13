@@ -211,33 +211,24 @@ class NativeDhColumnsTest {
                     try (var policy = NativeDhMaterials.create(source.mapping)) {
                         assertNotNull(policy, name + " canonical material admission");
                         for (int pass = 0; pass < 2; pass++) {
-                            assertTrue(NativeDhOcclusionPass.tryCull(policy, batch.nativeSource()), name + " actual owned native pass");
-                            for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) {
-                                var center = (NativeDhColumnList) source.getColumnAtRelPos(x, z);
-                                if (center.size() <= 1) continue;
-                                var a = source.tryGetColumnAtRelPos(x + 1, z); var b = source.tryGetColumnAtRelPos(x - 1, z);
-                                var c = source.tryGetColumnAtRelPos(x, z + 1); var d = source.tryGetColumnAtRelPos(x, z - 1);
-                                if (a == null || b == null || c == null || d == null || a.isEmpty() || b.isEmpty() || c.isEmpty() || d.isEmpty()) continue;
-                                int previous = center.size();
-                                assertTrue(center.tryCull(policy, a, b, c, d), name + " actual native consumer");
-                                admitted++; removed += previous - center.size();
-                            }
+                            int pointsBefore = Arrays.stream(batch.columnReferences()).mapToInt(LongList::size).sum();
+                            NativeDhOcclusionPass.cull(policy, batch.nativeSource());
+                            int after = Arrays.stream(batch.columnReferences()).mapToInt(LongList::size).sum();
+                            admitted++; removed += pointsBefore - after;
                             for (int i = 0; i < 4096; i++) {
-                                var column = source.getColumn(i); assertEquals(in.readInt(), column.size(), name + " pass " + pass + " column " + i);
+                                var column = batch.getColumn(i); assertEquals(in.readInt(), column.size(), name + " pass " + pass + " column " + i);
                                 for (int p = 0; p < column.size(); p++) assertEquals(in.readLong(), column.getLong(p), name + " pass " + pass + " point " + p);
                                 assertEquals(new LongArrayList(column).hashCode(), column.hashCode());
-                                assertEquals(column, batch.getColumn(i), name + " whole pass matches Frozen column " + i);
-                                assertEquals(column.hashCode(), batch.getColumn(i).hashCode());
                             }
                         }
                     }
-                    retained = Arrays.stream(source.columnReferences()).filter(c -> !c.isEmpty()).findFirst().orElseThrow(); before = new LongArrayList(retained);
+                    retained = Arrays.stream(batch.columnReferences()).filter(c -> !c.isEmpty()).findFirst().orElseThrow(); before = new LongArrayList(retained);
                 }
                 assertEquals(before, retained, "Mutable native lease survives source close");
             }
             assertEquals(-1, in.read());
         }
-        assertTrue(admitted > 1000, "The saved corpus must exercise actual native consumers");
+        assertEquals(64, admitted, "Two whole passes over each of the 32 saved cases");
         assertTrue(removed > 0, "The corpus must include real occlusion mutations");
     }
     @Test void ownedOcclusionDetachesProducerCentersAndRetainedReadersSurviveClose() throws Exception {
@@ -256,8 +247,8 @@ class NativeDhColumnsTest {
             var producer = columns.column(center / 64 - columns.offsetX(), center % 64 - columns.offsetZ());
             var original = new LongArrayList(producer);
             assertTrue(retained.isOriginalProducerView());
-            assertTrue(NativeDhOcclusionPass.tryCull(policy, owned.nativeSource()));
-            assertTrue(NativeDhOcclusionPass.tryCull(policy, compatibility.columnReferences()));
+            NativeDhOcclusionPass.cull(policy, owned.nativeSource());
+            NativeDhOcclusionPass.cull(policy, compatibility.nativeSource());
             assertSame(retained, owned.getColumn(center));
             assertFalse(retained.isOriginalProducerView());
             assertEquals(original, producer, "Culling preserves independent immutable producer values");
@@ -275,13 +266,13 @@ class NativeDhColumnsTest {
         try (var source = FullDataSourceV2.createEmpty(6)) {
             source.mapping.addIfNotPresentAndGetId(occlusionBiome(0), BlockStateWrapper.AIR);
             try (var policy = NativeDhMaterials.create(source.mapping)) {
-                assertNotNull(policy); assertTrue(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
+                assertNotNull(policy); NativeDhOcclusionPass.cull(policy, source.nativeSource());
                 var field = FullDataSourceV2.class.getDeclaredField("dataPoints"); field.setAccessible(true);
                 assertTrue(Arrays.stream((Object[]) field.get(source)).allMatch(Objects::isNull));
             }
         }
     }
-    @Test void completeOcclusionDeclinesAliasesCustomCallbacksAndBadIdsWithoutChangingPoints() {
+    @Test void occlusionNeverSeesAliasesOrCustomListsAndFailsOnBadIdsWithoutChangingPoints() {
         try (var source = FullDataSourceV2.createEmpty(6)) {
             source.mapping.addIfNotPresentAndGetId(occlusionBiome(0), BlockStateWrapper.AIR);
             try (var policy = NativeDhMaterials.create(source.mapping)) {
@@ -289,28 +280,18 @@ class NativeDhColumnsTest {
                 LongList original = source.getColumn(65);
                 original.add(3L << 32); original.add(1L << 32);
                 int oldHash = original.hashCode(); var old = new LongArrayList(original);
-                LongList next = source.getColumn(66); source.setColumn(66, original);
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
+                // Binding a bound list, or a Java list, binds a native copy: no cell aliases another.
+                source.setColumn(66, original); assertNotSame(original, source.getColumn(66));
+                // A custom list is read once, when its native copy is bound; later changes stay out.
+                var custom = new LongArrayList(new long[]{3L << 32});
+                source.setColumn(67, custom); custom.add(1L << 32);
+                assertEquals(1, source.getColumn(67).size());
+                NativeDhOcclusionPass.cull(policy, source.nativeSource());
                 assertEquals(old, original); assertEquals(oldHash, original.hashCode());
-                source.setColumn(66, new LongArrayList() {
-                    @Override public boolean isEmpty() { throw new AssertionError("Custom callback must remain in original route"); }
-                });
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
-                assertEquals(old, original);
-                source.setColumn(66, new LongArrayList(new long[]{1L << 32}));
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
-                source.setColumn(66, next);
+                // A point whose ID has no mapping entry fails before any point changes.
                 original.set(0, (3L << 32) | 0xffff_ffffL); old = new LongArrayList(original);
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.nativeSource()));
-                assertFalse(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
+                assertThrows(IndexOutOfBoundsException.class, () -> NativeDhOcclusionPass.cull(policy, source.nativeSource()));
                 assertEquals(old, original);
-                original.set(0, 3L << 32);
-                source.setColumn(66, new LongArrayList()); source.setColumn(67, null);
-                assertTrue(NativeDhOcclusionPass.tryCull(policy, source.columnReferences()));
-                assertEquals(oldHash, original.hashCode());
             }
         }
     }
@@ -359,9 +340,7 @@ class NativeDhColumnsTest {
                     assertSame(alias, recipient.getColumn(index), "Update preserves existing list identity");
                     for (int pass = 0; pass < 2; pass++) {
                         if (pass != 0) try (var policy = NativeDhMaterials.create(recipient.mapping)) {
-                            assertNotNull(policy);
-                            for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) if (recipient.getColumnAtRelPos(x, z).size() > 1)
-                                com.seibel.distanthorizons.core.dataObjects.transformers.FullDataOcclusionCuller.cullHiddenDatapointsInColumn(recipient, x, z, policy);
+                            assertNotNull(policy); NativeDhOcclusionPass.cull(policy, recipient.nativeSource());
                         }
                         for (var column : recipient.columnReferences()) {
                             assertInstanceOf(NativeDhColumnList.class, column, "Recipient keeps authoritative Rust point storage");
@@ -420,22 +399,6 @@ class NativeDhColumnsTest {
         var columns=NativeDhColumns.build(level,light(chunk(0,1)),1);assertNotNull(columns);var original=columns.column(0,0);
         var bytes=new ByteArrayOutputStream();try(var output=new ObjectOutputStream(bytes)){output.writeObject(original);}
         try(var input=new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))){var restored=input.readObject();assertInstanceOf(LongArrayList.class,restored);assertEquals(original,restored);}
-    }
-    @Test void eventSubscribersRunOriginalCallbacksAndCanOverrideMaterials() {
-        var wrapper=light(chunk(0,0));var calls=new int[1];
-        var handler=new com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent() {
-            @Override public void blockOrBiomeChangedDuringChunkProcessing(
-                    com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam<EventParam> event) {
-                calls[0]++;event.value.setBlockOverride(BlockStateWrapper.AIR);
-            }
-        };
-        var injector=com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector.INSTANCE;
-        injector.bind(com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent.class,handler);
-        try(var output=LodDataBuilder.createFromChunk(level,wrapper)) {
-            assertNotNull(output);assertTrue(calls[0]>0);
-            for(var column:output.columnReferences())if(column instanceof NativeDhColumnList nativeList)assertFalse(nativeList.isOriginalProducerView());
-            for(int id=0;id<output.mapping.size();id++)assertTrue(output.mapping.getBlockStateWrapper(id).isAir());
-        } finally { assertTrue(injector.unbind(com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent.class,handler.getClass())); }
     }
     @Test void customWorldCacheOverridesAndUnreadyBiomesDeclineBeforeNativePublication() {
         var source=chunk(0,0);var wrapper=light(source);var callbacks=new int[1];

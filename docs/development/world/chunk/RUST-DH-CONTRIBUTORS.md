@@ -1,5 +1,11 @@
 # Rust DH semantic contributor transport
 
+> **Current state:** the [Rust-owned DH full-data source](RUST-DH-SOURCE.md)
+> supersedes this page's descriptions of Java fallback, compatibility,
+> descriptor and decline routes, Java-held lists, resizable metadata and the
+> Java footprint map; those no longer exist. Ownership details and historical
+> results below remain as recorded.
+
 Rust captures immutable four-column
 footprints, clips source contributors and remaps their packed material IDs.
 Source updates and DTO loading retain direct CPU readers. With semantic

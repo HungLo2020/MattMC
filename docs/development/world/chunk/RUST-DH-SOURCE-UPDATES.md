@@ -1,5 +1,11 @@
 # Rust DH source updates
 
+> **Current state:** the [Rust-owned DH full-data source](RUST-DH-SOURCE.md)
+> supersedes this page's descriptions of Java fallback, compatibility,
+> descriptor and decline routes, Java-held lists, resizable metadata and the
+> Java footprint map; those no longer exist. Ownership details and historical
+> results below remain as recorded.
+
 The same-detail recipient merge runs
 through Rust preparation and publication over existing native point owners.
 Preparation reads the [retained source table](RUST-DH-SOURCE-TABLE.md) directly.

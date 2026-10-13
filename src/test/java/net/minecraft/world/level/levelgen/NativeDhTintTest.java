@@ -65,14 +65,16 @@ class NativeDhTintTest {
         try {var jobs=new ArrayList<Future<?>>();for(int thread=0;thread<4;thread++){int id=thread;jobs.add(pool.submit(()->{var key=new NativeDhTintCache.BiomeIdentity("test:thread_"+id);for(int i=0;i<2000;i++){a.put(key,i);assertEquals((1L<<32)|i,b.get(key));}}));}for(var job:jobs)job.get(30,TimeUnit.SECONDS);}
         finally{pool.shutdownNow();assertTrue(pool.awaitTermination(30,TimeUnit.SECONDS));}
     }
-    @Test void customColumnDeclinesWithoutPositionMutationAndReadOnlySpansRefreshAfterGrowth() throws Exception {
+    @Test void copiedColumnsBlendAndBadColumnsDeclineWithoutPositionMutation() throws Exception {
         var cache=new NativeDhTintCache("test:decline");var center=biome("test:decline_center");cache.put(center.nativeTintIdentity(),0xff123456);
         try(var source=FullDataSourceV2.createEmpty(6)) {
             source.mapping.addIfNotPresentAndGetId(center,BlockStateWrapper.AIR);
             var pos=new DhBlockPosMutable(30,0,30);
+            // A Java list is bound as a native copy, so the native blend admits it.
             source.setColumn(30*64+30,new it.unimi.dsi.fastutil.longs.LongArrayList(new long[]{1L<<32}));
-            assertFalse(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(30,pos.getX());assertEquals(30,pos.getZ());
+            assertTrue(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,cache.blendedColor());
             assertScratchReleasedColumns();
+            pos=new DhBlockPosMutable(30,0,30);
             var nativeList=NativeDhColumnList.empty();source.setColumn(30*64+30,nativeList);
             nativeList.add(1L<<32);assertTrue(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,cache.blendedColor());
             pos=new DhBlockPosMutable(30,0,30);nativeList.clear();for(int i=0;i<100;i++)nativeList.add(1L<<32);
@@ -125,7 +127,7 @@ class NativeDhTintTest {
         }finally{config.setWithoutFiringEvents(saved);registryCache.remove(first.getSerialString());registryCache.remove(second.getSerialString());}
     }
 
-    @Test void retainedSourceAliasesFollowFirstWritesGrowthReplacementAndCompatibilityEscapes() throws Exception {
+    @Test void boundCopiesStayIndependentAndRetainedReadersFollowGrowthAndReplacement() throws Exception {
         var cache = new NativeDhTintCache("test:retained_sources");
         var center = biome("test:retained_center"); var other = biome("test:retained_other");
         cache.put(center.nativeTintIdentity(), 0xff123456); cache.put(other.nativeTintIdentity(), 0xffabcdef);
@@ -136,28 +138,27 @@ class NativeDhTintTest {
                 source.mapping.addIfNotPresentAndGetId(center, BlockStateWrapper.AIR);
                 source.mapping.addIfNotPresentAndGetId(other, BlockStateWrapper.AIR);
             }
-            var shared = a.getColumn(index); retained = shared; b.setColumn(index, shared); a.setColumn(index+1, shared);
-            shared.add(1L<<32); // First materialization publishes to all three slots.
+            var shared = a.getColumn(index); retained = shared;
+            shared.add(1L<<32); // The first write materializes a's column.
+            b.setColumn(index, shared); a.setColumn(index+1, shared); // Both bind native copies.
+            assertNotSame(shared, b.getColumn(index)); assertNotSame(shared, a.getColumn(index+1));
             for (var source : List.of(a,b)) {
                 assertTrue(directSourceBlend(cache, center.nativeTintIdentity(), source, new DhBlockPosMutable(30,0,30),0,1));
                 assertEquals(0xff123456, cache.blendedColor());
             }
+            // Growth of a's reader reaches a's table only (its neighbor's copy is cleared first).
+            a.setColumn(index+1, null);
             shared.clear(); for(int i=0;i<200;i++)shared.add((1L<<32)|1);
+            assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
+            assertEquals(0xffabcdef,cache.blendedColor());
+            assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),b,new DhBlockPosMutable(30,0,30),0,1));
+            assertEquals(0xff123456,cache.blendedColor());
             var replacement = NativeDhColumnList.empty(); replacement.add(1L<<32);
             a.setColumn(index,replacement); a.setColumn(index+1,null);
             var escaped = a.columnReferences(); escaped[index] = shared;
             assertSame(replacement,a.getColumn(index),"Structural escapes cannot replace native slots");
             assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
             assertEquals(0xff123456,cache.blendedColor());
-            assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),b,new DhBlockPosMutable(30,0,30),0,1));
-            assertEquals(0xffabcdef,cache.blendedColor());
-            var legacy = new it.unimi.dsi.fastutil.longs.LongArrayList(); a.setColumn(index,legacy);
-            assertFalse(directSourceBlend(cache,center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
-            assertTrue(cache.tryBlend(center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
-            assertEquals(0xff123456,cache.blendedColor());
-            legacy.add((1L<<32)|1); // Mutating the retained legacy object preserves compatibility.
-            assertFalse(cache.tryBlend(center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
-
         }
         retained.set(0,1L<<32); // Retained lists remain valid after both sources close.
         assertEquals(1L<<32,retained.getLong(0));
@@ -173,7 +174,8 @@ class NativeDhTintTest {
                 int index=-1;
                 for(int i=0;i<4096;i++)if(!input.getColumn(i).isEmpty()){index=i;break;}
                 assertTrue(index>=0); var list=(NativeDhColumnList)input.getColumn(index);
-                assertTrue(input==source ? list.isOriginalProducerView() : list.isOriginalParentView());
+                // The producer cell is its original span; parent cells are owned Rust columns.
+                assertEquals(input==source, list.isOriginalProducerView());
                 int detail=com.seibel.distanthorizons.core.pos.DhSectionPos.getDetailLevel(input.getPos())-6;
                 int x=com.seibel.distanthorizons.core.pos.DhSectionPos.getMinCornerBlockX(input.getPos())+(index/64)*(1<<detail);
                 int z=com.seibel.distanthorizons.core.pos.DhSectionPos.getMinCornerBlockZ(input.getPos())+(index%64)*(1<<detail);
@@ -182,7 +184,7 @@ class NativeDhTintTest {
                 assertTrue(directSourceBlend(cache,biome,input,new DhBlockPosMutable(x,y,z),-64,3));
                 assertEquals(0xff579bdf,cache.blendedColor());
                 list.clear(); list.add(point);
-                assertFalse(list.isOriginalProducerView()); assertFalse(list.isOriginalParentView());
+                assertFalse(list.isOriginalProducerView());
                 assertTrue(directSourceBlend(cache,biome,input,new DhBlockPosMutable(x,y,z),-64,3));
                 assertEquals(0xff579bdf,cache.blendedColor());
             }

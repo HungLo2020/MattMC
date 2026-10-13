@@ -1,7 +1,7 @@
 //! Frozen's complete same-detail recipient merge, prepared before publication.
 //! Java supplies source facts/CPU views; Rust owns policy and replacement vectors.
 use super::{contributors::{capture, Snapshot}, mutable::Column};
-use std::{mem::align_of, ptr, slice};
+use std::{mem::align_of, ptr, slice, sync::Arc};
 const WIDTH: usize = 4096;
 static ALL_COLUMNS: [u32; WIDTH] = {
     let mut indices=[0u32;WIDTH];let mut i=0;
@@ -33,7 +33,8 @@ pub(crate) struct Merge<'a> {
     counts: Box<[u16]>,
     descriptors: Option<Box<[[usize; 8]]>>,
     actions: Vec<u32>,
-    _footprints: Vec<Snapshot>,
+    /// Admitted footprints by ascending cell index; descriptors borrow them.
+    footprints: Vec<(u32, Arc<Snapshot>)>,
     changed: bool,
     committed: bool,
     target_source: Option<(*const super::source::Source, u64)>,
@@ -72,7 +73,7 @@ fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<
         metadata: vec![[0; 2]; WIDTH].into_boxed_slice(), hashes: vec![0; WIDTH].into_boxed_slice(),
         counts: vec![0;WIDTH].into_boxed_slice(),
         descriptors: None,
-        actions: Vec::new(), _footprints: Vec::new(), changed: false, committed: false, target_source: None,
+        actions: Vec::new(), footprints: Vec::new(), changed: false, committed: false, target_source: None,
         source_proof: None, producer_mapping: None, reused: [0; WIDTH / 64], writes: Vec::new(),
         identity_remap: remap.iter().enumerate().all(|(i,&id)| id as i64 == i as i64) };
     for (index, input) in inputs.enumerate() {
@@ -104,7 +105,7 @@ fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<
             if let Some(footprint) = footprint(index) {
                 let snapshot = capture(footprint, Some(remap), 256)?;
                 result.descriptors.get_or_insert_with(||vec![EMPTY_DESCRIPTOR;WIDTH].into_boxed_slice())[index] = snapshot.descriptors();
-                result._footprints.push(snapshot); retained += 1;
+                result.footprints.push((index as u32, Arc::new(snapshot))); retained += 1;
                 footprint_admitted = true;
             }
         }
@@ -158,7 +159,7 @@ pub unsafe extern "C" fn mattmc_dh_same_detail_sources(
     remap: *const i32, count: i32, retained: i32,
 ) -> *mut Merge<'static> {
     if facts.is_null() { return ptr::null_mut(); }
-    sources_data(target, source, facts, ptr::null(), footprints, footprint_count, remap, count, retained)
+    sources_data(target, source, facts, ptr::null(), footprints, footprint_count, remap, count, retained, false)
 }
 /// Ordinary source metadata is authoritative Rust data; only sparse footprint membership is transported.
 #[no_mangle]
@@ -168,12 +169,35 @@ pub unsafe extern "C" fn mattmc_dh_same_detail_owned(
     remap: *const i32, count: i32, retained: i32,
 ) -> *mut Merge<'static> {
     if previous.is_null() { return ptr::null_mut(); }
-    sources_data(target, source, ptr::null(), previous, footprints, footprint_count, remap, count, retained)
+    sources_data(target, source, ptr::null(), previous, footprints, footprint_count, remap, count, retained, false)
+}
+/// The production same-detail merge: metadata and footprints are read from the
+/// two source tables (the recipient's presence and count, the input's
+/// snapshots). Publish admitted footprints with `publish_footprints` after commit.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_same_detail_source_owned(
+    target: *const super::source::Source, source: *const super::source::Source, remap: *const i32, count: i32,
+) -> *mut Merge<'static> {
+    let Some(recipient) = target.as_ref() else { return ptr::null_mut(); };
+    let previous: Vec<u8> = (0..WIDTH).map(|i| u8::from(recipient.footprint(i).is_some())).collect();
+    sources_data(target, source, ptr::null(), previous.as_ptr(), ptr::null(), 0, remap, count, recipient.footprint_count() as i32, true)
+}
+/// Apply a committed merge's footprint actions to its recipient, in cell order:
+/// each acted cell loses its old footprint and takes the admitted one, if any.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_same_detail_publish_footprints(owner: *const Merge<'_>, target: *mut super::source::Source) -> i32 {
+    let (Some(merge), Some(source)) = (owner.as_ref(), target.as_mut()) else { return -1; };
+    if !merge.committed || merge.target_source.is_none_or(|(p, _)| p != target as *const _) { return -1; }
+    for &index in &merge.actions {
+        let admitted = merge.footprints.binary_search_by_key(&index, |(i, _)| *i).ok().map(|at| merge.footprints[at].1.clone());
+        source.set_footprint(index as usize, admitted);
+    }
+    merge.actions.len() as i32
 }
 unsafe fn sources_data(
     target: *const super::source::Source, source: *const super::source::Source,
     facts: *const u8, previous: *const u8, footprints: *const usize, footprint_count: i32,
-    remap: *const i32, count: i32, retained: i32,
+    remap: *const i32, count: i32, retained: i32, owned_footprints: bool,
 ) -> *mut Merge<'static> {
     if target.is_null() || source.is_null() || target == source
         || !(0..=4096).contains(&footprint_count) || count < 0 || retained < 0
@@ -228,7 +252,9 @@ unsafe fn sources_data(
         // value hash. Do not read a second point backing just to compare lengths.
         // Keep the real source span for explicit compatibility-copy consumers.
         let old=if reused_hash.is_some() {new} else {target.column(i)?};
-        if new.len()>4096 || old.len()>4096 {return None;}
+        // Only the descriptor compatibility routes bound column sizes; the
+        // owned route has none (oversized columns skip the fused hash).
+        if !owned_footprints && (new.len()>4096 || old.len()>4096) {return None;}
         let hash_hint = if reused_hash.is_some() { reused_hash }
             else if identity_remap && !input_owner.is_null()
                 && admit(old_generation[i] as i8,new_generation[i] as i8) {
@@ -240,7 +266,9 @@ unsafe fn sources_data(
             compression:compression[i] as i8,
             uniform:uniform[i]!=0,previous_footprint:previous[i]!=0 }, hash_hint, reused_hash.is_some()))
     });
-    build_columns(inputs, ids, retained as usize,|i|footprint_inputs.as_ref().and_then(|columns|columns[i])).map_or(ptr::null_mut(), |mut m| {
+    let source_footprints: &super::source::Source = source;
+    build_columns(inputs, ids, retained as usize,|i| if owned_footprints { source_footprints.footprint(i).map(|s| s.spans()) }
+        else { footprint_inputs.as_ref().and_then(|columns|columns[i]) }).map_or(ptr::null_mut(), |mut m| {
         m.target_source = Some((target_pointer, target.version()));
         m.source_proof = Some((source_pointer, source.version(), mapping)); Box::into_raw(Box::new(m))
     })
@@ -347,7 +375,7 @@ unsafe fn extent_projection(owner:*const Merge<'_>,views:*const usize,detached:*
     let views=slice::from_raw_parts(views,WIDTH*2);
     // Validate the whole input before writing, preserving decline-before-write.
     for i in 0..WIDTH {
-        if detached[i]>1 || owner.flags[i]&1!=0 && views[i*2+1]>4096{return -1;}
+        if detached[i]>1 {return -1;}
     }
     let mut rows=0;
     for &index in &owner.writes {let i=index as usize;

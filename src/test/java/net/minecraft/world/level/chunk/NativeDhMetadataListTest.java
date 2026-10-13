@@ -15,29 +15,28 @@ class NativeDhMetadataListTest {
         assertEquals(expected.hashCode(),actual.hashCode());
         assertArrayEquals(expected.toByteArray(),actual.toByteArray());
     }
-    @Test void mutableViewsMatchByteArrayListAcrossSignedValuesResizeAndIteratorEdits() {
+    @Test void fixedSizeViewsMatchByteArrayListForSignedValuesAndRejectStructuralEdits() {
         try(var source=new NativeDhSource(new LongList[4096])) {
             var actual=source.generation();var expected=new ByteArrayList(new byte[4096]);
             for(int i=0;i<4096;i++){actual.set(i,(byte)i);expected.set(i,(byte)i);}
             equal(expected,actual);
-            actual.size(4095);expected.size(4095);equal(expected,actual);
-            actual.size(5000);expected.size(5000);equal(expected,actual);
-            actual.addElements(7,new byte[]{-128,-1,0,127});expected.addElements(7,new byte[]{-128,-1,0,127});
-            actual.removeElements(10,90);expected.removeElements(10,90);equal(expected,actual);
             var a=actual.listIterator(20);var e=expected.listIterator(20);
             assertEquals(e.nextByte(),a.nextByte());a.set((byte)-65);e.set((byte)-65);
-            a.add((byte)17);e.add((byte)17);assertEquals(e.previousByte(),a.previousByte());a.remove();e.remove();
-            actual.subList(1,4).clear();expected.subList(1,4).clear();equal(expected,actual);
+            assertEquals(e.previousByte(),a.previousByte());equal(expected,actual);
             byte[] copied=new byte[30];actual.getElements(4,copied,3,20);
             byte[] other=new byte[30];expected.getElements(4,other,3,20);assertArrayEquals(other,copied);
             actual.setElements(3,new byte[]{99,-128});expected.setElements(3,new byte[]{99,-128});equal(expected,actual);
-            assertThrows(IndexOutOfBoundsException.class,()->actual.addElements(0,new byte[2],0,3));equal(expected,actual);
-            assertThrows(IllegalArgumentException.class,()->actual.size(-1));equal(expected,actual);
-            actual.clear();expected.clear();
-            actual.addElements(0,new byte[]{1,2,3});expected.addElements(0,new byte[]{1,2,3});
-            actual.addAll(1,actual);expected.addAll(1,expected);equal(expected,actual);
-            actual.addAll(2,actual.subList(0,3));expected.addAll(2,expected.subList(0,3));equal(expected,actual);
-            actual.clear();expected.clear();actual.size(4096);expected.size(4096);equal(expected,actual);
+            var all=new byte[4096];java.util.Arrays.fill(all,(byte)-7);actual.setAll(all);expected.setElements(0,all);equal(expected,actual);
+            assertThrows(IllegalArgumentException.class,()->actual.setAll(new byte[4095]));
+            // One value per column: every structural edit is rejected without a change.
+            assertThrows(UnsupportedOperationException.class,()->actual.size(4095));
+            assertThrows(UnsupportedOperationException.class,()->actual.add((byte)1));
+            assertThrows(UnsupportedOperationException.class,()->actual.removeByte(0));
+            assertThrows(UnsupportedOperationException.class,()->actual.addElements(7,new byte[]{1}));
+            assertThrows(UnsupportedOperationException.class,()->actual.subList(1,4).clear());
+            assertThrows(UnsupportedOperationException.class,actual::clear);
+            actual.size(4096);actual.addElements(0,new byte[0]);actual.removeElements(5,5);
+            equal(expected,actual);assertEquals(4096,actual.size());
         }
     }
     @Test void retainedMetadataSurvivesSourceCloseAndSerializesAsIndependentValues() throws Exception {
@@ -47,7 +46,7 @@ class NativeDhMetadataListTest {
         source.close();assertFalse(source.isLive());
         assertEquals((byte)-128,generation.getByte(0));assertEquals((byte)127,compression.getByte(4095));
         assertTrue(source.uniform(0));assertFalse(source.uniform(123));
-        generation.add(0,(byte)31);compression.removeByte(4095);
+        generation.set(0,(byte)31);compression.set(4095,(byte)-1);
         var buffer=new ByteArrayOutputStream();try(var out=new ObjectOutputStream(buffer)){out.writeObject(generation);}
         ByteList restored;try(var in=new ObjectInputStream(new ByteArrayInputStream(buffer.toByteArray()))){restored=(ByteList)in.readObject();}
         equal(generation,restored);restored.set(0,(byte)9);assertEquals((byte)31,generation.getByte(0));

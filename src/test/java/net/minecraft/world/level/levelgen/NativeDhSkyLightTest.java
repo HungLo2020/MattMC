@@ -83,9 +83,9 @@ class NativeDhSkyLightTest {
     @Test
     void unsupportedSourcesDeclineWithoutChanges() throws Exception {
         try (var source = source(0, 5); var policy = NativeDhMaterials.create(source.mapping)) {
-            // A plain Java list column cannot be baked natively; nothing may change.
-            var custom = new LongArrayList(new long[] {FullDataPointUtil.encode(0, 4, 100, (byte) 0, (byte) 0)});
-            source.setColumn(0, custom);
+            // A point whose material has no mapping entry cannot be baked; nothing may change.
+            var unmapped = new LongArrayList(new long[] {FullDataPointUtil.encode(source.mapping.size(), 4, 100, (byte) 0, (byte) 0)});
+            source.setColumn(0, unmapped);
             var before = new LongArrayList[4096];
             for (int i = 0; i < 4096; i++) { var column = source.getColumn(i); before[i] = column == null ? null : new LongArrayList(column); }
             assertFalse(NativeDhSkyLight.tryBake(policy, source.nativeSource(), source.mapping.size(), 15));

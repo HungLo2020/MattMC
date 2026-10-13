@@ -22,11 +22,13 @@ def main():
     parser.add_argument("--frozen-classpath-file", type=Path, required=True)
     parser.add_argument("--current-classpath-file", type=Path, required=True)
     parser.add_argument("--native-dir", type=Path, required=True)
+    parser.add_argument("--frozen-native-dir", type=Path,
+                        help="native library for the Frozen-side classpath (default: --native-dir); use it to time another Current build")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--pairs", type=int, default=6)
     parser.add_argument("--rounds", type=int, default=1000)
     parser.add_argument("--warmup-rounds", type=int, default=1000)
-    parser.add_argument("--mode", choices=("create", "merge", "cull"), required=True)
+    parser.add_argument("--mode", choices=("create", "merge", "cull", "parent", "downsample"), required=True)
     args = parser.parse_args()
     if not 2 <= args.pairs <= 50 or args.rounds < 1 or args.warmup_rounds < 1:
         parser.error("pairs must be 2..50; measured and warmup rounds must be positive")
@@ -42,8 +44,9 @@ def main():
         shutil.copyfile(path, target / path.name)
     classpaths = {side: str(driver.resolve()) + ":" + path.read_text().strip()
                   for side, path in [("Frozen", args.frozen_classpath_file), ("Current", args.current_classpath_file)]}
-    native = args.native_dir / "mattmc_rust-linux-x64.so"
-    pins = {"native": digest(native), "driver": {p.name: digest(p) for p in classes}}
+    natives = {"Current": args.native_dir, "Frozen": args.frozen_native_dir or args.native_dir}
+    images = {side: path / "mattmc_rust-linux-x64.so" for side, path in natives.items()}
+    pins = {"native": {side: digest(path) for side, path in images.items()}, "driver": {p.name: digest(p) for p in classes}}
     protocol = {"scope": "synthetic CPU DH source lifecycle/update workload, not server ticks/FPS or gameplay acceptance",
                 "rounds": args.rounds, "warmup": f"five {args.warmup_rounds}-round rounds in every JVM", "pairs": args.pairs,
                 "order": [side for pair in range(args.pairs) for side in (["Frozen", "Current"] if pair % 2 == 0 else ["Current", "Frozen"])],
@@ -51,10 +54,10 @@ def main():
     (args.output / "protocol.json").write_text(json.dumps(protocol, indent=2) + "\n")
     rows = []
     for number, side in enumerate(protocol["order"]):
-        if digest(native) != pins["native"]:
+        if digest(images[side]) != pins["native"][side]:
             raise RuntimeError("Native image changed during timing")
         command = [str(args.java), "--enable-native-access=ALL-UNNAMED", "-Xmx2G",
-                   "-Dmattmc.rust.natives.dir=" + str(args.native_dir.resolve()), "-cp", classpaths[side],
+                   "-Dmattmc.rust.natives.dir=" + str(natives[side].resolve()), "-cp", classpaths[side],
                    "net.minecraft.world.level.levelgen.DhSourceVerification", str(args.rounds), str(args.warmup_rounds), args.mode]
         start = time.time_ns()
         result = subprocess.run(command, text=True, capture_output=True, timeout=180)
