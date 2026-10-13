@@ -1,9 +1,11 @@
 //! Java behavior binding leases. Native arrays own membership references.
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, MutexGuard};
+use super::super::entity_geometry::View;
 #[derive(Default)]
 struct Binding {
     generation: u32,
     references: usize,
+    geometry: Option<Arc<View>>,
 }
 struct State {
     rows: Vec<Binding>,
@@ -32,6 +34,7 @@ impl Bindings {
                 s.rows[slot as usize] = Binding {
                     generation,
                     references: 1,
+                    geometry: None,
                 };
                 return (u64::from(generation) << 32) | u64::from(slot);
             }
@@ -41,9 +44,18 @@ impl Bindings {
         s.rows.push(Binding {
             generation: 1,
             references: 1,
+            geometry: None,
         });
         (1u64 << 32) | u64::from(slot)
     }
+    pub(super) fn attach_geometry(&self, token: u64, view: Arc<View>) {
+        let mut s = self.state.lock().unwrap();
+        let row = &mut s.rows[token as u32 as usize];
+        assert_eq!(row.generation, (token >> 32) as u32);
+        assert!(row.references > 0);
+        row.geometry = Some(view);
+    }
+    pub(super) fn geometry(&self) -> Geometry<'_> { Geometry(self.state.lock().unwrap()) }
     pub(super) fn retain(&self, token: u64) {
         if token == 0 {
             return;
@@ -64,11 +76,22 @@ impl Bindings {
         assert!(row.references > 0);
         row.references -= 1;
         if row.references == 0 {
+            row.geometry = None;
             s.spare.push(token as u32);
             s.retired.push(token);
         }
     }
     pub(super) fn retired(&self) -> u64 {
         self.state.lock().unwrap().retired.pop().unwrap_or(0)
+    }
+}
+
+/// Lock once for a bounded scan, never for the subsequent Java callbacks.
+pub(super) struct Geometry<'a>(MutexGuard<'a, State>);
+impl Geometry<'_> {
+    pub(super) fn intersects(&self, token: u64, query: [f64; 6]) -> Option<bool> {
+        let row = self.0.rows.get(token as u32 as usize)?;
+        if row.generation != (token >> 32) as u32 || row.references == 0 { return None; }
+        row.geometry.as_ref()?.intersects(query)
     }
 }

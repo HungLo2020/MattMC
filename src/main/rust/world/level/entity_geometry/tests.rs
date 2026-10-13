@@ -103,7 +103,7 @@ fn null_reason_and_invalid_transitions_preserve_membership() {
 #[test]
 fn java_cpu_view_layout_is_stable() {
     use std::mem::{offset_of, size_of};
-    assert_eq!(size_of::<View>(), 160);
+    assert_eq!(size_of::<View>(), 168);
     assert_eq!(offset_of!(View, removal), 152);
     assert_eq!(offset_of!(View, indexed), 156);
     assert_eq!(offset_of!(View, culling), 72);

@@ -85,28 +85,23 @@ Follow the owner boundary relevant to the next change:
   through callback-validated pages. Java keeps atomic chunk references,
   scalar ring/range reads, radius relocation and
   callback delivery; public empty-set escape transfers membership to Java.
-- **Entity world state:** the [geometry slice](../world/entities/RUST-ENTITY-GEOMETRY.md)
-  owns primary position/bounds, coordinate-change policy and ordinary camera
-  queries in a per-world generational store. Java keeps immutable API projections,
-  callbacks and ordered extraction. The
-  [ticking-membership owner](../world/entities/RUST-ENTITY-ORDER.md) now connects
-  client/server membership and snapshot traversal to Rust; behavior callbacks
-  and simulation orchestration remain Java. The author reports geometry/ticking
-  CPU/live passes; the later removal-state/immediate-retirement slice extends
-  the geometry owner with reported CPU/live passes and a passing settled
-  four-mode matrix. The preceding ticking image's vanilla-p99 miss remains historical;
-  broad gameplay/streaming/memory acceptance remains open. Next move
-  section associations and remaining tracking orchestration onto native owners.
-  The [visible tracking registry](../world/entities/RUST-ENTITY-LOOKUP.md)
-  now owns ID/UUID entries and live ordered enumeration for client/server
-  consumers. Its author-recorded CPU/lifecycle and final settled timing checks
-  are scoped evidence; strict leash-crop and GUI crosshair differences remain
-  open, alongside the earlier same-native timing failure. Section membership
-  and persistence admission remain Java. Then migrate motion/collision producers
-  and their consumers. AI, synchronized
-  data and networking need separate behavior and realistic performance checks.
-  See the release-specific results and limits in the
-  [current performance boundary](../rendering/GAMEPLAY-PERFORMANCE.md#current-hardware-evidence-boundary).
+- **Entity world state:** Rust owns [primary geometry and removal](../world/entities/RUST-ENTITY-GEOMETRY.md),
+  [ticking membership](../world/entities/RUST-ENTITY-ORDER.md),
+  [ID/UUID tracking](../world/entities/RUST-ENTITY-LOOKUP.md),
+  [section members and ordinary range scans](../world/entities/RUST-ENTITY-SECTIONS.md),
+  the [coordinate index](../world/entities/RUST-ENTITY-SECTION-INDEX.md), and
+  [residency/persistence admission](../world/entities/RUST-ENTITY-RESIDENCY.md).
+  The range-query owner joins retained members to primary geometry,
+  eliminating ordinary Java bounds scans. Full suites and the Frozen CPU oracle
+  pass, as do two image pairs and three lifecycle checks. Vanilla average FPS
+  misses Frozen by 1.5%, despite improved p99; small-section boundary cost and
+  the CPU gap remain open. Next join coordinate traversal, visibility and
+  member scanning into one world-query boundary, then move motion/collision
+  producers and consumers. Java still supplies API projections, behavior/type
+  callbacks, visibility transitions, persistence I/O, loading and simulation
+  orchestration. AI, synchronized data and networking remain migration work.
+  Historical image/FPS results do not certify current broad gameplay, streaming,
+  long-session memory, leash or HUD parity; see the linked subsystem reports.
 - **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),
   [section color fields](../world/biome/RUST-SECTION-COLORS.md),
   [live light layers](../world/lighting/RUST-LIVE-LAYERS.md) and the

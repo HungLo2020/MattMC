@@ -87,6 +87,45 @@ class EntityGeometryIntegrationTest {
         field(entity,"nativeGeometry",world.create(scope,0,0,0,new AABB(-.2,-.2,-.2,.2,.2,.2)));
         entity.setBoundingBox(new AABB(-.2,-.2,-.2,.2,.2,.2));return entity;
     }
+    @Test void sectionQueriesReadLiveGeometryAndPreserveCallbackMutation() throws Exception {
+        try(var scope=Arena.ofConfined()) {
+            var world=new NativeEntityGeometry();
+            Fixture first=fixture(world,scope), second=fixture(world,scope), third=fixture(world,scope);
+            first.setId(1);second.setId(2);third.setId(3);
+            var section=new net.minecraft.world.level.entity.EntitySection<Fixture>(Fixture.class,net.minecraft.world.level.entity.Visibility.TRACKED);
+            section.add(first);section.add(second);section.add(third);
+            var query=new AABB(-1,-1,-1,1,1,1);
+            var seen=new ArrayList<Fixture>();
+            section.getEntities(query,e->{seen.add(e);if(e==first)second.setBoundingBox(new AABB(10,10,10,11,11,11));return net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE;});
+            assertEquals(List.of(first,third),seen);
+            seen.clear();
+            section.getEntities(net.minecraft.world.level.entity.EntityTypeTest.forClass(Fixture.class),query,e->{seen.add(e);return net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE;});
+            assertEquals(List.of(first,third),seen);
+            assertThrows(java.util.ConcurrentModificationException.class,()->section.getEntities(query,e->{section.add(second);return net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE;}));
+            assertEquals(net.minecraft.util.AbortableIterationConsumer.Continuation.ABORT,section.getEntities(query,e->{section.remove(third);return net.minecraft.util.AbortableIterationConsumer.Continuation.ABORT;}));
+        }
+    }
+    @Test void sectionQueriesDoNotSuppressCustomBoundsOrTypeCallbacks() throws Exception {
+        try(var scope=Arena.ofConfined()) {
+            var world=new NativeEntityGeometry();var entity=fixture(world,scope);
+            var section=new net.minecraft.world.level.entity.EntitySection<Fixture>(Fixture.class,net.minecraft.world.level.entity.Visibility.TRACKED);
+            section.add(entity);
+            var query=new AABB(-1,-1,-1,1,1,1);
+            var events=new ArrayList<String>();
+            entity.setBoundingBox(new AABB(10,10,10,11,11,11){@Override public boolean intersects(AABB other){events.add("custom");return true;}});
+            section.getEntities(query,e->{events.add("accept");return net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE;});
+            assertEquals(List.of("custom","accept"),events);
+            entity.setBoundingBox(null);
+            assertThrows(NullPointerException.class,()->section.getEntities(query,e->net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE));
+            entity.setBoundingBox(new AABB(10,10,10,11,11,11));events.clear();
+            var type=new net.minecraft.world.level.entity.EntityTypeTest<Fixture,Fixture>() {
+                public Class<Fixture> getBaseClass(){return Fixture.class;}
+                public Fixture tryCast(Fixture value){events.add("cast");value.setBoundingBox(query);return value;}
+            };
+            section.getEntities(type,query,e->{events.add("accept");return net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE;});
+            assertEquals(List.of("cast","accept"),events);
+        }
+    }
     @BeforeAll static void bootstrap(){SharedConstants.tryDetectVersion();Bootstrap.bootStrap();}
     @Test void removalRetiresCameraMembershipWhileRetainedEntityStaysQueryable() {
         var entity=new Fixture();entity.events=new ArrayList<>();

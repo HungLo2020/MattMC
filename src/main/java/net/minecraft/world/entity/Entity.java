@@ -3295,7 +3295,7 @@ public abstract class Entity
 	}
 
 	public final void setBoundingBox(AABB aABB) {
-		if(this.nativeGeometry!=null && aABB!=null)this.nativeGeometry.bounds(aABB);
+		if(this.nativeGeometry!=null)this.nativeGeometry.bounds(aABB);
 		this.nativeStandardBounds=aABB!=null && aABB.getClass()==AABB.class;
 		this.bb = aABB;
 	}

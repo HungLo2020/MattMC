@@ -9,6 +9,9 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
+import net.minecraft.world.entity.NativeEntityGeometry;
+import net.minecraft.world.phys.AABB;
 
 public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
 	// Class bindings preserve Java class identity/iteration; native groups own members.
@@ -22,13 +25,16 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
 		this.byClass.put(class_, this.allInstances);
 	}
 
-	public boolean add(T object) {
+    public boolean add(T object) { return add(object,null); }
+
+    /** Optional primary geometry is retained by the native membership binding. */
+    public boolean add(T object,NativeEntityGeometry.Body geometry) {
         long token=0;
         boolean added=false;
         try {
             for (var entry : this.byClass.entrySet()) {
                 if (entry.getKey().isInstance(object)) {
-                    if(token==0)token=this.nativeStorage.bind(object);
+                    if(token==0)token=this.nativeStorage.bind(object,geometry);
                     entry.getValue().append(token);
                     added=true;
                 }
@@ -67,6 +73,18 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
 			return (Collection<S>)Collections.unmodifiableCollection(list);
 		}
 	}
+
+    /** Rust scans attached stock geometry; bounds runs only for behavior requiring Java. */
+    public AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> consumer) {
+        return this.allInstances.forEachIntersecting(query,bounds,consumer);
+    }
+
+    @SuppressWarnings({"unchecked","rawtypes"})
+    public <S> AbortableIterationConsumer.Continuation forEachIntersecting(Class<S> type,AABB query,BiPredicate<? super S,AABB> bounds,AbortableIterationConsumer<? super S> consumer) {
+        this.find(type); // Preserve lazy class admission and group construction.
+        NativeClassInstanceStorage<S>.Group group=(NativeClassInstanceStorage.Group)this.byClass.get(type);
+        return group.forEachIntersecting(query,bounds,consumer);
+    }
 
 	public Iterator<T> iterator() {
 		return (Iterator<T>)(this.allInstances.isEmpty() ? Collections.emptyIterator() : Iterators.unmodifiableIterator(this.allInstances.iterator()));

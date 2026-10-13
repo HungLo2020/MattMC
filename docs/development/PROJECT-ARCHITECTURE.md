@@ -223,7 +223,10 @@ Full parity and Java removal remain open.
 
 The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
 retains primary position/bounds components per world and queries them directly
-for ordinary camera culling. Rust removal state retires camera membership
+for ordinary camera culling. The [section range-query owner](world/entities/RUST-ENTITY-SECTIONS.md#range-queries)
+links membership to those components and scans ordinary range queries in Rust;
+scoped correctness checks pass, while small-section CPU cost and the vanilla
+average-FPS floor remain open. Rust removal state retires camera membership
 at despawn while keeping primary geometry readable. The
 [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md) retains
 client/server insertion order and immutable tick snapshots. Java keeps API

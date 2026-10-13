@@ -5,6 +5,15 @@ use std::sync::{
     Arc, Mutex,
 };
 
+// A callback may mutate any subsequently visited entity. Range scans use this
+// conservative revision to invalidate prefetched matches across callbacks.
+// Membership mutations also advance it, including a wrapped Java modCount.
+static SPATIAL_REVISION: AtomicU64 = AtomicU64::new(1);
+pub(super) fn advance_spatial_revision() { SPATIAL_REVISION.fetch_add(1, Ordering::Release); }
+pub(super) fn bounds_revision() -> u64 { SPATIAL_REVISION.load(Ordering::Acquire) }
+#[no_mangle]
+pub extern "C" fn mattmc_entity_geometry_bounds_revision() -> *const AtomicU64 { &SPATIAL_REVISION }
+
 #[repr(C)]
 pub(crate) struct View {
     position: [AtomicU64; 3],
@@ -16,6 +25,7 @@ pub(crate) struct View {
     revision: AtomicU64,
     removal: AtomicI32,
     indexed: AtomicI32,
+    bounds_supported: AtomicI32,
 }
 impl View {
     fn new(position: [f64; 3], bounds: [f64; 6]) -> Self {
@@ -31,6 +41,7 @@ impl View {
             revision: AtomicU64::new(0),
             removal: AtomicI32::new(0),
             indexed: AtomicI32::new(1),
+            bounds_supported: AtomicI32::new(1),
         }
     }
     fn position(&self) -> [f64; 3] {
@@ -42,6 +53,15 @@ impl View {
         self.bounds
             .each_ref()
             .map(|v| f64::from_bits(v.load(Ordering::Relaxed)))
+    }
+    /// None requires the original Java bounds callback (custom or null bounds).
+    pub(super) fn intersects(&self, query: [f64; 6]) -> Option<bool> {
+        if self.bounds_supported.load(Ordering::Acquire) == 0 { return None; }
+        let coordinate = |i: usize| f64::from_bits(self.bounds[i].load(Ordering::Relaxed));
+        // Match Java's short circuit: rejected X bounds need no Y/Z reads.
+        Some(coordinate(0) < query[3] && coordinate(3) > query[0]
+            && coordinate(1) < query[4] && coordinate(4) > query[1]
+            && coordinate(2) < query[5] && coordinate(5) > query[2])
     }
     fn project_culling(&self) {
         let mut changed = false;
@@ -245,6 +265,11 @@ struct Binding {
 pub(crate) struct Body {
     binding: Mutex<Binding>,
 }
+impl Body {
+    pub(super) fn retained_view(&self) -> Arc<View> {
+        self.binding.lock().unwrap_or_else(|e| e.into_inner()).view.clone()
+    }
+}
 impl Drop for Body {
     fn drop(&mut self) {
         let binding = self.binding.get_mut().unwrap_or_else(|e| e.into_inner());
@@ -356,13 +381,16 @@ pub unsafe extern "C" fn mattmc_entity_geometry_change(
     }
     let flags = match mode {
         0 => binding.view.move_to([a, b, c]),
-        1 => {
+        1 | 2 => {
+            binding.view.bounds_supported.store(i32::from(mode == 1), Ordering::Release);
             for (target, value) in binding.view.bounds.iter().zip([a, b, c, d, e, f]) {
                 target.store(value.to_bits(), Ordering::Release);
             }
             binding.view.project_culling();
+            advance_spatial_revision();
             1
         }
+        3 => { binding.view.bounds_supported.store(0, Ordering::Release); advance_spatial_revision(); 0 }
         _ => return -1,
     };
     if flags != 0 && binding.id.is_some() {

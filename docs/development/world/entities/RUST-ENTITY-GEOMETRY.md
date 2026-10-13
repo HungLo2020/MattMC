@@ -1,7 +1,9 @@
 # Rust entity geometry
 
 Rust owns primary free-entity geometry, removal state and ordinary camera
-queries. Removal retires camera membership immediately while retaining readable
+queries. [Section range queries](RUST-ENTITY-SECTIONS.md#range-queries)
+also retain the primary view and invalidate batched results on bounds changes;
+custom bounds keep their Java callbacks. Removal retires camera membership immediately while retaining readable
 geometry and callback behavior. AI,
 physics integration and networking remain in Java. The subsequent
 [ticking membership slice](RUST-ENTITY-ORDER.md) moves snapshot/order storage

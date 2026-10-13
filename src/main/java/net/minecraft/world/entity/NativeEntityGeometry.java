@@ -24,6 +24,8 @@ public final class NativeEntityGeometry {
     private static final MethodHandle CHANGE=handle("change",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,
         ValueLayout.JAVA_INT,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,
         ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE));
+    private static final MethodHandle ATTACH_SECTION=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_members_attach_geometry",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle TRANSFER=handle("transfer",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle LIFECYCLE=handle("lifecycle",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
     private static final MethodHandle QUERY_ONE=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_entity_geometry_query_one",
@@ -68,7 +70,9 @@ public final class NativeEntityGeometry {
             try {
                 var bodyView=(MemorySegment)VIEW.invokeExact(pointer);
                 var bodyOwner=pointer.reinterpret(1,scope,NativeEntityGeometry::releaseBody);attached=true;
-                return new Body(this,bodyOwner,bodyView.reinterpret(160,scope,null).asReadOnly());
+                var body = new Body(this,bodyOwner,bodyView.reinterpret(160,scope,null).asReadOnly());
+                if(bounds.getClass()!=AABB.class)body.bounds(bounds);
+                return body;
             } finally {if(!attached)releaseBody(pointer);}
         } catch(Throwable failure) {throw failure(failure);}
         finally {Reference.reachabilityFence(this);}
@@ -90,7 +94,17 @@ public final class NativeEntityGeometry {
         private Body(NativeEntityGeometry world,MemorySegment owner,MemorySegment view) {this.world=world;this.owner=owner;this.view=view;}
         public NativeEntityGeometry world() {return world;}
         public int move(double x,double y,double z) {return change(0,x,y,z,0.0,0.0,0.0);}
-        public void bounds(AABB bounds) {change(1,bounds.minX,bounds.minY,bounds.minZ,bounds.maxX,bounds.maxY,bounds.maxZ);}
+        public void bounds(AABB bounds) {
+            if(bounds==null)change(3,0,0,0,0,0,0);
+            else change(bounds.getClass()==AABB.class?1:2,bounds.minX,bounds.minY,bounds.minZ,bounds.maxX,bounds.maxY,bounds.maxZ);
+        }
+        /** Links two retained CPU owners once; does not export a geometry array. */
+        public void attachSectionBinding(MemorySegment section,long token) {
+            try {
+                int status=(int)ATTACH_SECTION.invokeExact(section,token,owner);
+                if(status!=0)throw new IllegalStateException("Cannot attach section geometry");
+            }catch(Throwable failure){throw failure(failure);}finally{Reference.reachabilityFence(this);}
+        }
         private int change(int mode,double a,double b,double c,double d,double e,double f) {
             try {
                 int flags=(int)CHANGE.invokeExact(owner,mode,a,b,c,d,e,f);

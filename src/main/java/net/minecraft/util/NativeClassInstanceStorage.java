@@ -5,6 +5,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.ref.Reference;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.BiPredicate;
+import net.minecraft.world.entity.NativeEntityGeometry;
+import net.minecraft.world.phys.AABB;
 
 /** Behavior bindings over native section members; all membership arrays are Rust-owned. */
 final class NativeClassInstanceStorage<T> {
@@ -22,6 +25,25 @@ final class NativeClassInstanceStorage<T> {
     private static final MethodHandle CAPTURE=handle("capture",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE_CAPTURE=handle("release_capture",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle REMOVE=handle("remove",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
+    private static final MethodHandle INTERSECTIONS=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_members_intersections",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,
+            ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.ADDRESS,ValueLayout.JAVA_INT),Linker.Option.critical(true));
+    private static final MemorySegment BOUNDS_REVISION=boundsRevisionView();
+    private static MemorySegment boundsRevisionView() {
+        try {
+            var call=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_entity_geometry_bounds_revision",FunctionDescriptor.of(ValueLayout.ADDRESS));
+            return ((MemorySegment)call.invokeExact()).reinterpret(8).asReadOnly();
+        }catch(Throwable t){throw failure(t);}
+    }
+    private static final java.lang.invoke.VarHandle REVISION=ValueLayout.JAVA_LONG.varHandle();
+    private static long boundsRevision(){return (long)REVISION.getAcquire(BOUNDS_REVISION,0L);}
+    private static final class Matches {
+        final long[] rows=new long[130];
+        final MemorySegment output=MemorySegment.ofArray(rows);
+        boolean busy;
+    }
+    private static final ThreadLocal<Matches> MATCHES=ThreadLocal.withInitial(Matches::new);
     private final Arena scope;
     private final MemorySegment owner;
     private Object[] bindings=new Object[16];
@@ -53,12 +75,14 @@ final class NativeClassInstanceStorage<T> {
         }catch(Throwable t){throw failure(t);}
     }
     @SuppressWarnings("unchecked") private T object(long token){return token==0?null:(T)bindings[(int)token];}
-    long bind(T object) {
+    long bind(T object,NativeEntityGeometry.Body geometry) {
         long token=0;
         try {
             token=(long)ALLOCATE.invokeExact(owner);int slot=(int)token;
             if(slot>=bindings.length){int size=Math.max(slot+1,Math.multiplyExact(bindings.length,2));bindings=Arrays.copyOf(bindings,size);generations=Arrays.copyOf(generations,size);}
-            bindings[slot]=object;generations[slot]=token;return token;
+            bindings[slot]=object;generations[slot]=token;
+            if(geometry!=null)geometry.attachSectionBinding(owner,token);
+            return token;
         }catch(Throwable t){
             if(token!=0)finish(token);
             throw failure(t);
@@ -170,6 +194,39 @@ final class NativeClassInstanceStorage<T> {
                 return false;
             }
         }
+        AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> consumer) {
+            // Preserve empty/null and custom callback failure timing.
+            if(query==null) {
+                for(T value:this)if(bounds.test(value,query) && consumer.accept(value).shouldAbort())return AbortableIterationConsumer.Continuation.ABORT;
+                return AbortableIterationConsumer.Continuation.CONTINUE;
+            }
+            if(isEmpty())return AbortableIterationConsumer.Continuation.CONTINUE;
+            var reusable=MATCHES.get();var matches=reusable.busy?new Matches():reusable;matches.busy=true;
+            int cursor=0,expected=modifications(),count=0,consumed=0,scannedUntil=0;
+            long revision=-1;
+            try {
+                while(cursor!=size()) {
+                    if(expected!=modifications())throw new ConcurrentModificationException();
+                    if(consumed==count || revision!=boundsRevision()) {
+                        count=(int)INTERSECTIONS.invokeExact(owner,id,cursor,expected,query.minX,query.minY,query.minZ,query.maxX,query.maxY,query.maxZ,matches.output,128);
+                        if(count==-2)throw new ConcurrentModificationException();
+                        if(count==-3)throw new NoSuchElementException();
+                        if(count<0)throw new IllegalStateException("Invalid section query");
+                        if(count==0)return AbortableIterationConsumer.Continuation.CONTINUE;
+                        revision=matches.rows[0];scannedUntil=(int)matches.rows[1];consumed=0;
+                    }
+                    long next=matches.rows[2+consumed++];
+                    int index=(int)(next>>>32)&Integer.MAX_VALUE;cursor=index+1;
+                    T value=object(next);
+                    if((next<0 || bounds.test(value,query)) && consumer.accept(value).shouldAbort())return AbortableIterationConsumer.Continuation.ABORT;
+                    // Only skip a prefetched rejected tail if callbacks left it valid.
+                    if(consumed==count && revision==boundsRevision() && expected==modifications())cursor=scannedUntil;
+                }
+                return AbortableIterationConsumer.Continuation.CONTINUE;
+            }catch(Throwable t){throw NativeClassInstanceStorage.<RuntimeException>propagate(t);}
+            finally{matches.busy=false;Reference.reachabilityFence(NativeClassInstanceStorage.this);}
+        }
+
         @Override public Iterator<T> iterator() {
             return new Iterator<>() {
                 int cursor;final int expected=modifications();

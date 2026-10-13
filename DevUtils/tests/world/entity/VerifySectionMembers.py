@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import statistics
 
 ROOT = Path(__file__).resolve().parents[4]
 FROZEN = ROOT.parent / 'MattMC_JavaPerfTesting/MattMC'
@@ -29,6 +30,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--java-scan-control-ref", default="49e26cd8a7c31b6500a20ab39fa2aad8eef14d04", help="Published Java scan source used by --benchmark; remaining classes/native image stay current")
     args = parser.parse_args()
     if not args.java_home:
         parser.error('--java-home or JAVA_HOME must identify JDK25')
@@ -69,11 +72,13 @@ def main():
     try:
         counts = {}
         images = {}
+        classpaths = {}
         for side, repo in [('frozen', FROZEN), ('current', ROOT)]:
             data = run([str(repo / 'gradlew'), '-q', '-I', str(init),
                         'sectionMembersRuntimeClasspath'], side + '-classpath.log', repo)
             cp = next(line.removeprefix('MEMBERS_CP ') for line in data.splitlines()
                       if line.startswith('MEMBERS_CP '))
+            classpaths[side] = cp
             target = output / 'oracle' / side
             target.mkdir(parents=True)
             run([str(jdk / 'javac'), '-cp', cp, '-d', str(target),
@@ -82,7 +87,12 @@ def main():
             # HotSpot can drop messages from repeatedly thrown VM exceptions.
             # Compare full production failure messages on both sides, without
             # normalizing observer output or changing either implementation.
-            command = [str(jdk / 'java'), '-XX:-OmitStackTraceInFastThrow']
+            # Class-key HashMap order otherwise depends on VM identity hashes,
+            # an uncontrolled input between the two separate processes. Fix
+            # identity hashes for this callback oracle only; benchmarks and
+            # gameplay retain the normal VM policy. Frozen source is unchanged.
+            command = [str(jdk / 'java'), '-XX:-OmitStackTraceInFastThrow',
+                       '-XX:+UnlockExperimentalVMOptions', '-XX:hashCode=2']
             if side == 'current':
                 command += ['--enable-native-access=ALL-UNNAMED',
                             '-Dmattmc.rust.natives.dir=' + str(native.parent)]
@@ -104,7 +114,7 @@ def main():
                             if (Path(base) / resource).is_file())
                 assert path.is_relative_to(repo) and sha(path) == digest
                 checked[str(path)] = digest
-            assert len(checked) == (7 if side == 'current' else 2)
+            assert len(checked) == (13 if side == 'current' else 6)
             images[side] = checked
             if side == 'current':
                 assert 'NATIVE_IMAGE ' + pins['native'] + ' ' + str(native) in data
@@ -120,6 +130,46 @@ def main():
                       fixture_sha256=sha(output / 'frozen-members.txt'),
                       driver_classes={str(p.relative_to(output / 'oracle')): sha(p)
                                       for p in (output / 'oracle').rglob('*.class')})
+        if args.benchmark:
+            # Compile the published Java scan into an isolated classpath overlay.
+            # Everything else (including native library) is the candidate image;
+            # this is a consumer control, not a historical whole-game binary.
+            control=output / 'oracle' / 'java_scan_control'
+            control.mkdir()
+            control_sources=[]
+            for name in ('net/minecraft/util/ClassInstanceMultiMap.java','net/minecraft/util/NativeClassInstanceStorage.java',
+                         'net/minecraft/world/level/entity/EntitySection.java','net/minecraft/world/level/entity/EntityTypeTest.java'):
+                target=output / 'control-source' / name
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_bytes(subprocess.check_output(['git','show',args.java_scan_control_ref+':src/main/java/'+name],cwd=ROOT))
+                control_sources.append(str(target))
+            classpaths['java_scan_control']=classpaths['current']
+            run([str(jdk / 'javac'),'-cp',classpaths['current'],'-d',str(control)]+control_sources+
+                [str(ROOT / 'DevUtils/tests/world/entity/VerifySectionMembers.java')], 'compile-control.log')
+            result['java_scan_control']={'source_commit':subprocess.check_output(['git','rev-parse',args.java_scan_control_ref],cwd=ROOT,text=True).strip(),
+                'sources':{p:sha(Path(p)) for p in control_sources},'scope':'Published Java scan/membership adapters, candidate native image and remaining classes.'}
+            for key in ('JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS'):
+                env.pop(key,None)
+            for side in ('frozen','current','java_scan_control'):
+                target=output / 'oracle' / side
+                run([str(jdk / 'javac'),'-cp',str(target)+os.pathsep+classpaths[side],'-d',str(target),
+                     str(ROOT / 'DevUtils/tests/world/entity/BenchmarkSectionQueries.java')], 'compile-benchmark-'+side+'.log')
+            samples={'current':[],'frozen':[],'java_scan_control':[]}
+            for index,side in enumerate(['current','frozen','java_scan_control']*3):
+                command=[str(jdk / 'java'),'-Xms1g','-Xmx1g','-XX:+UseG1GC']
+                if side!='frozen':command+=['--enable-native-access=ALL-UNNAMED','-Dmattmc.rust.natives.dir='+str(native.parent)]
+                command+=['-cp',str(output / 'oracle' / side)+os.pathsep+classpaths[side],'BenchmarkSectionQueries']
+                data=run(command,f'benchmark-{index}-{side}.log')
+                lines=[line.split('[STDOUT]: ',1)[-1] for line in data.splitlines()]
+                rows=[list(map(int,line.split()[1:])) for line in lines if line.startswith('SECTION_TIMING ')]
+                assert len(rows)==96
+                samples[side].extend(rows)
+            summaries={}
+            for size,hits in {(r[0],r[1]) for r in samples['current']}:
+                matching={side:[r for r in rows if r[:2]==[size,hits]] for side,rows in samples.items()}
+                assert len({r[4] for rows in matching.values() for r in rows})==1
+                summaries[f'{size}-members-{hits}-hits']={side:{'median_ms':statistics.median(r[2] for r in rows)/1e6,'median_java_bytes':statistics.median(r[3] for r in rows)} for side,rows in matching.items()}
+            result['benchmark']={'scope':'32768 production section queries per sample; prebuilt entities. Nine alternating JVMs, five warmups/eight samples per workload. Excludes gameplay/GPU/native allocation.', 'samples':samples,'summaries':summaries}
     finally:
         result['guards_pass'] = (sources(ROOT) == pins['current']
                                 and sources(FROZEN) == pins['frozen']

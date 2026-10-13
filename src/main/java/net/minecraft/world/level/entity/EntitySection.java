@@ -20,7 +20,7 @@ public class EntitySection<T extends EntityAccess> {
 	}
 
 	public void add(T entityAccess) {
-		this.storage.add(entityAccess);
+		this.storage.add(entityAccess, entityAccess instanceof net.minecraft.world.entity.Entity entity ? entity.nativeCullingGeometry() : null);
 	}
 
 	public boolean remove(T entityAccess) {
@@ -28,18 +28,15 @@ public class EntitySection<T extends EntityAccess> {
 	}
 
 	public AbortableIterationConsumer.Continuation getEntities(AABB aABB, AbortableIterationConsumer<T> abortableIterationConsumer) {
-		for (T entityAccess : this.storage) {
-			if (entityAccess.getBoundingBox().intersects(aABB) && abortableIterationConsumer.accept(entityAccess).shouldAbort()) {
-				return AbortableIterationConsumer.Continuation.ABORT;
-			}
-		}
-
-		return AbortableIterationConsumer.Continuation.CONTINUE;
+        return this.storage.forEachIntersecting(aABB,EntitySection::intersectsBounds,abortableIterationConsumer);
 	}
 
 	public <U extends T> AbortableIterationConsumer.Continuation getEntities(
 		EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<? super U> abortableIterationConsumer
 	) {
+        if(entityTypeTest instanceof EntityTypeTest.ClassTest<T,U> stock) {
+            return this.storage.forEachIntersecting(stock.getBaseClass(),aABB,EntitySection::intersectsBounds,abortableIterationConsumer);
+        }
 		Collection<? extends T> collection = this.storage.find(entityTypeTest.getBaseClass());
 		if (collection.isEmpty()) {
 			return AbortableIterationConsumer.Continuation.CONTINUE;
@@ -54,6 +51,10 @@ public class EntitySection<T extends EntityAccess> {
 			return AbortableIterationConsumer.Continuation.CONTINUE;
 		}
 	}
+
+    private static boolean intersectsBounds(EntityAccess entityAccess,AABB aABB) {
+        return entityAccess.getBoundingBox().intersects(aABB);
+    }
 
 	public boolean isEmpty() {
 		return this.storage.isEmpty();

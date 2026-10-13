@@ -14,7 +14,7 @@
 - Rust owns renderer/GAL/presentation, terrain assembly/visibility, canonical block/biome sections, light fields and biome color windows.
 - Rust owns DH conversion policy/temporary points/color reuse, materials/topology/packets, retained visibility, primary full/render points and dense metadata, and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
-- Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index and manager residency serve production client/server consumers.
+- Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index/range scans and manager residency serve production client/server consumers.
 - Java retains entity simulation, behavior callbacks, visibility transitions, persistence I/O and the loading inbox.
 - Rust owns numerical fog policy, water transitions and rain history. Java retains ordered getters, environment dispatch/hooks and final scalar projections.
 - Rust owns atlases/model baking, ordinary GUI item templates and the star-field producer. Java retains font/layout and remaining frame-input extraction/orchestration.
@@ -25,22 +25,12 @@
 - ae7f499b3: entity UUID/chunk residency and persistence admission. 1a977b9db: fog numerical policy.
 - 61805d6dc: retained light queues/sky seeds. 8e16a569c: direct block-light inputs and bulk DH column resizing. 7acbefd0f: matched performance/memory reports.
 - b6a0f89ca: primary Rust DH point codecs and lazy closed-source readers. Real24-DTO hydration improved29.4%; historical matrix still missed the DH FPS floor5.8%.
-- Integrated upstream f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
+- Integrated upstream5f7b28a97 (DH sky light, saved contributor batches, fresh chunk slabs) preserving all19 entity-query paths; combined Rust2743/Java2068 pass. Earlier: f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
 - Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
 
-## Historical metadata and bulk-IO checkpoint
+## Earlier evidence
 
-- Rust payload policy and bulk byte-array IO match Frozen606 metadata and696830 point rows. Real24-DTO hydration78.73/43.62/41.51ms predecessor/Current/Frozen; Current44.6% faster predecessor,5.1% slower Frozen.
-- Full Rust2723/Java2043, seven lifecycle/three settled pairs and20 matched frame windows passed at native691c0b95. This historical matrix does not verify later binaries; original failures/profiles remain in build/native-dh-metadata-codec/ and world/chunk/RUST-DH-METADATA-CODEC.md.
-
-## Verified light-section input checkpoint
-
-- Removed ordinary live-section export into the Java callback buffer; Rust now captures/maps primary packed inputs directly into the existing pass snapshot. Typed CPU lease pins the owner; no mutable generation is retained across callbacks.
-- Rust2725/3ignored, Java2043/2skip and actual Frozen437089 rows/492 passes match; six primary-owner probes and all guards pass.
-- Twelve predecessor/current workload timings: terrain18.785/18.787ms,edits10.589/10.569ms,nether6.878/6.874ms. Effectively unchanged; no isolated speedup claimed.
-- Seven lifecycle cases and three settled pairs pass,VUID0;13 originals/10 Current identities reviewed. Gate haze proves structural behavior only. Unpinned first gate was automatically retired; pinned replacement proof passes and remains present.
-- All20 measured6000-frame runs clean with matched live JVM controls. Current/Frozen FPS1178.80/1162.10,803.15/669.25,348.40/316.40,263.80/227.30; p99ms3.752/4.111,3.116/6.331,4.791/7.003,6.577/8.755. All scene floors pass.
-- Earlier DH startup failed RSS12.95GiB/0 frames. Current game-only JFR completes9.02GiB; predecessor CPU-bridge control9.82GiB fails clean shutdown. Peak remains unroot-caused; sampled DH arrays/adapters are allocation evidence, not a retained-memory bound.
+- Historical metadata/IO results and retained failures: world/chunk/RUST-DH-METADATA-CODEC.md. Direct light-section inputs and their CPU/runtime results: world/lighting/RUST-LIGHT-SECTION-INPUTS.md and rendering/GAMEPLAY-PERFORMANCE.md. Those older binaries do not verify current sources.
 
 ## Render-source storage checkpoint
 
@@ -78,10 +68,18 @@
 - One clean6000-frame vanilla pair:1320.6/1068.7FPS and p993.736/4.428ms Current/Frozen. Two settled image pairs and three lifecycle cases pass,VUID0; seven originals/five presenter identities/six native images reviewed. Gate haze establishes structural evidence only; no new all-mode acceptance.
 - Sources/native/Frozen guards pass. Retired nine completed world copies; lossless profile JSON archival reclaimed625594176bytes, originals retained. Guide: world/biome/RUST-LIVE-BIOMES.md; receipts: build/native-biome-query/.
 
+## Entity range-query checkpoint
+
+- Rust scans retained membership/primary bounds for ordinary untyped and stock-class queries; Java receives bounded match batches. Geometry/membership revisions preserve mutations between callbacks; custom bounds/types retain ordered callbacks.
+- Integrated upstream5f7b28a97 without conflict; native066c6679 passes Rust2743/3ignored, Java2068/2skip and Frozen6403 cases with source/class/native guards. Default-hash class-map order failure retained; matched class-hash oracle controls that input.
+- CPU32768 queries over256 members: no-hit15.57/46.37/6.70ms and all-hit57.44/58.46/14.68ms Current/Java-scan-control/Frozen. No-hit CPU improves66.4% versus control; small sections regress and Frozen stays faster. Warmed Java allocation0; not a total-memory bound.
+- Two vanilla6000-frame pairs:1280.8/1326.8 and1357.1/1350.8FPS. Medians1318.95/1338.80FPS,p993.335/3.605ms Current/Frozen: FPS misses1.5%,p99 passes. Equal saved inputs/settings/heap/GC/JIT; slightly different live entity counts. No all-mode acceptance or isolated gameplay gain.
+- Two settled pairs/three lifecycles pass,VUID0; seven originals/five presenter identities reviewed. Hazy lifecycle views prove structural behavior only. Retired nine completed copied worlds; originals/failures retained. Guide: world/entities/RUST-ENTITY-SECTIONS.md; receipts: build/native-entity-range/.
+
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Next: use the fresh profile to target remaining world-state/frame-input preparation and move its producer/consumer together. Broader gameplay FPS, startup RSS, shutdown rejection and long memory remain open.
+- Next entity step: join native coordinate traversal, visibility and member scans to amortize small-section boundary cost; preserve live callbacks and cursor lifetimes.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.

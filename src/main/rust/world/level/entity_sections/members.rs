@@ -110,6 +110,7 @@ impl Members {
     }
     fn modified(&self) {
         self.view.modifications.fetch_add(1, Ordering::AcqRel);
+        super::super::entity_geometry::advance_spatial_revision();
     }
     pub(super) fn add(&mut self, token: u64) -> Result<(), AddError> {
         // Mirrors ArrayList.add's pre-growth modCount prefix.
