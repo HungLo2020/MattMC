@@ -80,6 +80,74 @@ fn decode(batches: &[FfiGuiMeshBatchRequest]) -> GalResult<Vec<GuiMeshBatchReque
 }
 
 #[test]
+fn flat_item_templates_match_inline_frames_with_live_foil_placement_and_clipping() {
+    let mut vertices = vertices();
+    for vertex in &mut vertices { vertex.source_face = 0; }
+    for scale in [1, 2, 4] {
+        for foil_kind in 0..3 {
+            let mut base = prototype(&vertices, &[0, 1, 2]);
+            base.block_item_layout = 0;
+            base.block_item_scale = 0;
+            base.block_model_bounds = [0.; 6];
+            base.item_raster_scale = scale;
+            base.lighting_mode = 1;
+            let mut prototypes = vec![base];
+            let mut selectors = vec![u32::MAX];
+            if foil_kind != 0 {
+                let mut foil = base;
+                foil.layer_index = 1;
+                foil.material_mode = 4;
+                foil.item_foil_mode = 1;
+                foil.item_foil_clock_millis = 3;
+                foil.item_foil_speed = 0.5;
+                foil.item_foil_strength = 0.75;
+                foil.decal_foil_mode = if foil_kind == 2 { 2 } else { 0 };
+                prototypes.push(foil);
+                selectors.push(0);
+            }
+            let mut id = 0;
+            assert_eq!(0, unsafe { create(FFI_ABI_VERSION, prototypes.as_ptr(),
+                prototypes.len() as u64, selectors.as_ptr(), 1, &mut id) });
+            for frame in 0..64 {
+                let facts = [FfiGuiItemLayerFoil {
+                    mode: u32::from(foil_kind != 0),
+                    clock_millis: if foil_kind == 0 { 0 } else { 987 + frame },
+                    speed: if foil_kind == 0 { 0. } else { 0.25 },
+                    strength: if foil_kind == 0 { 0. } else { 0.9 },
+                }];
+                let mut item = instance(id, &facts);
+                item.sequence = 100 + frame as u64;
+                item.gui_pose = [1., 0.25, -0.125, 1., frame as f32, 7.];
+                item.left = frame as i32; item.top = 8;
+                item.right = item.left + 16; item.bottom = 24;
+                item.clip_mode = 1;
+                item.clip_left = 2; item.clip_top = 3;
+                item.clip_width = 120; item.clip_height = 130;
+                let mut inline = prototypes.clone();
+                for batch in &mut inline {
+                    batch.sequence = item.sequence;
+                    batch.gui_pose = item.gui_pose;
+                    batch.left = item.left; batch.top = item.top;
+                    batch.right = item.right; batch.bottom = item.bottom;
+                    batch.clip_mode = item.clip_mode;
+                    batch.clip_left = item.clip_left; batch.clip_top = item.clip_top;
+                    batch.clip_width = item.clip_width; batch.clip_height = item.clip_height;
+                    if batch.item_foil_mode != 0 {
+                        batch.item_foil_clock_millis = facts[0].clock_millis;
+                        batch.item_foil_speed = facts[0].speed;
+                        batch.item_foil_strength = facts[0].strength;
+                    }
+                }
+                let mut retained = decode(&[item]).unwrap();
+                for batch in &mut retained { batch.persistent_geometry = None; }
+                assert_eq!(decode(&inline).unwrap(), retained, "scale={scale}, foil={foil_kind}, frame={frame}");
+            }
+            release(id);
+        }
+    }
+}
+
+#[test]
 fn gui_item_templates_own_geometry_and_reject_released_or_ambiguous_instances() {
     let mut vertices = vertices();
     let batches = [prototype(&vertices, &[0, 1, 2])];

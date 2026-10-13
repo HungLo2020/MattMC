@@ -15,6 +15,9 @@ for its own runtime and performance scope. The results below are retained
 author reports; this documentation review did not rerun tests or inspect their
 ignored `build/` artifacts.
 
+The current [flat GUI item migration](RUST-FLAT-ITEM-FRAMES.md) extends this
+owner to cached flat layers; its verification is tracked separately.
+
 ## Ownership direction
 
 Ordinary 3D GUI items previously rebuilt one Java `GuiMeshBatchRecord` per quad
@@ -31,8 +34,10 @@ GPU resources, passes, submission and presentation remain owned by Rust/GAL.
 
 ## Constraints
 
-- Templates contain one complete block item with contiguous layer indices.
-  Source-layer selectors preserve distinct foil clocks without per-quad inputs.
+- Templates contain one complete native-layout item with contiguous layer
+  indices and consistent block or flat raster layout across layers. Source-layer
+  selectors preserve distinct foil clocks without per-quad inputs. The
+  [flat-layer extension](RUST-FLAT-ITEM-FRAMES.md) records its own verification.
 - Conservative retained storage charges cover vector capacities and referenced
   geometry, even when shared. The global template budget is 64 MiB. This bounds
   template retention, not all renderer allocations or in-flight references.

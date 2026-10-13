@@ -72,14 +72,16 @@ impl GuiItemTemplate {
         validate_batches(&batches)?;
         let mut foil_sources = vec![false; source_layers];
         let group = (batches[0].stratum, batches[0].sequence);
+        let layout = (batches[0].block_item_raster, batches[0].item_raster_scale);
         for (batch, selector) in batches.iter().zip(&foil_layers) {
             if (batch.stratum, batch.sequence) != group
-                || batch.block_item_raster.is_none()
+                || (batch.block_item_raster.is_none() && batch.item_raster_scale == 0)
+                || (batch.block_item_raster, batch.item_raster_scale) != layout
                 || batch.item_foil.is_some() != selector.is_some()
                 || selector.is_some_and(|index| index >= source_layers)
             {
                 return Err(invalid(
-                    "retained template requires one complete block item",
+                    "retained template requires one complete native-layout item",
                 ));
             }
             if let Some(index) = selector {

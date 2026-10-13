@@ -943,19 +943,21 @@ changes invalidate them. Pending command uses still prevent eviction.
 Flat and standard 3D GUI items both carry a raster identity (`GuiItemCacheRecord`)
 from their topology cache key. Static items reuse their raster. Standard-foil
 items are marked animated: they re-raster each frame, but their cached geometry
-keeps stable native identity. Flat items reuse persistent encoded geometry;
-cached standard 3D items use the ABI 80 template owner described below. The
-foil clock is refreshed per frame (`withCurrentFoil`) and applied on the GPU as
-a per-draw UV transform. Foil and plain variants of one model use distinct
-identities, so they never share pixels.
+keeps stable native identity. Cached standard 3D and flat items use the ABI 80
+template owner described below. The foil clock is supplied per frame and applied
+on the GPU as a per-draw UV transform. Foil and plain variants of one model use
+distinct identities, so they never share pixels.
 
 ABI 80 [GUI item templates](RUST-GUI-ITEM-TEMPLATES.md) retain cached standard
-3D material layers, resolved authored poses and geometry in a bounded Rust CPU
-owner. Java sends one item placement/cache reference plus source-layer foil
-facts, and Rust expands owned frontend requests. Animated/uncached models keep
+3D and [flat item](RUST-FLAT-ITEM-FRAMES.md) material layers, resolved authored
+poses and geometry in a bounded Rust CPU owner. Successful flat-item admission
+discards Java layer geometry; resource bindings and cache admission remain Java.
+Java sends one item placement/cache reference plus source-layer foil facts, and Rust expands owned frontend requests. Animated/uncached models keep
 live extraction. Frame limits apply to expanded geometry, and atlas publication
 retains the template's source asset IDs rather than the outer instance's zero
-asset ID. Its CPU lease does not own GPU resources or presentation.
+asset ID. Its CPU lease does not own GPU resources or presentation. The
+[flat-frame verification](RUST-FLAT-ITEM-FRAMES.md#verification) records its
+separate runtime checks and unresolved shader p99 gap.
 The reported `a99b6f8d` checkpoint passes four GUI comparisons and scoped world
 runtime checks; its gameplay matrix fails vanilla p99. The later combined
 `c487f375` checkpoint does not rerun those GUI or allocation comparisons. Keep

@@ -1197,7 +1197,7 @@ public final class RustGalGuiItemRenderer {
 			: RustGalFrameCoordinator.enqueueGuiMeshItemRequest(snapshot.batches(), RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder), order, startedNanos);
 		snapshot.sources().forEach(GuiItemTextureSource::stage);
 		for (var batch : snapshot.batches()) {
-			var foil = batch.itemFoil();
+			var foil = batch.nativeTemplate() == null ? batch.itemFoil() : batch.layerFoils()[0];
 			if (foil != null) {
 				net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeSemanticClock(
 					item.x(), item.y(), foil.clockMillis(), foil.speed(), foil.strength());

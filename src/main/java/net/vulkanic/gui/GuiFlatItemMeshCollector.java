@@ -36,11 +36,20 @@ final class GuiFlatItemMeshCollector {
 			vertices = List.copyOf(vertices);
 		}
 	}
-	private record FlatTopology(List<FlatLayer> layers, List<GuiItemTextureSource> sources) {
-		private FlatTopology {
-			layers = List.copyOf(layers);
-			sources = List.copyOf(sources);
-		}
+	private static final class FlatTopology {
+        // Once admitted, Rust is the sole owner of retained layer geometry and
+        // transforms. Java keeps resource publication bindings, not a second mesh.
+        private List<FlatLayer> layers;
+        private final List<GuiItemTextureSource> sources;
+        private final GuiItemMeshSemanticCollector.TemplateSlot template = new GuiItemMeshSemanticCollector.TemplateSlot();
+        private final boolean hasFoil;
+        private FlatTopology(List<FlatLayer> layers, List<GuiItemTextureSource> sources) {
+            this.layers = List.copyOf(layers);
+            this.sources = List.copyOf(sources);
+            this.hasFoil = layers.stream().anyMatch(FlatLayer::foil);
+        }
+        List<FlatLayer> layers() { return layers; }
+        List<GuiItemTextureSource> sources() { return sources; }
 	}
 	record Snapshot(List<GuiMeshBatchRecord> batches, List<GuiItemTextureSource> sources) {
 		Snapshot { batches=List.copyOf(batches); sources=List.copyOf(sources); }
@@ -172,6 +181,9 @@ final class GuiFlatItemMeshCollector {
 
 	private static Snapshot instantiate(GuiItemRenderState item, int guiWidth, int guiHeight,
 		int guiScale, int stratum, FlatTopology topology, StandardItemFoilRecord foil, GuiItemCacheRecord itemCache) {
+		if (topology.hasFoil && foil == null) throw new IllegalArgumentException("flat mesh foil layer without foil semantics");
+        var owner = topology.template.owner();
+        if (owner != null) return retainedSnapshot(item, guiWidth, guiHeight, stratum, topology, foil, itemCache, owner);
 		List<GuiMeshBatchRecord> batches = new ArrayList<>(topology.layers().size());
 		for (FlatLayer layer : topology.layers()) {
 			if (layer.foil() && foil == null) throw new IllegalArgumentException("flat mesh foil layer without foil semantics");
@@ -180,8 +192,37 @@ final class GuiFlatItemMeshCollector {
 			if (layer.specialFoil()) batch = batch.withDecalFoil(GuiDecalFoilRecord.forNativeItemLayout());
 			batches.add(itemCache == null ? batch : batch.withItemCache(itemCache));
 		}
+        if (itemCache != null && topology.template.canRetain()) {
+            int[] selectors = new int[batches.size()];
+            var prototypes = new ArrayList<GuiMeshBatchRecord>(batches.size());
+            for (int i = 0; i < batches.size(); i++) {
+                selectors[i] = topology.layers().get(i).foil() ? 0 : -1;
+                // Registration validates a complete item; frame publication
+                // later assigns the real scheduler sequence to its instance.
+                prototypes.add(batches.get(i).withSequence(1));
+            }
+            owner = topology.template.retain(prototypes, selectors, 1);
+            if (owner != null) {
+                topology.layers = List.of();
+                return retainedSnapshot(item, guiWidth, guiHeight, stratum, topology, foil, itemCache, owner);
+            }
+        }
 		return new Snapshot(batches, topology.sources());
 	}
+
+    private static Snapshot retainedSnapshot(GuiItemRenderState item, int width, int height, int stratum,
+        FlatTopology topology, StandardItemFoilRecord foil, GuiItemCacheRecord cache,
+        net.vulkanic.bridge.NativeGuiItemTemplate owner) {
+        var pose = item.pose();
+        var clip = item.scissorArea();
+        var batch = GuiMeshBatchRecord.nativeItem(owner,
+            new StandardItemFoilRecord[]{topology.hasFoil ? foil : null}, stratum, 0,
+            new float[]{pose.m00(), pose.m01(), pose.m10(), pose.m11(), pose.m20(), pose.m21()},
+            item.x(), item.y(), item.x()+16, item.y()+16, width, height,
+            clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
+            clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(), cache);
+        return new Snapshot(List.of(batch), topology.sources());
+    }
 
     static GuiMeshBatchRecord batch(GuiItemRenderState item,int width,int height,int scale,int stratum,int layer,
                                            int material,long asset,float[] transform,List<GuiMeshVertexRecord> vertices,
