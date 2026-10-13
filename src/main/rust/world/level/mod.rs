@@ -6,6 +6,7 @@ pub(crate) mod chunk_distance;
 pub(crate) mod chunk;
 pub(crate) mod client_residency;
 pub(crate) mod camera_environment;
+pub(crate) mod collision_scan;
 pub(crate) mod entity_geometry;
 pub(crate) mod chunk_tasks;
 pub(crate) mod entity_order;

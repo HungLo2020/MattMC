@@ -18,11 +18,19 @@ public final class NativeCollisionGeometry {
     private static boolean install() {
         int count = Block.BLOCK_STATE_REGISTRY.size();
         int[] states = new int[count]; Arrays.fill(states, -1);
+        byte[] worldFlags = new byte[count];
+        int[] worldStates = new int[count]; Arrays.fill(worldStates, -1);
+        record Grid(int geometry, List<Double> x, List<Double> y, List<Double> z) {}
+        var worldGrids = new LinkedHashMap<Grid, Integer>();
+        var providers = new HashMap<Class<?>, Boolean>();
         var unique = new LinkedHashMap<List<AABB>, Integer>();
         var seen = new IdentityHashMap<VoxelShape, Integer>();
         for (int id = 0; id < count; id++) {
             var state = Block.BLOCK_STATE_REGISTRY.byId(id);
-            if (state.getClass() != BlockState.class || state.getBlock().hasDynamicShape()) continue;
+            if (state.getClass() != BlockState.class) continue;
+            worldFlags[id] = (byte)(16 | (state.hasLargeCollisionShape() ? 2 : 0)
+                | (state.is(Blocks.MOVING_PISTON) ? 8 : 0));
+            if (state.getBlock().hasDynamicShape()) continue;
             // The native registry's light-block fact proves this relation for
             // Frozen states. Other cached provider policies retain callbacks.
             if (!state.isAir() && !state.canOcclude() && state.getFluidState().isEmpty()
@@ -37,6 +45,15 @@ public final class NativeCollisionGeometry {
                 seen.put(shape, geometry);
             }
             states[id] = geometry;
+            if (providers.computeIfAbsent(state.getBlock().getClass(), NativeCollisionGeometry::contextFreeProvider)) {
+                var x = List.copyOf(shape.getCoords(net.minecraft.core.Direction.Axis.X));
+                var y = List.copyOf(shape.getCoords(net.minecraft.core.Direction.Axis.Y));
+                var z = List.copyOf(shape.getCoords(net.minecraft.core.Direction.Axis.Z));
+                if (x.size() > 65 || y.size() > 65 || z.size() > 65) continue;
+                var grid = new Grid(geometry, x, y, z);
+                worldStates[id] = worldGrids.computeIfAbsent(grid, ignored -> worldGrids.size());
+                worldFlags[id] |= (byte)(1 | (shape == Shapes.block() ? 4 : 0));
+            }
         }
         int boxCount = unique.keySet().stream().mapToInt(List::size).sum();
         if (unique.size() > 1024 || boxCount > 8192) return false;
@@ -57,8 +74,45 @@ public final class NativeCollisionGeometry {
                 call.allocateFrom(ValueLayout.JAVA_INT, rows), rows.length,
                 call.allocateFrom(ValueLayout.JAVA_DOUBLE, boxes), boxes.length);
             if (result != 1) throw new IllegalStateException("Rejected native collision geometry: " + result);
+            int[] gridRows = new int[worldGrids.size() * 7];
+            var coordinates = new ArrayList<Double>();
+            for (var entry : worldGrids.entrySet()) {
+                int row = entry.getValue() * 7;
+                var grid = entry.getKey(); gridRows[row++] = grid.geometry();
+                for (var axis : List.of(grid.x(), grid.y(), grid.z())) {
+                    gridRows[row++] = coordinates.size(); gridRows[row++] = axis.size();
+                    coordinates.addAll(axis);
+                }
+            }
+            double[] gridCoordinates = coordinates.stream().mapToDouble(Double::doubleValue).toArray();
+            var worldInstall = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_collision_world_install",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+            int worldResult = (int)worldInstall.invokeExact(call.allocateFrom(ValueLayout.JAVA_BYTE, worldFlags),
+                call.allocateFrom(ValueLayout.JAVA_INT, worldStates), worldFlags.length,
+                call.allocateFrom(ValueLayout.JAVA_INT, gridRows), gridRows.length,
+                call.allocateFrom(ValueLayout.JAVA_DOUBLE, gridCoordinates), gridCoordinates.length);
+            if (worldResult != 1) throw new IllegalStateException("Rejected native world collision facts: " + worldResult);
             return true;
         } catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot install native collision geometry", e); }
     }
+    /** Audited stock providers that read only state, never the world or context. */
+    private static boolean contextFreeProvider(Class<?> type) {
+        Class<?> collision = declaring(type, "getCollisionShape");
+        if (collision == SnowLayerBlock.class || type == WallBlock.class) return true;
+        if (collision != net.minecraft.world.level.block.state.BlockBehaviour.class) return false;
+        Class<?> shape = declaring(type, "getShape");
+        return shape == net.minecraft.world.level.block.state.BlockBehaviour.class || shape == AirBlock.class
+            || shape == SlabBlock.class || shape == StairBlock.class;
+    }
+    private static Class<?> declaring(Class<?> type, String method) {
+        for (Class<?> c = type; c != null; c = c.getSuperclass()) {
+            try { c.getDeclaredMethod(method, BlockState.class, net.minecraft.world.level.BlockGetter.class,
+                BlockPos.class, CollisionContext.class); return c; }
+            catch (NoSuchMethodException ignored) {}
+        }
+        return null;
+    }
+
 }

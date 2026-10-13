@@ -22,7 +22,10 @@ unchanged component; this input owner also admits canonical proto chunks.
 The adapter is now named `NativeChunkInputs` because ordinary lighting shares
 the same primary owners. The existing page URL and chunk cache are preserved;
 there is no second binding cache for the new
-[block-light producer](../lighting/RUST-BLOCK-LIGHT-SOURCES.md).
+[block-light producer](../lighting/RUST-BLOCK-LIGHT-SOURCES.md). The
+[collision traversal](../physics/RUST-BLOCK-COLLISIONS.md) also reads
+these owners directly. Its scoped reader releases each section before switching
+owners or returning to a Java callback; retired palettes trigger re-admission.
 
 ## Ownership and compatibility
 

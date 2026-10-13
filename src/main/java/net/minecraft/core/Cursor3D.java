@@ -40,6 +40,21 @@ public class Cursor3D {
 		}
 	}
 
+	/** Immutable traversal bounds and the next index for bounded bulk consumers. */
+	public int originX() { return this.originX; }
+	public int originY() { return this.originY; }
+	public int originZ() { return this.originZ; }
+	public int width() { return this.width; }
+	public int height() { return this.height; }
+	public int depth() { return this.depth; }
+	public int index() { return this.index; }
+
+	/** Skip unobservable cells; next advance restores coordinates in original order. */
+	public void skip(int count) {
+		if (count < 0 || count > this.end - this.index) throw new IllegalArgumentException("Invalid cursor prefix");
+		this.index += count;
+	}
+
 	public int nextX() {
 		return this.originX + this.x;
 	}

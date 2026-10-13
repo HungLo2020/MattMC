@@ -2,6 +2,9 @@
 
 Collision geometry and block physics are independent of renderer backends.
 
+- [Retained-section collision traversal](RUST-BLOCK-COLLISIONS.md): native
+  cell traversal, contextual callback boundaries and live mutation checks.
+
 - [Rust voxel Boolean joins](RUST-VOXEL-JOIN.md): complex-grid occupancy joining,
   exact bounds/coordinate compatibility and focused acceptance checks.
 - [Rust merged voxel boxes](RUST-VOXEL-BOXES.md): ordered collision-box extraction,

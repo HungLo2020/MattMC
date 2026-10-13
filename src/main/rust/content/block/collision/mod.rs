@@ -8,6 +8,11 @@ pub(crate) struct DhFacts {
     pub(crate) solid: bool,
     pub(crate) opacity: u8,
 }
+pub(crate) struct WorldGeometry<'a> {
+    pub(crate) grid: &'a WorldGrid,
+    pub(crate) large: bool,
+    pub(crate) full_block_identity: bool,
+}
 #[derive(Debug, PartialEq)]
 pub(crate) struct Catalog {
     states: Vec<i32>,
@@ -75,11 +80,28 @@ impl Catalog {
             )
         })
     }
+    pub(crate) fn excludes_world_border(&self, state: StateId, edge: usize) -> bool {
+        let Some(flags) = WORLD.get().and_then(|w| w.flags.get(state.0 as usize)) else { return false; };
+        flags & 16 != 0 && ((edge == 1 && flags & 2 == 0) || (edge == 2 && flags & 8 == 0))
+    }
+    pub(crate) fn world_geometry(&self, state: StateId) -> Option<WorldGeometry<'_>> {
+        let world = WORLD.get()?;
+        let flags = *world.flags.get(state.0 as usize)?;
+        if flags & 1 == 0 { return None; }
+        let grid = world.grids.get(*world.states.get(state.0 as usize)? as usize)?;
+        Some(WorldGeometry { grid, large: flags & 2 != 0, full_block_identity: flags & 4 != 0 })
+    }
     pub(crate) fn dh(&self, state: u32) -> Option<DhFacts> {
         self.dh.get(state as usize).copied().flatten()
     }
 }
+// Context-free provider and shape identity facts, installed by the semantic
+// adapter once. Dynamic/custom providers are never inferred from cached boxes.
+mod world;
+pub(crate) use world::WorldGrid;
+use world::WORLD;
 static CATALOG: OnceLock<Catalog> = OnceLock::new();
+
 pub(crate) fn installed() -> Option<&'static Catalog> {
     CATALOG.get()
 }

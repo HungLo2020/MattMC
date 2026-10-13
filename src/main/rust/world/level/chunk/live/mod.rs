@@ -138,6 +138,40 @@ pub(crate) struct StateReader<'a> {
     generation: &'a Generation,
     single: Option<u32>,
 }
+/// A primary section read held only within one callback-free world query.
+/// Drop this guard before acquiring another section or returning to Java.
+pub(crate) struct WorldReader<'a> {
+    guard: std::sync::MutexGuard<'a, State>,
+    authoritative: &'a AtomicBool,
+    single: Option<u32>,
+}
+impl WorldReader<'_> {
+    /// Fixed palette widths turn division by the packed word capacity into
+    /// constant arithmetic. World scans repeatedly read these same formats.
+    fn packed<const BITS: usize>(&self, index: usize) -> usize {
+        let per = 64 / BITS;
+        ((self.guard.generation.words[index / per].load(Ordering::Acquire)
+            >> (index % per * BITS)) & ((1 << BITS) - 1)) as usize
+    }
+    pub(crate) fn get(&self, index: usize) -> Option<u32> {
+        if !self.authoritative.load(Ordering::Acquire) { return None; }
+        let value = self.single.unwrap_or_else(|| {
+            let generation = &self.guard.generation;
+            let local = match generation.bits {
+                4 => self.packed::<4>(index), 5 => self.packed::<5>(index),
+                6 => self.packed::<6>(index), 7 => self.packed::<7>(index),
+                8 => self.packed::<8>(index), 9 => self.packed::<9>(index),
+                10 => self.packed::<10>(index), 11 => self.packed::<11>(index),
+                12 => self.packed::<12>(index), 13 => self.packed::<13>(index),
+                14 => self.packed::<14>(index), 15 => self.packed::<15>(index),
+                16 => self.packed::<16>(index), _ => generation.local(index),
+            };
+            if generation.global { local as u32 }
+            else { generation.palette[local].load(Ordering::Acquire) }
+        });
+        self.authoritative.load(Ordering::Acquire).then_some(value)
+    }
+}
 impl StateReader<'_> {
     /// Packed semantic reads stay inside `with_state_reader`'s owner lock.
     /// Consumers can capture directly without an intermediate wire projection.
@@ -195,6 +229,13 @@ impl Owner {
         if !self.authoritative.load(Ordering::Acquire) { return None; }
         let value = self.with_state_reader(|reader| reader.get(index));
         self.authoritative.load(Ordering::Acquire).then_some(value)
+    }
+    pub(crate) fn world_reader(&self) -> Option<WorldReader<'_>> {
+        if !self.authoritative.load(Ordering::Acquire) { return None; }
+        let guard = self.state.lock().unwrap();
+        if !self.authoritative.load(Ordering::Acquire) { return None; }
+        let single = (guard.generation.bits == 0).then(|| guard.generation.state(0));
+        Some(WorldReader { guard, authoritative: &self.authoritative, single })
     }
     pub(crate) fn read_stamp(&self) -> Option<ReadStamp> {
         let guard = self.state.lock().unwrap();

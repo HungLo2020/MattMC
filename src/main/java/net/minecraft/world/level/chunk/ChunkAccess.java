@@ -192,6 +192,14 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	NativeChunkInputs nativeDhSections() {
 		return this.nativeDhInputs = NativeChunkInputs.bind(this, this.nativeDhInputs);
 	}
+	/** Stable structural bindings; Rust rejects retired palette owners on demand. */
+	NativeChunkInputs nativeCollisionSections(boolean refresh) {
+		if (!refresh && !this.sectionArrayEscaped && this.nativeDhInputs != null) return this.nativeDhInputs;
+		var sections = this.getSectionsForRead();
+		if (sections == null) return null;
+		for (var section : sections) if (section == null || section.getClass() != LevelChunkSection.class) return null;
+		return this.nativeDhSections();
+	}
 	NativeChunkInputs nativeDhColumnSections() {
 		var inputs = this.nativeDhSections();
 		return inputs == null ? null : (this.nativeDhInputs = inputs.bindBiomes(this));

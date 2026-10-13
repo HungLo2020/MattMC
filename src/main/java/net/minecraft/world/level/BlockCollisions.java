@@ -21,9 +21,11 @@ public class BlockCollisions<T> extends AbstractIterator<T> {
 	private final CollisionContext context;
 	private final Cursor3D cursor;
 	private final BlockPos.MutableBlockPos pos;
-	private final VoxelShape entityShape;
+	@Nullable
+	private VoxelShape entityShape;
 	private final CollisionGetter collisionGetter;
 	private final boolean onlySuffocatingBlocks;
+	private final boolean nativeTraversal;
 	@Nullable
 	private BlockGetter cachedBlockGetter;
 	private long cachedBlockGetterPos;
@@ -40,7 +42,6 @@ public class BlockCollisions<T> extends AbstractIterator<T> {
 	) {
 		this.context = collisionContext;
 		this.pos = new BlockPos.MutableBlockPos();
-		this.entityShape = Shapes.create(aABB);
 		this.collisionGetter = collisionGetter;
 		this.box = aABB;
 		this.onlySuffocatingBlocks = bl;
@@ -52,6 +53,15 @@ public class BlockCollisions<T> extends AbstractIterator<T> {
 		int m = Mth.floor(aABB.minZ - 1.0E-7) - 1;
 		int n = Mth.floor(aABB.maxZ + 1.0E-7) + 1;
 		this.cursor = new Cursor3D(i, k, m, j, l, n);
+		this.nativeTraversal = !bl && net.minecraft.world.level.chunk.NativeBlockCollisionScan.supports(this.cursor, aABB, collisionContext);
+		// Rust owns query-shape preparation on the admitted path. Build the Java
+		// projection only if a contextual collision requires the Java voxel join.
+		if (!this.nativeTraversal) this.entityShape = Shapes.create(aABB);
+	}
+
+	private VoxelShape queryShape() {
+		if (this.entityShape == null) this.entityShape = Shapes.create(this.box);
+		return this.entityShape;
 	}
 
 	@Nullable
@@ -79,8 +89,21 @@ public class BlockCollisions<T> extends AbstractIterator<T> {
 			if (l != 3) {
 				BlockGetter blockGetter = this.getChunk(i, k);
 				if (blockGetter != null) {
+					BlockState nativeState = null;
+					boolean nativeHit = false;
+					if (this.nativeTraversal) {
+						long result = net.minecraft.world.level.chunk.NativeBlockCollisionScan.next(blockGetter, this.cursor, this.box, this.pos);
+						int skipped = (int)(result >>> 32), state = (int)result;
+						if (state != 0) {
+							if (skipped > 0) { this.cursor.skip(skipped - 1); this.cursor.advance(); }
+							i = this.cursor.nextX(); j = this.cursor.nextY(); k = this.cursor.nextZ(); l = this.cursor.getNextType();
+							nativeState = net.minecraft.world.level.block.Block.stateById((state & 65535) - 1);
+							nativeHit = (state & 65536) != 0;
+						} else if (skipped > 0) { this.cursor.skip(skipped - 1); continue; }
+					}
 					this.pos.set(i, j, k);
-					BlockState blockState = blockGetter.getBlockState(this.pos);
+					BlockState blockState = nativeState == null ? blockGetter.getBlockState(this.pos) : nativeState;
+					if (nativeHit) return this.resultProvider.apply(this.pos, blockState.getCollisionShape(this.collisionGetter, this.pos).move(this.pos));
 					if ((!this.onlySuffocatingBlocks || blockState.isSuffocating(blockGetter, this.pos))
 						&& (l != 1 || blockState.hasLargeCollisionShape())
 						&& (l != 2 || blockState.is(Blocks.MOVING_PISTON))) {
@@ -91,7 +114,7 @@ public class BlockCollisions<T> extends AbstractIterator<T> {
 							}
 						} else {
 							VoxelShape voxelShape2 = voxelShape.move(this.pos);
-							if (!voxelShape2.isEmpty() && Shapes.joinIsNotEmpty(voxelShape2, this.entityShape, BooleanOp.AND)) {
+							if (!voxelShape2.isEmpty() && Shapes.joinIsNotEmpty(voxelShape2, this.queryShape(), BooleanOp.AND)) {
 								return (T)this.resultProvider.apply(this.pos, voxelShape2);
 							}
 						}

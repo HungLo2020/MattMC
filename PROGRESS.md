@@ -12,7 +12,7 @@
 ## Current ownership and remaining migration
 
 - Rust owns renderer/GAL/presentation, terrain assembly/visibility, canonical block/biome sections, light fields and biome color windows.
-- Rust owns DH conversion policy/temporary points/color reuse, materials/topology/packets, retained visibility, primary full/render points and dense metadata, and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
+- Rust owns DH conversion, materials/topology/packets, visibility, full/render points and full-data source columns/metadata/footprints/updates. Java retains material wrappers, flags/timestamps, compression/DTOs and generation/retrieval orchestration; closed-source hashes still fold escaped readers in Java.
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
 - Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index/range scans and manager residency serve production client/server consumers.
 - Java retains entity simulation, behavior callbacks, visibility-transition orchestration, persistence I/O and the loading inbox.
@@ -66,6 +66,18 @@
 - Separate30s gameplay JFR samples new camera/native path; no camera allocation samples after first-thread events excluded (not a zero-allocation proof). Profile timings excluded; originals retained.
 - Integrated upstreamde7d3572f, preserving scoped/batched release and stale-binding retirement. Combined native971d56d8 passes Rust2750/3ignored, Java2087/2skip, five harness checks and Frozen49152+4. Fresh CPU121.58/127.65ms (4.8% less), Java heap0/319.29MB; one fresh vanilla pair1273.0/1330.2FPS,p993.395/3.298ms misses4.3%/2.9%. No isolated gameplay gain; shader+DH world-reload passes,VUID0; integrated guards/original/presenter checks pass, three copied worlds retired.
 - Documentation: rendering/RUST-CAMERA-ENVIRONMENT.md; evidence: build/native-camera-environment/. No gameplay gain claimed. Hash-verified profile JSON compression reclaimed640429745bytes; two completed copied worlds retired, JFR originals retained.
+
+## Collision traversal checkpoint
+
+- Published camera batch056582a23; worktree was clean and live origin/master verified before this batch.
+- Rust now owns retained-section traversal, static grid intersections and contextual face/edge exclusion. Java retains required contextual calls/result projection; no cell export or result batch across callbacks.
+- Frozen231212 cases pass on native2669a647 with current Java lazy query shapes, Java11 and Rust world325. Original-grid retention fixes the top-slab epsilon mismatch; failed versions/JIT timings remain recorded.
+- Latest CPU80.41/80.11ms Current/Frozen per65536 queries is comparable (+0.4%); Java heap34.25/75.23MB (54.5% less). Native border exclusion, fixed-width reads and lazy Java query shapes remove most scan-only overhead. No gameplay gain claimed.
+- Full check passes Rust2757/3ignored and Java2098/2skip; Oracle10 source/class/native guards and compiler-quiet samples pass. Four gameplay windows give1274.4/1347.7FPS,p993.310/3.498ms: FPS misses5.4%,p99 passes. Inputs/JVM controls match; live entities190/189/185/188.
+- Two settled pairs/three lifecycle cases pass,VUID0; seven originals/five presenter/seven native identities reviewed. Hazy gates are structural only. Nine copied worlds retired; originals/failures retained.
+- Integrated upstream8e7c5e496 (Rust-owned DH full-data sources/updates), preserving all22 local paths byte-for-byte without conflicts/stash. Combined native2ad8899a passes Rust2759/3ignored, Java2095/2skip and Frozen231212; CPU80.61/79.93ms, Java heap34.25/75.23MB. Fresh vanilla/DH pairs pass:1331.2/1262.8 and794.2/663.6FPS,p993.347/4.006 and4.334/7.003ms. Single pairs, entities186/192 and167/166; no isolated gain. Shader+DH pair/three lifecycles pass,VUID0; five originals/four presenter/six native identities reviewed; eight copies retired. native2669 receipts above stay pre-integration.
+- Upstream documents deliberate DH downsample alias/null differences from Frozen; preserve them and do not count those cases as exact Frozen parity.
+- Guide: world/physics/RUST-BLOCK-COLLISIONS.md. Drivers: DevUtils/tests/world/chunk/VerifyBlockCollisionScan.*; receipts: build/native-collision-scan/.
 
 ## Next work and open acceptance
 

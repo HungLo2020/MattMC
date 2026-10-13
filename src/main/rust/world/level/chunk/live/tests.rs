@@ -10,6 +10,34 @@ fn retired_world_binding_declines_but_copied_owner_and_old_reader_remain_live() 
     assert_eq!(copy.world_value(0), Some(previous));
     assert_eq!(owner.with_state_reader(|r| r.get(0)), previous);
 }
+#[test]
+fn world_reader_observes_retirement_without_invalidating_scoped_legacy_reads() {
+    let owner = single();
+    let reader = owner.world_reader().unwrap();
+    assert_eq!(reader.get(0), Some(71));
+    owner.invalidate();
+    assert_eq!(reader.get(0), None);
+    drop(reader);
+    assert_eq!(owner.with_state_reader(|r|r.get(0)), 71);
+    assert!(owner.world_reader().is_none());
+}
+#[test]
+fn world_reader_matches_all_local_and_global_packed_widths() {
+    for bits in 4usize..=16 {
+        let global = bits >= 9;
+        let palette: Vec<i32> = if global { vec![] } else { vec![71, 72] };
+        let mut words = vec![0u64; ENTRIES.div_ceil(64/bits)];
+        for index in 0..ENTRIES {
+            let value = if global { (index % ((1 << bits)-1)) as u64 } else { (index%2) as u64 };
+            words[index/(64/bits)] |= value << (index%(64/bits)*bits);
+        }
+        let limit = if global { (1u32 << bits)-1 } else { 31809 };
+        let owner = Owner::load(bits,bits,&palette,&words,limit,if global {bits} else {15}).unwrap();
+        let expected = owner.capture();
+        let reader = owner.world_reader().unwrap();
+        for (index, &state) in expected.iter().enumerate() { assert_eq!(reader.get(index),Some(state as u32),"bits={bits} index={index}"); }
+    }
+}
 use crate::world::level::levelgen::noise_fill::section::Section;
 fn single() -> Owner {
     Owner::load(0, 0, &[71], &[], 31809, 15).unwrap()
