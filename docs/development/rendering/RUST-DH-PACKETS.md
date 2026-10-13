@@ -1,5 +1,10 @@
 # Rust DH semantic packets
 
+> **Current state (2026-10-13):** subclass packet overrides and the unused
+> `NativeDhPacketPlan.build` route were removed; packets are always appended to
+> a native column. `NativeDhPacketPlanTest` replays the Frozen fixture through
+> that path. See [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
+
 Source reviewed at [`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5). Suite totals, timings, lifecycle runs and image comparisons below are
 implementation-author reports. This review inspected source and fixture
 assertions; it did not rerun Java/Rust suites, clients, captures or benchmarks,

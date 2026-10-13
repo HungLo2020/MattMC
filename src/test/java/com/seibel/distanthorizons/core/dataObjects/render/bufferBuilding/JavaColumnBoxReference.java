@@ -20,7 +20,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ColumnBox
+/** The Java box geometry before it became Rust-only (HEAD 1490391f9); test oracle only. */
+public class JavaColumnBoxReference
 {
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
@@ -37,7 +38,7 @@ public class ColumnBox
 	//=========//
 	
 	public static void addBoxQuadsToBuilder(
-			LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
+			JavaQuadSink builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
 			short width, short yHeight,
 			short minX, short minY, short minZ,
 			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
@@ -58,7 +59,7 @@ public class ColumnBox
 	 * overload above unchanged.
 	 */
 	public static void addBoxQuadsToBuilder(
-			LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
+			JavaQuadSink builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
 			short width, short yHeight,
 			short minX, short minY, short minZ,
 			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
@@ -66,17 +67,7 @@ public class ColumnBox
 			byte skyLight, byte blockLight,
 			long topData, long bottomData, ColumnArrayView[] adjData, boolean[] isAdjDataSameDetailLevel)
 	{
-		if (MC_RENDER instanceof IMinecraftRenderWrapper.NativeShadeFacts facts && facts.hasNativeShadeFacts()) {
-			int caveY = Integer.MIN_VALUE;
-			if (Config.Client.Advanced.Graphics.Culling.enableCaveCulling.get())
-				caveY = Config.Client.Advanced.Graphics.Culling.caveCullingHeight.get() - clientLevel.getLevelWrapper().getMinHeight();
-			var transparency = Config.Client.Advanced.Graphics.Quality.transparency.get();
-			if (builder.addNativeBox(width,yHeight,minX,minY,minZ,color,irisBlockMaterialId,semanticMaterialId,
-				semanticVariantState,semanticVariantPosition,semanticMaterialSpans,skyLight,blockLight,topData,bottomData,
-				adjData,isAdjDataSameDetailLevel,caveY,transparency.transparencyEnabled,transparency.fakeTransparencyEnabled,
-				facts.getNativeShadeFacts(),null)) return;
-		}
-
+		// Pure Java geometry: the independent oracle for Rust box production.
 		//================//
 		// variable setup //
 		//================//
@@ -280,7 +271,7 @@ public class ColumnBox
 	}
 	
 	static void makeAdjVerticalQuad(
-		LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout,
+		JavaQuadSink builder, PhantomArrayListCheckout phantomArrayCheckout,
 		@NotNull ColumnArrayView adjColumnView, boolean adjacentIsSameDetailLevel, int caveCullingMaxY, EDhDirection direction,
 			short x, short yMin, short z, short horizontalWidth, short ySize,
 			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
@@ -459,7 +450,7 @@ public class ColumnBox
 	}
 	
 	private static void tryAddVerticalFaceWithSkyLightToBuilder(
-			LodQuadBuilder builder, EDhDirection direction,
+			JavaQuadSink builder, EDhDirection direction,
 			short x, short z, short horizontalWidth,
 			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
 			long semanticVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans,
@@ -512,7 +503,7 @@ public class ColumnBox
 	}
 
 	static void addVerticalFaces(
-		LodQuadBuilder builder, EDhDirection direction, short x, short yMin, short z,
+		JavaQuadSink builder, EDhDirection direction, short x, short yMin, short z,
 		short horizontalWidth, short ySize, int color, byte irisBlockMaterialId, byte skyLight,
 		byte blockLight, int fallbackMaterialId, byte fallbackVariantState,
 		long fallbackVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> spans

@@ -28,11 +28,13 @@ def main():
     parser.add_argument("--pairs", type=int, default=6)
     parser.add_argument("--rounds", type=int, default=1000)
     parser.add_argument("--warmup-rounds", type=int, default=1000)
-    parser.add_argument("--mode", choices=("create", "merge", "cull", "parent", "downsample", "generation"), required=True)
+    parser.add_argument("--mode", choices=("create", "merge", "cull", "parent", "downsample", "generation", "render"), required=True)
     parser.add_argument("--recreate-heightmaps", action="store_true",
                         help="generation mode: build wrappers as freshly generated chunks instead of saved ones")
     parser.add_argument("--per-side-checksums", action="store_true",
                         help="require equal checksums within each side only, for an intended output change")
+    parser.add_argument("--jvm-arg", action="append", default=[],
+                        help="extra JVM argument for both sides, e.g. a -D launch switch")
     args = parser.parse_args()
     if not 2 <= args.pairs <= 50 or args.rounds < 1 or args.warmup_rounds < 1:
         parser.error("pairs must be 2..50; measured and warmup rounds must be positive")
@@ -55,7 +57,7 @@ def main():
                 "rounds": args.rounds, "warmup": f"five {args.warmup_rounds}-round rounds in every JVM", "pairs": args.pairs,
                 "order": [side for pair in range(args.pairs) for side in (["Frozen", "Current"] if pair % 2 == 0 else ["Current", "Frozen"])],
                 "pins": pins, "java": str(args.java), "classpaths": classpaths, "mode": args.mode,
-                "recreate_heightmaps": args.recreate_heightmaps, "per_side_checksums": args.per_side_checksums}
+                "recreate_heightmaps": args.recreate_heightmaps, "jvm_args": args.jvm_arg, "per_side_checksums": args.per_side_checksums}
     (args.output / "protocol.json").write_text(json.dumps(protocol, indent=2) + "\n")
     rows = []
     for number, side in enumerate(protocol["order"]):
@@ -63,7 +65,7 @@ def main():
             raise RuntimeError("Native image changed during timing")
         command = [str(args.java), "--enable-native-access=ALL-UNNAMED", "-Xmx2G",
                    "-Dmattmc.rust.natives.dir=" + str(natives[side].resolve()),
-                   "-Ddh.verify.recreate=" + str(args.recreate_heightmaps).lower(), "-cp", classpaths[side],
+                   "-Ddh.verify.recreate=" + str(args.recreate_heightmaps).lower(), *args.jvm_arg, "-cp", classpaths[side],
                    "net.minecraft.world.level.levelgen.DhSourceVerification", str(args.rounds), str(args.warmup_rounds), args.mode]
         start = time.time_ns()
         result = subprocess.run(command, text=True, capture_output=True, timeout=180)

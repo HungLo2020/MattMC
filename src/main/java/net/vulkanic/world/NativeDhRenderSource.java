@@ -126,7 +126,7 @@ public final class NativeDhRenderSource extends AbstractLongList implements Rand
         } catch (Throwable e) { throw failure(e); }
         finally { Reference.reachabilityFence(this); }
     }
-    /** Exact storage admission. Custom list/getter contracts retain compatibility. */
+    /** Storage Rust can borrow directly: a native source or an exact heap array. */
     public static boolean canonical(LongList data) { return data != null && (data.getClass() == LongArrayList.class || data instanceof NativeDhRenderSource); }
     public static MemorySegment borrow(LongList data, int offset, int length) {
         Objects.checkFromIndexSize(offset, length, data.size());

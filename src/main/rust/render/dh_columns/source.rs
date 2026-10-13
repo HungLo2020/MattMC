@@ -13,6 +13,23 @@ pub struct Source {
     uniform: Option<Box<[u8]>>,
 }
 impl Source {
+    /// Zeroes the first `count` points (a conversion scratch window).
+    pub(crate) fn conversion_clear(&mut self, count: usize) {
+        let count = count.min(self.points.len());
+        self.points[..count].fill(0);
+    }
+    pub(crate) fn points(&self) -> &[u64] {
+        &self.points
+    }
+    pub(crate) fn materials(&self) -> Option<&[i16]> {
+        self.materials.as_deref()
+    }
+    pub(crate) fn variants(&self) -> Option<&[u8]> {
+        self.variants.as_deref()
+    }
+    pub(crate) fn uniform(&self) -> Option<&[u8]> {
+        self.uniform.as_deref()
+    }
     fn conversion_index(&self, window: u64, index: i32) -> Option<usize> {
         let first = window as u32 as usize;
         let count = (window >> 32) as u32 as usize;

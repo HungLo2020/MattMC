@@ -65,10 +65,9 @@ public interface IMinecraftRenderWrapper extends IBindable
 	
 	float getShade(EDhDirection lodDirection);
 
-	/** Explicit opt-in for callback-free immutable CPU shade facts. */
+	/** Immutable CPU shade facts for the Rust DH build. */
 	interface NativeShadeFacts {
-		boolean hasNativeShadeFacts();
-		/** AUTO/ENABLED/DISABLED plus world/ambient/flat bits; -1 declines. */
+		/** AUTO/ENABLED/DISABLED in bits 0..1, then world, constant-ambient and flat-shading bits. */
 		int getNativeShadeFacts();
 	}
 

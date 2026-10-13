@@ -21,10 +21,10 @@ class LodQuadBuilderLayerTest {
 		assertEquals(1, builder.getCurrentOpaqueQuadsCount(),
 			"an opaque reduced leaf color must use dh_terrain, as in Frozen");
 		assertEquals(0, builder.getCurrentTransparentQuadsCount());
-		assertPayload(builder.makeOpaqueRustSemanticBuffers(), direction, 255, EDhApiBlockMaterial.LEAVES);
-		assertTrue(builder.makeTransparentRustSemanticBuffers().packedVertexBuffers().isEmpty());
-		assertTrue(builder.makeTransparentUpRustSemanticBuffers().packedVertexBuffers().isEmpty());
-		assertTrue(builder.makeTransparentWaterUpRustSemanticBuffers().packedVertexBuffers().isEmpty());
+		assertPayload(NativeDhQuadBuilderTest.packets(builder)[0], direction, 255, EDhApiBlockMaterial.LEAVES);
+		assertTrue(NativeDhQuadBuilderTest.packets(builder)[1].packedVertexBuffers().isEmpty());
+		assertTrue(NativeDhQuadBuilderTest.packets(builder)[2].packedVertexBuffers().isEmpty());
+		assertTrue(NativeDhQuadBuilderTest.packets(builder)[3].packedVertexBuffers().isEmpty());
 	}
 
 	@ParameterizedTest
@@ -35,11 +35,11 @@ class LodQuadBuilderLayerTest {
 
 		assertEquals(0, builder.getCurrentOpaqueQuadsCount());
 		assertEquals(1, builder.getCurrentTransparentQuadsCount());
-		assertTrue(builder.makeOpaqueRustSemanticBuffers().packedVertexBuffers().isEmpty());
+		assertTrue(NativeDhQuadBuilderTest.packets(builder)[0].packedVertexBuffers().isEmpty());
 		assertPayload(direction == EDhDirection.UP
-			? builder.makeTransparentUpRustSemanticBuffers()
-			: builder.makeTransparentRustSemanticBuffers(), direction, 128, EDhApiBlockMaterial.LEAVES);
-		assertTrue(builder.makeTransparentWaterUpRustSemanticBuffers().packedVertexBuffers().isEmpty());
+			? NativeDhQuadBuilderTest.packets(builder)[2]
+			: NativeDhQuadBuilderTest.packets(builder)[1], direction, 128, EDhApiBlockMaterial.LEAVES);
+		assertTrue(NativeDhQuadBuilderTest.packets(builder)[3].packedVertexBuffers().isEmpty());
 	}
 
 	@ParameterizedTest
@@ -51,9 +51,9 @@ class LodQuadBuilderLayerTest {
 		assertEquals(0, builder.getCurrentOpaqueQuadsCount());
 		assertEquals(1, builder.getCurrentTransparentQuadsCount());
 		assertPayload(direction == EDhDirection.UP
-			? builder.makeTransparentWaterUpRustSemanticBuffers()
-			: builder.makeTransparentRustSemanticBuffers(), direction, 255, EDhApiBlockMaterial.WATER);
-		assertTrue(builder.makeTransparentUpRustSemanticBuffers().packedVertexBuffers().isEmpty());
+			? NativeDhQuadBuilderTest.packets(builder)[3]
+			: NativeDhQuadBuilderTest.packets(builder)[1], direction, 255, EDhApiBlockMaterial.WATER);
+		assertTrue(NativeDhQuadBuilderTest.packets(builder)[2].packedVertexBuffers().isEmpty());
 	}
 
 	@Test
@@ -65,7 +65,7 @@ class LodQuadBuilderLayerTest {
 			emit(builder, EDhDirection.UP, 0x80336699, material);
 			assertEquals(1, builder.getCurrentOpaqueQuadsCount());
 			assertEquals(0, builder.getCurrentTransparentQuadsCount());
-			assertPayload(builder.makeOpaqueRustSemanticBuffers(), EDhDirection.UP, 255, material);
+			assertPayload(NativeDhQuadBuilderTest.packets(builder)[0], EDhDirection.UP, 255, material);
 		}
 	}
 

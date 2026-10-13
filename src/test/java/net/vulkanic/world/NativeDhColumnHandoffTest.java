@@ -20,21 +20,23 @@ class NativeDhColumnHandoffTest {
         try(var builder=new LodQuadBuilder(true,null)) {
             int identity=builder.internSemanticMaterial(new ColumnRenderSource.SemanticMaterialIdentity("minecraft:stone","minecraft:plains"));
             builder.addQuadUp((short)1,(short)2,(short)3,(short)1,(short)1,0xff336699,(byte)2,(byte)15,(byte)0,identity,(byte)1,123);
-            var opaque=builder.makeOpaqueRustSemanticBuffers();var side=builder.makeTransparentRustSemanticBuffers();var up=builder.makeTransparentUpRustSemanticBuffers();var water=builder.makeTransparentWaterUpRustSemanticBuffers();
-            var old=DistantHorizonsSemanticCollector.recordOwnedRustSemanticBuiltColumn(99201,new DhBlockPos(4,5,6),builder.semanticMaterials(),builder.semanticQuadCoverage(),LodQuadBuilder.semanticQuadCoverage(opaque,side,up,water),opaque,side,up,water);
-            try(old;var column=builder.makeNativeRustSemanticColumn()) {
+            LodQuadBuilder.SemanticVertexBufferBuild opaque,side,up,water;
+            try(var projected=builder.makeNativeRustSemanticColumn()) {
+                opaque=projected.project(0);side=projected.project(1);up=projected.project(2);water=projected.project(3);
+            }
+            long explicit=DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(99201,new DhBlockPos(4,5,6),builder.semanticMaterials(),
+                builder.semanticQuadCoverage(),builder.semanticQuadCoverage(),opaque,side,up,water);
+            try(var column=builder.makeNativeRustSemanticColumn()) {
                 long size=column.byteSize();assertEquals(64,size);
                 var nativeLease=DistantHorizonsSemanticCollector.recordOwnedNativeRustSemanticBuiltColumn(99201,new DhBlockPos(4,5,6),builder.semanticMaterials(),builder.semanticQuadCoverage(),column);
                 try(nativeLease) {
-                    assertEquals(old.generation(),nativeLease.generation());
+                    assertEquals(explicit,nativeLease.generation());
                     assertThrows(IllegalStateException.class,()->column.project(0));
                     var captured=DistantHorizonsSemanticCollector.snapshotForTest(99201);
                     assertEquals(4,captured.originX());assertEquals(5,captured.originY());assertEquals(6,captured.originZ());
                     assertArrayEquals(opaque.packedVertexBuffers().getFirst(),captured.opaque().getFirst().packedVerticesForRust());
                 }
-                assertTrue(DistantHorizonsSemanticCollector.hasColumn(99201,old.generation()));
             }
-            assertFalse(DistantHorizonsSemanticCollector.hasColumn(99201));
         }
     }
     @Test void ordinaryPublicationWorksWithoutCaptureAndEmptyBuildDoesNotReplaceItsOwner() {

@@ -14,7 +14,7 @@ mod reduction;
 mod parent;
 mod contributors;
 mod tint;
-mod source;
+pub(crate) mod source;
 mod metadata;
 mod codec;
 mod metadata_codec;

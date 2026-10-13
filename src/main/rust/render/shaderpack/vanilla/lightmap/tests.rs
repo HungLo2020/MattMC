@@ -131,7 +131,14 @@ fn cache_is_world_and_generation_coherent_without_retaining_caller_state() {
         },
         ..frame
     };
-    assert!(cache.update(3, changed_same_generation).is_err());
+    // Changed contents under a reused generation are a caller bug. Only debug
+    // builds re-derive the texels to detect it; release trusts the generation.
+    let reused = cache.update(3, changed_same_generation);
+    if cfg!(debug_assertions) {
+        assert!(reused.is_err());
+    } else {
+        assert_eq!(VanillaLightmapCacheUpdate::Unchanged, reused.unwrap());
+    }
     assert_eq!(expected, cache.rgba8());
 
     let stale = VanillaLightmapFrame {

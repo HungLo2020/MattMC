@@ -46,8 +46,9 @@ class NativeDhPacketPlanTest {
                             return null;
                         });
                         try(var plan=builder.packetPlan(route,grass)) {
-                            if(failed)assertThrows(Injected.class,()->plan.build(level,render));
-                            else {var flat=new ByteArrayOutputStream();for(byte[] bytes:plan.build(level,render).packedVertexBuffers())flat.write(bytes);assertArrayEquals(expected,flat.toByteArray(),"case "+c+" route "+route);}
+                            int layer=route;
+                            if(failed)assertThrows(Injected.class,()->build(plan,layer,level,render));
+                            else {var flat=new ByteArrayOutputStream();for(byte[] bytes:build(plan,route,level,render).packedVertexBuffers())flat.write(bytes);assertArrayEquals(expected,flat.toByteArray(),"case "+c+" route "+route);}
                             assertEquals(wanted,actual,"callback prefix case "+c+" route "+route);
                         }
                     }
@@ -57,6 +58,16 @@ class NativeDhPacketPlanTest {
         } finally {
             Config.Client.Advanced.Graphics.Experimental.earthCurveRatio.setWithoutFiringEvents(oldCurve);
             Config.Client.Advanced.Debugging.showOverlappingQuadErrors.setWithoutFiringEvents(oldErrors);
+        }
+    }
+    /** Production packet path: append one layer into a native column, then project it. */
+    private static LodQuadBuilder.SemanticVertexBufferBuild build(NativeDhPacketPlan plan, int route,
+        IClientLevelWrapper level, IMinecraftRenderWrapper render) {
+        // Columns take layers in order; earlier layers come from an empty builder.
+        try(var column=new NativeDhBuiltColumn();var empty=new NativeDhQuadBuilder(true)) {
+            for(int layer=0;layer<route;layer++)try(var none=empty.packetPlan(layer,0)){none.appendTo(column,layer,null,null);}
+            plan.appendTo(column,route,level,render);
+            return column.project(route);
         }
     }
     private static IClientLevelWrapper level(Runnable callback) {
@@ -89,7 +100,7 @@ class NativeDhPacketPlanTest {
         try(var builder=new NativeDhQuadBuilder(true)) {
             add(builder,7);
             try(var plan=builder.packetPlan(0,1)) {
-                var output=plan.build(level(()->{events.add("dirt");if(events.size()==1){add(builder,8);builder.close();}}),
+                var output=build(plan,0,level(()->{events.add("dirt");if(events.size()==1){add(builder,8);builder.close();}}),
                     render(()->events.add("shade")));
                 assertEquals(1,output.semanticMaterialIds().getFirst().length);
                 assertArrayEquals(new int[]{7},output.semanticMaterialIds().getFirst());
@@ -104,7 +115,7 @@ class NativeDhPacketPlanTest {
         try(var builder=new NativeDhQuadBuilder(true)) {
             for(int i=0;i<count;i++)add(builder,i);
             try(var plan=builder.packetPlan(0,1)) {
-                var output=plan.build(colors(()->0xff000000|((dirt[0]++/4)%256)<<16),render(()->shade[0]++));
+                var output=build(plan,0,colors(()->0xff000000|((dirt[0]++/4)%256)<<16),render(()->shade[0]++));
                 assertEquals(2,output.packedVertexBuffers().size());assertEquals(count*4,dirt[0]);assertEquals(dirt[0],shade[0]);
                 int identity=0;
                 for(int p=0;p<2;p++) {
@@ -127,11 +138,11 @@ class NativeDhPacketPlanTest {
         try(var builder=new NativeDhQuadBuilder(true)) {
             add(builder,1);var plan=builder.packetPlan(0,1);
             try(plan) {
-                assertThrows(IllegalArgumentException.class,()->plan.build(level(()->{events.add("dirt");throw new IllegalArgumentException("injected");}),render(()->events.add("shade"))));
+                assertThrows(IllegalArgumentException.class,()->build(plan,0,level(()->{events.add("dirt");throw new IllegalArgumentException("injected");}),render(()->events.add("shade"))));
             }
             assertEquals(java.util.List.of("dirt"),events);
-            plan.close();assertThrows(IllegalStateException.class,()->plan.build(null,null));
-            try(var fresh=builder.packetPlan(0,0)){assertEquals(64,fresh.build(null,null).packedVertexBuffers().getFirst().length);}
+            plan.close();assertThrows(IllegalStateException.class,()->build(plan,0,null,null));
+            try(var fresh=builder.packetPlan(0,0)){assertEquals(64,build(fresh,0,null,null).packedVertexBuffers().getFirst().length);}
         }
     }
 }

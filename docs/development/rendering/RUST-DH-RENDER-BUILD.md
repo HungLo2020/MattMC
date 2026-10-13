@@ -1,0 +1,148 @@
+# Rust-only DH render build
+
+A DH render section becomes GPU-ready packets in three Rust calls, with no
+Java column or point loops:
+
+1. **Conversion**, once per full-data source (the section and its four
+   neighbors): `mattmc_dh_render_convert_source` in
+   [`render/dh_columns/conversion.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_columns/conversion.rs)
+   walks all 4,096 columns, reads the Rust full-data source directly and
+   writes the Rust render source. Columns taller than the render source convert
+   into a scratch window and are reduced in Rust.
+2. **Section build**: `mattmc_dh_section_build` in
+   [`render/dh_quads/section.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_quads/section.rs)
+   walks every column and point, selects neighbor columns, applies debug colors
+   and the saturation/brightness adjustment, resolves semantic provenance and
+   produces every box, then the greedy merge runs.
+3. **Packets**: the four packet layers are encoded into a native column and
+   published to the collector ledger (unchanged; see
+   [Native DH column handoff](RUST-DH-COLUMN-HANDOFF.md)).
+
+Java entry points:
+[`FullDataToRenderDataTransformer`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java)
+(conversion settings and the semantic column hook),
+[`RenderColumnConversionContext`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/RenderColumnConversionContext.java)
+(contextual queries) and
+[`ColumnRenderBufferBuilder`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnRenderBufferBuilder.java)
+(per-build settings).
+
+## What Java still does
+
+- **Contextual queries during conversion.** Rust calls back for a block's
+  facts the first time a mapping id appears in a source, and for colors it has
+  not cached. Untinted colors are cached per id, so most columns never reach
+  Java. Tinted blocks (grass, leaves, fluids) still query
+  `IClientLevelWrapper.getBlockColor` per point, because their tint depends on
+  the position. Java sees a column only once it queries: `COLUMN_BEGIN` sets the
+  column's world position first.
+- **Semantic diagnostic builds** (`exactMaterialTopology`, capture, or
+  `forceSemanticPreservation`) intern block/biome identity strings in Java, so
+  each converted column also gets `COLUMN_BEGIN`/`COLUMN_END` hooks that record
+  its material spans, uniformity and contributor footprints
+  (`FullDataToRenderDataTransformer.finishSemanticColumn`). The section build
+  receives those sparse sidecars as two flat tables and handles them in Rust.
+- **Settings and lifecycle.** Java reads the configuration once per source or
+  section, owns the asynchronous scheduling in `LodRenderSection`, and supplies
+  grass dirt colors and shades for the packet layers.
+
+## Rules when changing this subsystem
+
+- **One implementation.** There is no Java box geometry, quad list, greedy
+  merge, packet encoder, reducer or column traversal in production. The old
+  Java versions survive only as test oracles (see Tests). Change the Rust code.
+- **Keep the section parameter block in step.** `section.rs` and
+  `ColumnRenderBufferBuilder` share its index layout (`P_*`, `F_*`).
+- **Semantic identities are builder-local.** The section build interns the
+  center source's identities in first-use order and returns that order;
+  `LodQuadBuilder.buildSection` checks Java assigns the same ids.
+- **Builds need a consumer.** `LodRenderSection` only builds while the Rust
+  whole-frame renderer is selected; otherwise a build would be discarded.
+- **A failed neighbor load counts as missing.** The load future always
+  completes, so a section never stays "upload in progress" after an error.
+- **Overlapping full-data points** in a tall column are rejected with an
+  `IllegalArgumentException` and the destination left untouched, as Frozen's
+  reducer did.
+
+## Removed
+
+- Java geometry and topology: `ColumnBox`, `BufferQuad`,
+  `BufferMergeDirectionEnum`, the Java quad lists, merge and packet encoder in
+  `LodQuadBuilder` (now `final`), and `ColumnQuadView`.
+- Java fallbacks: `RenderDataPointReducingList`, the heap-list conversion
+  scratch, the per-column conversion export and `NativeDhConversionReader`,
+  class-identity admission in the conversion scope (multiplayer levels now get
+  the Rust color cache), and the shade-facts admission gate.
+- Unused API: `NativeDhPacketPlan.build` and its Rust encoder export,
+  `ColumnArrayView.copyFrom`/`mergeWith`/`changeVerticalSizeFrom`, and
+  `LodBufferContainer`'s Java upload state.
+- Retired drivers (last in commit `1490391f9`): `VerifyDhQuads`,
+  `VerifyDhFaces`, `VerifyDhPackets`, `VerifyDhColumnPublication`,
+  `VerifyDhRenderSource`, `VerifyDhConversionPolicy`,
+  `VerifyDhPrimaryConversion` and `VerifyDhConversionReader`. Their recorded
+  Frozen fixtures are still replayed by the tests below.
+
+## Tests
+
+```bash
+./gradlew -PmattmcRustProfile=release test parityTest --tests '*NativeDh*' --tests '*LodQuadBuilder*' --tests '*ColumnRenderBufferBuilder*'
+```
+
+- `NativeDhSectionBuildTest` (parity) builds 240 random sections per mode in
+  Rust and with the Java reference (`JavaSectionBuildReference`,
+  `JavaColumnBoxReference`, `JavaQuadListReference`: the HEAD `1490391f9`
+  Java code), comparing quad rows, identity tables and packet bytes. It covers
+  neighbors, every debug mode, color adjustment, transparency modes, cave
+  culling, semantic planes, spans and contributor boxes.
+- `NativeDhQuadBuilderTest`, `NativeDhFacesTest`, `NativeDhPacketPlanTest`
+  and `NativeDhRenderReductionTest` replay the recorded Frozen fixtures.
+- `NativeDhRenderConversionTest` and `NativeDhConversionScopeTest` cover the
+  whole-source conversion bridge and its material cache.
+
+**Whole pipeline, across builds.** `VerifyDhSource.py --mode render` converts,
+builds and encodes recorded terrain (a 3 x 3 grid of block-detail sections
+plus two parent levels) with the identical driver on a baseline build and on
+Current, requires equal packet checksums and times both:
+
+```bash
+python3 DevUtils/tests/world/chunk/VerifyDhSource.py --mode render --java "$JAVA" \
+  --frozen-classpath-file baseline.cp --current-classpath-file current.cp \
+  --native-dir build/rust/native --frozen-native-dir ../baseline/build/rust/native \
+  --output build/dh-render-check --pairs 6 --rounds 6 --warmup-rounds 2
+```
+
+Add `--jvm-arg=-Ddh.verify.renderConfig=1` or `=2` for other settings presets,
+or a semantic launch switch such as
+`--jvm-arg=-Dmattmc.dev.rustGalDistantHorizons.exactMaterialTopology=true`.
+
+## Measured results (2026-10-13)
+
+Against a build of the previous commit (`1490391f9`, "baseline") on the laptop.
+
+**CPU, whole pipeline** (`--mode render`, medians; every pair's packet
+checksums matched):
+
+| Setting | Baseline ms | Current ms | Current / baseline |
+| --- | --- | --- | --- |
+| Defaults (6 pairs x 6 rounds) | 2,767.2 | 2,107.2 | 0.76 |
+| Preset 1: culling, fake ocean, color adjustment | 1,428.0 | 1,119.0 | 0.78 |
+| Preset 2: debug colors, no transparency | 1,418.0 | 1,110.4 | 0.78 |
+| Semantic preservation (diagnostic) | 4,847.8 | 4,877.4 | 1.01 |
+| Exact material topology (diagnostic) | 5,100.8 | 4,943.4 | 0.97 |
+
+The presets and diagnostic modes ran two pairs of three rounds each. Java heap
+allocation per default round (the driver prints `DH_ALLOCATED_PER_ROUND`;
+native storage is not counted) fell from 33.1 MB to 15.8 MB.
+
+**Gameplay** (small DH fixture, moving camera, 6,000 frames, four alternating
+runs per side, medians):
+
+| Side | FPS | Median frame | p99 | DH columns built during the run |
+| --- | --- | --- | --- | --- |
+| Baseline | 119.8 | 6.38 ms | 31.5 ms | ~414 |
+| Current | 116.7 | 6.46 ms | 34.4 ms | ~518 |
+
+The 1.3% median-frame difference is inside the run spread (5.98–6.86 ms on
+both sides). Current published about 25% more DH columns within the same window,
+and its extra frame time sits in GC and DH asset preflight rather than in the
+build. The laptop swapped 1.6–3.9 GB in every run, so GC times vary widely
+between runs. Runs: `artifacts/performance/realworld-20261011/dhab5-*`.

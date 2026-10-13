@@ -132,74 +132,146 @@ fn convert(mut call: impl FnMut(i32, i32, u64, u64) -> Result<u64, ()>, flags: i
     Ok(())
 }
 
+const COLUMN_BEGIN: i32 = 19;
+const COLUMN_END: i32 = 20;
+
 type Callback = unsafe extern "C" fn(i32, i32, u64, u64) -> u64;
 
-/// Noncritical synchronous call: callbacks may query the world, nest another
-/// conversion, or fail. Never unwind across the ABI or continue after failure.
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_render_convert(flags: i32, cave_y: i32, callback: Option<Callback>,
-    reader: *const Reader, output: *mut super::source::Source, window: u64,
-    materials: *mut super::conversion_materials::Materials) -> i32 {
-    let Some(callback) = callback else { return -1; };
-    catch_unwind(AssertUnwindSafe(|| {
-        let (mut selected, mut needs_selection) = (0u64, false);
-        let result = convert(|mut op, index, mut value, _extra| {
-            // Acquire and drop each borrow before a callback. The ABI scope pins
-            // the reader, while its selected column may grow or change in Java.
-            if let Some(reader) = reader.as_ref() {
-                if op == SIZE { return Ok(reader.size() as u64); }
-                if op == POINT {
-                    if let Some(point) = reader.point(index) { return Ok(point); }
-                    // Let the original getter report an invalid extent/index.
-                }
+/// One column through the conversion policy. Rust serves input, output and
+/// cached material facts; everything else is a contextual Java query.
+unsafe fn convert_column(flags: i32, cave_y: i32, java: &mut dyn FnMut(i32, i32, u64) -> Result<u64, ()>,
+    reader: &Reader, output: *mut super::source::Source, window: u64,
+    materials: *mut super::conversion_materials::Materials) -> Result<(), ()> {
+    let (mut selected, mut needs_selection) = (0u64, false);
+    convert(|mut op, index, mut value, _extra| {
+        // Acquire and drop each borrow before a callback. The ABI scope pins
+        // the reader, while its selected column may grow or change in Java.
+        if op == SIZE { return Ok(reader.size() as u64); }
+        if op == POINT {
+            if let Some(point) = reader.point(index) { return Ok(point); }
+            return Err(());
+        }
+        if op == OUTPUT_GET {
+            return output.as_ref().and_then(|out| out.conversion_read(window, index)).ok_or(());
+        } else if op == OUTPUT_SET {
+            let out = output.as_mut().ok_or(())?;
+            return if out.conversion_write(window, index, value) { Ok(0) } else { Err(()) };
+        }
+        if op == RESOLVE {
+            selected = (value << 32) | index as u32 as u64;
+            needs_selection = false;
+            if let Some(word) = materials.as_ref().and_then(|m| m.get(index)) {
+                needs_selection = true;
+                return Ok(word);
             }
-            if op == OUTPUT_GET {
-                if let Some(value) = output.as_ref().and_then(|out| out.conversion_read(window, index)) { return Ok(value); }
-            } else if op == OUTPUT_SET {
-                if let Some(out) = output.as_mut() {
-                    if out.conversion_write(window, index, value) { return Ok(0); }
-                }
+        } else if op == COLOR && flags & 8 == 0 {
+            if let Some(color) = materials.as_mut().and_then(|m| m.color(selected as i32)) {
+                return Ok(color as u64);
             }
-            if op == RESOLVE {
-                selected = (value << 32) | index as u32 as u64;
+        }
+        if needs_selection {
+            if op == COLOR {
+                op = COLOR_SELECTED;
+                value = selected;
                 needs_selection = false;
-                if let Some(word) = materials.as_ref().and_then(|m| m.get(index)) {
-                    needs_selection = true;
-                    return Ok(word);
-                }
-            } else if op == COLOR && flags & 8 == 0 {
-                if let Some(color) = materials.as_mut().and_then(|m| m.color(selected as i32)) {
-                    return Ok(color as u64);
-                }
+            } else if op == SEMANTIC_SET {
+                op = SEMANTIC_SET_UNAVAILABLE;
+            } else if op == SEMANTIC_MERGE {
+                op = SEMANTIC_MERGE_UNAVAILABLE;
             }
-            if needs_selection {
-                if op == COLOR {
-                    op = COLOR_SELECTED;
-                    value = selected;
-                    needs_selection = false;
-                } else if op == SEMANTIC_SET {
-                    op = SEMANTIC_SET_UNAVAILABLE;
-                } else if op == SEMANTIC_MERGE {
-                    op = SEMANTIC_MERGE_UNAVAILABLE;
-                }
+        }
+        let color_generation = super::conversion_materials::color_generation();
+        let result = java(op, index, value)?;
+        if op == RESOLVE && Intrinsic::resolve(result).is_some() {
+            if let Some(materials) = materials.as_mut() { materials.put(index, result); }
+        }
+        if matches!(op, COLOR | COLOR_SELECTED) && flags & 8 == 0 && result >> 63 != 0 {
+            if let Some(materials) = materials.as_mut() {
+                materials.put_color(selected as i32, result as u32, color_generation);
             }
-            let color_generation = super::conversion_materials::color_generation();
-            let mut failed = 0u8;
-            let result = callback(op, index, value, (&mut failed as *mut u8) as usize as u64);
-            if failed != 0 { return Err(()); }
-            if op == RESOLVE && Intrinsic::resolve(result).is_some() {
-                if let Some(materials) = materials.as_mut() { materials.put(index, result); }
+            return Ok(result as u32 as u64);
+        }
+        Ok(result)
+    }, flags, cave_y)
+}
+
+/// Converts every column of a full-data source into `output` (64 x 64 columns
+/// of `height` points). Columns taller than `height` convert into `scratch`
+/// and are reduced here; semantic builds instead hand that reduction and
+/// their sidecars to Java at COLUMN_END. Java sees COLUMN_BEGIN before the
+/// first contextual query of a column, and for every converted column in
+/// semantic builds. Returns 1, 0 on a failed or invalid conversion, or -5 when
+/// a tall column's points overlap (Java's IllegalArgumentException).
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_render_convert_source(flags: i32, cave_y: i32, callback: Option<Callback>,
+    source: *const crate::world::level::chunk::dh_columns::source::Source,
+    output: *mut super::source::Source, height: i32, scratch: *mut super::source::Source,
+    materials: *mut super::conversion_materials::Materials) -> i32 {
+    let (Some(callback), Some(source)) = (callback, source.as_ref()) else { return 0; };
+    if output.is_null() || scratch.is_null() || height < 0
+        || (height as usize).checked_mul(4096) != Some((*output).points().len()) {
+        return 0;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let semantic = flags & 8 != 0;
+        let height = height as usize;
+        let mut reader = Reader::new();
+        for column in 0..4096usize {
+            match reader.select(source, column) {
+                0 => continue,
+                1 => {}
+                _ => return 0,
             }
-            if matches!(op, COLOR | COLOR_SELECTED) && flags & 8 == 0 && result >> 63 != 0 {
-                if let Some(materials) = materials.as_mut() {
-                    materials.put_color(selected as i32, result as u32, color_generation);
-                }
-                return Ok(result as u32 as u64);
+            let length = reader.size();
+            if length == 0 { continue; }
+            let expanded = length > 0 && length as usize > height;
+            if expanded && length as usize > (*scratch).points().len() { return 0; }
+            let mut java = Column { callback, column: column as i32, length: if expanded { length as u64 } else { 0 }, begun: false };
+            if semantic && java.begin().is_err() { return 0; }
+            let column_window = (height as u64) << 32 | (column * height) as u64;
+            let (target, window) = if expanded {
+                (*scratch).conversion_clear(length as usize);
+                (scratch, (length as u32 as u64) << 32)
+            } else {
+                (output, column_window)
+            };
+            if convert_column(flags, cave_y, &mut |op, index, value| java.call(op, index, value),
+                &reader, target, window, materials).is_err() { return 0; }
+            if expanded && !semantic {
+                let points = &(*scratch).points()[..length as usize];
+                let written = super::reduction::with_reduced(points, None, height as i32, height, |result| {
+                    for (i, &(point, _)) in result.iter().enumerate() {
+                        (*output).conversion_write(column_window, i as i32, point);
+                    }
+                });
+                if written.is_err() { return -5; }
             }
-            Ok(result)
-        }, flags, cave_y);
-        i32::from(result.is_ok())
-    })).unwrap_or(-1)
+            if semantic && java.call(COLUMN_END, column as i32, if expanded { length as u64 } else { 0 }).is_err() { return 0; }
+        }
+        1
+    })).unwrap_or(0)
+}
+
+/// Java's view of one column: announced once, before its first query.
+struct Column { callback: Callback, column: i32, length: u64, begun: bool }
+impl Column {
+    unsafe fn raw(&self, op: i32, index: i32, value: u64) -> Result<u64, ()> {
+        let mut failed = 0u8;
+        let result = (self.callback)(op, index, value, (&mut failed as *mut u8) as usize as u64);
+        if failed != 0 { Err(()) } else { Ok(result) }
+    }
+    unsafe fn begin(&mut self) -> Result<(), ()> {
+        if !self.begun {
+            self.begun = true;
+            // The tall-column length, or 0 when the column converts in place.
+            self.raw(COLUMN_BEGIN, self.column, self.length)?;
+        }
+        Ok(())
+    }
+    unsafe fn call(&mut self, op: i32, index: i32, value: u64) -> Result<u64, ()> {
+        self.begin()?;
+        self.raw(op, index, value)
+    }
 }
 
 #[cfg(test)]

@@ -28,22 +28,22 @@ class BufferQuadSemanticMaterialTest {
 
 	@Test
 	void exactAtlasRouteKeepsDifferentSourceMaterialsInSeparateQuads() {
-		assertTrue(!LodQuadBuilder.canMergeSemanticMaterials(true, 11, 12));
-		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(true, 11, 11));
-		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(false, 11, 12));
+		assertTrue(!JavaQuadListReference.canMergeSemanticMaterials(true, 11, 12));
+		assertTrue(JavaQuadListReference.canMergeSemanticMaterials(true, 11, 11));
+		assertTrue(JavaQuadListReference.canMergeSemanticMaterials(false, 11, 12));
 	}
 
 	@Test
 	void exactAtlasRouteKeepsDifferentWeightedVariantPositionsSeparate() {
-		assertTrue(!LodQuadBuilder.canMergeSemanticMaterials(
+		assertTrue(!JavaQuadListReference.canMergeSemanticMaterials(
 			true, 11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L,
 			11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 200L
 		));
-		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(
+		assertTrue(JavaQuadListReference.canMergeSemanticMaterials(
 			true, 11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L,
 			11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L
 		));
-		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(
+		assertTrue(JavaQuadListReference.canMergeSemanticMaterials(
 			false, 11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L,
 			11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 200L
 		));
@@ -55,7 +55,7 @@ class BufferQuadSemanticMaterialTest {
 			new ColumnRenderSource.SemanticHorizontalContributor(java.util.List.of(
 				new ColumnRenderSource.SemanticMaterialSpan(0, 4, 11, (byte) 1, 10L),
 				new ColumnRenderSource.SemanticMaterialSpan(4, 8, 12, (byte) 1, 20L)));
-		var clipped = ColumnRenderBufferBuilder.clippedContributorSpans(contributor, 2, 7);
+		var clipped = JavaSectionBuildReference.clippedContributorSpans(contributor, 2, 7);
 		assertEquals(2, clipped.size());
 		assertEquals(2, clipped.get(0).minY());
 		assertEquals(4, clipped.get(0).maxY());
@@ -69,7 +69,7 @@ class BufferQuadSemanticMaterialTest {
 			new ColumnRenderSource.SemanticHorizontalContributor(java.util.List.of(
 				new ColumnRenderSource.SemanticMaterialSpan(0, 3, 11, (byte) 1, 10L),
 				new ColumnRenderSource.SemanticMaterialSpan(4, 8, 12, (byte) 1, 20L)));
-		assertTrue(ColumnRenderBufferBuilder.clippedContributorSpans(contributor, 0, 8).isEmpty());
+		assertTrue(JavaSectionBuildReference.clippedContributorSpans(contributor, 0, 8).isEmpty());
 	}
 
 	private static BufferQuad quad(short x, int semanticMaterialId) {

@@ -1,5 +1,7 @@
 package net.vulkanic.world;
 
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
@@ -7,24 +9,31 @@ import static org.junit.jupiter.api.Assertions.*;
 import static net.vulkanic.world.NativeDhRenderConversion.*;
 
 class NativeDhRenderConversionTest {
+    private static FullDataSourceV2 source(long... points) {
+        var data = new it.unimi.dsi.fastutil.longs.LongList[4096];
+        data[0] = new it.unimi.dsi.fastutil.longs.LongArrayList(points);
+        long pos = DhSectionPos.encode((byte)6, 0, 0);
+        return FullDataSourceV2.createWithData(pos, new com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap(pos),
+            data, new byte[4096], new byte[4096]);
+    }
+    private static void run(FullDataSourceV2 source, NativeDhRenderSource output, int height, Access access) {
+        try (var scratch = new NativeDhRenderSource(1)) {
+            convertSource(0, 0, access, source.nativeSource().stageOwner(), output, height, scratch, java.lang.foreign.MemorySegment.NULL);
+        }
+    }
+
     @Test void nativeInputsAndOutputStayAuthoritativeAcrossContextualGrowth() {
-        try (var source = com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2.createEmpty(com.seibel.distanthorizons.core.pos.DhSectionPos.encode((byte)6, 0, 0));
-             var reader = source.nativeSource().conversionReader(); var output = new NativeDhRenderSource(1)) {
-            assertTrue(net.minecraft.world.level.chunk.NativeDhCodec.initialize(source));
-            reader.column(0);
+        try (var source = source((1L << 32) | (10L << 44)); var output = new NativeDhRenderSource(2)) {
             var writer = source.getColumn(0);
-            writer.set(0, (1L << 32) | (10L << 44));
             var calls = new ArrayList<Integer>();
-            convert(0, 0, new Access() {
+            run(source, output, 2, new Access() {
                 int colors;
-                @Override public java.lang.foreign.MemorySegment inputOwner() { return reader.borrowOwner(); }
-                @Override public java.lang.foreign.MemorySegment outputOwner() { return output.borrowOwner(); }
-                @Override public long outputWindow() { return (2L << 32) | 17; }
-                @Override public long call(int op, int index, long value, long extra) {
+                @Override public long call(int op, int index, long value) {
                     calls.add(op);
                     return switch(op) {
-                        case RESOLVE, SNOW -> 0;
+                        case COLUMN_BEGIN, RESOLVE, SNOW -> 0;
                         case COLOR -> {
+                            // Rust reads the live column after every query.
                             if (colors++ == 0) writer.add((1L << 32) | (3L << 44));
                             yield 0xff223344L;
                         }
@@ -33,21 +42,17 @@ class NativeDhRenderConversionTest {
                     };
                 }
             });
-            assertEquals(0x2f22334400b00a00L, output.getLong(17));
-            assertEquals(0x2f22334400400300L, output.getLong(18));
-            assertEquals(0, output.getLong(16)); assertEquals(0, output.getLong(19));
-            assertEquals(8, calls.size());
+            assertEquals(0x2f22334400b00a00L, output.getLong(0));
+            assertEquals(0x2f22334400400300L, output.getLong(1));
+            assertEquals(0, output.getLong(2));
+            assertEquals(List.of(COLUMN_BEGIN, RESOLVE, SNOW, COLOR, BLOCK_MATERIAL, RESOLVE, SNOW, COLOR, BLOCK_MATERIAL), calls);
         }
     }
     @Test void outputCloseDuringCallbackIsRefusedUntilNativeUseFinishes() {
-        try (var output = new NativeDhRenderSource(1)) {
-            assertThrows(IllegalStateException.class, () -> convert(0, 0, new Access() {
-                @Override public java.lang.foreign.MemorySegment outputOwner() { return output.borrowOwner(); }
-                @Override public long outputWindow() { return 1L << 32; }
-                @Override public long call(int op, int index, long value, long extra) {
-                    output.close();
-                    throw new AssertionError("Closing a pinned output must fail");
-                }
+        try (var source = source((1L << 32) | (10L << 44)); var output = new NativeDhRenderSource(1)) {
+            assertThrows(IllegalStateException.class, () -> run(source, output, 1, (op, index, value) -> {
+                output.close();
+                throw new AssertionError("Closing a pinned output must fail");
             }));
             assertEquals(4096, output.size());
             output.set(0, 123); assertEquals(123, output.getLong(0));
@@ -56,34 +61,37 @@ class NativeDhRenderConversionTest {
     @Test void callbackExceptionRetainsIdentityAndStopsAtPublishedPrefix() {
         var failure = new AssertionError("color failed");
         var calls = new ArrayList<Integer>();
-        var actual = assertThrows(AssertionError.class, () -> convert(0, 0, (op, index, value, extra) -> {
-            calls.add(op);
-            return switch (op) {
-                case SIZE -> 1;
-                case POINT -> 1L << 32;
-                case RESOLVE, SNOW -> 0;
-                case COLOR -> throw failure;
-                default -> throw new AssertionError("Unexpected operation " + op);
-            };
-        }));
-        assertSame(failure, actual);
-        assertEquals(List.of(SIZE, POINT, RESOLVE, SNOW, COLOR), calls);
+        try (var source = source(1L << 32); var output = new NativeDhRenderSource(1)) {
+            var actual = assertThrows(AssertionError.class, () -> run(source, output, 1, (op, index, value) -> {
+                calls.add(op);
+                return switch (op) {
+                    case COLUMN_BEGIN, RESOLVE, SNOW -> 0;
+                    case COLOR -> throw failure;
+                    default -> throw new AssertionError("Unexpected operation " + op);
+                };
+            }));
+            assertSame(failure, actual);
+            assertEquals(List.of(COLUMN_BEGIN, RESOLVE, SNOW, COLOR), calls);
+            assertEquals(0, output.getLong(0));
+        }
     }
-    @Test void nestedConversionRestoresOuterCallbackAndEmptyOutputIsPublishedOnce() {
+    @Test void nestedConversionRestoresOuterCallback() {
         var outer = new ArrayList<Integer>();
         var nested = new ArrayList<Integer>();
-        convert(0, 0, (op, index, value, extra) -> {
-            outer.add(op);
-            if (op == SIZE) {
-                convert(0, 0, (innerOp, innerIndex, innerValue, innerExtra) -> {
-                    nested.add(innerOp); assertEquals(0, innerValue); return 0;
+        try (var first = source((1L << 32) | (10L << 44)); var second = source((1L << 32) | (4L << 44));
+             var firstOutput = new NativeDhRenderSource(1); var secondOutput = new NativeDhRenderSource(1)) {
+            run(first, firstOutput, 1, (op, index, value) -> {
+                outer.add(op);
+                if (op == COLUMN_BEGIN) run(second, secondOutput, 1, (innerOp, innerIndex, innerValue) -> {
+                    nested.add(innerOp);
+                    return innerOp == COLOR ? 0xff000001L : innerOp == BLOCK_MATERIAL ? 2 : 0;
                 });
-                return 0;
-            }
-            assertEquals(OUTPUT_SET, op); assertEquals(0, index); assertEquals(0, value);
-            return 0;
-        });
-        assertEquals(List.of(SIZE, OUTPUT_SET), outer);
-        assertEquals(List.of(SIZE, OUTPUT_SET), nested);
+                return op == COLOR ? 0xff000002L : op == BLOCK_MATERIAL ? 2 : 0;
+            });
+            assertEquals(List.of(COLUMN_BEGIN, RESOLVE, SNOW, COLOR, BLOCK_MATERIAL), outer);
+            assertEquals(List.of(COLUMN_BEGIN, RESOLVE, SNOW, COLOR, BLOCK_MATERIAL), nested);
+            assertEquals(0x2f00000200b00a00L, firstOutput.getLong(0));
+            assertEquals(0x2f00000100500400L, secondOutput.getLong(0));
+        }
     }
 }

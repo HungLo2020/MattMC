@@ -1,19 +1,15 @@
 package net.vulkanic.world;
 
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
-import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.util.HashSet;
 import net.minecraft.util.NativeLibraryLoader;
-import net.minecraft.world.level.block.NativeCollisionGeometry;
 
-/** One conversion's bounded Rust material facts and reusable native scratch.
- * Contextual/custom inputs keep their ordered queries. Close before returning
- * the completed render source so no full-data or level binding is retained. */
+/** One conversion's Rust material facts and its tall-column scratch. Close
+ * before returning the completed render source so no full-data or level
+ * binding is retained. */
 public final class NativeDhConversionScope implements AutoCloseable {
     private static MethodHandle bind(String name, FunctionDescriptor descriptor) {
         return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_conversion_materials_" + name, descriptor);
@@ -35,31 +31,26 @@ public final class NativeDhConversionScope implements AutoCloseable {
         try { owner = pointer.reinterpret(1, arena, NativeDhConversionScope::release); }
         catch (Throwable e) { arena.close(); release(pointer); throw failure(e); }
     }
-    public static NativeDhConversionScope create(IClientLevelWrapper level, FullDataSourceV2 source) {
-        if (level.getClass() != ClientLevelWrapper.class || source.getClass() != FullDataSourceV2.class
-            || source.mapping.getClass() != FullDataPointIdMap.class || !NativeCollisionGeometry.ready()) return null;
+    public static NativeDhConversionScope create(FullDataSourceV2 source) {
         try {
-            var pointer = (MemorySegment)CREATE.invokeExact(source.mapping.size());
-            return pointer.address() == 0 ? null : new NativeDhConversionScope(pointer);
+            var pointer = (MemorySegment)CREATE.invokeExact(Math.max(1, source.mapping.size()));
+            if (pointer.address() == 0) throw new OutOfMemoryError("DH conversion material scope");
+            return new NativeDhConversionScope(pointer);
         } catch (Throwable e) { throw failure(e); }
     }
+    /** Material facts depend on the avoided-block sets; new sets clear them. */
     public MemorySegment borrow(HashSet<IBlockStateWrapper> ignored, HashSet<IBlockStateWrapper> caves,
         HashSet<IBlockStateWrapper> snow) {
-        if (ignored.getClass() != HashSet.class || caves.getClass() != HashSet.class || snow.getClass() != HashSet.class)
-            return MemorySegment.NULL;
         if (this.ignored != ignored || this.caves != caves || this.snow != snow) {
             try { CLEAR.invokeExact(owner); } catch (Throwable e) { throw failure(e); }
             this.ignored = ignored; this.caves = caves; this.snow = snow;
         }
         return owner;
     }
-    /** Ordinary full columns fit one 4,096-point scratch window. Oversized or
-     * custom columns retain their public-list path. No point array crosses Java. */
-    public NativeDhRenderSource temporaryOutput(int length) {
+    /** One 4,096-point window for a column taller than the render source. */
+    public NativeDhRenderSource scratch() {
         if (!owner.scope().isAlive()) throw new IllegalStateException("DH conversion scope is closed");
-        if (length < 0 || length > 4096) return null;
         if (scratch == null) scratch = new NativeDhRenderSource(1);
-        NativeDhRenderSource.span(scratch, 0, length, 0, 0L);
         return scratch;
     }
     private static void release(MemorySegment pointer) {

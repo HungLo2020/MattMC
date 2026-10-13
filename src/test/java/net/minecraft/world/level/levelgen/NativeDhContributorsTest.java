@@ -131,18 +131,18 @@ class NativeDhContributorsTest {
                 org.mockito.Mockito.when(level.hasCeiling()).thenReturn(true);
                 org.mockito.Mockito.when(level.getBlockColor(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                     org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0xff223344);
-                var data = parent.getColumnAtRelPos(x, z);
-                var render = ColumnRenderSource.createEmpty(parent.getPos(), Math.max(1, data.size()), 0);
-                var ordinary = ColumnRenderSource.createEmpty(parent.getPos(), Math.max(1, data.size()), 0);
-                FullDataToRenderDataTransformer.updateOrReplaceRenderDataViewColumnWithFullDataColumn(
-                    level, watched, ordinary, x, z, x * 2, z * 2, ordinary.getVerticalDataPointView(x, z), data, false);
-                org.mockito.Mockito.verify(watched, org.mockito.Mockito.never()).getRetainedSemanticHorizontalContributors(x, z);
-                assertNull(ordinary.getRetainedSemanticHorizontalContributors(x, z));
-                FullDataToRenderDataTransformer.updateOrReplaceRenderDataViewColumnWithFullDataColumn(
-                    level, watched, render, x, z, x * 2, z * 2, render.getVerticalDataPointView(x, z), data, true);
-                org.mockito.Mockito.verify(watched, org.mockito.Mockito.times(1)).getRetainedSemanticHorizontalContributors(x, z);
-                org.mockito.Mockito.verify(watched, org.mockito.Mockito.never()).getSemanticHorizontalContributors(x, z);
-                var received = render.getRetainedSemanticHorizontalContributors(x, z);
+                var force = net.vulkanic.world.DistantHorizonsSemanticCollector.FORCE_SEMANTIC_PRESERVATION_PROPERTY;
+                try (var ordinary = FullDataToRenderDataTransformer.transformFullDataToRenderSource(watched, level)) {
+                    org.mockito.Mockito.verify(watched, org.mockito.Mockito.never()).getRetainedSemanticHorizontalContributors(x, z);
+                    assertNull(ordinary.getRetainedSemanticHorizontalContributors(x, z));
+                }
+                System.setProperty(force, "true");
+                LongList[] received;
+                try (var render = FullDataToRenderDataTransformer.transformFullDataToRenderSource(watched, level)) {
+                    org.mockito.Mockito.verify(watched, org.mockito.Mockito.times(1)).getRetainedSemanticHorizontalContributors(x, z);
+                    org.mockito.Mockito.verify(watched, org.mockito.Mockito.never()).getSemanticHorizontalContributors(x, z);
+                    received = render.getRetainedSemanticHorizontalContributors(x, z);
+                } finally { System.clearProperty(force); }
                 // Each read returns fresh views over the same Rust snapshot.
                 assertNotNull(received); for (int i = 0; i < 4; i++) assertEquals(expected[i], received[i]);
             }

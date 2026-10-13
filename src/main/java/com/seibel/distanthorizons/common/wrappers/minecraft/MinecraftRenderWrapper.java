@@ -229,24 +229,11 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper, IMinecra
 		wrapper.setLightmapId(tetxureId);
 	}
 	
-	@Override
-	public boolean hasNativeShadeFacts() {
-		if (getClass() != MinecraftRenderWrapper.class || MC == null) return false;
-		var level = MC.level;
-		if (level == null) return true;
-		if (level.getClass() != net.minecraft.client.multiplayer.ClientLevel.class) return false;
-		var effect = level.effects().getClass();
-		return effect == net.minecraft.client.renderer.DimensionSpecialEffects.OverworldEffects.class
-			|| effect == net.minecraft.client.renderer.DimensionSpecialEffects.NetherEffects.class
-			|| effect == net.minecraft.client.renderer.DimensionSpecialEffects.EndEffects.class
-			|| effect == net.minecraft.client.renderer.DimensionSpecialEffects.PrimordialCavesEffects.class;
-	}
-
+	/** Same inputs as {@link #getShade}: the shading mode and the current level's shading facts. */
 	@Override
 	public int getNativeShadeFacts() {
-		if (!hasNativeShadeFacts()) return -1;
 		int mode = Config.Client.Advanced.Graphics.Quality.lodShading.get().ordinal();
-		var level = MC.level;
+		var level = MC == null ? null : MC.level;
 		return mode | (level != null ? 4 : 0)
 			| (level != null && level.effects().constantAmbientLight() ? 8 : 0)
 			| (net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading() ? 16 : 0);

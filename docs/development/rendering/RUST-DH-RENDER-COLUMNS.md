@@ -1,5 +1,10 @@
 # Rust DH render-column reduction
 
+> **Current state (2026-10-13):** reduction is Rust-only. The Java
+> `RenderDataPointReducingList` fallback and custom-view admission were removed;
+> rejected input throws `IllegalArgumentException` with the destination
+> untouched, as in Frozen. See [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
+
 Rust owns the admitted complete compact render-column reduction.
 Ordinary `RenderDataPointUtil.mergeMultiData` calls borrow existing canonical
 column storage and publish directly into the destination; Java does not pack a

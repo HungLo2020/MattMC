@@ -6,6 +6,7 @@ mod ffi;
 #[cfg(test)]
 mod packet_tests;
 mod packets;
+mod section;
 #[cfg(test)]
 mod tests;
 

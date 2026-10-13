@@ -5,6 +5,18 @@ use super::{mutable::{Column, Lease}, source::Source};
 pub(crate) struct Reader { column: Option<Lease> }
 
 impl Reader {
+    pub(crate) fn new() -> Self { Self { column: None } }
+    /// -1: inconsistent slot; 0: missing; 1: selected (including empty).
+    pub(crate) unsafe fn select(&mut self, source: &Source, index: usize) -> i32 {
+        self.column = None;
+        if !source.present(index) { return 0; }
+        let owner = source.owner(index);
+        if !owner.is_null() {
+            self.column = Some(Lease::retain(owner));
+            return 1;
+        }
+        if source.column(index).is_some() { 1 } else { -1 }
+    }
     pub(crate) fn size(&self) -> i32 {
         self.column.as_ref().map_or(0, |lease| unsafe {
             (*(lease.identity() as *const Column)).logical_len() as i32
@@ -19,41 +31,6 @@ impl Reader {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn mattmc_dh_reader_create() -> *mut Reader {
-    Box::into_raw(Box::new(Reader { column: None }))
-}
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_reader_release(reader: *mut Reader) {
-    if !reader.is_null() { drop(Box::from_raw(reader)); }
-}
-/// -1: retain compatibility access; 0: missing; 1: selected (including empty).
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_reader_select(reader: *mut Reader, source: *const Source, index: i32) -> i32 {
-    let (Some(reader), Some(source)) = (reader.as_mut(), source.as_ref()) else { return -1; };
-    if !(0..4096).contains(&index) { return -1; }
-    reader.column = None;
-    let index = index as usize;
-    if !source.present(index) { return 0; }
-    let owner = source.owner(index);
-    if !owner.is_null() {
-        reader.column = Some(Lease::retain(owner));
-        return 1;
-    }
-    if source.column(index).is_some() { 1 } else { -1 }
-}
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_reader_size(reader: *const Reader) -> i32 {
-    reader.as_ref().map_or(0, Reader::size)
-}
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_reader_get(reader: *const Reader, index: i32, out: *mut u64) -> i32 {
-    if index < 0 || out.is_null() || out as usize % 8 != 0 { return 0; }
-    let Some(value) = reader.as_ref().and_then(|reader| reader.point(index)) else { return 0; };
-    *out = value;
-    1
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,40 +40,34 @@ mod tests {
         unsafe {
             let source = mattmc_dh_source_create();
             (*source).adopt(7, Box::new(Column::new(vec![11, 22])));
-            let reader = mattmc_dh_reader_create();
-            assert_eq!(mattmc_dh_reader_select(reader, source, 7), 1);
+            let mut reader = Reader::new();
+            assert_eq!(reader.select(&*source, 7), 1);
             let column = (*source).owner(7);
             Column::points_mut(column).push(33);
-            assert_eq!(mattmc_dh_reader_size(reader), 3);
-            let mut value = 0;
-            assert_eq!(mattmc_dh_reader_get(reader, 2, &mut value), 1);
-            assert_eq!(value, 33);
+            assert_eq!(reader.size(), 3);
+            assert_eq!(reader.point(2), Some(33));
             // Replacing/closing the source cannot invalidate a selected lease.
             (*source).adopt(7, Box::new(Column::new(vec![44])));
             mattmc_dh_source_release(source);
-            assert_eq!(mattmc_dh_reader_get(reader, 0, &mut value), 1);
-            assert_eq!(value, 11);
-            assert_eq!(mattmc_dh_reader_get(reader, 3, &mut value), 0);
-            mattmc_dh_reader_release(reader);
+            assert_eq!(reader.point(0), Some(11));
+            assert_eq!(reader.point(3), None);
         }
     }
     #[test]
     fn selection_distinguishes_missing_custom_empty_and_invalid_logical_sizes() {
         unsafe {
             let source = mattmc_dh_source_create();
-            let reader = mattmc_dh_reader_create();
-            assert_eq!(mattmc_dh_reader_select(reader, source, 0), 1);
-            assert_eq!(mattmc_dh_reader_size(reader), 0);
+            let mut reader = Reader::new();
+            assert_eq!(reader.select(&*source, 0), 1);
+            assert_eq!(reader.size(), 0);
             assert_eq!(mattmc_dh_source_set(source, 1, 0, std::ptr::null_mut()), 1);
-            assert_eq!(mattmc_dh_reader_select(reader, source, 1), 0);
+            assert_eq!(reader.select(&*source, 1), 0);
             let column = Box::new(Column::new(vec![])); column.negative_size(-3);
             (*source).adopt(3, column);
-            assert_eq!(mattmc_dh_reader_select(reader, source, 3), 1);
-            assert_eq!(mattmc_dh_reader_size(reader), -3);
-            let mut value = 99;
-            assert_eq!(mattmc_dh_reader_get(reader, 0, &mut value), 0);
-            assert_eq!(value, 99);
-            mattmc_dh_reader_release(reader); mattmc_dh_source_release(source);
+            assert_eq!(reader.select(&*source, 3), 1);
+            assert_eq!(reader.size(), -3);
+            assert_eq!(reader.point(0), None);
+            mattmc_dh_source_release(source);
         }
     }
 }

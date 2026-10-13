@@ -1,4 +1,4 @@
-use super::packets::{self, Plan};
+use super::packets::Plan;
 use super::{Builder, Policy, Quad};
 use std::{
     panic::{catch_unwind, AssertUnwindSafe},
@@ -307,58 +307,78 @@ fn aligned<T>(p: *const T) -> bool {
     !p.is_null() && p as usize % std::mem::align_of::<T>() == 0
 }
 
-/// Disjoint caller-owned spans. Complete validation precedes all writes.
+
+/// One complete section build into this owner. Inputs stay borrowed for the
+/// call only; the center and neighbor sources are pinned by the caller's scope.
+/// Returns 1 + the count of semantic identities written to `order` in first-use
+/// order, a negative size status (-2 zero, -3 negative quad, -4 negative point
+/// height), or 0 on failure.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_packet_encode(
-    plan: *const Plan,
-    offset: i32,
-    count: i32,
-    vertices: *mut u8,
-    identities: *mut i32,
-    variants: *mut u8,
-    positions: *mut i64,
-    colors: *const i32,
-    shades: *const f32,
-    callbacks: i32,
+pub unsafe extern "C" fn mattmc_dh_section_build(
+    owner: *mut Builder,
+    params: *const i64,
+    center: *const crate::render::dh_columns::source::Source,
+    neighbors: *const *const crate::render::dh_columns::source::Source,
+    min_x: *const i16,
+    min_z: *const i16,
+    flag_colors: *const u32,
+    spans: *const i64,
+    span_len: i32,
+    contributors: *const i64,
+    contributor_len: i32,
+    order: *mut i32,
+    order_capacity: i32,
 ) -> i32 {
+    use super::section::*;
     catch_unwind(AssertUnwindSafe(|| {
-        let Some(plan) = plan.as_ref() else {
+        let (Some(owner), Some(center)) = (owner.as_mut(), center.as_ref()) else {
             return 0;
         };
-        if offset < 0
-            || count < 0
-            || callbacks < 0
-            || callbacks as usize != plan.callbacks
-            || offset as usize > plan.entries.len()
-            || count as usize > plan.entries.len() - offset as usize
-            || count > 0
-                && (vertices.is_null()
-                    || variants.is_null()
-                    || !aligned(identities)
-                    || !aligned(positions))
-            || callbacks > 0 && (!aligned(colors) || !aligned(shades))
+        if !aligned(params) || !aligned(neighbors) || !aligned(min_x) || !aligned(min_z)
+            || span_len < 0 || contributor_len < 0 || order_capacity < 0
+            || span_len > 0 && !aligned(spans) || contributor_len > 0 && !aligned(contributors)
+            || order_capacity > 0 && !aligned(order) || !flag_colors.is_null() && !aligned(flag_colors)
         {
             return 0;
         }
-        let (colors, shades) = if callbacks == 0 {
-            (&[][..], &[][..])
+        let params = &*(params as *const [i64; PARAMS]);
+        let sized = |source: &crate::render::dh_columns::source::Source, height: i64| {
+            height >= 0 && (height as usize).checked_mul(64 * 64) == Some(source.points().len())
+        };
+        if !sized(center, params[P_HEIGHT]) || !(0..=31).contains(&params[P_DETAIL]) {
+            return 0;
+        }
+        let mut adjacent = [None; 4];
+        for (d, slot) in adjacent.iter_mut().enumerate() {
+            if let Some(source) = (*neighbors.add(d)).as_ref() {
+                if !sized(source, params[P_NEIGHBOR_HEIGHT + d]) {
+                    return 0;
+                }
+                *slot = Some(source);
+            }
+        }
+        let section = Section {
+            params,
+            center,
+            neighbors: adjacent,
+            min_x: &*(min_x as *const [i16; 64]),
+            min_z: &*(min_z as *const [i16; 64]),
+            flag_colors: (!flag_colors.is_null()).then(|| std::slice::from_raw_parts(flag_colors, 64 * 64)),
+            sidecars: Sidecars {
+                spans: if span_len == 0 { &[] } else { std::slice::from_raw_parts(spans, span_len as usize) },
+                contributors: if contributor_len == 0 {
+                    &[]
+                } else {
+                    std::slice::from_raw_parts(contributors, contributor_len as usize)
+                },
+            },
+        };
+        let order = if order_capacity == 0 {
+            &mut [][..]
         } else {
-            (
-                std::slice::from_raw_parts(colors, callbacks as usize),
-                std::slice::from_raw_parts(shades, callbacks as usize),
-            )
+            std::slice::from_raw_parts_mut(order, order_capacity as usize)
         };
-        for (i, entry) in plan.entries[offset as usize..offset as usize + count as usize]
-            .iter()
-            .enumerate()
-        {
-            let bytes = packets::encode(entry, plan.transparency, colors, shades);
-            ptr::copy_nonoverlapping(bytes.as_ptr(), vertices.add(i * 64), 64);
-            ptr::write(identities.add(i), entry.quad.identity);
-            ptr::write(variants.add(i), entry.quad.variant);
-            ptr::write(positions.add(i), entry.quad.position);
-        }
-        1
+        build(owner, &section, order)
     }))
     .unwrap_or(0)
 }

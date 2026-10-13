@@ -19,6 +19,8 @@ each module there has a short README with its own file map.
   model and its phased rollout toward Frozen parity.
 - [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,
   API overrides and direct pose consumption with bounded lifetime.
+- [Rust-only DH render build](RUST-DH-RENDER-BUILD.md): whole-source conversion
+  and whole-section builds in Rust, what Java still answers, tests and results.
 - [Rust DH render columns](RUST-DH-RENDER-COLUMNS.md): compact-column reduction,
   water/material policy, borrowed storage and actual Frozen CPU replay.
 - [Rust DH full-data conversion](RUST-DH-CONVERSION.md): conversion-policy

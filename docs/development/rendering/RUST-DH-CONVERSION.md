@@ -1,5 +1,11 @@
 # Rust DH full-data conversion
 
+> **Current state (2026-10-13):** conversion now runs one Rust call per source,
+> without the per-column Java loop, heap-list fallbacks or class-identity
+> admission described below; see [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
+> The policy and caching rules here still apply. `VerifyDhConversionPolicy` was
+> retired; the commands and results below are historical.
+
 Rust owns the
 top-down full-data conversion policy: cave culling, avoided-block tint/light
 transfer, snow trimming, adjacent-color merging and render-point packing.

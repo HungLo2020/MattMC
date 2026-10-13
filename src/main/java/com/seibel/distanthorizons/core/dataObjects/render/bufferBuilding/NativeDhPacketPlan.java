@@ -7,7 +7,6 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import net.minecraft.util.NativeLibraryLoader;
 import net.vulkanic.world.DistantHorizonsSemanticCollector;
 import net.vulkanic.world.NativeRenderLaunchConfiguration;
@@ -23,9 +22,6 @@ final class NativeDhPacketPlan implements AutoCloseable {
     private static final MethodHandle COUNT = bind("mattmc_dh_packet_count", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT), false);
     private static final MethodHandle EVENTS = bind("mattmc_dh_packet_events", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT), true);
-    private static final MethodHandle ENCODE = bind("mattmc_dh_packet_encode", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT), true);
     private static final EDhDirection[] DIRECTIONS = EDhDirection.values();
     private MemorySegment owner;
     private NativeDhPacketPlan(MemorySegment owner) { this.owner = owner; }
@@ -83,31 +79,6 @@ final class NativeDhPacketPlan implements AutoCloseable {
     void appendTo(NativeDhBuiltColumn column, int route, IClientLevelWrapper level, IMinecraftRenderWrapper render) {
         var values = callbacks(level, render);
         column.append(owner, route, values.colors(), values.shades());
-    }
-    LodQuadBuilder.SemanticVertexBufferBuild build(IClientLevelWrapper level, IMinecraftRenderWrapper render) {
-        int quads = count(0);
-        var values = callbacks(level, render);
-        int[] colors = values.colors(); float[] shades = values.shades(); int callbacks = colors.length;
-        var vertices = new ArrayList<byte[]>(3);
-        var identities = new ArrayList<int[]>(3);
-        var variants = new ArrayList<byte[]>(3);
-        var positions = new ArrayList<long[]>(3);
-        final int max = DistantHorizonsSemanticCollector.maxRustSemanticQuadsPerPacket();
-        MemorySegment colorSpan = callbacks == 0 ? MemorySegment.NULL : MemorySegment.ofArray(colors);
-        MemorySegment shadeSpan = callbacks == 0 ? MemorySegment.NULL : MemorySegment.ofArray(shades);
-        for (int offset = 0; offset < quads;) {
-            int count = Math.min(max, quads-offset);
-            byte[] bytes = new byte[Math.multiplyExact(count, 64)];
-            int[] ids = new int[count]; byte[] states = new byte[count]; long[] seeds = new long[count];
-            try {
-                if ((int)ENCODE.invokeExact(owner, offset, count, MemorySegment.ofArray(bytes), MemorySegment.ofArray(ids),
-                    MemorySegment.ofArray(states), MemorySegment.ofArray(seeds), colorSpan, shadeSpan, callbacks) != 1)
-                    throw new IllegalStateException("Cannot encode DH semantic packet");
-            } catch (Throwable e) { throw failure(e); }
-            vertices.add(bytes); identities.add(ids); variants.add(states); positions.add(seeds);
-            offset += count;
-        }
-        return new LodQuadBuilder.SemanticVertexBufferBuild(vertices, identities, variants, positions);
     }
     private static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); } catch (Throwable e) { throw failure(e); }

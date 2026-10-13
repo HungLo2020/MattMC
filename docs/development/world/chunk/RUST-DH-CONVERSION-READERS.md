@@ -1,5 +1,11 @@
 # Rust DH conversion readers
 
+> **Current state (2026-10-13):** the Java `NativeDhConversionReader` and its
+> exports were removed. Rust's conversion loop now selects columns itself
+> (`Reader::select`), including escaped columns, which are native-backed views.
+> `VerifyDhConversionReader` was retired; the content below is historical. See
+> [Rust-only DH render build](../../rendering/RUST-DH-RENDER-BUILD.md).
+
 Full-data to render-data conversion uses a scoped Rust reader over the primary
 column table. A conversion creates one reader and selects each column in the
 existing x/z order. Rust retains the selected allocation until the next
@@ -8,7 +14,7 @@ column-list identities, mutable-column adapters or grouped arena registrations
 for these reads. It does not copy points into a second array.
 
 Implementation: [Rust reader](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/reader.rs),
-[temporary adapter](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDhConversionReader.java)
+[temporary adapter](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/src/main/java/net/minecraft/world/level/chunk/NativeDhConversionReader.java)
 and [consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java).
 
 ## Lifetime and compatibility
@@ -49,7 +55,7 @@ tests (two skipped). Three settled Frozen/Current visual pairs pass with zero
 Vulkan validation findings; all six originals were reviewed. World unload/reload and resource reload also pass with no exceptions, Rust
 panics, dependency violations or GAL validation failures. Settled images do not prove temporal parity.
 
-The [saved-source observer](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/world/chunk/VerifyDhConversionReader.java)
+The [saved-source observer](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/DevUtils/tests/world/chunk/VerifyDhConversionReader.java)
 compiles separately against Current and unchanged Frozen. Arguments are a saved
 DTO manifest and a boolean selecting the native reader. It measures hydration,
 ordered consumption of every point and closure. The public-reader control uses

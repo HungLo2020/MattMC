@@ -1,5 +1,12 @@
 # Rust DH quad builds
 
+> **Current state (2026-10-13):** `LodQuadBuilder` is `final` and Rust-only; the
+> subclass compatibility lists, `BufferQuad` and the Java packet encoder were
+> removed. Java traversal and per-box calls were replaced by one section call;
+> see [Rust-only DH render build](RUST-DH-RENDER-BUILD.md). `VerifyDhQuads` was
+> retired; `NativeDhQuadBuilderTest` still replays its Frozen fixture. Commands
+> and results below are historical.
+
 The prior quad-owner checkpoint was reviewed at [`f8feb3ff`](https://github.com/HungLo2020/MattMC/commit/f8feb3ff553242127e1e9533f7af89b4fd5e1a8d).
 Suite totals, measured timings and untracked receipt descriptions below are
 implementation-author reports. This documentation review inspected source and

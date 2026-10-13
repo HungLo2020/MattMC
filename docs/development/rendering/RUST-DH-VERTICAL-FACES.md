@@ -1,5 +1,11 @@
 # Rust DH box production
 
+> **Current state (2026-10-13):** boxes are produced inside the Rust section
+> build; `ColumnBox`, its Java geometry and the shade-facts admission gate were
+> removed. See [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
+> `VerifyDhFaces` was retired; `NativeDhFacesTest` still replays its Frozen
+> fixture. Commands and results below are historical.
+
 Source reviewed at [`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8). Suite results, timings, profiles and hardware/capture checks below are
 implementation-author reports. This documentation review inspected source and
 fixture assertions; it did not rerun Java/Rust suites, clients, captures or

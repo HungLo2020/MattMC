@@ -328,6 +328,13 @@ public final class DistantHorizonsSemanticCollector {
 	 * {@code LodQuadBuilder}; it makes loss during full-data reduction visible
 	 * without fabricating water geometry or inspecting renderer state.
 	 */
+	/** Whether any capture probe watches DH source inputs; checked once per section build. */
+	public static boolean hasWaterSourceInputProbes() {
+		synchronized (LOCK) {
+			return !waterSourceInputProbes.isEmpty();
+		}
+	}
+
 	public static void recordWaterSourceInput(
 		long sectionKey,
 		byte detailLevel,
@@ -1443,22 +1450,6 @@ public final class DistantHorizonsSemanticCollector {
 	) {
 		return recordRustSemanticColumn(columnKey, origin, semanticMaterials, inputCoverage, outputCoverage,
 			opaque, transparentSide, transparentUp, transparentWaterUp, false).generation();
-	}
-
-	/** Publishes and acquires CPU ownership atomically, including generation reuse. */
-	public static SemanticColumnLease recordOwnedRustSemanticBuiltColumn(
-		long columnKey,
-		DhBlockPos origin,
-		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
-		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
-		LodQuadBuilder.SemanticQuadCoverage outputCoverage,
-		LodQuadBuilder.SemanticVertexBufferBuild opaque,
-		LodQuadBuilder.SemanticVertexBufferBuild transparentSide,
-		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
-		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp
-	) {
-		return recordRustSemanticColumn(columnKey, origin, semanticMaterials, inputCoverage, outputCoverage,
-			opaque, transparentSide, transparentUp, transparentWaterUp, true);
 	}
 
 	/** Ordinary native producers transfer final CPU bytes directly into the Rust ledger. */

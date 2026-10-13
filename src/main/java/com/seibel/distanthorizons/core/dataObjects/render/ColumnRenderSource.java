@@ -3,7 +3,6 @@ package com.seibel.distanthorizons.core.dataObjects.render;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
-import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnQuadView;
 import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
@@ -201,6 +200,63 @@ public class ColumnRenderSource implements AutoCloseable
 		SemanticHorizontalContributor[] contributors = this.semanticHorizontalContributorSpansByDataPoint.get(
 			dataPointIndex(posX, posZ, verticalIndex));
 		return contributors == null ? null : contributors.clone();
+	}
+
+	/** The Rust owner of this source's points and dense semantic planes. */
+	public NativeDhRenderSource nativeData() { return this.nativeData; }
+
+	public int semanticMaterialCount() { return this.semanticMaterials.size(); }
+
+	/**
+	 * Sparse reduced-entry spans as one table sorted by data-point index:
+	 * {@code [index, count, count x (minY|maxY<<32, id|variant<<32, position)]...};
+	 * null when there are none.
+	 */
+	public long[] flattenSemanticMaterialSpans()
+	{
+		if (this.semanticMaterialSpansByDataPoint.isEmpty()) return null;
+		int[] keys = this.semanticMaterialSpansByDataPoint.keySet().toIntArray();
+		java.util.Arrays.sort(keys);
+		var table = new it.unimi.dsi.fastutil.longs.LongArrayList();
+		for (int key : keys)
+		{
+			List<SemanticMaterialSpan> spans = this.semanticMaterialSpansByDataPoint.get(key);
+			table.add(key);
+			table.add(spans.size());
+			for (SemanticMaterialSpan span : spans) addSpanWords(table, span);
+		}
+		return table.toLongArray();
+	}
+
+	/**
+	 * Sparse coarse-cell contributor spans as one table sorted by data-point index:
+	 * {@code [index, then four times: count (-1 for none), count x span words]...};
+	 * null when there are none.
+	 */
+	public long[] flattenHorizontalContributorSpans()
+	{
+		if (this.semanticHorizontalContributorSpansByDataPoint.isEmpty()) return null;
+		int[] keys = this.semanticHorizontalContributorSpansByDataPoint.keySet().toIntArray();
+		java.util.Arrays.sort(keys);
+		var table = new it.unimi.dsi.fastutil.longs.LongArrayList();
+		for (int key : keys)
+		{
+			table.add(key);
+			for (SemanticHorizontalContributor contributor : this.semanticHorizontalContributorSpansByDataPoint.get(key))
+			{
+				if (contributor == null) { table.add(-1L); continue; }
+				table.add(contributor.spans().size());
+				for (SemanticMaterialSpan span : contributor.spans()) addSpanWords(table, span);
+			}
+		}
+		return table.toLongArray();
+	}
+
+	private static void addSpanWords(it.unimi.dsi.fastutil.longs.LongArrayList table, SemanticMaterialSpan span)
+	{
+		table.add((span.minY() & 0xffffffffL) | (long) span.maxY() << 32);
+		table.add((span.materialId() & 0xffffffffL) | (span.variantState() & 0xffL) << 32);
+		table.add(span.variantPosition());
 	}
 
 	public List<SemanticMaterialIdentity> semanticMaterials()
@@ -406,8 +462,6 @@ public class ColumnRenderSource implements AutoCloseable
 				offset, this.verticalDataCount);
 	}
 	
-	public ColumnQuadView getFullQuadView() { return this.getQuadViewOverRange(0, 0, WIDTH, WIDTH); }
-	public ColumnQuadView getQuadViewOverRange(int quadX, int quadZ, int quadXSize, int quadZSize) { return new ColumnQuadView(this.renderDataContainer, WIDTH, this.verticalDataCount, quadX, quadZ, quadXSize, quadZSize); }
 	
 	
 	

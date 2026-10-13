@@ -52,7 +52,7 @@ public final class DhSourceVerification {
     }
     public static void main(String[] args) throws Exception {
         String mode=args[2];
-        if(!java.util.Set.of("create","merge","cull","parent","downsample","generation").contains(mode))throw new IllegalArgumentException(mode);
+        if(!java.util.Set.of("create","merge","cull","parent","downsample","generation","render").contains(mode))throw new IllegalArgumentException(mode);
         // parent: the 64x64 block-detail input reduces into its parent's quadrant.
         // downsample: a parent-detail input projects onto a block-detail child.
         long inputPos=mode.equals("downsample") ? com.seibel.distanthorizons.core.pos.DhSectionPos.getParentPos(6) : 6;
@@ -63,6 +63,7 @@ public final class DhSourceVerification {
             case "getInstallationDirectory"->Path.of("run").toFile();case "isDedicatedServer"->false;case "getDelayedSetupComplete"->true;default->throw new UnsupportedOperationException(m.toString());});
         SingletonInjector.INSTANCE.bind(IMinecraftSharedWrapper.class,shared);
         if(mode.equals("generation")){DhSourceVerificationGeneration.run(Integer.parseInt(args[0]),Integer.parseInt(args[1]));return;}
+        if(mode.equals("render")){DhSourceVerificationRender.run(Integer.parseInt(args[0]),Integer.parseInt(args[1]));return;}
         Config.Common.LodBuilding.worldCompression.setWithoutFiringEvents(mode.equals("cull")
             ? EDhApiWorldCompressionMode.VISUALLY_EQUAL : EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
         try(var input=FullDataSourceV2.createEmpty(inputPos);var target=FullDataSourceV2.createEmpty(targetPos)) {

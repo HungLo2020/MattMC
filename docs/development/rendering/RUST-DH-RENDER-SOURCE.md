@@ -1,5 +1,10 @@
 # Rust DH render-source storage
 
+> **Current state (2026-10-13):** the section build now reads these sources in one
+> Rust call, and heap/custom list compatibility paths were removed; see
+> [Rust-only DH render build](RUST-DH-RENDER-BUILD.md). `VerifyDhRenderSource`
+> was retired; the commands and results below are historical.
+
 Ordinary DH conversion writes render points into a Rust CPU owner.
 The [conversion policy](RUST-DH-CONVERSION.md) publishes directly from Rust and
 uses native overflow scratch. Its full-source CPU comparison, seven lifecycle

@@ -16,7 +16,6 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodBufferContainer;
 import com.seibel.distanthorizons.core.render.renderer.DebugRenderer;
@@ -168,11 +167,10 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	/** @return true if the upload started, false if it wasn't able to for any reason */
 	public synchronized boolean uploadRenderDataToGpuAsync()
 	{
-		if (!GLProxy.hasInstance()
-			&& !net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
+		if (!net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
 		{
-			// it's possible to try uploading buffers before the GLProxy has been initialized
-			// which would cause the system to crash
+			// The Rust whole-frame renderer is the only consumer of built
+			// sections; without it a build would be converted and discarded.
 			return false;
 		}
 		
@@ -362,6 +360,13 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 				catch (Exception e)
 				{
 					LOGGER.error("Unexpected issue creating render data for pos: ["+DhSectionPos.toString(finalPos)+"], error: ["+e.getMessage()+"].", e);
+				}
+				finally
+				{
+					// A failed load counts as a missing position (no-op after success);
+					// an uncompleted future would leave this section's build and its
+					// upload slot waiting forever.
+					loadFuture.complete(null);
 				}
 			});
 			

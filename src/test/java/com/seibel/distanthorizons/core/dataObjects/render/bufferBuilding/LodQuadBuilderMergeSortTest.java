@@ -49,7 +49,7 @@ class LodQuadBuilderMergeSortTest {
 	private static void assertSameOrder(ArrayList<BufferQuad> quads, BufferMergeDirectionEnum merge) {
 		ArrayList<BufferQuad> expected = new ArrayList<>(quads);
 		expected.sort((a, b) -> a.compare(b, merge));
-		LodQuadBuilder.sortForMerge(quads, merge);
+		JavaQuadListReference.sortForMerge(quads, merge);
 		assertEquals(expected.size(), quads.size());
 		for (int index = 0; index < expected.size(); index++) {
 			assertSame(expected.get(index), quads.get(index), "index " + index);

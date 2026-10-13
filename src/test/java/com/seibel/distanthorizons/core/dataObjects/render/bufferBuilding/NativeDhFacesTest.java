@@ -42,7 +42,6 @@ class NativeDhFacesTest {
         static final List<Integer> events=new ArrayList<>();
         static final float[] shades={.5f,1f,.8f,.9f,.6f,.7f};
         static int failure;
-        static int admittedFacts=-1;
         static Runnable shadeAction=()->{};
         static PhantomArrayListCheckout checkout;
         static NativeDhQuadBuilder owner(LodQuadBuilder b) throws Exception {
@@ -51,8 +50,6 @@ class NativeDhFacesTest {
         static void setup() {
             var render=(IMinecraftRenderWrapper)Proxy.newProxyInstance(IMinecraftRenderWrapper.class.getClassLoader(),new Class<?>[]{IMinecraftRenderWrapper.class,IMinecraftRenderWrapper.NativeShadeFacts.class},(p,m,a)->{
                 if(m.getName().equals("getDelayedSetupComplete"))return true;
-                if(m.getName().equals("hasNativeShadeFacts"))return admittedFacts>=0;
-                if(m.getName().equals("getNativeShadeFacts"))return admittedFacts;
                 if(m.getName().equals("getShade")){
                     int d=((EDhDirection)a[0]).ordinal();events.add(d);shadeAction.run();
                     if(failure!=0&&events.size()==failure)throw new IllegalStateException("injected shade failure");
@@ -93,7 +90,7 @@ class NativeDhFacesTest {
                     Config.Client.Advanced.Graphics.Quality.transparency.setWithoutFiringEvents(EDhApiTransparency.values()[trans]);
                     try(var b=new LodQuadBuilder(trans!=0,null);var whole=failure==0?new LodQuadBuilder(trans!=0,null):null) {
                         events.clear();String error="";
-                        try {ColumnBox.addBoxQuadsToBuilder(b,checkout,null,width,height,x,y,z,color,material,0,(byte)0,0L,sky,block,top,bottom,neighbors,same);}
+                        try {JavaColumnBoxReference.addBoxQuadsToBuilder(sink(b),checkout,null,width,height,x,y,z,color,material,0,(byte)0,0L,sky,block,top,bottom,neighbors,same);}
                         catch(RuntimeException e){error=e.getClass().getName();}
                         assertEquals(expectedError,error,"case "+c+" seed "+seed);
                         assertEquals(wanted,events,"callback prefix case "+c);
@@ -110,7 +107,7 @@ class NativeDhFacesTest {
                         }
                         var nativeOwner=owner(b);assertNotNull(nativeOwner);
                         for(int layer=0;layer<2;layer++)for(int d=0;d<6;d++) {
-                            var rows=nativeOwner.snapshot(layer,d);assertEquals(in.readInt(),rows.size(),"case "+c+" direction "+d);
+                            var rows=NativeQuadRows.of(nativeOwner,layer,d);assertEquals(in.readInt(),rows.size(),"case "+c+" direction "+d);
                             for(var q:rows) {
                                 assertEquals(in.readShort(),q.x);assertEquals(in.readShort(),q.y);assertEquals(in.readShort(),q.z);
                                 assertEquals(in.readShort(),q.widthEastWest);assertEquals(in.readShort(),q.widthNorthSouthOrUpDown);
@@ -125,14 +122,19 @@ class NativeDhFacesTest {
             }
             failure=0;
         }
-        static class Compatibility extends LodQuadBuilder {Compatibility(){super(true,null);}}
-        static List<BufferQuad> rows(LodQuadBuilder b,int layer,int d) throws Exception {
-            var owner=owner(b);if(owner!=null)return owner.snapshot(layer,d);
-            var f=LodQuadBuilder.class.getDeclaredField(layer==0?"opaqueQuads":"transparentQuads");f.setAccessible(true);
+        static JavaQuadSink sink(Object builder) {
+            return builder instanceof LodQuadBuilder b ? JavaQuadSink.of(b) : (JavaQuadSink)builder;
+        }
+        static List<BufferQuad> rows(Object b,int layer,int d) throws Exception {
+            if(b instanceof LodQuadBuilder builder)return NativeQuadRows.of(owner(builder),layer,d);
+            var f=JavaQuadListReference.class.getDeclaredField(layer==0?"opaqueQuads":"transparentQuads");f.setAccessible(true);
             @SuppressWarnings("unchecked") var lists=(List<BufferQuad>[])f.get(b);return lists[d];
         }
-        static void equal(LodQuadBuilder a,LodQuadBuilder b) throws Exception {
-            assertEquals(a.semanticQuadCoverage(),b.semanticQuadCoverage());
+        static LodQuadBuilder.SemanticQuadCoverage coverage(Object b) {
+            return b instanceof LodQuadBuilder builder?builder.semanticQuadCoverage():((JavaQuadListReference)b).semanticQuadCoverage();
+        }
+        static void equal(Object a,Object b) throws Exception {
+            assertEquals(coverage(a),coverage(b));
             for(int layer=0;layer<2;layer++)for(int d=0;d<6;d++) {
                 var aa=rows(a,layer,d);var bb=rows(b,layer,d);assertEquals(aa.size(),bb.size());
                 for(int i=0;i<aa.size();i++) {
@@ -156,17 +158,17 @@ class NativeDhFacesTest {
                 var adjacent=new ColumnArrayView(new LongArrayList(points),16,0,16);
                 short minY=seed%11==0?(short)32760:seed%13==0?Short.MIN_VALUE:0;
                 short height=seed%11==0?(short)16:seed%13==0?Short.MAX_VALUE:32;
-                try(var a=new LodQuadBuilder(true,null);var b=new Compatibility()) {
-                    for(var builder:List.of(a,b))ColumnBox.makeAdjVerticalQuad(builder,checkout,adjacent,seed%2==0,seed%32,direction,
+                try(var a=new LodQuadBuilder(true,null);var b=new JavaQuadListReference(true,null)) {
+                    for(var builder:List.of(a,b))JavaColumnBoxReference.makeAdjVerticalQuad(sink(builder),checkout,adjacent,seed%2==0,seed%32,direction,
                         (short)(seed%3==0?0:256),minY,(short)(seed%5==0?0:256),(short)4,height,
                         seed%2==0?0xff336699:0x80336699,(byte)(seed%16),7,(byte)1,9L,spans,(byte)2);
                     equal(a,b);
                 }
                 // Complete production, including top/bottom semantic lookup and shaded neighbors.
-                try(var a=new LodQuadBuilder(true,null);var b=new Compatibility()) {
+                try(var a=new LodQuadBuilder(true,null);var b=new JavaQuadListReference(true,null)) {
                     var neighbors=new ColumnArrayView[]{adjacent,adjacent,adjacent,adjacent};
                     var same=new boolean[]{true,false,true,false};
-                    ColumnBox.addBoxQuadsToBuilder(b,checkout,null,(short)4,(short)32,(short)0,(short)0,(short)0,
+                    JavaColumnBoxReference.addBoxQuadsToBuilder(sink(b),checkout,null,(short)4,(short)32,(short)0,(short)0,(short)0,
                         0x80336699,(byte)(seed%16),7,(byte)1,9L,spans,(byte)15,(byte)2,0,0,neighbors,same);
                     assertTrue(a.addNativeBox((short)4,(short)32,(short)0,(short)0,(short)0,0x80336699,(byte)(seed%16),
                         7,(byte)1,9L,spans,(byte)15,(byte)2,0,0,neighbors,same,Integer.MIN_VALUE,true,false,0,shades));
@@ -176,10 +178,10 @@ class NativeDhFacesTest {
             // Read the borrowed neighbor only after the shade callback mutates it.
             var list=new LongArrayList(new long[]{0x2f336699010000f0L});var adjacent=new ColumnArrayView(list,1,0,1);
             shadeAction=()->list.set(0,0);
-            try(var a=new LodQuadBuilder(true,null);var b=new Compatibility()) {
+            try(var a=new LodQuadBuilder(true,null);var b=new JavaQuadListReference(true,null)) {
                 for(var builder:List.of(a,b)) {
                     list.set(0,0x2f336699010000f0L);
-                    ColumnBox.makeAdjVerticalQuad(builder,checkout,adjacent,true,Integer.MIN_VALUE,EDhDirection.NORTH,
+                    JavaColumnBoxReference.makeAdjVerticalQuad(sink(builder),checkout,adjacent,true,Integer.MIN_VALUE,EDhDirection.NORTH,
                         (short)1,(short)0,(short)1,(short)4,(short)16,0xff336699,(byte)2,7,(byte)1,9,List.of(),(byte)0);
                 }
                 equal(a,b);
@@ -190,11 +192,11 @@ class NativeDhFacesTest {
                 @Override public long getLong(int i){reads.add(i);if(i==1)throw new IllegalStateException("custom getter");return super.getLong(i);}
             };
             var customView=new ColumnArrayView(custom,2,0,2);
-            try(var a=new LodQuadBuilder(true,null);var b=new Compatibility()) {
+            try(var a=new LodQuadBuilder(true,null);var b=new JavaQuadListReference(true,null)) {
                 List<Integer> wanted=null;
                 for(var builder:List.of(a,b)) {
                     reads.clear();events.clear();
-                    assertThrows(IllegalStateException.class,()->ColumnBox.makeAdjVerticalQuad(builder,checkout,customView,true,0,EDhDirection.NORTH,
+                    assertThrows(IllegalStateException.class,()->JavaColumnBoxReference.makeAdjVerticalQuad(sink(builder),checkout,customView,true,0,EDhDirection.NORTH,
                         (short)0,(short)0,(short)0,(short)1,(short)4,0xff336699,(byte)2,7,(byte)1,9,List.of(),(byte)0));
                     assertEquals(List.of(2),events);
                     if(wanted==null)wanted=List.copyOf(reads);else assertEquals(wanted,reads);
@@ -209,12 +211,12 @@ class NativeDhFacesTest {
                 assertTrue(reads.isEmpty());assertEquals(0,a.getCurrentOpaqueQuadsCount());
             }
             try(var b=new LodQuadBuilder(false,null)) {
-                assertThrows(IllegalArgumentException.class,()->ColumnBox.addVerticalFaces(b,EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)0,(short)1,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of()));
+                assertThrows(IllegalArgumentException.class,()->JavaColumnBoxReference.addVerticalFaces(sink(b),EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)0,(short)1,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of()));
                 assertEquals(0,b.getCurrentOpaqueQuadsCount());
                 b.close();
-                assertDoesNotThrow(()->ColumnBox.addVerticalFaces(b,EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)1,(short)0,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of()));
-                assertDoesNotThrow(()->ColumnBox.addVerticalFaces(b,EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)1,(short)0,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of(new ColumnRenderSource.SemanticMaterialSpan(8,9,7,(byte)1,1))));
-                assertThrows(IllegalStateException.class,()->ColumnBox.addVerticalFaces(b,EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)1,(short)1,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of()));
+                assertDoesNotThrow(()->JavaColumnBoxReference.addVerticalFaces(sink(b),EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)1,(short)0,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of()));
+                assertDoesNotThrow(()->JavaColumnBoxReference.addVerticalFaces(sink(b),EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)1,(short)0,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of(new ColumnRenderSource.SemanticMaterialSpan(8,9,7,(byte)1,1))));
+                assertThrows(IllegalStateException.class,()->JavaColumnBoxReference.addVerticalFaces(sink(b),EDhDirection.NORTH,(short)0,(short)0,(short)0,(short)1,(short)1,0xff336699,(byte)2,(byte)15,(byte)0,0,(byte)0,0,List.of()));
             }
         }
         static void stockFactEntry() throws Exception {
@@ -227,16 +229,16 @@ class NativeDhFacesTest {
                     for(int d=0;d<6;d++){int f=in.readInt();if(facts<0)facts=f;assertEquals(facts,f);assertEquals(d,in.readByte());shades[d]=Float.intBitsToFloat(in.readInt());}
                     var neighbor=new ColumnArrayView(new LongArrayList(new long[]{0}),1,0,1);
                     var neighbors=new ColumnArrayView[]{neighbor,neighbor,neighbor,neighbor};var same=new boolean[]{true,true,true,true};
-                    try(var a=new LodQuadBuilder(true,null);var b=new Compatibility()) {
-                        admittedFacts=facts;events.clear();
-                        ColumnBox.addBoxQuadsToBuilder(a,checkout,null,(short)4,(short)16,(short)1,(short)0,(short)1,
-                            0xff336699,(byte)2,7,(byte)1,9L,(byte)15,(byte)2,0,0,neighbors,same);
+                    try(var a=new LodQuadBuilder(true,null);var b=new JavaQuadListReference(true,null)) {
+                        events.clear();
+                        var mode=Config.Client.Advanced.Graphics.Quality.transparency.get();
+                        assertTrue(a.addNativeBox((short)4,(short)16,(short)1,(short)0,(short)1,0xff336699,(byte)2,7,(byte)1,9L,List.of(),
+                            (byte)15,(byte)2,0,0,neighbors,same,Integer.MIN_VALUE,mode.transparencyEnabled,mode.fakeTransparencyEnabled,facts,null));
                         assertTrue(events.isEmpty(),"stock facts must not call per-face shade callbacks");
-                        admittedFacts=-1;
-                        ColumnBox.addBoxQuadsToBuilder(b,checkout,null,(short)4,(short)16,(short)1,(short)0,(short)1,
+                        JavaColumnBoxReference.addBoxQuadsToBuilder(sink(b),checkout,null,(short)4,(short)16,(short)1,(short)0,(short)1,
                             0xff336699,(byte)2,7,(byte)1,9L,(byte)15,(byte)2,0,0,neighbors,same);
                         equal(a,b);a.mergeQuads();b.mergeQuads();equal(a,b);
-                    }finally{admittedFacts=-1;}
+                    }
                 }
                 assertEquals(-1,in.read());
             }
