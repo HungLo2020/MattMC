@@ -68,6 +68,9 @@ Recent focused reviews address concrete player decisions:
 - **Sorting stored items:** [Hopper filtering](../../gameplay/blocks/Hopper.md#item-filtering)
   explains reserved slots, component-sensitive matching, the 2-to-3 Comparator threshold
   and why an unsuitable output inventory can drain filter material
+- **Moving a colony in Creative:** [Bee housing recovery](../../gameplay/blocks/BeeHousing.md#creative-recovery)
+  explains the occupied/honey-bearing drop exception, doTileDrops condition and
+  component restoration without weakening the separate Survival Silk Touch rules
 - **Lighting a shaft:** [Ambersol troubleshooting](../../gameplay/blocks/Ambersol.md#shaft-setup-and-troubleshooting)
   distinguishes transmitting blocks from obstructions and explains refreshing the column;
   its internal light cells have their own precise family section
