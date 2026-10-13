@@ -751,7 +751,7 @@ public final class RustGalFrameCoordinator {
             }
         } finally {
             // The pipelined worker may still decode borrowed CPU poses until join.
-            for (SubmittedFrame pending : abandonedModels) closeModelFrame(pending.primitiveFrame());
+            for (SubmittedFrame pending : abandonedModels) closeNativeFrame(pending.primitiveFrame());
         }
 	}
 
@@ -1158,7 +1158,7 @@ public final class RustGalFrameCoordinator {
 			renderdocFrameCaptureStarted = false;
 			executeCounted = true;
 		} finally {
-            if (!executeCounted) closeModelFrame(primitiveFrame);
+            if (!executeCounted) closeNativeFrame(primitiveFrame);
 			if (!executeCounted && frameId != 0L && !frameCancelled) {
 				int cancelled;
 				synchronized (LOCK) {
@@ -1258,7 +1258,7 @@ public final class RustGalFrameCoordinator {
 					false, pending.executeStarted(), pending.acquireStarted(), pending.acquireEnded(),
 					pending.submitStarted(), pending.submitEnded()), result.submit(), null, result.presented());
             } finally {
-                if (pending != null) closeModelFrame(pending.primitiveFrame());
+                if (pending != null) closeNativeFrame(pending.primitiveFrame());
             }
 		}
 	}
@@ -1300,7 +1300,7 @@ public final class RustGalFrameCoordinator {
 			}
 			completeSubmittedFrame(pending, result.submit(), null, result.presented());
         } finally {
-            closeModelFrame(pending.primitiveFrame());
+            closeNativeFrame(pending.primitiveFrame());
         }
 	}
 
@@ -1317,12 +1317,15 @@ public final class RustGalFrameCoordinator {
         try {
             completeSubmittedFrameOwned(submitted, wholeFrameResult, guiResult, pipelinedPresented);
         } finally {
-            closeModelFrame(submitted.primitiveFrame());
+            closeNativeFrame(submitted.primitiveFrame());
         }
     }
 
-    private static void closeModelFrame(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
-        if (frame != null) frame.modelRigPoses().close();
+    private static void closeNativeFrame(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
+        if (frame != null) {
+            try { frame.modelRigPoses().close(); }
+            finally { net.vulkanic.bridge.NativeParticleBuffer.closeSnapshot(frame.particleQuads()); }
+        }
     }
 
 	private static void completeSubmittedFrameOwned(

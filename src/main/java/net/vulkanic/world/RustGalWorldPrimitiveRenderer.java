@@ -466,8 +466,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
 	private static final BoundedSemanticQueue<VulkanicGalBridge.WorldMaterialQuadRecord> PENDING_MATERIAL_QUADS =
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MATERIAL_QUADS, "material-quad");
-	private static final BoundedSemanticQueue<VulkanicGalBridge.WorldParticleQuadRecord> PENDING_PARTICLE_QUADS =
-		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MATERIAL_QUADS, "particle-quad");
+	private static final net.vulkanic.bridge.NativeParticleBuffer PENDING_PARTICLE_QUADS =
+		new net.vulkanic.bridge.NativeParticleBuffer(() -> MAX_RUST_WORLD_MATERIAL_QUADS - PENDING_MATERIAL_QUADS.size());
+	private static net.vulkanic.bridge.NativeParticleBuffer consumingParticles;
 	// Generic DH boxes (often thousands of cloud cells) stay in packed
 	// buffers. A consumed frame takes the pending buffer itself; three
 	// buffers rotate so a frame's boxes outlive its queued completion.
@@ -4045,8 +4046,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			while (PENDING_MATERIAL_QUADS.size() + PENDING_PARTICLE_QUADS.size() > checkpoint) {
 				int last = PENDING_PARTICLE_QUADS.size() - 1;
-				if (last >= 0 && PENDING_PARTICLE_QUADS.get(last).materialIndex() == PENDING_MATERIAL_QUADS.size())
-					PENDING_PARTICLE_QUADS.remove(last);
+				if (last >= 0 && PENDING_PARTICLE_QUADS.materialIndex(last) == PENDING_MATERIAL_QUADS.size())
+					PENDING_PARTICLE_QUADS.truncate(last);
 				else PENDING_MATERIAL_QUADS.remove(PENDING_MATERIAL_QUADS.size() - 1);
 			}
 		}
@@ -14063,11 +14064,9 @@ float[] transform = new float[16];
 				rotation.x, rotation.y, rotation.z, rotation.w,
 				quadSize, localU0, localU1, localV0, localV1
 			);
-			PENDING_PARTICLE_QUADS.add(new VulkanicGalBridge.WorldParticleQuadRecord(textureId,
-				surface,
-				PENDING_MATERIAL_QUADS.size(), new float[]{centerX,centerY,centerZ},
-				new float[]{rotation.x,rotation.y,rotation.z,rotation.w}, quadSize,
-				new float[]{localU0,localU1,localV0,localV1}, colorArgb,packedLight));
+			PENDING_PARTICLE_QUADS.append(textureId, surface.wireValue(), PENDING_MATERIAL_QUADS.size(),
+				centerX, centerY, centerZ, rotation.x, rotation.y, rotation.z, rotation.w, quadSize,
+				localU0, localU1, localV0, localV1, colorArgb, packedLight);
 			if (ownedAnimation) {
 				recordAtlasSpriteUse(animationResource, TextureAtlas.LOCATION_BLOCKS, spriteId);
 			}
@@ -14132,9 +14131,8 @@ float[] transform = new float[16];
 	private static void enqueueNativeParticleLocked(int textureId, boolean translucent,
 		float x, float y, float z, float qx, float qy, float qz, float qw, float size,
 		float u0, float u1, float v0, float v1, int color, int light) {
-		PENDING_PARTICLE_QUADS.add(new VulkanicGalBridge.WorldParticleQuadRecord(textureId,
-			translucent, PENDING_MATERIAL_QUADS.size(), new float[]{x,y,z},
-			new float[]{qx,qy,qz,qw}, size, new float[]{u0,u1,v0,v1}, color, light));
+		PENDING_PARTICLE_QUADS.append(textureId, translucent ? 1 : 0, PENDING_MATERIAL_QUADS.size(),
+			x,y,z,qx,qy,qz,qw,size,u0,u1,v0,v1,color,light);
 	}
 
 	/** Enqueues a camera-relative ordinary particle quad using copied atlas bytes. */
@@ -14162,6 +14160,21 @@ float[] transform = new float[16];
 				localU0, localU1, localV0, localV1, colorArgb, packedLight);
 		}
 	}
+
+    /** Consume one captured ordinary layer without per-particle Java projection. */
+    public static int enqueueParticleLayer(boolean translucent, net.vulkanic.bridge.NativeParticleBuffer layer) {
+        synchronized (LOCK) {
+            if (layer.isEmpty()) return 0;
+            if (!hasMaterialQuadCapacity(layer.size())) throw new IllegalStateException("Rust particle material-quad capacity exceeded");
+            if (!WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_PARTICLE_ATLAS))
+                throw new IllegalStateException("Rust particle route selected before the copied particle atlas was registered");
+            ensureBoundedParticleViewportLocked();
+            if (!ensureParticleAtlasAssetLocked(TextureAtlas.LOCATION_PARTICLES, MATERIAL_TEXTURE_PARTICLE_ATLAS))
+                throw new IllegalStateException("Rust particle atlas incarnation failed publication");
+            return PENDING_PARTICLE_QUADS.appendLayer(layer, MATERIAL_TEXTURE_PARTICLE_ATLAS,
+                translucent ? 1 : 0, PENDING_MATERIAL_QUADS.size());
+        }
+    }
 
 	/** Returns whether an arbitrary particle atlas can be copied into Rust-owned asset memory. */
 	public static boolean canUseParticleAtlas(ResourceLocation atlasLocation) {
@@ -18548,11 +18561,24 @@ float[] transform = new float[16];
 			instance.meshKey(), instance, MAX_ACTIVE_STATIC_TERRAIN_INSTANCES);
 	}
 
+    private static List<VulkanicGalBridge.WorldParticleQuadRecord> snapshotParticleFrame() {
+        if (PENDING_PARTICLE_QUADS.isEmpty()) return List.of();
+        consumingParticles = PENDING_PARTICLE_QUADS.snapshot();
+        return consumingParticles;
+    }
+
     public static PrimitiveFrame consumeFrame() {
         synchronized (LOCK) {
-            try { return consumeFrameOwned(); }
+            try {
+                PrimitiveFrame frame = consumeFrameOwned();
+                consumingParticles = null;
+                return frame;
+            }
             catch (RuntimeException | Error failure) {
-                discardModelRigPosesLocked();
+                try { discardModelRigPosesLocked(); }
+                finally {
+                    if (consumingParticles != null) { consumingParticles.close(); consumingParticles = null; }
+                }
                 throw failure;
             }
         }
@@ -18698,7 +18724,7 @@ float[] transform = new float[16];
 			pendingEntityFlameQuadCount,
 			firstPersonFrame,
 				firstPersonInstances,
-				List.copyOf(PENDING_PARTICLE_QUADS),
+				snapshotParticleFrame(),
 				orbInstances,
 				admittedDistantHorizonsGenericBoxes,
 				pendingStaticTerrainCamera,
@@ -19024,7 +19050,7 @@ float[] transform = new float[16];
 			if (staticTerrainSections == null) {
 				staticTerrainSections = VulkanicGalBridge.StaticTerrainSections.EMPTY;
 			}
-			particleQuads = List.copyOf(particleQuads);
+			particleQuads = net.vulkanic.bridge.NativeParticleBuffer.immutableCopy(particleQuads);
 			orbInstances = List.copyOf(orbInstances);
 			// A packed buffer from the pending ring is not modified while frames
 			// that reference it can still run; copying it would build a record
@@ -19247,7 +19273,9 @@ float[] transform = new float[16];
 	/** Validate copied particle dependencies after asset flushing, before native submission. */
 	public static void requireAcceptedSemanticParticleTextures(List<VulkanicGalBridge.WorldParticleQuadRecord> quads) {
 		synchronized (LOCK) {
-			for (var quad : quads) requireAcceptedWorldMeshTextureGeneration(quad.textureId());
+			if (quads instanceof net.vulkanic.bridge.NativeParticleBuffer nativeQuads) {
+                for (int i = 0; i < nativeQuads.size(); i++) requireAcceptedWorldMeshTextureGeneration(nativeQuads.textureId(i));
+            } else for (var quad : quads) requireAcceptedWorldMeshTextureGeneration(quad.textureId());
 		}
 	}
 
@@ -19498,7 +19526,10 @@ float[] transform = new float[16];
 	/** Returns true only when copied semantics contain work requiring Fabulous attachments. */
 	public static boolean hasPendingFabulousTransparencyWork() {
 		synchronized (LOCK) {
-			if (PENDING_PARTICLE_QUADS.stream().anyMatch(VulkanicGalBridge.WorldParticleQuadRecord::translucent)) return true;
+			for (int i = 0; i < PENDING_PARTICLE_QUADS.size(); i++) {
+                int surface = PENDING_PARTICLE_QUADS.surface(i);
+                if (surface == 1 || surface == 4) return true;
+            }
 			if (PENDING_MATERIAL_QUADS.stream().anyMatch(quad -> materialUsesAlphaBlending(quad.materialMode()))) {
 				return true;
 			}

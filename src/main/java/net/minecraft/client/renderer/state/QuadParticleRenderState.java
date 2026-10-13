@@ -9,7 +9,6 @@ import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.MeshData;
 import net.blaze3d.vertex.VertexConsumer;
 import net.blaze3d.vertex.VertexFormat;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -37,7 +36,6 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	private static int debugParticlePrepareLogCount;
 	private static int debugParticleDrawLogCount;
 	private static int debugParticleSampleLogCount;
-	private static final int INITIAL_PARTICLE_CAPACITY = 1024;
 	/**
 	 * The Rust whole-frame particle stream is a bounded semantic queue.  Keep
 	 * extraction bounded as well so a pathological particle emitter cannot build
@@ -45,8 +43,6 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	 * reject it.
 	 */
 	private static final int MAX_RUST_SEMANTIC_PARTICLES = 65_536;
-	private static final int FLOATS_PER_PARTICLE = 12;
-	private static final int INTS_PER_PARTICLE = 2;
 	private final Map<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> particles = new HashMap();
 	private int particleCount;
 
@@ -102,9 +98,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 				SingleQuadParticle.Layer layer = entry.getKey();
 				QuadParticleRenderState.Storage storage = entry.getValue();
 				if (net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(layer.textureAtlasLocation())) {
-					storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
-						RustGalWorldPrimitiveRenderer.enqueueParticleQuad(layer.translucent(), x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light));
-					submitted += storage.count();
+                    submitted += RustGalWorldPrimitiveRenderer.enqueueParticleLayer(layer.translucent(), storage.nativeValues);
 				} else {
 					int[] admitted = {0};
 					storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
@@ -219,71 +213,13 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class Storage {
-		private int capacity = 1024;
-		private float[] floatValues = new float[12288];
-		private int[] intValues = new int[2048];
-		private int currentParticleIndex;
-
-		public void add(float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p, float q, int r, int s) {
-			if (this.currentParticleIndex >= this.capacity) {
-				this.grow();
-			}
-
-			int t = this.currentParticleIndex * 12;
-			this.floatValues[t++] = f;
-			this.floatValues[t++] = g;
-			this.floatValues[t++] = h;
-			this.floatValues[t++] = i;
-			this.floatValues[t++] = j;
-			this.floatValues[t++] = k;
-			this.floatValues[t++] = l;
-			this.floatValues[t++] = m;
-			this.floatValues[t++] = n;
-			this.floatValues[t++] = o;
-			this.floatValues[t++] = p;
-			this.floatValues[t] = q;
-			t = this.currentParticleIndex * 2;
-			this.intValues[t++] = r;
-			this.intValues[t] = s;
-			this.currentParticleIndex++;
-		}
-
-		public void forEachParticle(QuadParticleRenderState.ParticleConsumer particleConsumer) {
-			for (int i = 0; i < this.currentParticleIndex; i++) {
-				int j = i * 12;
-				int k = i * 2;
-				particleConsumer.consume(
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j++],
-					this.floatValues[j],
-					this.intValues[k++],
-					this.intValues[k]
-				);
-			}
-		}
-
-		public void clear() {
-			this.currentParticleIndex = 0;
-		}
-
-		private void grow() {
-			this.capacity *= 2;
-			this.floatValues = Arrays.copyOf(this.floatValues, this.capacity * 12);
-			this.intValues = Arrays.copyOf(this.intValues, this.capacity * 2);
-		}
-
-		public int count() {
-			return this.currentParticleIndex;
-		}
-	}
+    static class Storage {
+        private final net.vulkanic.bridge.NativeParticleBuffer nativeValues = new net.vulkanic.bridge.NativeParticleBuffer();
+        public void add(float f,float g,float h,float i,float j,float k,float l,float m,float n,float o,float p,float q,int r,int s) {
+            nativeValues.append(1,0,0,f,g,h,i,j,k,l,m,n,o,p,q,r,s);
+        }
+        public void forEachParticle(ParticleConsumer consumer) { nativeValues.visit(consumer::consume); }
+        public void clear() { nativeValues.clear(); }
+        public int count() { return nativeValues.size(); }
+    }
 }

@@ -36,6 +36,13 @@ class ParticleSemanticEncodingTest {
         assertEquals(List.of(0,1,2,2,3),particles.stream().map(WorldParticleQuadRecord::materialIndex).toList());
         assertThrows(IllegalArgumentException.class,()->mapParticleMaterialOrder(materials,List.of(particles.get(4),particles.get(0))));
         assertThrows(IllegalArgumentException.class,()->mapParticleMaterialOrder(List.of(),List.of(particles.get(4))));
+        try (var nativeParticles=new NativeParticleBuffer();var arena=Arena.ofConfined()) {
+            nativeParticles.addAll(particles);
+            assertEquals(-1,encodeParticleQuads(arena,mapped).mismatch(nativeParticles.encode(arena,materials)));
+            assertEquals(List.of(0,1,2,2,3),nativeParticles.stream().map(WorldParticleQuadRecord::materialIndex).toList());
+            nativeParticles.clear();nativeParticles.add(particles.get(4));nativeParticles.add(particles.get(0));
+            assertThrows(IllegalArgumentException.class,()->nativeParticles.encode(arena,materials));
+        }
     }
 
     private static WorldMaterialQuadRecord material(boolean modulated) throws Exception {

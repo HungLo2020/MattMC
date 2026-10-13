@@ -74,6 +74,7 @@ or backend dependency; see [VulkanicGAL](VULKANIC-GAL.md) for the closed-pipe ch
 | Canonical terrain face policy over retained block IDs | `chunk/meshing/face_policy/`; see [terrain culling](RUST-TERRAIN-CULLING.md) |
 | DH height fields, emitter enumeration or CPU light propagation | `world/level/chunk/dh_heightmaps/` or `world/level/lighting/dh/`; these are world CPU owners, outside `render/` |
 | Bounded shadow candidate CPU capture storage | `bridge/world/entity_shadow_query/`; see [capture lifetime](RUST-ENTITY-SHADOW-CANDIDATES.md) |
+| Particle capture, CPU frame snapshots and material-order transport | `particle_frame/`; see [particle frames](RUST-PARTICLE-FRAMES.md) for verification status |
 | A new Java entry point or wire record | `bridge/` (see [Java Bridge](JAVA-BRIDGE.md)) |
 | A new GPU capability, resource type or command | `vulkanic/` (see [VulkanicGAL](VULKANIC-GAL.md)) |
 

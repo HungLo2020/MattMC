@@ -13,6 +13,8 @@ each module there has a short README with its own file map.
   rollback history, stable rig dependency checks and scoped verification.
 - [Native model frames](RUST-MODEL-FRAMES.md): pose and instance production,
   frame ownership, rollback and current verification limits.
+- [Rust particle frames](RUST-PARTICLE-FRAMES.md): native capture, ordering and
+  frame lifetime, with measured verification.
 - [Retained render scene](RETAINED-SCENE.md): the proposed persistent scene
   model and its phased rollout toward Frozen parity.
 - [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,

@@ -1277,6 +1277,14 @@ the full particle region including transparent holes, and the visible effect
 against the hidden control. An opaque `particle-atlas-static-a` comparison
 cannot establish transparency: all its source texels have alpha 255.
 
+The Current cutout fixture waits for real packet-backed chunks covering its
+biome-blend and quart-lookup neighborhood before constructing the particle.
+Construction captures tint once; installing against unloaded biome data can
+retain a plains fallback after the forest data arrives. `ClientLevel.hasChunk()`
+always returns true and is not a readiness test. If the pair reports
+`terrain-particle-fixture-state`, compare the constructor colors as well as
+sprite pixels and pose before interpreting the images. Frozen stays unchanged.
+
 For falling-leaf particles, `-Dmattmc.dev.graphicsAuditLeafParticles=true`
 holds six leaves (tinted `leaf_*` with known tints, cherry, pale oak) in front
 of the camera through the ordinary `FallingLeavesParticle` extraction

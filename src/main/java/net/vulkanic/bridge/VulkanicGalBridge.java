@@ -2240,9 +2240,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			encodeGuiTiledQuads(guiTiledQuads, guiWidth, guiHeight), guiTiledQuads.size());
 		writeEngineGlobals(request, engineGlobals);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.pack-particles-and-orbs");
-		var orderedParticles = mapParticleMaterialOrder(worldMaterialQuads, worldParticles);
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 44,
-			encodeParticleQuads(arena, orderedParticles), orderedParticles.size());
+        if (worldParticles instanceof NativeParticleBuffer nativeParticles) {
+            Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 44,
+                nativeParticles.encode(arena, worldMaterialQuads), nativeParticles.size());
+        } else {
+            var orderedParticles = mapParticleMaterialOrder(worldMaterialQuads, worldParticles);
+            Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 44,
+                encodeParticleQuads(arena, orderedParticles), orderedParticles.size());
+        }
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 45,
 			encodeExperienceOrbInstances(arena, worldOrbs, worldMeshInstances.size()), worldOrbs.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 46,

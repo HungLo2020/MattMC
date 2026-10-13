@@ -3,6 +3,7 @@ package net.vulkanic.world;
 import java.util.ArrayList;
 import java.util.List;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import net.vulkanic.bridge.NativeParticleBuffer;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -75,6 +76,22 @@ class ShadowOnlyEntityCaptureTest {
         }
     }
 
+    private static void addGeometry(Object stream, Object sentinel, int texture) {
+        if (stream instanceof NativeParticleBuffer particles) {
+            particles.append(texture, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, -1, 240);
+        } else {
+            @SuppressWarnings("unchecked") var objects = (List<Object>) stream;
+            objects.add(sentinel);
+        }
+    }
+
+    private static void assertCameraGeometry(Object stream, Object sentinel) {
+        if (stream instanceof NativeParticleBuffer particles) {
+            assertEquals(1, particles.size());
+            assertEquals(17, particles.textureId(0), "shadow particles must not replace camera particles");
+        } else assertEquals(List.of(sentinel), stream);
+    }
+
     @SuppressWarnings("unchecked")
     @Test void offCameraStreamsNeverBecomeCameraGeometryAndRetainOwnershipGap() throws Exception {
         net.minecraft.SharedConstants.tryDetectVersion();
@@ -86,14 +103,14 @@ class ShadowOnlyEntityCaptureTest {
             for (String name : CAMERA_STREAMS) {
                 var stream = (List<Object>) field(name);
                 stream.clear();
-                stream.add(cameraGeometry);
+                addGeometry(stream, cameraGeometry, 17);
                 streams.add(stream);
             }
             RustGalWorldPrimitiveRenderer.beginShadowOnlyEntityCapture();
             assertThrows(IllegalStateException.class, RustGalWorldPrimitiveRenderer::beginShadowOnlyEntityCapture);
-            for (var stream : streams) stream.add(shadowGeometry);
+            for (var stream : streams) addGeometry(stream, shadowGeometry, 18);
             assertEquals(0, RustGalWorldPrimitiveRenderer.endShadowOnlyEntityCapture());
-            for (var stream : streams) assertEquals(List.of(cameraGeometry), stream);
+            for (var stream : streams) assertCameraGeometry(stream, cameraGeometry);
             RustGalWorldPrimitiveRenderer.enqueueWorldFeatureCoverage(
                 new net.minecraft.client.renderer.SubmitNodeCollection.WorldFeatureCoverageSnapshot(
                     0,0,0,0,0,2,0,0,0,0,0,0,0));
@@ -104,7 +121,7 @@ class ShadowOnlyEntityCaptureTest {
             RustGalWorldPrimitiveRenderer.beginShadowOnlyEntityCapture();
             assertEquals(0, RustGalWorldPrimitiveRenderer.endShadowOnlyEntityCapture());
             assertThrows(IllegalStateException.class, RustGalWorldPrimitiveRenderer::endShadowOnlyEntityCapture);
-            for (var stream : streams) assertEquals(List.of(cameraGeometry), stream);
+            for (var stream : streams) assertCameraGeometry(stream, cameraGeometry);
         } finally {
             for (var stream : streams) stream.clear();
             var count = RustGalWorldPrimitiveRenderer.class.getDeclaredField("pendingUnsupportedShadowGeometry");

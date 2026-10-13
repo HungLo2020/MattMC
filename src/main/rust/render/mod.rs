@@ -15,3 +15,4 @@ pub(crate) mod fog;
 pub(crate) mod mesh_lifetime;
 pub(crate) mod asset_registry;
 pub(crate) mod model_frame;
+pub(crate) mod particle_frame;

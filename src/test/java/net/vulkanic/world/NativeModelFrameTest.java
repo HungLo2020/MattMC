@@ -142,6 +142,10 @@ class NativeModelFrameTest {
         var owner = new NativeModelFrame();
         var instance = append(owner,nodes(),new Matrix4f(),1,0,0,null);
         var poses = ModelRigPoses.nativeFrame(owner);
+        var capturedParticles = new net.vulkanic.bridge.NativeParticleBuffer();
+        capturedParticles.append(17,0,0,1,2,3,0,0,0,1,.5F,0,1,0,1,-1,240);
+        var particles = capturedParticles.snapshot();
+        capturedParticles.close();
         var empty = new RustGalWorldPrimitiveRenderer.PrimitiveFrame(128,128,
             new Matrix4f().get(new float[16]),new Matrix4f().get(new float[16]),
             new WorldBackgroundRecord(false,0,0,0,0,128,128),List.of(),List.of(),List.of(),List.of(),List.of(instance));
@@ -149,7 +153,8 @@ class NativeModelFrameTest {
         Object[] values = new Object[components.length]; Class<?>[] types = new Class<?>[components.length];
         for(int i=0;i<components.length;i++) {
             types[i]=components[i].getType();
-            values[i]=components[i].getName().equals("modelRigPoses") ? poses : components[i].getAccessor().invoke(empty);
+            values[i]=components[i].getName().equals("modelRigPoses") ? poses
+                : components[i].getName().equals("particleQuads") ? particles : components[i].getAccessor().invoke(empty);
         }
         var frame = empty.getClass().getDeclaredConstructor(types).newInstance(values);
         var coordinator = net.vulkanic.gui.RustGalFrameCoordinator.class;
@@ -168,7 +173,9 @@ class NativeModelFrameTest {
             assertThrows(java.lang.reflect.InvocationTargetException.class,()->complete.invoke(null,value,null,null,null));
             assertFalse(owner.isAlive());
             assertThrows(IllegalStateException.class,instance::meshKey);
-        } finally { owner.close(); }
+            assertThrows(IllegalStateException.class,particles::size);
+            assertThrows(IllegalStateException.class,()->particles.get(0));
+        } finally { owner.close(); particles.close(); }
     }
 
 }

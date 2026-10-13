@@ -2,9 +2,9 @@
 
 | Mode | FPS, Current / Frozen | p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1289.30 / 1190.40 | 3.332 / 3.787 |
-| Vanilla + DH | 814.90 / 684.80 | 3.826 / 6.050 |
-| Shaders | 357.00 / 312.60 | 5.098 / 7.935 |
-| Shaders + DH | 282.80 / 225.80 | 5.889 / 9.223 |
-Shader rows: nativef29c8316 after upstream1490391f9, one clean6000-frame pair/mode; scoped FPS/p99 floors pass. Vanilla rows retain native5e09c034. Inputs/JVM controls match; entity counts differ. One settled pair/three lifecycles pass,VUID0; hazy gates structural only. Long/GPU memory acceptance stays open.
-Rust2788/Java2137/Frozen108 bounds pass. Shadow capture CPU7–44% below prior transport; mixed-holder Java heap25–26% lower. [Report](docs/development/rendering/RUST-ENTITY-SHADOW-CANDIDATES.md). Broad Java migration remains unfinished.
+| Vanilla | 1268.20 / 1246.60 | 3.530 / 3.720 |
+| Vanilla + DH | 786.50 / 656.10 | 4.623 / 6.955 |
+| Shaders | 343.40 / 305.30 | 6.288 / 8.177 |
+| Shaders + DH | 284.20 / 220.90 | 5.246 / 9.764 |
+Particle native6dc8870e: two clean6000-frame pairs for vanilla, one per other mode; all scoped FPS/p99 floors pass. Inputs/JVM controls match; live entity counts differ. Not an isolated gain or broad acceptance.
+Rust2790/Java2141 pass; particle comparisons, pipelined/synchronous lifetimes and three lifecycle cases pass. Native capture/frame transport replaces Java records and ordering copies; small-batch CPU overhead remains. [Report](docs/development/rendering/RUST-PARTICLE-FRAMES.md). Full migration and long/GPU memory acceptance stay open.

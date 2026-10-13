@@ -4,6 +4,28 @@ import net.minecraft.world.phys.Vec3;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GraphicsAuditTerrainParticleFixtureTest {
+    @Test void leafTintWaitsForRealChunksIncludingTheBiomeLookupBorder() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        var chunks = org.mockito.Mockito.mock(net.minecraft.world.level.chunk.ChunkSource.class);
+        var chunk = org.mockito.Mockito.mock(net.minecraft.world.level.chunk.LevelChunk.class);
+        var full = net.minecraft.world.level.chunk.status.ChunkStatus.FULL;
+        org.mockito.Mockito.when(chunks.getChunk(org.mockito.ArgumentMatchers.anyInt(),
+            org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.eq(full),
+            org.mockito.ArgumentMatchers.eq(false))).thenReturn(chunk);
+        var position = new net.minecraft.core.BlockPos(147, 102, 529);
+        assertTrue(GraphicsAuditTerrainParticleFixture.tintNeighborhoodReady(chunks, position, 2));
+        // The central chunk alone is insufficient: blending plus corner jitter
+        // can read the west/north neighbor even at this interior block position.
+        org.mockito.Mockito.when(chunks.getChunk(8, 32, full, false)).thenReturn(null);
+        assertFalse(GraphicsAuditTerrainParticleFixture.tintNeighborhoodReady(chunks, position, 2));
+        org.mockito.Mockito.when(chunks.getChunk(8, 32, full, false)).thenReturn(chunk);
+        assertTrue(GraphicsAuditTerrainParticleFixture.tintNeighborhoodReady(chunks, position, 2));
+        org.mockito.Mockito.when(chunks.getChunk(-1, 0, full, false)).thenReturn(null);
+        assertFalse(GraphicsAuditTerrainParticleFixture.tintNeighborhoodReady(chunks,
+            new net.minecraft.core.BlockPos(0, 102, 0), 0), "quart jitter crosses chunk boundaries without blending");
+    }
+
     @Test void fractionalSourceAlphaIsDistinguishedFromCutoutAndOpaque() {
         try(var pixels=new net.blaze3d.platform.NativeImage(16,16,true)) {
             for(int y=0;y<16;y++) for(int x=0;x<16;x++) pixels.setPixel(x,y,0x80405090);
