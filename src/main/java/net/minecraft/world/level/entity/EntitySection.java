@@ -59,6 +59,12 @@ public class EntitySection<T extends EntityAccess> {
         return this.storage.consumeTypedBatch(type,query,EntitySection::intersectsBounds,consumer,batch);
     }
 
+    final T collectionBinding(long token) { return this.storage.collectionBinding(token); }
+
+    final void continueCollection(AABB query,AbortableIterationConsumer<T> consumer,ClassInstanceMultiMap.QueryBatch batch,int cursor,int expected) {
+        this.storage.continueCollection(query,EntitySection::intersectsBounds,consumer,batch,cursor,expected);
+    }
+
     final void attachNativeIndex(java.lang.foreign.MemorySegment index,long token) {
         // Overrides may change visibility, emptiness or query behavior.
         if(getClass()==EntitySection.class)this.storage.attachSectionIndex(index,token);

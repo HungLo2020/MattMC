@@ -42,6 +42,12 @@ public class LevelEntityGetterAdapter<T extends EntityAccess> implements LevelEn
 		this.sectionStorage.getEntities(aABB, AbortableIterationConsumer.forConsumer(consumer));
 	}
 
+    @Override
+    public void collectEntities(AABB query,T excluded,java.util.function.Predicate<? super T> predicate,java.util.ArrayList<T> result) {
+        if(getClass()!=LevelEntityGetterAdapter.class)LevelEntityGetter.super.collectEntities(query,excluded,predicate,result);
+        else this.sectionStorage.collectEntities(query,excluded,predicate,result);
+    }
+
 	@Override
 	public <U extends T> void get(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer) {
 		this.sectionStorage.getEntities(entityTypeTest, aABB, abortableIterationConsumer);

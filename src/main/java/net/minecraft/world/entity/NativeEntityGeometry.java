@@ -25,7 +25,7 @@ public final class NativeEntityGeometry {
         ValueLayout.JAVA_INT,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,
         ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE));
     private static final MethodHandle ATTACH_SECTION=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_members_attach_geometry",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle TRANSFER=handle("transfer",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle LIFECYCLE=handle("lifecycle",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
     private static final MethodHandle QUERY_ONE=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_entity_geometry_query_one",
@@ -99,9 +99,10 @@ public final class NativeEntityGeometry {
             else change(bounds.getClass()==AABB.class?1:2,bounds.minX,bounds.minY,bounds.minZ,bounds.maxX,bounds.maxY,bounds.maxZ);
         }
         /** Links two retained CPU owners once; does not export a geometry array. */
-        public void attachSectionBinding(MemorySegment section,long token) {
+        public void attachSectionBinding(MemorySegment section,long token) { attachSectionBinding(section,token,false); }
+        public void attachSectionBinding(MemorySegment section,long token,boolean nonSpectator) {
             try {
-                int status=(int)ATTACH_SECTION.invokeExact(section,token,owner);
+                int status=(int)ATTACH_SECTION.invokeExact(section,token,owner,nonSpectator?1:0);
                 if(status!=0)throw new IllegalStateException("Cannot attach section geometry");
             }catch(Throwable failure){throw failure(failure);}finally{Reference.reachabilityFence(this);}
         }

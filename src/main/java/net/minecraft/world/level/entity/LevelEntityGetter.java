@@ -19,5 +19,9 @@ public interface LevelEntityGetter<T extends EntityAccess> {
 
 	void get(AABB aABB, Consumer<T> consumer);
 
+    default void collectEntities(AABB query,T excluded,java.util.function.Predicate<? super T> predicate,java.util.ArrayList<T> result) {
+        get(query,entity->{if(entity!=excluded && predicate.test(entity))result.add(entity);});
+    }
+
 	<U extends T> void get(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer);
 }

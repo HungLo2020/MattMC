@@ -230,9 +230,13 @@ for ordinary camera culling. The [section range-query owner](world/entities/RUST
 links membership to those components and scans ordinary range queries in Rust.
 The [world-query extension](world/entities/RUST-ENTITY-SECTION-INDEX.md#world-queries)
 owns section visibility and joins untyped coordinate traversal with those scans.
-Full CPU suites, Frozen replays and scoped runtime checks pass. Rejected-section
-CPU improves against the Java-traversal control; Frozen CPU cost and the latest
-vanilla p99 floor remain open. Rust removal state retires camera membership
+That checkpoint passed full CPU suites, Frozen replays and scoped runtime checks,
+but retained Frozen CPU and vanilla p99 gaps. The subsequent
+[entity collector](world/entities/RUST-ENTITY-COLLECTION.md) combines stock
+non-spectator matches across sections in Rust, yielding before custom bounds or
+spectator callbacks. Java projects bounded result batches; native counts reserve
+projection capacity. Current/Frozen CPU gaps remain explicit in its measurements.
+Rust removal state retires camera membership
 at despawn while keeping primary geometry readable. The
 [ticking membership owner](world/entities/RUST-ENTITY-ORDER.md) retains
 client/server insertion order and immutable tick snapshots. Java keeps API

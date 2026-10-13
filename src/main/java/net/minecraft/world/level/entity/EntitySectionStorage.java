@@ -79,6 +79,21 @@ public class EntitySectionStorage<T extends EntityAccess> {
         }
 	}
 
+    /** Stock collection owns no arbitrary result callbacks; custom selectors retain ordered dispatch. */
+    public void collectEntities(AABB query,T excluded,java.util.function.Predicate<? super T> predicate,java.util.ArrayList<T> result) {
+        if(getClass()!=EntitySectionStorage.class || predicate!=net.minecraft.world.entity.EntitySelector.NO_SPECTATORS
+            || result.getClass()!=java.util.ArrayList.class) {
+            getEntities(query,entity->{
+                if(entity!=excluded && predicate.test(entity))result.add(entity);
+                return AbortableIterationConsumer.Continuation.CONTINUE;
+            });
+            return;
+        }
+        try(var cursor=this.sections.spatialCursor(query.minX,query.minY,query.minZ,query.maxX,query.maxY,query.maxZ)) {
+            cursor.collectNonSpectators(query,excluded,predicate,result);
+        }
+    }
+
 	public <U extends T> void getEntities(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer) {
         if(getClass()==EntitySectionStorage.class && entityTypeTest instanceof EntityTypeTest.ClassTest<T,U> stock && stock.getBaseClass()!=null) {
             long identity=net.minecraft.util.ClassInstanceMultiMap.queryTypeIdentity(stock.getBaseClass());

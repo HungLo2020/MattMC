@@ -6,6 +6,7 @@ struct Binding {
     generation: u32,
     references: usize,
     geometry: Option<Arc<View>>,
+    non_spectator: bool,
 }
 struct State {
     rows: Vec<Binding>,
@@ -35,6 +36,7 @@ impl Bindings {
                     generation,
                     references: 1,
                     geometry: None,
+                    non_spectator: false,
                 };
                 return (u64::from(generation) << 32) | u64::from(slot);
             }
@@ -45,15 +47,17 @@ impl Bindings {
             generation: 1,
             references: 1,
             geometry: None,
+            non_spectator: false,
         });
         (1u64 << 32) | u64::from(slot)
     }
-    pub(super) fn attach_geometry(&self, token: u64, view: Arc<View>) {
+    pub(super) fn attach_geometry(&self, token: u64, view: Arc<View>, non_spectator: bool) {
         let mut s = self.state.lock().unwrap();
         let row = &mut s.rows[token as u32 as usize];
         assert_eq!(row.generation, (token >> 32) as u32);
         assert!(row.references > 0);
         row.geometry = Some(view);
+        row.non_spectator = non_spectator;
     }
     pub(super) fn geometry(&self) -> Geometry<'_> { Geometry(self.state.lock().unwrap()) }
     pub(super) fn retain(&self, token: u64) {
@@ -89,6 +93,10 @@ impl Bindings {
 /// Lock once for a bounded scan, never for the subsequent Java callbacks.
 pub(super) struct Geometry<'a>(MutexGuard<'a, State>);
 impl Geometry<'_> {
+    pub(super) fn non_spectator(&self, token: u64) -> bool {
+        self.0.rows.get(token as u32 as usize).is_some_and(|row|
+            row.generation == (token >> 32) as u32 && row.references > 0 && row.non_spectator)
+    }
     pub(super) fn intersects(&self, token: u64, query: [f64; 6]) -> Option<bool> {
         let row = self.0.rows.get(token as u32 as usize)?;
         if row.generation != (token >> 32) as u32 || row.references == 0 { return None; }

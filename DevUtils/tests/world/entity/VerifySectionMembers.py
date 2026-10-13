@@ -117,7 +117,7 @@ def main():
                             if (Path(base) / resource).is_file())
                 assert path.is_relative_to(repo) and sha(path) == digest
                 checked[str(path)] = digest
-            assert len(checked) == (18 if side == 'current' else 7)
+            assert len(checked) == (22 if side == 'current' else 10)
             images[side] = checked
             if side == 'current':
                 assert 'NATIVE_IMAGE ' + pins['native'] + ' ' + str(native) in data

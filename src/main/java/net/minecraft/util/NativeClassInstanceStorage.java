@@ -11,6 +11,13 @@ import net.minecraft.world.phys.AABB;
 
 /** Behavior bindings over native section members; all membership arrays are Rust-owned. */
 final class NativeClassInstanceStorage<T> {
+    private static final ClassValue<Boolean> STOCK_NON_SPECTATOR = new ClassValue<>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            if(!net.minecraft.world.entity.Entity.class.isAssignableFrom(type))return false;
+            try {return type.getMethod("isSpectator").getDeclaringClass()==net.minecraft.world.entity.Entity.class;}
+            catch(NoSuchMethodException e){throw new IllegalStateException(e);}
+        }
+    };
     private static MethodHandle handle(String name,FunctionDescriptor descriptor) {
         return NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_members_"+name,descriptor);
     }
@@ -86,13 +93,18 @@ final class NativeClassInstanceStorage<T> {
         }catch(Throwable t){throw failure(t);}
     }
     @SuppressWarnings("unchecked") private T object(long token){return token==0?null:(T)bindings[(int)token];}
+    T collectionBinding(long token) {
+        int slot=(int)token;
+        if(slot<=0 || slot>=generations.length || generations[slot]!=token)throw new IllegalStateException("Stale collected entity binding");
+        return object(token);
+    }
     long bind(T object,NativeEntityGeometry.Body geometry) {
         long token=0;
         try {
             token=(long)ALLOCATE.invokeExact(owner);int slot=(int)token;
             if(slot>=bindings.length){int size=Math.max(slot+1,Math.multiplyExact(bindings.length,2));bindings=Arrays.copyOf(bindings,size);generations=Arrays.copyOf(generations,size);}
             bindings[slot]=object;generations[slot]=token;
-            if(geometry!=null)geometry.attachSectionBinding(owner,token);
+            if(geometry!=null)geometry.attachSectionBinding(owner,token,STOCK_NON_SPECTATOR.get(object.getClass()));
             return token;
         }catch(Throwable t){
             if(token!=0)finish(token);
@@ -222,7 +234,11 @@ final class NativeClassInstanceStorage<T> {
         }
 
         AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> abortableIterationConsumer,ClassInstanceMultiMap.QueryBatch matches,int count,int expected) {
-            int cursor=0,consumed=0,scannedUntil=count==0?0:(int)matches.rows[1];
+            return forEachIntersecting(query,bounds,abortableIterationConsumer,matches,count,expected,0);
+        }
+
+        AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> abortableIterationConsumer,ClassInstanceMultiMap.QueryBatch matches,int count,int expected,int initialCursor) {
+            int cursor=initialCursor,consumed=0,scannedUntil=count==0?initialCursor:(int)matches.rows[1];
             long revision=count==0?-1:matches.rows[0];
             try {
                 while(cursor!=size()) {

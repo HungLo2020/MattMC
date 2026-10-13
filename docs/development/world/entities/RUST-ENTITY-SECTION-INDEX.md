@@ -48,6 +48,10 @@ candidate array, and no new crate or GPU handle crossing this boundary.
 
 ## World queries
 
+The [native result-collection slice](RUST-ENTITY-COLLECTION.md) extends stock
+non-spectator queries across sections; see its scoped verification and remaining
+Frozen component CPU gaps.
+
 Untyped `EntitySectionStorage.getEntities` now joins spatial traversal,
 section visibility and root-member bounds scans inside Rust. Empty, hidden
 and nonmatching sections are skipped without a Java round trip. Matching

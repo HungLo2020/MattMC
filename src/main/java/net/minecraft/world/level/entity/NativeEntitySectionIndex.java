@@ -40,6 +40,8 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle QUERY_TYPED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_query_typed",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS),Linker.Option.critical(true));
+    private static final MethodHandle COLLECT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_collect_non_spectators",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle CURSOR_CLOSE=handle("cursor_close",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_RELEASE=handle("cursor_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final Arena scope;
@@ -128,6 +130,8 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
         private final Arena cursorScope;
         private final MemorySegment handle,view;
         private final ClassInstanceMultiMap.QueryBatch matches;
+        private long[] collectionRows;
+        private MemorySegment collectionOutput;
         private boolean pooled,open=true;
         Cursor(MemorySegment p) { this(p,false); }
         Cursor(MemorySegment p,boolean spatial) {
@@ -173,6 +177,49 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
             if(matches.count>0)return section.consumeNativeTypedBatch(type.getBaseClass(),query,consumer,matches);
             if(accessible(section))return section.getEntities(type,query,consumer);
             return AbortableIterationConsumer.Continuation.CONTINUE;
+        }
+        void collectNonSpectators(AABB query,T excluded,java.util.function.Predicate<? super T> predicate,java.util.ArrayList<T> result) {
+            if(collectionRows==null){collectionRows=new long[258];collectionOutput=MemorySegment.ofArray(collectionRows);}
+            AbortableIterationConsumer<T> callback=null;
+            try {
+                while(true) {
+                    int count=(int)COLLECT.invokeExact(handle,collectionOutput);
+                    if(count==-2)throw rangeFailure(view.get(ValueLayout.JAVA_LONG,8),view.get(ValueLayout.JAVA_LONG,16));
+                    if(count<0)throw new IllegalStateException("Entity collection status "+count);
+                    boolean reserved=false;
+                    for(int i=0;i<count;i++) {
+                        T entity=object(collectionRows[2+2*i]).collectionBinding(collectionRows[3+2*i]);
+                        if(entity!=excluded) {
+                            if(!reserved) {
+                                int capacity=result.size()+count-i;
+                                if(capacity>=0)result.ensureCapacity(capacity);
+                                reserved=true;
+                            }
+                            result.add(entity);
+                        }
+                    }
+                    int kind=(int)collectionRows[0];
+                    if(kind==0)return;
+                    if(kind==1)continue;
+                    if(kind==4) {
+                        int status=(int)collectionRows[1];
+                        if(status==-2)throw rangeFailure(view.get(ValueLayout.JAVA_LONG,8),view.get(ValueLayout.JAVA_LONG,16));
+                        throw new IllegalStateException("Entity collection status "+status);
+                    }
+                    if(callback==null)callback=entity->{
+                        if(entity!=excluded && predicate.test(entity))result.add(entity);
+                        return AbortableIterationConsumer.Continuation.CONTINUE;
+                    };
+                    EntitySection<T> section=section();
+                    if(kind==3) {
+                        long iterator=collectionRows[1];
+                        section.continueCollection(query,callback,matches,(int)iterator,(int)(iterator>>>32));
+                    } else if(kind==2) {
+                        if(section!=null && !section.isEmpty() && section.getStatus().isAccessible())section.getEntities(query,callback);
+                    } else throw new IllegalStateException("Entity collection continuation "+kind);
+                }
+            }catch(Throwable t){throw NativeEntitySectionIndex.<RuntimeException>propagate(t);}
+            finally{Reference.reachabilityFence(NativeEntitySectionIndex.this);}
         }
         boolean accessible(EntitySection<T> section) {
             return matches.count!=-1 || (section!=null && !section.isEmpty() && section.getStatus().isAccessible());

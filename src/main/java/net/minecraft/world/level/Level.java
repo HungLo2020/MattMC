@@ -690,12 +690,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	@Override
 	public List<Entity> getEntities(@Nullable Entity entity, AABB aABB, Predicate<? super Entity> predicate) {
 		Profiler.get().incrementCounter("getEntities");
-		List<Entity> list = Lists.<Entity>newArrayList();
-		this.getEntities().get(aABB, entity2 -> {
-			if (entity2 != entity && predicate.test(entity2)) {
-				list.add(entity2);
-			}
-		});
+		java.util.ArrayList<Entity> list = Lists.<Entity>newArrayList();
+        this.getEntities().collectEntities(aABB, entity, predicate, list);
 
 		for (EnderDragonPart enderDragonPart : this.dragonParts()) {
 			if (enderDragonPart != entity && enderDragonPart.parentMob != entity && predicate.test(enderDragonPart) && aABB.intersects(enderDragonPart.getBoundingBox())

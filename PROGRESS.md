@@ -21,7 +21,10 @@
 - General simulation, networking and startup/platform remain Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
 
 ## Current implementation batch
-
+- Native entity collection (verified checkpoint): Rust batches stock NO_SPECTATORS queries across sections; custom bounds/spectator callbacks retain their original iterator boundary. Guide: [entity collection](docs/development/world/entities/RUST-ENTITY-COLLECTION.md).
+- Native6ba548a6 passes full Rust2783/3ignored, Java2126/2skip and exact Frozen6886 cases. The new range-failure case reproduced and fixed a lost result prefix; failure evidence retained.
+- Final component all-hit CPU41.84/67.65/26.31ms Current/previous consumer/Frozen per4096 queries; Java heap6.52/18.78/18.87MB. Current CPU improves38.2% against its previous consumer, but Frozen remains faster. Dense-section CPU1% slower than control despite74% lower Java allocation.
+- All four6000-frame FPS/p99 pairs pass scoped floors (SUMMARY); two settled pairs/three lifecycles pass,VUID0. Source/class/native/Frozen/input/JVM guards pass; seven originals/five presenter/nine native identities reviewed. Hazy gates remain structural only. Thirteen completed copies retired; lossless model-profile JSON archival reclaimed110536497B, original JFRs retained. Evidence: build/native-entity-collection/; broader migration remains unfinished.
 - Model frames (verified checkpoint): Rust now owns pose storage, instance construction and immutable variants; Java pose ring/full records removed. Rust 2779 and Java 2121 tests passed, followed by 24 focused tests on final Java changes. Java allocation falls 68%/73%; component CPU remains 8.8%/25.1% slower than the prior Java control. Four runtime modes completed; vanilla FPS remains 4.2% below Frozen. See [implementation, measurements and limits](docs/development/rendering/RUST-MODEL-FRAMES.md) and SUMMARY.md.
 
 ## Earlier DH checkpoints
@@ -32,10 +35,7 @@
 
 ## Live biome query checkpoint
 
-- Native487cebcc moves ordinary fiddled-distance selection and client biome identity reads into Rust's retained sections; Java resolves holders and dispatches unsupported/custom sources. No Java selection loop or section export remains on the admitted path.
-- Frozen162701 coordinate cases, Java8/native9 boundary tests, full Rust2737/3ignored and Java2060/2skip pass. Scalar selection1048576queries:76.07/216.02ms Current/Frozen,64.8% faster, zero Java heap on both sides; excludes world lookup/GPU.
-- One clean6000-frame vanilla pair:1320.6/1068.7FPS and p993.736/4.428ms Current/Frozen. Two settled image pairs and three lifecycle cases pass,VUID0; seven originals/five presenter identities/six native images reviewed. Gate haze establishes structural evidence only; no new all-mode acceptance.
-- Sources/native/Frozen guards pass. Retired nine completed world copies; lossless profile JSON archival reclaimed625594176bytes, originals retained. Guide: world/biome/RUST-LIVE-BIOMES.md; receipts: build/native-biome-query/.
+- Rust owns fiddled-distance selection and retained client biome reads. Historical CPU76.07/216.02ms Current/Frozen over1048576 queries; Java heap0 on both sides. Frozen162701 cases, Rust2737/Java2060 and scoped runtime checks passed on native487cebcc. Full evidence and limits: [live biome guide](docs/development/world/biome/RUST-LIVE-BIOMES.md).
 
 ## Entity range-query checkpoint
 

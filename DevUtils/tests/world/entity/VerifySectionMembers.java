@@ -52,6 +52,81 @@ public final class VerifySectionMembers {
         @Override public boolean hurtServer(net.minecraft.server.level.ServerLevel level,net.minecraft.world.damagesource.DamageSource source,float damage){return false;}
     }
     static final class SpatialTyped extends SpatialEntity {}
+    static final class SpectatorEntity extends SpatialEntity {
+        Runnable spectatorHook;
+        boolean spectator;
+        @Override public boolean isSpectator() {
+            events.add("spectator:"+ordinal);
+            Runnable hook=spectatorHook;spectatorHook=null;if(hook!=null)hook.run();
+            return spectator;
+        }
+    }
+    static final java.lang.reflect.Method COLLECT=collectionMethod();
+    static java.lang.reflect.Method collectionMethod() {
+        try{return LevelEntityGetter.class.getMethod("collectEntities",AABB.class,EntityAccess.class,java.util.function.Predicate.class,ArrayList.class);}
+        catch(NoSuchMethodException frozen){return null;}
+    }
+    static void collect(LevelEntityGetter<SpatialEntity> getter,AABB box,SpatialEntity excluded,
+        java.util.function.Predicate<? super SpatialEntity> predicate,ArrayList<SpatialEntity> result) {
+        if(COLLECT==null){getter.get(box,e->{if(e!=excluded && predicate.test(e))result.add(e);});return;}
+        try{COLLECT.invoke(getter,box,excluded,predicate,result);}
+        catch(java.lang.reflect.InvocationTargetException e){throw propagate(e.getCause());}
+        catch(ReflectiveOperationException e){throw new IllegalStateException(e);}
+    }
+    @SuppressWarnings("unchecked") static <E extends Throwable> RuntimeException propagate(Throwable t)throws E{throw (E)t;}
+
+    static void collectedQueries(PrintWriter out) throws Exception {
+        for(int size:new int[]{0,1,3,129,257})for(int mode=0;mode<15;mode++)for(int scattered=0;scattered<2;scattered++) {
+            try(var scope=java.lang.foreign.Arena.ofConfined()) {
+                var storage=new EntitySectionStorage<SpatialEntity>(SpatialEntity.class,k->Visibility.TRACKED);
+                var getter=new LevelEntityGetterAdapter<>(new EntityLookup<SpatialEntity>(),storage);
+                var members=new ArrayList<SpatialEntity>();
+                var sections=new ArrayList<EntitySection<SpatialEntity>>();
+                int midpoint=size/2;
+                for(int i=0;i<size;i++) {
+                    var entity=spatial(i,scope,i==midpoint?SpectatorEntity.class:SpatialEntity.class);
+                    entity.setBoundingBox(new AABB(0,0,0,1,1,1));
+                    var section=storage.getOrCreateSection(net.minecraft.core.SectionPos.asLong(scattered==0?0:i,0,0));
+                    section.add(entity);members.add(entity);sections.add(section);
+                }
+                AABB query=new AABB(-1,-1,-1,16.0*Math.max(2,size)+1,2,2);
+                final int action=mode;
+                SpectatorEntity special=size==0?null:(SpectatorEntity)members.get(midpoint);
+                if(special!=null) {
+                    special.spectator=mode==1;
+                    special.spectatorHook=()->{
+                        switch(action) {
+                            case 3 -> {if(midpoint+1<size)members.get(midpoint+1).setBoundingBox(new AABB(-50,-50,-50,-49,-49,-49));}
+                            case 4 -> {if(midpoint+1<size)sections.get(midpoint+1).remove(members.get(midpoint+1));}
+                            case 5 -> sections.get(midpoint).add(members.get(0));
+                            case 6 -> sections.get(midpoint).updateChunkStatus(Visibility.HIDDEN);
+                            case 7 -> {
+                                var nested=new ArrayList<SpatialEntity>();collect(getter,query,null,net.minecraft.world.entity.EntitySelector.NO_SPECTATORS,nested);
+                                events.add("nested:"+nested.stream().map(e->e.ordinal).toList());
+                            }
+                            case 8 -> throw new IllegalStateException("spectator callback");
+                            case 9 -> storage.getOrCreateSection(net.minecraft.core.SectionPos.asLong(size+1,0,0)).add(members.get(0));
+                            case 10 -> {if(midpoint+1<size)members.get(midpoint+1).setBoundingBox(null);}
+                            default -> {}
+                        }
+                    };
+                    if(mode==11)special.setBoundingBox(new AABB(100,100,100,101,101,101){
+                        @Override public boolean intersects(AABB other){events.add("collection-bounds");return true;}
+                    });
+                    if(mode==12)sections.get(0).updateChunkStatus(null);
+                    if(mode==13)special.setBoundingBox(new AABB(-50,-50,-50,-49,-49,-49));
+                }
+                SpatialEntity excluded=mode==2?special:null;
+                java.util.function.Predicate<? super SpatialEntity> predicate=mode==14?e->{events.add("predicate:"+e.ordinal);return true;}:net.minecraft.world.entity.EntitySelector.NO_SPECTATORS;
+                var result=new ArrayList<SpatialEntity>();
+                call(out,"collection:"+size+":"+mode+":"+scattered,()->{
+                    try {collect(getter,query,excluded,predicate,result);}
+                    finally{events.add("result:"+result.stream().map(e->e.ordinal).toList());}
+                });
+            }
+        }
+    }
+
     static SpatialEntity spatial(int id,java.lang.foreign.Arena scope) throws Exception { return spatial(id,scope,SpatialEntity.class); }
     static SpatialEntity spatial(int id,java.lang.foreign.Arena scope,Class<? extends SpatialEntity> type) throws Exception {
         Class<?> unsafe=Class.forName("sun.misc.Unsafe");var field=unsafe.getDeclaredField("theUnsafe");field.setAccessible(true);
@@ -253,6 +328,21 @@ public final class VerifySectionMembers {
             spatialQueries(out);
             worldQueries(out);
             typedWorldQueries(out);
+            collectedQueries(out);
+            try(var scope=java.lang.foreign.Arena.ofConfined()) {
+                int x=(1<<21)-2;
+                double edge=x*16.0;
+                var storage=new EntitySectionStorage<SpatialEntity>(SpatialEntity.class,k->Visibility.TRACKED);
+                var entity=spatial(123,scope);entity.setBoundingBox(new AABB(edge,0,0,edge+1,1,1));
+                storage.getOrCreateSection(net.minecraft.core.SectionPos.asLong(x,0,0)).add(entity);
+                var getter=new LevelEntityGetterAdapter<>(new EntityLookup<SpatialEntity>(),storage);
+                var result=new ArrayList<SpatialEntity>();
+                call(out,"collection-range-failure-prefix",()->{
+                    try{collect(getter,new AABB(edge-1,-1,-1,edge+17,2,2),null,net.minecraft.world.entity.EntitySelector.NO_SPECTATORS,result);}
+                    finally{events.add("result:"+result.stream().map(e->e.ordinal).toList());}
+                });
+            }
+
             // Root and cached typed membership, duplicates, live immutable views and snapshots.
             var values=new ClassInstanceMultiMap<Member>(Member.class);
             var typed=values.find(Typed.class);var root=values.find(Member.class);
@@ -355,10 +445,10 @@ public final class VerifySectionMembers {
         }
         byte[] data=buffer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);Files.write(Path.of(args[0]),data);
         System.out.println("MEMBERS_CASES "+cases+" bytes="+data.length+" sha="+sha(data));
-        var classes=new ArrayList<>(List.of("net.minecraft.util.ClassInstanceMultiMap","net.minecraft.world.level.entity.EntitySection","net.minecraft.world.level.entity.EntitySectionStorage","net.minecraft.world.level.entity.EntityTypeTest","net.minecraft.world.entity.Entity"));
+        var classes=new ArrayList<>(List.of("net.minecraft.util.ClassInstanceMultiMap","net.minecraft.world.level.entity.EntitySection","net.minecraft.world.level.entity.EntitySectionStorage","net.minecraft.world.level.entity.EntityTypeTest","net.minecraft.world.entity.Entity","net.minecraft.world.level.Level","net.minecraft.world.level.entity.LevelEntityGetter","net.minecraft.world.level.entity.LevelEntityGetterAdapter"));
         classes.add(EntityTypeTest.forClass(Member.class).getClass().getName());
         classes.add(EntityTypeTest.forExactClass(Member.class).getClass().getName());
-        if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.NativeClassInstanceStorage","net.minecraft.util.NativeClassInstanceStorage$Group","net.minecraft.util.NativeClassInstanceStorage$Group$1","net.minecraft.util.NativeClassInstanceStorage$Group$MemberSpliterator","net.minecraft.util.NativeClassInstanceStorage$Captured","net.minecraft.world.entity.NativeEntityGeometry","net.minecraft.world.entity.NativeEntityGeometry$Body"));
+        if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.NativeClassInstanceStorage","net.minecraft.util.NativeClassInstanceStorage$1","net.minecraft.util.NativeClassInstanceStorage$Group","net.minecraft.util.NativeClassInstanceStorage$Group$1","net.minecraft.util.NativeClassInstanceStorage$Group$MemberSpliterator","net.minecraft.util.NativeClassInstanceStorage$Captured","net.minecraft.world.entity.NativeEntityGeometry","net.minecraft.world.entity.NativeEntityGeometry$Body"));
         if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.ClassInstanceMultiMap$1","net.minecraft.util.ClassInstanceMultiMap$QueryBatch","net.minecraft.world.level.entity.NativeEntitySectionIndex","net.minecraft.world.level.entity.NativeEntitySectionIndex$Cursor"));
         for(String name:classes)try(var in=Class.forName(name).getResourceAsStream("/"+name.replace('.','/')+".class")){System.out.println("CLASS "+name+" "+sha(in.readAllBytes()));}
         if(args[1].equals("current")) {

@@ -221,10 +221,10 @@ pub unsafe extern "C" fn mattmc_section_members_remove(
 /// pointer is retained, and world transfer preserves this view's identity.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_members_attach_geometry(
-    owner: *const c_void, token: u64, body: *const super::super::entity_geometry::Body,
+    owner: *const c_void, token: u64, body: *const super::super::entity_geometry::Body, non_spectator: i32,
 ) -> i32 {
     let (Some(c), Some(body)) = (owner.cast::<Context>().as_ref(), body.as_ref()) else { return -1; };
-    c.bindings.attach_geometry(token, body.retained_view());
+    c.bindings.attach_geometry(token, body.retained_view(), non_spectator != 0);
     0
 }
 
@@ -249,7 +249,45 @@ pub unsafe extern "C" fn mattmc_section_members_intersections(
 
 /// None yields for Java status/custom-section behavior; zero skips this section.
 /// A positive result is the first selected member batch and its iterator version.
+pub(super) enum CollectionStep {
+    Done,
+    Full(i32),
+    Callback { cursor: i32, expected: i32 },
+    Custom,
+}
 impl Context {
+    /// Append pure stock matches without invoking Java or opening future sections.
+    /// Stop at the first bounds/spectator callback, leaving its iterator position intact.
+    pub(super) fn collect_non_spectators(&self, bounds: [f64; 6], section: u64,
+        mut cursor: i32, out: &mut [u64], count: &mut usize) -> CollectionStep {
+        let groups = self.groups.lock().unwrap();
+        let members = &groups[0];
+        if members.size() == 0 { return CollectionStep::Done; }
+        match self.visibility.load(Ordering::Acquire) {
+            0 => return CollectionStep::Done,
+            1 | 2 => {},
+            _ => return CollectionStep::Custom,
+        }
+        let geometry = self.bindings.geometry();
+        while cursor != members.size() {
+            let Some(token) = members.get(cursor as usize).filter(|_| cursor >= 0 && cursor < members.size()) else {
+                return CollectionStep::Callback { cursor, expected: members.modifications() };
+            };
+            match geometry.intersects(token, bounds) {
+                Some(false) => {},
+                Some(true) if geometry.non_spectator(token) => {
+                    out[2 * *count] = section;
+                    out[2 * *count + 1] = token;
+                    *count += 1;
+                },
+                _ => return CollectionStep::Callback { cursor, expected: members.modifications() },
+            }
+            cursor += 1;
+            if 2 * *count == out.len() { return CollectionStep::Full(cursor); }
+        }
+        CollectionStep::Done
+    }
+
     pub(super) fn query(&self, bounds: Option<[f64; 6]>, type_identity: u64, out: &mut [u64]) -> Option<(i32, i32)> {
         let groups = self.groups.lock().unwrap();
         let m = &groups[0];
@@ -320,7 +358,7 @@ mod spatial_tests {
             let weak=Arc::downgrade(&(*body).retained_view());
             let owner=mattmc_section_members_create();
             let token=mattmc_section_members_allocate(owner);
-            assert_eq!(mattmc_section_members_attach_geometry(owner,token,body),0);
+            assert_eq!(mattmc_section_members_attach_geometry(owner,token,body,0),0);
             assert_eq!(mattmc_section_members_add(owner,0,token,std::ptr::null_mut()),0);
             mattmc_section_members_finish_binding(owner,token);
             assert_eq!(query(owner,0,1),1i64<<32);

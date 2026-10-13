@@ -1,5 +1,7 @@
 //! Primary section identity/storage and bounded live spatial cursors.
 //! No native lock spans a Java visibility, section or consumer callback.
+#[path = "collection.rs"]
+mod collection;
 use super::{
     bindings::Bindings,
     ffi::Context,
@@ -66,6 +68,7 @@ struct Lease {
     id: usize,
     view: CursorView,
     bounds: Option<[f64; 6]>,
+    collection_cursor: Option<i32>,
 }
 fn encode(x: i32, y: i32, z: i32) -> i64 {
     (((x as u64) & 0x3fffff) << 42 | ((z as u64) & 0x3fffff) << 20 | ((y as u64) & 0xfffff)) as i64
@@ -287,6 +290,7 @@ unsafe fn lease(owner: *const Index, d: &mut Data, cursor: Cursor, active: bool)
             ..Default::default()
         },
         bounds: None,
+        collection_cursor: None,
     }))
     .cast()
 }
@@ -379,6 +383,7 @@ pub unsafe extern "C" fn mattmc_section_index_spatial_reopen(cursor: *mut c_void
         ..Default::default()
     };
     l.bounds = Some(*bounds.cast::<[f64; 6]>());
+    l.collection_cursor = None;
     0
 }
 #[no_mangle]
@@ -514,6 +519,7 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_close(cursor: *mut c_void) 
         d.cursors[l.id] = None;
         d.sweep();
         l.view.active = 0;
+        l.collection_cursor = None;
     }
 }
 #[no_mangle]
@@ -649,7 +655,7 @@ mod tests {
             let body = mattmc_entity_geometry_create(world, 0., 0., 0., 0., 8., 0., 1., 9., 1.);
             let members = mattmc_section_members_create();
             let member = mattmc_section_members_allocate(members);
-            mattmc_section_members_attach_geometry(members, member, body);
+            mattmc_section_members_attach_geometry(members, member, body, 0);
             assert_eq!(mattmc_section_members_add(members, 0, member, std::ptr::null_mut()), 0);
             mattmc_section_members_finish_binding(members, member);
             mattmc_section_members_visibility(members, 1);

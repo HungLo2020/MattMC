@@ -108,6 +108,14 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
         return this.allInstances.forEachIntersecting(query,bounds,consumer,batch,batch.count,batch.expected);
     }
 
+    /** Identity projection only; the collector cannot run user code while projecting a batch. */
+    public T collectionBinding(long token) { return this.nativeStorage.collectionBinding(token); }
+
+    /** Resume the original iterator at the first callback not handled by native collection. */
+    public void continueCollection(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> consumer,QueryBatch batch,int cursor,int expected) {
+        this.allInstances.forEachIntersecting(query,bounds,consumer,batch,0,expected,cursor);
+    }
+
     public int sectionVisibility() { return this.nativeStorage.sectionVisibility(); }
     public int updateSectionVisibility(int value) { return this.nativeStorage.updateSectionVisibility(value); }
     public void attachSectionIndex(java.lang.foreign.MemorySegment index,long token) { this.nativeStorage.attachSectionIndex(index,token); }

@@ -10,6 +10,8 @@
   member arrays, callback lifetime and Current/Frozen verification.
 - [Rust section-coordinate index](RUST-ENTITY-SECTION-INDEX.md): native primary
   coordinate storage, live spatial cursors and mutation compatibility.
+- [Native entity collection](RUST-ENTITY-COLLECTION.md): bounded cross-section
+  collection, callback boundaries and scoped verification.
 - [Rust entity residency](RUST-ENTITY-RESIDENCY.md): client/server primary
   residency state, persistence admission and callback compatibility.
 - [Component model](../../game-model/COMPONENTS-AND-ENTITIES.md): the broader
