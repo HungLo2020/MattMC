@@ -29,6 +29,26 @@ final class NativeTerrainLighting {
     }
 
     static void writeContext(long address, BlockAndTintGetter level, BlockState state, BlockPos pos) {
+        long facts = state.staticTerrainLightFacts();
+        if (facts >= 0) {
+            // Position-free state: the same predicate answers Frozen's per-block calls give.
+            // A deterministic second emissive call repeats the first, so it is never set.
+            float shade = 1.0F;
+            if (state.getLightEmission() == 0) {
+                float raw = Float.intBitsToFloat((int) (facts >>> 32));
+                // BlockStateBase.getShadeBrightness, with the live Iris AO level.
+                float ao = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getAmbientOcclusionLevel();
+                shade = 1.0F - ao * (1.0F - raw);
+            }
+            org.lwjgl.system.MemoryUtil.memPutInt(address, (int) facts & 7);
+            org.lwjgl.system.MemoryUtil.memPutFloat(address + 4, shade);
+            return;
+        }
+        writeCallbackContext(address, level, state, pos);
+    }
+
+    /** The original ordered callbacks, for states whose predicates may read the level or position. */
+    static void writeCallbackContext(long address, BlockAndTintGetter level, BlockState state, BlockPos pos) {
         boolean emissive = state.emissiveRendering(level, pos);
         boolean viewBlocking = state.isViewBlocking(level, pos);
         boolean fullOpaque = state.isSolidRender();

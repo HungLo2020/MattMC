@@ -625,6 +625,63 @@ public abstract class BlockBehaviour implements FeatureElement {
 			return this.emissiveRendering.test(this.asState(), blockGetter, blockPos);
 		}
 
+		/** Not yet computed; see {@link #staticTerrainLightFacts()}. */
+		private static final long TERRAIN_LIGHT_UNKNOWN = Long.MIN_VALUE;
+		private volatile long staticTerrainLight = TERRAIN_LIGHT_UNKNOWN;
+		/** Block classes whose {@code getShadeBrightness} override reads only the state. */
+		private static final java.util.Set<String> STATE_ONLY_SHADE = java.util.Set.of(
+			"net.minecraft.world.level.block.state.BlockBehaviour",
+			"net.minecraft.world.level.block.TransparentBlock",
+			"net.minecraft.world.level.block.BarrierBlock",
+			"net.minecraft.world.level.block.LightBlock",
+			"net.minecraft.world.level.block.StructureVoidBlock",
+			"net.minecraft.world.level.block.SoulSandBlock",
+			"net.minecraft.world.level.block.MudBlock",
+			"net.minecraft.world.level.block.SnowLayerBlock",
+			"net.alexscaves.server.block.AmbersolLightBlock");
+
+		/**
+		 * The terrain mesher's light context for this state when it cannot depend
+		 * on the level or position, or -1 when it may: bits 1 emissive, 2 view
+		 * blocking, 4 full collision cube; the block's raw (pre-AO) shade
+		 * brightness as float bits in the high 32 bits.
+		 *
+		 * <p>Static means: an exact {@link BlockState}, a collision cache (no
+		 * dynamic shape), {@link StateOnlyPredicate} emissive and view-blocking
+		 * predicates, and a {@code getShadeBrightness} declared by a class known
+		 * to read only the state. Such predicates give the same answer for every
+		 * call, so evaluating them once is identical to Frozen's per-block calls.
+		 */
+		public long staticTerrainLightFacts() {
+			long facts = this.staticTerrainLight;
+			if (facts == TERRAIN_LIGHT_UNKNOWN) this.staticTerrainLight = facts = this.computeStaticTerrainLightFacts();
+			return facts;
+		}
+
+		private long computeStaticTerrainLightFacts() {
+			if (this.getClass() != BlockState.class || this.cache == null
+				|| !(this.emissiveRendering instanceof StateOnlyPredicate)
+				|| !(this.isViewBlocking instanceof StateOnlyPredicate)
+				|| !STATE_ONLY_SHADE.contains(shadeDeclaringClass(this.getBlock().getClass()))) return -1L;
+			BlockState state = this.asState();
+			BlockGetter empty = net.minecraft.world.level.EmptyBlockGetter.INSTANCE;
+			int flags = (this.emissiveRendering.test(state, empty, BlockPos.ZERO) ? 1 : 0)
+				| (this.isViewBlocking.test(state, empty, BlockPos.ZERO) ? 2 : 0)
+				| (this.isCollisionShapeFullBlock(empty, BlockPos.ZERO) ? 4 : 0);
+			float shade = this.getBlock().getShadeBrightness(state, empty, BlockPos.ZERO);
+			return ((long) Float.floatToRawIntBits(shade) << 32) | flags;
+		}
+
+		private static String shadeDeclaringClass(Class<?> type) {
+			for (Class<?> c = type; c != null; c = c.getSuperclass()) {
+				try {
+					c.getDeclaredMethod("getShadeBrightness", BlockState.class, BlockGetter.class, BlockPos.class);
+					return c.getName();
+				} catch (NoSuchMethodException ignored) {}
+			}
+			return "";
+		}
+
 		public float getShadeBrightness(BlockGetter blockGetter, BlockPos blockPos) {
 			float originalValue = this.getBlock().getShadeBrightness(this.asState(), blockGetter, blockPos);
 			// Iris: Apply ambientOcclusionLevel support
@@ -1054,11 +1111,11 @@ public abstract class BlockBehaviour implements FeatureElement {
 			)
 			&& blockState.getLightEmission() < 14;
 		BlockBehaviour.StatePredicate isRedstoneConductor = (blockState, blockGetter, blockPos) -> blockState.isCollisionShapeFullBlock(blockGetter, blockPos);
-		BlockBehaviour.StatePredicate isSuffocating = (blockState, blockGetter, blockPos) -> blockState.blocksMotion()
+		BlockBehaviour.StatePredicate isSuffocating = (BlockBehaviour.StateOnlyPredicate) (blockState, blockGetter, blockPos) -> blockState.blocksMotion()
 			&& blockState.isCollisionShapeFullBlock(blockGetter, blockPos);
 		BlockBehaviour.StatePredicate isViewBlocking = this.isSuffocating;
 		BlockBehaviour.StatePredicate hasPostProcess = (blockState, blockGetter, blockPos) -> false;
-		BlockBehaviour.StatePredicate emissiveRendering = (blockState, blockGetter, blockPos) -> false;
+		BlockBehaviour.StatePredicate emissiveRendering = (BlockBehaviour.StateOnlyPredicate) (blockState, blockGetter, blockPos) -> false;
 		boolean dynamicShape;
 		FeatureFlagSet requiredFeatures = FeatureFlags.VANILLA_SET;
 		@Nullable
@@ -1352,4 +1409,13 @@ public abstract class BlockBehaviour implements FeatureElement {
 	public interface StatePredicate {
 		boolean test(BlockState blockState, BlockGetter blockGetter, BlockPos blockPos);
 	}
+
+	/**
+	 * A predicate whose result depends only on the state: it reads nothing from
+	 * the level or position except position-free state facts (the collision
+	 * cache of a state without a dynamic shape). The terrain mesher evaluates
+	 * such predicates once per state instead of once per block
+	 * ({@link BlockStateBase#staticTerrainLightFacts()}).
+	 */
+	public interface StateOnlyPredicate extends StatePredicate {}
 }

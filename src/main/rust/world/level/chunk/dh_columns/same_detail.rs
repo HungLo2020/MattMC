@@ -38,6 +38,9 @@ pub(crate) struct Merge<'a> {
     committed: bool,
     target_source: Option<(*const super::source::Source, u64)>,
     source_proof: Option<(*const super::source::Source, u64, [u64; 2])>,
+    /// Set instead of `source_proof` for a merge read straight from producer
+    /// columns: the recipient's mapping stamp, with no source copy proofs.
+    producer_mapping: Option<[u64; 2]>,
     reused: [u64; WIDTH / 64],
     writes: Vec<u32>,
     identity_remap: bool,
@@ -70,7 +73,7 @@ fn build_columns<'a,'b>(inputs: impl ExactSizeIterator<Item=Option<(ColumnInput<
         counts: vec![0;WIDTH].into_boxed_slice(),
         descriptors: None,
         actions: Vec::new(), _footprints: Vec::new(), changed: false, committed: false, target_source: None,
-        source_proof: None, reused: [0; WIDTH / 64], writes: Vec::new(),
+        source_proof: None, producer_mapping: None, reused: [0; WIDTH / 64], writes: Vec::new(),
         identity_remap: remap.iter().enumerate().all(|(i,&id)| id as i64 == i as i64) };
     for (index, input) in inputs.enumerate() {
         let (input, hash_hint, reused)=input?;
@@ -240,6 +243,46 @@ unsafe fn sources_data(
     build_columns(inputs, ids, retained as usize,|i|footprint_inputs.as_ref().and_then(|columns|columns[i])).map_or(ptr::null_mut(), |mut m| {
         m.target_source = Some((target_pointer, target.version()));
         m.source_proof = Some((source_pointer, source.version(), mapping)); Box::into_raw(Box::new(m))
+    })
+}
+/// `mattmc_dh_same_detail_owned` with a generated chunk's columns as the
+/// source, without a producer data source. The producer occupies its chunk's
+/// 16x16 region of the 64x64 section (`createNative`'s layout) with generation
+/// LIGHT (9), its compression and the block-detail uniform flag; every other
+/// column has no source, which the owned merge never admits. No footprints
+/// apply at block detail (`previous` must be all zero, `retained` 0). The
+/// producer must stay alive until the merge is released.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_same_detail_columns(
+    target: *const super::source::Source, producer: *const super::Columns,
+    remap: *const i32, count: i32,
+) -> *mut Merge<'static> {
+    if target.is_null() || producer.is_null() || producer as usize % align_of::<super::Columns>() != 0 || count < 0
+        || count != 0 && (remap.is_null() || remap as usize % 4 != 0) { return ptr::null_mut(); }
+    let target_pointer = target;
+    // Caller exclusion also covers the bounded structural proof caches.
+    let target = &mut *(target as *mut super::source::Source);
+    let producer = &*producer;
+    if !target.metadata.canonical() { return ptr::null_mut(); }
+    let ids = if count == 0 { &[] } else { slice::from_raw_parts(remap, count as usize) };
+    let mapping = target.mapping(ids);
+    let old_generation = target.metadata.plane(0);
+    let (ox, oz) = ((producer.chunk_x & 3) as usize * 16, (producer.chunk_z & 3) as usize * 16);
+    const LIGHT: i8 = 9;
+    let inputs = (0..WIDTH).map(|i| {
+        let (x, z) = (i / 64, i % 64);
+        let occupied = (ox..ox + 16).contains(&x) && (oz..oz + 16).contains(&z);
+        let new = if occupied { Some(producer.column(x - ox, z - oz)) } else { None };
+        let old = target.column(i)?;
+        if new.is_some_and(|n| n.len() > 4096) || old.len() > 4096 { return None; }
+        Some((ColumnInput { source: new, target: target.present(i).then_some(old),
+            generation: [old_generation[i], if occupied { LIGHT } else { 0 }],
+            compression: if occupied { producer.compression as i8 } else { 0 },
+            uniform: occupied, previous_footprint: false }, None, false))
+    });
+    build_columns(inputs, ids, 0, |_| None).map_or(ptr::null_mut(), |mut m| {
+        m.target_source = Some((target_pointer, target.version()));
+        m.producer_mapping = Some(mapping); Box::into_raw(Box::new(m))
     })
 }
 #[no_mangle]
@@ -513,8 +556,15 @@ unsafe fn commit_source(owner: *mut Merge<'_>, target: *const super::source::Sou
     let Some(target_ref) = target.as_ref() else { return 0; };
     if output.is_null() || output as usize % align_of::<usize>() != 0 || detached.is_null()
         || merge.committed || merge.target_source != Some((target, target_ref.version())) { return 0; }
-    let Some((source, source_version, mapping)) = merge.source_proof else { return 0; };
-    if (*source).version() != source_version || target_ref.mapping_stamp() != mapping { return 0; }
+    // A producer-column merge has no source table to prove copies against.
+    let proof = if let Some(mapping) = merge.producer_mapping {
+        if target_ref.mapping_stamp() != mapping { return 0; }
+        None
+    } else {
+        let Some((source, source_version, mapping)) = merge.source_proof else { return 0; };
+        if (*source).version() != source_version || target_ref.mapping_stamp() != mapping { return 0; }
+        Some((source, mapping))
+    };
     let mut targets = [0usize; WIDTH];
     let detached = slice::from_raw_parts_mut(detached, WIDTH); detached.fill(0);
     let indices=if sparse {merge.writes.as_slice()} else {&ALL_COLUMNS};
@@ -538,7 +588,7 @@ unsafe fn commit_source(owner: *mut Merge<'_>, target: *const super::source::Sou
     }
     let result = commit_checked(owner, targets.as_ptr(), output, true, sparse,
         &mut |points, count| points.try_reserve(count.saturating_sub(points.len())).is_ok());
-    if result == 1 {
+    if let (1, Some((source, mapping))) = (result, proof) {
         let merge = &mut *owner;
         for &index in &merge.writes {let i=index as usize;
             let input = (*source).owner(i);

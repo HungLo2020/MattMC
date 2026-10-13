@@ -16,6 +16,34 @@ class NativeLightMapTest {
         pool.add(layer); return pool.size();
     }
 
+    /**
+     * Map owners and views go to the batched reclaimer: thousands of dropped
+     * copies are collected while a retained old copy keeps its own layers,
+     * tops and sky-height metadata.
+     */
+    @Test void droppedCopiesAreReclaimedAndRetainedCopiesStayIntact() throws Exception {
+        var map = new SkyLightSectionStorage.SkyDataLayerStorageMap();
+        var first = new DataLayer(3); var second = new DataLayer(5);
+        map.setLayer(1L, first); map.putTop(1L, 40); map.lowestY(-4);
+        var kept = map.copy();
+        map.setLayer(1L, second); map.putTop(1L, 50); map.lowestY(-2);
+        for (int round = 0; round < 3; round++) {
+            for (int i = 0; i < 3000; i++) {
+                var dropped = map.copy();
+                dropped.setLayer(i, first);
+                dropped.removeLayer(1L);
+            }
+            System.gc();
+            Thread.sleep(50);
+            assertSame(first, kept.getLayer(1L), "retained copy after GC " + round);
+            assertEquals(40, kept.top(1L));
+            assertSame(second, map.getLayer(1L));
+            assertEquals(50, map.top(1L));
+            assertEquals(-4, kept.lowestY());
+            assertEquals(-2, map.lowestY());
+        }
+    }
+
     @Test void actualFrozenOperationsCrossCanonicalProducerAndNativeOwners() throws Exception {
         var maps = new ArrayList<DataLayerStorageMap<?>>();
         var pool = new ArrayList<DataLayer>();

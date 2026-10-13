@@ -132,9 +132,18 @@ final class NativeLightingMap {
         this.bindings=bindings;this.pins=pins;
         try {
             MemorySegment created=source==null?(MemorySegment)bindings.create.invokeExact(pins.owner):(MemorySegment)bindings.copy.invokeExact(source);
-            owner=adopt(created,1,bindings.release);
-            CpuView projection=new CpuView((MemorySegment)bindings.view.invokeExact(owner),2L*Integer.BYTES,bindings.viewRelease);
-            view=projection.handle;metadata=projection.metadata;
+            if(created.address()==0)throw new IllegalStateException("Missing native light-map owner");
+            MemorySegment projection;
+            try {
+                projection=(MemorySegment)bindings.view.invokeExact(created);
+                if(projection.address()==0)throw new IllegalStateException("Missing native light-map view");
+            } catch(Throwable error){release(bindings.release,created);throw error;}
+            // Every call fences this map, so it is the batched reclaimer's referent
+            // for both; the segments themselves keep nothing alive.
+            owner=created.reinterpret(1).asReadOnly();
+            view=projection.reinterpret(Long.BYTES).asReadOnly();
+            metadata=view.get(ValueLayout.ADDRESS,0).reinterpret(2L*Integer.BYTES).asReadOnly();
+            net.minecraft.world.level.chunk.NativeReclaimer.registerLightMap(this,created,projection);
         } catch(Throwable error){throw failure(error);}
         finally {Reference.reachabilityFence(pins);Reference.reachabilityFence(source);}
     }
@@ -232,7 +241,7 @@ final class NativeLightingMap {
         for (long key : keysForVerification(true)) result.put(key, top(key));
         return result;
     }
-    int lowestY() {return(int)INT.getAcquire(metadata,0L);}
+    int lowestY() {try{return(int)INT.getAcquire(metadata,0L);}finally{Reference.reachabilityFence(this);}}
     void lowestY(int value,boolean defaultOnly) {
         try {if((int)bindings.minY.invokeExact(owner,value,defaultOnly?1:0)!=0)throw new IllegalStateException("Rejected sky-height metadata");}
         catch(Throwable error){throw failure(error);}

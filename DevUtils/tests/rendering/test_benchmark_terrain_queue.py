@@ -17,14 +17,23 @@ class BenchmarkTerrainQueueOptionsTest(unittest.TestCase):
     def test_moving_rows_start_drained_and_count_later_streaming(self):
         self.assertEqual(harness.benchmark_terrain_queue_options('rust-vulkan', 'moving-camera', []),
                          [f'{PREFIX}requireTerrainQueueDrain=true',
-                          f'{PREFIX}terrainQueueDrainDuringMeasurement=false'])
+                          f'{PREFIX}terrainQueueDrainDuringMeasurement=false',
+                          f'{PREFIX}dhPublicationDuringMeasurement=false'])
 
     def test_explicit_jvm_arguments_win(self):
         self.assertEqual(harness.benchmark_terrain_queue_options(
-            'rust-vulkan', 'moving-camera', [f'{PREFIX}requireTerrainQueueDrain=false']), [])
+            'rust-vulkan', 'moving-camera', [f'{PREFIX}requireTerrainQueueDrain=false']),
+            [f'{PREFIX}dhPublicationDuringMeasurement=false'])
         self.assertEqual(harness.benchmark_terrain_queue_options(
             'rust-vulkan', 'moving-camera', [f'{PREFIX}terrainQueueDrainDuringMeasurement=true']),
-            [f'{PREFIX}requireTerrainQueueDrain=true'])
+            [f'{PREFIX}requireTerrainQueueDrain=true', f'{PREFIX}dhPublicationDuringMeasurement=false'])
+        self.assertEqual(harness.benchmark_terrain_queue_options(
+            'rust-vulkan', 'moving-camera', [f'{PREFIX}dhPublicationDuringMeasurement=true']),
+            [f'{PREFIX}requireTerrainQueueDrain=true', f'{PREFIX}terrainQueueDrainDuringMeasurement=false'])
+
+    def test_static_rows_keep_dh_publication_strict(self):
+        options = harness.benchmark_terrain_queue_options('rust-vulkan', 'settled-static', [])
+        self.assertFalse(any('dhPublicationDuringMeasurement' in option for option in options))
 
     def test_frozen_and_other_profiles_get_no_current_gate(self):
         self.assertEqual(harness.benchmark_terrain_queue_options('opengl', 'moving-camera', []), [])

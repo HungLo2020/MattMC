@@ -471,6 +471,16 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		}
 		
 		@Override
+		public java.util.function.Predicate<net.minecraft.world.level.chunk.NativeDhColumns> getNativeColumnsConsumer()
+		{
+			return (columns) ->
+			{
+				GeneratedFullDataSourceProvider.this.delayedFullDataSourceSaveCache.writeNativeColumnsToMemoryAndQueueSave(columns);
+				return true;
+			};
+		}
+		
+		@Override
 		public CompletableFuture<Boolean> shouldGenerateSplitChild(long pos)
 		{
 			return GeneratedFullDataSourceProvider.this.getAsync(pos).thenApply(fullDataSource ->

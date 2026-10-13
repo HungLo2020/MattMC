@@ -55,6 +55,32 @@ class NativeTerrainLightingTest {
         }
     }
 
+    @Test void staticStateFactsWriteTheSameContextAsTheOrderedCallbacks() throws Exception {
+        World world = new World();
+        var settings = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE;
+        float previousAo = settings.getAmbientOcclusionLevel();
+        var aoField = settings.getClass().getDeclaredField("ambientOcclusionLevel");
+        aoField.setAccessible(true);
+        try (Arena arena = Arena.ofConfined()) {
+            var facts = arena.allocate(8, 8);
+            var callbacks = arena.allocate(8, 8);
+            int statics = 0;
+            for (float ao : new float[] {0f, .5f, 1f}) {
+                aoField.setFloat(settings, ao);
+                for (int id = 0; id < Block.BLOCK_STATE_REGISTRY.size(); id++) {
+                    world.state = Block.BLOCK_STATE_REGISTRY.byId(id);
+                    if (world.state.staticTerrainLightFacts() < 0) continue;
+                    if (ao == 0f) statics++;
+                    NativeTerrainLighting.writeContext(facts.address(), world, world.state, net.minecraft.core.BlockPos.ZERO);
+                    NativeTerrainLighting.writeCallbackContext(callbacks.address(), world, world.state, net.minecraft.core.BlockPos.ZERO);
+                    assertEquals(callbacks.get(ValueLayout.JAVA_LONG, 0), facts.get(ValueLayout.JAVA_LONG, 0),
+                        "state " + id + " (" + world.state + ") ao " + ao);
+                }
+            }
+            assertTrue(statics > Block.BLOCK_STATE_REGISTRY.size() / 2, "most states are position-free: " + statics);
+        } finally { aoField.setFloat(settings, previousAo); }
+    }
+
     @Test void productionBoundaryMatchesAll254472FrozenWords() throws Exception {
         Fixture fixture = Fixture.read();
         int cells = NativeTerrainLighting.CELLS;

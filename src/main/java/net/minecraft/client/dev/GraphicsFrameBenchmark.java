@@ -103,6 +103,20 @@ public final class GraphicsFrameBenchmark {
 		Boolean.parseBoolean(System.getProperty(
 			"mattmc.dev.graphicsFrameBenchmark.terrainQueueDrainDuringMeasurement", "true"));
 	private static long measurementFramesWithTerrainStreaming;
+	/**
+	 * DH publishes at most a bounded number of new LOD columns per frame, so a
+	 * moving camera keeps finding never-published columns; they appear a frame
+	 * or more later, as in stock DH, and published columns keep drawing. Frozen
+	 * has no such check and lets DH stream inside its window. The harness sets
+	 * this to false for moving-camera rows: full publication is still required
+	 * to start measuring, and later pending frames are counted in
+	 * {@code measurementFramesWithDhPublicationPending} instead of restarting.
+	 * DH execution and the visible-column minimum stay enforced throughout.
+	 */
+	private static final boolean DH_PUBLICATION_DURING_MEASUREMENT =
+		Boolean.parseBoolean(System.getProperty(
+			"mattmc.dev.graphicsFrameBenchmark.dhPublicationDuringMeasurement", "true"));
+	private static long measurementFramesWithDhPublicationPending;
 	private static final int TERRAIN_QUEUE_DRAIN_STABLE_FRAMES = Math.max(1,
 		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.terrainQueueDrainStableFrames", 8));
 	private static final long POSITIVE_CONTROL_DELAY_NANOS = Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos", 0L));
@@ -504,6 +518,7 @@ public final class GraphicsFrameBenchmark {
 		// only one contiguous workload generation for timing and allocation data.
 		measurementRestartsAfterReadinessLoss++;
 		measurementFramesWithTerrainStreaming = 0L;
+		measurementFramesWithDhPublicationPending = 0L;
 		producerWorkloadStartNanos = -1L;
 		lastMeasurementRestartCause = lastProducerWorkloadBlocker
 			+ "; changingCounters=" + staticTerrainLastChangingCounters
@@ -561,6 +576,9 @@ public final class GraphicsFrameBenchmark {
 				measurementFrame = false;
 				PHASE_STACK.clear();
 				return;
+			}
+			if (REQUIRE_DH_EXECUTION && !DH_PUBLICATION_DURING_MEASUREMENT && dhPublicationPending()) {
+				measurementFramesWithDhPublicationPending++;
 			}
 			if (REQUIRE_TERRAIN_QUEUE_DRAIN && !TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT
 				&& !RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
@@ -1108,8 +1126,8 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static boolean producerWorkloadReady(Minecraft minecraft) {
-		List<String> missing = missingProducerWorkloads();
 		boolean measuring = !FRAME_NANOS.isEmpty();
+		List<String> missing = missingProducerWorkloads(measuring);
 		if (REQUIRE_TERRAIN_QUEUE_DRAIN && !(measuring && !TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT)) {
 			if (RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
 				terrainQueueDrainStableFrames++;
@@ -1174,7 +1192,14 @@ public final class GraphicsFrameBenchmark {
 		return false;
 	}
 
-	private static List<String> missingProducerWorkloads() {
+	/** New DH LOD columns are visible but not yet published (they draw a frame or more later). */
+	private static boolean dhPublicationPending() {
+		DistantHorizonsSemanticCollector.RouteDiagnostics route =
+			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		return route.semanticUnpublishedCandidates() != 0 || route.unpublishedVisibleColumns() != 0;
+	}
+
+	private static List<String> missingProducerWorkloads(boolean measuring) {
 		List<String> missing = new ArrayList<>();
 		if (REQUIRE_DH_EXECUTION && !submittedWorkObserved("distant-horizons")) {
 			missing.add("distant-horizons");
@@ -1191,8 +1216,9 @@ public final class GraphicsFrameBenchmark {
 				missing.add("distant-horizons-visible-columns=" + route.visibleColumns()
 					+ "/" + MIN_DH_VISIBLE_COLUMNS);
 			}
-			if (route.semanticUnpublishedCandidates() != 0
-				|| route.unpublishedVisibleColumns() != 0) {
+			if ((route.semanticUnpublishedCandidates() != 0
+				|| route.unpublishedVisibleColumns() != 0)
+				&& !(measuring && !DH_PUBLICATION_DURING_MEASUREMENT)) {
 				missing.add("distant-horizons-publication");
 			}
 		}
@@ -2040,6 +2066,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"terrainQueueDrainStableFramesRequired\": ").append(TERRAIN_QUEUE_DRAIN_STABLE_FRAMES).append(",\n");
 		json.append("  \"terrainQueueDrainDuringMeasurement\": ").append(TERRAIN_QUEUE_DRAIN_DURING_MEASUREMENT).append(",\n");
 		json.append("  \"measurementFramesWithTerrainStreaming\": ").append(measurementFramesWithTerrainStreaming).append(",\n");
+		json.append("  \"dhPublicationDuringMeasurement\": ").append(DH_PUBLICATION_DURING_MEASUREMENT).append(",\n");
+		json.append("  \"measurementFramesWithDhPublicationPending\": ").append(measurementFramesWithDhPublicationPending).append(",\n");
 		json.append("  \"terrainQueueDrainStableFrames\": ").append(terrainQueueDrainStableFrames).append(",\n");
 		json.append("  \"dhQuiescenceRequired\": ").append(REQUIRE_DH_QUIESCENCE).append(",\n");
 		json.append("  \"dhQuiescenceStableFramesRequired\": ").append(DH_QUIESCENCE_STABLE_FRAMES).append(",\n");

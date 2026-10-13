@@ -21,8 +21,13 @@ final class NativeSectionCounters {
         try {
             var pointer = (MemorySegment)CREATE.invokeExact(packed);
             if (pointer.address() == 0) throw new IllegalStateException("Missing section counters");
-            // Callers pin the counters by holding this segment, so it is the reclaimer's referent.
-            try { owner = pointer.reinterpret(8).asReadOnly(); NativeReclaimer.register(owner, pointer, NativeReclaimer.SECTION_COUNTERS); }
+            // Callers pin the counters by holding this segment, so it is the reclaimer's referent;
+            // inside a release scope it is bound to the scope's arena instead.
+            var release = NativeReleaseScope.current();
+            try {
+                if (release != null) owner = pointer.reinterpret(8, release, NativeSectionCounters::release).asReadOnly();
+                else { owner = pointer.reinterpret(8).asReadOnly(); NativeReclaimer.register(owner, pointer, NativeReclaimer.SECTION_COUNTERS); }
+            }
             catch (Throwable failure) { release(pointer); throw failure; }
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot create section counters", failure); }

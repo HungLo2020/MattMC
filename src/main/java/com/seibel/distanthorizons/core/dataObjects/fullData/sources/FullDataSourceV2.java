@@ -517,6 +517,12 @@ public class FullDataSourceV2
 		
 		
 		
+		return this.finishUpdate(dataChanged, preparedHash);
+	}
+	
+	/** After any merge: cull hidden points and refresh the hash when points changed. */
+	private boolean finishUpdate(boolean dataChanged, long preparedHash)
+	{
 		if (dataChanged)
 		{
 			EDhApiWorldCompressionMode worldCompressionMode = Config.Common.LodBuilding.worldCompression.get();
@@ -552,6 +558,40 @@ public class FullDataSourceV2
 		}
 		
 		return dataChanged;
+	}
+	
+	/**
+	 * {@link #updateFromDataSource} for a generated chunk's native columns, without a
+	 * producer data source (no producer table, mapping or ID map). It follows the
+	 * same-detail owned route exactly: remap, merge, the input's parent/children
+	 * flags (a producer's {@code applyToParent} is true and {@code applyToChildren}
+	 * null), then culling and hashing. Returns false, with only the idempotent
+	 * mapping merge done, when that route does not apply; the caller then merges
+	 * {@link #createNative} through {@link #updateFromDataSource}.
+	 */
+	public boolean updateFromNativeColumns(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		if (RUN_DATA_ORDER_VALIDATION || this.getClass() != FullDataSourceV2.class || this.pos != columns.position()
+			|| DhSectionPos.getDetailLevel(this.pos) != DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL
+			|| !this.semanticHorizontalContributors.isEmpty() || !this.nativeSource.isLive())
+		{
+			return false;
+		}
+		// An empty producer mapping changes nothing, as in updateFromDataSource.
+		if (columns.materialCount() == 0) return true;
+		int[] remappedIds = this.mapping.mergeAndReturnRemappedEntityIds(columns);
+		var update = net.minecraft.world.level.chunk.NativeDhSameDetailMerge.updateOwnedFromColumns(
+			this.nativeSource, columns, this.dataPoints, remappedIds, this.pos);
+		if (update == null) return false;
+		if (update.metadataUpdated()) this.isEmpty = false;
+		this.applyToParent = DhSectionPos.getDetailLevel(this.pos) < FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL;
+		if (this.applyToChildren != null)
+		{
+			this.applyToChildren = this.applyToChildren
+				&& (DhSectionPos.getDetailLevel(this.pos) > FullDataSourceProviderV2.LEAF_SECTION_DETAIL_LEVEL);
+		}
+		this.finishUpdate(update.changed(), update.hash());
+		return true;
 	}
 	
 	private boolean updateFromSameDetailLevel(FullDataSourceV2 inputDataSource, int[] remappedIds)

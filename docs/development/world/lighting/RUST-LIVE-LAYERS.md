@@ -53,7 +53,8 @@ before result installation, as described in [propagation](RUST-LIGHT-PROPAGATION
   array; it is an ownership escape, not a temporary read-only export.
   Later writes use that array until a fill or independent copy adopts
   native ownership again. Subclasses retain their original Java callbacks.
-- CPU owner and view leases have separate automatic arenas. A view retains its
+- CPU owner and view leases are separate `NativeReclaimer` registrations
+  (kinds 9 and 10); every read fences its holder. A view retains its
   generation after owner release. Synchronous callbacks pin their source until
   Rust finishes reading; no borrowed Java or owner pointer survives the pass.
 - Preserve original light-storage caller exclusion and map copy-on-write.

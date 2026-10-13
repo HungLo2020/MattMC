@@ -265,6 +265,37 @@ public class FullDataPointIdMap
 		return remappedPairIds;
 	}
 	
+	/**
+	 * {@link #mergeAndReturnRemappedEntityIds} for a generated chunk's materials,
+	 * without building a producer map: each material, in order, is added unless
+	 * an equal entry exists, giving the same IDs, append order and tint bindings
+	 * as the native deduplicating merge.
+	 */
+	public int[] mergeAndReturnRemappedEntityIds(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		int count = columns.materialCount();
+		int[] ids = new int[count];
+		boolean supported = true;
+		for (int i = 0; i < count && supported; i++) supported = net.minecraft.world.level.chunk.NativeDhIdMap.supports(columns.material(i));
+		if (supported && this.getClass() == FullDataPointIdMap.class && this.ensureNative())
+		{
+			this.detachNative();
+			int before = this.blockBiomePairList.size();
+			this.blockBiomePairList.ensureCapacity(Math.addExact(before, count));
+			for (int i = 0; i < count; i++)
+			{
+				BlockBiomeWrapperPair pair = columns.material(i);
+				int id = this.nativeMap.addIfAbsent(pair, this.blockBiomePairList.size());
+				if (id == this.blockBiomePairList.size()) this.blockBiomePairList.add(pair);
+				ids[i] = id;
+			}
+			if (this.blockBiomePairList.size() != before) this.cachedHashCode = 0;
+			return ids;
+		}
+		for (int i = 0; i < count; i++) ids[i] = this.addIfNotPresentAndGetId(columns.material(i));
+		return ids;
+	}
+	
 	private int[] mergeNative(FullDataPointIdMap inputMap, boolean append)
 	{
 		this.detachNative();

@@ -1428,6 +1428,18 @@ window, and restarting on every build left vanilla rows unable to settle.
 `measurementFramesWithTerrainStreaming` in the benchmark JSON counts those frames;
 compare it across runs. Settled-static rows keep restarting on any build.
 
+DH rows follow the same pattern for LOD publication. The renderer publishes at
+most 16 new LOD columns (16 MiB) per update, so a turning camera keeps finding
+never-published columns, which draw a frame or more later while published
+columns keep drawing. Moving-camera rows therefore require full publication
+before measurement starts, and the harness passes
+`-Dmattmc.dev.graphicsFrameBenchmark.dhPublicationDuringMeasurement=false`.
+Later pending frames are counted in `measurementFramesWithDhPublicationPending`
+instead of restarting the window. Before this change, one small-DH row restarted
+15 times and saw 26,529 frames to measure 6,000. DH execution and the minimum
+visible column count are still enforced throughout. Settled-static rows keep
+restarting on a publication change, alongside their DH quiescence gate.
+
 The capture runner's timed diagnostic dump (thread dump, heap and native-memory
 summaries) stops the JVM at a safepoint, so it waits until a frame benchmark
 completes or fails; its class histogram uses `-all` so it never forces a full GC.

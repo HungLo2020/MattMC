@@ -86,7 +86,7 @@ public final class NativeDhLighting {
             long iterations=(long)ITERATIONS.invokeExact(batch);if(iterations<0||iterations>Integer.MAX_VALUE)throw new IllegalStateException("DH work count overflow");
             var outputs=new Field[9];
             // Complete adoption before publishing any wrapper. Untaken owners are
-            // released by the batch; taken owners have independent automatic arenas.
+            // released by the batch; taken owners go to the batched reclaimer.
             for(int slot=0;slot<9;slot++)if(scratch.wrappers[slot]!=null) {
                 var pointer=(MemorySegment)TAKE.invokeExact(batch,slot);if(pointer.address()==0)throw new IllegalStateException("Missing DH light output");
                 outputs[slot]=new Field(pointer,scratch.metadata);
@@ -113,21 +113,22 @@ public final class NativeDhLighting {
         private final int minY;
         private final boolean cachedSources;
         private Field(MemorySegment pointer,MemorySegment metadata) {
-            Arena arena=Arena.ofAuto();boolean attached=false;
+            boolean attached=false;
             try {
                 int result=(int)VIEW.invokeExact(pointer,metadata);if(result!=1)throw new IllegalStateException("Invalid DH light view");
-                owner=pointer.reinterpret(1,arena,NativeDhLighting::releaseField);attached=true;
+                // The owner segment is the batched reclaimer's referent; reads fence this field.
+                owner=pointer.reinterpret(1);NativeReclaimer.register(owner,pointer,NativeReclaimer.DH_LIGHT_FIELD);attached=true;
                 long blockLength=metadata.getAtIndex(ValueLayout.JAVA_LONG,1),skyLength=metadata.getAtIndex(ValueLayout.JAVA_LONG,4);
                 long sectionCount=metadata.getAtIndex(ValueLayout.JAVA_LONG,6),sourceCount=metadata.getAtIndex(ValueLayout.JAVA_LONG,8);
                 if(sectionCount<1||sectionCount>256||blockLength<0||skyLength<0||blockLength>sectionCount*2048||skyLength>sectionCount*2048
                     ||blockLength%2048!=0||skyLength%2048!=0||sourceCount < -1 ||sourceCount>sectionCount*4096)throw new IllegalStateException("DH light view bounds");
                 sections=(int)sectionCount;
-                blockBytes=metadata.getAtIndex(ValueLayout.ADDRESS,0).reinterpret(blockLength,arena,null).asReadOnly();
-                blockSections=metadata.getAtIndex(ValueLayout.ADDRESS,2).reinterpret(sectionCount*4,arena,null).asReadOnly();
-                skyBytes=metadata.getAtIndex(ValueLayout.ADDRESS,3).reinterpret(skyLength,arena,null).asReadOnly();
-                skySections=metadata.getAtIndex(ValueLayout.ADDRESS,5).reinterpret(sectionCount*4,arena,null).asReadOnly();
+                blockBytes=metadata.getAtIndex(ValueLayout.ADDRESS,0).reinterpret(blockLength).asReadOnly();
+                blockSections=metadata.getAtIndex(ValueLayout.ADDRESS,2).reinterpret(sectionCount*4).asReadOnly();
+                skyBytes=metadata.getAtIndex(ValueLayout.ADDRESS,3).reinterpret(skyLength).asReadOnly();
+                skySections=metadata.getAtIndex(ValueLayout.ADDRESS,5).reinterpret(sectionCount*4).asReadOnly();
                 cachedSources = sourceCount >= 0;
-                sources=metadata.getAtIndex(ValueLayout.ADDRESS,7).reinterpret(Math.max(0,sourceCount)*4,arena,null).asReadOnly();
+                sources=metadata.getAtIndex(ValueLayout.ADDRESS,7).reinterpret(Math.max(0,sourceCount)*4).asReadOnly();
                 minY=(int)metadata.getAtIndex(ValueLayout.JAVA_LONG,9);
             } catch(RuntimeException|Error e) {if(!attached)releaseField(pointer);throw e;}
             catch(Throwable e) {if(!attached)releaseField(pointer);throw new IllegalStateException("Cannot adopt DH lights",e);}

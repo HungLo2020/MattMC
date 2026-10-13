@@ -60,9 +60,13 @@ public class Blocks {
 	private static final BlockBehaviour.StatePredicate NOT_CLOSED_SHULKER = (blockStatex, blockGetter, blockPos) -> blockGetter.getBlockEntity(blockPos) instanceof ShulkerBoxBlockEntity shulkerBoxBlockEntity
 		? shulkerBoxBlockEntity.isClosed()
 		: true;
-	private static final BlockBehaviour.StatePredicate NOT_EXTENDED_PISTON = (blockStatex, blockGetter, blockPos) -> !(Boolean)blockStatex.getValue(
+	private static final BlockBehaviour.StateOnlyPredicate NOT_EXTENDED_PISTON = (blockStatex, blockGetter, blockPos) -> !(Boolean)blockStatex.getValue(
 		PistonBaseBlock.EXTENDED
 	);
+	/** {@link #always}/{@link #never} as shared state-only predicates, so the terrain
+	 * mesher can recognize them ({@link BlockBehaviour.StateOnlyPredicate}). */
+	private static final BlockBehaviour.StateOnlyPredicate STATE_ALWAYS = Blocks::always;
+	private static final BlockBehaviour.StateOnlyPredicate STATE_NEVER = Blocks::never;
 	public static final Block AIR = register("air", AirBlock::new, BlockBehaviour.Properties.of().noLootTable());
 	public static final Block STONE = register(
 		"stone", BlockBehaviour.Properties.of()
@@ -329,8 +333,8 @@ public class Blocks {
 		"mangrove_roots",
 		MangroveRootsBlock::new,
 		BlockBehaviour.Properties.of()
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block MUDDY_MANGROVE_ROOTS = register(
 		"muddy_mangrove_roots",
@@ -471,8 +475,8 @@ public class Blocks {
 		properties -> new UntintedParticleLeavesBlock(0.1F, ParticleTypes.CHERRY_LEAVES, properties),
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::ocelotOrParrot)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block DARK_OAK_LEAVES = register(
@@ -483,8 +487,8 @@ public class Blocks {
 		properties -> new UntintedParticleLeavesBlock(0.02F, ParticleTypes.PALE_OAK_LEAVES, properties),
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::ocelotOrParrot)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 			.isRedstoneConductor(Blocks::never)
 	);
 	public static final Block MANGROVE_LEAVES = register(
@@ -512,8 +516,8 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 			.isRedstoneConductor(Blocks::never)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block LAPIS_ORE = register(
 		"lapis_ore",
@@ -695,8 +699,8 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.noLootTable()
 			.isRedstoneConductor(Blocks::never)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block DANDELION = register(
 		"dandelion",
@@ -939,8 +943,8 @@ public class Blocks {
 		"farmland",
 		FarmBlock::new,
 		BlockBehaviour.Properties.of()
-			.isViewBlocking(Blocks::always)
-			.isSuffocating(Blocks::always)
+			.isViewBlocking(STATE_ALWAYS)
+			.isSuffocating(STATE_ALWAYS)
 	);
 	public static final Block FURNACE = register(
 		"furnace",
@@ -1267,7 +1271,7 @@ public class Blocks {
 		"snow",
 		SnowLayerBlock::new,
 		BlockBehaviour.Properties.of()
-			.isViewBlocking((blockStatex, blockGetter, blockPos) -> (Integer)blockStatex.getValue(SnowLayerBlock.LAYERS) >= 8)
+			.isViewBlocking((BlockBehaviour.StateOnlyPredicate) (blockStatex, blockGetter, blockPos) -> (Integer)blockStatex.getValue(SnowLayerBlock.LAYERS) >= 8)
 	);
 	public static final Block ICE = register(
 		"ice",
@@ -1318,8 +1322,8 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::always)
 			.isRedstoneConductor(Blocks::always)
-			.isViewBlocking(Blocks::always)
-			.isSuffocating(Blocks::always)
+			.isViewBlocking(STATE_ALWAYS)
+			.isSuffocating(STATE_ALWAYS)
 	);
 	public static final Block SOUL_SOIL = register(
 		"soul_soil", BlockBehaviour.Properties.of()
@@ -2817,7 +2821,7 @@ public class Blocks {
 	public static final Block DIRT_PATH = register(
 		"dirt_path",
 		DirtPathBlock::new,
-		BlockBehaviour.Properties.of().isViewBlocking(Blocks::always).isSuffocating(Blocks::always)
+		BlockBehaviour.Properties.of().isViewBlocking(STATE_ALWAYS).isSuffocating(STATE_ALWAYS)
 	);
 	public static final Block END_GATEWAY = register(
 		"end_gateway",
@@ -2848,7 +2852,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.isValidSpawn((blockStatex, blockGetter, blockPos, entityType) -> entityType.fireImmune())
 			.hasPostProcess(Blocks::always)
-			.emissiveRendering(Blocks::always)
+			.emissiveRendering(STATE_ALWAYS)
 	);
 	public static final Block NETHER_WART_BLOCK = register(
 		"nether_wart_block", BlockBehaviour.Properties.of()
@@ -3802,7 +3806,7 @@ public class Blocks {
 	public static final Block TEST_INSTANCE_BLOCK = register(
 		"test_instance_block",
 		TestInstanceBlock::new,
-		BlockBehaviour.Properties.of().noLootTable().isViewBlocking(Blocks::never)
+		BlockBehaviour.Properties.of().noLootTable().isViewBlocking(STATE_NEVER)
 	);
 	public static final Block COMPOSTER = register(
 		"composter",
@@ -3992,7 +3996,7 @@ public class Blocks {
 	);
 	// Alex's Caves primordial blocks - decorative
 	public static final Block AMBER = register("amber", props -> new TransparentBlock(props), BlockBehaviour.Properties.of());
-	public static final Block AMBERSOL = register("ambersol", AmbersolBlock::new, BlockBehaviour.Properties.of().emissiveRendering((state, getter, pos) -> true));
+	public static final Block AMBERSOL = register("ambersol", AmbersolBlock::new, BlockBehaviour.Properties.of().emissiveRendering((BlockBehaviour.StateOnlyPredicate) (state, getter, pos) -> true));
 	public static final Block AMBERSOL_LIGHT = register("ambersol_light", AmbersolLightBlock::new, BlockBehaviour.Properties.of().noLootTable());
 	public static final Block BUDDING_AMETHYST = register(
 		"budding_amethyst",
@@ -4054,8 +4058,8 @@ public class Blocks {
 		BlockBehaviour.Properties.ofLegacyCopy(GLASS)
 			.isValidSpawn(Blocks::never)
 			.isRedstoneConductor(Blocks::never)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block POWDER_SNOW = register(
 		"powder_snow",
@@ -4067,7 +4071,7 @@ public class Blocks {
 		"sculk_sensor",
 		SculkSensorBlock::new,
 		BlockBehaviour.Properties.of()
-			.emissiveRendering((blockStatex, blockGetter, blockPos) -> SculkSensorBlock.getPhase(blockStatex) == SculkSensorPhase.ACTIVE)
+			.emissiveRendering((BlockBehaviour.StateOnlyPredicate) (blockStatex, blockGetter, blockPos) -> SculkSensorBlock.getPhase(blockStatex) == SculkSensorPhase.ACTIVE)
 	);
 	public static final Block CALIBRATED_SCULK_SENSOR = register(
 		"calibrated_sculk_sensor", CalibratedSculkSensorBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SCULK_SENSOR)
@@ -4307,8 +4311,8 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::never)
 			.isRedstoneConductor(Blocks::never)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block EXPOSED_COPPER_GRATE = register(
 		"exposed_copper_grate",
@@ -4577,8 +4581,8 @@ public class Blocks {
 		BlockBehaviour.Properties.ofLegacyCopy(DIRT)
 			.isValidSpawn(Blocks::always)
 			.isRedstoneConductor(Blocks::always)
-			.isViewBlocking(Blocks::always)
-			.isSuffocating(Blocks::always)
+			.isViewBlocking(STATE_ALWAYS)
+			.isSuffocating(STATE_ALWAYS)
 	);
 	public static final Block DEEPSLATE = register(
 		"deepslate",
@@ -4685,13 +4689,13 @@ public class Blocks {
 		"trial_spawner",
 		TrialSpawnerBlock::new,
 		BlockBehaviour.Properties.of()
-			.isViewBlocking(Blocks::never)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block VAULT = register(
 		"vault",
 		VaultBlock::new,
 		BlockBehaviour.Properties.of()
-			.isViewBlocking(Blocks::never)
+			.isViewBlocking(STATE_NEVER)
 	);
 	public static final Block HEAVY_CORE = register(
 		"heavy_core",
@@ -4757,7 +4761,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
 			.hasPostProcess((state, getter, pos) -> true)
-			.emissiveRendering((state, getter, pos) -> true)
+			.emissiveRendering((BlockBehaviour.StateOnlyPredicate) (state, getter, pos) -> true)
 	);
 	public static final Block FISSURE_PRIMAL_MAGMA = register(
 		"fissure_primal_magma",
@@ -4765,7 +4769,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
 			.hasPostProcess((state, getter, pos) -> true)
-			.emissiveRendering((state, getter, pos) -> true)
+			.emissiveRendering((BlockBehaviour.StateOnlyPredicate) (state, getter, pos) -> true)
 	);
 	public static final Block FLOOD_BASALT = register(
 		"flood_basalt",
@@ -4776,7 +4780,7 @@ public class Blocks {
 		"ancient_leaves",
 		properties -> new TintedParticleLeavesBlock(0.01F, properties),
 		BlockBehaviour.Properties.of()
-			.isSuffocating((blockState, getter, pos) -> false)
+			.isSuffocating((BlockBehaviour.StateOnlyPredicate) (blockState, getter, pos) -> false)
 	);
 	public static final Block ARCHAIC_VINE = register(
 		"archaic_vine",
@@ -4934,16 +4938,16 @@ public class Blocks {
 			BlockBehaviour.Properties.of()
 				.isValidSpawn(Blocks::never)
 				.isRedstoneConductor(Blocks::never)
-				.isSuffocating(Blocks::never)
-				.isViewBlocking(Blocks::never)
+				.isSuffocating(STATE_NEVER)
+				.isViewBlocking(STATE_NEVER)
 		);
 	}
 
 	public static BlockBehaviour.Properties leavesProperties(SoundType soundType) {
 		return BlockBehaviour.Properties.of()
 			.isValidSpawn(Blocks::ocelotOrParrot)
-			.isSuffocating(Blocks::never)
-			.isViewBlocking(Blocks::never)
+			.isSuffocating(STATE_NEVER)
+			.isViewBlocking(STATE_NEVER)
 			.isRedstoneConductor(Blocks::never);
 	}
 

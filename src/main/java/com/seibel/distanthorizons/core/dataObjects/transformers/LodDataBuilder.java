@@ -49,21 +49,34 @@ public class LodDataBuilder
 	// converters //
 	//============//
 	
-	public static FullDataSourceV2 createFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper)
+	/**
+	 * The chunk's columns built natively, or null when the native producer does
+	 * not apply: a custom factory or wrapper, chunk-processing subscribers (which
+	 * may override the semantic inputs), or inputs the producer declines.
+	 */
+	@Nullable
+	public static net.minecraft.world.level.chunk.NativeDhColumns nativeColumnsFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper)
 	{
 		// only block lighting is needed here, sky lighting is populated at the data source stage
 		LodUtil.assertTrue(chunkWrapper.isDhBlockLightingCorrect(), "Provided chunk's DH Block lighting hasn't been baked.");
+		if (WRAPPER_FACTORY != com.seibel.distanthorizons.common.wrappers.WrapperFactory.INSTANCE
+			|| chunkWrapper.getClass() != com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper.class
+			|| hasChunkProcessingSubscribers())
+		{
+			return null;
+		}
+		var columns = net.minecraft.world.level.chunk.NativeDhColumns.build(levelWrapper,
+			(com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper)chunkWrapper,
+			Config.Common.LodBuilding.worldCompression.get().value);
+		return columns != null && !hasChunkProcessingSubscribers() ? columns : null;
+	}
+	
+	public static FullDataSourceV2 createFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper)
+	{
 		// Native policy can bypass voxel callbacks only for the stock factory and
 		// when no chunk-processing subscriber can override the semantic inputs.
-		if (WRAPPER_FACTORY == com.seibel.distanthorizons.common.wrappers.WrapperFactory.INSTANCE
-			&& chunkWrapper.getClass() == com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper.class
-			&& !hasChunkProcessingSubscribers())
-		{
-			var columns = net.minecraft.world.level.chunk.NativeDhColumns.build(levelWrapper,
-				(com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper)chunkWrapper,
-				Config.Common.LodBuilding.worldCompression.get().value);
-			if (columns != null && !hasChunkProcessingSubscribers()) return FullDataSourceV2.createNative(columns);
-		}
+		var columns = nativeColumnsFromChunk(levelWrapper, chunkWrapper);
+		if (columns != null) return FullDataSourceV2.createNative(columns);
 		
 		int chunkPosX = chunkWrapper.getChunkPos().getX();
 		int chunkPosZ = chunkWrapper.getChunkPos().getZ();

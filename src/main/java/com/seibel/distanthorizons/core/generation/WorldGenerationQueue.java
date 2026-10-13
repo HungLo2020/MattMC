@@ -364,7 +364,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		int generationRequestChunkWidthCount = BitShiftUtil.powerOfTwo(DhSectionPos.getDetailLevel(taskPos) - taskDetailLevel - 4); // minus 4 is equal to dividing by 16 to convert to chunk scale
 		
 		long generationStartMsTime = System.currentTimeMillis();
-		CompletableFuture<Void> generationFuture = this.startGenerationEvent(taskPos, taskDetailLevel, generationRequestChunkWidthCount, newTaskGroup.group::consumeDataSource);
+		CompletableFuture<Void> generationFuture = this.startGenerationEvent(taskPos, taskDetailLevel, generationRequestChunkWidthCount,
+			newTaskGroup.group::consumeDataSource, newTaskGroup.group::consumeNativeColumns);
 		generationFuture.thenRun(() -> 
 		{
 			long totalGenTimeInMs = System.currentTimeMillis() - generationStartMsTime;
@@ -413,7 +414,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		long requestPos, 
 		byte targetDataDetail,
 		int generationRequestChunkWidthCount,
-		Consumer<FullDataSourceV2> dataSourceConsumer
+		Consumer<FullDataSourceV2> dataSourceConsumer,
+		@org.jetbrains.annotations.Nullable Consumer<net.minecraft.world.level.chunk.NativeDhColumns> nativeColumnsConsumer
 		)
 	{
 		DhChunkPos chunkPosMin = new DhChunkPos(DhSectionPos.getSectionBBoxPos(requestPos).getCornerBlockPos());
@@ -447,10 +449,21 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 								DhLightingEngine.INSTANCE.bakeChunkBlockLighting(chunkWrapper, nearbyChunkList, maxSkyLight);
 							}
 							
-							try (FullDataSourceV2 dataSource = LodDataBuilder.createFromChunk(this.level.getLevelWrapper(), chunkWrapper))
+							// Native columns merge straight into the recipients; no producer data source.
+							var nativeColumns = LodDataBuilder.nativeColumnsFromChunk(this.level.getLevelWrapper(), chunkWrapper);
+							if (nativeColumns != null && nativeColumnsConsumer != null)
 							{
-								LodUtil.assertTrue(dataSource != null);
-								dataSourceConsumer.accept(dataSource);
+								nativeColumnsConsumer.accept(nativeColumns);
+							}
+							else
+							{
+								try (FullDataSourceV2 dataSource = nativeColumns != null
+									? FullDataSourceV2.createNative(nativeColumns)
+									: LodDataBuilder.createFromChunk(this.level.getLevelWrapper(), chunkWrapper))
+								{
+									LodUtil.assertTrue(dataSource != null);
+									dataSourceConsumer.accept(dataSource);
+								}
 							}
 						}
 						catch (ClassCastException e)

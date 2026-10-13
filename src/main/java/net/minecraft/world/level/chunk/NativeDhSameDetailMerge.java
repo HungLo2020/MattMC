@@ -108,6 +108,35 @@ public final class NativeDhSameDetailMerge implements AutoCloseable {
             Reference.reachabilityFence(target);Reference.reachabilityFence(source);Reference.reachabilityFence(columns);
         }
     }
+    private static final MethodHandle COLUMNS = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_same_detail_columns",
+        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    /**
+     * {@link #updateOwnedWithoutFootprints} with a generated chunk's columns as
+     * the source, read in place (Rust {@code mattmc_dh_same_detail_columns}), so
+     * no producer data source, table or ID map is built. Null declines before
+     * any change to {@code target}.
+     */
+    @Nullable public static OwnedUpdate updateOwnedFromColumns(NativeDhSource target, NativeDhColumns producer,
+        LongList[] columns, int[] remap, long position) {
+        if(!target.isLive()||remap.length>4096)return null;
+        var scratch=SOURCE_SCRATCH.get();MemorySegment pointer=MemorySegment.NULL;
+        try {
+            MemorySegment.copy(MemorySegment.ofArray(remap),0,scratch.remap,0,remap.length*4L);
+            pointer=(MemorySegment)COLUMNS.invokeExact(target.stageOwner(),producer.stageSourceOwner(),scratch.remap,remap.length);
+            if(pointer.address()==0)return null;
+            if((int)VIEW.invokeExact(pointer,scratch.metadata)!=1 || scratch.metadata.getAtIndex(ValueLayout.JAVA_LONG,10)!=0)
+                throw new IllegalStateException("Invalid producer-column DH merge");
+            boolean changed=scratch.metadata.getAtIndex(ValueLayout.JAVA_LONG,8)!=0;
+            commitSource(pointer,columns,target);
+            int count=(int)APPLY_OWNED_HASH.invokeExact(pointer,target.stageOwner(),position,scratch.metadata);
+            if(count<0)throw new IllegalStateException("Invalid owned DH metadata publication");
+            return new OwnedUpdate(changed,count!=0,scratch.metadata.get(ValueLayout.JAVA_LONG,0));
+        }catch(RuntimeException|Error e){throw e;}catch(Throwable e){throw new IllegalStateException(e);}
+        finally {
+            if(pointer.address()!=0)release(pointer);
+            Reference.reachabilityFence(target);Reference.reachabilityFence(producer);Reference.reachabilityFence(columns);
+        }
+    }
     /** Ordinary source metadata and uniformity are already Rust-owned; no dense fact packing. */
     @Nullable public static NativeDhSameDetailMerge prepareOwned(NativeDhSource target, NativeDhSource source,
         Map<Integer,LongList[]> oldFootprints, Map<Integer,LongList[]> sourceFootprints, int[] remap) {

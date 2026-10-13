@@ -37,6 +37,9 @@ verification projections are separate from gameplay.
   generations remain alive; subsequent Java reads observe the escaped array.
   Re-adoption creates a fresh owner. Retained map entries containing an invalid
   owner must decline direct native reads until replaced.
+- Each map snapshot's owner and metadata view are `NativeReclaimer`
+  registrations (kinds 16 and 17) against the `NativeLightingMap` object, which
+  every call fences. The shared identity registry keeps its automatic arena.
 - Queued light still precedes visible storage. Terrain rebuild captures retain
   the original layer references, then the existing
   [bulk consumer](../../rendering/RUST-TERRAIN-LIGHTING.md) leases their current

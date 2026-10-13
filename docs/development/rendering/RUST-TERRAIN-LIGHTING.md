@@ -22,7 +22,25 @@ complete bulk-path visual parity and performance acceptance remain open.
   Rust borrows the flat span directly; it creates no second context collection.
   One mutable position follows Frozen's synchronous light-cache convention.
 - The immutable native registry owns emission, light blocking and solid-render
-  facts. Java predicate and shade callbacks remain migration work. World light
+  facts.
+- Position-free states write their context from per-state facts computed once
+  (`BlockStateBase.staticTerrainLightFacts`), with no per-block callbacks. A
+  state qualifies when it is an exact `BlockState` with a collision cache (no
+  dynamic shape), its emissive and view-blocking predicates implement
+  `BlockBehaviour.StateOnlyPredicate`, and its `getShadeBrightness` is declared
+  by a class known to read only the state.
+  - The defaults, `Blocks.always`/`never` (shared as `STATE_ALWAYS`/`STATE_NEVER`)
+    and the state-only lambdas in `Blocks` are marked.
+  - Shulker boxes (they read the block entity), dynamic shapes and unmarked
+    predicates keep the ordered callbacks with the shared mutable position.
+  - The raw shade is stored, and the live Iris AO level is applied on each
+    rebuild with `getShadeBrightness`'s own expression.
+  - A deterministic second emissive call repeats the first, so it is 0 for
+    static states.
+  - A new block predicate is safe by default, because unmarked predicates use
+    the callbacks. Mark one `StateOnlyPredicate` only if it reads nothing but
+    the state.
+- World light
   publication still follows its original copy-on-write transaction through
   [Rust canonical map snapshots](../world/lighting/RUST-LIGHT-MAPS.md).
 
@@ -48,7 +66,7 @@ Native pointer validity, alignment and disjoint writable output remain caller
 contracts; shape checks do not authenticate arbitrary pointers as CPU leases.
 
 A returned read-only CPU segment retains its Rust generation independently of
-its `DataLayer` owner through an automatic arena. The synchronous call fences
+its `DataLayer` owner; the segment is its `NativeReclaimer` referent. The synchronous call fences
 all leases; Rust retains no input pointer. Fill, owner reclamation and map
 replacement cannot invalidate an already retained generation. A retained view
 is not an immutable light snapshot: allocated-generation writes remain visible,

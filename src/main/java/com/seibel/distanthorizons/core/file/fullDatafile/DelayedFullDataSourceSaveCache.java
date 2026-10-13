@@ -114,6 +114,39 @@ public class DelayedFullDataSourceSaveCache implements AutoCloseable
 		}
 	}
 	
+	/**
+	 * {@link #writeDataSourceToMemoryAndQueueSave} for a generated chunk's native
+	 * columns: merged straight into the memory source under the same lock, or
+	 * through a producer data source when the direct merge declines.
+	 */
+	public void writeNativeColumnsToMemoryAndQueueSave(@NotNull net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		long inputPos = columns.position();
+		ReentrantLock lockForPos = this.saveLockContainer.getLockForPos(inputPos);
+		try
+		{
+			lockForPos.lock();
+			DataSourceSavedTimePair pair = this.dataSourceByPosition.getOrDefault(inputPos, null);
+			if (pair == null)
+			{
+				pair = new DataSourceSavedTimePair(FullDataSourceV2.createEmpty(inputPos));
+				this.dataSourceByPosition.put(inputPos, pair);
+			}
+			if (!pair.dataSource.updateFromNativeColumns(columns))
+			{
+				try (FullDataSourceV2 input = FullDataSourceV2.createNative(columns))
+				{
+					pair.dataSource.updateFromDataSource(input);
+				}
+			}
+			pair.updateLastWrittenTimestamp();
+		}
+		finally
+		{
+			lockForPos.unlock();
+		}
+	}
+	
 	/** when this method is called the datasource should no longer be in the memory cache */
 	public void handleDataSourceRemoval(@NotNull FullDataSourceV2 removedDataSource)
 	{

@@ -67,6 +67,8 @@ final class NativeLiveBiomeSection<T> {
     }
     final Binding<T> binding;
     final MemorySegment owner;
+    /** The arena whose scope the owner and its views carry (a slab or release scope), or null for reclaimer owners. */
+    @Nullable private final Arena scope;
     private volatile View view;
     private SingletonAliases<T> singleton;
     /** Only compatibility escape allocates a shared Java palette. Weak members
@@ -99,17 +101,23 @@ final class NativeLiveBiomeSection<T> {
         return new NativeLiveBiomeSection<>(pointer, binding);
     }
     private NativeLiveBiomeSection(MemorySegment pointer, Binding<T> binding, SingletonAliases<T> aliases) {
-        this(registered(pointer), binding, aliases, true);
+        this(registered(pointer), binding, aliases, NativeReleaseScope.current());
     }
     // Callers pin the section by holding this segment, so it is the reclaimer's referent.
+    // Inside a release scope it is bound to the scope's arena instead.
     private static MemorySegment registered(MemorySegment pointer) {
         MemorySegment owner;
-        try { owner = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(owner, pointer, NativeReclaimer.LIVE_BIOME); }
+        var release = NativeReleaseScope.current();
+        try {
+            if (release != null) return pointer.reinterpret(1, release, bound -> release(RELEASE, bound)).asReadOnly();
+            owner = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(owner, pointer, NativeReclaimer.LIVE_BIOME);
+        }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
         return owner;
     }
-    private NativeLiveBiomeSection(MemorySegment owner, Binding<T> binding, SingletonAliases<T> aliases, boolean ignored) {
+    private NativeLiveBiomeSection(MemorySegment owner, Binding<T> binding, SingletonAliases<T> aliases, @Nullable Arena scope) {
         this.owner = owner;
+        this.scope = scope;
         this.binding = binding; this.view = loadView(null);
         if (view.bits == 0) {
             singleton = aliases == null ? new SingletonAliases<>() : aliases;
@@ -117,8 +125,8 @@ final class NativeLiveBiomeSection<T> {
         }
     }
     /** A slab item: {@code scoped} carries the slab arena's scope, which keeps the item alive. */
-    static <T> NativeLiveBiomeSection<T> adoptBorrowed(MemorySegment scoped, Binding<T> binding) {
-        return new NativeLiveBiomeSection<>(scoped.asReadOnly(), binding, null, true);
+    static <T> NativeLiveBiomeSection<T> adoptBorrowed(MemorySegment scoped, Binding<T> binding, Arena arena) {
+        return new NativeLiveBiomeSection<>(scoped.asReadOnly(), binding, null, arena);
     }
     /** Arguments of {@code mattmc_live_biome_create} for a fresh single-value container,
      * {@code [biome id, requested bits, limit, global bits]}, or null when {@link #adopt} would decline it. */
@@ -173,6 +181,10 @@ final class NativeLiveBiomeSection<T> {
             return global ? id : (int) INT.getAcquire(palette, id * 4L);
         }
     }
+    /** A view span carrying the owner's scope, so a closed slab or release scope cannot be read through it. */
+    private MemorySegment viewSegment(MemorySegment address, long size) {
+        return (this.scope == null ? address.reinterpret(size) : address.reinterpret(size, this.scope, null)).asReadOnly();
+    }
     /** As {@code NativeLiveBlockSection.loadView}: only generations replaced since
      * {@code previous} need a registration, against that previous view. */
     private View loadView(@Nullable View previous) {
@@ -182,9 +194,9 @@ final class NativeLiveBiomeSection<T> {
             lease = h.getAtIndex(ValueLayout.ADDRESS, 5);
             int bits = h.getAtIndex(ValueLayout.JAVA_INT, 0), requested = h.getAtIndex(ValueLayout.JAVA_INT, 1);
             boolean global = h.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
-            var words = h.getAtIndex(ValueLayout.ADDRESS, 2).reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L).asReadOnly();
-            var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).reinterpret((global ? 0 : bits == 0 ? 1 : 1 << bits) * 4L).asReadOnly();
-            var count = h.getAtIndex(ValueLayout.ADDRESS, 4).reinterpret(4).asReadOnly();
+            var words = viewSegment(h.getAtIndex(ValueLayout.ADDRESS, 2), h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L);
+            var palette = viewSegment(h.getAtIndex(ValueLayout.ADDRESS, 3), (global ? 0 : bits == 0 ? 1 : 1 << bits) * 4L);
+            var count = viewSegment(h.getAtIndex(ValueLayout.ADDRESS, 4), 4);
             var view = new View(owner, bits, requested, global, words, palette, count);
             if (lease.address() != 0) NativeReclaimer.register(previous != null ? previous : view, lease, NativeReclaimer.LIVE_BIOME_VIEW);
             adopted = true; return view;

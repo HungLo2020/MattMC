@@ -23,12 +23,13 @@ public final class NativeDhSources {
     private final MemorySegment owner,positions;
     private final int minY;
     private NativeDhSources(MemorySegment pointer,MemorySegment metadata) {
-        Arena arena=Arena.ofAuto();boolean attached=false;
+        boolean attached=false;
         try {
             int result=(int)VIEW.invokeExact(pointer,metadata);if(result!=1)throw new IllegalStateException("Invalid emitter CPU view");
-            owner=pointer.reinterpret(1,arena,NativeDhSources::release);attached=true;
+            // The owner segment is the batched reclaimer's referent; reads fence this object.
+            owner=pointer.reinterpret(1);NativeReclaimer.register(owner,pointer,NativeReclaimer.DH_SOURCES);attached=true;
             long count=metadata.getAtIndex(ValueLayout.JAVA_LONG,1);if(count<0||count>1048576)throw new IllegalStateException("Emitter count bound");
-            positions=metadata.getAtIndex(ValueLayout.ADDRESS,0).reinterpret(count*4,arena,null).asReadOnly();minY=(int)metadata.getAtIndex(ValueLayout.JAVA_LONG,2);
+            positions=metadata.getAtIndex(ValueLayout.ADDRESS,0).reinterpret(count*4).asReadOnly();minY=(int)metadata.getAtIndex(ValueLayout.JAVA_LONG,2);
         } catch(RuntimeException|Error e){if(!attached)release(pointer);throw e;}
         catch(Throwable e){if(!attached)release(pointer);throw new IllegalStateException("Cannot adopt native emitters",e);}
     }

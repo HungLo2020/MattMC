@@ -37,7 +37,7 @@ final class NativeChunkInputs {
             counts = Arrays.copyOf(scratch.counts, count);
             biomes = null;
             this.minY = minY;
-            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeChunkInputs::release);
+            owner = adopt(pointer);
             attached = true;
         } finally { if (!attached) release(pointer); }
     }
@@ -46,7 +46,7 @@ final class NativeChunkInputs {
         try {
             blocks = base.blocks; counts = base.counts; minY = base.minY;
             this.biomes = biomes;
-            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeChunkInputs::release);
+            owner = adopt(pointer);
             attached = true;
         } finally { if (!attached) release(pointer); }
     }
@@ -65,6 +65,18 @@ final class NativeChunkInputs {
         finally { Reference.reachabilityFence(binding); Reference.reachabilityFence(this); }
     }
 
+    /**
+     * Binds to a release scope's arena when one is open (the inputs pin its
+     * sections). Otherwise the owner segment is the batched reclaimer's
+     * referent: every native caller fences this object across its call.
+     */
+    private static MemorySegment adopt(MemorySegment pointer) {
+        var release = NativeReleaseScope.current();
+        if (release != null) return pointer.reinterpret(1, release, NativeChunkInputs::release);
+        var owner = pointer.reinterpret(1);
+        NativeReclaimer.register(owner, pointer, NativeReclaimer.CHUNK_INPUTS);
+        return owner;
+    }
     private static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); }
         catch (Throwable e) { throw new IllegalStateException("Cannot release chunk inputs", e); }

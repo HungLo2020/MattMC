@@ -15,6 +15,15 @@ pub(crate) const SECTION_COUNTERS: u8 = 5;
 pub(crate) const DH_CONTRIBUTORS: u8 = 6;
 pub(crate) const DH_CONTRIBUTOR_BATCH: u8 = 7;
 pub(crate) const SECTION_SNAPSHOT: u8 = 8;
+pub(crate) const LIGHT_LAYER: u8 = 9;
+pub(crate) const LIGHT_VIEW: u8 = 10;
+pub(crate) const DH_HEIGHTMAPS: u8 = 11;
+pub(crate) const DH_SOURCES: u8 = 12;
+pub(crate) const DH_LIGHT_FIELD: u8 = 13;
+pub(crate) const CHUNK_INPUTS: u8 = 14;
+pub(crate) const BIOME_CHUNK_INPUTS: u8 = 15;
+pub(crate) const LIGHT_MAP: u8 = 16;
+pub(crate) const LIGHT_MAP_VIEW: u8 = 17;
 
 extern "C" {
     // The owners' own release exports; each drops one reference it was given.
@@ -26,6 +35,15 @@ extern "C" {
     fn mattmc_dh_contributors_release(owner: *mut c_void);
     fn mattmc_dh_contributor_batch_release(owner: *mut c_void);
     fn mattmc_chunk_snapshot_release(states: *mut c_void);
+    fn mattmc_light_layer_release(layer: *mut c_void);
+    fn mattmc_light_layer_view_release(view: *mut c_void);
+    fn mattmc_dh_heightmaps_release(owner: *mut c_void);
+    fn mattmc_dh_sources_release(owner: *mut c_void);
+    fn mattmc_dh_light_field_release(field: *mut c_void);
+    fn mattmc_chunk_inputs_release(owner: *mut c_void);
+    fn mattmc_chunk_biome_inputs_release(owner: *mut c_void);
+    fn mattmc_light_map_release(pointer: *mut c_void);
+    fn mattmc_light_map_view_release(pointer: *mut c_void);
 }
 
 /// Releases `count` pointers, each of its kind. Returns how many were
@@ -50,6 +68,15 @@ pub unsafe extern "C" fn mattmc_native_release_batch(kinds: *const u8, pointers:
             DH_CONTRIBUTORS => mattmc_dh_contributors_release(pointer),
             DH_CONTRIBUTOR_BATCH => mattmc_dh_contributor_batch_release(pointer),
             SECTION_SNAPSHOT => mattmc_chunk_snapshot_release(pointer),
+            LIGHT_LAYER => mattmc_light_layer_release(pointer),
+            LIGHT_VIEW => mattmc_light_layer_view_release(pointer),
+            DH_HEIGHTMAPS => mattmc_dh_heightmaps_release(pointer),
+            DH_SOURCES => mattmc_dh_sources_release(pointer),
+            DH_LIGHT_FIELD => mattmc_dh_light_field_release(pointer),
+            CHUNK_INPUTS => mattmc_chunk_inputs_release(pointer),
+            BIOME_CHUNK_INPUTS => mattmc_chunk_biome_inputs_release(pointer),
+            LIGHT_MAP => mattmc_light_map_release(pointer),
+            LIGHT_MAP_VIEW => mattmc_light_map_view_release(pointer),
             _ => return index as u32,
         }
     }

@@ -50,7 +50,15 @@ public final class NativeDhIdMap {
         return pair.getClass() == BlockBiomeWrapperPair.class && pair.biome != null && pair.blockState != null
             && pair.biome.getClass() == BiomeWrapper.class && pair.blockState.getClass() == BlockStateWrapper.class;
     }
-    public int add(BlockBiomeWrapperPair pair, int mode) {
+    public int add(BlockBiomeWrapperPair pair, int mode) { return add(pair, mode, -1); }
+    /**
+     * A deduplicating add, as {@link #merge} with {@code append=false} adds one
+     * source entry: the pair's tint binds only when it becomes the new entry
+     * {@code newId}, never onto an existing one. {@code newId} is the current
+     * entry count.
+     */
+    public int addIfAbsent(BlockBiomeWrapperPair pair, int newId) { return add(pair, 0, newId); }
+    private int add(BlockBiomeWrapperPair pair, int mode, int tintOnlyFor) {
         try {
             String biome = pair.biome.getSerialString(), state = pair.blockState.getSerialString();
             var b = MemorySegment.ofArray(serialChars(biome));
@@ -62,7 +70,8 @@ public final class NativeDhIdMap {
             if (result == -2) throw new OutOfMemoryError("DH identity storage");
             if (result < 0) throw new IllegalStateException("Invalid DH identity input");
             var tint = ((BiomeWrapper)pair.biome).nativeTintIdentity();
-            if (tint != null && (int)TINT.invokeExact(owner, result, tint.stageOwner()) != 1) throw new IllegalStateException("Invalid DH tint binding");
+            if (tint != null && (tintOnlyFor < 0 || result == tintOnlyFor)
+                && (int)TINT.invokeExact(owner, result, tint.stageOwner()) != 1) throw new IllegalStateException("Invalid DH tint binding");
             return result;
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(pair); Reference.reachabilityFence(this); }

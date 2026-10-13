@@ -35,7 +35,7 @@ import org.slf4j.Logger;
  * every reader of the native memory holds (an owner's segment, a view), and
  * keep using segments derived from it only while the referent is reachable.
  */
-final class NativeReclaimer {
+public final class NativeReclaimer {
     static final byte LIVE_SECTION = 1;
     static final byte LIVE_SECTION_VIEW = 2;
     static final byte LIVE_BIOME = 3;
@@ -44,7 +44,16 @@ final class NativeReclaimer {
     static final byte DH_CONTRIBUTORS = 6;
     static final byte DH_CONTRIBUTOR_BATCH = 7;
     static final byte SECTION_SNAPSHOT = 8;
-    private static final int KINDS = 9;
+    static final byte LIGHT_LAYER = 9;
+    static final byte LIGHT_VIEW = 10;
+    static final byte DH_HEIGHTMAPS = 11;
+    static final byte DH_SOURCES = 12;
+    static final byte DH_LIGHT_FIELD = 13;
+    static final byte CHUNK_INPUTS = 14;
+    static final byte BIOME_CHUNK_INPUTS = 15;
+    static final byte LIGHT_MAP = 16;
+    static final byte LIGHT_MAP_VIEW = 17;
+    private static final int KINDS = 18;
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int BATCH = 1024;
@@ -97,9 +106,19 @@ final class NativeReclaimer {
         if ((REGISTRATIONS.incrementAndGet() & 1023) == 0 && LIVE.size() >= gcMark && GC_REQUEST.availablePermits() == 0) GC_REQUEST.release();
     }
 
+    /**
+     * Releases a light-storage map owner and its metadata view once {@code map}
+     * (the Java object every call fences) is unreachable.
+     */
+    public static void registerLightMap(Object map, MemorySegment owner, MemorySegment view) {
+        register(map, owner, LIGHT_MAP);
+        register(map, view, LIGHT_MAP_VIEW);
+    }
+
     /** Registrations not yet released, and releases so far (diagnostics and tests). */
     static int pending() { return LIVE.size(); }
     static long released() { return RELEASED.get(); }
+    static long registered(byte kind) { return REGISTERED_BY_KIND[kind].sum(); }
 
     private static void drain() {
         // Thread-confined scratch, allocated once for the process.

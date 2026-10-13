@@ -82,7 +82,10 @@ public final class GenerationEvent
 					}
 					else
 					{
-						try
+						// The event's chunks are local copies whose results are merged into LOD
+						// sources before it returns: free their native section storage now,
+						// instead of when the GC next finds them (NativeReleaseScope).
+						try (var release = net.minecraft.world.level.chunk.NativeReleaseScope.open())
 						{
 							genEnvironment.generateEvent(genEvent);
 						}

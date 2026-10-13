@@ -40,15 +40,18 @@ final class NativeLightLayer {
             "mattmc_light_layer_" + suffix, descriptor, options);
     }
     private MemorySegment owner;
-    // Reused only under the original light-storage caller exclusion.
-    private final MemorySegment changedView = Arena.ofAuto().allocate(ValueLayout.ADDRESS);
+    /** Out-slot for a replaced view; read right after each call on the same thread. */
+    private static final ThreadLocal<MemorySegment> CHANGED_VIEW = ThreadLocal.withInitial(() -> Arena.global().allocate(ValueLayout.ADDRESS));
     private Projection view;
 
     private NativeLightLayer() {}
     private NativeLightLayer adopt(MemorySegment owner, MemorySegment view) {
         if (owner.address() == 0 || view.address() == 0) throw new IllegalStateException("No light owner/projection");
         try {
-            this.owner = owner.asReadOnly().reinterpret(1, Arena.ofAuto(), NativeLightLayer::releaseOwner);
+            // Callers pin the layer by holding this segment (DataLayer -> NativeLightLayer -> owner),
+            // so it is the batched reclaimer's referent; every call fences this layer.
+            this.owner = owner.reinterpret(1).asReadOnly();
+            NativeReclaimer.register(this.owner, owner, NativeReclaimer.LIGHT_LAYER);
         } catch (RuntimeException | Error failure) {
             releaseOwner(owner);
             releaseView(view);
@@ -91,28 +94,34 @@ final class NativeLightLayer {
         } catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
+    /** The thread's out-slot, cleared before a call that may replace the view. */
+    private static MemorySegment changedView() {
+        var slot = CHANGED_VIEW.get();
+        slot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL);
+        return slot;
+    }
     private void updateView(int status) {
         if (status != 0) throw new IllegalArgumentException("Invalid native light input");
-        MemorySegment changed = changedView.get(ValueLayout.ADDRESS, 0);
+        MemorySegment changed = CHANGED_VIEW.get().get(ValueLayout.ADDRESS, 0);
         if (changed.address() != 0) view = Projection.adoptOwned(changed);
     }
     void set(int index, int value) {
-        try { updateView((int) SET.invokeExact(owner, index, value, changedView)); }
+        try { updateView((int) SET.invokeExact(owner, index, value, changedView())); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
     void fill(int value) {
-        try { updateView((int) FILL.invokeExact(owner, value, changedView)); }
+        try { updateView((int) FILL.invokeExact(owner, value, changedView())); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
     void materialize() {
-        try { updateView((int) MATERIALIZE.invokeExact(owner, changedView)); }
+        try { updateView((int) MATERIALIZE.invokeExact(owner, changedView())); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
     void installResult(long engine, int index) {
-        try { updateView((int) INSTALL_RESULT.invokeExact(engine, index, owner, changedView)); }
+        try { updateView((int) INSTALL_RESULT.invokeExact(engine, index, owner, changedView())); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
@@ -120,7 +129,7 @@ final class NativeLightLayer {
         if (columns.length != 1280 || entries.length != 8192 || output.length != 3)
             throw new IllegalArgumentException("Invalid sky source spans");
         try { updateView((int) SKY_OWNED.invokeExact(owner, MemorySegment.ofArray(columns), bottom, minX, minZ,
-                MemorySegment.ofArray(entries), MemorySegment.ofArray(output), changedView)); }
+                MemorySegment.ofArray(entries), MemorySegment.ofArray(output), changedView())); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
@@ -129,7 +138,7 @@ final class NativeLightLayer {
         if (columns.byteSize() != 1280 * 4L || output.byteSize() != 3 * 4L)
             throw new IllegalArgumentException("Invalid sky source spans");
         try { updateView((int) SKY_QUEUED.invokeExact(owner, columns, bottom, minX, minZ,
-                queues.ownerForNativeCall(), output, changedView)); }
+                queues.ownerForNativeCall(), output, changedView())); }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(queues); Reference.reachabilityFence(this); }
     }
@@ -154,31 +163,46 @@ final class NativeLightLayer {
         if (failure instanceof RuntimeException exception) return exception;
         return new IllegalStateException(failure);
     }
+    /**
+     * A leased read-only generation. The metadata segment is the batched
+     * reclaimer's referent: native consumers hold it (terrain light views),
+     * and every read here fences this projection, which holds it. A view keeps
+     * its generation after its owner is released.
+     */
     static final class Projection {
         private final MemorySegment metadata;
         private final MemorySegment bytes;
         static Projection adoptOwned(MemorySegment pointer) {
-            Arena lifetime;
             MemorySegment metadata;
             try {
-                lifetime = Arena.ofAuto();
-                metadata = pointer.asReadOnly().reinterpret(16, lifetime, NativeLightLayer::releaseView);
+                metadata = pointer.reinterpret(16).asReadOnly();
+                NativeReclaimer.register(metadata, pointer, NativeReclaimer.LIGHT_VIEW);
             } catch (RuntimeException | Error failure) {
                 releaseView(pointer);
                 throw failure;
             }
-            return new Projection(metadata, lifetime);
+            return new Projection(metadata);
         }
-        private Projection(MemorySegment metadata, Arena lifetime) {
+        private Projection(MemorySegment metadata) {
             this.metadata = metadata;
             MemorySegment address = metadata.get(ValueLayout.ADDRESS, 8);
-            bytes = address.address() == 0 ? null : address.asReadOnly().reinterpret(2048, lifetime, null);
+            bytes = address.address() == 0 ? null : address.reinterpret(2048).asReadOnly();
         }
-        int rawDefault() { return metadata.get(ValueLayout.JAVA_INT, 0); }
-        boolean allocated() { return metadata.get(ValueLayout.JAVA_INT, 4) != 0; }
+        int rawDefault() {
+            try { return metadata.get(ValueLayout.JAVA_INT, 0); } finally { Reference.reachabilityFence(this); }
+        }
+        boolean allocated() {
+            try { return metadata.get(ValueLayout.JAVA_INT, 4) != 0; } finally { Reference.reachabilityFence(this); }
+        }
         int get(int index) {
-            if (bytes == null) return rawDefault();
-            return (bytes.get(ValueLayout.JAVA_BYTE, index >> 1) >> ((index & 1) << 2)) & 15;
+            try {
+                if (bytes == null) return metadata.get(ValueLayout.JAVA_INT, 0);
+                return (bytes.get(ValueLayout.JAVA_BYTE, index >> 1) >> ((index & 1) << 2)) & 15;
+            } finally { Reference.reachabilityFence(this); }
+        }
+        /** The 2048 light bytes, copied while this projection is held. */
+        byte[] copyBytes() {
+            try { return bytes.toArray(ValueLayout.JAVA_BYTE); } finally { Reference.reachabilityFence(this); }
         }
         MemorySegment bytes() { return bytes; }
         MemorySegment metadata() { return metadata; }

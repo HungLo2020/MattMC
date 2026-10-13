@@ -36220,18 +36220,23 @@ def benchmark_terrain_queue_options(backend: str, workload_profile: str, jvm_arg
     keeps exposing sections (cave networks advance one portal hop per rotation
     in both Sodium implementations) and Frozen builds them inside its measured
     window too, so moving rows start from a drained queue and then count that
-    streaming instead of restarting. Explicit --jvm-arg values always win.
+    streaming instead of restarting. New Distant Horizons LOD columns likewise
+    publish a bounded number per frame while the camera turns, as stock DH does
+    in Frozen's window: moving rows require full publication only to start and
+    then count pending frames. Explicit --jvm-arg values always win.
     """
     if backend != "rust-vulkan" or workload_profile not in {"settled-static", "moving-camera"}:
         return []
     prefix = "-Dmattmc.dev.graphicsFrameBenchmark."
     def overridden(name: str) -> bool:
         return any(value.startswith(f"{prefix}{name}=") for value in jvm_args)
-    if overridden("requireTerrainQueueDrain"):
-        return []
-    options = [f"{prefix}requireTerrainQueueDrain=true"]
-    if workload_profile == "moving-camera" and not overridden("terrainQueueDrainDuringMeasurement"):
-        options.append(f"{prefix}terrainQueueDrainDuringMeasurement=false")
+    options = []
+    if not overridden("requireTerrainQueueDrain"):
+        options.append(f"{prefix}requireTerrainQueueDrain=true")
+        if workload_profile == "moving-camera" and not overridden("terrainQueueDrainDuringMeasurement"):
+            options.append(f"{prefix}terrainQueueDrainDuringMeasurement=false")
+    if workload_profile == "moving-camera" and not overridden("dhPublicationDuringMeasurement"):
+        options.append(f"{prefix}dhPublicationDuringMeasurement=false")
     return options
 
 def build_capture_command(

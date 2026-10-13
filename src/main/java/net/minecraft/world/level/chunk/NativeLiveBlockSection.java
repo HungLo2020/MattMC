@@ -40,22 +40,33 @@ final class NativeLiveBlockSection {
         final MemorySegment words = arena.allocate(1024 * 8, 8), palette = arena.allocate(257 * 4, 4), header = arena.allocate(48, 8);
     }
     private final MemorySegment owner;
+    /** The arena whose scope the owner and its views carry (a slab or release scope), or null for reclaimer owners. */
+    @Nullable private final Arena scope;
     private volatile View view;
 
     static NativeLiveBlockSection adoptOwned(MemorySegment pointer) {
         if (pointer.address() == 0) throw new IllegalStateException("Missing native live section");
+        var release = NativeReleaseScope.current();
+        if (release != null) {
+            // Freed when the release scope closes; later reads throw instead of reading freed memory.
+            MemorySegment bound;
+            try { bound = pointer.reinterpret(1, release, owner -> release(RELEASE, owner)).asReadOnly(); }
+            catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
+            return new NativeLiveBlockSection(bound, release);
+        }
         MemorySegment scoped;
         // Callers pin the section by holding this segment, so it is the reclaimer's referent.
         try { scoped = pointer.reinterpret(1).asReadOnly(); NativeReclaimer.register(scoped, pointer, NativeReclaimer.LIVE_SECTION); }
         catch (Throwable failure) { release(RELEASE, pointer); throw failure; }
-        return new NativeLiveBlockSection(scoped);
+        return new NativeLiveBlockSection(scoped, null);
     }
-    private NativeLiveBlockSection(MemorySegment scoped) {
+    private NativeLiveBlockSection(MemorySegment scoped, @Nullable Arena scope) {
         this.owner = scoped;
+        this.scope = scope;
         this.view = loadView(null);
     }
     /** A slab item: {@code scoped} carries the slab arena's scope, which keeps the item alive. */
-    static NativeLiveBlockSection adoptBorrowed(MemorySegment scoped) { return new NativeLiveBlockSection(scoped.asReadOnly()); }
+    static NativeLiveBlockSection adoptBorrowed(MemorySegment scoped, Arena arena) { return new NativeLiveBlockSection(scoped.asReadOnly(), arena); }
     /** Arguments of {@code mattmc_live_section_create} for a fresh single-value container,
      * {@code [state, requested bits, registry size, global bits]}, or null when
      * {@link #adopt} would decline it. */
@@ -117,9 +128,9 @@ final class NativeLiveBlockSection {
             lease = h.getAtIndex(ValueLayout.ADDRESS, 5);
             int bits = h.getAtIndex(ValueLayout.JAVA_INT, 0), requested = h.getAtIndex(ValueLayout.JAVA_INT, 1);
             boolean global = h.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
-            var words = h.getAtIndex(ValueLayout.ADDRESS, 2).reinterpret(h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L).asReadOnly();
-            var palette = h.getAtIndex(ValueLayout.ADDRESS, 3).reinterpret((global ? 0 : bits == 0 ? 1 : (1 << bits) + (bits >= 5 ? 1 : 0)) * 4L).asReadOnly();
-            var count = h.getAtIndex(ValueLayout.ADDRESS, 4).reinterpret(4).asReadOnly();
+            var words = viewSegment(h.getAtIndex(ValueLayout.ADDRESS, 2), h.getAtIndex(ValueLayout.JAVA_INT, 3) * 8L);
+            var palette = viewSegment(h.getAtIndex(ValueLayout.ADDRESS, 3), (global ? 0 : bits == 0 ? 1 : (1 << bits) + (bits >= 5 ? 1 : 0)) * 4L);
+            var count = viewSegment(h.getAtIndex(ValueLayout.ADDRESS, 4), 4);
             var result = new View(this.owner, bits, requested, global, words, palette, count);
             if (lease.address() != 0) NativeReclaimer.register(previous != null ? previous : result, lease, NativeReclaimer.LIVE_SECTION_VIEW);
             adopted = true;
@@ -127,6 +138,10 @@ final class NativeLiveBlockSection {
         } catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Cannot view native live section", failure); }
         finally { if (!adopted && lease.address() != 0) release(VIEW_RELEASE, lease); Reference.reachabilityFence(this); }
+    }
+    /** A view span carrying the owner's scope, so a closed slab or release scope cannot be read through it. */
+    private MemorySegment viewSegment(MemorySegment address, long size) {
+        return (this.scope == null ? address.reinterpret(size) : address.reinterpret(size, this.scope, null)).asReadOnly();
     }
     static final class View {
         final int bits, requested, per, mul, add, shift;

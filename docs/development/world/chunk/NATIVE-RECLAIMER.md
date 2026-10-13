@@ -32,12 +32,23 @@ releases dead objects in batches of up to 1,024 per downcall.
   generations, registered against the previous view, which readers may still
   hold. Every read through a view fences it with `Reference.reachabilityFence`.
   `NativeDhContributors` registers itself, and each column holds and fences it.
+- Light layers register their owner segment, and each light view its metadata
+  segment, which terrain meshing passes to Rust and fences. DH heightmaps,
+  emitter sources and light fields register their owner (or view) segment;
+  native callers fence the holder (`ChunkInput`, the wrapper) across the call.
+  `NativeDhColumns` keeps its automatic arena, because column list views alias
+  its point slices.
+- Chunk block and biome input bindings register their owner segment unless a
+  release scope is open. Light-storage maps register owner and view against
+  the map object through the public `registerLightMap`.
 - A downcall that receives a raw address taken from a reclaimer-owned segment
   must keep the referent reachable until the call returns.
 - Adding a kind needs a code in both `NativeReclaimer` and `reclaim.rs`, and a
-  release export that drops exactly one reference. Kinds 1–8 are: block
+  release export that drops exactly one reference. Kinds 1–17 are: block
   section, retired block views, biome section, retired biome views, counters,
-  contributor snapshot, saved contributor batch, block snapshot. An unknown kind stops the
+  contributor snapshot, saved contributor batch, block snapshot, light layer,
+  light view, DH heightmaps, DH emitter sources, DH light field, chunk inputs,
+  chunk biome inputs, light map, light map view. An unknown kind stops the
   batch, and Java logs the leaked count.
 
 ## Chunk slabs
@@ -61,6 +72,32 @@ the native block install and four for the biome fill. It now makes about two,
 plus one slab per chunk. `-Dmattmc.chunk.sectionSlabs=false`
 restores the one-by-one path for control runs. `NativeChunkSlab.created()`
 counts slabs.
+
+## Release scopes
+
+[`NativeReleaseScope`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeReleaseScope.java)
+frees a short-lived workload's chunk storage explicitly, without waiting for the GC.
+
+- **Binding.** While a scope is open on a thread, these are bound to the scope's
+  shared arena instead of the reclaimer:
+  - block and biome section owners, their view segments, and counters;
+  - chunk slabs;
+  - chunk inputs and biome chunk inputs.
+- **Closing.** Closing the scope closes the arena and frees them all. A read
+  afterwards throws FFM's "already closed" `IllegalStateException`; it never
+  reads freed memory.
+- **Shared items.** Rust items stay reference counted, so a native consumer that
+  retains one keeps it alive.
+- **Deferred closes.** If another thread is still inside a call on one of the
+  segments, the close is retried by a later scope (`deferredCloses()`).
+
+Each DH batch generation event (`GenerationEvent`, not the internal-server
+mode) runs in a scope. Its chunks are event-local copies, and their results are
+merged into LOD sources before the event returns. Two kinds of object stay with
+the reclaimer: objects created on other threads, such as vanilla's parallel
+noise steps, and native DH outputs (columns, heightmaps, lighting fields).
+`-Dmattmc.dh.eventReleaseScope=false` turns scopes off. Open a scope only around
+work whose chunks provably don't escape it.
 
 ## Pressure collections
 
@@ -110,9 +147,15 @@ timings as indicative.
 | Before reclamation changes | 23.5 GB | — | — (did not measure) | — |
 | Reclaimer and creation-site fixes | 19.3, 16.7 GB | 7.9, 8.4 GB | 216 / 17.9 ms, 159 / 26.5 ms | 136 / 33.3 ms, 138 / 33.3 ms |
 | Plus pressure collections | 11.6, 12.1 GB | 7.9, 7.5 GB | 238 / 13.3 ms, 270 / 12.6 ms | 116 / 33.3 ms, 97 / 33.3 ms |
+| Release scopes, direct DH merge, more reclaimer kinds | 10.6, 10.6 GB | 7.1, 8.0 GB | 136 / 34.9 ms, 129 / 36.9 ms | 165 / 20.7 ms, 114 / 33.3 ms |
 
-Current still peaked about 4 GB above Frozen. Frozen's runs were shorter
-because Current restarts measurement while it waits for DH publication. These
+In the earlier rows Current restarted measurement while it waited for DH
+publication (12 and 20 restarts in the run before the last row), so it timed
+only quiet stretches. The last row (series `dhsmall6`, 2026-10-12) uses
+`dhPublicationDuringMeasurement=false`: neither client restarted, both timed
+frames during DH background work, and its timings are the first comparable
+pair. Current still peaked about 2.6–3.5 GB above Frozen and swapped
+(1.8–2.3 GB); Frozen did not. These
 runs don't establish bounded long-session memory, and they don't resolve the
 DH startup RSS failure recorded in
 [gameplay performance](../../rendering/GAMEPLAY-PERFORMANCE.md).

@@ -24,7 +24,11 @@ final class NativeBiomeChunkInputs {
         boolean attached = false;
         try {
             owners = Arrays.copyOf(scratch.owners, count);
-            owner = pointer.reinterpret(1, Arena.ofAuto(), NativeBiomeChunkInputs::release);
+            // A release scope's arena when one is open; otherwise the owner
+            // segment is the batched reclaimer's referent, and callers fence this object.
+            var release = NativeReleaseScope.current();
+            if (release != null) owner = pointer.reinterpret(1, release, NativeBiomeChunkInputs::release);
+            else { owner = pointer.reinterpret(1); NativeReclaimer.register(owner, pointer, NativeReclaimer.BIOME_CHUNK_INPUTS); }
             attached = true;
         } finally { if (!attached) release(pointer); }
     }

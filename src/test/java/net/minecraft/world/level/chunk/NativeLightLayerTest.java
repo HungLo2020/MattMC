@@ -43,6 +43,40 @@ class NativeLightLayerTest {
         }
     }
 
+    /**
+     * Layers and replaced views go to the batched reclaimer: unreachable ones
+     * are released through GC, and a retained layer, an old view of it and its
+     * terrain view stay readable after collections and further writes.
+     */
+    @Test void batchedReclaimerReleasesDroppedLayersAndKeepsRetainedOnes() throws Exception {
+        long layers = NativeReclaimer.registered(NativeReclaimer.LIGHT_LAYER);
+        long views = NativeReclaimer.registered(NativeReclaimer.LIGHT_VIEW);
+        long released = NativeReclaimer.released();
+        var kept = new DataLayer(3);
+        kept.set(1, 2, 3, 9);
+        var oldView = kept.nativeLightLayer().view();
+        var terrainView = kept.nativeLightView();
+        for (int round = 0; round < 3; round++) {
+            for (int i = 0; i < 2000; i++) {
+                var dropped = new DataLayer(i & 15);
+                dropped.set(i & 15, 0, 0, 5);
+                dropped.copy().fill(2);
+            }
+            System.gc();
+            Thread.sleep(50);
+            kept.set(round, 0, 0, round + 4);
+            assertEquals(9, kept.get(1, 2, 3), "retained layer after GC " + round);
+            assertEquals(round + 4, kept.get(round, 0, 0));
+            assertEquals(9, oldView.get(1 + 3 * 16 + 2 * 256), "a replaced view keeps its generation");
+            assertEquals(16, terrainView.byteSize(), "terrain view metadata stays mapped");
+        }
+        assertTrue(NativeReclaimer.registered(NativeReclaimer.LIGHT_LAYER) - layers >= 12_000, "layers are registered");
+        assertTrue(NativeReclaimer.registered(NativeReclaimer.LIGHT_VIEW) - views >= 12_000, "views are registered");
+        for (int wait = 0; wait < 100 && NativeReclaimer.released() - released < 1000; wait++) { System.gc(); Thread.sleep(20); }
+        assertTrue(NativeReclaimer.released() - released >= 1000, "dropped layers are released");
+        assertArrayEquals(kept.getData(), kept.copy().getData());
+    }
+
     @Test void independentPacketImportOwnsBytesWithoutAJavaClone() {
         byte[] payload = new byte[2048];
         payload[0] = 0x23;

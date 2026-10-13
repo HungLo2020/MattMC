@@ -178,7 +178,7 @@ public class DataLayer {
         if (this.nativeLayer != null) {
             this.nativeLayer.materialize();
             this.defaultValue = this.nativeLayer.view().rawDefault();
-            this.data = this.nativeLayer.view().bytes().toArray(java.lang.foreign.ValueLayout.JAVA_BYTE);
+            this.data = this.nativeLayer.view().copyBytes();
             this.nativeLayer.invalidate();
             this.nativeLayer = null;
             return this.data;

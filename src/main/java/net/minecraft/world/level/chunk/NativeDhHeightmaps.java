@@ -18,7 +18,9 @@ public final class NativeDhHeightmaps {
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final MemorySegment view;
     private NativeDhHeightmaps(MemorySegment pointer) {
-        try { view = pointer.asReadOnly().reinterpret(BYTES, Arena.ofAuto(), NativeDhHeightmaps::release); }
+        // The view is the batched reclaimer's referent; reads fence this object
+        // and native callers fence its holder.
+        try { view = pointer.reinterpret(BYTES).asReadOnly(); NativeReclaimer.register(view, pointer, NativeReclaimer.DH_HEIGHTMAPS); }
         catch (Throwable failure) { release(pointer); throw failure; }
     }
     private static void release(MemorySegment pointer) {

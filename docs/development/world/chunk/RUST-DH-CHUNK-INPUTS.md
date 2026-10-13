@@ -49,8 +49,10 @@ there is no second binding cache for the new
   disappear. Independently retained inputs remain valid; immutable height,
   emitter, light and column outputs own their values independently of inputs.
   An obsolete cached binding can retain a replaced container until the next
-  admission or chunk unload. Reclamation still depends on Java arena/GC lifetimes
-  during transition; sustained memory behavior remains unverified.
+  admission or chunk unload. Block and biome bindings are `NativeReclaimer`
+  registrations (kinds 14 and 15); every native caller fences the binding
+  object. Inside a `NativeReleaseScope` they bind to the scope's arena instead.
+  Sustained memory behavior remains unverified.
   Immutable bindings publish through a volatile cache; concurrent cold admission
   may create duplicate temporary leases. No cache monitor encloses escape or
   compatibility callbacks.

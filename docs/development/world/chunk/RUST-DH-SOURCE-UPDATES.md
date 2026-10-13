@@ -94,6 +94,41 @@ a GC release deadline or permit closing a batch while those readers are live.
   footprints while readers exist. Validate total retention in sustained runtime
   memory checks before claiming resource acceptance.
 
+## Generated chunks merge without a producer source
+
+A generated chunk's `NativeDhColumns` merge straight into its block-detail memory
+source (`FullDataSourceV2.updateFromNativeColumns`, Rust
+`mattmc_dh_same_detail_columns`). The route works like this:
+
+- **Remap.** `FullDataPointIdMap.mergeAndReturnRemappedEntityIds(NativeDhColumns)`
+  adds each producer material, in order, unless an equal entry exists
+  (`NativeDhIdMap.addIfAbsent`). That gives the same IDs, append order and tint
+  bindings as the native deduplicating merge. A tint binds only onto a new entry.
+- **Merge.** The owned same-detail merge reads the producer's 16×16 region in
+  place, with generation LIGHT, its compression and the block-detail uniform
+  flag. No other column has a source.
+- **Commit.** The commit stamps the recipient's mapping, but has no source table
+  to publish copy proofs against.
+- **Afterwards.** The input's flags apply as they would for a producer
+  (`applyToParent` true, `applyToChildren` null), followed by the shared
+  `finishUpdate` culling and hash.
+
+It replaces the per-chunk producer: a `FullDataSourceV2` with its native
+source, 256 column bindings, metadata, `FullDataPointIdMap` and a producer
+`NativeDhIdMap` with one add per material.
+
+Generation trackers that accept columns (`IWorldGenTaskTracker.getNativeColumnsConsumer`)
+receive them through `WorldGenTaskGroup.consumeNativeColumns`. Any other
+tracker gets one producer source, built only if needed. The DH save cache
+merges under its usual per-position lock (`writeNativeColumnsToMemoryAndQueueSave`).
+
+When the direct route does not apply, the save cache merges a producer through
+`updateFromDataSource`. That covers dev builds (`RUN_DATA_ORDER_VALIDATION`),
+subclasses, another position or detail, contributors, more than 4,096
+materials, or a native decline. The mapping merge already done is idempotent.
+`NativeDhColumnsMergeTest` compares both routes for every point, mapping
+entry, metadata byte, hash and flag.
+
 ## Verification
 
 Use JDK25 and a consistently configured release library:

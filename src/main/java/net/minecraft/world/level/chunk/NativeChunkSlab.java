@@ -43,7 +43,9 @@ public final class NativeChunkSlab {
         int[] biome = NativeLiveBiomeSection.freshParameters(factory.biomeStrategy(), factory.defaultBiome());
         var binding = NativeLiveBiomeSection.binding(factory.biomeStrategy());
         if (block == null || biome == null || binding == null) return null;
-        var arena = Arena.ofAuto();
+        // A release scope frees the slab when it closes; otherwise when no item is reachable.
+        var release = NativeReleaseScope.current();
+        var arena = release != null ? release : Arena.ofAuto();
         MemorySegment slab;
         long[] items = new long[3 * count];
         try (var scratch = Arena.ofConfined()) {
@@ -58,8 +60,8 @@ public final class NativeChunkSlab {
         slab.reinterpret(1, arena, NativeChunkSlab::release);
         var sections = new LevelChunkSection[count];
         for (int i = 0; i < count; i++) {
-            var blocks = NativeLiveBlockSection.adoptBorrowed(MemorySegment.ofAddress(items[i]).reinterpret(1, arena, null));
-            var biomes = NativeLiveBiomeSection.adoptBorrowed(MemorySegment.ofAddress(items[count + i]).reinterpret(1, arena, null), binding);
+            var blocks = NativeLiveBlockSection.adoptBorrowed(MemorySegment.ofAddress(items[i]).reinterpret(1, arena, null), arena);
+            var biomes = NativeLiveBiomeSection.adoptBorrowed(MemorySegment.ofAddress(items[count + i]).reinterpret(1, arena, null), binding, arena);
             var counters = new NativeSectionCounters(MemorySegment.ofAddress(items[2 * count + i]).reinterpret(8, arena, null), true);
             sections[i] = new LevelChunkSection(counters,
                 new PalettedContainer<BlockState>(factory.blockStatesStrategy(), blocks),

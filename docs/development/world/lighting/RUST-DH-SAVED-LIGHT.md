@@ -38,9 +38,9 @@ Implementation: [saved policy](https://github.com/HungLo2020/MattMC/blob/b32fd91
   not freeze an empty emitter cache or enumerate emitters early.
 - Each call pins its heap nibble spans synchronously. Rust retains independent
   bytes and counters, with no Java source pointer or live chunk/world reference.
-  The scoped importer releases on success, decline or exception. Fields keep
-  existing automatic arena lifetimes; sustained memory behavior needs runtime
-  verification. No global importer cache is added.
+  The scoped importer releases on success, decline or exception. Fields are
+  released by the batched `NativeReclaimer` (kind 13); sustained memory
+  behavior needs runtime verification. No global importer cache is added.
 - Bound fields to 256 sections and input lists to 4,096 entries. Unsupported
   heights, tag subclasses, malformed lists and short arrays decline before
   publication. The compatibility reader supplies its original failure/log.
