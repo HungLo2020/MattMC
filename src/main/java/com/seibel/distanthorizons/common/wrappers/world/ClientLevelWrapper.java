@@ -229,7 +229,18 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	}
 	
 	@Override 
-	public void clearBlockColorCache() { this.blockColorCacheByBlockState.clear(); }
+	public void clearBlockColorCache() {
+		this.blockColorCacheByBlockState.clear();
+		net.vulkanic.world.NativeDhConversionScope.colorsChanged();
+	}
+
+	/** Read an already-resolved stock color without constructing a cache entry. */
+	public long resolvedConstantColor(BlockStateWrapper block)
+	{
+		ClientBlockStateColorCache cache = this.blockColorCacheByBlockState.get(block.blockState);
+		return cache != null && cache.getClass() == ClientBlockStateColorCache.class
+			? cache.resolvedConstantColor() : 0L;
+	}
 	
 	@Override
 	public IDimensionTypeWrapper getDimensionType()

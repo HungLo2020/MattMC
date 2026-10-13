@@ -26,9 +26,12 @@ and [consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/co
 - Already escaped lists, custom lists and closed sources retain their public
   getter path and identity. Source subclasses retain the original traversal.
   Missing/empty facts and corrupt negative logical sizes remain distinct.
-- Contextual material/color callbacks, conversion arithmetic, sparse semantic
-  sidecars and render-column traversal remain Java. This slice removes
-  persistent reader construction; it does not complete conversion migration.
+- Contextual material/color callbacks, sparse semantic sidecars and source
+  traversal remain Java. The subsequent [conversion-policy migration](../../rendering/RUST-DH-CONVERSION.md)
+  moves arithmetic into Rust and consumes this reader directly. Its full-source
+  CPU comparison, lifecycle checks and settled pairs pass; broader runtime
+  acceptance remains open. This published reader checkpoint alone does not
+  complete conversion migration.
 
 ## Verification
 

@@ -13,6 +13,21 @@ pub struct Source {
     uniform: Option<Box<[u8]>>,
 }
 impl Source {
+    fn conversion_index(&self, window: u64, index: i32) -> Option<usize> {
+        let first = window as u32 as usize;
+        let count = (window >> 32) as u32 as usize;
+        if index < 0 || index as usize >= count || first > self.points.len()
+            || count > self.points.len() - first { return None; }
+        Some(first + index as usize)
+    }
+    pub(crate) fn conversion_read(&self, window: u64, index: i32) -> Option<u64> {
+        self.conversion_index(window, index).map(|i| self.points[i])
+    }
+    pub(crate) fn conversion_write(&mut self, window: u64, index: i32, value: u64) -> bool {
+        let Some(i) = self.conversion_index(window, index) else { return false; };
+        self.points[i] = value;
+        true
+    }
     /// A boxed source cannot resize. Resolve bounded neighbor windows directly
     /// while the caller holds its scoped owner, without four Java span adapters.
     pub(crate) fn window(&self, packed: u64) -> Result<(*const u64, i32), ()> {

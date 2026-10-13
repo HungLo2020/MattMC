@@ -6,5 +6,5 @@
 | Vanilla + DH | 796.85 / 873.55 | 3.363 / 4.368 |
 | Shaders | 347.40 / 314.85 | 5.376 / 7.484 |
 | Shaders + DH | 264.00 / 226.95 | 6.492 / 9.940 |
-FPS rows describe preceding native a9286e05: DH misses Frozen by 8.8%; the 13.25 GiB startup RSS failure remains open. Reader bbd8fc84 has no accepted new gameplay timing: the ordinary pair failed focus/observer checks.
-Reader CPU Current/public-reader/Frozen: 56.59/57.20/46.14 ms; Java allocation 7.14/33.85/4.21 MB (78.9% below control). CPU remains 22.6% slower Frozen. All 51 Rust DH tests and 2,049 Java/parity tests pass (2 skipped), plus two lifetime gates/three settled pairs. [Report](docs/development/world/chunk/RUST-DH-CONVERSION-READERS.md).
+FPS rows describe published native a9286e05: DH misses Frozen by 8.8%; the 13.25 GiB startup RSS failure remains open. The conversion-policy candidate has no runtime/FPS acceptance.
+DH full-source CPU Current/preceding/Frozen50.29/63.57/64.69ms; heap5.85/34.23/29.85MB. Rust policy/colors/scratch pass output/guard checks;22.3% faster Frozen in this CPU fixture. Rust2736/Java2058 pass (3ignored/2skipped); 7lifecycle/3settled pairs pass,VUID0; no new FPS acceptance. Integrated check/Wiki pass. [Report](docs/development/rendering/RUST-DH-CONVERSION.md).

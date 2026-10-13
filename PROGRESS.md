@@ -12,7 +12,7 @@
 ## Current ownership and remaining migration
 
 - Rust owns renderer/GAL/presentation, terrain assembly/visibility, canonical block/biome sections, light fields and biome color windows.
-- Rust owns DH materials/topology/packets, retained visibility, primary full/render points and dense metadata, and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
+- Rust owns DH conversion policy/temporary points/color reuse, materials/topology/packets, retained visibility, primary full/render points and dense metadata, and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
 - Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index and manager residency serve production client/server consumers.
 - Java retains entity simulation, behavior callbacks, visibility transitions, persistence I/O and the loading inbox.
@@ -25,7 +25,7 @@
 - ae7f499b3: entity UUID/chunk residency and persistence admission. 1a977b9db: fog numerical policy.
 - 61805d6dc: retained light queues/sky seeds. 8e16a569c: direct block-light inputs and bulk DH column resizing. 7acbefd0f: matched performance/memory reports.
 - b6a0f89ca: primary Rust DH point codecs and lazy closed-source readers. Real24-DTO hydration improved29.4%; historical matrix still missed the DH FPS floor5.8%.
-- Integrated upstream f1de16e11 without conflicts: sky transforms/native stars, identity-map critical calls and GUI allocation changes.
+- Integrated upstream f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
 - Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
 
 ## Verified metadata and bulk-IO checkpoint
@@ -69,13 +69,20 @@
 - First24-saved-source hydration/read/close comparison: Current57.89ms, public-reader control56.24ms, Frozen44.04ms; exact point checksums and source/class/native/corpus guards pass. Java allocation7.14/33.85/4.21MB. CPU floor fails; original attempt retained.
 - Off-heap scalar result candidate56.59/57.20/46.14ms (Current/public/Frozen), heap7.14/33.85/4.21MB. CPU still22.6% slower Frozen;78.9% less Java allocation than control. Full Java/parity2049/2skip and51 Rust DH tests pass. Three settled pairs pass,VUID0;6 originals reviewed.
 - Removed direct-span experiment:55.84ms but15.00MB heap and broader invalidation machinery. Source hashes exactly match simpler candidate. Receipts/predecessor: build/native-dh-conversion-reader/. SUMMARY describes published a9286e05, not this candidate.
-
 - Ordinary paired gameplay failed: Current lost focus before travel; Frozen observer failed reflection before timing. Preserved both, added full error stacks; short Frozen diagnostic passes but does not reproduce/explain failure. No accepted new FPS. World unload/reload and resource reload pass with zero failures.
+
+## Conversion-policy checkpoint
+
+- 0a7d1f4af published the scoped reader; this batch migrates the actual top-down conversion loop into Rust. No Java loop fallback; contextual callbacks and semantic publication remain transitional Java.
+- Initial prototype matches896 Frozen color-only and896 preceding semantic output/callback/failure-prefix cases. Saved-geometry CPU174.70/38.61/33.12ms(candidate/preceding/Frozen) rejects its callback-heavy boundary; no performance acceptance or publication.
+- Native1fcb8c8c reads retained columns/writes render windows directly and derives intrinsic facts in Rust. Callback-frame reuse removes allocation churn. Final10 oracle runs pass896cases each; guarded CPU66.53/39.85/22.00ms(candidate/preceding/Frozen), heap63.39/48.45/42.93MB still FAIL. Java/parity2053/2skip,61 focused Rust tests and Wiki pass. No runtime acceptance. Guide: rendering/RUST-DH-CONVERSION.md.
+- Native561b048e: Rust policy/untinted-color reuse/reload invalidation/native overflow scratch. Full-source CPU50.29/63.57/64.69ms(Current/preceding/Frozen), heap5.85/34.23/29.85MB;22.3% faster Frozen, outputs/10oracles/guards pass. Rust2736/3ignored, Java2058/2skip pass. Seven lifecycle and3settled Frozen pairs pass,VUID0;13 originals/10 Current identities reviewed. No new FPS acceptance. Integrated test/parity/slow tiers pass1863/184/11,2skip; Wiki passes.
+- Retired3 older copied worlds/308773838bytes and the runtime harness retired10 new completed copies; originals, failures and receipts retained. Receipt: build/native-dh-conversion-policy/retention.json.
 
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Profile remaining DH conversion traversal, sparse semantics and full-source lifetimes; migrate producers/consumers together. Investigate startup RSS and shutdown rejection. Continue node/world-state ownership with adequate samples. Keep CPU hydration gains separate from whole-game measurements.
+- Next: profile the next world-state/frame-input ownership slice and migrate its producer with its consumer. Native561b048e is the verified conversion checkpoint. CPU fixtures omit texture/tint resolution; new gameplay/FPS and long memory remain open. Startup RSS, shutdown rejection and whole-game performance remain open.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.

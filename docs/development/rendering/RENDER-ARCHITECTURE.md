@@ -624,6 +624,15 @@ source traversal and contextual getter implementations remain Java; ordinary
 box/face construction is now [native](RUST-DH-VERTICAL-FACES.md). The admitted
 [cached tint path](../world/biome/RUST-DH-TINT.md) now samples retained inputs in Rust.
 
+The [full-data conversion migration](RUST-DH-CONVERSION.md) also moves
+cave/snow policy, tint transfer, point packing and adjacent-point merging into
+Rust. Ordinary input, output and overflow scratch stay in native storage.
+Conversion-scoped material facts and untinted colors avoid repeated Java queries;
+color reloads invalidate native reuse. Java retains contextual color providers,
+source traversal and semantic sidecar orchestration. Full CPU comparisons,
+source tests, seven lifecycle scenarios and three settled Frozen pairs pass;
+gameplay performance and broader rendering acceptance remain separate.
+
 Ordinary [quad builds](RUST-DH-QUADS.md) retain lists and merge topology in Rust.
 [Packet plans](RUST-DH-PACKETS.md) now select layers, determine ordered contextual
 callbacks and encode final vertices and semantic companions. Java supplies raw

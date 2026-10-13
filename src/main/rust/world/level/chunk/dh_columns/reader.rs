@@ -4,6 +4,21 @@ use super::{mutable::{Column, Lease}, source::Source};
 
 pub(crate) struct Reader { column: Option<Lease> }
 
+impl Reader {
+    pub(crate) fn size(&self) -> i32 {
+        self.column.as_ref().map_or(0, |lease| unsafe {
+            (*(lease.identity() as *const Column)).logical_len() as i32
+        })
+    }
+    pub(crate) fn point(&self, index: i32) -> Option<u64> {
+        if index < 0 { return None; }
+        let lease = self.column.as_ref()?;
+        let column = unsafe { &*(lease.identity() as *const Column) };
+        if column.invalid_size() { return None; }
+        column.points().get(index as usize).copied()
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn mattmc_dh_reader_create() -> *mut Reader {
     Box::into_raw(Box::new(Reader { column: None }))
@@ -29,17 +44,13 @@ pub unsafe extern "C" fn mattmc_dh_reader_select(reader: *mut Reader, source: *c
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_reader_size(reader: *const Reader) -> i32 {
-    reader.as_ref().and_then(|r| r.column.as_ref())
-        .map_or(0, |lease| (*(lease.identity() as *const Column)).logical_len() as i32)
+    reader.as_ref().map_or(0, Reader::size)
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_reader_get(reader: *const Reader, index: i32, out: *mut u64) -> i32 {
     if index < 0 || out.is_null() || out as usize % 8 != 0 { return 0; }
-    let Some(lease) = reader.as_ref().and_then(|r| r.column.as_ref()) else { return 0; };
-    let column = &*(lease.identity() as *const Column);
-    if column.invalid_size() { return 0; }
-    let Some(value) = column.points().get(index as usize) else { return 0; };
-    *out = *value;
+    let Some(value) = reader.as_ref().and_then(|reader| reader.point(index)) else { return 0; };
+    *out = value;
     1
 }
 

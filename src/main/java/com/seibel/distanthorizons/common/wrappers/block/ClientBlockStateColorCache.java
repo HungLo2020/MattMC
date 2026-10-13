@@ -392,6 +392,14 @@ public class ClientBlockStateColorCache
 	// public getter //
 	//===============//
 	
+	/** Bounded semantic fact for Rust conversion: bit 32 marks a resolved,
+	 * position-independent color. Never resolves textures or calls a tint provider. */
+	public long resolvedConstantColor()
+	{
+		return this.isColorResolved && !this.needPostTinting
+			? (1L << 32) | Integer.toUnsignedLong(this.baseColor) : 0L;
+	}
+
 	public int getColor(BiomeWrapper biomeWrapper, FullDataSourceV2 fullDataSource, DhBlockPos blockPos)
 	{
 		// only get the tint if the block needs to be tinted

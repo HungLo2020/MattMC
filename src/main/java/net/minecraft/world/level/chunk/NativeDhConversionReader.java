@@ -63,6 +63,9 @@ public final class NativeDhConversionReader extends AbstractLongList implements 
         } catch (Throwable failure) { throw failure(failure); }
     }
     @Override public void close() { if (arena.scope().isAlive()) arena.close(); }
+    /** Pin only for a synchronous native consumer. No selected point address
+     * escapes; Rust resolves the live lease after each contextual callback. */
+    public MemorySegment borrowOwner() { return owner; }
     private static void release(MemorySegment pointer) {
         try { RELEASE.invokeExact(pointer); } catch (Throwable failure) { throw failure(failure); }
     }

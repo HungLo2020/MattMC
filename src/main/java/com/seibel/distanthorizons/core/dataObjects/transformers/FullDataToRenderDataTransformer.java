@@ -2,26 +2,20 @@ package com.seibel.distanthorizons.core.dataObjects.transformers;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiBlocksToAvoid;
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pooling.PhantomArrayListCheckout;
 import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
 import com.seibel.distanthorizons.core.util.*;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
@@ -32,7 +26,6 @@ import java.util.List;
  */
 public class FullDataToRenderDataTransformer
 {
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	// Pure semantic helpers can run before platform dependencies are registered.
 	private static final class WrapperDependencies
@@ -40,7 +33,6 @@ public class FullDataToRenderDataTransformer
 		private static final IWrapperFactory FACTORY = SingletonInjector.INSTANCE.get(IWrapperFactory.class);
 	}
 	
-	private static final LongOpenHashSet BROKEN_POS_SET = new LongOpenHashSet();
 	private static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("Data Transformer");
 	
 	private static HashSet<IBlockStateWrapper> snowLayerBlockStates = null;
@@ -114,20 +106,24 @@ public class FullDataToRenderDataTransformer
 			boolean preserveSemanticMaterials =
 				net.vulkanic.world.DistantHorizonsSemanticCollector.semanticMaterialPreservationRequired();
 
-			for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
+			try (var conversionScope = net.vulkanic.world.NativeDhConversionScope.create(levelWrapper, fullDataSource))
 			{
-				for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
+				for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
 				{
-					ColumnArrayView columnArrayView = columnSource.getVerticalDataPointView(x, z);
-					LongList dataColumn = reader == null ? fullDataSource.getColumnAtRelPos(x, z)
-						: reader.column(x * FullDataSourceV2.WIDTH + z);
+					for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
+					{
+						ColumnArrayView columnArrayView = columnSource.getVerticalDataPointView(x, z);
+						LongList dataColumn = reader == null ? fullDataSource.getColumnAtRelPos(x, z)
+							: reader.column(x * FullDataSourceV2.WIDTH + z);
 
-					updateOrReplaceRenderDataViewColumnWithFullDataColumn(
-							levelWrapper, fullDataSource, columnSource, x, z,
-							// bitshift is to account for LODs with a detail level greater than 0 so the block pos is correct
-							baseX + BitShiftUtil.pow(x,dataDetail), baseZ + BitShiftUtil.pow(z,dataDetail),
-							columnArrayView, dataColumn, preserveSemanticMaterials);
+						updateColumnWithScope(
+								levelWrapper, fullDataSource, columnSource, x, z,
+								// bitshift is to account for LODs with a detail level greater than 0 so the block pos is correct
+								baseX + BitShiftUtil.pow(x,dataDetail), baseZ + BitShiftUtil.pow(z,dataDetail),
+								columnArrayView, dataColumn, preserveSemanticMaterials, conversionScope);
+					}
 				}
+
 			}
 
 			columnSource.fillDebugFlag(0, 0, ColumnRenderSource.WIDTH, ColumnRenderSource.WIDTH, ColumnRenderSource.DebugSourceFlag.FULL);
@@ -166,6 +162,18 @@ public class FullDataToRenderDataTransformer
 			ColumnArrayView columnArrayView, 
 			LongList fullDataColumn, boolean preserveSemanticMaterials)
 	{
+		updateColumnWithScope(levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
+			blockX, blockZ, columnArrayView, fullDataColumn, preserveSemanticMaterials, null);
+	}
+
+	private static void updateColumnWithScope(
+			IClientLevelWrapper levelWrapper,
+			FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+			int blockX, int blockZ,
+			ColumnArrayView columnArrayView,
+			LongList fullDataColumn, boolean preserveSemanticMaterials,
+			net.vulkanic.world.NativeDhConversionScope conversionScope)
+	{
 		columnSource.clearSemanticMaterialsForColumn(renderSourceX, renderSourceZ);
 		// we can't do anything if the full data is missing or empty
 		if (fullDataColumn == null 
@@ -180,32 +188,40 @@ public class FullDataToRenderDataTransformer
 			// Directly use the arrayView since it fits.
 			setRenderColumnView(
 				levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
-				blockX, blockZ, columnArrayView, fullDataColumn, preserveSemanticMaterials, null, null, null
+				blockX, blockZ, columnArrayView, fullDataColumn, preserveSemanticMaterials, null, null, null, conversionScope
 			);
 		}
 		else
 		{
-			PhantomArrayListCheckout checkout = ARRAY_LIST_POOL.checkoutArrays(0, 0, 1);
-			LongList dataArrayList = checkout.getLongArray(0, fullDataLength);
+			LongList nativeScratch = conversionScope != null
+				&& fullDataColumn instanceof net.minecraft.world.level.chunk.NativeDhConversionReader
+				? conversionScope.temporaryOutput(fullDataLength) : null;
+			PhantomArrayListCheckout checkout = nativeScratch == null ? ARRAY_LIST_POOL.checkoutArrays(0, 0, 1) : null;
+			LongList dataArrayList = nativeScratch != null ? nativeScratch : checkout.getLongArray(0, fullDataLength);
 			
 			try
 			{
 				// expand the ColumnArrayView to fit the new larger max vertical size
 				ColumnArrayView newColumnArrayView = new ColumnArrayView(dataArrayList, fullDataLength, 0, fullDataLength);
-				int[] expandedSemanticMaterials = new int[fullDataLength];
-				byte[] expandedVariantStates = new byte[fullDataLength];
-				long[] expandedVariantPositions = new long[fullDataLength];
+				int[] expandedSemanticMaterials = preserveSemanticMaterials ? new int[fullDataLength] : null;
+				byte[] expandedVariantStates = preserveSemanticMaterials ? new byte[fullDataLength] : null;
+				long[] expandedVariantPositions = preserveSemanticMaterials ? new long[fullDataLength] : null;
 				setRenderColumnView(
 					levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
 					blockX, blockZ, newColumnArrayView, fullDataColumn, preserveSemanticMaterials, expandedSemanticMaterials,
-					expandedVariantStates, expandedVariantPositions
+					expandedVariantStates, expandedVariantPositions, conversionScope
 				);
 				
-				int[] reducedSemanticMaterials = new int[columnArrayView.size()];
-				RenderDataPointUtil.mergeMultiData(
-						newColumnArrayView, expandedSemanticMaterials,
-						columnArrayView, reducedSemanticMaterials
-				);
+				int[] reducedSemanticMaterials = preserveSemanticMaterials ? new int[columnArrayView.size()] : null;
+				if (preserveSemanticMaterials)
+				{
+					RenderDataPointUtil.mergeMultiData(newColumnArrayView, expandedSemanticMaterials,
+						columnArrayView, reducedSemanticMaterials);
+				}
+				else
+				{
+					RenderDataPointUtil.mergeMultiData(newColumnArrayView, columnArrayView);
+				}
 				for (int index = 0; preserveSemanticMaterials && index < columnArrayView.verticalSize(); index++)
 				{
 					List<ColumnRenderSource.SemanticMaterialSpan> spans = reducedSemanticMaterialSpans(
@@ -239,7 +255,7 @@ public class FullDataToRenderDataTransformer
 			}
 			finally
 			{
-				ARRAY_LIST_POOL.returnCheckout(checkout);
+				if (checkout != null) ARRAY_LIST_POOL.returnCheckout(checkout);
 			}
 		}
 		if (!preserveSemanticMaterials)
@@ -415,7 +431,8 @@ public class FullDataToRenderDataTransformer
 			int blockX, int blockZ,
 			ColumnArrayView renderColumnData, LongList fullColumnData,
 			boolean preserveSemanticMaterials, int[] semanticMaterialScratch,
-			byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch)
+			byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch,
+			net.vulkanic.world.NativeDhConversionScope conversionScope)
 	{
 		if (semanticMaterialScratch != null && semanticMaterialScratch.length < renderColumnData.size())
 		{
@@ -460,254 +477,14 @@ public class FullDataToRenderDataTransformer
 				&& !levelWrapper.getDimensionType().isTheEnd()
 			);
 		
-		boolean isColumnVoid = true;
-		
-		int colorToApplyToNextBlock = -1;
-		int lastColor = 0;
-		int lastBottom = -10_000;
-		
-		int skylightToApplyToNextBlock = -1;
-		int blocklightToApplyToNextBlock = -1;
-		int renderDataIndex = 0;
-		
-		
-		
-		//==================================//
-		// convert full data to render data //
-		//==================================//
-		
-		FullDataPointIdMap fullDataMapping = fullDataSource.mapping;
-		
-		DhBlockPosMutable mutableBlockPos = new DhBlockPosMutable(blockX, 0, blockZ);
-		
-		// goes from the top down
-		for (int fullDataIndex = 0; fullDataIndex < fullColumnData.size(); fullDataIndex++)
-		{
-			long fullData = fullColumnData.getLong(fullDataIndex);
-			
-			int bottomY = FullDataPointUtil.getBottomY(fullData);
-			int blockHeight = FullDataPointUtil.getHeight(fullData);
-			int topY = bottomY + blockHeight;
-			int id = FullDataPointUtil.getId(fullData);
-			int blockLight = FullDataPointUtil.getBlockLight(fullData);
-			int skyLight = FullDataPointUtil.getSkyLight(fullData);
-			
-			mutableBlockPos.setY(bottomY + levelWrapper.getMinHeight());
-			
-			IBiomeWrapper biome;
-			IBlockStateWrapper block;
-			try
-			{
-				biome = fullDataMapping.getBiomeWrapper(id);
-				block = fullDataMapping.getBlockStateWrapper(id);
-			}
-			catch (IndexOutOfBoundsException e)
-			{
-				if (!BROKEN_POS_SET.contains(fullDataMapping.getPos()))
-				{
-					BROKEN_POS_SET.add(fullDataMapping.getPos());
-					String levelId = levelWrapper.getDhIdentifier();
-					LOGGER.warn("Unable to get data point with id ["+id+"] " +
-							"(Max possible ID: ["+fullDataMapping.getMaxValidId()+"]) " +
-							"for pos ["+fullDataMapping.getPos()+"] in level ["+levelId+"]. " +
-							"Error: ["+e.getMessage()+"]. " +
-							"Further errors for this position won't be logged.");
-				}
-				
-				// don't render broken data
-				continue;
-			}
-			
-			
-			
-			//====================//
-			// ignored block and  //
-			// cave culling check //
-			//====================//
-			
-			boolean ignoreBlock = blockStatesToIgnore.contains(block);
-			boolean caveBlock = caveBlockStatesToIgnore.contains(block); // TODO caves should also ignore transparent/non-solid blocks (IE grass and plants) wthout each being defined
-			if (caveBlock)
-			{
-				if (caveCullingEnabled
-						// assume this data point is underground if it has no sky-light
-						&& skyLight == LodUtil.MIN_MC_LIGHT
-						// ignore caves above a certain height to prevent floating islands from having walls underneath them
-						&& topY < caveCullingMaxY
-						// cave culling shouldn't happen when at the top of the world
-						&& renderDataIndex != 0 && fullDataIndex != 0
-						// cave culling can't happen when at the bottom of the world
-						&& (fullDataIndex + 1) < fullColumnData.size())
-				{
-					// we need to get the next sky/block lights because
-					// the air block here will always have a light of 0/0 due to only the top of the LOD's light being saved.
-					long nextFullData = fullColumnData.getLong(fullDataIndex + 1);
-					int nextSkyLight = FullDataPointUtil.getSkyLight(nextFullData);
-					
-					if (nextSkyLight == LodUtil.MIN_MC_LIGHT
-							&& ColorUtil.getAlpha(lastColor) == 255)
-					{
-						// replace the previous block with new bottom
-						long columnData = renderColumnData.get(renderDataIndex - 1);
-						columnData = RenderDataPointUtil.setYMin(columnData, bottomY);
-						renderColumnData.set(renderDataIndex - 1, columnData);
-					}
-					
-					continue;
-				}
-				
-				
-				if (ignoreBlock)
-				{
-					// this is a merged block and a cave block, so it should never be rendered
-					continue;
-				}
-			}
-			else if (ignoreBlock)
-			{
-				// this is an ignored block, but shouldn't be merged like a cave block
-				continue;
-			}
-			
-			
-			
-			//=======================//
-			// non-solid block check //
-			//=======================//
-			
-			boolean ignoreNonSolidBlock =
-				ignoreNonCollidingBlocks
-				&& !block.isSolid()
-				&& !block.isLiquid()
-				&& block.getOpacity() != LodUtil.BLOCK_FULLY_OPAQUE;
-			
-			// merge snow into the block below it
-			if (snowLayerBlockStates.contains(block))
-			{
-				// sometimes a snow datapoint will be multiple blocks tall,
-				// in that case we just want to drop the top by 1
-				blockHeight -= 1;
-				if (blockHeight == 0)
-				{
-					// this snow block was entirely removed, just color the block below it
-					ignoreNonSolidBlock = true;
-				}
-			}
-			
-			if (ignoreNonSolidBlock)
-			{
-				if (colorBelowWithAvoidedBlocks)
-				{
-					int tempColor = levelWrapper.getBlockColor(mutableBlockPos, biome, fullDataSource, block);
-					
-					// don't transfer the color when alpha is 0
-					// this prevents issues if grass is transparent
-					if (ColorUtil.getAlpha(tempColor) != 0)
-					{
-						colorToApplyToNextBlock = ColorUtil.setAlpha(tempColor, 255);
-						skylightToApplyToNextBlock = skyLight;
-						blocklightToApplyToNextBlock = blockLight;
-						// The visible surface will use another block's geometry but this
-						// avoided block's color. It has no exact texture identity.
-					}
-				}
-				
-				// skip this non-colliding block
-				continue;
-			}
-			
-			
-			int color;
-			int semanticMaterialId = ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE;
-			byte semanticVariantState = ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE;
-			long semanticVariantPosition = 0L;
-			if (colorToApplyToNextBlock == -1 || block.isLiquid())
-			{
-				// use this block's color
-				color = levelWrapper.getBlockColor(mutableBlockPos, biome, fullDataSource, block);
-				colorToApplyToNextBlock = -1;
-				if (preserveSemanticMaterials)
-				{
-					semanticMaterialId = columnSource.internSemanticMaterial(
-						block.getSerialString(), biome.getSerialString()
-					);
-					if (semanticMaterialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
-					{
-						semanticVariantState = ColumnRenderSource.SEMANTIC_VARIANT_EXACT;
-						semanticVariantPosition = ColumnRenderSource.packSemanticVariantPosition(
-							blockX, bottomY + levelWrapper.getMinHeight(), blockZ
-						);
-					}
-				}
-			}
-			else
-			{
-				// use the previous block's color
-				color = colorToApplyToNextBlock;
-				colorToApplyToNextBlock = -1;
-				skyLight = skylightToApplyToNextBlock;
-				blockLight = blocklightToApplyToNextBlock;
-			}
-			
-			
-			
-			//=============================//
-			// merge same-colored adjacent //
-			//=============================//
-			
-			// check if they share a top-bottom face and if they have same color
-			if (color == lastColor 
-				&& bottomY + blockHeight == lastBottom
-				&& renderDataIndex > 0
-				&& (!preserveSemanticMaterials || sameSemanticMaterial(
-					semanticMaterialAt(
-						columnSource, renderSourceX, renderSourceZ, semanticMaterialScratch, renderDataIndex - 1
-					),
-					semanticMaterialId
-				)))
-			{
-				//replace the previous block with new bottom
-				long columnData = renderColumnData.get(renderDataIndex - 1);
-				columnData = RenderDataPointUtil.setYMin(columnData, bottomY);
-				renderColumnData.set(renderDataIndex - 1, columnData);
-				if (preserveSemanticMaterials)
-				{
-					mergeSemanticVariantAt(
-						columnSource, renderSourceX, renderSourceZ,
-						semanticVariantStateScratch, semanticVariantPositionScratch,
-						renderDataIndex - 1, semanticVariantState, semanticVariantPosition
-					);
-				}
-			}
-			else
-			{
-				// add the block
-				isColumnVoid = false;
-				long columnData = RenderDataPointUtil.createDataPoint(bottomY + blockHeight, bottomY, color, skyLight, blockLight, block.getMaterialId());
-				renderColumnData.set(renderDataIndex, columnData);
-				if (preserveSemanticMaterials)
-				{
-					setSemanticMaterialAt(
-						columnSource, renderSourceX, renderSourceZ, semanticMaterialScratch,
-						renderDataIndex, semanticMaterialId
-					);
-					setSemanticVariantAt(
-						columnSource, renderSourceX, renderSourceZ,
-						semanticVariantStateScratch, semanticVariantPositionScratch,
-						renderDataIndex, semanticVariantState, semanticVariantPosition
-					);
-				}
-				renderDataIndex++;
-			}
-			lastBottom = bottomY;
-			lastColor = color;
-		}
-		
-		
-		if (isColumnVoid)
-		{
-			renderColumnData.set(0, RenderDataPointUtil.EMPTY_DATA);
-		}
+		int flags = (ignoreNonCollidingBlocks ? 1 : 0) | (colorBelowWithAvoidedBlocks ? 2 : 0)
+			| (caveCullingEnabled ? 4 : 0) | (preserveSemanticMaterials ? 8 : 0)
+			| (RenderDataPointUtil.RUN_VALIDATION ? 16 : 0);
+		RenderColumnConversionContext.convert(flags, caveCullingMaxY,
+			levelWrapper, fullDataSource, columnSource,
+				renderSourceX, renderSourceZ, blockX, blockZ, renderColumnData, fullColumnData,
+				blockStatesToIgnore, caveBlockStatesToIgnore, snowLayerBlockStates,
+				semanticMaterialScratch, semanticVariantStateScratch, semanticVariantPositionScratch, conversionScope);
 	}
 
 	static boolean sameSemanticMaterial(int leftMaterialId, int rightMaterialId)
@@ -715,7 +492,7 @@ public class FullDataToRenderDataTransformer
 		return leftMaterialId == rightMaterialId;
 	}
 
-	private static int semanticMaterialAt(
+	static int semanticMaterialAt(
 		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 		int[] semanticMaterialScratch, int index
 	)
@@ -725,7 +502,7 @@ public class FullDataToRenderDataTransformer
 			: semanticMaterialScratch[index];
 	}
 
-	private static void setSemanticMaterialAt(
+	static void setSemanticMaterialAt(
 		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 		int[] semanticMaterialScratch, int index, int materialId
 	)
@@ -760,7 +537,7 @@ public class FullDataToRenderDataTransformer
 			: semanticVariantPositionScratch[index];
 	}
 
-	private static void setSemanticVariantAt(
+	static void setSemanticVariantAt(
 		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 		byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch,
 		int index, byte state, long position
@@ -777,7 +554,7 @@ public class FullDataToRenderDataTransformer
 		}
 	}
 
-	private static void mergeSemanticVariantAt(
+	static void mergeSemanticVariantAt(
 		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 		byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch,
 		int index, byte incomingState, long incomingPosition

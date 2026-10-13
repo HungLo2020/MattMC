@@ -1,6 +1,9 @@
 # Rust DH render-source storage
 
 Ordinary DH conversion writes render points into a Rust CPU owner.
+The [conversion policy](RUST-DH-CONVERSION.md) publishes directly from Rust and
+uses native overflow scratch. Its full-source CPU comparison, seven lifecycle
+scenarios and three settled Frozen image pairs pass; broader acceptance remains open.
 [Scoped full-data readers](../world/chunk/RUST-DH-CONVERSION-READERS.md) consume
 primary input columns without materializing persistent Java list adapters. Reduction
 and neighbor-box production borrow its stable point spans directly. Java does
