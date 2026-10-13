@@ -66,7 +66,49 @@ final class DhSourceVerificationRender {
         var field = type.getDeclaredField(name); field.setAccessible(true); field.set(object, value);
     }
 
+    /** Recorded terrain as full-data sources, with the client color fixture and a DH level. */
+    record Fixture(List<FullDataSourceV2> sources, Map<Long, FullDataSourceV2> all, IClientLevelWrapper client, IDhClientLevel level) {
+        long round(int rounds) { return DhSourceVerificationRender.round(sources, all, client, level, rounds); }
+        void warmTints(String mode) { DhSourceVerificationRender.warmTints(all.values(), client, mode); }
+    }
+
     static void run(int rounds, int warmup) throws Exception {
+        configure(Integer.getInteger("dh.verify.renderConfig", 0));
+        com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Quality.lodBiomeBlending.setWithoutFiringEvents(
+            Integer.getInteger("dh.verify.blend", com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Quality.lodBiomeBlending.get()));
+        var fixture = fixture();
+        fixture.warmTints(System.getProperty("dh.verify.tint", "all"));
+        for (int i = 0; i < 5; i++) fixture.round(warmup);
+        var threads = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long allocated = threads.getCurrentThreadAllocatedBytes();
+        long start = System.nanoTime(); long checksum = fixture.round(rounds); long elapsed = System.nanoTime() - start;
+        allocated = threads.getCurrentThreadAllocatedBytes() - allocated;
+        System.out.println("DH_SOURCE " + elapsed + " " + checksum);
+        // Java heap allocated per measured round (native storage is not counted).
+        System.out.println("DH_ALLOCATED_PER_ROUND " + allocated / rounds);
+    }
+
+    /**
+     * The conversion's native tint route against Java's per-point colors in one
+     * JVM, with warm caches (misses would switch states to broken between runs).
+     */
+    static void tintCheck() throws Exception {
+        var fixture = fixture();
+        fixture.warmTints("all");
+        var toggle = Class.forName("com.seibel.distanthorizons.core.dataObjects.transformers.RenderColumnConversionContext").getDeclaredField("nativeTint");
+        toggle.setAccessible(true);
+        var blending = com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Quality.lodBiomeBlending;
+        for (int radius : new int[]{0, 1, 3}) {
+            blending.setWithoutFiringEvents(radius);
+            toggle.setBoolean(null, true); long nativeRoute = fixture.round(1);
+            toggle.setBoolean(null, false); long javaRoute = fixture.round(1);
+            toggle.setBoolean(null, true);
+            if (nativeRoute != javaRoute) throw new AssertionError("Tint routes differ at blend radius " + radius);
+        }
+        System.out.println("TINT ROUTES MATCH");
+    }
+
+    static Fixture fixture() throws Exception {
         // Server side: recorded chunks become full-data sections.
         ILevelWrapper server; PalettedContainerFactory factory; List<Holder<net.minecraft.world.level.biome.Biome>> pattern;
         RegistryAccess access;
@@ -139,16 +181,31 @@ final class DhSourceVerificationRender {
                 default -> m.getReturnType() == boolean.class ? false : m.getReturnType() == int.class ? 0 : null;
             });
 
-        configure(Integer.getInteger("dh.verify.renderConfig", 0));
-        var sources = new ArrayList<>(all.values());
-        for (int i = 0; i < 5; i++) round(sources, all, client, dhLevel, warmup);
-        var threads = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
-        long allocated = threads.getCurrentThreadAllocatedBytes();
-        long start = System.nanoTime(); long checksum = round(sources, all, client, dhLevel, rounds); long elapsed = System.nanoTime() - start;
-        allocated = threads.getCurrentThreadAllocatedBytes() - allocated;
-        System.out.println("DH_SOURCE " + elapsed + " " + checksum);
-        // Java heap allocated per measured round (native storage is not counted).
-        System.out.println("DH_ALLOCATED_PER_ROUND " + allocated / rounds);
+        return new Fixture(new ArrayList<>(all.values()), all, client, dhLevel);
+    }
+
+    /**
+     * Publishes biome tints for tinted blocks, as a running client's resolvers
+     * would: "all" pairs (every point takes the warm route), "partial" (some
+     * biomes miss and fall back to Minecraft's resolver, unavailable here, so
+     * those states become broken) or "none".
+     */
+    private static void warmTints(Collection<FullDataSourceV2> sources, IClientLevelWrapper client, String mode) {
+        if (mode.equals("none")) return;
+        for (var source : sources) {
+            var blocks = new LinkedHashSet<BlockStateWrapper>();
+            var biomes = new LinkedHashSet<com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper>();
+            for (int id = 0; id < source.mapping.size(); id++) {
+                if (source.mapping.getBlockStateWrapper(id) instanceof BlockStateWrapper block && block.blockState != null) blocks.add(block);
+                if (source.mapping.getBiomeWrapper(id) instanceof com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper biome) biomes.add(biome);
+            }
+            for (var block : blocks) for (var biome : biomes) {
+                int key = Objects.hash(block.getSerialString(), biome.getSerialString());
+                if (mode.equals("partial") && Math.floorMod(key, 7) == 0) continue;
+                var tints = block.nativeTintCache(); var identity = biome.nativeTintIdentity();
+                if (tints != null && identity != null) tints.put(identity, 0xff000000 | (key * 0x2545F491 >>> 8));
+            }
+        }
     }
 
     private static IClientLevelWrapper clientLevel() throws Exception {

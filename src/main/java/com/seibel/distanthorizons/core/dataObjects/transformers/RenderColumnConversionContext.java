@@ -1,5 +1,6 @@
 package com.seibel.distanthorizons.core.dataObjects.transformers;
 
+import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
@@ -63,12 +64,31 @@ final class RenderColumnConversionContext implements NativeDhRenderConversion.Ac
         this.detail = source.getDataDetailLevel();
     }
 
+    /** Tests turn this off to compare Rust tinting with Java's per-point colors. */
+    static boolean nativeTint = true;
+
     static void convert(int flags, int caveY, IClientLevelWrapper level, FullDataSourceV2 source, ColumnRenderSource render,
         HashSet<IBlockStateWrapper> ignored, HashSet<IBlockStateWrapper> caves, HashSet<IBlockStateWrapper> snow,
         boolean semantic, NativeDhConversionScope scope) {
         var context = new RenderColumnConversionContext(level, source, render, ignored, caves, snow, semantic, scope);
-        NativeDhRenderConversion.convertSource(flags, caveY, context, source.nativeSource().stageOwner(),
-            render.nativeData(), render.verticalDataCount, scope.scratch(), scope.borrow(ignored, caves, snow));
+        try (var arena = java.lang.foreign.Arena.ofConfined()) {
+            var tint = java.lang.foreign.MemorySegment.NULL;
+            var map = source.mapping.nativeMaterialMap();
+            if (nativeTint && context.stockLevel != null) {
+                // The same facts AbstractDhTintGetter reads for every point.
+                tint = arena.allocate(TINT_PARAMS);
+                tint.set(java.lang.foreign.ValueLayout.ADDRESS, 0, map == null ? java.lang.foreign.MemorySegment.NULL : map.stageOwner());
+                tint.set(java.lang.foreign.ValueLayout.JAVA_LONG, 8, source.getPos());
+                tint.set(java.lang.foreign.ValueLayout.JAVA_INT, 16, context.baseX);
+                tint.set(java.lang.foreign.ValueLayout.JAVA_INT, 20, context.baseZ);
+                tint.set(java.lang.foreign.ValueLayout.JAVA_INT, 24, context.detail);
+                tint.set(java.lang.foreign.ValueLayout.JAVA_INT, 28, level.getMinHeight());
+                tint.set(java.lang.foreign.ValueLayout.JAVA_INT, 32, com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Quality.lodBiomeBlending.get());
+            }
+            NativeDhRenderConversion.convertSource(flags, caveY, context, source.nativeSource().stageOwner(),
+                render.nativeData(), render.verticalDataCount, scope.scratch(), scope.borrow(ignored, caves, snow), tint);
+            java.lang.ref.Reference.reachabilityFence(map);
+        }
     }
 
     @Override public long call(int operation, int index, long value) {
@@ -101,9 +121,19 @@ final class RenderColumnConversionContext implements NativeDhRenderConversion.Ac
                 yield 0;
             }
             case BLOCK_MATERIAL -> block.getMaterialId();
+            case TINT -> tintFacts(index);
+            case TINT_CACHE -> ((BlockStateWrapper)source.mapping.getBlockStateWrapper(index)).nativeTintCache().stageOwner().address();
+            case TINT_BIOME -> ((BiomeWrapper)source.mapping.getBiomeWrapper(index)).nativeTintIdentity().stageOwner().address();
             case INVALID_POINT -> RenderDataPointUtil.createDataPoint((int)(value >>> 32), (int)value, 0, 0, 0, index);
             default -> throw new IllegalArgumentException("Unknown Rust conversion request: " + operation);
         };
+    }
+    /** {@code ClientBlockStateColorCache.nativeTintFacts}, or "Java route" when an id has no native tint keys. */
+    private long tintFacts(int id) {
+        if (!(source.mapping.getBlockStateWrapper(id) instanceof BlockStateWrapper stock)
+            || !(source.mapping.getBiomeWrapper(id) instanceof BiomeWrapper biome)
+            || stock.nativeTintCache() == null || biome.nativeTintIdentity() == null) return 1L << 32;
+        return stockLevel.nativeTintFacts(stock);
     }
     private void begin(int column, int expandedLength) {
         x = column / ColumnRenderSource.WIDTH;

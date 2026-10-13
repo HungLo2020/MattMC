@@ -400,6 +400,20 @@ public class ClientBlockStateColorCache
 			? (1L << 32) | Integer.toUnsignedLong(this.baseColor) : 0L;
 	}
 
+	/**
+	 * Which route {@link #getColor} takes for this state, for Rust conversion:
+	 * bits 32+ are 2 when it is the warm DH tint route (base color times the
+	 * cached biome tint, low 32 bits the base color), 1 when it is any other
+	 * route, 0 while the color is unresolved.
+	 */
+	public long nativeTintFacts()
+	{
+		if (!this.isColorResolved) return 0L;
+		if (!this.needPostTinting || BROKEN_BLOCK_STATES.contains(this.blockState)
+			|| BLOCK_STATES_THAT_NEED_LEVEL.contains(this.blockState)) return 1L << 32;
+		return (2L << 32) | Integer.toUnsignedLong(this.baseColor);
+	}
+
 	public int getColor(BiomeWrapper biomeWrapper, FullDataSourceV2 fullDataSource, DhBlockPos blockPos)
 	{
 		// only get the tint if the block needs to be tinted
@@ -446,6 +460,8 @@ public class ClientBlockStateColorCache
 					// this exception generally occurs if the tint requires other blocks besides itself
 					LOGGER.debug("Unable to use ["+ TintWithoutLevelOverrider.class.getSimpleName()+"] to get the block tint for block: [" + this.blockState + "] and biome: [" + biomeWrapper + "] at pos: " + blockPos + ". Error: [" + e.getMessage() + "]. Attempting to use backup method...", e);
 					BLOCK_STATES_THAT_NEED_LEVEL.add(this.blockState);
+					// Rust caches each state's route; this one now needs the level.
+					net.vulkanic.world.NativeDhConversionScope.colorsChanged();
 				}
 			}
 			
@@ -477,6 +493,8 @@ public class ClientBlockStateColorCache
 			{
 				LOGGER.warn("Failed to get block color for block: [" + this.blockState + "] and biome: [" + biomeWrapper + "] at pos: " + blockPos + ". Error: ["+e.getMessage() + "]. Note: future errors for this block/biome will be ignored.", e);
 				BROKEN_BLOCK_STATES.add(this.blockState);
+				// Rust caches each state's route; broken states use the base color.
+				net.vulkanic.world.NativeDhConversionScope.colorsChanged();
 			}
 		}
 		

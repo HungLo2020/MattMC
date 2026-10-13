@@ -10,7 +10,7 @@ public final class NativeDhRenderConversion {
         OPACITY = 5, SNOW = 6, COLOR = 7, PREVIOUS_MATERIAL = 9, OUTPUT_GET = 10,
         OUTPUT_SET = 11, SEMANTIC_SET = 12, SEMANTIC_MERGE = 13, BLOCK_MATERIAL = 14,
         INVALID_POINT = 15, COLOR_SELECTED = 16, SEMANTIC_SET_UNAVAILABLE = 17, SEMANTIC_MERGE_UNAVAILABLE = 18,
-        COLUMN_BEGIN = 19, COLUMN_END = 20;
+        COLUMN_BEGIN = 19, COLUMN_END = 20, TINT = 21, TINT_CACHE = 22, TINT_BIOME = 23;
     @FunctionalInterface public interface Access {
         long call(int operation, int index, long value);
     }
@@ -28,7 +28,12 @@ public final class NativeDhRenderConversion {
     private static final MemorySegment CALLBACK;
     private static final MethodHandle RUN = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_render_convert_source",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    /** TintParams in render/dh_columns/conversion.rs. */
+    public static final MemoryLayout TINT_PARAMS = MemoryLayout.structLayout(ValueLayout.ADDRESS.withName("map"),
+        ValueLayout.JAVA_LONG.withName("pos"), ValueLayout.JAVA_INT.withName("baseX"), ValueLayout.JAVA_INT.withName("baseZ"),
+        ValueLayout.JAVA_INT.withName("detail"), ValueLayout.JAVA_INT.withName("minY"), ValueLayout.JAVA_INT.withName("radius"),
+        ValueLayout.JAVA_INT.withName("reserved"));
     static {
         try {
             var target = MethodHandles.lookup().findStatic(NativeDhRenderConversion.class, "callback",
@@ -53,16 +58,18 @@ public final class NativeDhRenderConversion {
     /**
      * Converts every column of {@code source} into {@code output}. The caller
      * keeps all owners open for the call; {@code scratch} holds one tall column.
+     * {@code tint} ({@link #TINT_PARAMS}, or NULL) lets Rust color tinted blocks
+     * from the cached biome tints, asking Java only on a miss.
      */
     public static void convertSource(int flags, int caveY, Access access, MemorySegment source,
-        NativeDhRenderSource output, int height, NativeDhRenderSource scratch, MemorySegment materials) {
+        NativeDhRenderSource output, int height, NativeDhRenderSource scratch, MemorySegment materials, MemorySegment tint) {
         Frames frames = FRAMES.get();
         Frame previous = frames.active, current = previous == null ? frames.root : new Frame();
         current.access = access;
         frames.active = current;
         try {
             int result = (int)RUN.invokeExact(flags, caveY, CALLBACK, source, output.borrowOwner(), height,
-                scratch.borrowOwner(), materials);
+                scratch.borrowOwner(), materials, tint);
             if (current.failure != null) throw current.failure;
             if (result == -5) throw new IllegalArgumentException("DH full-data column points overlap");
             if (result != 1) throw new IllegalStateException("Rust DH render conversion failed");

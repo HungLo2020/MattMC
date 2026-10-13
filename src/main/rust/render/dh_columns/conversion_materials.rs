@@ -3,8 +3,13 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 static COLOR_GENERATION: AtomicU64 = AtomicU64::new(0);
 pub(crate) fn color_generation() -> u64 { COLOR_GENERATION.load(Ordering::Acquire) }
+use crate::world::level::chunk::dh_columns::tint::{Biome, Cache};
+/// How an id's color is tinted: Java's warm `ClientBlockStateColorCache` route
+/// (base color times the cached biome tint) or not natively.
+#[derive(Clone, Copy)]
+pub(crate) enum Tint { Native { base: u32, cache: *const Cache, biome: *const Biome }, Java }
 #[derive(Clone, Copy, Default)]
-struct Entry { facts: u64, color: Option<u32> }
+struct Entry { facts: u64, color: Option<u32>, tint: Option<Tint> }
 pub(crate) struct Materials { words: Box<[Entry]>, color_generation: u64 }
 impl Materials {
     pub(crate) fn get(&self, id: i32) -> Option<u64> {
@@ -17,13 +22,23 @@ impl Materials {
     fn refresh_colors(&mut self) {
         let generation = color_generation();
         if generation != self.color_generation {
-            for entry in &mut self.words { entry.color = None; }
+            for entry in &mut self.words { entry.color = None; entry.tint = None; }
             self.color_generation = generation;
         }
     }
     pub(crate) fn color(&mut self, id: i32) -> Option<u32> {
         self.refresh_colors();
         self.words.get(usize::try_from(id).ok()?)?.color
+    }
+    /// The id's tint route, or None until Java has reported it this generation.
+    pub(crate) fn tint(&mut self, id: i32) -> Option<Tint> {
+        self.refresh_colors();
+        self.words.get(usize::try_from(id).ok()?)?.tint
+    }
+    pub(crate) fn put_tint(&mut self, id: i32, tint: Tint, generation: u64) {
+        self.refresh_colors();
+        if generation != self.color_generation { return; }
+        if let Some(slot) = usize::try_from(id).ok().and_then(|i| self.words.get_mut(i)) { slot.tint = Some(tint); }
     }
     pub(crate) fn put_color(&mut self, id: i32, color: u32, generation: u64) {
         self.refresh_colors();

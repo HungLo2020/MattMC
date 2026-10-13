@@ -58,7 +58,7 @@ class NativeDhConversionScopeTest {
         }
         void run(int flags) {
             convertSource(flags, 0, this, source.nativeSource().stageOwner(), render, 3, scope.scratch(),
-                scope.borrow(ignored, caves, snow));
+                scope.borrow(ignored, caves, snow), java.lang.foreign.MemorySegment.NULL);
             for (int i = 0; i < 3; i++) output[i] = render.getLong(i);
         }
         @Override public long call(int op, int index, long value) {

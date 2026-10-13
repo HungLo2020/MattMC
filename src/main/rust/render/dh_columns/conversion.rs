@@ -134,6 +134,52 @@ fn convert(mut call: impl FnMut(i32, i32, u64, u64) -> Result<u64, ()>, flags: i
 
 const COLUMN_BEGIN: i32 = 19;
 const COLUMN_END: i32 = 20;
+const TINT: i32 = 21;
+const TINT_CACHE: i32 = 22;
+const TINT_BIOME: i32 = 23;
+
+/// Facts for Java's warm tint route, fixed for one conversion. Mirrored by
+/// NativeDhRenderConversion.TintParams.
+#[repr(C)]
+pub struct TintParams {
+    map: *const crate::world::level::chunk::dh_columns::id_map::Map,
+    pos: u64,
+    base_x: i32,
+    base_z: i32,
+    detail: i32,
+    min_y: i32,
+    radius: i32,
+    reserved: i32,
+}
+struct TintContext<'a> {
+    params: &'a TintParams,
+    source: &'a crate::world::level::chunk::dh_columns::source::Source,
+    column: usize,
+}
+impl TintContext<'_> {
+    /// ClientBlockStateColorCache.getColor's warm route: the base color times
+    /// the cached (or neighborhood-blended) biome tint. None asks Java.
+    unsafe fn color(&self, base: u32, cache: *const crate::world::level::chunk::dh_columns::tint::Cache,
+        biome: *const crate::world::level::chunk::dh_columns::tint::Biome, bottom: i32) -> Option<u32> {
+        use crate::world::level::chunk::dh_columns::tint;
+        let (cache, biome) = (cache.as_ref()?, biome.as_ref()?);
+        let p = self.params;
+        let unsmoothed = p.radius == 0 || (1i64 << p.detail) > i64::from(p.radius);
+        let value = if unsmoothed {
+            tint::cached(cache, biome)?
+        } else {
+            let x = p.base_x.wrapping_add(((self.column / 64) as i32) << p.detail);
+            let z = p.base_z.wrapping_add(((self.column % 64) as i32) << p.detail);
+            tint::source_blend(cache, biome, p.map.as_ref()?, self.source, p.pos, x, bottom.wrapping_add(p.min_y), z, p.min_y, p.radius)?
+        };
+        // Frozen's invalid sentinel sends Java to Minecraft's color resolver.
+        if value == i32::MIN { return None; }
+        if value == -1 { return Some(base); }
+        let (b, t) = (base, value as u32);
+        let channel = |shift: u32| ((b >> shift & 255) * (t >> shift & 255) / 255) << shift;
+        Some((b & 0xff00_0000) | channel(16) | channel(8) | channel(0))
+    }
+}
 
 type Callback = unsafe extern "C" fn(i32, i32, u64, u64) -> u64;
 
@@ -141,7 +187,7 @@ type Callback = unsafe extern "C" fn(i32, i32, u64, u64) -> u64;
 /// cached material facts; everything else is a contextual Java query.
 unsafe fn convert_column(flags: i32, cave_y: i32, java: &mut dyn FnMut(i32, i32, u64) -> Result<u64, ()>,
     reader: &Reader, output: *mut super::source::Source, window: u64,
-    materials: *mut super::conversion_materials::Materials) -> Result<(), ()> {
+    materials: *mut super::conversion_materials::Materials, tint: Option<&TintContext>) -> Result<(), ()> {
     let (mut selected, mut needs_selection) = (0u64, false);
     convert(|mut op, index, mut value, _extra| {
         // Acquire and drop each borrow before a callback. The ABI scope pins
@@ -167,6 +213,32 @@ unsafe fn convert_column(flags: i32, cave_y: i32, java: &mut dyn FnMut(i32, i32,
         } else if op == COLOR && flags & 8 == 0 {
             if let Some(color) = materials.as_mut().and_then(|m| m.color(selected as i32)) {
                 return Ok(color as u64);
+            }
+            if let (Some(context), Some(m)) = (tint, materials.as_mut()) {
+                use super::conversion_materials::Tint;
+                let id = selected as i32;
+                let route = match m.tint(id) {
+                    Some(route) => Some(route),
+                    None => {
+                        // Java reports the id's route once per color generation.
+                        let generation = super::conversion_materials::color_generation();
+                        let facts = java(TINT, id, 0)?;
+                        let route = match facts >> 32 {
+                            2 => Some(Tint::Native { base: facts as u32,
+                                cache: java(TINT_CACHE, id, 0)? as usize as *const _,
+                                biome: java(TINT_BIOME, id, 0)? as usize as *const _ }),
+                            1 => Some(Tint::Java),
+                            _ => None, // not resolved yet: ask again later
+                        };
+                        if let Some(route) = route { m.put_tint(id, route, generation); }
+                        route
+                    }
+                };
+                if let Some(Tint::Native { base, cache, biome }) = route {
+                    if let Some(color) = context.color(base, cache, biome, (selected >> 32) as i32) {
+                        return Ok(u64::from(color));
+                    }
+                }
             }
         }
         if needs_selection {
@@ -206,7 +278,7 @@ unsafe fn convert_column(flags: i32, cave_y: i32, java: &mut dyn FnMut(i32, i32,
 pub unsafe extern "C" fn mattmc_dh_render_convert_source(flags: i32, cave_y: i32, callback: Option<Callback>,
     source: *const crate::world::level::chunk::dh_columns::source::Source,
     output: *mut super::source::Source, height: i32, scratch: *mut super::source::Source,
-    materials: *mut super::conversion_materials::Materials) -> i32 {
+    materials: *mut super::conversion_materials::Materials, tint: *const TintParams) -> i32 {
     let (Some(callback), Some(source)) = (callback, source.as_ref()) else { return 0; };
     if output.is_null() || scratch.is_null() || height < 0
         || (height as usize).checked_mul(4096) != Some((*output).points().len()) {
@@ -235,8 +307,9 @@ pub unsafe extern "C" fn mattmc_dh_render_convert_source(flags: i32, cave_y: i32
             } else {
                 (output, column_window)
             };
+            let tint = tint.as_ref().map(|params| TintContext { params, source, column });
             if convert_column(flags, cave_y, &mut |op, index, value| java.call(op, index, value),
-                &reader, target, window, materials).is_err() { return 0; }
+                &reader, target, window, materials, tint.as_ref()).is_err() { return 0; }
             if expanded && !semantic {
                 let points = &(*scratch).points()[..length as usize];
                 let written = super::reduction::with_reduced(points, None, height as i32, height, |result| {

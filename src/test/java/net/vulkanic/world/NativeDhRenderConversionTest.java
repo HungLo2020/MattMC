@@ -18,7 +18,7 @@ class NativeDhRenderConversionTest {
     }
     private static void run(FullDataSourceV2 source, NativeDhRenderSource output, int height, Access access) {
         try (var scratch = new NativeDhRenderSource(1)) {
-            convertSource(0, 0, access, source.nativeSource().stageOwner(), output, height, scratch, java.lang.foreign.MemorySegment.NULL);
+            convertSource(0, 0, access, source.nativeSource().stageOwner(), output, height, scratch, java.lang.foreign.MemorySegment.NULL, java.lang.foreign.MemorySegment.NULL);
         }
     }
 

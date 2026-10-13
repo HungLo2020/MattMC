@@ -23,6 +23,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class DistantHorizonsLodWaterReductionTest {
+	// Parent merges read Config.Common.LodBuilding, whose initializer needs the
+	// shared Minecraft wrapper; do not rely on another suite having bound it.
+	@org.junit.jupiter.api.BeforeAll
+	static void bindEnvironment()
+	{
+		var injector = com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE;
+		var type = com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper.class;
+		if (injector.get(type) != null) return;
+		injector.bind(type, (com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper)
+			java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (p, m, a) -> switch (m.getName()) {
+				case "getInstallationDirectory" -> java.nio.file.Path.of("run").toFile();
+				case "isDedicatedServer" -> false;
+				case "getDelayedSetupComplete" -> true;
+				default -> throw new UnsupportedOperationException("Unexpected fixture environment callback " + m);
+			}));
+	}
+
 
     @Test
     public void reduceToOneKeepsWaterBelowTransparentOceanPlants() {

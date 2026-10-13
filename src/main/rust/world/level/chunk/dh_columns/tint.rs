@@ -8,7 +8,7 @@ use std::{
     slice,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex, OnceLock, TryLockError,
+        Arc, Mutex, OnceLock,
     },
 };
 #[cfg(test)]
@@ -53,45 +53,6 @@ impl Colors {
         let first = first.units.lock().unwrap_or_else(|e| e.into_inner());
         let second = second.units.lock().unwrap_or_else(|e| e.into_inner());
         *first == *second
-    }
-    // The bounded entrypoint never waits for key locks and rejects expensive
-    // collision/string groups before comparison. Ordinary reads keep full policy.
-    fn bounded_get(&self, key: &Arc<Identity>) -> Result<Option<i32>, ()> {
-        let Some(entries) = self.0.get(&key.hash) else {
-            return Ok(None);
-        };
-        if entries.len() > 16 {
-            return Err(());
-        }
-        for entry in entries {
-            let equal = if Arc::ptr_eq(&entry.identity, key) {
-                true
-            } else {
-                let (a, b) = if Arc::as_ptr(&entry.identity) < Arc::as_ptr(key) {
-                    (&entry.identity, key)
-                } else {
-                    (key, &entry.identity)
-                };
-                let a = match a.units.try_lock() {
-                    Ok(v) => v,
-                    Err(TryLockError::Poisoned(e)) => e.into_inner(),
-                    Err(TryLockError::WouldBlock) => return Err(()),
-                };
-                let b = match b.units.try_lock() {
-                    Ok(v) => v,
-                    Err(TryLockError::Poisoned(e)) => e.into_inner(),
-                    Err(TryLockError::WouldBlock) => return Err(()),
-                };
-                if a.len() > 128 || b.len() > 128 {
-                    return Err(());
-                }
-                *a == *b
-            };
-            if equal {
-                return Ok(Some(entry.value.load(Ordering::Acquire) as i32));
-            }
-        }
-        Ok(None)
     }
     fn cell(&self, key: &Arc<Identity>) -> Option<&AtomicU64> {
         self.0
@@ -241,8 +202,7 @@ fn column(pos: u64, x: i32, z: i32) -> Option<usize> {
 }
 /// Outputs one column index per ordered sample; -1 means outside the source.
 /// Return -1 declines, zero means Frozen's unsmoothed path, 1..49 is the plan.
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_dh_tint_plan(
+pub(super) unsafe fn mattmc_dh_tint_plan(
     pos: u64,
     x: i32,
     z: i32,
@@ -293,7 +253,6 @@ unsafe fn blend(
     radius: i32,
     raw: *const usize,
     out: *mut i32,
-    bounded: bool,
 ) -> i32 {
     let (Some(cache), Some(center), Some(map)) = (cache.as_ref(), biome.as_ref(), map.as_ref())
     else {
@@ -311,13 +270,8 @@ unsafe fn blend(
     let mut columns: [&[u64]; 49] = [&[]; 49];
     // Validate all spans before borrowing. Malformed material IDs decline only
     // if reached; an earlier miss must retain its original prefix.
-    let mut work = 0usize;
     for (i, pair) in raw.chunks_exact(2).enumerate() {
         if pair[1] > 4096 || pair[1] != 0 && (pair[0] == 0 || pair[0] % 8 != 0) {
-            return 0;
-        }
-        work += pair[1];
-        if bounded && work > 4096 {
             return 0;
         }
         columns[i] = if pair[1] == 0 {
@@ -327,17 +281,13 @@ unsafe fn blend(
         };
     }
     blend_columns(cache, center, map, x, y, z, min_y, radius,
-        &plan[..count as usize], &columns[..count as usize], out, bounded)
+        &plan[..count as usize], &columns[..count as usize], out)
 }
 // Both transport routes share the exact Frozen traversal and mutation prefix.
 unsafe fn blend_columns(cache: &Cache, center: &Biome, map: &Map,
     x: i32, y: i32, z: i32, min_y: i32, radius: i32,
-    plan: &[i32], columns: &[&[u64]], out: *mut i32, bounded: bool) -> i32 {
-    let colors = match cache.0.try_lock() {
-        Ok(v) => v,
-        Err(TryLockError::Poisoned(e)) => e.into_inner(),
-        Err(TryLockError::WouldBlock) => return 0,
-    };
+    plan: &[i32], columns: &[&[u64]], out: *mut i32) -> i32 {
+    let colors = cache.0.lock().unwrap_or_else(|e| e.into_inner());
     let mut sum = [0i32; 3];
     let mut found = 0;
     let mut final_x = x;
@@ -360,15 +310,7 @@ unsafe fn blend_columns(cache: &Cache, center: &Biome, map: &Map,
         let Some(identity) = map.tint_biome((point & 0x7fff_ffff) as usize) else {
             return 0;
         };
-        let color = if bounded {
-            match colors.bounded_get(identity) {
-                Ok(v) => v,
-                Err(()) => return 0,
-            }
-        } else {
-            colors.get(identity)
-        }
-        .unwrap_or(i32::MIN);
+        let color = colors.get(identity).unwrap_or(i32::MIN);
         if color == i32::MIN {
             out.write(color);
             out.add(1).write(final_x);
@@ -381,15 +323,7 @@ unsafe fn blend_columns(cache: &Cache, center: &Biome, map: &Map,
         found += 1;
     }
     let color = if found == 0 {
-        if bounded {
-            match colors.bounded_get(&center.0) {
-                Ok(v) => v,
-                Err(()) => return 0,
-            }
-        } else {
-            colors.get(&center.0)
-        }
-        .unwrap_or(i32::MIN)
+        colors.get(&center.0).unwrap_or(i32::MIN)
     } else {
         (0xff00_0000u32
             | ((sum[0] / found) as u32) << 16
@@ -400,6 +334,32 @@ unsafe fn blend_columns(cache: &Cache, center: &Biome, map: &Map,
     out.add(1).write(final_x);
     out.add(2).write(final_z);
     1
+}
+
+/// A biome's published tint for this block, if any (the unsmoothed lookup).
+pub(crate) fn cached(cache: &Cache, biome: &Biome) -> Option<i32> {
+    cache.0.lock().unwrap_or_else(|e| e.into_inner()).get(&biome.0)
+}
+
+/// The smoothed tint at a point, blended over the full-data source's columns.
+/// None when the inputs are outside the native route (the caller asks Java);
+/// a missing neighbor color yields `i32::MIN`, Frozen's invalid sentinel.
+pub(crate) unsafe fn source_blend(cache: &Cache, center: &Biome, map: &Map, source: &super::source::Source,
+    pos: u64, x: i32, y: i32, z: i32, min_y: i32, radius: i32) -> Option<i32> {
+    let mut plan = [0; 49];
+    let count = mattmc_dh_tint_plan(pos, x, z, radius, plan.as_mut_ptr());
+    if count <= 0 { return None; }
+    let mut columns = [&[][..]; 49];
+    for (i, &index) in plan[..count as usize].iter().enumerate() {
+        if index >= 0 {
+            let points = source.column(index as usize)?;
+            if points.len() > 4096 { return None; }
+            columns[i] = points;
+        }
+    }
+    let mut out = [0i32; 3];
+    (blend_columns(cache, center, map, x, y, z, min_y, radius,
+        &plan[..count as usize], &columns[..count as usize], out.as_mut_ptr()) == 1).then_some(out[0])
 }
 
 /// Borrow a stable primary color cell, until owner destruction. Published cache
@@ -425,62 +385,28 @@ pub extern "C" fn mattmc_dh_tint_epoch() -> *const AtomicU64 {
     &EPOCH
 }
 
-macro_rules! export_blend {
-    ($name:ident,$bounded:expr) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn $name(
-            cache: *const Cache,
-            center: *const Biome,
-            map: *const Map,
-            pos: u64,
-            x: i32,
-            y: i32,
-            z: i32,
-            min_y: i32,
-            radius: i32,
-            raw: *const usize,
-            out: *mut i32,
-        ) -> i32 {
-            blend(
-                cache, center, map, pos, x, y, z, min_y, radius, raw, out, $bounded,
-            )
+/// One point's tint blended over a full-data source's columns, for tests of
+/// the conversion's native route. Output color/x/z; 0 declines.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_dh_tint_source(
+    cache: *const Cache, center: *const Biome, map: *const Map,
+    source: *const super::source::Source, pos: u64,
+    x: i32, y: i32, z: i32, min_y: i32, radius: i32, out: *mut i32,
+) -> i32 {
+    let (Some(cache), Some(center), Some(map), Some(source)) =
+        (cache.as_ref(), center.as_ref(), map.as_ref(), source.as_ref()) else { return 0; };
+    if out.is_null() || out as usize % 4 != 0 { return 0; }
+    let mut plan = [0; 49];
+    let count = mattmc_dh_tint_plan(pos, x, z, radius, plan.as_mut_ptr());
+    if count <= 0 { return 0; }
+    let mut columns = [&[][..]; 49];
+    for (i, &index) in plan[..count as usize].iter().enumerate() {
+        if index >= 0 {
+            let Some(points) = source.column(index as usize) else { return 0; };
+            if points.len() > 4096 { return 0; }
+            columns[i] = points;
         }
-    };
+    }
+    blend_columns(cache, center, map, x, y, z, min_y, radius,
+        &plan[..count as usize], &columns[..count as usize], out)
 }
-export_blend!(mattmc_dh_tint_blend, false);
-// At most4096 point visits/49 keys, with collision/string limits above; no
-// allocation, blocking locks or callbacks. Oversized/contended inputs decline.
-export_blend!(mattmc_dh_tint_blend_bounded, true);
-
-macro_rules! export_source_blend {
-    ($name:ident, $bounded:expr) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn $name(
-            cache: *const Cache, center: *const Biome, map: *const Map,
-            source: *const super::source::Source, pos: u64,
-            x: i32, y: i32, z: i32, min_y: i32, radius: i32, out: *mut i32,
-        ) -> i32 {
-            let (Some(cache), Some(center), Some(map), Some(source)) =
-                (cache.as_ref(), center.as_ref(), map.as_ref(), source.as_ref()) else { return 0; };
-            if out.is_null() || out as usize % 4 != 0 { return 0; }
-            let mut plan = [0; 49];
-            let count = mattmc_dh_tint_plan(pos, x, z, radius, plan.as_mut_ptr());
-            if count <= 0 { return 0; }
-            let mut columns = [&[][..]; 49];
-            let mut work = 0;
-            for (i, &index) in plan[..count as usize].iter().enumerate() {
-                if index >= 0 {
-                    let Some(points) = source.column(index as usize) else { return 0; };
-                    if points.len() > 4096 { return 0; }
-                    columns[i] = points;
-                    work += points.len();
-                    if $bounded && work > 4096 { return 0; }
-                }
-            }
-            blend_columns(cache, center, map, x, y, z, min_y, radius,
-                &plan[..count as usize], &columns[..count as usize], out, $bounded)
-        }
-    };
-}
-export_source_blend!(mattmc_dh_tint_source, false);
-export_source_blend!(mattmc_dh_tint_source_bounded, true);

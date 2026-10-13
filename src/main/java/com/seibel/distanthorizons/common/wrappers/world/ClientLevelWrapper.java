@@ -242,6 +242,13 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 			? cache.resolvedConstantColor() : 0L;
 	}
 	
+	/** {@link ClientBlockStateColorCache#nativeTintFacts} for a state, without constructing a cache entry. */
+	public long nativeTintFacts(BlockStateWrapper block)
+	{
+		ClientBlockStateColorCache cache = this.blockColorCacheByBlockState.get(block.blockState);
+		return cache != null && cache.getClass() == ClientBlockStateColorCache.class ? cache.nativeTintFacts() : 0L;
+	}
+	
 	@Override
 	public IDimensionTypeWrapper getDimensionType()
 	{

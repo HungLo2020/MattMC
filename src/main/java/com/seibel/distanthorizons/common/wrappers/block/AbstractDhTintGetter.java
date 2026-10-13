@@ -123,13 +123,9 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 		int zMin = mutableBlockPos.getZ() - this.smoothingRadiusInBlocks;
 		int zMax = mutableBlockPos.getZ() + this.smoothingRadiusInBlocks + 1;
 		
+		// Render conversion blends cached tints in Rust before asking Java, so
+		// this traversal runs for cache misses (and with a resolver, to fill them).
 		int levelMinY = this.clientLevelWrapper.getMinHeight();
-        var nativeCache = this.blockStateWrapper.nativeTintCache();
-        var nativeBiome = this.biomeWrapper.nativeTintIdentity();
-        if (nativeCache != null && nativeBiome != null && colorResolver == null
-            && nativeCache.tryBlend(nativeBiome, this.fullDataSource, mutableBlockPos, levelMinY, this.smoothingRadiusInBlocks)) {
-            return nativeCache.blendedColor();
-        }
 		
 		for (int x = xMin; x < xMax; x++)
 		{

@@ -36,12 +36,11 @@ section-build replacement and does not verify the integrated source.
 ## What Java still does
 
 - **Contextual queries during conversion.** Rust calls back for a block's
-  facts the first time a mapping id appears in a source, and for colors it has
-  not cached. Untinted colors are cached per id, so most columns never reach
-  Java. Tinted blocks (grass, leaves, fluids) still query
-  `IClientLevelWrapper.getBlockColor` per point, because their tint depends on
-  the position. Java sees a column only once it queries: `COLUMN_BEGIN` sets the
-  column's world position first.
+  facts the first time a mapping id appears in a source, and for colors it
+  cannot resolve itself. Untinted colors are cached per id. Tinted blocks
+  (grass, leaves, fluids) are colored in Rust as well; see
+  [Tinted colors](#tinted-colors). Java sees a column only once it queries:
+  `COLUMN_BEGIN` sets the column's world position first.
 - **Semantic diagnostic builds** (`exactMaterialTopology`, capture, or
   `forceSemanticPreservation`) intern block/biome identity strings in Java, so
   each converted column also gets `COLUMN_BEGIN`/`COLUMN_END` hooks that record
@@ -58,6 +57,29 @@ the ordinary build loops is not a claim that every diagnostic or contextual
 callback has migrated. These paths are visible in
 [`ColumnRenderBufferBuilder`](https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnRenderBufferBuilder.java)
 and [`finishSemanticColumn`](https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java).
+
+## Tinted colors
+
+`ClientBlockStateColorCache.getColor` colors a tinted block as its base color
+times a biome tint. The tint is the cached tint for the point's biome or, with
+biome blending, the average over the neighboring columns' cached tints. Render
+conversion does exactly that in Rust
+([`TintContext`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/dh_columns/conversion.rs)):
+
+- Java reports each mapping id's route once per color generation (`TINT`):
+  native, with the base color and the block's tint cache and biome identity, or
+  Java, for untinted, broken or level-dependent states. Unresolved colors are
+  asked again later.
+- Rust reads the cached tint, or blends neighbors over the Rust full-data source
+  ([`tint::source_blend`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/dh_columns/tint.rs)),
+  and multiplies. A miss (no cached tint, Frozen's invalid sentinel, or input
+  outside the native route) asks Java for that point's color. Java then runs
+  Minecraft's color resolver, which fills the cache, so later points stay native.
+- Anything that changes a state's route bumps the color generation
+  (`NativeDhConversionScope.colorsChanged`): color-cache clears, and states
+  joining `ClientBlockStateColorCache`'s broken or needs-level sets.
+- Tests set `RenderColumnConversionContext.nativeTint` to false to compare with
+  Java's per-point colors.
 
 ## Rules when changing this subsystem
 
@@ -111,6 +133,10 @@ and [`finishSemanticColumn`](https://github.com/HungLo2020/MattMC/blob/c357b63cd
   and `NativeDhRenderReductionTest` replay the recorded Frozen fixtures.
 - `NativeDhRenderConversionTest` and `NativeDhConversionScopeTest` cover the
   whole-source conversion bridge and its material cache.
+- `NativeDhTintConversionTest` (parity) converts recorded terrain with warm tint
+  caches through the native tint route and through Java's per-point colors, at
+  blend radii 0, 1 and 3, and requires equal packets. `NativeDhTintTest` replays
+  Frozen's cached-neighborhood fixture through the Rust source blend.
 
 **Whole pipeline, across builds.** `VerifyDhSource.py --mode render` converts,
 builds and encodes recorded terrain (a 3 x 3 grid of block-detail sections
@@ -133,6 +159,9 @@ mapped-library identity. Preserve any additional author-run provenance checks
 separately from what this script enforces.
 
 Add `--jvm-arg=-Ddh.verify.renderConfig=1` or `=2` for other settings presets,
+`--jvm-arg=-Ddh.verify.tint=all|partial|none` for warm, partly missing or empty
+tint caches (default `all`), `--jvm-arg=-Ddh.verify.blend=N` for the biome
+blend radius,
 or a semantic launch switch such as
 `--jvm-arg=-Dmattmc.dev.rustGalDistantHorizons.exactMaterialTopology=true`.
 
@@ -177,3 +206,27 @@ pressure. Their CPU attribution and timing spread are author observations, not
 a controlled isolated throughput gain or broad frame-time, streaming or
 long-session memory acceptance. The diagnostic semantic CPU ratio of 1.01
 remains slower than the preceding implementation.
+
+## Measured results: tinted colors (2026-10-13)
+
+Against a build of the preceding Current implementation (`c357b63cd`,
+"baseline"), not unchanged Frozen.
+
+**CPU, whole pipeline** (`--mode render`; every pair's packet checksums matched):
+
+| Tint caches, blend radius | Baseline ms | Current ms | Current / baseline |
+| --- | --- | --- | --- |
+| Warm, 3 (default; 6 pairs x 4 rounds) | 2,633.9 | 2,420.7 | 0.92 |
+| Warm, 0 | 723 | 709 | 0.98 |
+| Warm, 1 | 854 | 773 | 0.91 |
+| Warm, 2 | 1,025 | 991 | 0.97 |
+| Partly missing, 3 (misses fall back to Java) | 1,385 | 1,161 | 0.84 |
+| Empty, 3 (every tinted point asks Java) | 699 | 701 | 1.00 |
+
+The rows after the first ran two pairs of two rounds each.
+
+**Gameplay** (small DH fixture, moving camera, 6,000 frames, four alternating
+runs per side, medians): baseline 110.9 FPS, 6.39 ms median frame, 42.2 ms
+p99; Current 111.6 FPS, 6.05 ms, 45.8 ms. Both sides spread widely (median frame
+5.64–8.65 ms) with 1.5–4.4 GB of swap in every run, so this shows no regression
+rather than a measured gain. Runs: `artifacts/performance/realworld-20261011/dhab6-*`.

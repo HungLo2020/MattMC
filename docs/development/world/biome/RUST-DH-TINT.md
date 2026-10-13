@@ -1,5 +1,13 @@
 # Rust DH cached tint neighborhoods
 
+> **Current state (2026-10-13):** render conversion now colors tinted blocks in
+> Rust: it reads these caches and blends over the full-data source directly,
+> asking Java only on a miss; see
+> [Rust-only DH render build](../../rendering/RUST-DH-RENDER-BUILD.md#tinted-colors).
+> The Java `NativeDhTintCache.tryBlend` routes (column plans, borrowed views,
+> bounded critical calls) were removed with their exports; the content below
+> about them is historical.
+
 The current implementation moves canonical DH block/biome tint-cache storage
 and cached neighborhood sampling into
 [`dh_columns/tint.rs`](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/src/main/rust/world/level/chunk/dh_columns/tint.rs).

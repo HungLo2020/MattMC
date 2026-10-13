@@ -17,25 +17,34 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Actual Frozen cached neighborhoods; synthetic CPU contract evidence only. */
 @Tag("parity")
 class NativeDhTintTest {
-    @BeforeAll static void bootstrap() throws Exception { NativeDhColumnsTest.bootstrap(); }
-    private static void assertScratchReleasedColumns() throws Exception {
-        var local=NativeDhTintCache.class.getDeclaredField("SCRATCH");local.setAccessible(true);
-        var scratch=((ThreadLocal<?>)local.get(null)).get();var pins=scratch.getClass().getDeclaredField("pins");pins.setAccessible(true);
-        for(var column:(Object[])pins.get(scratch))assertNull(column,"Completed or declined calls must not retain column owners");
-    }
+    @BeforeAll static void bootstrap() throws Throwable { NativeDhColumnsTest.bootstrap(); }
+    private static final java.lang.invoke.MethodHandle SOURCE = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_tint_source",
+        java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.ADDRESS,
+            java.lang.foreign.ValueLayout.ADDRESS, java.lang.foreign.ValueLayout.ADDRESS, java.lang.foreign.ValueLayout.ADDRESS,
+            java.lang.foreign.ValueLayout.JAVA_LONG, java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.JAVA_INT,
+            java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.JAVA_INT,
+            java.lang.foreign.ValueLayout.ADDRESS));
+    private static int blended;
+    /** The render conversion's native route: one point's tint over the Rust source table; position updates on success. */
     private static boolean directSourceBlend(NativeDhTintCache cache, NativeDhTintCache.BiomeIdentity biome,
-                                            FullDataSourceV2 source, DhBlockPosMutable pos, int minY, int radius) throws Exception {
-        var method = NativeDhTintCache.class.getDeclaredMethod("trySourceBlend", NativeDhTintCache.BiomeIdentity.class,
-            FullDataSourceV2.class, DhBlockPosMutable.class, int.class, int.class);
-        method.setAccessible(true);
-        return (boolean)method.invoke(cache, biome, source, pos, minY, radius);
+                                            FullDataSourceV2 source, DhBlockPosMutable pos, int minY, int radius) throws Throwable {
+        var map = source.mapping.nativeMaterialMap(); if (map == null) return false;
+        try (var arena = java.lang.foreign.Arena.ofConfined()) {
+            var out = arena.allocate(12, 4);
+            int status = (int)SOURCE.invokeExact(cache.stageOwner(), biome.stageOwner(), map.stageOwner(), source.nativeSource().stageOwner(),
+                source.getPos(), pos.getX(), pos.getY(), pos.getZ(), minY, radius, out);
+            if (status != 1) return false;
+            blended = out.getAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, 0);
+            pos.setX(out.getAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, 1)); pos.setZ(out.getAtIndex(java.lang.foreign.ValueLayout.JAVA_INT, 2));
+            return true;
+        }
     }
-    private static BiomeWrapper biome(String name) throws Exception {
+    private static BiomeWrapper biome(String name) throws Throwable {
         var ctor=BiomeWrapper.class.getDeclaredConstructors()[0];ctor.setAccessible(true);var b=(BiomeWrapper)ctor.newInstance(null,null);
         var serial=BiomeWrapper.class.getDeclaredField("serialString");serial.setAccessible(true);serial.set(b,name);
         var hash=BiomeWrapper.class.getDeclaredField("hashCode");hash.setAccessible(true);hash.setInt(b,Objects.hash(name));return b;
     }
-    @Test void ordinaryGetterMatchesEveryFrozenColorCacheMissAndPositionPrefix() throws Exception {
+    @Test void ordinaryGetterMatchesEveryFrozenColorCacheMissAndPositionPrefix() throws Throwable {
         var blend=Config.Client.Advanced.Graphics.Quality.lodBiomeBlending;int saved=blend.get();
         var level=(IClientLevelWrapper)Proxy.newProxyInstance(IClientLevelWrapper.class.getClassLoader(),new Class<?>[]{IClientLevelWrapper.class},(p,m,a)->{if(m.getName().equals("getMinHeight"))return -64;throw new AssertionError(m.toString());});
         try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(getClass().getResourceAsStream("/world/chunk/frozen-dh-tint.bin.gz"))))) {
@@ -51,13 +60,13 @@ class NativeDhTintTest {
                     blend.setWithoutFiringEvents(radius);var getter=new TintWithoutLevelOverrider();getter.update(biomes[0],BlockStateWrapper.AIR,source,level);
                     var mutable=new DhBlockPosMutable(x,y,z);assertEquals(expected,getter.tryGetBlockTint(mutable),"case"+test);assertEquals(expectedX,mutable.getX());assertEquals(expectedZ,mutable.getZ());
                     mutable=new DhBlockPosMutable(x,y,z);
-                    if(directSourceBlend(cache,biomes[0].nativeTintIdentity(),source,mutable,min,radius)) {nativeWindows++;assertEquals(expected,cache.blendedColor());assertEquals(expectedX,mutable.getX());assertEquals(expectedZ,mutable.getZ());}
+                    if(directSourceBlend(cache,biomes[0].nativeTintIdentity(),source,mutable,min,radius)) {nativeWindows++;assertEquals(expected,blended);assertEquals(expectedX,mutable.getX());assertEquals(expectedZ,mutable.getZ());}
                 }
             }
             assertTrue(nativeWindows>80,"Native admission exercised");assertEquals(-1,in.read());
         }finally{blend.setWithoutFiringEvents(saved);}
     }
-    @Test void sharedIdentityCachePreservesAllColorsAndConcurrentPublication() throws Exception {
+    @Test void sharedIdentityCachePreservesAllColorsAndConcurrentPublication() throws Throwable {
         var a=new NativeDhTintCache("test:shared_jni_cache");var b=new NativeDhTintCache("test:shared_jni_cache");
         var biome=new NativeDhTintCache.BiomeIdentity("test:shared_jni_biome");assertEquals(0,a.get(biome));
         for(int color:new int[]{Integer.MIN_VALUE,-1,0,Integer.MAX_VALUE}){a.put(biome,color);assertEquals((1L<<32)|(color&0xffffffffL),b.get(biome));}
@@ -65,30 +74,26 @@ class NativeDhTintTest {
         try {var jobs=new ArrayList<Future<?>>();for(int thread=0;thread<4;thread++){int id=thread;jobs.add(pool.submit(()->{var key=new NativeDhTintCache.BiomeIdentity("test:thread_"+id);for(int i=0;i<2000;i++){a.put(key,i);assertEquals((1L<<32)|i,b.get(key));}}));}for(var job:jobs)job.get(30,TimeUnit.SECONDS);}
         finally{pool.shutdownNow();assertTrue(pool.awaitTermination(30,TimeUnit.SECONDS));}
     }
-    @Test void copiedColumnsBlendAndBadColumnsDeclineWithoutPositionMutation() throws Exception {
+    @Test void copiedColumnsBlendAndBadColumnsDeclineWithoutPositionMutation() throws Throwable {
         var cache=new NativeDhTintCache("test:decline");var center=biome("test:decline_center");cache.put(center.nativeTintIdentity(),0xff123456);
         try(var source=FullDataSourceV2.createEmpty(6)) {
             source.mapping.addIfNotPresentAndGetId(center,BlockStateWrapper.AIR);
             var pos=new DhBlockPosMutable(30,0,30);
             // A Java list is bound as a native copy, so the native blend admits it.
             source.setColumn(30*64+30,new it.unimi.dsi.fastutil.longs.LongArrayList(new long[]{1L<<32}));
-            assertTrue(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,cache.blendedColor());
-            assertScratchReleasedColumns();
+            assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,blended);
             pos=new DhBlockPosMutable(30,0,30);
             var nativeList=NativeDhColumnList.empty();source.setColumn(30*64+30,nativeList);
-            nativeList.add(1L<<32);assertTrue(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,cache.blendedColor());
+            nativeList.add(1L<<32);assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,blended);
             pos=new DhBlockPosMutable(30,0,30);nativeList.clear();for(int i=0;i<100;i++)nativeList.add(1L<<32);
-            assertTrue(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,cache.blendedColor());
-            assertScratchReleasedColumns();
+            assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),source,pos,0,3));assertEquals(0xff123456,blended);
             pos=new DhBlockPosMutable(30,0,30);nativeList.set(0,(1L<<32)|Integer.MAX_VALUE);
-            assertFalse(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(30,pos.getX());assertEquals(30,pos.getZ());
-            assertScratchReleasedColumns();
+            assertFalse(directSourceBlend(cache,center.nativeTintIdentity(),source,pos,0,3));assertEquals(30,pos.getX());assertEquals(30,pos.getZ());
             nativeList.clear();for(int i=0;i<4097;i++)nativeList.add(1L<<32);
-            assertFalse(cache.tryBlend(center.nativeTintIdentity(),source,pos,0,3));assertEquals(30,pos.getX());assertEquals(30,pos.getZ());
-            assertScratchReleasedColumns();
+            assertFalse(directSourceBlend(cache,center.nativeTintIdentity(),source,pos,0,3));assertEquals(30,pos.getX());assertEquals(30,pos.getZ());
         }
     }
-    @Test void actualFrozenMutableKeyHistoriesPreserveHashAndOriginalBindings() throws Exception {
+    @Test void actualFrozenMutableKeyHistoriesPreserveHashAndOriginalBindings() throws Throwable {
         try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(getClass().getResourceAsStream("/world/chunk/frozen-dh-tint-keys.bin.gz"))))) {
             assertEquals(0x44544b31,in.readInt());assertEquals(32,in.readInt());
             for(int test=0;test<32;test++) {
@@ -103,7 +108,7 @@ class NativeDhTintTest {
             assertEquals(-1,in.read());
         }
     }
-    @Test void resolverCallbacksMayMutateLaterSamplesBeforeCachedNativeTraversal() throws Exception {
+    @Test void resolverCallbacksMayMutateLaterSamplesBeforeCachedNativeTraversal() throws Throwable {
         var config=Config.Client.Advanced.Graphics.Quality.lodBiomeBlending;int saved=config.get();
         var field=AbstractDhTintGetter.class.getDeclaredField("BIOME_BY_RESOURCE_STRING");field.setAccessible(true);
         @SuppressWarnings("unchecked") var registryCache=(Map<String,net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome>>)field.get(null);
@@ -127,7 +132,7 @@ class NativeDhTintTest {
         }finally{config.setWithoutFiringEvents(saved);registryCache.remove(first.getSerialString());registryCache.remove(second.getSerialString());}
     }
 
-    @Test void boundCopiesStayIndependentAndRetainedReadersFollowGrowthAndReplacement() throws Exception {
+    @Test void boundCopiesStayIndependentAndRetainedReadersFollowGrowthAndReplacement() throws Throwable {
         var cache = new NativeDhTintCache("test:retained_sources");
         var center = biome("test:retained_center"); var other = biome("test:retained_other");
         cache.put(center.nativeTintIdentity(), 0xff123456); cache.put(other.nativeTintIdentity(), 0xffabcdef);
@@ -144,26 +149,26 @@ class NativeDhTintTest {
             assertNotSame(shared, b.getColumn(index)); assertNotSame(shared, a.getColumn(index+1));
             for (var source : List.of(a,b)) {
                 assertTrue(directSourceBlend(cache, center.nativeTintIdentity(), source, new DhBlockPosMutable(30,0,30),0,1));
-                assertEquals(0xff123456, cache.blendedColor());
+                assertEquals(0xff123456, blended);
             }
             // Growth of a's reader reaches a's table only (its neighbor's copy is cleared first).
             a.setColumn(index+1, null);
             shared.clear(); for(int i=0;i<200;i++)shared.add((1L<<32)|1);
             assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
-            assertEquals(0xffabcdef,cache.blendedColor());
+            assertEquals(0xffabcdef,blended);
             assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),b,new DhBlockPosMutable(30,0,30),0,1));
-            assertEquals(0xff123456,cache.blendedColor());
+            assertEquals(0xff123456,blended);
             var replacement = NativeDhColumnList.empty(); replacement.add(1L<<32);
             a.setColumn(index,replacement); a.setColumn(index+1,null);
             var escaped = a.columnReferences(); escaped[index] = shared;
             assertSame(replacement,a.getColumn(index),"Structural escapes cannot replace native slots");
             assertTrue(directSourceBlend(cache,center.nativeTintIdentity(),a,new DhBlockPosMutable(30,0,30),0,1));
-            assertEquals(0xff123456,cache.blendedColor());
+            assertEquals(0xff123456,blended);
         }
         retained.set(0,1L<<32); // Retained lists remain valid after both sources close.
         assertEquals(1L<<32,retained.getLong(0));
     }
-    @Test void ordinaryProducerAndParentConsumersUseRetainedNativeTableBeforeAndAfterDetachment() throws Exception {
+    @Test void ordinaryProducerAndParentConsumersUseRetainedNativeTableBeforeAndAfterDetachment() throws Throwable {
         var columns = NativeDhColumnsTest.savedNativeColumns(0); assertNotNull(columns);
         var cache = new NativeDhTintCache("test:retained_producer_parent");
         try (var source = FullDataSourceV2.createNative(columns);
@@ -182,11 +187,11 @@ class NativeDhTintTest {
                 long point=list.getLong(0); int y=-64+(int)((point>>>44)&4095);
                 var biome=((BiomeWrapper)input.mapping.getBiomeWrapper(0)).nativeTintIdentity();
                 assertTrue(directSourceBlend(cache,biome,input,new DhBlockPosMutable(x,y,z),-64,3));
-                assertEquals(0xff579bdf,cache.blendedColor());
+                assertEquals(0xff579bdf,blended);
                 list.clear(); list.add(point);
                 assertFalse(list.isOriginalProducerView());
                 assertTrue(directSourceBlend(cache,biome,input,new DhBlockPosMutable(x,y,z),-64,3));
-                assertEquals(0xff579bdf,cache.blendedColor());
+                assertEquals(0xff579bdf,blended);
             }
         }
     }

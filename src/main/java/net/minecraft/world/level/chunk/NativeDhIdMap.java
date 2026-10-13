@@ -94,7 +94,7 @@ public final class NativeDhIdMap {
         } catch (RuntimeException | Error e) { throw e; } catch (Throwable e) { throw new IllegalStateException(e); }
         finally { Reference.reachabilityFence(source); Reference.reachabilityFence(this); }
     }
-    MemorySegment stageOwner() { return owner; }
+    public MemorySegment stageOwner() { return owner; }
     public int hash(long position) {
         try { return (int) HASH.invokeExact(owner, position); }
         catch (Throwable e) { throw new IllegalStateException(e); }

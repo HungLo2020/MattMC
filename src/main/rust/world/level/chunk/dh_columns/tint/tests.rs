@@ -111,42 +111,11 @@ fn untouched_frozen_cached_neighborhoods_match_color_and_mutation_prefix() {
                     }
                 }
                 assert_eq!(
-                    mattmc_dh_tint_blend(
-                        &cache,
-                        &center,
-                        map,
-                        pos,
-                        x,
-                        y,
-                        z,
-                        min_y,
-                        radius,
-                        raw.as_ptr(),
-                        out.as_mut_ptr()
-                    ),
+                    blend(&cache, &center, map, pos, x, y, z, min_y, radius, raw.as_ptr(), out.as_mut_ptr()),
                     1,
                     "case{case}"
                 );
                 assert_eq!(out, expected, "case{case}");
-                out.fill(999);
-                assert_eq!(
-                    mattmc_dh_tint_blend_bounded(
-                        &cache,
-                        &center,
-                        map,
-                        pos,
-                        x,
-                        y,
-                        z,
-                        min_y,
-                        radius,
-                        raw.as_ptr(),
-                        out.as_mut_ptr()
-                    ),
-                    1,
-                    "bounded case{case}"
-                );
-                assert_eq!(out, expected, "bounded case{case}");
             }
             id_map::mattmc_dh_id_map_release(map);
         }
@@ -192,22 +161,7 @@ fn malformed_spans_and_unsupported_bounds_leave_result_untouched() {
         let map = id_map::mattmc_dh_id_map_create();
         let mut raw = [0usize; 98];
         raw[1] = 4097;
-        assert_eq!(
-            mattmc_dh_tint_blend(
-                &cache,
-                &biome,
-                map,
-                6,
-                30,
-                0,
-                30,
-                0,
-                3,
-                raw.as_ptr(),
-                out.as_mut_ptr()
-            ),
-            0
-        );
+        assert_eq!(blend(&cache, &biome, map, 6, 30, 0, 30, 0, 3, raw.as_ptr(), out.as_mut_ptr()), 0);
         assert_eq!(out, [31; 3]);
         id_map::mattmc_dh_id_map_release(map);
     }
@@ -298,90 +252,3 @@ fn primary_color_cells_survive_growth_and_publish_membership_generation() {
     }
 }
 
-#[test]
-fn bounded_sampling_declines_long_work_and_contended_keys_without_writes() {
-    let cache = Cache(Arc::new(Mutex::default()));
-    let name = [b'a' as u16];
-    let state = [b'A' as u16];
-    unsafe {
-        let biome = mattmc_dh_tint_biome_v2(name.as_ptr(), 1, 1);
-        let map = id_map::mattmc_dh_id_map_create();
-        assert_eq!(
-            id_map::mattmc_dh_id_map_add(map, name.as_ptr(), 1, state.as_ptr(), 1, 0, 0),
-            0
-        );
-        assert_eq!(id_map::mattmc_dh_id_map_bind_tint(map, 0, biome), 1);
-        assert_eq!(mattmc_dh_tint_put(&cache, biome, 0xff123456u32 as i32), 1);
-        let points = vec![1u64 << 32; 100];
-        let mut raw = [0usize; 98];
-        for i in 0..49 {
-            raw[2 * i] = points.as_ptr() as usize;
-            raw[2 * i + 1] = points.len();
-        }
-        let mut out = [313; 3];
-        assert_eq!(
-            mattmc_dh_tint_blend_bounded(
-                &cache,
-                biome,
-                map,
-                6,
-                30,
-                0,
-                30,
-                0,
-                3,
-                raw.as_ptr(),
-                out.as_mut_ptr()
-            ),
-            0
-        );
-        assert_eq!(out, [313; 3]);
-        assert_eq!(
-            mattmc_dh_tint_blend(
-                &cache,
-                biome,
-                map,
-                6,
-                30,
-                0,
-                30,
-                0,
-                3,
-                raw.as_ptr(),
-                out.as_mut_ptr()
-            ),
-            1
-        );
-        assert_eq!(out, [0xff123456u32 as i32, 33, 33]);
-        for i in 0..49 {
-            raw[2 * i + 1] = 1;
-        }
-        let guard = cache.0.lock().unwrap();
-        out.fill(313);
-        assert_eq!(
-            mattmc_dh_tint_blend_bounded(
-                &cache,
-                biome,
-                map,
-                6,
-                30,
-                0,
-                30,
-                0,
-                3,
-                raw.as_ptr(),
-                out.as_mut_ptr()
-            ),
-            0
-        );
-        assert_eq!(out, [313; 3]);
-        drop(guard);
-        let other = mattmc_dh_tint_biome_v2(name.as_ptr(), 1, 1);
-        let guard = (&(*other).0).units.lock().unwrap();
-        assert!(cache.0.lock().unwrap().bounded_get(&(*other).0).is_err());
-        drop(guard);
-        mattmc_dh_tint_biome_release(other);
-        mattmc_dh_tint_biome_release(biome);
-        id_map::mattmc_dh_id_map_release(map);
-    }
-}

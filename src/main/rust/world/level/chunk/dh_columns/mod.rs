@@ -4,7 +4,7 @@ use super::{biomes, counters, dh_heightmaps::Heightmaps, live, inputs::Sections}
 use crate::world::level::lighting::dh::Field;
 use std::collections::HashMap;
 mod ffi;
-mod id_map;
+pub(crate) mod id_map;
 mod mutable;
 mod occlusion;
 mod occlusion_pass;
@@ -13,7 +13,7 @@ mod materials;
 mod reduction;
 mod parent;
 mod contributors;
-mod tint;
+pub(crate) mod tint;
 pub(crate) mod source;
 mod metadata;
 mod codec;
