@@ -7,6 +7,8 @@ each module there has a short README with its own file map.
 - [Goal 5 rendering checkpoint](GOAL-5-STATUS.md): current source scope, bounded evidence, open tracker work and remaining parity/performance limits.
 - [Render Architecture](RENDER-ARCHITECTURE.md): the layers, what each may
   depend on, and where new code belongs.
+- [Rust dynamic mesh lifetime](RUST-MESH-LIFETIME.md): semantic asset usage,
+  generation retirement, rollback ownership and scoped verification.
 - [Retained render scene](RETAINED-SCENE.md): the proposed persistent scene
   model and its phased rollout toward Frozen parity.
 - [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,

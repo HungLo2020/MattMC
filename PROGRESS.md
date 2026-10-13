@@ -22,11 +22,7 @@
 
 ## Recent published checkpoints
 
-- ae7f499b3: entity UUID/chunk residency and persistence admission. 1a977b9db: fog numerical policy.
-- 61805d6dc: retained light queues/sky seeds. 8e16a569c: direct block-light inputs and bulk DH column resizing. 7acbefd0f: matched performance/memory reports.
-- b6a0f89ca: primary Rust DH point codecs and lazy closed-source readers. Real24-DTO hydration improved29.4%; historical matrix still missed the DH FPS floor5.8%.
 - Integrated upstream5f7b28a97 (DH sky light, saved contributor batches, fresh chunk slabs) preserving all19 entity-query paths; combined Rust2743/Java2068 pass. Earlier: f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
-- Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
 
 ## Earlier DH checkpoints
 
@@ -69,7 +65,7 @@
 
 ## Collision traversal checkpoint
 
-- Published camera batch056582a23; worktree was clean and live origin/master verified before this batch.
+- Published camera056582a23 and collisionefe94ff71; live origin/master and clean worktree verified after publication.
 - Rust now owns retained-section traversal, static grid intersections and contextual face/edge exclusion. Java retains required contextual calls/result projection; no cell export or result batch across callbacks.
 - Frozen231212 cases pass on native2669a647 with current Java lazy query shapes, Java11 and Rust world325. Original-grid retention fixes the top-slab epsilon mismatch; failed versions/JIT timings remain recorded.
 - Latest CPU80.41/80.11ms Current/Frozen per65536 queries is comparable (+0.4%); Java heap34.25/75.23MB (54.5% less). Native border exclusion, fixed-width reads and lazy Java query shapes remove most scan-only overhead. No gameplay gain claimed.
@@ -82,7 +78,10 @@
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Next: migrate further world-query/motion/collision producers and consumers. Typed query dispatch and entity simulation remain Java.
+- Mesh-lifetime slice: Rust owns usage, ordered generation retirement and rollback; registered rigs touch their retained part identities directly. Java asset wrappers, pending deliveries, typed query dispatch and entity simulation remain.
+- Fresh paired JFRs identify73MB sampled lifetime allocation weight (not a rate). Final stable-rig CPU3.49/4.42ms vs prior Java improves21%, allocation0/31.46MB; changing rigs8.72/7.14ms regress22%, scalar paths also slower. Initial/intermediate failures retained; oracle-3 replay200000 and full Rust2763/3ignored, Java2100/2skip pass.
+- Nativeec10875b: four fresh6000-frame Current/Frozen pairs give FPS1269.9/1191.4 vanilla,359.2/315.8 shaders,808.6/621.8 DH,282.1/226.2 both; all scoped FPS/p99 floors pass. Single pairs, matching inputs/JVM controls, live entities188/182,188/185,167/167,167/166; no isolated/sustained gain.
+- Two settled pairs/three lifecycles pass,VUID0; seven originals/five presenter/nine native identities reviewed. Captures disable rigs and hazy gates are structural only; ordinary gameplay enables rigs. Source/class/native/Frozen guards pass;13 completed copies retired, originals retained. Guide: rendering/RUST-MESH-LIFETIME.md; receipts: build/native-mesh-lifetime/.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.
@@ -93,7 +92,7 @@
 
 - Protected stashes:12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb. No workflow stash needed.
 - Explicitly stage reviewed paths; never force-push/reset/blanket-stage. Preserve incoming and local work together on upstream master.
-- Prune only recognized completed generated copies after clients exit. Preserve measurements/originals/profiles, failures, unknown/active/symlinked scopes, prepared inputs and open-defect worlds. Never clean during timing.
+- Prune only recognized completed copies after clients exit; preserve originals/profiles/failures/unknown or active scopes and open-defect worlds. Never clean during timing. Fresh paired model JFRs retained: two completed worlds retired; verified lossless JSON compression reclaimed641680011bytes.
 - Prior manifests record large cache/archive/video retirement. Latest point-codec cleanup retired21 completed copies/2.29GiB while preserving1550 selected evidence hashes and all originals/profiles/failures.
 - Metadata/IO cleanup retired29 completed copies, reclaiming3.11GiB;1387 selected evidence hashes unchanged. Interrupted final DH scope, all originals/profiles/per-frame diagnostics and protected inputs remain.
 - Light-input cleanup retired21 completed copies/2.29GiB with1548 selected evidence hashes unchanged; all originals/profiles/per-frame diagnostics and failed RSS/legacy-shutdown scopes remain.

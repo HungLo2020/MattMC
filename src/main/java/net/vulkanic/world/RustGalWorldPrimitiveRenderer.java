@@ -10646,6 +10646,11 @@ float[] transform = new float[16];
 
 	/** Admits the asset; true when its resident records were already current. */
 	private static boolean ensureMeshAssetLocked(BlockMeshExtraction extraction) {
+		return ensureMeshAssetLocked(extraction, true);
+	}
+
+	/** Rig producers touch retained identities together after ordered admission. */
+	private static boolean ensureMeshAssetLocked(BlockMeshExtraction extraction, boolean observeLifetime) {
 		VulkanicGalBridge.WorldMeshAssetRecord previousAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
 		// A stable ModelPart topology reuses these exact, previously validated
 		// records for every pose and pattern layer. The full admission below is
@@ -10661,7 +10666,7 @@ float[] transform = new float[16];
 		}
 		if (residentRecordsUnchanged) {
 			PENDING_WORLD_MESH_RETIREMENTS.remove(extraction.meshKey());
-			DYNAMIC_WORLD_MESH_LIFETIME.observe(
+			if (observeLifetime) DYNAMIC_WORLD_MESH_LIFETIME.observe(
 				extraction.meshKey(), previousAsset.meshGeneration(), Math.max(1L, semanticFrameSequence)
 			);
 			return true;
@@ -10725,7 +10730,7 @@ float[] transform = new float[16];
 		// Cancel that pending record before the next combined update and publish
 		// this exact immutable generation as live for the current semantic frame.
 		PENDING_WORLD_MESH_RETIREMENTS.remove(extraction.meshKey());
-		DYNAMIC_WORLD_MESH_LIFETIME.observe(
+		if (observeLifetime) DYNAMIC_WORLD_MESH_LIFETIME.observe(
 			extraction.meshKey(), retainedAsset.meshGeneration(), Math.max(1L, semanticFrameSequence)
 		);
 		if (changed) {
@@ -12743,37 +12748,56 @@ float[] transform = new float[16];
 		if (changed) {
 			generations = new long[meshes.length];
 		}
-		for (int node = 0; node < meshes.length; node++) {
-			BlockMeshExtraction mesh = meshes[node];
-			if (mesh == null) continue;
-			if (!ensureMeshAssetLocked(mesh)) {
-				topology.rigUploadProof = -1L;
-			}
-			VulkanicGalBridge.WorldMeshAssetRecord admitted = WORLD_MESH_ASSETS.get(mesh.meshKey());
-			long generation = admitted == null ? mesh.meshGeneration() : admitted.meshGeneration();
-			if (generations[node] != generation) {
-				if (!changed) {
-					generations = generations.clone();
-					changed = true;
-				}
-				generations[node] = generation;
-			}
-		}
-		if (changed) {
-			long[] keys = new long[meshes.length];
+		int admittedPrefix = 0;
+		boolean observed = false;
+		try {
 			for (int node = 0; node < meshes.length; node++) {
-				keys[node] = meshes[node] == null ? 0L : meshes[node].meshKey();
+				BlockMeshExtraction mesh = meshes[node];
+				if (mesh == null) continue;
+				if (!ensureMeshAssetLocked(mesh, false)) {
+					topology.rigUploadProof = -1L;
+				}
+				admittedPrefix = node + 1;
+				VulkanicGalBridge.WorldMeshAssetRecord admitted = WORLD_MESH_ASSETS.get(mesh.meshKey());
+				long generation = admitted == null ? mesh.meshGeneration() : admitted.meshGeneration();
+				if (generations[node] != generation) {
+					if (!changed) {
+						generations = generations.clone();
+						changed = true;
+					}
+					generations[node] = generation;
+				}
 			}
-			long rigId = ++nextModelRigId;
-			VulkanicGalBridge.registerModelRig(rigId, topology.parents, keys, generations);
-			// Queued frames may still name the previous id: it is released later.
-			retireModelRig(topology);
-			topology.rigId = rigId;
-			topology.rigGenerations = generations;
-			topology.rigUploadProof = -1L;
-			MODEL_RIGS.put(rigId, topology);
+			if (changed) {
+				long[] keys = new long[meshes.length];
+				for (int node = 0; node < meshes.length; node++) {
+					keys[node] = meshes[node] == null ? 0L : meshes[node].meshKey();
+				}
+				long rigId = ++nextModelRigId;
+				VulkanicGalBridge.registerModelRig(rigId, topology.parents, keys, generations);
+				// Queued frames may still name the previous id: it is released later.
+				retireModelRig(topology);
+				topology.rigId = rigId;
+				topology.rigGenerations = generations;
+				topology.rigUploadProof = -1L;
+				MODEL_RIGS.put(rigId, topology);
+			}
+			DYNAMIC_WORLD_MESH_LIFETIME.observeRig(topology.rigId, Math.max(1L, semanticFrameSequence));
+			observed = true;
+			return topology.rigId;
+		} finally {
+			if (!observed) {
+				// Admission/registration can fail after a prefix. Preserve those
+				// exact lifetime touches for the surrounding producer rollback.
+				for (int node = 0; node < admittedPrefix; node++) {
+					BlockMeshExtraction mesh = meshes[node];
+					if (mesh == null) continue;
+					var admitted = WORLD_MESH_ASSETS.get(mesh.meshKey());
+					DYNAMIC_WORLD_MESH_LIFETIME.observe(mesh.meshKey(), admitted.meshGeneration(),
+						Math.max(1L, semanticFrameSequence));
+				}
+			}
 		}
-		return topology.rigId;
 	}
 
 	/** Copies the nodes' current pose fields; returns the first pose index. */

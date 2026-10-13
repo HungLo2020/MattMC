@@ -75,6 +75,25 @@ fn release(id: u64) -> bool {
     rigs().lock().map(|mut rigs| rigs.remove(&id).is_some()).unwrap_or(false)
 }
 
+/// Touch the already-owned part identities in order, without exporting them
+/// back to Java. The caller exclusively borrows a live CPU lifetime owner.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_mesh_lifetime_observe_rig(
+    owner: *mut crate::render::mesh_lifetime::Lifetime, id: u64, frame: i64,
+) -> i32 {
+    let Some(owner) = owner.as_mut() else { return -1; };
+    if frame <= 0 { return -1; }
+    let Ok(table) = lock_model_rigs() else { return -1; };
+    let Some(nodes) = table.get(&id) else { return -1; };
+    // Registration validates every nonzero mesh identity before publication.
+    for node in nodes.iter() {
+        if let Some((key, generation)) = node.mesh {
+            owner.observe(key as i64, generation as i64, frame);
+        }
+    }
+    0
+}
+
 /// The registered rigs, locked once for a frame's expansions.
 pub(super) type ModelRigTable = std::sync::MutexGuard<'static, HashMap<u64, Arc<[RigNode]>>>;
 

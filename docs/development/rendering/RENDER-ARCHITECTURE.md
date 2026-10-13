@@ -310,6 +310,11 @@ second copy of the instance records. Source resource sets (`TerrainSourceOwnedRe
 are immutable and `Arc`-shared: per-draw material preparation clones and compares
 them, so keep them cheap to clone and do not add mutable state.
 
+Dynamic model/item mesh usage and rollback history now live in the
+[Rust lifetime tracker](RUST-MESH-LIFETIME.md).
+Java applies ordered generation retirements to its remaining asset wrappers;
+GAL completion still governs GPU resource destruction.
+
 Cacheable entity models use ABI 71 rigs: Java supplies local-space part assets
 and raw poses after `setupAnim`; Rust composes the hierarchy and expands ordinary
 part instances. Java retains animation, texture/material choice and foil clocks.
