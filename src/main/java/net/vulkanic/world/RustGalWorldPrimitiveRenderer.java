@@ -656,8 +656,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<EntityLeashSemanticDiagnostic> ENTITY_LEASH_SEMANTIC_DIAGNOSTICS = new ArrayList<>();
 	private static final List<EntityLeashExecutionDiagnostic> ENTITY_LEASH_EXECUTION_DIAGNOSTICS = new ArrayList<>();
 	/** Membership-journaled so model batch checkpoints record a position, not a key copy. */
-	private static final MembershipJournaledMap<Long, VulkanicGalBridge.WorldMeshAssetRecord> WORLD_MESH_ASSETS =
-		new MembershipJournaledMap<>();
+	private static final WorldAssetRegistry<Long, VulkanicGalBridge.WorldMeshAssetRecord> WORLD_MESH_ASSETS =
+		new WorldAssetRegistry<>(Long.class);
 	/**
 	 * Immutable ModelPart topology is shared by every animated instance of the
 	 * same baked model. Poses remain frame-local instance data. The bounded LRU
@@ -697,8 +697,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	/** Explicit Rust resource retirements awaiting the next immutable mesh update. */
 	private static final Map<Long, Long> PENDING_WORLD_MESH_RETIREMENTS = new LinkedHashMap<>();
-	private static final MembershipJournaledMap<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES =
-		new MembershipJournaledMap<>();
+	private static final WorldAssetRegistry<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES =
+		new WorldAssetRegistry<>(Integer.class);
 	/** Collision guard for hashed semantic identities used by custom particle atlases. */
 	private static final Map<Integer, ResourceLocation> PARTICLE_ATLAS_TEXTURE_IDENTITIES = new LinkedHashMap<>();
 	private static final Map<Integer, ParticleAtlasSnapshotPublication> PARTICLE_ATLAS_SNAPSHOT_PUBLICATIONS = new LinkedHashMap<>();
@@ -4193,11 +4193,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		private final java.util.BitSet journalAdded = new java.util.BitSet();
 		private long epoch;
 
-		MembershipJournaledMap.Mark mark() {
-			return new MembershipJournaledMap.Mark(epoch, journal.size());
+		MembershipJournalMark mark() {
+			return new MembershipJournalMark(epoch, journal.size());
 		}
 
-		void rollbackTo(MembershipJournaledMap.Mark mark) {
+		void rollbackTo(MembershipJournalMark mark) {
 			if (mark.epoch() != epoch || mark.position() > journal.size()) {
 				throw new IllegalStateException("model mesh checkpoint predates the current pending-set journal");
 			}
@@ -4289,11 +4289,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		private final int firstPersonMeshInstances;
 		private final int firstPersonMainHandInstances;
 		private final int producers;
-		private final MembershipJournaledMap.Mark modelSemantics;
-		private final MembershipJournaledMap.Mark modelMeshKeys;
-		private final MembershipJournaledMap.Mark modelPartMeshKeys;
-		private final MembershipJournaledMap.Mark meshAssets;
-		private final MembershipJournaledMap.Mark textureAssets;
+		private final MembershipJournalMark modelSemantics;
+		private final MembershipJournalMark modelMeshKeys;
+		private final MembershipJournalMark modelPartMeshKeys;
+		private final MembershipJournalMark meshAssets;
+		private final MembershipJournalMark textureAssets;
 		private final DynamicWorldMeshLifetime.Checkpoint dynamicMeshLifetime;
 		private final Map<Long, Long> pendingMeshRetirements;
 		private final long meshGeneration;
@@ -4307,11 +4307,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			int firstPersonMeshInstances,
 			int firstPersonMainHandInstances,
 			int producers,
-			MembershipJournaledMap.Mark modelSemantics,
-			MembershipJournaledMap.Mark modelMeshKeys,
-			MembershipJournaledMap.Mark modelPartMeshKeys,
-			MembershipJournaledMap.Mark meshAssets,
-			MembershipJournaledMap.Mark textureAssets,
+			MembershipJournalMark modelSemantics,
+			MembershipJournalMark modelMeshKeys,
+			MembershipJournalMark modelPartMeshKeys,
+			MembershipJournalMark meshAssets,
+			MembershipJournalMark textureAssets,
 			DynamicWorldMeshLifetime.Checkpoint dynamicMeshLifetime,
 			Map<Long, Long> pendingMeshRetirements,
 			long meshGeneration,
@@ -12742,6 +12742,12 @@ float[] transform = new float[16];
 			return topology.rigId;
 		}
 		topology.rigPreparedFrame = semanticFrameSequence;
+		if (topology.rigId != 0L && topology.rigAdmission != null && topology.rigAdmission.valid()) {
+			// Rust checks primary registry slots in one bounded call. A changed
+			// dependency resumes the ordered admission/rollback path below.
+			DYNAMIC_WORLD_MESH_LIFETIME.observeRig(topology.rigId, Math.max(1L, semanticFrameSequence));
+			return topology.rigId;
+		}
 		BlockMeshExtraction[] meshes = topology.meshes;
 		long[] generations = topology.rigGenerations;
 		boolean changed = generations == null;
@@ -12784,6 +12790,9 @@ float[] transform = new float[16];
 			}
 			DYNAMIC_WORLD_MESH_LIFETIME.observeRig(topology.rigId, Math.max(1L, semanticFrameSequence));
 			observed = true;
+			if (topology.rigAdmission == null || !topology.rigAdmission.refreshAfterAdmission()) {
+				topology.rigAdmission = captureModelRigAdmission(topology);
+			}
 			return topology.rigId;
 		} finally {
 			if (!observed) {
@@ -12798,6 +12807,17 @@ float[] transform = new float[16];
 				}
 			}
 		}
+	}
+
+	private static WorldAssetRegistry.Proof captureModelRigAdmission(CachedModelTopology topology) {
+		var meshes = new it.unimi.dsi.fastutil.longs.LongArrayList();
+		var textures = new it.unimi.dsi.fastutil.longs.LongArrayList();
+		for (BlockMeshExtraction mesh : topology.meshes) {
+			if (mesh == null) continue;
+			meshes.add(mesh.meshKey());
+			for (var texture : mesh.textures()) textures.add(texture.textureId());
+		}
+		return WorldAssetRegistry.Proof.capture(WORLD_MESH_ASSETS, meshes.toLongArray(), WORLD_MESH_TEXTURES, textures.toLongArray());
 	}
 
 	/** Copies the nodes' current pose fields; returns the first pose index. */
@@ -13959,6 +13979,8 @@ float[] transform = new float[16];
 		private long rigUploadProof = -1L;
 		/** Semantic frame whose part assets were last admitted (one pass per frame). */
 		private long rigPreparedFrame = -1L;
+		/** Native dependency revisions; no Java membership or payload mirror. */
+		private WorldAssetRegistry.Proof rigAdmission;
 
 		private CachedModelTopology(ModelPart[] nodes, int[] parents, BlockMeshExtraction[] meshes,
 				Map<String, BlockMeshExtraction> meshesByPath) {

@@ -19,6 +19,51 @@ class ModelRigLifetimeAdmissionTest {
     @Test void failedSecondAdmissionPreservesOnlySuccessfulPrefix() throws Exception { failure(false); }
     @Test void failedRegistrationPreservesAllPreviouslyAdmittedParts() throws Exception { failure(true); }
 
+    @Test @SuppressWarnings("unchecked")
+    void retainedAdmissionReusesOnlyUnchangedDependenciesAcrossFrames() throws Exception {
+        synchronized(field("LOCK")) {
+            var assets=(Map<Long,WorldMeshAssetRecord>)field("WORLD_MESH_ASSETS");
+            var textures=(Map<Integer,net.vulkanic.bridge.VulkanicGalBridge.WorldMeshTextureAssetRecord>)field("WORLD_MESH_TEXTURES");
+            var lifetime=(DynamicWorldMeshLifetime)field("DYNAMIC_WORLD_MESH_LIFETIME");
+            var frameField=RustGalWorldPrimitiveRenderer.class.getDeclaredField("semanticFrameSequence");frameField.setAccessible(true);
+            long originalFrame=frameField.getLong(null), frame=Math.max(1L,originalFrame+1), key=0x7d030101L, rig=0;
+            int textureId=0x7d030102;
+            var mark=lifetime.checkpoint(frame);
+            var asset=new WorldMeshAssetRecord(key,101,2,1,List.of(),new byte[0],List.of());
+            var texture=new net.vulkanic.bridge.VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId,new byte[]{1,2});
+            assertFalse(assets.containsKey(key));assertFalse(textures.containsKey(textureId));
+            assets.put(key,asset);textures.put(textureId,texture);
+            try {
+                Class<?> extraction=Class.forName(RustGalWorldPrimitiveRenderer.class.getName()+"$BlockMeshExtraction");
+                var ec=extraction.getDeclaredConstructors()[0];ec.setAccessible(true);
+                Object meshes=Array.newInstance(extraction,1);Array.set(meshes,0,ec.newInstance(key,101L,asset,List.of(texture)));
+                Class<?> topology=Class.forName(RustGalWorldPrimitiveRenderer.class.getName()+"$CachedModelTopology");
+                var tc=topology.getDeclaredConstructors()[0];tc.setAccessible(true);
+                Object model=tc.newInstance(new ModelPart[1],new int[]{-1},meshes,Map.of());
+                var prepare=RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("prepareModelRigLocked",topology);prepare.setAccessible(true);
+                var proof=topology.getDeclaredField("rigAdmission");proof.setAccessible(true);
+                frameField.setLong(null,frame);rig=(long)prepare.invoke(null,model);
+                Object firstProof=proof.get(model);assertNotNull(firstProof);
+                frameField.setLong(null,++frame);assertEquals(rig,(long)prepare.invoke(null,model));assertSame(firstProof,proof.get(model));
+                // Equal content in a new wrapper still invalidates identity-dependent admission.
+                textures.put(textureId,new net.vulkanic.bridge.VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId,new byte[]{1,2}));
+                assertFalse(((WorldAssetRegistry.Proof)firstProof).valid());
+                frameField.setLong(null,++frame);assertEquals(rig,(long)prepare.invoke(null,model));
+                assertSame(firstProof,proof.get(model));assertTrue(((WorldAssetRegistry.Proof)firstProof).valid());
+                // Removing the pre-admitted fixture must resume full validation;
+                // its deliberately empty geometry cannot be re-admitted.
+                assets.remove(key);frameField.setLong(null,++frame);
+                assertInstanceOf(IllegalArgumentException.class,assertThrows(InvocationTargetException.class,()->prepare.invoke(null,model)).getCause());
+            } finally {
+                lifetime.rollbackTo(mark);assets.remove(key);textures.remove(textureId);frameField.setLong(null,originalFrame);
+                if(rig!=0) {
+                    ((Map<Long,?>)field("MODEL_RIGS")).remove(rig);
+                    net.vulkanic.bridge.VulkanicGalBridge.releaseModelRig(rig);
+                }
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static void failure(boolean registration) throws Exception {
         synchronized(field("LOCK")) {

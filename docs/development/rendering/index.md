@@ -9,6 +9,8 @@ each module there has a short README with its own file map.
   depend on, and where new code belongs.
 - [Rust dynamic mesh lifetime](RUST-MESH-LIFETIME.md): semantic asset usage,
   generation retirement, rollback ownership and scoped verification.
+- [Rust world asset registry](RUST-ASSET-REGISTRY.md): primary numeric membership,
+  rollback history, stable rig dependency checks and scoped verification.
 - [Retained render scene](RETAINED-SCENE.md): the proposed persistent scene
   model and its phased rollout toward Frozen parity.
 - [Rust DH cloud preparation](RUST-DH-CLOUDS.md): native motion/culling ownership,

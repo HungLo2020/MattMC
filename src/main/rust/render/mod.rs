@@ -13,3 +13,4 @@ pub(crate) mod clouds;
 pub(crate) mod items;
 pub(crate) mod fog;
 pub(crate) mod mesh_lifetime;
+pub(crate) mod asset_registry;

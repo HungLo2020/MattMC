@@ -315,6 +315,12 @@ Dynamic model/item mesh usage and rollback history now live in the
 Java applies ordered generation retirements to its remaining asset wrappers;
 GAL completion still governs GPU resource destruction.
 
+Mesh/texture numeric registry membership and its journal now live in the
+[Rust asset registry](RUST-ASSET-REGISTRY.md). Java keeps payload references by
+native slot. Stable rig admission checks primary dependency revisions in Rust;
+changed dependencies resume ordered Java preflight before refreshing the proof.
+Scoped runtime/performance evidence and remaining limits are tracked there.
+
 Cacheable entity models use ABI 71 rigs: Java supplies local-space part assets
 and raw poses after `setupAnim`; Rust composes the hierarchy and expands ordinary
 part instances. Java retains animation, texture/material choice and foil clocks.

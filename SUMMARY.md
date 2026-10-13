@@ -2,9 +2,9 @@
 
 | Mode | FPS, Current / Frozen | p99 ms, Current / Frozen |
 | --- | --- | --- |
-| Vanilla | 1251.00 / 1181.10 | 3.690 / 3.706 |
-| Vanilla + DH | 833.30 / 629.90 | 3.927 / 6.507 |
-| Shaders | 341.60 / 319.30 | 5.103 / 7.014 |
-| Shaders + DH | 277.40 / 226.10 | 5.398 / 9.295 |
-Native e6a65319: one fresh 6000-frame pair per mode; scoped FPS/p99 floors pass, not an isolated/sustained gain. Two settled pairs/three lifecycles pass; inputs/JVM controls match, live entity counts vary slightly. Historical RSS13.25GiB and long-memory concerns remain open.
-Rust random ticks: Frozen600/Rust2769/Java2110 pass. Sparse CPU1.31/1.73ms Current/Frozen; dense5.41/3.08ms remains slower (previous Current3.92ms). Sparse Java allocation1716B/7.08MB; behavior callbacks remain Java. [Report](docs/development/world/chunk/RUST-RANDOM-TICKS.md).
+| Vanilla | 1293.20 / 1345.50 | 3.321 / 3.636 |
+| Vanilla + DH | 747.40 / 636.50 | 5.112 / 6.612 |
+| Shaders | 357.40 / 317.90 | 4.403 / 7.356 |
+| Shaders + DH | 284.30 / 225.40 | 5.869 / 9.948 |
+Native de0fabcc: one fresh 6000-frame pair per mode; vanilla FPS misses3.9%, other FPS/all p99 floors pass. Single pairs do not establish an isolated/sustained gain. Two settled pairs/three lifecycles pass; inputs/JVM controls match, live entity counts differ. Historical RSS13.25GiB and long-memory concerns remain open.
+Rust asset registry: Rust2775/Java2115/replay200000 pass. Admission CPU1.44/3.01ms stable,1.43/14.98 equivalent wrappers,4.24/4.20 churn vs previous Current; stable Java heap0, churn5.32/23.22MB. [Report](docs/development/rendering/RUST-ASSET-REGISTRY.md). Java producers and broad migration remain unfinished.

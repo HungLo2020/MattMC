@@ -460,7 +460,8 @@ optical bit) answers residency and caster checks
 section ranges to batch plans, which miss whenever the camera moves.
 Pass-invariant retained-write facts live in the batch scope
 (`RetainedSourceTerrainPass`). On the Java side, model batch checkpoints record
-journal positions (`MembershipJournaledMap`, the pending-set undo journal)
+journal positions (now the [Rust asset registry](RUST-ASSET-REGISTRY.md) and the
+Java pending-set undo journal)
 instead of copying registries per producer, and off-camera entity candidates
 skip extraction when ineligible (`EntityRenderer.rustShadowCullingEligible`).
 

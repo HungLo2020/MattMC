@@ -17,6 +17,11 @@ and completion. Static terrain uses its separate residency policy. Java still
 owns asset wrappers, upload bookkeeping, pending retirement delivery and model
 animation/submission. This slice does not complete retained entity rendering.
 
+The subsequent [asset registry migration](RUST-ASSET-REGISTRY.md) moves numeric
+mesh/texture membership and journals into Rust, with native dependency checks
+for stable rig admission. Its verification is separate from the historical
+lifetime checkpoint below.
+
 ## Constraints
 
 - Retain the current and previous semantic frame. Retirement preserves first
