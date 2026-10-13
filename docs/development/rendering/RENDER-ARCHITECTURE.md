@@ -323,7 +323,9 @@ Scoped runtime/performance evidence and remaining limits are tracked there.
 
 Cacheable entity models use ABI 71 rigs: Java supplies local-space part assets
 and raw poses after `setupAnim`; Rust composes the hierarchy and expands ordinary
-part instances. Java retains animation, texture/material choice and foil clocks.
+part instances. [Native model frames](RUST-MODEL-FRAMES.md) now own pose storage
+and rig instance production/variants; Java supplies animated fields directly and
+retains animation, texture/material choice and foil clocks. Scoped runtime/CPU evidence and remaining gaps are recorded in that guide.
 Armor/trident glint reuses rig parts; per-topology admission and cached upload
 proof reduce repeated checks. First-person, uncacheable dynamic textures and
 specified diagnostics retain Java-posed geometry for the same native renderer.

@@ -64,7 +64,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
         orders.removeLast();
         if (orders.isEmpty()) ACTIVE_MODEL_ORDERS.remove();
     }
-    private static Integer activeSemanticModelOrder() {
+    public static Integer activeSemanticModelOrder() {
         var orders=ACTIVE_MODEL_ORDERS.get();
         return orders.isEmpty() ? null : orders.peekLast();
     }
@@ -282,7 +282,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	private MemorySegment persistentWorldMeshInstanceArray = MemorySegment.NULL;
 	private int persistentWorldMeshInstanceCapacity;
 	private int persistentWorldMeshInstanceCount;
-	private WorldMeshInstanceRecord[] persistentWorldMeshInstanceIdentities = new WorldMeshInstanceRecord[0];
+	private WorldMeshInstance[] persistentWorldMeshInstanceIdentities = new WorldMeshInstance[0];
 	private MemorySegment persistentCompactMaterialArray = MemorySegment.NULL;
 	private int persistentCompactMaterialCapacity;
 	private int persistentCompactMaterialCount;
@@ -792,12 +792,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
     private static net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pinWorldItemPoses(
-        net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pins,List<WorldMeshInstanceRecord> world,List<WorldMeshInstanceRecord> hands) {
-        int count=0;for(var record:world)if(record.nativeItemPose!=null)count++;
-        for(var record:hands)if(record.nativeItemPose!=null)count++;
+        net.vulkanic.world.NativeItemLayerTransform.WorldPose[] pins,List<WorldMeshInstance> world,List<WorldMeshInstance> hands) {
+        int count=0;for(var record:world)if(record.nativeItemPose()!=null)count++;
+        for(var record:hands)if(record.nativeItemPose()!=null)count++;
         if(pins.length<count)pins=new net.vulkanic.world.NativeItemLayerTransform.WorldPose[count];
-        int i=0;for(var record:world)if(record.nativeItemPose!=null)pins[i++]=record.nativeItemPose;
-        for(var record:hands)if(record.nativeItemPose!=null)pins[i++]=record.nativeItemPose;
+        int i=0;for(var record:world)if(record.nativeItemPose()!=null)pins[i++]=record.nativeItemPose();
+        for(var record:hands)if(record.nativeItemPose()!=null)pins[i++]=record.nativeItemPose();
         Arrays.fill(pins,i,pins.length,null);return pins;
     }
 
@@ -1204,7 +1204,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		List<GuiSpriteRecord> guiSprites
 	) {
 		return submitWholeFrame(
@@ -1245,7 +1245,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		List<GuiSpriteRecord> guiSprites
 	) {
@@ -1288,7 +1288,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<GuiSpriteRecord> guiSprites
@@ -1317,7 +1317,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1453,7 +1453,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances
+		List<WorldMeshInstance> worldMeshInstances
 	) {
 		return submitWorldFrame(
 			generation,
@@ -1507,7 +1507,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1545,7 +1545,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1587,7 +1587,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1598,7 +1598,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances
+		List<WorldMeshInstance> firstPersonMeshInstances
 	) {
 		return submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
 			generation, frameId, correlationId, frameTarget, guiWidth, guiHeight, viewportWidth, viewportHeight,
@@ -1631,7 +1631,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1642,7 +1642,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum
 	) {
 		return submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
@@ -1671,7 +1671,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1682,7 +1682,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -1713,7 +1713,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1724,7 +1724,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -1748,12 +1748,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float[] viewMatrix, float[] projectionMatrix, WorldBackgroundRecord worldBackground,
 		List<WorldLineSegmentRecord> worldSegments, List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads, List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		List<WorldMeshInstance> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame, List<WorldLodColumnInstanceRecord> worldLodInstances,
 		WorldLodRenderFrameRecord worldLodRenderFrame, WorldFeatureCoverageRecord worldFeatureCoverage,
 		List<GuiSpriteRecord> guiSprites, List<GuiAffineQuadRecord> guiAffineQuads,
 		List<GuiMeshBatchRecord> guiMeshBatches, List<WorldTextQuadRecord> worldTextQuads,
-		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum, int guiBlurRadius, String postEffectId, GuiProjectionRecord guiProjection,
 		List<GuiTiledQuadRecord> guiTiledQuads, EngineGlobalsRecord engineGlobals,
 		List<WorldParticleQuadRecord> worldParticles, List<WorldExperienceOrbInstanceRecord> worldOrbs,
@@ -1775,12 +1775,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float[] viewMatrix, float[] projectionMatrix, WorldBackgroundRecord worldBackground,
 		List<WorldLineSegmentRecord> worldSegments, List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads, List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		List<WorldMeshInstance> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame, List<WorldLodColumnInstanceRecord> worldLodInstances,
 		WorldLodRenderFrameRecord worldLodRenderFrame, WorldFeatureCoverageRecord worldFeatureCoverage,
 		List<GuiSpriteRecord> guiSprites, List<GuiAffineQuadRecord> guiAffineQuads,
 		List<GuiMeshBatchRecord> guiMeshBatches, List<WorldTextQuadRecord> worldTextQuads,
-		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum, int guiBlurRadius, String postEffectId, GuiProjectionRecord guiProjection,
 		List<GuiTiledQuadRecord> guiTiledQuads, EngineGlobalsRecord engineGlobals,
 		List<WorldParticleQuadRecord> worldParticles, List<WorldExperienceOrbInstanceRecord> worldOrbs,
@@ -1807,12 +1807,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float[] viewMatrix, float[] projectionMatrix, WorldBackgroundRecord worldBackground,
 		List<WorldLineSegmentRecord> worldSegments, List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads, List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		List<WorldMeshInstance> worldMeshInstances, WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame, List<WorldLodColumnInstanceRecord> worldLodInstances,
 		WorldLodRenderFrameRecord worldLodRenderFrame, WorldFeatureCoverageRecord worldFeatureCoverage,
 		List<GuiSpriteRecord> guiSprites, List<GuiAffineQuadRecord> guiAffineQuads,
 		List<GuiMeshBatchRecord> guiMeshBatches, List<WorldTextQuadRecord> worldTextQuads,
-		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		WorldFirstPersonFrameRecord firstPersonFrame, List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum, int guiBlurRadius, String postEffectId, GuiProjectionRecord guiProjection,
 		List<GuiTiledQuadRecord> guiTiledQuads, EngineGlobalsRecord engineGlobals,
 		List<WorldParticleQuadRecord> worldParticles, List<WorldExperienceOrbInstanceRecord> worldOrbs,
@@ -1850,7 +1850,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1861,7 +1861,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -1888,7 +1888,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1899,7 +1899,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -1927,7 +1927,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1938,7 +1938,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -1978,7 +1978,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -1989,7 +1989,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -2024,7 +2024,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
-		List<WorldMeshInstanceRecord> worldMeshInstances,
+		List<WorldMeshInstance> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<WorldLodColumnInstanceRecord> worldLodInstances,
@@ -2035,7 +2035,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiMeshBatchRecord> guiMeshBatches,
 		List<WorldTextQuadRecord> worldTextQuads,
 		WorldFirstPersonFrameRecord firstPersonFrame,
-		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<WorldMeshInstance> firstPersonMeshInstances,
 		int guiBlurBeforeStratum,
 		int guiBlurRadius,
 		String postEffectId,
@@ -2600,10 +2600,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	/** Packs one frame stream; kept out of submitWorldFrame so C2 compiles it separately. */
-	private MemorySegment encodeFirstPersonMeshInstances(List<WorldMeshInstanceRecord> firstPersonMeshInstances) {
+	private MemorySegment encodeFirstPersonMeshInstances(List<WorldMeshInstance> firstPersonMeshInstances) {
 		MemorySegment firstPersonMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, firstPersonMeshInstances.size());
 		for (int i = 0; i < firstPersonMeshInstances.size(); i++) {
-			WorldMeshInstanceRecord instance = firstPersonMeshInstances.get(i);
+			WorldMeshInstance instance = firstPersonMeshInstances.get(i);
 			if (instance.terrainPlacement() != null) throw new IllegalArgumentException("first-person meshes cannot carry terrain placement");
 			MemorySegment item = Abi.item(firstPersonMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, i);
             if(instance.entityCulling()!=null)throw new IllegalArgumentException("first-person meshes cannot carry world entity culling");
@@ -2953,12 +2953,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * the synchronous submission, so no Java object or native renderer state is
 	 * retained across the VulkanicGAL boundary.
 	 */
-	private MemorySegment encodeWorldMeshInstances(List<WorldMeshInstanceRecord> instances) {
+	private MemorySegment encodeWorldMeshInstances(List<WorldMeshInstance> instances) {
 		return encodeWorldMeshInstances(instances, null);
 	}
 
 	private MemorySegment encodeWorldMeshInstances(
-		List<WorldMeshInstanceRecord> instances,
+		List<WorldMeshInstance> instances,
 		TerrainFrameCamera terrainFrameCamera
 	) {
 		int count = instances.size();
@@ -2974,18 +2974,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 		ensureWorldMeshInstanceStagingCapacity(count);
 		for (int index = 0; index < count; index++) {
-			WorldMeshInstanceRecord instance = instances.get(index);
+			WorldMeshInstance instance = instances.get(index);
 			if (instance == null) {
 				throw new NullPointerException("worldMeshInstances[" + index + "]");
 			}
 			MemorySegment item = Abi.item(
 				persistentWorldMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, index);
-			if (persistentWorldMeshInstanceIdentities[index] == instance) {
+			if (instance instanceof WorldMeshInstanceRecord && persistentWorldMeshInstanceIdentities[index] == instance) {
 				encodeTerrainPlacement(item, instance.terrainPlacement(), terrainFrameCamera);
 				continue;
 			}
 			encodeWorldMeshInstance(item, instance, terrainFrameCamera);
-			persistentWorldMeshInstanceIdentities[index] = instance;
+			persistentWorldMeshInstanceIdentities[index] = instance instanceof WorldMeshInstanceRecord ? instance : null;
 		}
 		if (count < persistentWorldMeshInstanceCount) {
 			Arrays.fill(persistentWorldMeshInstanceIdentities, count,
@@ -3006,18 +3006,24 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 		persistentWorldMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(contextArena, capacity);
 		persistentWorldMeshInstanceCapacity = capacity;
-		persistentWorldMeshInstanceIdentities = new WorldMeshInstanceRecord[capacity];
+		persistentWorldMeshInstanceIdentities = new WorldMeshInstance[capacity];
 	}
 
 	private static void encodeWorldMeshInstance(
-		MemorySegment item, WorldMeshInstanceRecord instance
+		MemorySegment item, WorldMeshInstance instance
 	) {
 		encodeWorldMeshInstance(item, instance, null);
 	}
 
 	private static void encodeWorldMeshInstance(
-		MemorySegment item, WorldMeshInstanceRecord instance, TerrainFrameCamera terrainFrameCamera
+		MemorySegment item, WorldMeshInstance instance, TerrainFrameCamera terrainFrameCamera
 	) {
+        instance.encodeInto(item, terrainFrameCamera);
+    }
+
+    private static void encodeCopiedWorldMeshInstance(
+        MemorySegment item, WorldMeshInstanceRecord instance, TerrainFrameCamera terrainFrameCamera
+    ) {
 		item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_INSTANCE_RECORD.offset(0),
 			Struct.WORLD_MESH_INSTANCE_RECORD.byteSize());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 1, instance.stratum());
@@ -6976,17 +6982,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * {@link #MODEL_RIG_POSE_SKIP_DRAW}). Rust composes each registered rig's
 	 * hierarchy from them; Java builds no per-part transform or instance.
 	 */
-	public record ModelRigPoses(float[] values, int[] flags, int count) {
-		public static final ModelRigPoses EMPTY = new ModelRigPoses(new float[0], new int[0], 0);
-
-		public ModelRigPoses {
-			Objects.requireNonNull(values, "values");
-			Objects.requireNonNull(flags, "flags");
-			if (count < 0 || count > flags.length || (long) count * MODEL_RIG_POSE_FLOATS > values.length) {
-				throw new IllegalArgumentException("model rig poses are not bounded");
-			}
-		}
-	}
+	public record ModelRigPoses(float[] values, int[] flags, int count,
+        net.vulkanic.world.NativeModelFrame nativeFrame) implements AutoCloseable {
+        public static final ModelRigPoses EMPTY = new ModelRigPoses(new float[0], new int[0], 0);
+        public ModelRigPoses(float[] values, int[] flags, int count) { this(values, flags, count, null); }
+        public static ModelRigPoses nativeFrame(net.vulkanic.world.NativeModelFrame frame) {
+            return new ModelRigPoses(null, null, frame.poseCount(), frame);
+        }
+        public ModelRigPoses {
+            if (nativeFrame == null) {
+                Objects.requireNonNull(values, "values"); Objects.requireNonNull(flags, "flags");
+                if (count < 0 || count > flags.length || (long)count * MODEL_RIG_POSE_FLOATS > values.length)
+                    throw new IllegalArgumentException("model rig poses are not bounded");
+            } else if (values != null || flags != null || count != nativeFrame.poseCount()) {
+                throw new IllegalArgumentException("native model poses must name their exact owner");
+            } else {
+                nativeFrame.seal();
+            }
+        }
+        @Override public void close() { if (nativeFrame != null) nativeFrame.close(); }
+    }
 
 	public static final int MODEL_RIG_POSE_FLOATS = 9;
 	public static final int MODEL_RIG_POSE_VISIBLE = 1;
@@ -6996,6 +7011,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 	private static void writeModelRigPoses(Arena arena, MemorySegment request, ModelRigPoses poses) {
 		int count = poses.count();
+        if (poses.nativeFrame() != null) {
+            Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 50, poses.nativeFrame().poseData(), count);
+            return;
+        }
 		var layout = Struct.MODEL_RIG_POSE;
 		MemorySegment records = layout.array(arena, count);
 		long stride = layout.byteSize();
@@ -7272,6 +7291,43 @@ public final class VulkanicGalBridge implements AutoCloseable {
             return new WorldEntityCullingRecord(flags | PLAYER_ONLY_VARIANT,bounds,leashHolderBounds,cameraX,cameraY,cameraZ);
         }
     }
+    /** Semantic instance view. Native model views are scoped to their owning
+     * frame; copied records retain their independent immutable lifetime. */
+    public interface WorldMeshInstance {
+        int stratum();
+        long meshKey();
+        long meshGeneration();
+        int meshSectionIndex();
+        int depthPolicy();
+        int cullPolicy();
+        int winding();
+        int colorArgb();
+        float[] transform();
+        int viewportWidth();
+        int viewportHeight();
+        int entityId();
+        int entityColorArgb();
+        int outlineColorArgb();
+        int flags();
+        int blockEntityId();
+        TerrainSectionPlacement terrainPlacement();
+        StandardItemFoilRecord itemFoil();
+        WorldDecalFoilRecord decalFoil();
+        Integer modelSubmissionOrder();
+        int packedLight();
+        WorldEntityCullingRecord entityCulling();
+        net.vulkanic.world.NativeItemLayerTransform.WorldPose nativeItemPose();
+        WorldMeshInstance withNativeDecalFoil();
+        WorldMeshInstance withViewport(int width, int height);
+        WorldMeshInstance asShadowOnlyEntityCaster();
+        WorldMeshInstance withPackedLight(int light);
+        WorldMeshInstance withDecalFoil(WorldDecalFoilRecord decal);
+        WorldMeshInstance withItemFoil(StandardItemFoilRecord foil);
+        WorldMeshInstance withModelSubmissionOrder(Integer order);
+        WorldMeshInstance withTerrainPlacement(TerrainSectionPlacement placement);
+        void encodeInto(MemorySegment target, TerrainFrameCamera camera);
+    }
+
 	public record WorldMeshInstanceRecord(
 		int stratum,
 		long meshKey,
@@ -7296,7 +7352,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int packedLight,
 		WorldEntityCullingRecord entityCulling,
         net.vulkanic.world.NativeItemLayerTransform.WorldPose nativeItemPose
-	) {
+	) implements WorldMeshInstance {
         public WorldMeshInstanceRecord(int stratum,long meshKey,long meshGeneration,int meshSectionIndex,
             int depthPolicy,int cullPolicy,int winding,int colorArgb,float[] transform,int viewportWidth,int viewportHeight,
             int entityId,int entityColorArgb,int outlineColorArgb,int flags,int blockEntityId,TerrainSectionPlacement terrainPlacement,
@@ -7592,6 +7648,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				winding,colorArgb,TERRAIN_IDENTITY_TRANSFORM,viewportWidth,viewportHeight,
 				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight,entityCulling,nativeItemPose);
 		}
+        @Override public void encodeInto(MemorySegment target, TerrainFrameCamera camera) {
+            encodeCopiedWorldMeshInstance(target, this, camera);
+        }
+
 	}
 
 	/** One copied backend-neutral glyph quad in a shared world-text frame stream. */

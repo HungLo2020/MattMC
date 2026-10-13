@@ -1941,7 +1941,7 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void recordExecutedStaticTerrainInstances(
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> instances,
+		List<VulkanicGalBridge.WorldMeshInstance> instances,
 		long frameId,
 		long submissionId
 	) {
@@ -1954,7 +1954,7 @@ public final class RustGalTerrainRenderer {
 	 * only the count is kept, so no per-instance identity lookup runs.
 	 */
 	public static void recordExecutedStaticTerrainInstances(
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> instances,
+		List<VulkanicGalBridge.WorldMeshInstance> instances,
 		int compactSections,
 		long frameId,
 		long submissionId
@@ -1976,7 +1976,7 @@ public final class RustGalTerrainRenderer {
 		}
 		long executedStaticTerrainInstances = compactSections;
 		if (!detailedDiagnostics) {
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : instances) {
 				if (instance.stratum() == RustGalWorldPrimitiveRenderer.STRATUM_WORLD_TERRAIN) {
 					executedStaticTerrainInstances++;
 				}
@@ -1988,7 +1988,7 @@ public final class RustGalTerrainRenderer {
 		}
 		List<net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity> executionReceipt =
 			new ArrayList<>(instances.size());
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
+		for (VulkanicGalBridge.WorldMeshInstance instance : instances) {
 			TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(instance.meshKey());
 			if (identity == null) {
 				continue;

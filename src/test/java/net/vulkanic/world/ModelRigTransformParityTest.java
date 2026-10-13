@@ -100,15 +100,10 @@ class ModelRigTransformParityTest {
 			activePath[0] = path;
 			expected.add(new Matrix4f(entity).mul(pose.pose()));
 		});
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment poses = arena.allocate(40L * nodes.size(), 8);
-			for (int node = 0; node < nodes.size(); node++) {
-				ModelPart part = nodes.get(node);
-				long base = node * 40L;
-				float[] values = {part.x, part.y, part.z, part.xRot, part.yRot, part.zRot, part.xScale, part.yScale, part.zScale};
-				MemorySegment.copy(values, 0, poses, ValueLayout.JAVA_FLOAT, base, 9);
-				poses.set(ValueLayout.JAVA_INT, base + 36, (part.visible ? 1 : 0) | (part.skipDraw ? 2 : 0));
-			}
+        try (Arena arena = Arena.ofConfined(); NativeModelFrame frame = new NativeModelFrame()) {
+            frame.append(nodes.toArray(ModelPart[]::new), rigId, entity, 1, 0, -1, 0, 0, 0, 128, 128, 0, null);
+            frame.seal();
+            MemorySegment poses = frame.poseData();
 			MemorySegment entityMatrix = arena.allocate(64, 4);
 			MemorySegment.copy(entity.get(new float[16]), 0, entityMatrix, ValueLayout.JAVA_FLOAT, 0, 16);
 			int capacity = nodes.size();

@@ -20,7 +20,7 @@ class WorldEntityCullingEncodingTest {
             new WorldAabbRecord(40.0+1e-10,-1,-2,41,2,3),
             new WorldAabbRecord(-10,-11,-12,10,11,12));
     }
-    static WorldMeshInstanceRecord instance() {
+    static WorldMeshInstance instance() {
         return new WorldMeshInstanceRecord(WORLD_MESH_ENTITY_STRATUM,17,1,-1,1,0,0,-1,
             new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},128,128);
     }
@@ -29,7 +29,7 @@ class WorldEntityCullingEncodingTest {
         net.minecraft.server.Bootstrap.bootStrap();
         var expected=inputs();
         beginSemanticEntityCulling(expected);
-        WorldMeshInstanceRecord copied;
+        WorldMeshInstance copied;
         try {
             copied=instance();
             beginSemanticEntityCulling(null);

@@ -26,7 +26,7 @@ class NativeWorldItemPoseEncodingTest {
         assertEquals(pose.ownerAddress(),copied.nativeItemPose().ownerAddress());
         var raw=WorldMeshInstanceRecord.class.getDeclaredField("transform");raw.setAccessible(true);
         assertNull(raw.get(copied));
-        var encode=VulkanicGalBridge.class.getDeclaredMethod("encodeWorldMeshInstance",MemorySegment.class,WorldMeshInstanceRecord.class);encode.setAccessible(true);
+        var encode=VulkanicGalBridge.class.getDeclaredMethod("encodeWorldMeshInstance",MemorySegment.class,WorldMeshInstance.class);encode.setAccessible(true);
         var struct=Struct.WORLD_MESH_INSTANCE_RECORD;
         try(Arena arena=Arena.ofConfined()) {
             var wire=struct.allocate(arena);wire.fill((byte)0x5a);encode.invoke(null,wire,copied);

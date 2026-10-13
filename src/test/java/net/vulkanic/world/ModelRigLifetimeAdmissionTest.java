@@ -64,6 +64,60 @@ class ModelRigLifetimeAdmissionTest {
         }
     }
 
+    @Test @SuppressWarnings("unchecked")
+    void productionEnqueueAndBatchRollbackUseNativeInstanceAndPoseOwnership() throws Exception {
+        synchronized(field("LOCK")) {
+            var renderer=RustGalWorldPrimitiveRenderer.class;
+            var width=renderer.getDeclaredField("pendingViewportWidth");width.setAccessible(true);
+            var height=renderer.getDeclaredField("pendingViewportHeight");height.setAccessible(true);
+            int oldWidth=width.getInt(null),oldHeight=height.getInt(null);
+            var pending=(List<net.vulkanic.bridge.VulkanicGalBridge.WorldMeshInstance>)field("PENDING_MESH_INSTANCES");
+            assertNull(field("pendingNativeModelFrame"));
+            var initial=RustGalWorldPrimitiveRenderer.markModelMeshBatch();
+            var assets=(Map<Long,WorldMeshAssetRecord>)field("WORLD_MESH_ASSETS");
+            long key=0x7d031111L,rig=0;
+            var asset=new WorldMeshAssetRecord(key,101,2,1,List.of(),new byte[0],List.of());
+            assertFalse(assets.containsKey(key));assets.put(key,asset);
+            try {
+                width.setInt(null,320);height.setInt(null,200);
+                var root=net.minecraft.client.model.CowModel.createBodyLayer().bakeRoot();
+                var cow=new net.minecraft.client.model.CowModel(root);
+                Class<?> extraction=Class.forName(renderer.getName()+"$BlockMeshExtraction");
+                var ec=extraction.getDeclaredConstructors()[0];ec.setAccessible(true);
+                Object mesh=ec.newInstance(key,101L,asset,List.of());
+                Object meshes=Array.newInstance(extraction,1);Array.set(meshes,0,mesh);
+                Class<?> topology=Class.forName(renderer.getName()+"$CachedModelTopology");
+                var tc=topology.getDeclaredConstructors()[0];tc.setAccessible(true);
+                Object model=tc.newInstance(new ModelPart[]{root},new int[]{-1},meshes,Map.of("",mesh));
+                var enqueue=Arrays.stream(renderer.getDeclaredMethods()).filter(m->m.getName().equals("enqueueModelRig")).findFirst().orElseThrow();
+                enqueue.setAccessible(true);
+                Object[] args={cow,model,new net.blaze3d.vertex.PoseStack().last(),
+                    net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/cow/temperate_cow.png"),
+                    0xf000f0,1,2,-1,0,0,0,null,"test"};
+                rig=(long)enqueue.invoke(null,args);
+                var owner=(NativeModelFrame)field("pendingNativeModelFrame");
+                var first=pending.getLast();assertEquals(rig,first.meshKey());
+                assertFalse(first instanceof net.vulkanic.bridge.VulkanicGalBridge.WorldMeshInstanceRecord);
+                assertEquals(1,owner.poseCount());assertEquals(1,owner.instanceCount());
+                var mark=RustGalWorldPrimitiveRenderer.markModelMeshBatch();
+                enqueue.invoke(null,args);var second=pending.getLast();
+                RustGalWorldPrimitiveRenderer.rollbackModelMeshBatch(mark);
+                assertEquals(1,owner.poseCount());assertEquals(1,owner.instanceCount());
+                assertEquals(rig,first.meshKey());assertThrows(IllegalStateException.class,second::meshKey);
+                enqueue.invoke(null,args);assertThrows(IllegalStateException.class,second::meshKey);
+                assertEquals(2,pending.getLast().meshGeneration());
+            } finally {
+                RustGalWorldPrimitiveRenderer.rollbackModelMeshBatch(initial);
+                var discard=renderer.getDeclaredMethod("discardModelRigPosesLocked");discard.setAccessible(true);discard.invoke(null);
+                assets.remove(key);width.setInt(null,oldWidth);height.setInt(null,oldHeight);
+                if(rig!=0) {
+                    ((Map<Long,?>)field("MODEL_RIGS")).remove(rig);
+                    net.vulkanic.bridge.VulkanicGalBridge.releaseModelRig(rig);
+                }
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static void failure(boolean registration) throws Exception {
         synchronized(field("LOCK")) {

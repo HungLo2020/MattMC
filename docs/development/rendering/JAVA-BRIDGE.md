@@ -255,9 +255,10 @@ expands one ordinary instance per drawn part before validation
 ([`model_rigs.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/model_rigs.rs)).
 Java retires a rig when its topology is evicted or a part generation changes.
 Release uses a [three-semantic-frame delay](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L12578-L12621)
-and a three-slot pose ring; that delay is not a GPU-completion fence or per-rig
-completion receipt. Queued submission decodes/copies on the caller before
-return, while the optional single in-flight route decodes later on its worker
+for registered topology; that delay is not a GPU-completion fence or per-rig
+completion receipt. [Native model frames](RUST-MODEL-FRAMES.md) replace the Java
+pose ring with explicitly scoped CPU pose/instance owners. Queued submission
+decodes/copies on the caller before return, while the optional single in-flight route decodes later on its worker
 and retains the request arena until join. Preserve these separate contracts
 when changing queue depth or lifetime. A rig instance may carry standard item foil: enchanted armor and trident
 glint passes are rigs over the same parts with the glint texture and material,

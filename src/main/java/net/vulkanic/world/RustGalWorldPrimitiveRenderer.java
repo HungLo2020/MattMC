@@ -497,7 +497,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static long attemptedWorldTextImageGeneration;
 	private static WorldTextDiagnostic worldTextDiagnostic = WorldTextDiagnostic.empty();
 	private static int pendingUnsupportedWorldTextSubmits;
-	private static final List<VulkanicGalBridge.WorldMeshInstanceRecord> PENDING_MESH_INSTANCES =
+	private static final List<VulkanicGalBridge.WorldMeshInstance> PENDING_MESH_INSTANCES =
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance");
 	private static final List<PendingMeshProducer> PENDING_MESH_PRODUCERS =
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MESH_INSTANCES, "mesh-producer");
@@ -516,7 +516,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * replay it into the next frozen frame. Moving/entity instances remain
 	 * frame-local and are never retained here.
 	 */
-	private static final it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<VulkanicGalBridge.WorldMeshInstanceRecord> ACTIVE_STATIC_TERRAIN_INSTANCES = new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
+	private static final it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<VulkanicGalBridge.WorldMeshInstance> ACTIVE_STATIC_TERRAIN_INSTANCES = new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
 	private static final LongOpenHashSet NEWLY_ADMITTED_STATIC_TERRAIN_KEYS = new LongOpenHashSet();
 	// Visible sections plus the bounded shadow-candidate stream (each up to
 	// 4096 sections x 3 layers) are retained together. A smaller cap evicted
@@ -632,7 +632,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	// First-person items have an explicit camera-space projection/depth domain.
 	// They never join ordinary entity meshes, even though both reuse the same
 	// copied indexed asset family.
-	private static final List<VulkanicGalBridge.WorldMeshInstanceRecord> PENDING_FIRST_PERSON_MESH_INSTANCES =
+	private static final List<VulkanicGalBridge.WorldMeshInstance> PENDING_FIRST_PERSON_MESH_INSTANCES =
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MESH_INSTANCES, "first-person-mesh-instance");
 	private static final float[] PENDING_FIRST_PERSON_PROJECTION = new float[16];
 	private static final float[] PENDING_FIRST_PERSON_MODEL_VIEW = new float[16];
@@ -1570,7 +1570,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				ATLAS_ANIMATION_PUBLICATIONS.clear();
 				registerWorldSkyTextureAssetsLocked(resourceManager);
 				PENDING_MESH_INSTANCES.clear();
-				pendingModelRigPoseCount = 0;
+				discardModelRigPosesLocked();
 				PENDING_SHADOW_CASTERS.clear();
 				PENDING_TERRAIN_SECTIONS.clear();
             pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
@@ -1755,13 +1755,13 @@ public final class RustGalWorldPrimitiveRenderer {
 			int references = Math.addExact(Math.addExact(frame.meshInstances().size(),
 				frame.firstPersonMeshInstances().size()), frame.orbInstances().size());
 			var protectedGenerations = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap(references);
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : frame.meshInstances()) {
 				forEachInstanceMeshLocked(instance, (meshKey, meshGeneration) -> {
 					StaticTerrainVisibilitySet.protectGeneration(protectedGenerations, meshKey, meshGeneration);
 					return 0L;
 				});
 			}
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.firstPersonMeshInstances()) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : frame.firstPersonMeshInstances()) {
 				StaticTerrainVisibilitySet.protectGeneration(protectedGenerations, instance.meshKey(), instance.meshGeneration());
 			}
 			for (VulkanicGalBridge.WorldExperienceOrbInstanceRecord instance : frame.orbInstances()) {
@@ -2249,7 +2249,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingUnsupportedWorldTextSubmits = 0;
 			worldTextDiagnostic = WorldTextDiagnostic.empty(semanticFrameSequence);
 			PENDING_MESH_INSTANCES.clear();
-			pendingModelRigPoseCount = 0;
+			discardModelRigPosesLocked();
 			PENDING_SHADOW_CASTERS.clear();
 			PENDING_TERRAIN_SECTIONS.clear();
             pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
@@ -3253,7 +3253,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_DH_GENERIC_BOXES.clear();
 				PENDING_TEXT_QUADS.clear();
 				PENDING_MESH_INSTANCES.clear();
-				pendingModelRigPoseCount = 0;
+				discardModelRigPosesLocked();
 				PENDING_SHADOW_CASTERS.clear();
 				PENDING_TERRAIN_SECTIONS.clear();
             pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
@@ -3286,7 +3286,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_DH_GENERIC_BOXES.clear();
 			pendingUnsupportedWorldTextSubmits = 0;
 			PENDING_MESH_INSTANCES.clear();
-			pendingModelRigPoseCount = 0;
+			discardModelRigPosesLocked();
 			PENDING_SHADOW_CASTERS.clear();
 			PENDING_TERRAIN_SECTIONS.clear();
             pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
@@ -4119,7 +4119,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				|| producerMark < 0 || producerMark > PENDING_MESH_PRODUCERS.size()) {
 				throw new IllegalStateException("shadow-only entity capture was not active for this frame");
 			}
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> captured =
+			List<VulkanicGalBridge.WorldMeshInstance> captured =
 				new ArrayList<>(PENDING_MESH_INSTANCES.subList(instanceMark, PENDING_MESH_INSTANCES.size()));
 			PENDING_MESH_INSTANCES.subList(instanceMark, PENDING_MESH_INSTANCES.size()).clear();
 			// Camera-producer receipts must not include shadow-only work.
@@ -4164,7 +4164,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			// (copying every key was a per-producer cost once meshes changed).
 			return new ModelMeshBatchCheckpoint(
 				PENDING_MESH_INSTANCES.size(),
-				pendingModelRigPoseCount,
+				pendingNativeModelFrame == null ? 0 : pendingNativeModelFrame.poseCount(),
+				pendingNativeModelFrame == null ? 0 : pendingNativeModelFrame.instanceCount(),
 				PENDING_FIRST_PERSON_MESH_INSTANCES.size(),
 				pendingFirstPersonMainHandInstanceCount,
 				PENDING_MESH_PRODUCERS.size(),
@@ -4252,7 +4253,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				throw new IllegalArgumentException("Rust model mesh batch checkpoint is outside the pending frame");
 			}
 			PENDING_MESH_INSTANCES.subList(checkpoint.meshInstances, PENDING_MESH_INSTANCES.size()).clear();
-			pendingModelRigPoseCount = Math.min(pendingModelRigPoseCount, checkpoint.modelRigPoses);
+			if (pendingNativeModelFrame != null) pendingNativeModelFrame.rollback(checkpoint.modelRigInstances, checkpoint.modelRigPoses);
 			PENDING_FIRST_PERSON_MESH_INSTANCES.subList(
 				checkpoint.firstPersonMeshInstances, PENDING_FIRST_PERSON_MESH_INSTANCES.size()).clear();
 			pendingFirstPersonMainHandInstanceCount = checkpoint.firstPersonMainHandInstances;
@@ -4286,6 +4287,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final class ModelMeshBatchCheckpoint {
 		private final int meshInstances;
 		private final int modelRigPoses;
+		private final int modelRigInstances;
 		private final int firstPersonMeshInstances;
 		private final int firstPersonMainHandInstances;
 		private final int producers;
@@ -4304,6 +4306,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		private ModelMeshBatchCheckpoint(
 			int meshInstances,
 			int modelRigPoses,
+			int modelRigInstances,
 			int firstPersonMeshInstances,
 			int firstPersonMainHandInstances,
 			int producers,
@@ -4321,6 +4324,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		) {
 			this.meshInstances = meshInstances;
 			this.modelRigPoses = modelRigPoses;
+			this.modelRigInstances = modelRigInstances;
 			this.firstPersonMeshInstances = firstPersonMeshInstances;
 			this.firstPersonMainHandInstances = firstPersonMainHandInstances;
 			this.producers = producers;
@@ -8921,7 +8925,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					// require a Java GPU residency check at this callsite.
 					VulkanicGalBridge.WorldMeshAssetRecord cachedAsset = WORLD_MESH_ASSETS.get(prepared.extraction().meshKey());
 					long meshGeneration = cachedAsset == null ? prepared.extraction().meshGeneration() : cachedAsset.meshGeneration();
-					VulkanicGalBridge.WorldMeshInstanceRecord instance;
+					VulkanicGalBridge.WorldMeshInstance instance;
                     if(prepared.nativePose()!=null) {
                         // Foil marker is attached after its timing record to preserve admission.
                         var pose=prepared.nativePose();
@@ -9168,7 +9172,7 @@ float[] transform = new float[16];
 				synchronized (LOCK) {
 				int viewportWidth = pendingViewportWidth;
 				int viewportHeight = pendingViewportHeight;
-				List<VulkanicGalBridge.WorldMeshInstanceRecord> destination = pendingFirstPersonFrame
+				List<VulkanicGalBridge.WorldMeshInstance> destination = pendingFirstPersonFrame
 					? PENDING_FIRST_PERSON_MESH_INSTANCES
 					: PENDING_MESH_INSTANCES;
 					ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL ModelPart requires a seeded bounded world primitive frame");
@@ -9961,7 +9965,7 @@ float[] transform = new float[16];
 		synchronized (LOCK) {
 			try {
 				ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL model foil requires a seeded bounded world primitive frame");
-				List<VulkanicGalBridge.WorldMeshInstanceRecord> destination = pendingFirstPersonFrame
+				List<VulkanicGalBridge.WorldMeshInstance> destination = pendingFirstPersonFrame
 					? PENDING_FIRST_PERSON_MESH_INSTANCES : PENDING_MESH_INSTANCES;
 				ensureWorldQueueCapacityLocked(
 					destination.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
@@ -10078,7 +10082,7 @@ float[] transform = new float[16];
 			synchronized (LOCK) {
 				int viewportWidth = pendingViewportWidth;
 				int viewportHeight = pendingViewportHeight;
-				List<VulkanicGalBridge.WorldMeshInstanceRecord> destination = pendingFirstPersonFrame
+				List<VulkanicGalBridge.WorldMeshInstance> destination = pendingFirstPersonFrame
 					? PENDING_FIRST_PERSON_MESH_INSTANCES
 					: PENDING_MESH_INSTANCES;
 					ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL model mesh requires a seeded bounded world primitive frame");
@@ -11165,7 +11169,7 @@ float[] transform = new float[16];
 				|| Double.compare(frameCamera.z(), cameraZ) != 0) {
 				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
 			}
-			VulkanicGalBridge.WorldMeshInstanceRecord active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKey);
+			VulkanicGalBridge.WorldMeshInstance active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKey);
 			VulkanicGalBridge.TerrainSectionPlacement placement =
 				active == null ? null : active.terrainPlacement();
 			if (active != null
@@ -11330,7 +11334,7 @@ float[] transform = new float[16];
 			throw new IllegalArgumentException("cached static terrain viewport is not bounded");
 		}
 		synchronized (LOCK) {
-			for (VulkanicGalBridge.WorldMeshInstanceRecord pending : PENDING_MESH_INSTANCES) {
+			for (VulkanicGalBridge.WorldMeshInstance pending : PENDING_MESH_INSTANCES) {
 				if (pending.stratum() == STRATUM_WORLD_TERRAIN) {
 					// A replacement or another producer already queued terrain this
 					// frame. Fall back to the per-record path so admission ordering
@@ -11342,7 +11346,7 @@ float[] transform = new float[16];
 				throw new IllegalStateException("cached static terrain instance capacity exceeded");
 			}
 			for (int index = 0; index < count; index++) {
-				VulkanicGalBridge.WorldMeshInstanceRecord active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKeys[index]);
+				VulkanicGalBridge.WorldMeshInstance active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKeys[index]);
 				if (active == null || active.meshGeneration() != meshGenerations[index]
 					|| (active.flags() & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY) != 0
 					|| active.viewportWidth() != viewportWidth
@@ -11412,7 +11416,7 @@ float[] transform = new float[16];
 				);
 			int flags = (cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0)
 				| (shadowOnly ? WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY : 0);
-			VulkanicGalBridge.WorldMeshInstanceRecord instance = terrainPlacement == null
+			VulkanicGalBridge.WorldMeshInstance instance = terrainPlacement == null
 				? new VulkanicGalBridge.WorldMeshInstanceRecord(
 					STRATUM_WORLD_TERRAIN, meshKey, meshGeneration, MESH_SECTION_ALL, depthPolicy,
 					cullPolicy, WORLD_WINDING_CCW, 0xFFFFFFFF, transform, viewportWidth,
@@ -11443,7 +11447,7 @@ float[] transform = new float[16];
 		synchronized (LOCK) {
 			StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleMeshKeys);
 			for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
-				VulkanicGalBridge.WorldMeshInstanceRecord instance = PENDING_MESH_INSTANCES.get(index);
+				VulkanicGalBridge.WorldMeshInstance instance = PENDING_MESH_INSTANCES.get(index);
 				if (instance.stratum() == STRATUM_WORLD_TERRAIN
 						&& !visibleMeshKeys.contains(instance.meshKey())) {
 					PENDING_MESH_INSTANCES.remove(index);
@@ -11494,7 +11498,7 @@ float[] transform = new float[16];
 		// shared; this is only admission ordering for the current semantic frame.
 		long[] frameBytes = {0L};
 		boolean[] full = {false};
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
+		for (VulkanicGalBridge.WorldMeshInstance instance : PENDING_MESH_INSTANCES) {
 			if (full[0]) {
 				break;
 			}
@@ -11522,7 +11526,7 @@ float[] transform = new float[16];
 			});
 		}
 		bytes = frameBytes[0];
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
+		for (VulkanicGalBridge.WorldMeshInstance instance : PENDING_MESH_INSTANCES) {
 			if (instance.stratum() != STRATUM_WORLD_TERRAIN) {
 				continue;
 			}
@@ -12651,25 +12655,10 @@ float[] transform = new float[16];
 						PENDING_MESH_INSTANCES.size(), topology.meshesByPath.size(), MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
 					);
 					long rigId = prepareModelRigLocked(topology);
-					int firstPose = appendModelRigPosesLocked(topology.nodes);
-					VulkanicGalBridge.WorldMeshInstanceRecord instance = new VulkanicGalBridge.WorldMeshInstanceRecord(
-						STRATUM_WORLD_ENTITY_MESH,
-						rigId,
-						firstPose + 1L,
-						MESH_SECTION_ALL,
-						depthPolicy,
-						cullPolicy,
-						WORLD_WINDING_CCW,
-						colorArgb,
-						entityPose.pose().get(new float[16]),
-						pendingViewportWidth,
-						pendingViewportHeight,
-						0,
-						entityColorArgb,
-						outlineColor,
-						flags | VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG
-					).withPackedLight(packedLight);
-					PENDING_MESH_INSTANCES.add(foil == null ? instance : instance.withItemFoil(foil));
+                    if (pendingNativeModelFrame == null) pendingNativeModelFrame = new NativeModelFrame();
+                    PENDING_MESH_INSTANCES.add(pendingNativeModelFrame.append(topology.nodes, rigId,
+                        entityPose.pose(), depthPolicy, cullPolicy, colorArgb, entityColorArgb, outlineColor,
+                        packedLight, pendingViewportWidth, pendingViewportHeight, flags, foil));
 					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
 					if (foil == null) {
 						PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity(
@@ -12703,11 +12692,7 @@ float[] transform = new float[16];
 	/** Rig ids awaiting release with the frame sequence that retired them. */
 	private static final java.util.ArrayDeque<long[]> RETIRED_MODEL_RIGS = new java.util.ArrayDeque<>();
 	private static long nextModelRigId;
-	private static final int MODEL_RIG_POSE_RING = 3;
-	private static final float[][] MODEL_RIG_POSE_VALUES = new float[MODEL_RIG_POSE_RING][];
-	private static final int[][] MODEL_RIG_POSE_FLAGS = new int[MODEL_RIG_POSE_RING][];
-	private static int modelRigPoseRing;
-	private static int pendingModelRigPoseCount;
+	private static NativeModelFrame pendingNativeModelFrame;
 
 	/** Queues a topology's rig for release once no queued frame can name it. */
 	private static void retireModelRig(CachedModelTopology topology) {
@@ -12820,51 +12805,18 @@ float[] transform = new float[16];
 		return WorldAssetRegistry.Proof.capture(WORLD_MESH_ASSETS, meshes.toLongArray(), WORLD_MESH_TEXTURES, textures.toLongArray());
 	}
 
-	/** Copies the nodes' current pose fields; returns the first pose index. */
-	private static int appendModelRigPosesLocked(ModelPart[] nodes) {
-		int first = pendingModelRigPoseCount;
-		int end = Math.addExact(first, nodes.length);
-		float[] values = MODEL_RIG_POSE_VALUES[modelRigPoseRing];
-		int[] flags = MODEL_RIG_POSE_FLAGS[modelRigPoseRing];
-		if (flags == null || flags.length < end) {
-			int capacity = Math.max(end, flags == null ? 1024 : flags.length * 2);
-			values = values == null ? new float[capacity * VulkanicGalBridge.MODEL_RIG_POSE_FLOATS]
-				: Arrays.copyOf(values, capacity * VulkanicGalBridge.MODEL_RIG_POSE_FLOATS);
-			flags = flags == null ? new int[capacity] : Arrays.copyOf(flags, capacity);
-			MODEL_RIG_POSE_VALUES[modelRigPoseRing] = values;
-			MODEL_RIG_POSE_FLAGS[modelRigPoseRing] = flags;
-		}
-		for (int node = 0; node < nodes.length; node++) {
-			ModelPart part = nodes[node];
-			int base = (first + node) * VulkanicGalBridge.MODEL_RIG_POSE_FLOATS;
-			values[base] = part.x;
-			values[base + 1] = part.y;
-			values[base + 2] = part.z;
-			values[base + 3] = part.xRot;
-			values[base + 4] = part.yRot;
-			values[base + 5] = part.zRot;
-			values[base + 6] = part.xScale;
-			values[base + 7] = part.yScale;
-			values[base + 8] = part.zScale;
-			flags[first + node] = (part.visible ? VulkanicGalBridge.MODEL_RIG_POSE_VISIBLE : 0)
-				| (part.skipDraw ? VulkanicGalBridge.MODEL_RIG_POSE_SKIP_DRAW : 0);
-		}
-		pendingModelRigPoseCount = end;
-		return first;
-	}
+    /** Pending extraction owns storage until consumeFrame transfers it. */
+    private static void discardModelRigPosesLocked() {
+        if (pendingNativeModelFrame != null) {
+            pendingNativeModelFrame.close();
+            pendingNativeModelFrame = null;
+        }
+    }
 
-	/** Hands the frame its poses and moves the producer to the next ring buffer. */
-	private static VulkanicGalBridge.ModelRigPoses takeModelRigPosesLocked() {
-		int count = pendingModelRigPoseCount;
-		pendingModelRigPoseCount = 0;
-		if (count == 0) {
-			return VulkanicGalBridge.ModelRigPoses.EMPTY;
-		}
-		var poses = new VulkanicGalBridge.ModelRigPoses(MODEL_RIG_POSE_VALUES[modelRigPoseRing],
-			MODEL_RIG_POSE_FLAGS[modelRigPoseRing], count);
-		modelRigPoseRing = (modelRigPoseRing + 1) % MODEL_RIG_POSE_RING;
-		return poses;
-	}
+    private static VulkanicGalBridge.ModelRigPoses sealModelRigPosesLocked() {
+        return pendingNativeModelFrame == null ? VulkanicGalBridge.ModelRigPoses.EMPTY
+            : VulkanicGalBridge.ModelRigPoses.nativeFrame(pendingNativeModelFrame);
+    }
 
 	/** Whether every part mesh of a rig instance has crossed with the rig's current generations. */
 	private static boolean isModelRigUploadedLocked(long rigId) {
@@ -12895,7 +12847,7 @@ float[] transform = new float[16];
 	}
 
 	/** Each mesh identity an instance draws: its own, or every part of its rig. */
-	private static void forEachInstanceMeshLocked(VulkanicGalBridge.WorldMeshInstanceRecord instance,
+	private static void forEachInstanceMeshLocked(VulkanicGalBridge.WorldMeshInstance instance,
 			java.util.function.LongBinaryOperator consumer) {
 		if ((instance.flags() & VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) == 0) {
 			consumer.applyAsLong(instance.meshKey(), instance.meshGeneration());
@@ -15121,7 +15073,7 @@ float[] transform = new float[16];
 		Map<CompletedMeshProducer, Integer> instancesByProducer = new LinkedHashMap<>();
 		int count = Math.min(frame.meshProducerLabels().size(), frame.meshInstances().size());
 		for (int index = 0; index < count; index++) {
-			VulkanicGalBridge.WorldMeshInstanceRecord instance = frame.meshInstances().get(index);
+			VulkanicGalBridge.WorldMeshInstance instance = frame.meshInstances().get(index);
 			String producer = frame.meshProducerLabels().get(index);
 			if (PENDING_MODEL_PART_MESH_KEYS.contains(instance.meshKey())) {
 				producer = "model-part";
@@ -15176,7 +15128,7 @@ float[] transform = new float[16];
 			for (int diagnosticIndex = BLOCK_MODEL_DIAGNOSTICS.size() - 1; diagnosticIndex >= 0; diagnosticIndex--) {
 				BlockModelDiagnostic diagnostic = BLOCK_MODEL_DIAGNOSTICS.get(diagnosticIndex);
 				int instances = 0;
-				for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+				for (VulkanicGalBridge.WorldMeshInstance instance : frame.meshInstances()) {
 					if (instance.meshKey() == diagnostic.meshKey()
 						&& instance.meshGeneration() == diagnostic.meshGeneration()
 						&& instance.stratum() == STRATUM_WORLD_MATERIAL) instances++;
@@ -15193,7 +15145,7 @@ float[] transform = new float[16];
 				ItemEntityDiagnostic diagnostic = ITEM_ENTITY_DIAGNOSTICS.get(diagnosticIndex);
 				if (!"item-frame-item".equals(diagnostic.producer()) || diagnostic.semanticIdentity().isEmpty()) continue;
 				int instances = 0;
-				for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+				for (VulkanicGalBridge.WorldMeshInstance instance : frame.meshInstances()) {
 					if (instance.meshKey() == diagnostic.meshKey()
 						&& instance.meshGeneration() == diagnostic.meshGeneration()
 						&& instance.stratum() == STRATUM_WORLD_ENTITY_MESH) instances++;
@@ -15461,7 +15413,7 @@ float[] transform = new float[16];
 			countsByComposition.put(composition, new LinkedHashMap<>());
 		}
 		synchronized (LOCK) {
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : frame.meshInstances()) {
 				if (instance.stratum() != STRATUM_WORLD_ENTITY_MESH) continue;
 				ModelMeshDiagnostic diagnostic = null;
 				for (int index = MODEL_MESH_DIAGNOSTICS.size() - 1; index >= 0; index--) {
@@ -15518,7 +15470,7 @@ float[] transform = new float[16];
 				if (body != null && pumpkin != null) {
 					int bodyInstances = 0;
 					int blockInstances = 0;
-					for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+					for (VulkanicGalBridge.WorldMeshInstance instance : frame.meshInstances()) {
 						if (instance.stratum() == STRATUM_WORLD_ENTITY_MESH
 							&& instance.meshKey() == body.meshKey() && instance.meshGeneration() == body.meshGeneration()
 							&& instance.entityId() == body.entityId()) bodyInstances++;
@@ -16415,7 +16367,7 @@ float[] transform = new float[16];
 	/** Capture-only receipt for energy-swirl quads in the completed selected submission. */
 	public static void recordWholeFrameEnergySwirlExecution(
 		long frameId, long submissionId, List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances
+		List<VulkanicGalBridge.WorldMeshInstance> meshInstances
 	) {
 		if (materialQuads == null || materialQuads.isEmpty() || !DeterministicCameraCapture.isActiveForDiagnostics()) return;
 		int quads = 0;
@@ -16428,7 +16380,7 @@ float[] transform = new float[16];
 		if (quads == 0) return;
 		int outlinedMeshInstances = 0;
 		if (meshInstances != null) {
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : meshInstances) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : meshInstances) {
 				if (instance.stratum() == STRATUM_WORLD_ENTITY_MESH && instance.outlineColorArgb() != 0) {
 					outlinedMeshInstances++;
 				}
@@ -18590,16 +18542,26 @@ float[] transform = new float[16];
 	}
 
 	private static void rememberActiveStaticTerrainInstanceLocked(
-		VulkanicGalBridge.WorldMeshInstanceRecord instance
+		VulkanicGalBridge.WorldMeshInstance instance
 	) {
 		StaticTerrainVisibilitySet.rememberBounded(ACTIVE_STATIC_TERRAIN_INSTANCES,
 			instance.meshKey(), instance, MAX_ACTIVE_STATIC_TERRAIN_INSTANCES);
 	}
 
-	public static PrimitiveFrame consumeFrame() {
+    public static PrimitiveFrame consumeFrame() {
+        synchronized (LOCK) {
+            try { return consumeFrameOwned(); }
+            catch (RuntimeException | Error failure) {
+                discardModelRigPosesLocked();
+                throw failure;
+            }
+        }
+    }
+
+    private static PrimitiveFrame consumeFrameOwned() {
 		synchronized (LOCK) {
 			releaseRetiredModelRigsLocked();
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> admittedMeshInstances = new ArrayList<>(
+			List<VulkanicGalBridge.WorldMeshInstance> admittedMeshInstances = new ArrayList<>(
 				ACTIVE_STATIC_TERRAIN_INSTANCES.size() + PENDING_MESH_INSTANCES.size());
 			List<String> meshProducerLabels = new ArrayList<>(
 				ACTIVE_STATIC_TERRAIN_INSTANCES.size() + PENDING_MESH_INSTANCES.size());
@@ -18607,7 +18569,7 @@ float[] transform = new float[16];
 			int[] admittedPrefix = new int[PENDING_MESH_INSTANCES.size() + 1];
 			for (int index = 0; index < PENDING_MESH_INSTANCES.size(); index++) {
 				admittedPrefix[index] = admittedMeshInstances.size();
-				VulkanicGalBridge.WorldMeshInstanceRecord instance = PENDING_MESH_INSTANCES.get(index);
+				VulkanicGalBridge.WorldMeshInstance instance = PENDING_MESH_INSTANCES.get(index);
 				if (!isWorldMeshInstanceUploadedLocked(instance)) {
 					continue;
 				}
@@ -18634,7 +18596,7 @@ float[] transform = new float[16];
 			// seeds its camera. Retained sections have no valid placement in that
 			// frame; keep them resident, but resume replay only with a camera.
 			if (pendingStaticTerrainCamera != null) {
-				for (VulkanicGalBridge.WorldMeshInstanceRecord instance : ACTIVE_STATIC_TERRAIN_INSTANCES.values()) {
+				for (VulkanicGalBridge.WorldMeshInstance instance : ACTIVE_STATIC_TERRAIN_INSTANCES.values()) {
 					if (NEWLY_ADMITTED_STATIC_TERRAIN_KEYS.contains(instance.meshKey())) {
 						continue;
 					}
@@ -18645,10 +18607,10 @@ float[] transform = new float[16];
 					meshProducerLabels.add(PendingMeshProducer.STATIC_TERRAIN.diagnosticLabel());
 				}
 			}
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> admittedFirstPersonInstances = new ArrayList<>(PENDING_FIRST_PERSON_MESH_INSTANCES.size());
+			List<VulkanicGalBridge.WorldMeshInstance> admittedFirstPersonInstances = new ArrayList<>(PENDING_FIRST_PERSON_MESH_INSTANCES.size());
 			int admittedFirstPersonMainHandInstanceCount = 0;
 			for (int index = 0; index < PENDING_FIRST_PERSON_MESH_INSTANCES.size(); index++) {
-				VulkanicGalBridge.WorldMeshInstanceRecord instance = PENDING_FIRST_PERSON_MESH_INSTANCES.get(index);
+				VulkanicGalBridge.WorldMeshInstance instance = PENDING_FIRST_PERSON_MESH_INSTANCES.get(index);
 				if (!isWorldMeshInstanceUploadedLocked(instance)) {
 					continue;
 				}
@@ -18673,9 +18635,9 @@ float[] transform = new float[16];
 			// handoff instead of copying them a second time with List.copyOf(). The
 			// pending producer list is cleared below, but these are independent
 			// admission lists and therefore remain valid for the PrimitiveFrame.
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonInstances = admittedFirstPersonInstances;
+			List<VulkanicGalBridge.WorldMeshInstance> firstPersonInstances = admittedFirstPersonInstances;
 			if (pendingStaticTerrainCamera == null) {
-				for (VulkanicGalBridge.WorldMeshInstanceRecord instance : admittedMeshInstances) {
+				for (VulkanicGalBridge.WorldMeshInstance instance : admittedMeshInstances) {
 					if (instance.terrainPlacement() != null) {
 						throw new IllegalStateException(
 							"frozen static terrain frame is missing full-precision camera semantics");
@@ -18742,7 +18704,7 @@ float[] transform = new float[16];
 				pendingStaticTerrainCamera,
 				shadowCasters,
 				terrainSections,
-				takeModelRigPosesLocked(),
+				sealModelRigPosesLocked(),
 				consumedDistantHorizons.lifecycle(),
 				consumedDistantHorizons.nativeReference()
 			);
@@ -18757,7 +18719,7 @@ float[] transform = new float[16];
 					pendingEntityFlameQuadCount = 0;
 					PENDING_TEXT_QUADS.clear();
 					PENDING_MESH_INSTANCES.clear();
-					pendingModelRigPoseCount = 0;
+					// Native storage transfers only when consumption succeeds.
 					PENDING_SHADOW_CASTERS.clear();
 					PENDING_TERRAIN_SECTIONS.clear();
             pendingNativeTerrainFrame = VulkanicGalBridge.StaticTerrainFrameReference.EMPTY;
@@ -18778,6 +18740,7 @@ float[] transform = new float[16];
 			shadowCasterCaptureInstanceMark = -1;
 			shadowCasterCaptureProducerMark = -1;
 			shadowOnlyStreamCheckpoint = null;
+					pendingNativeModelFrame = null;
 					return frame;
 			}
 		}
@@ -18889,12 +18852,12 @@ float[] transform = new float[16];
 				quad.blockEntityId()
 			));
 		}
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances = new ArrayList<>(frame.meshInstances().size());
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+		List<VulkanicGalBridge.WorldMeshInstance> meshInstances = new ArrayList<>(frame.meshInstances().size());
+		for (VulkanicGalBridge.WorldMeshInstance instance : frame.meshInstances()) {
 			meshInstances.add(instance.withViewport(viewportWidth,viewportHeight));
 		}
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances = new ArrayList<>(frame.firstPersonMeshInstances().size());
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.firstPersonMeshInstances()) {
+		List<VulkanicGalBridge.WorldMeshInstance> firstPersonMeshInstances = new ArrayList<>(frame.firstPersonMeshInstances().size());
+		for (VulkanicGalBridge.WorldMeshInstance instance : frame.firstPersonMeshInstances()) {
 			firstPersonMeshInstances.add(instance.withViewport(viewportWidth,viewportHeight));
 		}
 		VulkanicGalBridge.WorldBackgroundRecord background = frame.background();
@@ -18977,7 +18940,7 @@ float[] transform = new float[16];
 		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 		List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 		List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+		List<VulkanicGalBridge.WorldMeshInstance> meshInstances,
 		List<String> meshProducerLabels,
 		VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
@@ -18986,7 +18949,7 @@ float[] transform = new float[16];
 		VulkanicGalBridge.WorldLodRenderFrameRecord lodRenderFrame,
 		int entityFlameQuadCount,
 		VulkanicGalBridge.WorldFirstPersonFrameRecord firstPersonFrame,
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances,
+		List<VulkanicGalBridge.WorldMeshInstance> firstPersonMeshInstances,
 		List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads,
 		List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
 		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes,
@@ -19010,7 +18973,7 @@ float[] transform = new float[16];
 			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 			List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+			List<VulkanicGalBridge.WorldMeshInstance> meshInstances,
 			List<String> meshProducerLabels,
 			VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
@@ -19019,7 +18982,7 @@ float[] transform = new float[16];
 			VulkanicGalBridge.WorldLodRenderFrameRecord lodRenderFrame,
 			int entityFlameQuadCount,
 			VulkanicGalBridge.WorldFirstPersonFrameRecord firstPersonFrame,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances,
+			List<VulkanicGalBridge.WorldMeshInstance> firstPersonMeshInstances,
 			List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads,
 			List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
 			List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes,
@@ -19082,7 +19045,7 @@ float[] transform = new float[16];
 			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 			List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+			List<VulkanicGalBridge.WorldMeshInstance> meshInstances,
 			List<String> meshProducerLabels,
 			VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
@@ -19091,7 +19054,7 @@ float[] transform = new float[16];
 			VulkanicGalBridge.WorldLodRenderFrameRecord lodRenderFrame,
 			int entityFlameQuadCount,
 			VulkanicGalBridge.WorldFirstPersonFrameRecord firstPersonFrame,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances,
+			List<VulkanicGalBridge.WorldMeshInstance> firstPersonMeshInstances,
 			List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads,
 			List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
 			List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes
@@ -19114,7 +19077,7 @@ float[] transform = new float[16];
 		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 		List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 		List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+		List<VulkanicGalBridge.WorldMeshInstance> meshInstances,
 		List<String> meshProducerLabels,
 		VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
@@ -19123,7 +19086,7 @@ float[] transform = new float[16];
 		VulkanicGalBridge.WorldLodRenderFrameRecord lodRenderFrame,
 		int entityFlameQuadCount,
 		VulkanicGalBridge.WorldFirstPersonFrameRecord firstPersonFrame,
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances
+		List<VulkanicGalBridge.WorldMeshInstance> firstPersonMeshInstances
 	) {
 		this(viewportWidth, viewportHeight, viewMatrix, projectionMatrix, background, segments, crackQuads, borderQuads, materialQuads, textQuads, meshInstances, meshProducerLabels, voxelVolumeFrame, shaderEnvironmentFrame, featureCoverage, lodInstances, lodRenderFrame, entityFlameQuadCount, firstPersonFrame, firstPersonMeshInstances, List.of(), List.of(), List.of());
 	}
@@ -19139,7 +19102,7 @@ float[] transform = new float[16];
 			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 			List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+			List<VulkanicGalBridge.WorldMeshInstance> meshInstances,
 			List<String> meshProducerLabels,
 			VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
@@ -19165,7 +19128,7 @@ float[] transform = new float[16];
 			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
 			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+			List<VulkanicGalBridge.WorldMeshInstance> meshInstances,
 			List<String> meshProducerLabels,
 			VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
@@ -19191,7 +19154,7 @@ float[] transform = new float[16];
 			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
 			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances
+			List<VulkanicGalBridge.WorldMeshInstance> meshInstances
 		) {
 			this(
 				viewportWidth,
@@ -19218,7 +19181,7 @@ float[] transform = new float[16];
 		}
 	}
 
-	private static boolean isWorldMeshInstanceUploadedLocked(VulkanicGalBridge.WorldMeshInstanceRecord instance) {
+	private static boolean isWorldMeshInstanceUploadedLocked(VulkanicGalBridge.WorldMeshInstance instance) {
 		if ((instance.flags() & VulkanicGalBridge.WORLD_MESH_INSTANCE_FLAG_MODEL_RIG) != 0) {
 			return isModelRigUploadedLocked(instance.meshKey());
 		}
@@ -19540,7 +19503,7 @@ float[] transform = new float[16];
 				return true;
 			}
 			boolean[] blended = {false};
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : PENDING_MESH_INSTANCES) {
 				forEachInstanceMeshLocked(instance, (meshKey, meshGeneration) -> {
 					VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
 					if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
@@ -19552,7 +19515,7 @@ float[] transform = new float[16];
 					return true;
 				}
 			}
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_FIRST_PERSON_MESH_INSTANCES) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : PENDING_FIRST_PERSON_MESH_INSTANCES) {
 				VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(instance.meshKey());
 				if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
 					return true;

@@ -16,7 +16,7 @@ class ShadowOnlyEntityCaptureTest {
         return field.get(null);
     }
 
-    private static VulkanicGalBridge.WorldMeshInstanceRecord mesh() {
+    private static VulkanicGalBridge.WorldMeshInstance mesh() {
         return new VulkanicGalBridge.WorldMeshInstanceRecord(
             VulkanicGalBridge.WORLD_MESH_ENTITY_STRATUM,17,1,0,2,1,0,-1,
             new org.joml.Matrix4f().get(new float[16]),128,128,42,0,0,0,-1);
@@ -26,7 +26,7 @@ class ShadowOnlyEntityCaptureTest {
     @Test void foilRemovalKeepsCameraAndShadowOrbsAtTheirCollectedMeshBoundaries() throws Exception {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
-        var meshes = (List<VulkanicGalBridge.WorldMeshInstanceRecord>) field("PENDING_MESH_INSTANCES");
+        var meshes = (List<VulkanicGalBridge.WorldMeshInstance>) field("PENDING_MESH_INSTANCES");
         var collector = (ExperienceOrbSemanticCollector) field("ORB_SEMANTICS");
         var pendingField = ExperienceOrbSemanticCollector.class.getDeclaredField("pending");
         pendingField.setAccessible(true);

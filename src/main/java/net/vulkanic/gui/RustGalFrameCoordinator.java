@@ -711,12 +711,18 @@ public final class RustGalFrameCoordinator {
 	public static void shutdown() {
 		RustGalGuiRenderer.invalidateLoadingGridAsset();
 		VulkanicGalBridge existing;
+        List<SubmittedFrame> abandonedModels;
 		synchronized (LOCK) {
 			int cancelled = SCHEDULER.cancelAll("shutdown");
 			existing = bridge;
-			// Closing the bridge joins and frees queued native work.
-			QUEUED_FRAME_RECORDS.clear();
 			retireOutstanding(true);
+			// Closing the bridge joins and frees queued native work.
+            abandonedModels = new ArrayList<>(QUEUED_FRAME_RECORDS);
+            QUEUED_FRAME_RECORDS.clear();
+            if (pendingPipelinedFrame != null) {
+                abandonedModels.add(pendingPipelinedFrame);
+                pendingPipelinedFrame = null;
+            }
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 				auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted, true));
 			}
@@ -738,13 +744,15 @@ public final class RustGalFrameCoordinator {
 			METRICS.cancellations++;
 			METRICS.batchesCancelled += cancelled;
 		}
-		if (existing != null) {
-			try {
-				existing.shutdownFrame();
-			} finally {
-				existing.close();
-			}
-		}
+        try {
+            if (existing != null) {
+                try { existing.shutdownFrame(); }
+                finally { existing.close(); }
+            }
+        } finally {
+            // The pipelined worker may still decode borrowed CPU poses until join.
+            for (SubmittedFrame pending : abandonedModels) closeModelFrame(pending.primitiveFrame());
+        }
 	}
 
 	public static String currentAuditMetricsLine() {
@@ -1150,6 +1158,7 @@ public final class RustGalFrameCoordinator {
 			renderdocFrameCaptureStarted = false;
 			executeCounted = true;
 		} finally {
+            if (!executeCounted) closeModelFrame(primitiveFrame);
 			if (!executeCounted && frameId != 0L && !frameCancelled) {
 				int cancelled;
 				synchronized (LOCK) {
@@ -1215,38 +1224,42 @@ public final class RustGalFrameCoordinator {
 	private static void completeQueuedFrames(int keep) {
 		while (bridge != null && bridge.queuedFrameCount() > keep) {
 			SubmittedFrame pending = QUEUED_FRAME_RECORDS.pollFirst();
-			VulkanicGalBridge.QueuedFrameResult result;
 			try {
-				result = bridge.joinQueuedFrame();
-			} catch (IllegalStateException failure) {
-				if (failure.getMessage() != null && failure.getMessage().contains("retryable selected-source failure")) {
-					LOGGER.warn("Rust VulkanicGAL dropped queued frame {} after a retryable source failure",
-						pending == null ? -1L : pending.correlationId());
+				VulkanicGalBridge.QueuedFrameResult result;
+				try {
+					result = bridge.joinQueuedFrame();
+				} catch (IllegalStateException failure) {
+					if (failure.getMessage() != null && failure.getMessage().contains("retryable selected-source failure")) {
+						LOGGER.warn("Rust VulkanicGAL dropped queued frame {} after a retryable source failure",
+							pending == null ? -1L : pending.correlationId());
+						METRICS.cancellations++;
+						continue;
+					}
+					throw failure;
+				}
+				if (pending == null || result == null) {
+					throw new IllegalStateException("queued Rust VulkanicGAL frame records are out of step");
+				}
+				VulkanicGalBridge.AcquiredFrame acquired = result.acquired();
+				lastAcquiredWholeFrameFrame = acquired.frameId();
+				recordWholeFrameAcquire(acquired, pending.correlationId());
+				if (acquired.status() == 4 || acquired.frameTarget() == 0L) {
+					int cancelled;
+					synchronized (LOCK) {
+						cancelled = SCHEDULER.cancelFrame(acquired.frameId(), "acquire-skipped");
+					}
 					METRICS.cancellations++;
+					METRICS.batchesCancelled += cancelled;
 					continue;
 				}
-				throw failure;
-			}
-			if (pending == null || result == null) {
-				throw new IllegalStateException("queued Rust VulkanicGAL frame records are out of step");
-			}
-			VulkanicGalBridge.AcquiredFrame acquired = result.acquired();
-			lastAcquiredWholeFrameFrame = acquired.frameId();
-			recordWholeFrameAcquire(acquired, pending.correlationId());
-			if (acquired.status() == 4 || acquired.frameTarget() == 0L) {
-				int cancelled;
-				synchronized (LOCK) {
-					cancelled = SCHEDULER.cancelFrame(acquired.frameId(), "acquire-skipped");
-				}
-				METRICS.cancellations++;
-				METRICS.batchesCancelled += cancelled;
-				continue;
-			}
-			completeSubmittedFrame(new SubmittedFrame(pending.window(), acquired, pending.primitiveFrame(),
-				acquired.frameId(), pending.correlationId(), pending.wholeFrameVulkan(), pending.requestCount(),
-				pending.affineQuadCount(), pending.guiTextAffineQuadCount(), pending.guiItemAffineQuadCount(),
-				false, pending.executeStarted(), pending.acquireStarted(), pending.acquireEnded(),
-				pending.submitStarted(), pending.submitEnded()), result.submit(), null, result.presented());
+				completeSubmittedFrame(new SubmittedFrame(pending.window(), acquired, pending.primitiveFrame(),
+					acquired.frameId(), pending.correlationId(), pending.wholeFrameVulkan(), pending.requestCount(),
+					pending.affineQuadCount(), pending.guiTextAffineQuadCount(), pending.guiItemAffineQuadCount(),
+					false, pending.executeStarted(), pending.acquireStarted(), pending.acquireEnded(),
+					pending.submitStarted(), pending.submitEnded()), result.submit(), null, result.presented());
+            } finally {
+                if (pending != null) closeModelFrame(pending.primitiveFrame());
+            }
 		}
 	}
 
@@ -1270,21 +1283,25 @@ public final class RustGalFrameCoordinator {
 			return;
 		}
 		pendingPipelinedFrame = null;
-		VulkanicGalBridge.PipelinedFrameResult result;
-		try {
-			result = bridge.joinPipelinedFrame();
-		} catch (IllegalStateException failure) {
-			if (failure.getMessage() != null && failure.getMessage().contains("retryable selected-source failure")) {
-				LOGGER.warn("Rust VulkanicGAL dropped pipelined frame {} after a retryable source failure", pending.frameId());
-				METRICS.cancellations++;
-				return;
+        try {
+			VulkanicGalBridge.PipelinedFrameResult result;
+			try {
+				result = bridge.joinPipelinedFrame();
+			} catch (IllegalStateException failure) {
+				if (failure.getMessage() != null && failure.getMessage().contains("retryable selected-source failure")) {
+					LOGGER.warn("Rust VulkanicGAL dropped pipelined frame {} after a retryable source failure", pending.frameId());
+					METRICS.cancellations++;
+					return;
+				}
+				throw failure;
 			}
-			throw failure;
-		}
-		if (result == null) {
-			throw new IllegalStateException("pipelined Rust VulkanicGAL frame " + pending.frameId() + " produced no result");
-		}
-		completeSubmittedFrame(pending, result.submit(), null, result.presented());
+			if (result == null) {
+				throw new IllegalStateException("pipelined Rust VulkanicGAL frame " + pending.frameId() + " produced no result");
+			}
+			completeSubmittedFrame(pending, result.submit(), null, result.presented());
+        } finally {
+            closeModelFrame(pending.primitiveFrame());
+        }
 	}
 
 	/**
@@ -1292,6 +1309,23 @@ public final class RustGalFrameCoordinator {
 	 * (unless the pipelined worker already presented), metrics and retirement.
 	 */
 	private static void completeSubmittedFrame(
+		SubmittedFrame submitted,
+		VulkanicGalBridge.WholeFrameSubmitResult wholeFrameResult,
+		VulkanicGalBridge.GuiFrameSubmitResult guiResult,
+		VulkanicGalBridge.PresentedFrame pipelinedPresented
+	) {
+        try {
+            completeSubmittedFrameOwned(submitted, wholeFrameResult, guiResult, pipelinedPresented);
+        } finally {
+            closeModelFrame(submitted.primitiveFrame());
+        }
+    }
+
+    private static void closeModelFrame(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
+        if (frame != null) frame.modelRigPoses().close();
+    }
+
+	private static void completeSubmittedFrameOwned(
 		SubmittedFrame submitted,
 		VulkanicGalBridge.WholeFrameSubmitResult wholeFrameResult,
 		VulkanicGalBridge.GuiFrameSubmitResult guiResult,
@@ -1953,10 +1987,10 @@ public final class RustGalFrameCoordinator {
 		}
 		// Primitive keys: sorting thousands of boxed Longs every frame was a
 		// measurable render-thread cost. The order and fingerprint are unchanged.
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> instances = frame.meshInstances();
+		List<VulkanicGalBridge.WorldMeshInstance> instances = frame.meshInstances();
 		long[] terrainKeys = new long[instances.size()];
 		int terrainKeyCount = 0;
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
+		for (VulkanicGalBridge.WorldMeshInstance instance : instances) {
 			if (instance.stratum() == RustGalWorldPrimitiveRenderer.STRATUM_WORLD_TERRAIN) {
 				terrainKeys[terrainKeyCount++] = instance.meshKey() ^ Long.rotateLeft(instance.meshGeneration(), 17);
 			}

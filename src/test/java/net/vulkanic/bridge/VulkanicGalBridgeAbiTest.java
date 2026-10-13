@@ -833,7 +833,7 @@ class VulkanicGalBridgeAbiTest {
 	void firstPersonMeshConvenienceRecordUsesExplicitNoScopeIdentity() {
 		assertEquals(67, VulkanicGalBridge.WORLD_MESH_ENTITY_STRATUM);
 		assertEquals(71, VulkanicGalBridge.WORLD_MESH_ORDINARY_BLOCK_STRATUM);
-		VulkanicGalBridge.WorldMeshInstanceRecord firstPerson = new VulkanicGalBridge.WorldMeshInstanceRecord(
+		VulkanicGalBridge.WorldMeshInstance firstPerson = new VulkanicGalBridge.WorldMeshInstanceRecord(
 			VulkanicGalBridge.WORLD_MESH_ENTITY_STRATUM, 41L, 2L, 0,
 			0, 0, 0, 0xffffffff, new float[16], 640, 480
 		);

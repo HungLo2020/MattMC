@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CameraSortedTerrainContractTest {
-    private static VulkanicGalBridge.WorldMeshInstanceRecord instance(int stratum, int section, int depth, int flags) {
+    private static VulkanicGalBridge.WorldMeshInstance instance(int stratum, int section, int depth, int flags) {
         return new VulkanicGalBridge.WorldMeshInstanceRecord(stratum, 1, 1, section, depth, 1, 0,
             0xffffffff, new float[]{1,0,0,0, 0,1,0,0, 0,0,1,0, 2,3,4,1},
             1280, 720, 0, 0, 0, flags, -1);
