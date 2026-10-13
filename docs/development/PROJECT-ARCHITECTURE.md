@@ -202,51 +202,37 @@ points in Rust. Palette replacement and mutable-array escape retire query bindin
 Java retains atomic chunk references, reference-CAS facts, scalar ring/range reads,
 radius relocation and callback delivery. This is partial client-world ownership.
 
-The [visible tracking registry](world/entities/RUST-ENTITY-LOOKUP.md) in
-`world/level/entity_lookup/` owns primary visible ID/UUID entries, ordered
-enumeration and binding retirement for production client/server consumers.
-Java retains behavior references and callbacks. The linked owner separates the
-author-recorded CPU, lifecycle and settled checks from the outstanding strict
-leash-crop and GUI crosshair differences. The following
-[section-membership owner](world/entities/RUST-ENTITY-SECTIONS.md)
-stores root and typed arrays in `world/level/entity_sections/`; production
-client/server section consumers read native CPU views. Its CPU/Frozen,
-seven lifecycle and scoped world/entity comparisons pass. Performance acceptance
-remains open: the latest matched matrix passes DH and both shader modes,
-but vanilla misses FPS/p99 floors. Broader runtime scope remains open. The
-subsequent [section-coordinate index](world/entities/RUST-ENTITY-SECTION-INDEX.md)
-owns production coordinates and ordered spatial queries. Its full suites,
-Frozen replays and scoped lifecycle/world/entity checks pass; its matched
-matrix still misses vanilla/DH FPS, so aggregate performance remains open. The subsequent [entity residency slice](world/entities/RUST-ENTITY-RESIDENCY.md)
-owns primary UUID/chunk states and persistence admission in Rust. Full CPU
-suites, Frozen replays and scoped lifecycle/world/entity checks pass; every
-matched FPS/p99 floor passes in its settled rotating workload. Gameplay callbacks, persistence
-I/O and the loading inbox remain Java.
-Full parity and Java removal remain open.
+Entity world state has several native owners with different consumers:
 
-The [entity geometry slice](world/entities/RUST-ENTITY-GEOMETRY.md)
-retains primary position/bounds components per world and queries them directly
-for ordinary camera culling. The [section range-query owner](world/entities/RUST-ENTITY-SECTIONS.md#range-queries)
-links membership to those components and scans ordinary range queries in Rust.
-The [world-query extension](world/entities/RUST-ENTITY-SECTION-INDEX.md#world-queries)
-owns section visibility and joins untyped coordinate traversal with those scans.
-That checkpoint passed full CPU suites, Frozen replays and scoped runtime checks,
-but retained Frozen CPU and vanilla p99 gaps. The subsequent
-[entity collector](world/entities/RUST-ENTITY-COLLECTION.md) combines stock
-non-spectator matches across sections in Rust, yielding before custom bounds or
-spectator callbacks. Java projects bounded result batches; native counts reserve
-projection capacity. Current/Frozen CPU gaps remain explicit in its measurements.
-Rust removal state retires camera membership
-at despawn while keeping primary geometry readable. The
-[ticking membership owner](world/entities/RUST-ENTITY-ORDER.md) retains
-client/server insertion order and immutable tick snapshots. Java keeps API
-projections, object bindings, hooks, behavior callbacks and tick/extraction
-orchestration. The [latest visible-tracking checkpoint](rendering/GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint)
-records author-reported CPU/lifecycle and scoped image checks, with passing settled
-FPS/p99 floors after Java text-record cleanup. An earlier matrix on the same native
-image failed vanilla p99; baseline movement and the combined changes do not
-establish an isolated improvement or its cause. General entity
-components, complete tick ownership and broad/long-session acceptance remain unfinished.
+- [Visible tracking](world/entities/RUST-ENTITY-LOOKUP.md) owns ID/UUID maps,
+  live ordered enumeration and binding retirement.
+- [Section membership](world/entities/RUST-ENTITY-SECTIONS.md) owns root and
+  cached typed arrays; retained geometry feeds ordinary range scans.
+- [Section coordinates and world queries](world/entities/RUST-ENTITY-SECTION-INDEX.md)
+  own the coordinate map, ordered keys, primary visibility and stock typed/untyped
+  traversal. Custom type/bounds/consumer callbacks still yield to Java.
+- [Residency](world/entities/RUST-ENTITY-RESIDENCY.md) owns UUID/chunk states and
+  persistence admission. Java retains persistence I/O, the loading inbox and
+  ordered gameplay callbacks.
+- [Entity collection](world/entities/RUST-ENTITY-COLLECTION.md) combines admitted
+  non-spectator matches in Rust and selects screen-shake sources. Java projects
+  result batches and retains shake intensity/behavior callbacks.
+- [Geometry](world/entities/RUST-ENTITY-GEOMETRY.md) owns primary position/bounds,
+  removal state and camera retirement; [tick membership](world/entities/RUST-ENTITY-ORDER.md)
+  owns order and snapshots while Java still executes simulation behavior.
+
+These CPU ownership slices do not establish complete entity simulation or
+common atomic publication across every owner. Follow each guide's admission,
+callback and lifetime contract. Source fixtures, recorded lifecycle/image
+results and component timings have different scopes; the
+[current rendering checkpoint](rendering/GOAL-5-STATUS.md) distinguishes the
+latest single-pair evidence from older matrices and unmatched-JVM history.
+Strict leash/HUD observations, sustained streaming, temporal behavior and
+long-session host/GPU memory remain open. The
+[shadow-candidate owner](rendering/RUST-ENTITY-SHADOW-CANDIDATES.md) stores
+bounded off-camera CPU captures; it does not replace visible entity state or
+Rust/GAL GPU ownership. General components, complete tick ownership and Java
+removal remain unfinished.
 
 At the [reviewed source](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/mod.rs),
 DH world CPU ownership also includes columns, mutable full-data recipients,

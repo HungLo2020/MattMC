@@ -1,7 +1,8 @@
 # Rust shadow candidate storage
 
-**Implemented and verified with upstream `1490391f9` on 2026-10-13.
-This is scoped verification, not whole-renderer or whole-migration acceptance.**
+**Implementation inspected at [source `0d23141bd`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3), including Rust-only DH generation from `1490391f9`.
+The author-reported October 13 verification below is scoped; this documentation
+review did not rerun Java/Rust suites, timings or image captures.**
 
 Off-camera shader shadow candidates are captured directly into bounded Rust
 CPU storage. Java supplies ordered gameplay callbacks and immutable bounds;
@@ -12,9 +13,9 @@ still use their existing bridge representation.
 
 The producer is `EntityRenderer.captureEntityShadowCandidate`, called from
 `LevelRenderer.extractRustShadowCandidates`. The confined Java view is
-[`EntityShadowCandidates`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/EntityShadowCandidates.java);
+[`EntityShadowCandidates`](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/vulkanic/bridge/EntityShadowCandidates.java);
 its owner and bridge consumer are under
-[`bridge/world/entity_shadow_query`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/render/bridge/world/entity_shadow_query).
+[`bridge/world/entity_shadow_query`](https://github.com/HungLo2020/MattMC/tree/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/render/bridge/world/entity_shadow_query).
 This is CPU data ownership. Shader policy, GPU resources and presentation retain
 their existing Rust/GAL ownership.
 
@@ -24,13 +25,19 @@ their existing Rust/GAL ownership.
   callback ordering. It does not batch callbacks or reuse results across them.
 - Each slot contains flags, prepared entity bounds and uninflated holder bounds.
   Camera state belongs to the selection query, not to each candidate.
-- Native growth preserves earlier captures and caps storage at 65,536 entries.
-  Java refreshes its borrowed views after growth, including allocation failure.
+- Rust owns the slot and admission vectors; Java owns the producer count and
+  confined borrowed views, not the candidate backing allocation. Native growth
+  starts at 64 slots, doubles to a power-of-two capacity and caps storage at
+  65,536 entries. Earlier captures survive growth. Java refreshes both borrowed
+  pointers even when allocation fails, because one vector may already have moved.
 - Capture validates before advancing the producer count. A failed candidate
-  leaves the completed prefix intact. Clear reuses allocation; absent holder
-  fields are zeroed so a previous frame cannot leak into the new one.
+  leaves the completed prefix intact. Holder bounds are validated before entity
+  bounds, preserving failure order. Clear resets only the Java count and reuses
+  allocation; absent holder fields are zeroed so a previous frame cannot leak into the new one.
 - Query and producer run serially on the render thread. Closing the query
-  invalidates its Java views and releases native storage. This storage never
+  destroys the standalone query, then closes candidate and query arenas even
+  if destruction throws. Closing candidates is idempotent, invalidates confined
+  views and releases the native owner. This storage never
   travels with an asynchronous GPU frame.
 - Undecided admission keeps every candidate. A partially written result is not
   consumed. Full frame planning still applies shadow policy independently.
@@ -56,8 +63,8 @@ compiled-class and native-image guards. This internal transport control is
 supplemental; unchanged Frozen OpenGL remains the gameplay and correctness
 baseline. It does not measure total native memory or establish runtime parity.
 
-Full checks pass 2,788 Rust tests (three ignored) and 2,137 Java tests (two
-skipped), including callback mutation/failure order and the native entry point
+The implementation author reports full checks passing 2,788 Rust tests (three
+ignored) and 2,137 Java tests (two skipped), including callback mutation/failure order and the native entry point
 against all 108 Frozen fixture decisions. A fresh actual Frozen bounds probe
 reproduces those decisions with source/class guards. Scoped runtime results are below.
 Preliminary measurements are retained under
@@ -67,11 +74,11 @@ observation view instead of recreating it each frame.
 
 ## Integrated checkpoint (native `f29c8316`)
 
-Upstream `1490391f9` removes DH Java generation fallbacks. Integration preserved
-all 18 local paths without conflicts. The combined full checks pass the Rust
-and Java counts above. Fresh DH generation matches actual unchanged Frozen
-checksums over 16 recorded chunks in four JVMs; those short timings are diagnostic
-only. Saved-chunk heightmap differences documented in
+The author reports that integration of upstream `1490391f9` preserved all
+18 local paths without conflicts, with the combined full-check counts above.
+Fresh-wrapper DH generation matches actual unchanged Frozen checksums over
+16 recorded chunks in four JVMs; those short timings are diagnostic only.
+Saved-chunk heightmap differences documented in
 [Rust DH generation](../world/chunk/RUST-DH-GENERATION.md) are not exact parity.
 
 `build/native-shadow-candidates/integrated/measurement/` passes captured-field
@@ -101,8 +108,9 @@ model rigs enabled and no overlapping build or documentation checks:
 Both scoped FPS/p99 floors pass. Saved inputs, configuration and live JVM flags
 match; live entity counts differ: 181/183 with shaders and 165/167 with shaders+DH
 (Current/Frozen). One pair does not isolate this migration's gameplay effect or
-prove sustained performance. Vanilla modes retain their preceding checkpoint;
-this candidate changes shader-only capture.
+prove sustained performance. Vanilla and vanilla+DH retain native `5e09c034`
+evidence, while these shader rows use `f29c8316`. This is a mixed-image evidence matrix, not a fresh four-mode
+run of one binary; this candidate changes shader-only capture.
 
 One settled shader+DH image pair and world unload/reload, resource reload and
 view-distance decrease pass with zero validation errors, exceptions and panics.
@@ -118,10 +126,20 @@ Peak client RSS is 5.92/7.31 GiB with shaders and 7.73/7.51 GiB with shaders+DH
 long-session memory bound is established. Eight completed copied worlds were
 retired after clients exited; original images and diagnostic receipts remain.
 
-Evidence: `build/native-shadow-candidates/integrated/` contains full-check,
+The author records these evidence locations (local receipts, not wiki-hosted
+artifacts): `build/native-shadow-candidates/integrated/` contains full-check,
 measurement, fresh-generation, runtime, gameplay-comparison, image-review,
 memory-observations, final-integrity and retention receipts. Original captures:
 `artifacts/graphics-captures/validation/native-shadow-candidates-integrated-20261013/`.
+
+The [capture tests](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/test/java/net/vulkanic/bridge/EntityShadowCaptureTest.java)
+exercise callback ordering, mutation and a throwing holder callback. The
+[storage tests](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/test/java/net/vulkanic/bridge/EntityShadowCandidatesTest.java)
+cover growth, clear, invalid publication, the cap and closed access. These are
+specific cases, not exhaustive allocation-failure or long-session coverage. The
+[component verifier](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/DevUtils/tests/rendering/VerifyShadowCandidates.py)
+checks its captured fields/checksums, eight compiler-quiet samples per JVM and
+source/class/native guards; it does not compare rendered Frozen images.
 
 ## Historical pre-integration checkpoint
 

@@ -10,9 +10,14 @@
 > removal callbacks. The [visible tracking slice](../world/entities/RUST-ENTITY-LOOKUP.md)
 > now owns ID/UUID maps, live ordered enumeration and binding retirement in Rust;
 > Java retains behavior-object bindings and section-manager orchestration.
+> Subsequent owners implement [root/typed membership](../world/entities/RUST-ENTITY-SECTIONS.md),
+> [section coordinates, visibility and queries](../world/entities/RUST-ENTITY-SECTION-INDEX.md),
+> [residency and persistence admission](../world/entities/RUST-ENTITY-RESIDENCY.md),
+> and [stock result collection](../world/entities/RUST-ENTITY-COLLECTION.md).
 > These are separate owners, not a general component store. The slice guides
-> distinguish author-recorded CPU/live checks from this source-only review at
-> `d8e6b8f4`; no runtime suites were rerun for this reconciliation.
+> preserve their original source and author-recorded CPU/live checkpoints;
+> this reconciliation checks current ownership at `0d23141b` without rerunning
+> runtime suites or independently validating receipts.
 > Broad gameplay and long-session memory
 > acceptance remain separate from implemented ownership.
 > See the [game model index](index.md).
@@ -123,10 +128,17 @@ callbacks. Visible tracking now has a separate
 and [Java behavior-binding view](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/minecraft/world/level/entity/NativeEntityLookup.java).
 Its ID/UUID lookups and live insertion-order enumeration do not replace camera
 geometry, immutable tick snapshots or typed spatial section membership. Here
-“visible” means admitted to tracking, not passing a camera-frustum test. Section
-keys, typed membership, persistence's known-UUID set and load/visibility
-orchestration remain Java; the anchored-entity store described above is still
-proposed. See [tracking constraints and verification](../world/entities/RUST-ENTITY-LOOKUP.md).
+“visible” means admitted to tracking, not passing a camera-frustum test. Later slices move section
+keys and ordered spatial cursors, root/typed membership arrays, section
+visibility, the server known-UUID set and chunk residency/admission to Rust.
+Combined queries consume those owners and retained geometry; stock result
+collection also handles non-spectator and screen-shake source selection.
+Java still owns class descriptors, behavior bindings, custom callbacks,
+load/visibility transition orchestration, persistence I/O and the loading inbox.
+The anchored-entity store described above remains proposed. Follow the canonical
+[current ownership guides](../world/entities/index.md) for compatibility,
+lifetime and evidence boundaries; earlier lookup results do not verify these
+later migrations.
 
 AI (goals and brains), synchronised data, entity networking, anchored entities
 and the complete simulation loop need their own migration and verification.

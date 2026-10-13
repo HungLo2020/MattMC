@@ -13,13 +13,16 @@ residency and persistence admission into Rust with scoped verification.
 Transition orchestration, behavior callbacks and persistence I/O remain further
 migration work.
 
-Implementation: [native owner](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_sections/index_ffi.rs),
-[physical map](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_sections/section_map.rs),
-[threaded ordered index](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/entity_sections/section_tree.rs)
-and [behavior bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/entity/NativeEntitySectionIndex.java).
+Implementation: [native owner](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/world/level/entity_sections/index_ffi.rs),
+[physical map](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/world/level/entity_sections/section_map.rs),
+[threaded ordered index](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/world/level/entity_sections/section_tree.rs)
+and [behavior bridge](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/minecraft/world/level/entity/NativeEntitySectionIndex.java).
 This complements [native section membership](RUST-ENTITY-SECTIONS.md).
 There is no Java primary section map or sorted-key mirror, no per-query Java
 candidate array, and no new crate or GPU handle crossing this boundary.
+The current ownership description is pinned to `0d23141b`; the recorded
+checkpoint results below are historical author evidence, not fresh runtime
+verification by this documentation reconciliation.
 
 ## Mutation and lifetime rules
 
@@ -39,9 +42,13 @@ candidate array, and no new crate or GPU handle crossing this boundary.
   `mattmc_section_index_spatial_reopen` restarts one with new bounds, so entity
   queries allocate no lease or arena per search. Each cursor also retains one
   bounded match buffer without entity references. Reopening an open lease fails.
-  Nested searches take another pooled cursor or allocate one.
+  Nested searches take another pooled cursor or allocate one. The pool limit
+  bounds idle pooled cursors, not all concurrent/nested or retained leases.
 - Thread links use an arena with reachability-based retirement rather than
-  owning reference cycles. Unreachable retired slots are reused. Follow the
+  owning reference cycles. Unreachable retired slots are reused. Slot/arena
+  capacity can remain at its high-water mark; automatic arena cleanup has no
+  fixed collection deadline. Owner/cursor lifetime controls do not establish
+  a production long-session memory bound. Follow the
   existing world-thread mutation contract; this does not add concurrent APIs.
 - Java chunk sets are required API snapshots projected from native key order;
   they do not serve as a second primary coordinate map.
@@ -208,8 +215,10 @@ python3 DevUtils/tests/world/entity/VerifySectionMembers.py \
 
 ## Historical coordinate-index verification
 
-Native `168dd924` passes thirteen focused controls,
-including 20,000 randomized AVL mutations, physical hash resize/shrink,
+Native `168dd924` passes thirteen combined native controls: seven coordinate-
+index controls and six membership controls. Four Java index integration
+controls cover captured insertion slots, removed prefetched keys, future-column
+mutation and null visibility. The native controls include 20,000 randomized AVL mutations, physical hash resize/shrink,
 callback slot capture, detached-node retention and owner/cursor lifetimes.
 The expanded actual Frozen corpus matches all 6,721 cases with source/class/
 native guards; manager lookup matches all 4,417 cases. Full suites pass 2,698
@@ -249,3 +258,12 @@ removal/reinsertion/rotations after cursor creation, callback exceptions and
 reentrant physical-map insertion. Source, compiled class and loaded native
 identities must remain unchanged throughout replay. CPU replays supplement
 real gameplay, performance and long-session resource checks.
+
+The [6,721-case index observer](https://github.com/HungLo2020/MattMC/blob/f54c1d75418d8da57d751b26ab2d67d5cf2cd7ad/DevUtils/tests/world/entity/VerifySectionIndex.java)
+invokes `forEachAccessibleNonEmptySection`, section streams and coordinate
+operations. It does not call the per-entity `getEntities` overloads or
+`EntityTypeTest.tryCast`, despite broader driver coverage language. Its spatial
+coverage is section candidate order, visibility/nonempty admission and
+mutation/abort/exception timing, not per-entity bounds or cast filtering.
+Use the [membership/range observer](RUST-ENTITY-SECTIONS.md#verification) and
+later world-query records above for those separate boundaries.

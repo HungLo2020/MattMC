@@ -13,6 +13,48 @@ supply a matched Frozen comparison or acceptance verdict. An ordinary driver's
 the requested observation finished and passed its state/health checks; the
 driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 
+## October 13 current evidence boundary
+
+Source [`0d23141b`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3)
+is 34 implementation commits beyond documentation base `6b858d35`.
+The current [shadow-candidate guide](RUST-ENTITY-SHADOW-CANDIDATES.md#integrated-checkpoint-native-f29c8316)
+records integrated native `f29c8316` after upstream `1490391f9`. Its fresh
+runtime evidence covers **one 6,000-frame pair per shader mode**. The root
+summary retains the predecessor's vanilla rows; it is not a fresh four-mode
+matrix on this native image:
+
+| Mode | Native checkpoint | FPS, Current / Frozen | p99 ms, Current / Frozen |
+| --- | --- | --- | --- |
+| Vanilla | Predecessor `5e09c034` | 1289.30 / 1190.40 | 3.332 / 3.787 |
+| Vanilla + DH | Predecessor `5e09c034` | 814.90 / 684.80 | 3.826 / 6.050 |
+| Shaders | Integrated `f29c8316` | 357.00 / 312.60 | 5.098 / 7.935 |
+| Shaders + DH | Integrated `f29c8316` | 282.80 / 225.80 | 5.889 / 9.223 |
+
+Each row passes its scoped FPS/p99 floors. Both checkpoints use matched saved
+inputs and live JVM controls, but live entity counts differ. The predecessor
+rows are single pairs from the [screen-shake checkpoint](../world/entities/RUST-ENTITY-COLLECTION.md#screen-shake-runtime-checkpoint),
+not new measurements of the integrated shadow candidate. Its pre-integration
+`cd299da9` two-pair medians remain historical; the overlapping first shader
+pair and its replacement are recorded separately in that guide. These are
+implementation-author results; this documentation review did not rerun runtime
+checks or independently inspect untracked captures and profiles.
+
+Integrated shadow capture uses 7–44% less CPU and 25–26% less mixed-holder
+Java allocation than the prior Java transport in guarded component trials.
+That is neither a Frozen CPU comparison nor an isolated gameplay gain. One
+settled shader+DH pair and three lifecycle checks pass with zero VUIDs; the
+hazy lifecycle images support structural behavior only. Peak Current RSS is
+5.92 GiB for shaders and 7.73 GiB for shaders+DH, with no GPU-memory metric or
+long-session bound. Receipts: `build/native-shadow-candidates/integrated/`.
+
+The dated matrices below preserve their original candidates and failures.
+In particular, `9c9f085c` used unmatched heap/GC/JIT controls; its apparent pass
+is not controlled acceptance. The subsequent matched `6076262e`, then
+`168dd924`, matrices retain their failed floors. None verifies this later
+source. Settled rotating scenes hide the minimap and leave first shader-world
+frames, first-turn terrain gaps/flicker, sustained streaming, broad gameplay
+and host/GPU memory acceptance open.
+
 ## Iteration and acceptance runs
 
 A single gameplay run takes 5–8 minutes, and the full protocol repeats each
@@ -506,6 +548,7 @@ directory. Java removal and broad rendering acceptance remain open.
 
 ## Local section-coordinate checkpoint
 
+This historical checkpoint follows `6076262e`; it is not current-head verification.
 Native `168dd924` routes production client/server section-coordinate storage,
 ordered keys, chunk relations and coordinate queries through Rust. Java keeps
 section behavior bindings and visibility/membership callbacks. See the
@@ -555,7 +598,7 @@ original-review records and `runtime-identities.json`), plus
 
 ## Local entity-section checkpoint
 
-The preceding native `6076262e` includes Rust root/typed section membership, retained
+This historical native `6076262e` predates `168dd924` above. It includes Rust root/typed section membership, retained
 DH accepted-parent culling reuse and count-only admitted frame output. The
 benchmark matches actual heap/collector/JIT settings on unchanged Frozen.
 All twenty alternating exact 6,000-frame runs are clean; all live controls,
@@ -623,9 +666,9 @@ All scheduled repeats remain included; the protocol still uses360 settle,
 matched-control 15s vanilla/DH profiles completed sequentially after timing,
 with live flag guards for both clients. They selected retained-DH traversal
 and count-only output changes; native `6076262e` passes refreshed combined
-suites and Frozen CPU replays. Fresh gameplay and twenty matched timing runs
-are in progress. No isolated section-regression cause or accepted speedup
-is established yet. Corrected receipts:
+suites and Frozen CPU replays. Its subsequent twenty-run result is the
+`6076262e` table above; these runs are no longer pending. No isolated
+section-regression cause or accepted speedup is established. Corrected receipts:
 `build/native-entity-sections/matched-jvm-v3/gameplay/`, including
 `effective-control-verification.json` and the mode/all-run results.
 
@@ -680,7 +723,7 @@ host/GPU memory acceptance remain open. Those receipts describe that earlier sou
 
 ## Local visible tracking checkpoint
 
-The implementation author reports the October 11 native `9c9f085c` checkpoint,
+This historical October 11 native `9c9f085c` checkpoint is author-reported,
 published in [`d8e6b8f4`](https://github.com/HungLo2020/MattMC/commit/d8e6b8f477b9c6f55aef3030260a3e2af4b10212)
 after documentation base `cc929bd06`. This source moves production visible
 ID/UUID maps and ordered enumeration into
@@ -707,9 +750,13 @@ Final source/native/Frozen/prompt/three prepared-input guards pass.
 | Shaders | 346.25 / 316.50 | 5.508 / 6.757 |
 | Shaders + DH | 266.75 / 227.85 | 6.118 / 8.369 |
 
-**All four average-FPS and all four p99 floors pass.** Vanilla p99 margin is about 1.9%.
-The preceding 5.1% vanilla-tail miss remains below; this does not prove an
-isolated gain or root-cause repair, and some absolute medians/baselines moved.
+**The original controller reported all eight floors passing**, with about
+1.9% vanilla p99 margin. Later source records identify unmatched controls:
+Current used G1 with a 1 GiB initial heap, Frozen ZGC with 4 GiB, and different
+launcher JIT thresholds. Preserve these raw values, but do not treat the pass
+as a controlled renderer comparison or performance acceptance. The preceding
+5.1% vanilla-tail miss remains below with the same control limitation; neither
+matrix establishes an isolated gain, regression or root-cause repair.
 These are settled rotating scenes with hidden minimap, not broad gameplay,
 first shader-world-frame/first-turn, streaming or long-memory acceptance.
 
@@ -763,8 +810,10 @@ Final source/native/Frozen/prompt/three prepared-input guards pass.
 | Shaders | 344.10 / 318.40 | 4.868 / 6.550 |
 | Shaders + DH | 266.45 / 228.35 | 5.299 / 8.614 |
 
-All FPS floors and the other three p99 floors pass; **vanilla p99 misses
-5.1%, so the overall matrix fails**. Both Current vanilla repeats have higher
+The original controller reports all FPS floors and the other three p99 floors
+passing; **vanilla p99 misses 5.1%, so the raw matrix fails**. As with the
+post-cleanup table above, unmatched heap/GC/JIT controls prevent controlled
+renderer acceptance or causal attribution. Both Current vanilla repeats have higher
 p99 than their paired Frozen runs. Current's median is below its earlier
 published measurement, but Frozen's median also moved; neither an isolated
 migration regression nor its cause is proved. Do not rerun selectively or

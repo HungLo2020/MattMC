@@ -39,7 +39,11 @@ VulkanicGAL remains the sole GPU resource/submission/presentation owner.
   counters. The nine root offsets use the same fixed stable distance order.
 - `collectVisibleTreeSummary` is the production count/admission boundary;
   `collectVisibleTree` preserves the full diagnostic result. Exact-atlas frames
-  export keys because their Java per-column callbacks still require them.
+  export keys because their Java per-column callbacks still require them. An
+  admitted summary has an empty `nearToFar()` array but a separate positive
+  `columnCount()` when columns exist; use the count for empty-result checks.
+  Non-admitted summary requests retain full keys. This avoids Java key-array
+  copies, not native sorting, allocation or admission work.
 - Tree close drops topology storage immediately. Late callbacks become no-ops;
   the small wrapper survives until its automatic FFM scope has no remaining users.
   No Java pointer or GPU handle is retained by the topology.
@@ -67,8 +71,20 @@ and [FFM owner lifetime](https://github.com/HungLo2020/MattMC/blob/65457ef804714
 
 ## Verify
 
-The current source checkpoint is verified within the following scope: matched-JVM
-15s DH profiles put retained visibility collection in45 of75 sampled Current
+The [current collector boundary](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java#L2550-L2587)
+and [retained traversal](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/render/dh_collector/tree.rs#L207-L268)
+retain the summary contract and accepted-parent reuse described above. The
+1,280-walk oracle exercises generic tree/frustum behavior with synthetic item
+state; production binding/admission controls are separate. The recorded parent
+retirement overlap uses a deterministic replacement inside a mocked close
+callback, not a threaded stress test. See the
+[current evidence boundary](GOAL-5-STATUS.md) before comparing newer releases.
+
+
+The following is the implementation author’s historical `6076262e` checkpoint
+from `0cea5de1`, not verification of every subsequent source change. No runtime
+suites, profiles or untracked original images were rerun or inspected in this
+documentation reconciliation. Matched-JVM 15s DH profiles put retained visibility collection in45 of75 sampled Current
 render stacks (39 leaf samples at the Java boundary). The native traversal now
 avoids duplicate accepted-parent tests and the ordinary admitted boundary no
 longer copies an entire key list into two Java arrays. This is a profile-selected

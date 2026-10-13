@@ -1,6 +1,8 @@
 # Rust-only DH generation
 
-Every generated or loaded chunk becomes DH data through Rust only:
+At [source `1490391f9`](https://github.com/HungLo2020/MattMC/commit/1490391f94850b7afd3335d1c9448ca0b79ea9ff),
+retained in `0d23141bd`, the supported generated/loaded chunk path produces DH
+data through Rust:
 
 1. height fields (`NativeDhHeightmaps`);
 2. block and sky lighting (`NativeDhLighting`);
@@ -8,23 +10,25 @@ Every generated or loaded chunk becomes DH data through Rust only:
 4. the merge into its full-data source (see [Rust-owned DH source](RUST-DH-SOURCE.md));
 5. data-source sky light (`NativeDhSkyLight`).
 
-None of these steps has a Java fallback any more. The source
+Lighting, columns and data-source sky light have no Java generation fallback.
+A Java height scan remains for unsupported chunks, but does not provide a
+working Java lighting/column route (see the limits below). The source
 updates they feed are described in [Rust-owned DH source](RUST-DH-SOURCE.md).
 
 - **Java entry points:**
-  - [`DhLightingEngine`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/generation/DhLightingEngine.java)
+  - [`DhLightingEngine`](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/src/main/java/com/seibel/distanthorizons/core/generation/DhLightingEngine.java)
     (chunk lighting, data-source sky light);
-  - [`LodDataBuilder`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/LodDataBuilder.java)
+  - [`LodDataBuilder`](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/LodDataBuilder.java)
     (chunk columns);
-  - [`ChunkCompoundTagParser.readLightingForGeneration`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/chunkFileHandling/ChunkCompoundTagParser.java)
+  - [`ChunkCompoundTagParser.readLightingForGeneration`](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/chunkFileHandling/ChunkCompoundTagParser.java)
     (saved light).
-- **Block facts:** [`NativeCollisionGeometry.dhSolid` / `dhOpacity`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeCollisionGeometry.java),
+- **Block facts:** [`NativeCollisionGeometry.dhSolid` / `dhOpacity`](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/src/main/java/net/minecraft/world/level/block/NativeCollisionGeometry.java),
   installed into Rust by `mattmc_collision_dh_install`.
 
 ## Why the Java paths ran, and what fixed them
 
-A route survey counted every route and decline reason in a DH gameplay run on
-the small DH fixture. Before these changes, the Java lighting pass handled 73%
+The implementation author reports a route survey of routes and decline reasons
+in a DH gameplay run on the small DH fixture. Before these changes, the Java lighting pass handled 73%
 of chunks (1,488 Java, 560 native), and the Java chunk builder ran just as often.
 There were three causes:
 
@@ -58,14 +62,15 @@ height-field builds, with no decline.
 - **A decline is logged once and leaves the chunk without that step.** The chunk
   stays unlit (it is still marked lit, as before, so it isn't retried) or gives
   no LOD data. With registered block states, stock wrappers and stock levels,
-  nothing declines.
+  the recorded survey saw no declines; this does not prove admission for every
+  modded, corrupt or unsupported input.
 - **Saved chunks use DH's own heights.** A `recreateHeightmaps=false` wrapper
   used to read Minecraft's saved `WORLD_SURFACE`/`MOTION_BLOCKING` heightmaps
   (empty when the chunk wasn't primed). It now gets the same Rust height fields
-  as a fresh chunk, so a saved chunk and the same chunk generated fresh give
-  identical LOD data. In the generation benchmark, current saved-chunk output
-  equals Frozen's fresh-chunk output for all 16 recorded chunks; Frozen's
-  saved-chunk output differs on 14 of them.
+  as a fresh chunk. The author reports matching current saved/fresh output and
+  Frozen fresh output for the 16 recorded chunks; Frozen saved output differs
+  on 14. This is an intentional saved-heightmap behavior change, not exact
+  Frozen saved-chunk parity or proof for arbitrary worlds.
 - **Saved light that can't be imported natively isn't imported.** DH lights
   that chunk instead. Frozen's Java reader imported a partial copy of malformed
   data, or threw.
@@ -94,8 +99,9 @@ classes), which can't be lit or converted natively either.
 
 ## Measured results (2026-10-13)
 
-Measured on the laptop against a build of the previous commit (`d6e1e3f68`,
-"baseline").
+The implementation author reports laptop measurements against the previous
+Current commit (`d6e1e3f68`, "baseline"). These are not measurements made by this
+documentation review, and that baseline is not unchanged Frozen OpenGL.
 
 **CPU, per-chunk generation** (`VerifyDhSource.py --mode generation`, 16
 recorded chunks × 20 rounds, six alternating pairs, medians):
@@ -133,8 +139,16 @@ didn't fit the harness's 300-second per-mode limit on this machine.
 - `NativeDhHeightmapsTest` checks that states without cached geometry get the
   shared facts.
 
-The generation benchmark times the per-chunk path (wrapper, lighting, columns)
-against Frozen:
+The [generation driver](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/src/test/java/net/minecraft/world/level/levelgen/DhSourceVerificationGeneration.java)
+times wrapper construction, chunk block lighting and column production. It uses
+recorded block sections with a synthetic four-biome pattern in ProtoChunks and
+a one-chunk neighborhood; it does not time world generation, full 3×3 lighting,
+separate source sky baking or gameplay. Its checksum accumulates produced
+source hashes, not a field-by-field output comparison.
+
+The [runner](https://github.com/HungLo2020/MattMC/blob/1490391f94850b7afd3335d1c9448ca0b79ea9ff/DevUtils/tests/world/chunk/VerifyDhSource.py)
+can compare unchanged Frozen or a separately supplied previous Current build;
+the classpaths/native pins determine which comparison was actually run:
 
 ```bash
 python3 DevUtils/tests/world/chunk/VerifyDhSource.py --mode generation --recreate-heightmaps ...
@@ -144,7 +158,15 @@ python3 DevUtils/tests/world/chunk/VerifyDhSource.py --mode generation --per-sid
 `--recreate-heightmaps` times fresh chunks; both builds must give equal output.
 Without it, the benchmark times saved chunks, whose output intentionally changed
 (see above), so `--per-side-checksums` only requires each side to be
-consistent.
+consistent. It must not be used to claim cross-side equivalence. The runner
+copies and hashes compiled driver classes and guards native images; this alone
+is not a complete source/class provenance audit.
+
+The later [shadow-candidate integration record](../../rendering/RUST-ENTITY-SHADOW-CANDIDATES.md#integrated-checkpoint-native-f29c8316)
+reports an actual unchanged-Frozen fresh-wrapper checksum check for the same
+16 recorded chunks in four JVMs. Its short timings are diagnostic. That scoped
+check does not erase the saved-heightmap deviation, certify every generation
+route, or establish an all-mode runtime or long-session memory result.
 
 To repeat the route survey, temporarily count the decline sites and run one
 gameplay pass, as in the phase-2 survey (`phase2-survey*` under

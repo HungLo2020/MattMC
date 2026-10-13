@@ -2,11 +2,54 @@
 
 **Goal 5 remains incomplete.**
 
+## October 13 current source and runtime scope
+
+The reviewed source is [`0d23141b`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3),
+34 implementation commits after documentation base `6b858d35`. Use the
+[current performance boundary](GAMEPLAY-PERFORMANCE.md#october-13-current-evidence-boundary)
+and subsystem guides for current scope; the checkpoints below preserve dated
+results rather than accepting later source.
+
+Rust now owns further entity membership/index/query and screen-shake selection,
+world lighting/fog/camera/collision/random-tick producers, DH source/conversion
+and generation, asset membership, mesh lifetime and model-frame storage.
+The latest [shadow candidate owner](RUST-ENTITY-SHADOW-CANDIDATES.md) stores
+bounded CPU captures and admission output. Java still supplies ordered
+behavior callbacks, shadow bounds inflation and ordinary render-state extraction;
+remaining simulation, networking, platform/startup and consumer orchestration
+prevent claiming a Java-free application.
+
+The implementation author reports integrated native `f29c8316` after upstream
+`1490391f9`: Rust 2,788/three ignored, Java 2,137/two skipped, 108 actual Frozen
+bounds decisions and fresh-generation checksums for 16 chunks pass. Saved-DH
+height differences remain outside exact Frozen parity. The fresh gameplay
+scope is one 6,000-frame Current/Frozen pair each for shaders and shaders+DH;
+both FPS/p99 floors pass with matched input/JVM controls and differing live
+entity counts. Vanilla rows in the root summary retain predecessor `5e09c034`.
+This is not a repeated all-mode result for the integrated image. Earlier
+`cd299da9` pairs and its excluded/replaced overlapping timing remain historical.
+
+The author reports one settled shader+DH pair and three lifecycles passing,
+VUID zero, with five originals, four presenter correlations and six native
+identities checked. Hazy lifecycle images are structural evidence only.
+Short-session Current RSS of 5.92/7.73 GiB and lower component Java allocation
+do not establish total native/GPU or long-session memory bounds. This review
+inspected source and documented assertions only; it did not rerun suites,
+benchmarks or captures, or independently inspect untracked originals.
+
+First shader-world-frame, first-turn terrain pop-in/flicker, sustained streaming,
+broad weather/entities/items/hands/GUI/resource-pack parity and long host/GPU
+memory remain open. Strict leash width and historical missing-crosshair
+fixtures below remain unresolved; a visible crosshair in a newer vanilla coast
+pose does not close broader HUD defects. Rain foreground and waypoint-chat
+mismatches also remain. Serial success does not resolve the strict height-world
+teardown/closed-channel race or parallel Rust GLX BadAccess/poison failures.
+
 <a id="october11-visible-tracking-checkpoint"></a>
 
 ## October 11 visible-tracking checkpoint
 
-At source [`d8e6b8f4`](https://github.com/HungLo2020/MattMC/commit/d8e6b8f477b9c6f55aef3030260a3e2af4b10212),
+This historical checkpoint is at source [`d8e6b8f4`](https://github.com/HungLo2020/MattMC/commit/d8e6b8f477b9c6f55aef3030260a3e2af4b10212),
 following documentation base `cc929bd06`,
 [Rust entity lookup](../world/entities/RUST-ENTITY-LOOKUP.md) owns primary
 visible ID/UUID maps and live ordered enumeration. Profile-backed Java text
@@ -14,8 +57,11 @@ input copy cleanup retains the same Rust fields; font/layout ownership remains
 Java. The implementation author reports fresh Rust 2,685/three ignored,
 Java/parity 2,010 executed/two skipped and Frozen lookup 4,417 passing.
 Seven lifecycles/two world/four GUI item pairs pass with zero VUIDs; twelve
-originals reviewed/thirteen runtime identities match. All twenty fresh timings
-and final identity/input guards pass all eight FPS/p99 floors. Native
+originals reviewed/thirteen runtime identities match. The original twenty-run
+controller reported all eight FPS/p99 floors passing with final identity/input
+guards. Later source identifies unmatched JVM controls: Current G1/1 GiB initial
+heap versus Frozen ZGC/4 GiB and different JIT thresholds. These raw values
+are historical evidence, not controlled renderer performance acceptance. Native
 `9c9f085c` is unchanged across the Java cleanup. Final vanilla p99 is
 3.049/3.109 ms Current/Frozen; the earlier same-native matrix remains a
 recorded failure at 3.190/3.035 ms. Frozen OpenGL remains the unmodified
@@ -24,6 +70,9 @@ inspected source and assertions, without independently running native/Java
 suites, captures or replays, or viewing the untracked original images.
 See the [matrix and limits](GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint).
 No isolated gain or root-cause repair of the prior 5.1% vanilla-tail miss is proved.
+The later matched `6076262e` matrix misses vanilla FPS/p99, then `168dd924`
+misses vanilla/DH FPS; both remain historical failures in the performance guide,
+not current results or acceptance of the October 13 source.
 
 Equivalent copied-cow inputs expose thinner near-camera leash geometry in
 Current, also seen with the published-registry control. The equivalent-leash

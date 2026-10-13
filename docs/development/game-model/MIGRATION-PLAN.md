@@ -100,14 +100,17 @@ Follow the owner boundary relevant to the next change:
   The [world-query owner](../world/entities/RUST-ENTITY-SECTION-INDEX.md#world-queries)
   joins retained coordinates, primary visibility, members and geometry in Rust,
   eliminating ordinary Java bounds scans and per-rejected-section crossings.
-  Full CPU suites and Frozen oracles pass, as do two image pairs and three
-  lifecycle checks. Latest vanilla FPS passes; p99 misses Frozen by 3.4%, and
-  the CPU gap remains open. Typed dispatch and motion/collision producers and
-  consumers remain further work. Java supplies API projections, behavior/type
-  callbacks, visibility-transition orchestration, persistence I/O, loading and
-  simulation orchestration. AI, synchronized data and networking remain migration work.
-  Historical image/FPS results do not certify current broad gameplay, streaming,
-  long-session memory, leash or HUD parity; see the linked subsystem reports.
+  [Stock typed traversal](../world/entities/RUST-ENTITY-SECTION-INDEX.md#stock-typed-traversal-scoped-verification-2026-10-13)
+  and [entity collection](../world/entities/RUST-ENTITY-COLLECTION.md) now have
+  admitted native consumers; custom callbacks remain Java. Java also retains
+  persistence I/O, loading and simulation orchestration. AI, synchronized data,
+  networking and remaining motion/behavior work need separate migration.
+  The linked owners preserve their dated CPU and runtime records, including
+  remaining component slowdowns. Do not carry an earlier pass or failure forward
+  as acceptance of later combined source. Use the
+  [current rendering evidence](../rendering/GOAL-5-STATUS.md) for release and
+  workload scope; broad gameplay, streaming, long-session memory, leash and HUD
+  acceptance remain open.
 - **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),
   [section color fields](../world/biome/RUST-SECTION-COLORS.md),
   [live light layers](../world/lighting/RUST-LIVE-LAYERS.md) and the

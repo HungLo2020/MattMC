@@ -10,18 +10,24 @@ queries with scoped verification and open performance limits. The subsequent [re
 Rust also owns each section's visibility value. Java still requests transitions,
 dispatches behavior callbacks and performs persistence I/O.
 
-Implementation: [native member owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/entity_sections),
-[Java behavior bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/util/NativeClassInstanceStorage.java),
-and [production section consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/entity/EntitySection.java).
+Implementation: [native member owner](https://github.com/HungLo2020/MattMC/tree/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/world/level/entity_sections),
+[Java behavior bridge](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/minecraft/util/NativeClassInstanceStorage.java),
+and [production section consumer](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/minecraft/world/level/entity/EntitySection.java).
 Quiet traversal reads retained, read-only CPU views; it does not reconstruct
 a Java member list or send that list back to Rust. No GPU handles cross this
 boundary. This is membership ownership, not complete entity simulation.
+The current ownership description is a source review at `0d23141b`; historical
+results below retain their original checkpoints. No runtime suites or receipts
+were independently rerun or validated for this reconciliation.
 
 ## Compatibility and lifetime
 
-- Preserve insertion order, duplicate members, lazy typed views and immutable
-  snapshots. The Java class-descriptor map preserves class identity and callback
-  ordering; its values refer to native groups rather than Java member arrays.
+- Preserve insertion order, duplicate members, lazy typed views and the explicit
+  immutable snapshots required by the collection API. Captured backing arrays
+  are live storage, not immutable snapshots: mutations without growth remain
+  observable through a capture; growth leaves the captured old array alive.
+  The Java class-descriptor map preserves class identity and callback ordering;
+  its values refer to native groups rather than Java member arrays.
 - Iterators and typed spliterators keep ArrayList's mutation/failure timing.
   Root streams still use the enclosing collection's iterator-based spliterator.
 - Typed array projections preserve ArrayList's VM bounds/type failures and the
@@ -35,7 +41,12 @@ boundary. This is membership ownership, not complete entity simulation.
   reference disappears. Java clears matching retired generations promptly.
 - Never hold a native mutex across a Java callback. Follow the existing world
   thread contract; atomic views do not introduce concurrent mutation support.
-  Automatic arenas keep the owner alive while collection wrappers are reachable.
+  Automatic arenas keep the owner alive while collection wrappers, typed views
+  or their iterators remain reachable. Scoped captures release their leases on
+  exit, including exceptions; automatic owner cleanup has no deterministic GC
+  deadline. Active member arrays and binding tables can retain high-water
+  capacity. Reusing retired slots proves reuse, not shrink-to-live-size storage
+  or a measured long-session memory bound.
 
 ## Range queries
 
@@ -132,6 +143,16 @@ manager lookup replay matches all 4,417, with source/class/native guards.
 Review found and repaired a typed-array VM-error and destination-prefix
 mismatch before these checks. The initial 5,691-case corpus, full-message JVM
 control failure and pre-repair results remain in `build/native-entity-sections/`.
+
+The [original membership observer](https://github.com/HungLo2020/MattMC/blob/0cea5de1d07fc0f569576a8938be37416e86eb66/DevUtils/tests/world/entity/VerifySectionMembers.java)
+and [guard wrapper](https://github.com/HungLo2020/MattMC/blob/0cea5de1d07fc0f569576a8938be37416e86eb66/DevUtils/tests/world/entity/VerifySectionMembers.py)
+bound that 6,123-case record: the wrapper requires matching counts of at least
+5,500, not exactly 6,123. Its section fixtures use intersecting bounds and
+custom `tryCast` returns the supplied member. They cover bounds/cast/consumer
+ordering, callback mutation, aborts and exceptions, but do not establish
+rejected spatial filtering, a rejecting cast or manager lifecycle behavior.
+The 4,417 manager replay is separate evidence. Later range and world-query
+corpora extend this scope; do not backdate those checks to this checkpoint.
 
 The preceding `d4348edd` candidate passes seven lifecycle checks, two world
 comparisons and the cow/body-shadow pair with zero VUIDs. Fourteen original

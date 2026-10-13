@@ -24,11 +24,17 @@ camera frustum. The ID/UUID lookup and live ordered enumeration are distinct
 from spatial section queries. The subsequent [section-key index](RUST-ENTITY-SECTION-INDEX.md) owns production coordinates and ordered queries; its guide separates passing
 CPU/scoped runtime checks from open performance and broader acceptance. The subsequent [residency owner](RUST-ENTITY-RESIDENCY.md) moves primary known
 UUIDs and chunk residency/admission into Rust with scoped verification.
-Gameplay callbacks, section visibility transitions, persistence I/O and the
-loading inbox remain Java. Root and typed section arrays now use the
+Gameplay callbacks, transition orchestration, persistence I/O and the
+loading inbox remain Java. Primary section visibility and combined spatial/member
+query admission now live in Rust; transition orchestration does not imply a
+Java primary visibility map. Root and typed section arrays now use the
 [native membership owner](RUST-ENTITY-SECTIONS.md). Tracking is also distinct from the
 [geometry owner](RUST-ENTITY-GEOMETRY.md) and
-[ticking membership](RUST-ENTITY-ORDER.md). None of these CPU views carries
+[ticking membership](RUST-ENTITY-ORDER.md). The later
+[result-collection owner](RUST-ENTITY-COLLECTION.md) covers stock non-spectator
+and screen-shake source selection. These subsequent-owner links describe the
+current `0d23141b` source boundary; the lookup review and recorded results below
+keep their original chronology. None of these CPU views carries
 native GPU handles; rendering resources remain owned by Rust/GAL.
 
 ## Compatibility boundaries
