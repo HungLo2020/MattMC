@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn retained_world_lease_reads_live_words_and_rejects_replacement_and_retirement() {
+    let owner = single();
+    let old = owner.world_lease().unwrap();
+    assert_eq!(old.get(&owner, 0), Some(71));
+    owner.write(0, 72).unwrap(); // Single to packed storage replaces the generation.
+    assert!(!old.valid(&owner));
+    let current = owner.world_lease().unwrap();
+    assert_eq!(current.get(&owner, 0), Some(72));
+    owner.write(1, 72).unwrap(); // An ordinary write stays visible through the same lease.
+    assert_eq!(current.get(&owner, 1), Some(72));
+    owner.invalidate();
+    assert_eq!(current.get(&owner, 1), None);
+    assert!(owner.world_lease().is_none());
+}
+
+#[test]
+fn saturated_generation_epoch_declines_leases_without_wrapping() {
+    let owner = single();
+    owner.generation_epoch.store(u64::MAX - 1, Ordering::Release);
+    let lease = owner.world_lease().unwrap();
+    owner.write(0, 72).unwrap();
+    assert!(!lease.valid(&owner));
+    assert!(owner.world_lease().is_none());
+}
+
+#[test]
 fn retired_world_binding_declines_but_copied_owner_and_old_reader_remain_live() {
     let owner = single();
     let copy = owner.copy();
@@ -202,10 +228,13 @@ fn concurrent_atomic_views_observe_only_admitted_values() {
 #[test]
 fn single_copies_share_network_palette_replacement_until_growth() {
     let owner = single();
+    let lease = owner.world_lease().unwrap();
     let copy = owner.copy();
     assert!(copy.read_single(2));
+    assert_eq!(lease.get(&owner, 0), Some(2));
     assert_eq!(owner.capture()[0], 2);
     assert_eq!(owner.write(0, 71).unwrap().0, 2);
+    assert_eq!(lease.get(&owner, 0), None);
     assert_eq!(owner.capture()[0], 71);
     assert_eq!(copy.capture()[0], 2);
     assert!(copy.read_single(3));

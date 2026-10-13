@@ -34,6 +34,12 @@ CPU verification and runtime limits remain scoped to the linked guides.
 
 ## Consumers and remaining work
 
+[Random tick selection](RUST-RANDOM-TICKS.md) reads primary atomic storage through
+strong generation leases. A saturating owner epoch changes on storage replacement;
+old leases decline and are rebound, while ordinary writes and zero-width aliases
+remain visible without rebuilding block arrays. The tick view holds no owner lock
+across behavior callbacks. Existing mutation exclusion still applies.
+
 Rebuild captures decode directly from the live owner in Rust. Under the owner
 lock, [`Generation::unpack`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/rust/world/level/chunk/live/mod.rs)
 reads each packed word once and snapshots the local palette once; global storage

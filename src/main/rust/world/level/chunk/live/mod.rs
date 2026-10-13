@@ -41,7 +41,17 @@ impl Generation {
             words: words.iter().map(|v| AtomicU64::new(*v)).collect(),
         }
     }
+    fn packed_index<const BITS: usize>(&self, index: usize) -> usize {
+        let per = 64 / BITS;
+        ((self.words[index / per].load(Ordering::Acquire) >> (index % per * BITS)) & ((1 << BITS) - 1)) as usize
+    }
     fn local(&self, index: usize) -> usize {
+        match self.bits {
+            4 => return self.packed_index::<4>(index), 5 => return self.packed_index::<5>(index),
+            6 => return self.packed_index::<6>(index), 7 => return self.packed_index::<7>(index),
+            8 => return self.packed_index::<8>(index), 15 => return self.packed_index::<15>(index),
+            _ => {}
+        }
         if self.bits == 0 {
             return 0;
         }
@@ -116,6 +126,7 @@ struct State {
 pub struct Owner {
     authoritative: AtomicBool,
     state: Mutex<State>,
+    generation_epoch: AtomicU64,
     limit: u32,
     global_bits: usize,
 }
@@ -221,7 +232,26 @@ impl StateReader<'_> {
         }
     }
 }
+/// Strong primary generation lease. Atomic words remain live; only storage
+/// replacement invalidates it. A saturated epoch declines forever to avoid ABA.
+pub(crate) struct WorldLease { generation: Arc<Generation>, epoch: u64 }
+impl WorldLease {
+    pub(crate) fn valid(&self, owner: &Owner) -> bool {
+        self.epoch != u64::MAX && owner.authoritative.load(Ordering::Acquire)
+            && owner.generation_epoch.load(Ordering::Acquire) == self.epoch
+    }
+    pub(crate) fn get(&self, owner: &Owner, index: usize) -> Option<u32> {
+        if !self.valid(owner) { return None; }
+        let value = self.generation.state(index);
+        self.valid(owner).then_some(value)
+    }
+}
 impl Owner {
+    pub(crate) fn world_lease(&self) -> Option<WorldLease> {
+        let guard = self.state.lock().unwrap();
+        let lease = WorldLease { generation: guard.generation.clone(), epoch: self.generation_epoch.load(Ordering::Acquire) };
+        lease.valid(self).then_some(lease)
+    }
     /// Retired owners may still back scoped readers, but must no longer serve
     /// current-world queries after their Java container replaces the binding.
     pub(crate) fn invalidate(&self) { self.authoritative.store(false, Ordering::Release); }
@@ -307,6 +337,7 @@ impl Owner {
         let generation = Arc::new(Generation::new(bits, requested, global, &entries, words));
         Some(Self {
             authoritative: AtomicBool::new(true),
+            generation_epoch: AtomicU64::new(0),
             state: Mutex::new(State { generation, ids, retired: Vec::new() }),
             limit,
             global_bits,
@@ -320,6 +351,7 @@ impl Owner {
         if g.bits == 0 {
             return Self {
                 authoritative: AtomicBool::new(true),
+                generation_epoch: AtomicU64::new(0),
                 state: Mutex::new(State {
                     generation: g.clone(),
                     ids: guard.ids.clone(),
@@ -335,6 +367,7 @@ impl Owner {
         let words: Vec<_> = g.words.iter().map(|v| v.load(Ordering::Acquire)).collect();
         Self {
             authoritative: AtomicBool::new(true),
+            generation_epoch: AtomicU64::new(0),
             state: Mutex::new(State {
                 generation: Arc::new(Generation::new(
                     g.bits,
@@ -398,7 +431,7 @@ impl Owner {
         Some((kind, bits, palette, words, counts.values()))
     }
     // One fused write, including palette admission, first-use growth and packed mutation.
-    pub(super) fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {
+    pub(crate) fn write(&self, index: usize, value: u32) -> Option<(u32, bool)> {
         if index >= ENTRIES || value >= self.limit {
             return None;
         }
@@ -468,6 +501,8 @@ impl Owner {
         ));
         next.set(index, id);
         let previous = std::mem::replace(&mut s.generation, next);
+        self.generation_epoch.fetch_update(Ordering::Release, Ordering::Relaxed,
+            |v| Some(v.saturating_add(1))).unwrap();
         s.retired.push(previous);
         s.ids = ids;
         Some((old, true))

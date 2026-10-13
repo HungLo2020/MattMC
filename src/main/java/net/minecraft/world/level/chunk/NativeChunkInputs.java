@@ -24,6 +24,12 @@ final class NativeChunkInputs {
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
     private static final VarHandle COUNTS = ValueLayout.JAVA_LONG.varHandle();
     private final MemorySegment owner;
+    private volatile NativeRandomTicks.ChunkView tickView;
+    NativeRandomTicks.ChunkView randomTickView(boolean refresh) {
+        var view = tickView;
+        if (refresh || view == null) tickView = view = NativeRandomTicks.ChunkView.create(this);
+        return view;
+    }
     // Compatibility identities for detecting container/section replacement.
     // The mutable state is exclusively in the Rust owners, not these bindings.
     private final NativeLiveBlockSection[] blocks;

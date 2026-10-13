@@ -116,8 +116,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	private final Thread thread;
 	private final boolean isDebug;
 	private int skyDarken;
-	protected int randValue = RandomSource.create().nextInt();
-	protected final int addend = 1013904223;
+	protected final net.minecraft.world.level.chunk.NativeRandomTicks randomTicks =
+		new net.minecraft.world.level.chunk.NativeRandomTicks(RandomSource.create().nextInt());
 	protected float oRainLevel;
 	protected float rainLevel;
 	protected float oThunderLevel;
@@ -984,8 +984,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	public abstract RecipeAccess recipeAccess();
 
 	public BlockPos getBlockRandomPos(int i, int j, int k, int l) {
-		this.randValue = this.randValue * 3 + 1013904223;
-		int m = this.randValue >> 2;
+		int m = this.randomTicks.nextBits();
 		return new BlockPos(i + (m & 15), j + (m >> 16 & l), k + (m >> 8 & 15));
 	}
 

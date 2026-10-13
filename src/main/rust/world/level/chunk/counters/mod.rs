@@ -75,6 +75,7 @@ pub(crate) struct Policy {
     fluid_ticks: bool,
 }
 impl Policy {
+    pub(crate) fn random_tick_callbacks(self) -> bool { self.ticking || self.fluid_ticks }
     fn incremental(self) -> [i32; 3] {
         [
             i32::from(!self.air),

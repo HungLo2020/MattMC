@@ -27,6 +27,13 @@ there is no second binding cache for the new
 these owners directly. Its scoped reader releases each section before switching
 owners or returning to a Java callback; retired palettes trigger re-admission.
 
+[Random tick selection](RUST-RANDOM-TICKS.md) also traverses this retained chunk
+owner. Its cached tick view leases primary generations and checks replacement
+epochs before reuse; it never copies block values. Read-only packet, light
+initialization and save consumers now use the section read-borrow API, allowing
+ordinary native traversal to retain structural authority. The mutable section
+array API still marks escape and preserves compatibility revalidation.
+
 ## Ownership and compatibility
 
 - Retain the authoritative mutable block and section-counter owners through

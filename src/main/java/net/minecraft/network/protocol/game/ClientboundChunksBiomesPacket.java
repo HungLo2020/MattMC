@@ -51,7 +51,7 @@ public record ClientboundChunksBiomesPacket(List<ClientboundChunksBiomesPacket.C
 		private static int calculateChunkSize(LevelChunk levelChunk) {
 			int i = 0;
 
-			for (LevelChunkSection levelChunkSection : levelChunk.getSections()) {
+			for (LevelChunkSection levelChunkSection : levelChunk.getSectionsForRead()) {
 				i += levelChunkSection.getBiomes().getSerializedSize();
 			}
 
@@ -69,7 +69,7 @@ public record ClientboundChunksBiomesPacket(List<ClientboundChunksBiomesPacket.C
 		}
 
 		public static void extractChunkData(FriendlyByteBuf friendlyByteBuf, LevelChunk levelChunk) {
-			for (LevelChunkSection levelChunkSection : levelChunk.getSections()) {
+			for (LevelChunkSection levelChunkSection : levelChunk.getSectionsForRead()) {
 				levelChunkSection.getBiomes().write(friendlyByteBuf);
 			}
 

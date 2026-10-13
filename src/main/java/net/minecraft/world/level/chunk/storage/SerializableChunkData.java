@@ -383,7 +383,7 @@ public record SerializableChunkData(
 		} else {
 			ChunkPos chunkPos = chunkAccess.getPos();
 			List<SerializableChunkData.SectionData> list = new ArrayList();
-			LevelChunkSection[] levelChunkSections = chunkAccess.getSections();
+			LevelChunkSection[] levelChunkSections = chunkAccess.getSectionsForRead();
 			LevelLightEngine levelLightEngine = serverLevel.getChunkSource().getLightEngine();
 
 			for (int i = levelLightEngine.getMinLightSection(); i < levelLightEngine.getMaxLightSection(); i++) {
