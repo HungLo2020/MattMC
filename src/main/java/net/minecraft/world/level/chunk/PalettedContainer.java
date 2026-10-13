@@ -74,7 +74,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 	private void materializeForMutation() {
 		var live = this.nativeBlocks;
-		if (live != null) { this.data = live.legacy(this.strategy); this.nativeBlocks = null; }
+		if (live != null) { this.data = live.legacy(this.strategy); live.invalidate(); this.nativeBlocks = null; }
 		var biomes = this.nativeBiomes;
 		if (biomes != null) { this.escapedBiomeSingleton = biomes.bits() == 0; var data = biomes.legacyForMutation(this.strategy); this.data = data; this.nativeBiomes = null; }
 	}
@@ -246,6 +246,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			: new SimpleBitStorage(configuration.bitsInMemory(), this.strategy.entryCount(), raw);
 		if (this.nativeBiomes != null) { this.nativeBiomes.invalidate(); this.nativeBiomes = null; }
 		this.data = new PalettedContainer.Data<>(configuration, bitStorage, configuration.createPalette(this.strategy, entries));
+		if (this.nativeBlocks != null) this.nativeBlocks.invalidate();
 		this.nativeBlocks = null;
 		this.adoptNative();
 	}
@@ -265,6 +266,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 	/** Canonical stage result already constructed and owned entirely in Rust. */
 	void installNativeGenerated(NativeLiveBlockSection live) {
+		if (this.nativeBlocks != null && this.nativeBlocks != live) this.nativeBlocks.invalidate();
 		this.nativeBlocks = live;
 		this.data = null;
 	}
@@ -418,6 +420,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			friendlyByteBuf.readFixedSizeLongArray(data.storage.getRaw());
 			if (this.nativeBiomes != null) { this.nativeBiomes.invalidate(); this.nativeBiomes = null; }
 			this.data = data;
+			if (this.nativeBlocks != null) this.nativeBlocks.invalidate();
 			this.nativeBlocks = null;
 			this.adoptNative();
 		} finally {

@@ -15,6 +15,17 @@ pub(super) struct RangeIndex {
     custom: usize,
 }
 impl RangeIndex {
+    /// Distinguish an absent coordinate from a custom binding whose getters
+    /// must run in Java. A ring slot may hold an unrelated, out-of-range chunk.
+    pub(super) fn lookup(&self, policy: &super::Residency, x: i32, z: i32) -> Option<Option<usize>> {
+        if !policy.in_range(x, z) { return Some(None); }
+        let index = policy.index(x, z);
+        match self.bindings[index] {
+            Binding::Vacant => Some(None),
+            Binding::Stock(cx, cz) => Some(((cx, cz) == (x, z)).then_some(index)),
+            Binding::Custom => None,
+        }
+    }
     pub(super) fn new(length: usize) -> Self {
         Self {
             bindings: vec![Binding::Vacant; length].into_boxed_slice(),

@@ -1,4 +1,15 @@
 use super::*;
+
+#[test]
+fn retired_world_binding_declines_but_copied_owner_and_old_reader_remain_live() {
+    let owner = single();
+    let copy = owner.copy();
+    let previous = owner.world_value(0).unwrap();
+    owner.invalidate();
+    assert_eq!(owner.world_value(0), None);
+    assert_eq!(copy.world_value(0), Some(previous));
+    assert_eq!(owner.with_state_reader(|r| r.get(0)), previous);
+}
 use crate::world::level::levelgen::noise_fill::section::Section;
 fn single() -> Owner {
     Owner::load(0, 0, &[71], &[], 31809, 15).unwrap()

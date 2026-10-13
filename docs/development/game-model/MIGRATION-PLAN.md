@@ -43,6 +43,12 @@ checkpoints have distinct release identities and workload results; follow their
 linked guides rather than carrying an earlier pass or failure forward. This
 documentation review inspects source and adds no runtime verification.
 
+The [camera immersion query](../rendering/RUST-CAMERA-ENVIRONMENT.md)
+extends retained client residency into direct environment queries. Its final-source
+Frozen behavior comparison, full suites and focused CPU/allocation benchmark pass.
+Two vanilla timing pairs and scoped image/lifecycle checks pass; broad gameplay,
+transient rendering and long-session memory acceptance remain open.
+
 Follow the owner boundary relevant to the next change:
 
 - **Packs, tags and synchronization:** [resource owners](../resources/index.md)

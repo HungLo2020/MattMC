@@ -21,6 +21,64 @@ public final class NativeClientResidency {
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle VIEW = handle("view", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle IDENTITY = handle("identity", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle CAMERA = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_client_residency_camera", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
+        ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_INT), Linker.Option.critical(false));
+    private static final ThreadLocal<MemorySegment> CAMERA_INPUT = ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(96, 8));
+
+    private record CameraTags(long generation, int mask) {}
+    private static volatile CameraTags cameraTags = new CameraTags(Long.MIN_VALUE, 0);
+    /** Binding generations invalidate the bounded tag projection on resource reload. */
+    public static int cameraFluidTags() {
+        long generation = net.minecraft.core.Holder.TAG_GENERATION.get();
+        var previous = cameraTags;
+        if (previous.generation == generation) return previous.mask;
+        int mask;
+        try { mask = cameraTags(net.minecraft.world.level.material.Fluids.EMPTY, 0)
+            | cameraTags(net.minecraft.world.level.material.Fluids.FLOWING_WATER, 1)
+            | cameraTags(net.minecraft.world.level.material.Fluids.WATER, 2)
+            | cameraTags(net.minecraft.world.level.material.Fluids.FLOWING_LAVA, 3)
+            | cameraTags(net.minecraft.world.level.material.Fluids.LAVA, 4); }
+        catch (IllegalStateException unbound) { return -1; } // Original query preserves lazy exception order.
+        if (net.minecraft.core.Holder.TAG_GENERATION.get() == generation) cameraTags = new CameraTags(generation, mask);
+        return mask;
+    }
+    private static int cameraTags(net.minecraft.world.level.material.Fluid fluid, int id) {
+        return (fluid.is(net.minecraft.tags.FluidTags.WATER) ? 1 << id : 0)
+            | (fluid.is(net.minecraft.tags.FluidTags.LAVA) ? 1 << (id + 5) : 0);
+    }
+    public int cameraEnvironment(int minY, int maxY, net.minecraft.world.phys.Vec3 position,
+        org.joml.Vector3f forward, org.joml.Vector3f left, org.joml.Vector3f up,
+        double halfHeight, double aspect, int tags) {
+        var input = CAMERA_INPUT.get();
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 0, position.x);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 1, position.y);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 2, position.z);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 3, (double)forward.x);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 4, (double)forward.y);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 5, (double)forward.z);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 6, (double)left.x);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 7, (double)left.y);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 8, (double)left.z);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 9, (double)up.x);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 10, (double)up.y);
+        input.setAtIndex(ValueLayout.JAVA_DOUBLE, 11, (double)up.z);
+        try { return (int)CAMERA.invokeExact(owner, minY, maxY, input, halfHeight, aspect, tags); }
+        catch (Throwable failure) { throw failure(failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
+
+    /** Republish after packet/container replacement, or retire on mutable array escape. */
+    public void refreshWorldInputs(LevelChunk chunk, int index, long id) {
+        if (!stockGeometry(chunk)) {
+            scan(null, index, id, 0, 0, 0, 0, 0, 3, MemorySegment.NULL);
+            return;
+        }
+        var sections = chunk.getSectionsForRead();
+        var inputs = chunk.hasEscapedSectionArray() ? null : inputs(chunk, sections);
+        var pos = chunk.getPos();
+        scan(inputs, index, id, pos.x, pos.z, 0, 0, 0, 3, MemorySegment.NULL);
+    }
     private static final MethodHandle CHANGE = handle("change", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle EMPTY = handle("empty", FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -188,7 +246,7 @@ public final class NativeClientResidency {
             && chunk.getLevel().getClass() == ClientLevel.class && chunk.levelHeightAccessor == chunk.getLevel();
     }
     @Nullable private static NativeChunkInputs inputs(LevelChunk chunk, LevelChunkSection[] sections) {
-        if (!stockGeometry(chunk) || chunk.getSectionsForRead() != sections) return null;
+        if (!stockGeometry(chunk) || chunk.hasEscapedSectionArray() || chunk.getSectionsForRead() != sections) return null;
         for (var section : sections) if (section == null || section.getClass() != LevelChunkSection.class) return null;
         return chunk.nativeDhSections();
     }

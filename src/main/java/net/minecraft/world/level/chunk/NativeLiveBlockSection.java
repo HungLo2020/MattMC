@@ -22,6 +22,7 @@ final class NativeLiveBlockSection {
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle INVALIDATE = handle("invalidate", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle COPY = handle("copy", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle VIEW = handle("view", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle VIEW_RELEASE = handle("view_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
@@ -80,6 +81,11 @@ final class NativeLiveBlockSection {
         return new int[] {id, fresh.bitsInStorage(), Block.BLOCK_STATE_REGISTRY.size(), strategy.getConfigurationForBitCount(32).bitsInMemory()};
     }
     MemorySegment stageOwner() { return this.owner; }
+    void invalidate() {
+        try { INVALIDATE.invokeExact(this.owner); }
+        catch (Throwable failure) { throw new IllegalStateException("Cannot retire native block binding", failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
     private static void release(MethodHandle handle, MemorySegment pointer) {
         try { handle.invokeExact(pointer); }
         catch (Throwable failure) { throw new IllegalStateException("Cannot release native live section", failure); }

@@ -2,7 +2,7 @@
 //! read views of a generation; only this owner changes words or palette policy.
 use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc, Mutex, Weak,
 };
 mod ffi;
@@ -114,6 +114,7 @@ struct State {
     retired: Vec<Arc<Generation>>,
 }
 pub struct Owner {
+    authoritative: AtomicBool,
     state: Mutex<State>,
     limit: u32,
     global_bits: usize,
@@ -187,6 +188,14 @@ impl StateReader<'_> {
     }
 }
 impl Owner {
+    /// Retired owners may still back scoped readers, but must no longer serve
+    /// current-world queries after their Java container replaces the binding.
+    pub(crate) fn invalidate(&self) { self.authoritative.store(false, Ordering::Release); }
+    pub(crate) fn world_value(&self, index: usize) -> Option<u32> {
+        if !self.authoritative.load(Ordering::Acquire) { return None; }
+        let value = self.with_state_reader(|reader| reader.get(index));
+        self.authoritative.load(Ordering::Acquire).then_some(value)
+    }
     pub(crate) fn read_stamp(&self) -> Option<ReadStamp> {
         let guard = self.state.lock().unwrap();
         let g = &guard.generation;
@@ -256,6 +265,7 @@ impl Owner {
         }
         let generation = Arc::new(Generation::new(bits, requested, global, &entries, words));
         Some(Self {
+            authoritative: AtomicBool::new(true),
             state: Mutex::new(State { generation, ids, retired: Vec::new() }),
             limit,
             global_bits,
@@ -268,6 +278,7 @@ impl Owner {
         // mutates that shared palette; copies share only this single generation.
         if g.bits == 0 {
             return Self {
+                authoritative: AtomicBool::new(true),
                 state: Mutex::new(State {
                     generation: g.clone(),
                     ids: guard.ids.clone(),
@@ -282,6 +293,7 @@ impl Owner {
             .collect();
         let words: Vec<_> = g.words.iter().map(|v| v.load(Ordering::Acquire)).collect();
         Self {
+            authoritative: AtomicBool::new(true),
             state: Mutex::new(State {
                 generation: Arc::new(Generation::new(
                     g.bits,

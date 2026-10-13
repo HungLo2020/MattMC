@@ -35,6 +35,10 @@ scans; it does not pack Java booleans or rebuild Rust section arrays.
   Native creation admits radii 0 through 127; unsupported radii retain the
   existing compatibility storage behavior. Moving the center alone does not
   evict old physical slots; radius changes still relocate them in Java order.
+- [Camera immersion](../../rendering/RUST-CAMERA-ENVIRONMENT.md) consumes
+  retained block owners through this same residency index. Palette replacement
+  and mutable section-array escape retire stale query bindings; current CPU
+  and runtime acceptance are recorded separately in that guide.
 - `getLoadedEmptySections()` transfers the exact fastutil table once, including
   zero, capacity, collisions and iteration order. Later public mutation remains
   authoritative in that compatibility set; native empty membership is retired.

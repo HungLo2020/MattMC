@@ -30,6 +30,48 @@ impl Source for NativeSource<'_> {
     }
 }
 pub(crate) struct World { view: View, state: Mutex<State> }
+
+/// Camera consumes already-retained chunk bindings, observing live palette and
+/// counter mutations. Custom/missing bindings decline instead of reading stale data.
+/// Input: position, forward, left, up (12 doubles); no pointer is retained.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_client_residency_camera(world: *const World,
+    min_y: i32, max_y: i32, input: *const f64, half_height: f64, aspect: f64,
+    tags: u32) -> i32 {
+    let Some(world) = world.as_ref() else { return -1; };
+    let Some(registry) = crate::content::block::installed() else { return -1; };
+    if input.is_null() || input as usize % 8 != 0 || min_y > max_y { return -1; }
+    let values = std::slice::from_raw_parts(input, 12);
+    let position = [values[0], values[1], values[2]];
+    let axes = std::array::from_fn(|i| [values[3+i*3], values[4+i*3], values[5+i*3]]);
+    let Some(air) = registry.air().map(|id| registry.block(id).default_state()) else { return -1; };
+    let state = world.state.lock().unwrap_or_else(|e| e.into_inner());
+    // Near-plane points commonly occupy the same cell. Reuse only within this
+    // callback-free query; no frame/tick cache can hide subsequent world edits.
+    let mut recent = [None; 2]; let mut cursor = 0;
+    let mut read = |[x, y, z]: [i32; 3]| {
+            for &(position, id) in recent.iter().flatten() {
+                if position == [x, y, z] { return Some(id); }
+            }
+            if y < min_y || y > max_y { return Some(air); }
+            let Some(index) = state.range.lookup(&state.policy, x >> 4, z >> 4)? else { return Some(air); };
+            let chunk = state.owners[index].as_ref()?;
+            let sections = Sections::Retained(chunk);
+            let relative = y.checked_sub(chunk.min_y)?;
+            if relative < 0 || relative as usize / 16 >= sections.len() { return Some(air); }
+            let row = relative as usize / 16;
+            if sections.counter(row)?.packed() as u16 == 0 { return Some(air); }
+            let id = sections.block(row).world_value(((y & 15) * 256 + (z & 15) * 16 + (x & 15)) as usize)?;
+            if id as usize >= registry.state_count() { return None; }
+            let id = crate::content::block::StateId(id as u16);
+            recent[cursor] = Some(([x, y, z], id)); cursor ^= 1;
+            Some(id)
+        };
+    use crate::world::level::camera_environment::{query, NONE};
+    let result = query(registry, position, &axes, half_height, aspect, tags, false, &mut read);
+    if result != Some(NONE) { return result.unwrap_or(-1); }
+    query(registry, position, &axes, half_height, aspect, tags, true, &mut read).unwrap_or(-1)
+}
 impl World {
     fn project(&self, state: &State) {
         self.view.count.store(state.policy.count, Ordering::Release);
@@ -130,7 +172,7 @@ pub unsafe extern "C" fn mattmc_client_residency_scan(world:*const World, owner:
     let mut state=world.state.lock().unwrap_or_else(|e|e.into_inner());
     if id!=0 && index>=0 && (index as usize)<state.owners.len() && state.policy.slots[index as usize]==id {
         let slot=&mut state.owners[index as usize];
-        if mode==3 || owner.is_null() {*slot=None;}
+        if owner.is_null() {*slot=None;}
         else if slot.as_ref().is_none_or(|old|!std::ptr::eq(Arc::as_ptr(old),owner)) {
             Arc::increment_strong_count(owner);*slot=Some(Arc::from_raw(owner));
         }

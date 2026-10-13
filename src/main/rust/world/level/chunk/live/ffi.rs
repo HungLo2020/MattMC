@@ -1,5 +1,10 @@
 use super::*;
 
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_section_invalidate(owner: *const Owner) {
+    if let Some(owner) = owner.as_ref() { owner.invalidate(); }
+}
+
 /// All spans must be aligned and live for the call. No input is retained.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_live_section_create(

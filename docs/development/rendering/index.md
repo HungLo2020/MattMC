@@ -34,6 +34,8 @@ each module there has a short README with its own file map.
   colors and generation-validated reuse, Java lifecycle events and bounded evidence.
 - [Rust fog policy](RUST-FOG-POLICY.md): candidate color/range policy, native
   water/rain histories and ordered callback boundaries.
+- [Rust camera immersion](RUST-CAMERA-ENVIRONMENT.md): direct retained-world
+  fluid queries, palette retirement and current verification limits.
 - [Native item-layer preparation](RUST-ITEM-LAYERS.md): authored CPU poses,
   direct GUI/world/hand consumption and lazy mutable-mesh allocation.
 - [Rust GUI item templates](RUST-GUI-ITEM-TEMPLATES.md): retained semantic

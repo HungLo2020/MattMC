@@ -28,34 +28,11 @@
 - Integrated upstream5f7b28a97 (DH sky light, saved contributor batches, fresh chunk slabs) preserving all19 entity-query paths; combined Rust2743/Java2068 pass. Earlier: f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
 - Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
 
-## Render-source storage checkpoint
+## Earlier DH checkpoints
 
-- Rust owns primary DH render points and lazy dense semantic planes; reducer/box consumers borrow those spans directly. Java retains contextual callbacks, sparse bindings and traversal.
-- Conversion failures close partially built owners; scoped views invalidate safely on close. Frozen packed-height edge behavior is preserved.
-- Final full suites pass Rust2728/3ignored and Java2046/2skip. Complete saved-world point/geometry oracles match Frozen and predecessor; all guards pass. Seven lifecycle and three settled pairs pass,VUID0;13 originals reviewed.
-- Interior boxes now pass one scoped CPU source owner; Rust resolves/validates four windows, removing Java span construction and repeated source-scope acquisition.
-- CPU build Current/predecessor/Frozen321.42/313.36/657.63ms. Current is51.1% faster Frozen but2.6% slower predecessor. Heap allocation37.6/315.4/156.2MB per24-source batch;88.1% lower predecessor, not a total-memory bound.
-- Retired unused Rust caches after checking no live references:36.45GiB reclaimed; lossless archival of19 completed historical audit JSONs saved2.14GiB. Controls, originals and failures retained.
-- Current DH attempt2 failed during startup:RSS13.25GiB,0 measured frames, DH still generating. Earlier measured DH run821FPS,p99 2.718ms,peak9.00GiB. Failure retained; continuation completed the missing measured pair with unchanged guard.
-- Sixteen completed6000-frame windows plus one failed startup retained. Current/Frozen FPS1322.30/1231.60,796.85/873.55,347.40/314.85,264.00/226.95. DH FPS misses8.8%; other FPS/all p99 floors pass. See SUMMARY/table guide.
-- Game-only JFR/NMT diagnostic completes9.52GiB, not a peak reproduction.6,858 allocation samples identify empty/mutable DH column wrappers and render views; allocation weights do not prove retention. Preserve failure and profile.
-
-## Conversion-reader checkpoint
-
-- Replaced ordinary per-column Java identity projection during render conversion with one scoped Rust column lease; custom/escaped inputs retain their public path. Production callbacks/arithmetic still Java.
-- Two new Rust and23 focused Java tests pass, including nested readers, source replacement/closure and no persistent Java bindings.
-- First24-saved-source hydration/read/close comparison: Current57.89ms, public-reader control56.24ms, Frozen44.04ms; exact point checksums and source/class/native/corpus guards pass. Java allocation7.14/33.85/4.21MB. CPU floor fails; original attempt retained.
-- Off-heap scalar result candidate56.59/57.20/46.14ms (Current/public/Frozen), heap7.14/33.85/4.21MB. CPU still22.6% slower Frozen;78.9% less Java allocation than control. Full Java/parity2049/2skip and51 Rust DH tests pass. Three settled pairs pass,VUID0;6 originals reviewed.
-- Removed direct-span experiment:55.84ms but15.00MB heap and broader invalidation machinery. Source hashes exactly match simpler candidate. Receipts/predecessor: build/native-dh-conversion-reader/. SUMMARY describes published a9286e05, not this candidate.
-- Ordinary paired gameplay failed: Current lost focus before travel; Frozen observer failed reflection before timing. Preserved both, added full error stacks; short Frozen diagnostic passes but does not reproduce/explain failure. No accepted new FPS. World unload/reload and resource reload pass with zero failures.
-
-## Conversion-policy checkpoint
-
-- 0a7d1f4af published the scoped reader; this batch migrates the actual top-down conversion loop into Rust. No Java loop fallback; contextual callbacks and semantic publication remain transitional Java.
-- Initial prototype matches896 Frozen color-only and896 preceding semantic output/callback/failure-prefix cases. Saved-geometry CPU174.70/38.61/33.12ms(candidate/preceding/Frozen) rejects its callback-heavy boundary; no performance acceptance or publication.
-- Native1fcb8c8c reads retained columns/writes render windows directly and derives intrinsic facts in Rust. Callback-frame reuse removes allocation churn. Final10 oracle runs pass896cases each; guarded CPU66.53/39.85/22.00ms(candidate/preceding/Frozen), heap63.39/48.45/42.93MB still FAIL. Java/parity2053/2skip,61 focused Rust tests and Wiki pass. No runtime acceptance. Guide: rendering/RUST-DH-CONVERSION.md.
-- Native561b048e: Rust policy/untinted-color reuse/reload invalidation/native overflow scratch. Full-source CPU50.29/63.57/64.69ms(Current/preceding/Frozen), heap5.85/34.23/29.85MB;22.3% faster Frozen, outputs/10oracles/guards pass. Rust2736/3ignored, Java2058/2skip pass. Seven lifecycle and3settled Frozen pairs pass,VUID0;13 originals/10 Current identities reviewed. No new FPS acceptance. Integrated test/parity/slow tiers pass1863/184/11,2skip; Wiki passes.
-- Retired3 older copied worlds/308773838bytes and the runtime harness retired10 new completed copies; originals, failures and receipts retained. Receipt: build/native-dh-conversion-policy/retention.json.
+- Published retained DH sources/codecs/conversion policy remove Java point reconstruction and callback-heavy conversion. Detailed results, failures and limits remain in rendering/RUST-DH-RENDER-SOURCE.md and RUST-DH-CONVERSION.md.
+- Final conversion policy CPU50.29/64.69ms Current/Frozen on24 saved sources; Java heap5.85/29.85MB. Rust2736/Java2058 pass; seven lifecycle/three settled pairs pass. These historical results do not verify later candidates.
+- Historical full gameplay matrix: Current/Frozen FPS1322.30/1231.60,796.85/873.55,347.40/314.85,264.00/226.95. DH FPS misses8.8%; other FPS/all p99 floors pass. Failed DH startup peaked13.25GiB RSS with no measured frames; retain that failure and profiles.
 
 ## Live biome query checkpoint
 
@@ -79,10 +56,21 @@
 - CPU4096queries,256 one-member sections: no-hit34.94/57.20/21.88ms and all-hit60.29/60.31/22.78ms Current/Java-traversal-control/Frozen. No-hit38.9% better control, all-hit equal; Frozen CPU gap stays open. Warmed Current Java allocation0. Initial all-hit regression/profile and subsequent candidates retained in build/native-world-entity-query/.
 - Four clean6000-frame vanilla windows give Current/Frozen medians1235.60/1206.95FPS,p993.606/3.487ms: FPS passes,p99 misses3.4%. Inputs/JVM controls match; live entity counts188/186 vs180/175. Two settled pairs/three lifecycles pass,VUID0; seven originals/five presenter/seven native identities reviewed. Hazy gate views prove structural behavior only. Retired nine copied worlds. Guide: world/entities/RUST-ENTITY-SECTION-INDEX.md#world-queries.
 
+## Camera environment checkpoint
+
+- Fresh paired vanilla JFRs at04cde9ff5 complete with guards; camera fluid checks account for248MB sampled allocation weight, not a rate or retained memory. Evidence: build/native-world-state-profile/paired/.
+- Rust now queries retained client block owners/counters and computes near-plane immersion. Java supplies pose/projection/tag semantics; no per-query cell arrays or copied block data. Palette replacement and mutable array escape retire old query bindings.
+- Pre-integration natived885e723 passes49152 actual Frozen camera/world cases and4 lazy/reset controls; native admission and source/class/native guards pass. Full Rust2750/3ignored and Java2080/2skip pass, including ten camera boundary tests. Final Java-source oracle/class/native guards pass; four vanilla6000-frame runs clean; two settled pairs/three lifecycles pass, VUID0.
+- CPU1048576queries:121.10/124.87ms Current/Frozen (3.0% less); Java heap0/319.29MB. Initial187.57ms candidate failed; tag/cell reuse, one native query and immutable projection inputs removed repeated work. Superseded two-call API removed; all attempts retained.
+- Vanilla Current/Frozen medians1298.60/1264.80FPS,p993.543/3.679ms; both scoped floors pass. Two pairs are not an isolated gain or all-mode acceptance. Inputs/JVM controls/source/native guards pass; seven originals/five presenter/seven native identities reviewed. Hazy lifecycle views prove structural behavior only. Nine completed copied worlds retired.
+- Separate30s gameplay JFR samples new camera/native path; no camera allocation samples after first-thread events excluded (not a zero-allocation proof). Profile timings excluded; originals retained.
+- Integrated upstreamde7d3572f, preserving scoped/batched release and stale-binding retirement. Combined native971d56d8 passes Rust2750/3ignored, Java2087/2skip, five harness checks and Frozen49152+4. Fresh CPU121.58/127.65ms (4.8% less), Java heap0/319.29MB; one fresh vanilla pair1273.0/1330.2FPS,p993.395/3.298ms misses4.3%/2.9%. No isolated gameplay gain; shader+DH world-reload passes,VUID0; integrated guards/original/presenter checks pass, three copied worlds retired.
+- Documentation: rendering/RUST-CAMERA-ENVIRONMENT.md; evidence: build/native-camera-environment/. No gameplay gain claimed. Hash-verified profile JSON compression reclaimed640429745bytes; two completed copied worlds retired, JFR originals retained.
+
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Next: profile current gameplay costs and move further world-query/motion/collision producers with their consumers. Typed query dispatch and entity simulation remain Java.
+- Next: migrate further world-query/motion/collision producers and consumers. Typed query dispatch and entity simulation remain Java.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.

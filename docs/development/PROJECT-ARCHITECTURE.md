@@ -196,6 +196,9 @@ fingerprints and empty membership, using retained counters for ordinary scans.
 The [range index](world/chunk-loading/RUST-CLIENT-RANGES.md) now selects loaded
 stock chunks for block-entity and moving-piston scans through bounded pages;
 mutations invalidate unread entries between callbacks.
+The [camera immersion query](rendering/RUST-CAMERA-ENVIRONMENT.md) reads
+retained block owners for water/lava/powder-snow queries and computes near-plane
+points in Rust. Palette replacement and mutable-array escape retire query bindings.
 Java retains atomic chunk references, reference-CAS facts, scalar ring/range reads,
 radius relocation and callback delivery. This is partial client-world ownership.
 

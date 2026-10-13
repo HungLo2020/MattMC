@@ -68,11 +68,25 @@ public class ClientChunkCache extends ChunkSource {
 		return this.nativeBiomes == null || this.readingBiomePacket ? null : this.nativeBiomes.biomeAtBlock(seed, x, y, z);
 	}
 
-	private void publishNativeBiomes(LevelChunk chunk) {
-		if (this.nativeBiomes == null || this.readingBiomePacket) return;
+	private void publishNativeWorldInputs(LevelChunk chunk) {
+		if (this.readingBiomePacket) return;
 		var storage = this.storage;
-		if (storage.getChunk(storage.getIndex(chunk.getPos().x, chunk.getPos().z)) != chunk) return;
-		this.nativeBiomes.replace(chunk);
+		int index = storage.getIndex(chunk.getPos().x, chunk.getPos().z);
+		if (storage.getChunk(index) != chunk) return;
+		if (storage.nativeResidency != null) storage.nativeResidency.refreshWorldInputs(chunk, index, storage.nativeResidency.identity(index));
+		if (this.nativeBiomes != null) this.nativeBiomes.replace(chunk);
+	}
+
+	/** Ordinary camera queries consume Rust's loaded block owners directly. */
+	public int nativeCameraEnvironment(net.minecraft.world.phys.Vec3 position,
+		org.joml.Vector3f forward, org.joml.Vector3f left, org.joml.Vector3f up,
+		double halfHeight, double aspect, int tags) {
+		if (getClass() != ClientChunkCache.class || this.level == null || this.level.getClass() != ClientLevel.class
+			|| this.level.isDebug() || this.readingBiomePacket || this.storage == null) return -1;
+		var residency = this.storage.nativeResidency;
+		if (residency == null) return -1;
+		return residency.cameraEnvironment(this.level.getMinY(), this.level.getMaxY(), position,
+			forward, left, up, halfHeight, aspect, tags);
 	}
 
 	public LevelLightEngine getLightEngine() {
@@ -157,7 +171,7 @@ public class ClientChunkCache extends ChunkSource {
 			} else {
 				this.readingBiomePacket = true;
 				try { levelChunk.replaceBiomes(friendlyByteBuf); }
-				finally { this.readingBiomePacket = false; this.publishNativeBiomes(levelChunk); }
+				finally { this.readingBiomePacket = false; this.publishNativeWorldInputs(levelChunk); }
 			}
 		}
 	}
@@ -175,18 +189,16 @@ public class ClientChunkCache extends ChunkSource {
 				levelChunk = new LevelChunk(this.level, chunkPos);
 				this.readingBiomePacket = true;
 				try { levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer); }
-				finally { this.readingBiomePacket = false; this.publishNativeBiomes(levelChunk); }
+				finally { this.readingBiomePacket = false; this.publishNativeWorldInputs(levelChunk); }
 				this.storage.replace(k, levelChunk);
-				this.publishNativeBiomes(levelChunk);
-				if (this.nativeBiomes != null) {
-					LevelChunk installed = levelChunk;
-					installed.setNativeSectionArrayEscapeListener(() -> this.publishNativeBiomes(installed));
-					for (var section : installed.getSectionsForRead()) section.setNativeBiomeListener(() -> this.publishNativeBiomes(installed));
-				}
+				this.publishNativeWorldInputs(levelChunk);
+				LevelChunk installed = levelChunk;
+				installed.setNativeSectionArrayEscapeListener(() -> this.publishNativeWorldInputs(installed));
+				for (var section : installed.getSectionsForRead()) section.setNativeBiomeListener(() -> this.publishNativeWorldInputs(installed));
 			} else {
 				this.readingBiomePacket = true;
 				try { levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer); }
-				finally { this.readingBiomePacket = false; this.publishNativeBiomes(levelChunk); }
+				finally { this.readingBiomePacket = false; this.publishNativeWorldInputs(levelChunk); }
 				this.storage.refreshEmptySections(levelChunk);
 			}
 
