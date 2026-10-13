@@ -17,6 +17,10 @@ final class NativeClassInstanceStorage<T> {
     private static final MethodHandle CREATE=handle("create",FunctionDescriptor.of(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE=handle("release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle VIEW=handle("view",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle VISIBILITY_VIEW=handle("visibility_view",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle VISIBILITY=handle("visibility",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle ATTACH_INDEX=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_attach_members",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle NEW_GROUP=handle("new_group",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
     private static final MethodHandle ALLOCATE=handle("allocate",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle FINISH=handle("finish_binding",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS,ValueLayout.JAVA_LONG));
@@ -38,14 +42,9 @@ final class NativeClassInstanceStorage<T> {
     }
     private static final java.lang.invoke.VarHandle REVISION=ValueLayout.JAVA_LONG.varHandle();
     private static long boundsRevision(){return (long)REVISION.getAcquire(BOUNDS_REVISION,0L);}
-    private static final class Matches {
-        final long[] rows=new long[130];
-        final MemorySegment output=MemorySegment.ofArray(rows);
-        boolean busy;
-    }
-    private static final ThreadLocal<Matches> MATCHES=ThreadLocal.withInitial(Matches::new);
+    private static final ThreadLocal<ClassInstanceMultiMap.QueryBatch> MATCHES=ThreadLocal.withInitial(ClassInstanceMultiMap.QueryBatch::new);
     private final Arena scope;
-    private final MemorySegment owner;
+    private final MemorySegment owner,visibility;
     private Object[] bindings=new Object[16];
     private long[] generations=new long[16];
     NativeClassInstanceStorage() {
@@ -53,11 +52,22 @@ final class NativeClassInstanceStorage<T> {
             MemorySegment pointer=(MemorySegment)CREATE.invokeExact();
             if(pointer.address()==0)throw new IllegalStateException("Cannot create section members");
             boolean attached=false;
-            try {scope=Arena.ofAuto();owner=pointer.reinterpret(1,scope,NativeClassInstanceStorage::release);attached=true;}
+            try {
+                scope=Arena.ofAuto();owner=pointer.reinterpret(1,scope,NativeClassInstanceStorage::release);attached=true;
+                visibility=((MemorySegment)VISIBILITY_VIEW.invokeExact(owner)).reinterpret(4,scope,null).asReadOnly();
+            }
             finally {if(!attached)release(pointer);}
         }catch(Throwable t){throw failure(t);}
     }
     private static void release(MemorySegment owner) {try{RELEASE.invokeExact(owner);}catch(Throwable t){throw failure(t);}}
+    int sectionVisibility(){return visibility.get(ValueLayout.JAVA_INT,0);}
+    int updateSectionVisibility(int value){
+        try{return (int)VISIBILITY.invokeExact(owner,value);}catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(this);}
+    }
+    void attachSectionIndex(MemorySegment index,long token){
+        try{if((int)ATTACH_INDEX.invokeExact(index,token,owner)!=0)throw new IllegalStateException("Cannot attach section membership");}
+        catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(this);}
+    }
     private static RuntimeException failure(Throwable t) {
         if(t instanceof RuntimeException r)return r;
         if(t instanceof Error e)throw e;
@@ -194,16 +204,21 @@ final class NativeClassInstanceStorage<T> {
                 return false;
             }
         }
-        AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> consumer) {
+        AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> abortableIterationConsumer) {
             // Preserve empty/null and custom callback failure timing.
             if(query==null) {
-                for(T value:this)if(bounds.test(value,query) && consumer.accept(value).shouldAbort())return AbortableIterationConsumer.Continuation.ABORT;
+                for(T value:this)if(bounds.test(value,query) && abortableIterationConsumer.accept(value).shouldAbort())return AbortableIterationConsumer.Continuation.ABORT;
                 return AbortableIterationConsumer.Continuation.CONTINUE;
             }
             if(isEmpty())return AbortableIterationConsumer.Continuation.CONTINUE;
-            var reusable=MATCHES.get();var matches=reusable.busy?new Matches():reusable;matches.busy=true;
-            int cursor=0,expected=modifications(),count=0,consumed=0,scannedUntil=0;
-            long revision=-1;
+            var reusable=MATCHES.get();var matches=reusable.busy?new ClassInstanceMultiMap.QueryBatch():reusable;matches.busy=true;
+            try{return forEachIntersecting(query,bounds,abortableIterationConsumer,matches,0,modifications());}
+            finally{matches.busy=false;}
+        }
+
+        AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> abortableIterationConsumer,ClassInstanceMultiMap.QueryBatch matches,int count,int expected) {
+            int cursor=0,consumed=0,scannedUntil=count==0?0:(int)matches.rows[1];
+            long revision=count==0?-1:matches.rows[0];
             try {
                 while(cursor!=size()) {
                     if(expected!=modifications())throw new ConcurrentModificationException();
@@ -218,13 +233,13 @@ final class NativeClassInstanceStorage<T> {
                     long next=matches.rows[2+consumed++];
                     int index=(int)(next>>>32)&Integer.MAX_VALUE;cursor=index+1;
                     T value=object(next);
-                    if((next<0 || bounds.test(value,query)) && consumer.accept(value).shouldAbort())return AbortableIterationConsumer.Continuation.ABORT;
+                    if((next<0 || bounds.test(value,query)) && abortableIterationConsumer.accept(value).shouldAbort())return AbortableIterationConsumer.Continuation.ABORT;
                     // Only skip a prefetched rejected tail if callbacks left it valid.
                     if(consumed==count && revision==boundsRevision() && expected==modifications())cursor=scannedUntil;
                 }
                 return AbortableIterationConsumer.Continuation.CONTINUE;
             }catch(Throwable t){throw NativeClassInstanceStorage.<RuntimeException>propagate(t);}
-            finally{matches.busy=false;Reference.reachabilityFence(NativeClassInstanceStorage.this);}
+            finally{Reference.reachabilityFence(NativeClassInstanceStorage.this);}
         }
 
         @Override public Iterator<T> iterator() {

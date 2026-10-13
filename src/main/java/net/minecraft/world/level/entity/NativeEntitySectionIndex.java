@@ -9,6 +9,9 @@ import java.util.PrimitiveIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.util.NativeLibraryLoader;
+import net.minecraft.util.ClassInstanceMultiMap;
+import net.minecraft.util.AbortableIterationConsumer;
+import net.minecraft.world.phys.AABB;
 
 /** Behavior bindings over Rust's primary section map and ordered spatial index. */
 final class NativeEntitySectionIndex<T extends EntityAccess> {
@@ -33,6 +36,8 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
     private static final MethodHandle SPATIAL_REOPEN=handle("spatial_reopen",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_VIEW=handle("cursor_view",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_NEXT=handle("cursor_next",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
+    private static final MethodHandle QUERY_NEXT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_query_next",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle CURSOR_CLOSE=handle("cursor_close",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_RELEASE=handle("cursor_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final Arena scope;
@@ -82,6 +87,7 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
             pending=(long)ALLOCATE.invokeExact(owner);int binding=(int)pending;
             if(binding>=bindings.length){int length=Math.max(binding+1,Math.multiplyExact(bindings.length,2));bindings=Arrays.copyOf(bindings,length);generations=Arrays.copyOf(generations,length);}
             bindings[binding]=section;generations[binding]=pending;
+            section.attachNativeIndex(owner,pending);
             check((int)INSERT.invokeExact(owner,key,slot,pending,change));
         } catch(Throwable t){throw NativeEntitySectionIndex.<RuntimeException>propagate(t);}
         finally {try{if(pending!=0)FINISH.invokeExact(owner,pending);}catch(Throwable t){throw failure(t);}finally{clearRetired();Reference.reachabilityFence(this);}}
@@ -112,20 +118,23 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
                 if((int)SPATIAL_REOPEN.invokeExact(idle.handle,bounds)!=0)throw new IllegalStateException("Cannot reopen section cursor");
                 idle.open=true;return idle;
             }
-            Cursor cursor=new Cursor((MemorySegment)SPATIAL_CURSOR.invokeExact(owner,bounds));cursor.pooled=true;return cursor;
+            Cursor cursor=new Cursor((MemorySegment)SPATIAL_CURSOR.invokeExact(owner,bounds),true);cursor.pooled=true;return cursor;
         }catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(this);}
     }
     private static IllegalArgumentException rangeFailure(long from,long to){return new IllegalArgumentException("Start element ("+from+") is larger than end element ("+to+")");}
     final class Cursor implements PrimitiveIterator.OfLong,AutoCloseable {
         private final Arena cursorScope;
         private final MemorySegment handle,view;
+        private final ClassInstanceMultiMap.QueryBatch matches;
         private boolean pooled,open=true;
-        Cursor(MemorySegment p) {
+        Cursor(MemorySegment p) { this(p,false); }
+        Cursor(MemorySegment p,boolean spatial) {
             boolean attached=false;
             try {
                 if(p.address()==0)throw new IllegalStateException("Cannot create section cursor");
                 cursorScope=Arena.ofAuto();handle=p.reinterpret(1,cursorScope,NativeEntitySectionIndex::releaseCursor);attached=true;
                 view=((MemorySegment)CURSOR_VIEW.invokeExact(handle)).reinterpret(32,cursorScope,null).asReadOnly();
+                matches=spatial?new ClassInstanceMultiMap.QueryBatch():null;
             }catch(Throwable t){throw failure(t);}finally{if(!attached && p.address()!=0)releaseCursor(p);}
         }
         @Override public boolean hasNext(){return view.get(ValueLayout.JAVA_INT,0)!=0;}
@@ -137,6 +146,26 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
                 if(status<0)throw new IllegalStateException("Section cursor status "+status);
                 return status==1;
             }catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(NativeEntitySectionIndex.this);}
+        }
+        boolean advanceQuery(boolean scanMembers) {
+            try {
+                int status=(int)QUERY_NEXT.invokeExact(handle,scanMembers?1:0,matches.output);
+                if(status==-2)throw rangeFailure(view.get(ValueLayout.JAVA_LONG,8),view.get(ValueLayout.JAVA_LONG,16));
+                if(status==-4)throw new java.util.ConcurrentModificationException();
+                if(status==-5)throw new NoSuchElementException();
+                if(status<0)throw new IllegalStateException("Section query status "+status);
+                matches.begin(status);
+                return status>0;
+            }catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(NativeEntitySectionIndex.this);}
+        }
+        AbortableIterationConsumer.Continuation consume(AABB query,AbortableIterationConsumer<T> consumer) {
+            EntitySection<T> section=section();
+            if(matches.count>0)return section.consumeNativeBatch(query,consumer,matches);
+            if(accessible(section))return section.getEntities(query,consumer);
+            return AbortableIterationConsumer.Continuation.CONTINUE;
+        }
+        boolean accessible(EntitySection<T> section) {
+            return matches.count!=-1 || (section!=null && !section.isEmpty() && section.getStatus().isAccessible());
         }
         long key(){return view.get(ValueLayout.JAVA_LONG,8);}
         EntitySection<T> section(){return object(view.get(ValueLayout.JAVA_LONG,24));}

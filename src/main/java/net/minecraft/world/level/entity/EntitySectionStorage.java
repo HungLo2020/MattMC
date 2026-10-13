@@ -28,9 +28,9 @@ public class EntitySectionStorage<T extends EntityAccess> {
 	public void forEachAccessibleNonEmptySection(AABB aABB, AbortableIterationConsumer<EntitySection<T>> abortableIterationConsumer) {
         try (var cursor=this.sections.spatialCursor(aABB.minX,aABB.minY,aABB.minZ,aABB.maxX,aABB.maxY,aABB.maxZ)) {
             while(cursor.hasNext()) {
-                if(!cursor.advance())break;
+                if(!cursor.advanceQuery(false))break;
                 EntitySection<T> entitySection=cursor.section();
-                if(entitySection!=null && !entitySection.isEmpty() && entitySection.getStatus().isAccessible()
+                if(cursor.accessible(entitySection)
                     && abortableIterationConsumer.accept(entitySection).shouldAbort())return;
             }
         }
@@ -67,7 +67,16 @@ public class EntitySectionStorage<T extends EntityAccess> {
     }
 
 	public void getEntities(AABB aABB, AbortableIterationConsumer<T> abortableIterationConsumer) {
-		this.forEachAccessibleNonEmptySection(aABB, entitySection -> entitySection.getEntities(aABB, abortableIterationConsumer));
+        // Subclasses may override the public section traversal.
+        if(getClass()!=EntitySectionStorage.class) {
+            this.forEachAccessibleNonEmptySection(aABB, section -> section.getEntities(aABB,abortableIterationConsumer));
+            return;
+        }
+        try(var cursor=this.sections.spatialCursor(aABB.minX,aABB.minY,aABB.minZ,aABB.maxX,aABB.maxY,aABB.maxZ)) {
+            while(cursor.hasNext() && cursor.advanceQuery(true)) {
+                if(cursor.consume(aABB,abortableIterationConsumer).shouldAbort())return;
+            }
+        }
 	}
 
 	public <U extends T> void getEntities(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer) {

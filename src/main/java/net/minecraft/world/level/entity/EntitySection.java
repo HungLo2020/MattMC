@@ -12,11 +12,10 @@ import org.slf4j.Logger;
 public class EntitySection<T extends EntityAccess> {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final ClassInstanceMultiMap<T> storage;
-	private Visibility chunkStatus;
 
 	public EntitySection(Class<T> class_, Visibility visibility) {
-		this.chunkStatus = visibility;
 		this.storage = new ClassInstanceMultiMap<>(class_);
+        this.storage.updateSectionVisibility(visibility == null ? -1 : visibility.ordinal());
 	}
 
 	public void add(T entityAccess) {
@@ -56,6 +55,15 @@ public class EntitySection<T extends EntityAccess> {
         return entityAccess.getBoundingBox().intersects(aABB);
     }
 
+    final void attachNativeIndex(java.lang.foreign.MemorySegment index,long token) {
+        // Overrides may change visibility, emptiness or query behavior.
+        if(getClass()==EntitySection.class)this.storage.attachSectionIndex(index,token);
+    }
+
+    final AbortableIterationConsumer.Continuation consumeNativeBatch(AABB query,AbortableIterationConsumer<T> consumer,ClassInstanceMultiMap.QueryBatch batch) {
+        return this.storage.forEachIntersecting(query,EntitySection::intersectsBounds,consumer,batch);
+    }
+
 	public boolean isEmpty() {
 		return this.storage.isEmpty();
 	}
@@ -65,14 +73,16 @@ public class EntitySection<T extends EntityAccess> {
 	}
 
 	public Visibility getStatus() {
-		return this.chunkStatus;
+        return visibility(this.storage.sectionVisibility());
 	}
 
 	public Visibility updateChunkStatus(Visibility visibility) {
-		Visibility visibility2 = this.chunkStatus;
-		this.chunkStatus = visibility;
-		return visibility2;
+        return visibility(this.storage.updateSectionVisibility(visibility == null ? -1 : visibility.ordinal()));
 	}
+
+    private static Visibility visibility(int value) {
+        return switch(value) { case 0 -> Visibility.HIDDEN; case 1 -> Visibility.TRACKED; case 2 -> Visibility.TICKING; default -> null; };
+    }
 
 	@VisibleForDebug
 	public int size() {

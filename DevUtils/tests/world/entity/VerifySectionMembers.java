@@ -109,6 +109,75 @@ public final class VerifySectionMembers {
     static String label(Object object) {
         return object==null ? "null" : object instanceof Member m ? "m"+m.id : object.toString();
     }
+    static void worldQueries(PrintWriter out) throws Exception {
+        for(int kind=0;kind<4;kind++) {
+            var storage=new EntitySectionStorage<Member>(Member.class,k->Visibility.TRACKED);
+            var section=storage.getOrCreateSection(0);
+            var member=new Member(0);section.add(member);
+            var sought=new Member(1);sought.equalResult=true;sought.equalHook=()->section.remove(member);
+            call(out,"world-failed-removal:"+kind,()->section.remove(sought));
+            int queryKind=kind;
+            call(out,"world-after-failed-removal:"+kind,()->{
+                var query=new AABB(0,0,0,1,1,1);
+                if(queryKind==0)storage.getEntities(query,e->AbortableIterationConsumer.Continuation.CONTINUE);
+                else if(queryKind==1)storage.getEntities(EntityTypeTest.forClass(Member.class),query,e->AbortableIterationConsumer.Continuation.CONTINUE);
+                else if(queryKind==2)storage.forEachAccessibleNonEmptySection(query,s->{events.add("section:"+s.size());return AbortableIterationConsumer.Continuation.CONTINUE;});
+                else {section.updateChunkStatus(Visibility.HIDDEN);storage.getEntities(query,e->AbortableIterationConsumer.Continuation.CONTINUE);}
+            });
+        }
+        for(int size:new int[]{1,3,129})for(int mode=0;mode<21;mode++)for(int kind=0;kind<4;kind++) {
+            try(var scope=java.lang.foreign.Arena.ofConfined()) {
+                var storage=new EntitySectionStorage<SpatialEntity>(SpatialEntity.class,k->Visibility.TRACKED);
+                long firstKey=net.minecraft.core.SectionPos.asLong(0,0,0),futureKey=net.minecraft.core.SectionPos.asLong(1,0,0);
+                var section=storage.getOrCreateSection(firstKey);
+                var future=storage.getOrCreateSection(futureKey);
+                var members=new ArrayList<SpatialEntity>();
+                AABB query=mode==19?null:new AABB(-1,-1,-1,33,2,2);
+                AABB inside=new AABB(0,0,0,1,1,1),outside=new AABB(0,8,0,1,9,1);
+                for(int i=0;i<size;i++){var e=spatial(i,scope);e.setBoundingBox(mode==0 || i%2==0?inside:outside);members.add(e);section.add(e);}
+                var later=spatial(size,scope);later.setBoundingBox(mode==2?outside:inside);
+                future.add(later);
+                if(mode==3)future.updateChunkStatus(Visibility.HIDDEN);
+                if(mode==9)storage.remove(futureKey);
+                if(mode==15)later.setBoundingBox(new AABB(0,8,0,1,9,1){
+                    @Override public boolean intersects(AABB other){events.add("custom-world-bounds");section.updateChunkStatus(Visibility.HIDDEN);return true;}
+                });
+                if(mode==16)later.setBoundingBox(null);
+                int action=mode,queryKind=kind;
+                AbortableIterationConsumer<SpatialEntity> consumer=e->{
+                    events.add("world-accept:"+e.ordinal);
+                    if(e.ordinal==0)switch(action) {
+                        case 1 -> {if(size>1)members.get(1).setBoundingBox(inside);}
+                        case 2 -> later.setBoundingBox(inside);
+                        case 3 -> future.updateChunkStatus(Visibility.TRACKED);
+                        case 4 -> future.updateChunkStatus(Visibility.HIDDEN);
+                        case 5 -> future.updateChunkStatus(null);
+                        case 6 -> storage.remove(futureKey);
+                        case 7 -> {storage.remove(firstKey);storage.getOrCreateSection(firstKey).add(later);}
+                        case 8 -> {storage.remove(futureKey);storage.getOrCreateSection(futureKey).add(later);}
+                        case 9 -> storage.getOrCreateSection(futureKey).add(later);
+                        case 10 -> storage.getEntities(query,nested->{events.add("world-nested:"+nested.ordinal);return AbortableIterationConsumer.Continuation.CONTINUE;});
+                        case 11 -> {return AbortableIterationConsumer.Continuation.ABORT;}
+                        case 12 -> throw new IllegalStateException("world query callback");
+                        case 13 -> section.remove(members.get(size-1));
+                        case 14 -> section.add(later);
+                        case 17 -> section.remove(e);
+                        default -> {}
+                    }
+                    return AbortableIterationConsumer.Continuation.CONTINUE;
+                };
+                EntityTypeTest<SpatialEntity,SpatialEntity> type=kind==1?EntityTypeTest.forClass(SpatialEntity.class):kind==2?EntityTypeTest.forExactClass(SpatialEntity.class):new EntityTypeTest<>() {
+                    public Class<SpatialEntity> getBaseClass(){return SpatialEntity.class;}
+                    public SpatialEntity tryCast(SpatialEntity e){events.add("world-cast:"+e.ordinal);if(action==18)e.setBoundingBox(inside);return e;}
+                };
+                call(out,"world:"+size+":"+mode+":"+kind,()->{
+                    if(queryKind==0)storage.getEntities(query,action==20?null:consumer);
+                    else storage.getEntities(type,query,action==20?null:consumer);
+                });
+                out.println("world-after:"+storage.count()+":"+section.size()+":"+section.getStatus()+":"+future.size()+":"+future.getStatus());
+            }
+        }
+    }
     static String labels(Collection<?> values) {
         var result=new ArrayList<String>();for(Object value:values)result.add(label(value));return result.toString();
     }
@@ -146,6 +215,7 @@ public final class VerifySectionMembers {
         var buffer=new StringWriter();
         try(var out=new PrintWriter(buffer)) {
             spatialQueries(out);
+            worldQueries(out);
             // Root and cached typed membership, duplicates, live immutable views and snapshots.
             var values=new ClassInstanceMultiMap<Member>(Member.class);
             var typed=values.find(Typed.class);var root=values.find(Member.class);
@@ -248,10 +318,11 @@ public final class VerifySectionMembers {
         }
         byte[] data=buffer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);Files.write(Path.of(args[0]),data);
         System.out.println("MEMBERS_CASES "+cases+" bytes="+data.length+" sha="+sha(data));
-        var classes=new ArrayList<>(List.of("net.minecraft.util.ClassInstanceMultiMap","net.minecraft.world.level.entity.EntitySection","net.minecraft.world.level.entity.EntityTypeTest","net.minecraft.world.entity.Entity"));
+        var classes=new ArrayList<>(List.of("net.minecraft.util.ClassInstanceMultiMap","net.minecraft.world.level.entity.EntitySection","net.minecraft.world.level.entity.EntitySectionStorage","net.minecraft.world.level.entity.EntityTypeTest","net.minecraft.world.entity.Entity"));
         classes.add(EntityTypeTest.forClass(Member.class).getClass().getName());
         classes.add(EntityTypeTest.forExactClass(Member.class).getClass().getName());
         if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.NativeClassInstanceStorage","net.minecraft.util.NativeClassInstanceStorage$Group","net.minecraft.util.NativeClassInstanceStorage$Group$1","net.minecraft.util.NativeClassInstanceStorage$Group$MemberSpliterator","net.minecraft.util.NativeClassInstanceStorage$Captured","net.minecraft.world.entity.NativeEntityGeometry","net.minecraft.world.entity.NativeEntityGeometry$Body"));
+        if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.ClassInstanceMultiMap$QueryBatch","net.minecraft.world.level.entity.NativeEntitySectionIndex","net.minecraft.world.level.entity.NativeEntitySectionIndex$Cursor"));
         for(String name:classes)try(var in=Class.forName(name).getResourceAsStream("/"+name.replace('.','/')+".class")){System.out.println("CLASS "+name+" "+sha(in.readAllBytes()));}
         if(args[1].equals("current")) {
             var nativePath=Path.of(System.getProperty("mattmc.rust.natives.dir"),"mattmc_rust-linux-x64.so").toRealPath();

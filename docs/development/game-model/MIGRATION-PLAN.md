@@ -91,15 +91,15 @@ Follow the owner boundary relevant to the next change:
   [section members and ordinary range scans](../world/entities/RUST-ENTITY-SECTIONS.md),
   the [coordinate index](../world/entities/RUST-ENTITY-SECTION-INDEX.md), and
   [residency/persistence admission](../world/entities/RUST-ENTITY-RESIDENCY.md).
-  The range-query owner joins retained members to primary geometry,
-  eliminating ordinary Java bounds scans. Full suites and the Frozen CPU oracle
-  pass, as do two image pairs and three lifecycle checks. Vanilla average FPS
-  misses Frozen by 1.5%, despite improved p99; small-section boundary cost and
-  the CPU gap remain open. Next join coordinate traversal, visibility and
-  member scanning into one world-query boundary, then move motion/collision
-  producers and consumers. Java still supplies API projections, behavior/type
-  callbacks, visibility transitions, persistence I/O, loading and simulation
-  orchestration. AI, synchronized data and networking remain migration work.
+  The [world-query owner](../world/entities/RUST-ENTITY-SECTION-INDEX.md#world-queries)
+  joins retained coordinates, primary visibility, members and geometry in Rust,
+  eliminating ordinary Java bounds scans and per-rejected-section crossings.
+  Full CPU suites and Frozen oracles pass, as do two image pairs and three
+  lifecycle checks. Latest vanilla FPS passes; p99 misses Frozen by 3.4%, and
+  the CPU gap remains open. Typed dispatch and motion/collision producers and
+  consumers remain further work. Java supplies API projections, behavior/type
+  callbacks, visibility-transition orchestration, persistence I/O, loading and
+  simulation orchestration. AI, synchronized data and networking remain migration work.
   Historical image/FPS results do not certify current broad gameplay, streaming,
   long-session memory, leash or HUD parity; see the linked subsystem reports.
 - **Rebuild preparation:** [immutable section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md),

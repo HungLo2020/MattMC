@@ -15,7 +15,7 @@
 - Rust owns DH conversion policy/temporary points/color reuse, materials/topology/packets, retained visibility, primary full/render points and dense metadata, and saved-point/metadata payload policy. Java retains compression, DTO/material/contributor orchestration and generation/retrieval scheduling.
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
 - Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index/range scans and manager residency serve production client/server consumers.
-- Java retains entity simulation, behavior callbacks, visibility transitions, persistence I/O and the loading inbox.
+- Java retains entity simulation, behavior callbacks, visibility-transition orchestration, persistence I/O and the loading inbox.
 - Rust owns numerical fog policy, water transitions and rain history. Java retains ordered getters, environment dispatch/hooks and final scalar projections.
 - Rust owns atlases/model baking, ordinary GUI item templates and the star-field producer. Java retains font/layout and remaining frame-input extraction/orchestration.
 - General simulation, networking and startup/platform remain Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
@@ -27,10 +27,6 @@
 - b6a0f89ca: primary Rust DH point codecs and lazy closed-source readers. Real24-DTO hydration improved29.4%; historical matrix still missed the DH FPS floor5.8%.
 - Integrated upstream5f7b28a97 (DH sky light, saved contributor batches, fresh chunk slabs) preserving all19 entity-query paths; combined Rust2743/Java2068 pass. Earlier: f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
 - Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
-
-## Earlier evidence
-
-- Historical metadata/IO results and retained failures: world/chunk/RUST-DH-METADATA-CODEC.md. Direct light-section inputs and their CPU/runtime results: world/lighting/RUST-LIGHT-SECTION-INPUTS.md and rendering/GAMEPLAY-PERFORMANCE.md. Those older binaries do not verify current sources.
 
 ## Render-source storage checkpoint
 
@@ -76,10 +72,17 @@
 - Two vanilla6000-frame pairs:1280.8/1326.8 and1357.1/1350.8FPS. Medians1318.95/1338.80FPS,p993.335/3.605ms Current/Frozen: FPS misses1.5%,p99 passes. Equal saved inputs/settings/heap/GC/JIT; slightly different live entity counts. No all-mode acceptance or isolated gameplay gain.
 - Two settled pairs/three lifecycles pass,VUID0; seven originals/five presenter identities reviewed. Hazy lifecycle views prove structural behavior only. Retired nine completed copied worlds; originals/failures retained. Guide: world/entities/RUST-ENTITY-SECTIONS.md; receipts: build/native-entity-range/.
 
+## Combined world-query checkpoint
+
+- Rust owns section visibility and joins untyped coordinate/member scans, skipping empty/hidden/nonmatching sections without a Java round trip. Retained dense slots and bounded first batches preserve callbacks, generations and lease lifetime; no new crate.
+- Nativea554bfbc passes full Rust2746/3ignored and Java2070/2skip, plus Frozen6663 membership/world and6721 index cases. Initial null-consumer text and failed-removal exception mismatches fixed; failures retained.
+- CPU4096queries,256 one-member sections: no-hit34.94/57.20/21.88ms and all-hit60.29/60.31/22.78ms Current/Java-traversal-control/Frozen. No-hit38.9% better control, all-hit equal; Frozen CPU gap stays open. Warmed Current Java allocation0. Initial all-hit regression/profile and subsequent candidates retained in build/native-world-entity-query/.
+- Four clean6000-frame vanilla windows give Current/Frozen medians1235.60/1206.95FPS,p993.606/3.487ms: FPS passes,p99 misses3.4%. Inputs/JVM controls match; live entity counts188/186 vs180/175. Two settled pairs/three lifecycles pass,VUID0; seven originals/five presenter/seven native identities reviewed. Hazy gate views prove structural behavior only. Retired nine copied worlds. Guide: world/entities/RUST-ENTITY-SECTION-INDEX.md#world-queries.
+
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Next entity step: join native coordinate traversal, visibility and member scans to amortize small-section boundary cost; preserve live callbacks and cursor lifetimes.
+- Next: profile current gameplay costs and move further world-query/motion/collision producers with their consumers. Typed query dispatch and entity simulation remain Java.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.

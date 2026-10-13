@@ -2,11 +2,11 @@
 //! No native lock spans a Java visibility, section or consumer callback.
 use super::{
     bindings::Bindings,
+    ffi::Context,
     section_map::{Bounds, SectionMap},
     section_tree::SectionTree,
 };
 use std::{
-    collections::HashMap,
     ffi::c_void,
     sync::{
         atomic::{AtomicI32, Ordering},
@@ -49,9 +49,12 @@ struct Cursor {
 struct Data {
     map: SectionMap,
     tree: SectionTree,
-    cursors: HashMap<u64, Cursor>,
-    next: u64,
+    // Slots stay reserved until lease release, including closed pooled leases.
+    cursors: Vec<Option<Cursor>>,
+    free_cursors: Vec<usize>,
     chunks: Vec<i64>,
+    // Binding slots are already dense and generational; no second key hash is needed.
+    members: Vec<Option<(u64, Arc<Context>)>>,
 }
 struct Index {
     data: Mutex<Data>,
@@ -60,8 +63,9 @@ struct Index {
 }
 struct Lease {
     owner: Arc<Index>,
-    id: u64,
+    id: usize,
     view: CursorView,
+    bounds: Option<[f64; 6]>,
 }
 fn encode(x: i32, y: i32, z: i32) -> i64 {
     (((x as u64) & 0x3fffff) << 42 | ((z as u64) & 0x3fffff) << 20 | ((y as u64) & 0xfffff)) as i64
@@ -78,7 +82,7 @@ impl Data {
         if !self.tree.needs_sweep() {
             return;
         }
-        let heads: Vec<_> = self.cursors.values().map(|c| c.head).collect();
+        let heads: Vec<_> = self.cursors.iter().flatten().map(|c| c.head).collect();
         self.tree.sweep(&heads);
     }
 }
@@ -100,9 +104,10 @@ pub extern "C" fn mattmc_section_index_create() -> *const c_void {
         data: Mutex::new(Data {
             map: SectionMap::default(),
             tree: SectionTree::default(),
-            cursors: HashMap::new(),
-            next: 0,
+            cursors: Vec::new(),
+            free_cursors: Vec::new(),
             chunks: Vec::new(),
+            members: Vec::new(),
         }),
         bindings: Bindings::default(),
         count: AtomicI32::new(0),
@@ -183,7 +188,27 @@ pub unsafe extern "C" fn mattmc_section_index_retired(owner: *const c_void) -> u
     owner
         .cast::<Index>()
         .as_ref()
-        .map_or(0, |o| o.bindings.retired())
+        .map_or(0, |o| {
+            let token = o.bindings.retired();
+            if token != 0 {
+                if let Some(slot) = o.data.lock().unwrap().members.get_mut(token as u32 as usize) {
+                    if slot.as_ref().is_some_and(|(generation, _)| *generation == token) { *slot = None; }
+                }
+            }
+            token
+        })
+}
+/// Retain the primary member/visibility owner, never a Java object or GPU handle.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_index_attach_members(owner: *const c_void, token: u64, members: *const c_void) -> i32 {
+    let Some(o) = owner.cast::<Index>().as_ref() else { return -1; };
+    if members.is_null() || token == 0 { return -1; }
+    let mut d = o.data.lock().unwrap();
+    let slot = token as u32 as usize;
+    if slot >= d.members.len() { d.members.resize_with(slot + 1, || None); }
+    Arc::increment_strong_count(members.cast::<Context>());
+    d.members[slot] = Some((token, Arc::from_raw(members.cast::<Context>())));
+    0
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_index_insert(
@@ -248,12 +273,11 @@ pub unsafe extern "C" fn mattmc_section_index_chunks(
     d.chunks.len() as i32
 }
 unsafe fn lease(owner: *const Index, d: &mut Data, cursor: Cursor, active: bool) -> *mut c_void {
-    d.next = d
-        .next
-        .checked_add(1)
-        .expect("section cursor identity exhausted");
-    let id = d.next;
-    d.cursors.insert(id, cursor);
+    let id = d.free_cursors.pop().unwrap_or_else(|| {
+        d.cursors.push(None);
+        d.cursors.len() - 1
+    });
+    d.cursors[id] = Some(cursor);
     Arc::increment_strong_count(owner);
     Box::into_raw(Box::new(Lease {
         owner: Arc::from_raw(owner),
@@ -262,6 +286,7 @@ unsafe fn lease(owner: *const Index, d: &mut Data, cursor: Cursor, active: bool)
             active: i32::from(active),
             ..Default::default()
         },
+        bounds: None,
     }))
     .cast()
 }
@@ -327,7 +352,9 @@ pub unsafe extern "C" fn mattmc_section_index_spatial_cursor(
     let c = spatial(&*bounds.cast::<[f64; 6]>());
     let active = c.spatial.is_some_and(|s| s.x <= s.max_x);
     let mut d = o.data.lock().unwrap();
-    lease(o, &mut d, c, active)
+    let pointer = lease(o, &mut d, c, active);
+    (*pointer.cast::<Lease>()).bounds = Some(*bounds.cast::<[f64; 6]>());
+    pointer
 }
 /// Reuses a closed cursor's lease for a new spatial search, so a hot query
 /// path allocates no lease (and Java no cleanup registration) per search.
@@ -343,19 +370,15 @@ pub unsafe extern "C" fn mattmc_section_index_spatial_reopen(cursor: *mut c_void
     let c = spatial(&*bounds.cast::<[f64; 6]>());
     let active = c.spatial.is_some_and(|s| s.x <= s.max_x);
     let mut d = l.owner.data.lock().unwrap();
-    if d.cursors.contains_key(&l.id) {
+    if d.cursors[l.id].is_some() {
         return -1;
     }
-    d.next = d
-        .next
-        .checked_add(1)
-        .expect("section cursor identity exhausted");
-    l.id = d.next;
-    d.cursors.insert(l.id, c);
+    d.cursors[l.id] = Some(c);
     l.view = CursorView {
         active: i32::from(active),
         ..Default::default()
     };
+    l.bounds = Some(*bounds.cast::<[f64; 6]>());
     0
 }
 #[no_mangle]
@@ -374,7 +397,44 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
         return 0;
     }
     let mut d = l.owner.data.lock().unwrap();
-    let Some(mut c) = d.cursors.get(&l.id).copied() else {
+    advance(&mut d, l.id, &mut l.view)
+}
+
+/// Advances through rejected sections within the same native call. Stops before
+/// every Java callback, leaving the original live cursor's next raw node intact.
+/// `scan_members` is only valid for untyped queries; typed casts may have effects.
+/// Returns 1..128 matches, 129=accessible section, 130=custom/null-status section,
+/// 0=end, -2=coordinate range error, -4=iterator mutation, -5=no next member.
+/// A match batch packs its iterator version in the high half of out[1].
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_index_query_next(cursor: *mut c_void, scan_members: i32, output: *mut u64) -> i32 {
+    let Some(l) = cursor.cast::<Lease>().as_mut() else { return -1; };
+    if output.is_null() || l.bounds.is_none() { return -1; }
+    let out = std::slice::from_raw_parts_mut(output, 130);
+    let mut d = l.owner.data.lock().unwrap();
+    loop {
+        let status = advance(&mut d, l.id, &mut l.view);
+        if status != 1 { return status; }
+        if l.view.token == 0 { continue; }
+        if let Some((_, context)) = d.members.get(l.view.token as u32 as usize)
+            .and_then(Option::as_ref).filter(|(token, _)| *token == l.view.token) {
+            if let Some((count, modifications)) = context.query(if scan_members != 0 { l.bounds } else { None }, out) {
+                if count == 0 { continue; }
+                if count == -2 { return -4; } // Iterator modification failure.
+                if count == -3 { return -5; } // Failed mutation left no next element.
+                if count < -1 { return -3; }
+                if count == -1 { return 129; }
+                out[1] |= u64::from(modifications as u32) << 32;
+                return count;
+            }
+        }
+        return 130;
+    }
+}
+
+fn advance(d: &mut Data, id: usize, view: &mut CursorView) -> i32 {
+    if view.active == 0 { return 0; }
+    let Some(mut c) = d.cursors[id] else {
         return -1;
     };
     if c.spatial.is_none() {
@@ -383,9 +443,9 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
         if c.head != 0 && d.tree.key(c.head) >= c.end {
             c.head = 0;
         }
-        l.view.key = key;
-        l.view.active = i32::from(c.head != 0);
-        d.cursors.insert(l.id, c);
+        view.key = key;
+        view.active = i32::from(c.head != 0);
+        d.cursors[id] = Some(c);
         d.sweep();
         return 1;
     }
@@ -395,10 +455,10 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
             let from = encode(s.x, 0, 0);
             c.end = encode(s.x, -1, -1).wrapping_add(1);
             if from > c.end {
-                l.view.active = 0;
-                l.view.key = from;
-                l.view.end = c.end;
-                d.cursors.remove(&l.id);
+                view.active = 0;
+                view.key = from;
+                view.end = c.end;
+                d.cursors[id] = None;
                 d.sweep();
                 return -2;
             }
@@ -407,8 +467,8 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
         }
         if c.head == 0 {
             if s.x == s.max_x {
-                l.view.active = 0;
-                d.cursors.remove(&l.id);
+                view.active = 0;
+                d.cursors[id] = None;
                 d.sweep();
                 return 0;
             }
@@ -427,9 +487,9 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
             // Leave the next raw node and unopened future x-ranges intact.
             // The Java consumer may mutate them before the next call.
             c.spatial = Some(s);
-            l.view.key = key;
-            l.view.token = d.map.get(key);
-            d.cursors.insert(l.id, c);
+            view.key = key;
+            view.token = d.map.get(key);
+            d.cursors[id] = Some(c);
             d.sweep();
             return 1;
         }
@@ -439,7 +499,7 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
 pub unsafe extern "C" fn mattmc_section_index_cursor_close(cursor: *mut c_void) {
     if let Some(l) = cursor.cast::<Lease>().as_mut() {
         let mut d = l.owner.data.lock().unwrap();
-        d.cursors.remove(&l.id);
+        d.cursors[l.id] = None;
         d.sweep();
         l.view.active = 0;
     }
@@ -448,13 +508,120 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_close(cursor: *mut c_void) 
 pub unsafe extern "C" fn mattmc_section_index_cursor_release(cursor: *mut c_void) {
     if !cursor.is_null() {
         mattmc_section_index_cursor_close(cursor);
-        drop(Box::from_raw(cursor.cast::<Lease>()));
+        let lease = Box::from_raw(cursor.cast::<Lease>());
+        lease.owner.data.lock().unwrap().free_cursors.push(lease.id);
+        drop(lease);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::ffi::{
+        mattmc_section_members_create, mattmc_section_members_release,
+        mattmc_section_members_allocate, mattmc_section_members_add,
+        mattmc_section_members_finish_binding, mattmc_section_members_visibility,
+        mattmc_section_members_attach_geometry,
+    };
+
+    #[test]
+    fn closed_cursor_reserves_its_slot_until_release_and_released_slots_are_bounded() {
+        unsafe {
+            let owner = mattmc_section_index_create();
+            insert(owner, encode(0, 0, 0));
+            let bounds = [0., 0., 0., 1., 1., 1.];
+            let first = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+            mattmc_section_index_cursor_close(first);
+            let second = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+            assert_ne!((*first.cast::<Lease>()).id, (*second.cast::<Lease>()).id);
+            assert_eq!(mattmc_section_index_spatial_reopen(first, bounds.as_ptr()), 0);
+            assert_eq!(mattmc_section_index_cursor_next(first), 1);
+            assert_eq!(mattmc_section_index_cursor_next(second), 1);
+            mattmc_section_index_cursor_release(first);
+            for _ in 0..10_000 {
+                let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+                assert_eq!(mattmc_section_index_cursor_next(cursor), 1);
+                mattmc_section_index_cursor_release(cursor);
+            }
+            assert_eq!((*owner.cast::<Index>()).data.lock().unwrap().cursors.len(), 2);
+            assert_eq!(mattmc_section_index_cursor_next(second), 0);
+            mattmc_section_index_cursor_release(second);
+            mattmc_section_index_release(owner);
+        }
+    }
+
+    #[test]
+    fn query_retains_members_until_index_retirement_and_preserves_null_visibility() {
+        unsafe {
+            let owner = mattmc_section_index_create();
+            insert(owner, encode(0, 0, 0));
+            let token = mattmc_section_index_get(owner, encode(0, 0, 0));
+            let members = mattmc_section_members_create();
+            let weak = {
+                Arc::increment_strong_count(members.cast::<Context>());
+                Arc::downgrade(&Arc::from_raw(members.cast::<Context>()))
+            };
+            assert_eq!(mattmc_section_index_attach_members(owner, token, members), 0);
+            let member = mattmc_section_members_allocate(members);
+            assert_eq!(mattmc_section_members_add(members, 0, member, std::ptr::null_mut()), 0);
+            mattmc_section_members_finish_binding(members, member);
+            let bounds = [0., 0., 0., 1., 1., 1.];
+            let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+            let mut out = [0; 130];
+            assert_eq!(mattmc_section_index_query_next(cursor, 1, out.as_mut_ptr()), 130); // Null yields for Java's NPE.
+            mattmc_section_index_cursor_close(cursor);
+            assert_eq!(mattmc_section_members_visibility(members, 1), -1);
+            mattmc_section_members_release(members);
+            assert!(weak.upgrade().is_some());
+            assert_eq!(mattmc_section_index_spatial_reopen(cursor, bounds.as_ptr()), 0);
+            assert_eq!(mattmc_section_index_query_next(cursor, 1, out.as_mut_ptr()), 1);
+            assert_eq!(out[1] >> 32, 1); // Member iterator version is part of the same batch.
+            assert_eq!(out[2] as u32, member as u32); // Unknown bounds yield a behavior binding.
+            let mut change = Change::default();
+            assert_eq!(mattmc_section_index_remove(owner, encode(0, 0, 0), &mut change), 0);
+            assert_eq!(mattmc_section_index_retired(owner), token);
+            assert!(weak.upgrade().is_none());
+            mattmc_section_index_cursor_release(cursor);
+            mattmc_section_index_release(owner);
+        }
+    }
+
+    #[test]
+    fn query_skips_stock_misses_but_opens_future_columns_only_after_match_consumption() {
+        use crate::world::level::entity_geometry::*;
+        unsafe {
+            let owner = mattmc_section_index_create();
+            let world = mattmc_entity_geometry_world_create();
+            let body = mattmc_entity_geometry_create(world, 0., 0., 0., 0., 8., 0., 1., 9., 1.);
+            let members = mattmc_section_members_create();
+            let member = mattmc_section_members_allocate(members);
+            mattmc_section_members_attach_geometry(members, member, body);
+            assert_eq!(mattmc_section_members_add(members, 0, member, std::ptr::null_mut()), 0);
+            mattmc_section_members_finish_binding(members, member);
+            mattmc_section_members_visibility(members, 1);
+            insert(owner, encode(0, 0, 0));
+            let token = mattmc_section_index_get(owner, encode(0, 0, 0));
+            mattmc_section_index_attach_members(owner, token, members);
+            let bounds = [0., 0., 0., 33., 2., 2.];
+            let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+            let mut out = [0; 130];
+            assert_eq!(mattmc_section_index_query_next(cursor, 1, out.as_mut_ptr()), 0);
+            mattmc_section_index_cursor_close(cursor);
+            mattmc_entity_geometry_change(body, 1, 0., 0., 0., 1., 1., 1.);
+            mattmc_section_index_spatial_reopen(cursor, bounds.as_ptr());
+            assert_eq!(mattmc_section_index_query_next(cursor, 1, out.as_mut_ptr()), 1);
+            assert_eq!(out[2] >> 63, 1);
+            insert(owner, encode(1, 0, 0)); // Simulate a callback populating a future column.
+            assert_eq!(mattmc_section_index_query_next(cursor, 1, out.as_mut_ptr()), 130);
+            assert_eq!((*cursor.cast::<Lease>()).view.key, encode(1, 0, 0));
+            assert_eq!(mattmc_section_index_query_next(cursor, 1, out.as_mut_ptr()), 0);
+            mattmc_section_index_cursor_release(cursor);
+            mattmc_section_members_release(members);
+            mattmc_section_index_release(owner);
+            mattmc_entity_geometry_release(body);
+            mattmc_entity_geometry_world_release(world);
+        }
+    }
     unsafe fn insert(owner: *const c_void, key: i64) {
         let mut change = Change::default();
         assert_eq!(mattmc_section_index_find(owner, key, &mut change), 0);
@@ -508,7 +675,7 @@ mod tests {
                 assert_eq!((*cursor.cast::<Lease>()).view.key, encode(0, 0, 0));
                 mattmc_section_index_cursor_close(cursor);
             }
-            assert!((*owner.cast::<Index>()).data.lock().unwrap().cursors.is_empty());
+            assert!((*owner.cast::<Index>()).data.lock().unwrap().cursors.iter().all(Option::is_none));
             mattmc_section_index_cursor_release(cursor);
             mattmc_section_index_release(owner);
         }

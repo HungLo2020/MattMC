@@ -7,8 +7,8 @@ object bindings, and custom equality/type/bounds/consumer callbacks.
 Ordinary untyped and stock `forClass` range queries now scan retained primary
 geometry in Rust. The subsequent [coordinate/index slice](RUST-ENTITY-SECTION-INDEX.md) owns production keys and coordinate
 queries with scoped verification and open performance limits. The subsequent [residency slice](RUST-ENTITY-RESIDENCY.md) has scoped verification.
-Section visibility transitions, behavior callbacks and persistence I/O remain
-Java and are subsequent migration work.
+Rust also owns each section's visibility value. Java still requests transitions,
+dispatches behavior callbacks and performs persistence I/O.
 
 Implementation: [native member owner](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/entity_sections),
 [Java behavior bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/util/NativeClassInstanceStorage.java),
@@ -90,11 +90,11 @@ views are heavily hazy and establish structural evidence only; they do not
 close transient terrain defects or long-session memory bounds. Nine completed
 copied worlds were retired, preserving original images, observations and failures.
 
-Next join the retained coordinate index, section visibility and member scan
-into one world-query boundary so small sections share a native call. Preserve
-live cursor/mutation semantics; do not restore a Java bounds scan by section size.
-Receipts: `build/native-entity-range/`. Add `--benchmark` to the oracle command
-below to repeat the CPU comparison.
+Enclosing world queries now join retained coordinate traversal, visibility and
+root-member scans in Rust. See the [world-query owner and current measurements](RUST-ENTITY-SECTION-INDEX.md#world-queries).
+The table above remains historical member-query evidence. Receipts:
+`build/native-entity-range/`; add `--benchmark` to the command below to repeat
+that member-query workload.
 
 ## Verification
 

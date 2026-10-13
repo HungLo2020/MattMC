@@ -5,14 +5,15 @@ use super::{
 };
 use std::{
     ffi::c_void,
-    sync::{Arc, Mutex},
+    sync::{atomic::{AtomicI32, Ordering}, Arc, Mutex},
 };
-struct Context {
+pub(super) struct Context {
     bindings: Arc<Bindings>,
     groups: Mutex<Vec<Box<Members>>>,
+    visibility: AtomicI32,
 }
 #[repr(C)]
-struct Change {
+pub(super) struct Change {
     source: i32,
     destination: i32,
     length: i32,
@@ -26,20 +27,29 @@ struct Capture {
     size: i32,
 }
 #[no_mangle]
-pub extern "C" fn mattmc_section_members_create() -> *mut c_void {
+pub extern "C" fn mattmc_section_members_create() -> *const c_void {
     let bindings = Arc::new(Bindings::default());
     let root = Box::new(Members::with_bindings(bindings.clone()));
-    Box::into_raw(Box::new(Context {
+    Arc::into_raw(Arc::new(Context {
         bindings,
         groups: Mutex::new(vec![root]),
+        visibility: AtomicI32::new(-1),
     }))
     .cast()
 }
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_section_members_release(owner: *mut c_void) {
+pub unsafe extern "C" fn mattmc_section_members_release(owner: *const c_void) {
     if !owner.is_null() {
-        drop(Box::from_raw(owner.cast::<Context>()));
+        drop(Arc::from_raw(owner.cast::<Context>()));
     }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_members_visibility_view(owner: *const c_void) -> *const AtomicI32 {
+    owner.cast::<Context>().as_ref().map_or(std::ptr::null(), |c| &c.visibility)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_members_visibility(owner: *const c_void, value: i32) -> i32 {
+    owner.cast::<Context>().as_ref().map_or(-1, |c| c.visibility.swap(value, Ordering::AcqRel))
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_members_view(
@@ -212,7 +222,7 @@ pub unsafe extern "C" fn mattmc_section_members_attach_geometry(
 /// prefetched matches. Never hold either owner lock across behavior calls.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_members_intersections(
-    owner: *const c_void, group: i32, mut cursor: i32, expected: i32,
+    owner: *const c_void, group: i32, cursor: i32, expected: i32,
     a: f64, b: f64, c: f64, d: f64, e: f64, f: f64,
     output: *mut u64, capacity: i32,
 ) -> i32 {
@@ -221,6 +231,28 @@ pub unsafe extern "C" fn mattmc_section_members_intersections(
     let out = std::slice::from_raw_parts_mut(output, capacity as usize + 2);
     let groups = context.groups.lock().unwrap();
     let Some(m) = groups.get(group as usize) else { return -4; };
+    scan(context, m, cursor, expected, [a,b,c,d,e,f], out)
+}
+
+/// None yields for Java status/custom-section behavior; zero skips this section.
+/// A positive result is the first root-member batch and its iterator version.
+impl Context {
+    pub(super) fn query(&self, bounds: Option<[f64; 6]>, out: &mut [u64]) -> Option<(i32, i32)> {
+        let groups = self.groups.lock().unwrap();
+        let m = &groups[0];
+        if m.size() == 0 { return Some((0, 0)); }
+        match self.visibility.load(Ordering::Acquire) {
+            0 => Some((0, 0)),
+            1 | 2 => match bounds {
+                Some(bounds) => Some((scan(self, m, 0, m.modifications(), bounds, out), m.modifications())),
+                None => Some((-1, 0)), // Accessible, but this traversal must not inspect entity bounds.
+            },
+            _ => None, // Preserve a null visibility's Java failure after the empty check.
+        }
+    }
+}
+
+fn scan(context: &Context, m: &Members, mut cursor: i32, expected: i32, bounds: [f64; 6], out: &mut [u64]) -> i32 {
     let geometry = context.bindings.geometry();
     out[0] = super::super::entity_geometry::bounds_revision();
     let mut count = 0;
@@ -230,7 +262,7 @@ pub unsafe extern "C" fn mattmc_section_members_intersections(
         if expected != m.modifications() { return -2; }
         if cursor < 0 || cursor >= m.size() { return -3; }
         let Some(token) = m.get(cursor as usize) else { return -2; };
-        let found = geometry.intersects(token, [a,b,c,d,e,f]);
+        let found = geometry.intersects(token, bounds);
         if found != Some(false) {
             // Membership retains this binding until mutation. Java checks the
             // modification count before consuming any cached slot.
@@ -239,7 +271,7 @@ pub unsafe extern "C" fn mattmc_section_members_intersections(
             count += 1;
         }
         cursor += 1;
-        if count == capacity as usize { break; }
+        if count == out.len() - 2 { break; }
     }
     out[1] = cursor as u64;
     count as i32

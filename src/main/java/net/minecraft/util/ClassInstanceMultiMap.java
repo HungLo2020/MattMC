@@ -14,6 +14,17 @@ import net.minecraft.world.entity.NativeEntityGeometry;
 import net.minecraft.world.phys.AABB;
 
 public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
+    /** Reusable bounded CPU output for the enclosing native section cursor. No entity references. */
+    public static final class QueryBatch {
+        final long[] rows = new long[130];
+        public final java.lang.foreign.MemorySegment output = java.lang.foreign.MemorySegment.ofArray(rows);
+        public int count, expected;
+        boolean busy;
+        public void begin(int result) {
+            count=result==129?-2:result==130?-1:result;
+            if(count>0)expected=(int)(rows[1]>>>32);
+        }
+    }
 	// Class bindings preserve Java class identity/iteration; native groups own members.
 	private final NativeClassInstanceStorage<T> nativeStorage = new NativeClassInstanceStorage<>();
 	private final Map<Class<?>, NativeClassInstanceStorage<T>.Group> byClass = Maps.newHashMap();
@@ -78,6 +89,15 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
     public AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> consumer) {
         return this.allInstances.forEachIntersecting(query,bounds,consumer);
     }
+
+    /** Consumes the first batch already scanned by the native section index. */
+    public AbortableIterationConsumer.Continuation forEachIntersecting(AABB query,BiPredicate<? super T,AABB> bounds,AbortableIterationConsumer<? super T> consumer,QueryBatch batch) {
+        return this.allInstances.forEachIntersecting(query,bounds,consumer,batch,batch.count,batch.expected);
+    }
+
+    public int sectionVisibility() { return this.nativeStorage.sectionVisibility(); }
+    public int updateSectionVisibility(int value) { return this.nativeStorage.updateSectionVisibility(value); }
+    public void attachSectionIndex(java.lang.foreign.MemorySegment index,long token) { this.nativeStorage.attachSectionIndex(index,token); }
 
     @SuppressWarnings({"unchecked","rawtypes"})
     public <S> AbortableIterationConsumer.Continuation forEachIntersecting(Class<S> type,AABB query,BiPredicate<? super S,AABB> bounds,AbortableIterationConsumer<? super S> consumer) {

@@ -58,4 +58,26 @@ class EntitySectionStorageNativeTest {
         section.add(mock(EntityAccess.class));
         assertThrows(NullPointerException.class,()->storage.forEachAccessibleNonEmptySection(new AABB(0,0,0,1,1,1),s->AbortableIterationConsumer.Continuation.CONTINUE));
     }
+    @Test void rangeQueriesPreserveOverriddenSectionTraversal() {
+        var calls=new ArrayList<String>();
+        var storage=new EntitySectionStorage<EntityAccess>(EntityAccess.class,chunk->Visibility.TRACKED) {
+            @Override public void forEachAccessibleNonEmptySection(AABB box,AbortableIterationConsumer<EntitySection<EntityAccess>> consumer) {
+                calls.add("override");
+            }
+        };
+        storage.getEntities(new AABB(0,0,0,1,1,1),entity->{fail("Override supplies no entities");return AbortableIterationConsumer.Continuation.CONTINUE;});
+        assertEquals(java.util.List.of("override"),calls);
+    }
+    @Test void retainedSectionVisibilityChangesAfterRemovalRemainLocalToThatSection() {
+        var storage=new EntitySectionStorage<EntityAccess>(EntityAccess.class,chunk->Visibility.TRACKED);
+        var first=storage.getOrCreateSection(0);
+        assertEquals(Visibility.TRACKED,first.updateChunkStatus(Visibility.HIDDEN));
+        storage.remove(0);
+        var replacement=storage.getOrCreateSection(0);
+        assertEquals(Visibility.HIDDEN,first.updateChunkStatus(null));
+        assertNull(first.getStatus());
+        assertEquals(Visibility.TRACKED,replacement.getStatus());
+        assertNull(first.updateChunkStatus(Visibility.TICKING));
+        assertEquals(Visibility.TICKING,first.getStatus());
+    }
 }

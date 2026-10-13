@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--world-benchmark", action="store_true", help="Measure 4096 enclosing world queries per sample; implies --benchmark")
     parser.add_argument("--java-scan-control-ref", default="49e26cd8a7c31b6500a20ab39fa2aad8eef14d04", help="Published Java scan source used by --benchmark; remaining classes/native image stay current")
     args = parser.parse_args()
     if not args.java_home:
@@ -114,7 +115,7 @@ def main():
                             if (Path(base) / resource).is_file())
                 assert path.is_relative_to(repo) and sha(path) == digest
                 checked[str(path)] = digest
-            assert len(checked) == (13 if side == 'current' else 6)
+            assert len(checked) == (17 if side == 'current' else 7)
             images[side] = checked
             if side == 'current':
                 assert 'NATIVE_IMAGE ' + pins['native'] + ' ' + str(native) in data
@@ -130,7 +131,7 @@ def main():
                       fixture_sha256=sha(output / 'frozen-members.txt'),
                       driver_classes={str(p.relative_to(output / 'oracle')): sha(p)
                                       for p in (output / 'oracle').rglob('*.class')})
-        if args.benchmark:
+        if args.benchmark or args.world_benchmark:
             # Compile the published Java scan into an isolated classpath overlay.
             # Everything else (including native library) is the candidate image;
             # this is a consumer control, not a historical whole-game binary.
@@ -138,7 +139,8 @@ def main():
             control.mkdir()
             control_sources=[]
             for name in ('net/minecraft/util/ClassInstanceMultiMap.java','net/minecraft/util/NativeClassInstanceStorage.java',
-                         'net/minecraft/world/level/entity/EntitySection.java','net/minecraft/world/level/entity/EntityTypeTest.java'):
+                         'net/minecraft/world/level/entity/EntitySection.java','net/minecraft/world/level/entity/EntityTypeTest.java',
+                         'net/minecraft/world/level/entity/EntitySectionStorage.java','net/minecraft/world/level/entity/NativeEntitySectionIndex.java'):
                 target=output / 'control-source' / name
                 target.parent.mkdir(parents=True,exist_ok=True)
                 target.write_bytes(subprocess.check_output(['git','show',args.java_scan_control_ref+':src/main/java/'+name],cwd=ROOT))
@@ -159,6 +161,7 @@ def main():
                 command=[str(jdk / 'java'),'-Xms1g','-Xmx1g','-XX:+UseG1GC']
                 if side!='frozen':command+=['--enable-native-access=ALL-UNNAMED','-Dmattmc.rust.natives.dir='+str(native.parent)]
                 command+=['-cp',str(output / 'oracle' / side)+os.pathsep+classpaths[side],'BenchmarkSectionQueries']
+                if args.world_benchmark:command+=['world']
                 data=run(command,f'benchmark-{index}-{side}.log')
                 lines=[line.split('[STDOUT]: ',1)[-1] for line in data.splitlines()]
                 rows=[list(map(int,line.split()[1:])) for line in lines if line.startswith('SECTION_TIMING ')]
@@ -170,6 +173,7 @@ def main():
                 assert len({r[4] for rows in matching.values() for r in rows})==1
                 summaries[f'{size}-members-{hits}-hits']={side:{'median_ms':statistics.median(r[2] for r in rows)/1e6,'median_java_bytes':statistics.median(r[3] for r in rows)} for side,rows in matching.items()}
             result['benchmark']={'scope':'32768 production section queries per sample; prebuilt entities. Nine alternating JVMs, five warmups/eight samples per workload. Excludes gameplay/GPU/native allocation.', 'samples':samples,'summaries':summaries}
+            if args.world_benchmark:result['benchmark']['scope']='4096 production EntitySectionStorage queries per sample; one primary entity per section. Nine alternating JVMs, five warmups/eight samples per workload. Excludes gameplay/GPU/native allocation.'
     finally:
         result['guards_pass'] = (sources(ROOT) == pins['current']
                                 and sources(FROZEN) == pins['frozen']
