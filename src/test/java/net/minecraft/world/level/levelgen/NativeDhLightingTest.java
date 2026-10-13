@@ -68,7 +68,7 @@ class NativeDhLightingTest {
             }
         }
     }
-    @Test void immutableFieldsSurviveRebuildAndPublicMutableStorageDetaches() {
+    @Test void immutableFieldsSurviveRebuildAndWrappersReadTheLatestOwner() {
         var source=HeightmapFixtures.chunk("empty",-64,32,0);source.getSection(1).setBlockState(1,7,2,Blocks.GLOWSTONE.defaultBlockState());
         var wrapper=new ChunkWrapper(source,level);var nearby=new ArrayList<IChunkWrapper>();nearby.add(wrapper);
         assertTrue(NativeDhLighting.tryLight(wrapper,nearby,15,true,true)>=0);var first=wrapper.nativeDhLightingInput().previous();assertNotNull(first);assertEquals(1,first.sourceCount());
@@ -76,21 +76,14 @@ class NativeDhLightingTest {
         if(!IChunkWrapper.RUN_RELATIVE_POS_INDEX_VALIDATION)assertEquals(wrapper.getDhBlockLight(2,-41,2),wrapper.getDhBlockLight(18,-41,18),"Original LightSection masks coordinates when validation is off");
         source.getSection(1).setBlockState(8,7,8,Blocks.GLOWSTONE.defaultBlockState());
         assertTrue(NativeDhLighting.tryLight(wrapper,nearby,15,true,true)>=0);var next=wrapper.nativeDhLightingInput().previous();assertNotSame(first,next);assertEquals(1,next.sourceCount(),"Original source-position cache remains stale");assertEquals(old,first.light(2,-41,2,false));
-        wrapper.setDhBlockLight(2,-41,2,3);assertNull(wrapper.nativeDhLightingInput());assertEquals(3,wrapper.getDhBlockLight(2,-41,2));assertEquals(old,first.light(2,-41,2,false));
+        assertEquals(next.light(2,-41,2,false),wrapper.getDhBlockLight(2,-41,2),"Wrappers read their latest Rust light owner");
         assertEquals(1,wrapper.getWorldBlockLightPosList().size());
-        var injected=ChunkLightStorage.createSkyLightStorage(wrapper);injected.set(2,-41,2,11);wrapper.setSkyLightStorage(injected);
-        assertEquals(11,wrapper.getDhSkyLight(2,-41,2));injected.set(2,-41,2,7);assertEquals(7,wrapper.getDhSkyLight(2,-41,2));
     }
-    @Test void customWrappersAndPublicCachedSourcesOrStateOverridesDeclineBeforeCallbacks() {
+    @Test void customWrappersAndEditedPublicEmitterListsDeclineBeforeCallbacks() {
         var source=HeightmapFixtures.chunk("empty",-64,32,0);var calls=new int[1];
         var custom=new ChunkWrapper(source,level){@Override public int getDhBlockLight(int x,int y,int z){calls[0]++;return 7;}};
         var nearby=new ArrayList<IChunkWrapper>();nearby.add(custom);assertEquals(-1,NativeDhLighting.tryLight(custom,nearby,15,true,true));assertEquals(0,calls[0]);
         var wrapper=new ChunkWrapper(source,level);nearby.clear();nearby.add(wrapper);wrapper.getWorldBlockLightPosList().add(new com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos(0,-63,0));assertEquals(-1,NativeDhLighting.tryLight(wrapper,nearby,15,true,true));
-        wrapper=new ChunkWrapper(source,level);nearby.clear();nearby.add(wrapper);
-        var air=Blocks.AIR.defaultBlockState();var stone=BlockStateWrapper.fromBlockState(Blocks.STONE.defaultBlockState(),level);
-        var previous=BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(air,stone);
-        try{assertEquals(-1,NativeDhLighting.tryLight(wrapper,nearby,15,true,true));assertNull(wrapper.nativeDhLightingInput().previous());}
-        finally{if(previous==null)BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.remove(air);else BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(air,previous);}
     }
     @Test void independentParallelPassesReadOneLiveWorldWithoutSharingScratchOrOutputs() throws Exception {
         var source=HeightmapFixtures.recorded(HeightmapFixtures.saved().getFirst());var expected=soloExpected().getFirst().getFirst();
@@ -163,7 +156,7 @@ class NativeDhLightingTest {
             assertEquals(-1,in.read());
         }
     }
-    @Test void mutableEscapeRetainsFrozenCountersAcrossRepeatedClearAndPaletteEdits() throws Exception {
+    @Test void repeatedClearAndPaletteEditsMatchFrozenInEveryNativePhase() throws Exception {
         try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(NativeDhLightingTest.class.getResourceAsStream("/world/lighting/frozen-dh-mutable-escape.bin.gz"))))) {
             assertEquals(0x44484531,in.readInt());assertEquals(8,in.readInt());
             for(int i=0;i<8;i++){in.readUTF();assertEquals(64,in.readUTF().length());}
@@ -177,15 +170,14 @@ class NativeDhLightingTest {
                 assertEquals(in.readInt(),wrapper.getWorldBlockLightPosList().size());assertEquals(10,in.readInt());
                 NativeDhLighting.Field retained=null;int retainedValue=0;
                 for(int phase=0;phase<10;phase++) {
+                    // Frozen escaped to mutable Java storage at phase 2 (an unchanged write).
+                    // Light storage is Rust-only now, so every phase stays native.
                     boolean escape=in.readBoolean();assertEquals(phase==2,escape);
-                    if(escape)wrapper.setDhBlockLight(0,-64,0,wrapper.getDhBlockLight(0,-64,0));
                     if(phase%2==1)source.getSection(0).getStates().set(1,4,2,Blocks.AIR.defaultBlockState());
                     else if(phase>0)source.getSection(0).getStates().set(1,4,2,Blocks.GLOWSTONE.defaultBlockState());
                     assertEquals(in.readInt(),(int)light.invoke(DhLightingEngine.INSTANCE,wrapper,nearby,15,true,true),"Frozen mutable-escape work case "+test+" phase "+phase);
-                    if(phase<2) {
-                        assertNotNull(wrapper.nativeDhLightingInput().previous(),"Actual native admission before escape");
-                        if(phase==0){retained=wrapper.nativeDhLightingInput().previous();retainedValue=retained.light(2,-60,2,false);}
-                    } else assertNull(wrapper.nativeDhLightingInput(),"Public storage remains Java-owned after escape");
+                    assertNotNull(wrapper.nativeDhLightingInput().previous(),"Actual native admission in every phase");
+                    if(phase==0){retained=wrapper.nativeDhLightingInput().previous();retainedValue=retained.light(2,-60,2,false);}
                     assertEquals(retainedValue,retained.light(2,-60,2,false),"Retained native field remains immutable");
                     for(int y=-64;y<-32;y++)for(int z=0;z<16;z++)for(int x=0;x<16;x++) {
                         int packed=in.readUnsignedByte();assertEquals(packed&15,wrapper.getDhBlockLight(x,y,z));assertEquals(packed>>4,wrapper.getDhSkyLight(x,y,z));

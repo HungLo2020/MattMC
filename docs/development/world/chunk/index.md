@@ -3,6 +3,8 @@
 - [Rust world random ticks](RUST-RANDOM-TICKS.md): primary random-position state,
   direct live-section candidate selection and callback ordering.
 
+- [Rust-only DH generation](RUST-DH-GENERATION.md): chunk height fields, lighting,
+  columns and sky light with no Java fallback; route survey and removed paths.
 - [Rust-owned DH full-data source](RUST-DH-SOURCE.md): current ownership of the
   whole source in Rust, its update calls, rules and removed compatibility paths.
 - [Rust DH conversion readers](RUST-DH-CONVERSION-READERS.md): scoped primary-column

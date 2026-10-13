@@ -8,13 +8,12 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Data-source sky light baked in Rust over the primary column table
- * ({@code dh_columns/sky.rs}), replacing the per-point list writes of
- * {@code DhLightingEngine.bakeDataSourceSkyLight}. Escaped readers get the
- * detached views, as after native occlusion culling.
+ * ({@code dh_columns/sky.rs}); the only DH sky bake. Escaped readers get the
+ * detached views, as after native occlusion culling. It declines, with
+ * nothing changed, only for corrupt input: a point's material outside the
+ * mapping or an invalid column size.
  */
 public final class NativeDhSkyLight {
-    /** {@code -Dmattmc.dh.javaSkyBake=true} keeps the original Java bake (control runs). */
-    public static final boolean JAVA_ONLY = Boolean.getBoolean("mattmc.dh.javaSkyBake");
     private static final MethodHandle BAKE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_source_bake_sky",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final ThreadLocal<MemorySegment> OUTPUT = ThreadLocal.withInitial(
@@ -25,7 +24,7 @@ public final class NativeDhSkyLight {
     /** Bakes {@code source}, whose mapping holds {@code materials} entries, and returns
      * true, or returns false with nothing changed. */
     public static boolean tryBake(@Nullable NativeDhMaterials policy, NativeDhSource source, int materials, int maxSkyLight) {
-        if (JAVA_ONLY || policy == null || !source.isLive()) return false;
+        if (policy == null || !source.isLive()) return false;
         var output = OUTPUT.get();
         try {
             int result = (int) BAKE.invokeExact(source.stageOwner(), policy.owner, materials, maxSkyLight, output);

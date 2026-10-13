@@ -1,5 +1,10 @@
 # Rust DH data-source sky light
 
+> **Current state:** [Rust-only DH generation](RUST-DH-GENERATION.md) supersedes this page's
+> descriptions of Java fallback, compatibility and decline routes, Java light
+> storage and wrapper-replacement checks; those no longer exist. Details and
+> historical results below remain as recorded.
+
 `DhLightingEngine.bakeDataSourceSkyLight` lights a DH full-data source's
 points before each save of generated data (`GeneratedFullDataSourceProvider`)
 and after live chunk updates (`AbstractDhLevel`). It now runs as one Rust pass

@@ -175,8 +175,9 @@ pub unsafe extern "C" fn mattmc_dh_light_field_release(field: *mut Field) {
     }
 }
 
-/// Mutable CPU compatibility handoff: retained counts followed by constant.
-/// Zero means the original section was never allocated; one means copied.
+/// Inspect one section's retained policy state: its per-level counts, then
+/// its constant. Zero means the section was never allocated; one means copied.
+/// (Java no longer copies fields into mutable storage; tests use this.)
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_dh_light_section_meta(
     field: *const Field,

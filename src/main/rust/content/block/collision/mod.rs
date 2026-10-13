@@ -91,7 +91,11 @@ impl Catalog {
         let grid = world.grids.get(*world.states.get(state.0 as usize)? as usize)?;
         Some(WorldGeometry { grid, large: flags & 2 != 0, full_block_identity: flags & 4 != 0 })
     }
+    /// DH solidity and opacity. Once Java installs facts for every state
+    /// (`mattmc_collision_dh_install`, the exact `BlockStateWrapper` policy),
+    /// they cover states without cached geometry too.
     pub(crate) fn dh(&self, state: u32) -> Option<DhFacts> {
+        if let Some(facts) = DH_FACTS.get() { return facts.get(state as usize).copied(); }
         self.dh.get(state as usize).copied().flatten()
     }
 }
@@ -101,6 +105,20 @@ mod world;
 pub(crate) use world::WorldGrid;
 use world::WORLD;
 static CATALOG: OnceLock<Catalog> = OnceLock::new();
+static DH_FACTS: OnceLock<Box<[DhFacts]>> = OnceLock::new();
+
+/// Install DH facts for every registered state: one solid byte (0/1) and one
+/// opacity byte each, as `BlockStateWrapper` computes them from context-free
+/// state queries. Returns 1, or 0 for malformed input or a different table.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_collision_dh_install(solid: *const u8, opacity: *const u8, count: i32) -> i32 {
+    if solid.is_null() || opacity.is_null() || count <= 0 { return 0; }
+    let (solid, opacity) = (std::slice::from_raw_parts(solid, count as usize), std::slice::from_raw_parts(opacity, count as usize));
+    if solid.iter().any(|&s| s > 1) || opacity.iter().any(|&o| o > 16) { return 0; }
+    let facts: Box<[DhFacts]> = solid.iter().zip(opacity).map(|(&s, &o)| DhFacts { solid: s != 0, opacity: o }).collect();
+    let installed = DH_FACTS.get_or_init(|| facts.clone());
+    i32::from(**installed == *facts)
+}
 
 pub(crate) fn installed() -> Option<&'static Catalog> {
     CATALOG.get()

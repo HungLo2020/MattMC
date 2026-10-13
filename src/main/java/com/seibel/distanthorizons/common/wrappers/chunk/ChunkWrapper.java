@@ -8,7 +8,6 @@ import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
@@ -50,8 +49,6 @@ public class ChunkWrapper implements IChunkWrapper
 	private boolean isDhBlockLightCorrect = false;
 	private boolean isDhSkyLightCorrect = false;
 	
-	private ChunkLightStorage blockLightStorage;
-	private ChunkLightStorage skyLightStorage;
 	
 	private ArrayList<DhBlockPos> blockLightPosList = null;
 	
@@ -86,6 +83,12 @@ public class ChunkWrapper implements IChunkWrapper
 		if (recreateHeightmaps)
 		{
 			this.createDhHeightMaps();
+		}
+		else
+		{
+			// Saved chunks skip the Java height scan, but native lighting and
+			// columns need Rust height fields for every wrapper in a neighborhood.
+			this.createNativeDhHeightMaps();
 		}
 	}
 	
@@ -188,18 +191,25 @@ public class ChunkWrapper implements IChunkWrapper
 	}
 	private int getChunkSectionMinHeight(int index) { return (index * 16) + this.getInclusiveMinBuildHeight(); }
 	
-	public void createDhHeightMaps()
+	/** Build Rust height fields when the chunk admits them; true on success. */
+	private boolean createNativeDhHeightMaps()
 	{
 		// Subclasses may override getBlockState or height metadata callbacks.
 		var nativeMaps = this.getClass() == ChunkWrapper.class
 			? net.minecraft.world.level.chunk.NativeDhHeightmaps.build(this.chunk) : null;
-		if (nativeMaps != null)
+		if (nativeMaps == null) return false;
+		this.nativeHeightMaps = nativeMaps;
+		this.minNonEmptyHeight = nativeMaps.minHeight();
+		this.maxNonEmptyHeight = nativeMaps.maxHeight();
+		this.solidHeightMap = null;
+		this.lightBlockingHeightMap = null;
+		return true;
+	}
+	
+	public void createDhHeightMaps()
+	{
+		if (this.createNativeDhHeightMaps())
 		{
-			this.nativeHeightMaps = nativeMaps;
-			this.minNonEmptyHeight = nativeMaps.minHeight();
-			this.maxNonEmptyHeight = nativeMaps.maxHeight();
-			this.solidHeightMap = null;
-			this.lightBlockingHeightMap = null;
 			return;
 		}
 		this.nativeHeightMaps = null;
@@ -473,8 +483,7 @@ public class ChunkWrapper implements IChunkWrapper
 	/** Canonical native inputs only; externally injected storage/cache stays compatible. */
 	public net.minecraft.world.level.chunk.NativeDhLighting.ChunkInput nativeDhLightingInput()
 	{
-		if (this.getClass() != ChunkWrapper.class || this.nativeHeightMaps == null
-			|| this.blockLightStorage != null || this.skyLightStorage != null) return null;
+		if (this.getClass() != ChunkWrapper.class || this.nativeHeightMaps == null) return null;
 		// Hashing/beacons expose the original mutable list before lighting. Admit
 		// that cache only while it still matches its immutable native owner.
 		if (this.blockLightPosList != null)
@@ -499,19 +508,6 @@ public class ChunkWrapper implements IChunkWrapper
 			|| field.maxY() != this.getExclusiveMaxBuildHeight()) throw new IllegalStateException("Incompatible DH light owner");
 		this.nativeLighting = field;
 	}
-	/** A public mutable-storage operation detaches to the original Java authority. */
-	private void detachNativeDhLighting()
-	{
-		var field = this.nativeLighting;
-		if (field == null) return;
-		this.getWorldBlockLightPosList(); // Preserve the first native emitter enumeration.
-		var block = field.copyToMutableStorage(false);
-		var sky = field.copyToMutableStorage(true);
-		this.blockLightStorage = block;
-		this.skyLightStorage = sky;
-		this.nativeLighting = null;
-	}
-
 	@Override 
 	public void setIsDhSkyLightCorrect(boolean isDhLightCorrect) { this.isDhSkyLightCorrect = isDhLightCorrect; }
 	@Override 
@@ -523,60 +519,24 @@ public class ChunkWrapper implements IChunkWrapper
 	public boolean isDhSkyLightCorrect() { return this.isDhSkyLightCorrect; }
 	
 	
+	/** Block light from the chunk's Rust light owner; 0 before the chunk is lit. */
 	@Override
 	public int getDhBlockLight(int relX, int y, int relZ)
 	{
 		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(relX, y, relZ);
 		var nativeField = this.nativeLighting;
-		return nativeField != null ? nativeField.light(relX & 15, y, relZ & 15, false) : this.getBlockLightStorage().get(relX, y, relZ);
-	}
-	@Override
-	public void setDhBlockLight(int relX, int y, int relZ, int lightValue)
-	{
-		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(relX, y, relZ);
-		this.getBlockLightStorage().set(relX, y, relZ, lightValue);
+		return nativeField != null ? nativeField.light(relX & 15, y, relZ & 15, false) : LodUtil.MIN_MC_LIGHT;
 	}
 	
-	private ChunkLightStorage getBlockLightStorage()
-	{
-		this.detachNativeDhLighting();
-		if (this.blockLightStorage == null)
-		{
-			this.blockLightStorage = ChunkLightStorage.createBlockLightStorage(this);
-		}
-		return this.blockLightStorage;
-	}
-	public void setBlockLightStorage(ChunkLightStorage lightStorage) { this.detachNativeDhLighting(); this.blockLightStorage = lightStorage; }
-	@Override
-	public void clearDhBlockLighting() { this.getBlockLightStorage().clear(); }
-	
-	
+	/** Sky light from the chunk's Rust light owner; before it is lit, full above the world and 0 elsewhere. */
 	@Override
 	public int getDhSkyLight(int relX, int y, int relZ)
 	{
 		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(relX, y, relZ);
 		var nativeField = this.nativeLighting;
-		return nativeField != null ? nativeField.light(relX & 15, y, relZ & 15, true) : this.getSkyLightStorage().get(relX, y, relZ);
+		if (nativeField != null) return nativeField.light(relX & 15, y, relZ & 15, true);
+		return y >= this.getExclusiveMaxBuildHeight() ? LodUtil.MAX_MC_LIGHT : LodUtil.MIN_MC_LIGHT;
 	}
-	@Override
-	public void setDhSkyLight(int relX, int y, int relZ, int lightValue)
-	{
-		this.throwIndexOutOfBoundsIfRelativePosOutsideChunkBounds(relX, y, relZ);
-		this.getSkyLightStorage().set(relX, y, relZ, lightValue);
-	}
-	@Override
-	public void clearDhSkyLighting() { this.getSkyLightStorage().clear(); }
-	
-	private ChunkLightStorage getSkyLightStorage()
-	{
-		this.detachNativeDhLighting();
-		if (this.skyLightStorage == null)
-		{
-			this.skyLightStorage = ChunkLightStorage.createSkyLightStorage(this);
-		}
-		return this.skyLightStorage;
-	}
-	public void setSkyLightStorage(ChunkLightStorage lightStorage) { this.detachNativeDhLighting(); this.skyLightStorage = lightStorage; }
 	
 	
 	/** 

@@ -1,5 +1,10 @@
 # Rust DH lighting pass
 
+> **Current state:** [Rust-only DH generation](../chunk/RUST-DH-GENERATION.md) supersedes this page's
+> descriptions of Java fallback, compatibility and decline routes, Java light
+> storage and wrapper-replacement checks; those no longer exist. Details and
+> historical results below remain as recorded.
+
 Rust owns the admitted whole DH lighting pass and its immutable CPU outputs.
 Java retains exact-input admission, wrapper publication, correctness flags,
 error handling and compatibility lighting. Broad gameplay and long-session

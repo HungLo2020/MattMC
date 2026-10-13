@@ -1,5 +1,10 @@
 # Rust DH chunk height fields
 
+> **Current state:** [Rust-only DH generation](RUST-DH-GENERATION.md) supersedes this page's
+> descriptions of Java fallback, compatibility and decline routes, Java light
+> storage and wrapper-replacement checks; those no longer exist. Details and
+> historical results below remain as recorded.
+
 Admitted `ChunkWrapper` instances use a Rust-owned pair
 of height fields. Rust scans the existing live block and section-counter owners;
 Java does not construct dense block inputs, computed masks or two mirrored

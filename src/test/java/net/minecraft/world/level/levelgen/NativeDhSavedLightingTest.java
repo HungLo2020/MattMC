@@ -2,7 +2,6 @@ package net.minecraft.world.level.levelgen;
 
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkCompoundTagParser;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
 import java.io.*;
 import java.util.Objects;
 import java.util.zip.GZIPInputStream;
@@ -20,19 +19,21 @@ import static org.junit.jupiter.api.Assertions.*;
 class NativeDhSavedLightingTest {
     @BeforeAll static void bootstrap() { SharedConstants.tryDetectVersion(); Bootstrap.bootStrap(); }
     private static byte[] array(DataInputStream in) throws IOException { int n=in.readInt();return n<0?null:in.readNBytes(n); }
-    private static void compare(DataInputStream in,ChunkLightStorage storage,NativeDhLighting.Field field,boolean sky,int min,int count) throws IOException {
-        boolean empty=in.readBoolean();assertEquals(empty,storage.isEmpty());
+    /** One recorded light plane: the allocation summary, then every value, which the field must match. */
+    private static void compare(DataInputStream in,NativeDhLighting.Field field,boolean sky,int min,int count) throws IOException {
+        boolean empty=in.readBoolean();
         if(field!=null)assertEquals(!empty,field.hasAllocatedSections(sky));
-        for(int s=0;s<count;s++) {
-            boolean allocated=in.readBoolean();var v=storage.lightSections==null?null:storage.lightSections[s];assertEquals(allocated,v!=null);
-            if(allocated) { assertEquals(in.readByte(),v.constantValue);assertEquals(in.readBoolean(),v.data!=null);for(int n=0;n<16;n++)assertEquals(in.readShort(),v.counts[n]); }
-        }
+        skipSections(in,count);
         for(int y=min-1;y<=min+count*16;y++)for(int z=0;z<16;z++)for(int x=0;x<16;x++) {
-            int expected=in.readUnsignedByte();assertEquals(expected,storage.get(x,y,z));
-            if(field!=null)assertEquals(expected,field.light(x,y,z,sky));
+            int expected=in.readUnsignedByte();
+            if(field!=null)assertEquals(expected,field.light(x,y,z,sky),"y "+y+" x "+x+" z "+z);
         }
     }
-    @Test void actualFrozenSavedImportsAndMutableClearEditPolicies() throws Exception {
+    /** Java light-storage section details, which no longer exist in production. */
+    private static void skipSections(DataInputStream in,int count) throws IOException {
+        for(int s=0;s<count;s++) if(in.readBoolean()) { in.readByte();in.readBoolean();for(int n=0;n<16;n++)in.readShort(); }
+    }
+    @Test void actualFrozenSavedImportsMatchNativeFieldsAndMalformedDataIsNotImported() throws Exception {
         int nativeCases=0;
         try(var in=new DataInputStream(new GZIPInputStream(Objects.requireNonNull(getClass().getResourceAsStream("/world/lighting/frozen-dh-saved-light.bin.gz"))))) {
             assertEquals(0x44484931,in.readInt());assertEquals(7,in.readInt());
@@ -52,19 +53,18 @@ class NativeDhSavedLightingTest {
                 else if(kind==3){var wrong=new ListTag();wrong.add(IntTag.valueOf(8));tag.put("sections",wrong);}
                 else if(kind==4)tag=null;
                 String error=in.readUTF();boolean returned=in.readBoolean();var chunk=HeightmapFixtures.chunk("empty",min,count*16,0);
-                ChunkCompoundTagParser.LoadedChunkLighting result=null;String actual="";
-                try { result=ChunkCompoundTagParser.readLightingForGeneration(chunk,tag); }catch(RuntimeException e){actual=e.getClass().getName();}
-                assertEquals(error,actual,"Frozen exception case "+c);assertEquals(returned,result!=null);
-                if(result==null)continue;
-                var field=result.nativeField();if(canonical){assertNotNull(field,"Actual native import "+c);nativeCases++;assertEquals(-1,field.sourceCount(),"Import must not freeze an empty emitter cache");}
-                var mutable=field==null?ChunkCompoundTagParser.readLight(chunk,tag):null;
-                var block=field==null?mutable.blockLightStorage:field.copyToMutableStorage(false);
-                var sky=field==null?mutable.skyLightStorage:field.copyToMutableStorage(true);
-                compare(in,block,field,false,min,count);compare(in,sky,field,true,min,count);
-                int retained=field==null?0:field.light(7,min+1,9,true);
-                block.clear();sky.clear();block.set(7,min+1,9,3);sky.set(7,min+1,9,11);
-                compare(in,block,null,false,min,count);compare(in,sky,null,true,min,count);
-                if(field!=null)assertEquals(retained,field.light(7,min+1,9,true),"Mutable reader must not modify native field");
+                var result=ChunkCompoundTagParser.readLightingForGeneration(chunk,tag);
+                // Canonical saved light imports natively and matches Frozen; anything
+                // else is not imported (DH lights that chunk), where Frozen imported
+                // a partial Java copy or threw.
+                if(canonical){assertEquals("",error);assertTrue(returned);assertNotNull(result,"Actual native import "+c);nativeCases++;}
+                else assertNull(result,"Malformed saved light is not imported "+c);
+                if(!returned)continue;
+                var field=result==null?null:result.nativeField();
+                if(field!=null)assertEquals(-1,field.sourceCount(),"Import must not freeze an empty emitter cache");
+                compare(in,field,false,min,count);compare(in,field,true,min,count);
+                // Frozen's mutable clear/edit storage policy has no production counterpart.
+                compare(in,null,false,min,count);compare(in,null,true,min,count);
             }
             assertEquals(-1,in.read());
         }
@@ -88,7 +88,8 @@ class NativeDhSavedLightingTest {
         var direct=new ChunkWrapper(source,null);imported.applyTo(direct);nearby.clear();nearby.add(direct);
         assertTrue(NativeDhLighting.tryLight(direct,nearby,15,true,true)>=0);
         assertEquals(2,direct.nativeDhLightingInput().previous().sourceCount(),"Native pass also performs deferred enumeration");
-        var noHeights=new ChunkWrapper(source,null,false);imported.applyTo(noHeights);
-        assertNull(noHeights.nativeDhLightingInput());assertTrue(noHeights.isDhBlockLightingCorrect());assertEquals(0,noHeights.getDhBlockLight(1,-63,1));
+        // Wrappers that skip the Java height scan still get Rust height fields, so they adopt saved light.
+        var saved=new ChunkWrapper(source,null,false);assertNotNull(saved.nativeDhLightingInput());imported.applyTo(saved);
+        assertTrue(saved.isDhBlockLightingCorrect());assertSame(imported.nativeField(),saved.nativeDhLightingInput().previous());
     }
 }

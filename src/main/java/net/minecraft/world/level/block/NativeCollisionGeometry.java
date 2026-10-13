@@ -93,9 +93,36 @@ public final class NativeCollisionGeometry {
                 call.allocateFrom(ValueLayout.JAVA_INT, gridRows), gridRows.length,
                 call.allocateFrom(ValueLayout.JAVA_DOUBLE, gridCoordinates), gridCoordinates.length);
             if (worldResult != 1) throw new IllegalStateException("Rejected native world collision facts: " + worldResult);
+            // DH solidity/opacity for every state, including states without
+            // cached geometry: the same context-free policy BlockStateWrapper uses.
+            byte[] solid = new byte[count], opacity = new byte[count];
+            for (int id = 0; id < count; id++) {
+                var state = Block.BLOCK_STATE_REGISTRY.byId(id);
+                solid[id] = (byte)(dhSolid(state) ? 1 : 0); opacity[id] = (byte)dhOpacity(state);
+            }
+            var dhInstall = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_collision_dh_install",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+            int dhResult = (int)dhInstall.invokeExact(call.allocateFrom(ValueLayout.JAVA_BYTE, solid),
+                call.allocateFrom(ValueLayout.JAVA_BYTE, opacity), count);
+            if (dhResult != 1) throw new IllegalStateException("Rejected native DH block facts");
             return true;
         } catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot install native collision geometry", e); }
+    }
+    /** DH solidity: a non-air state with a non-empty context-free collision shape. */
+    public static boolean dhSolid(BlockState state) {
+        return state != null && !state.isAir() && !state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
+    }
+    /**
+     * DH opacity from context-free state queries: air 0, a non-occluding fluid
+     * 1 (translucent), a non-occluding sky-light-passing block 0, otherwise 16.
+     */
+    public static int dhOpacity(BlockState state) {
+        if (state == null || state.isAir()) return 0;
+        boolean canOcclude = state.canOcclude();
+        if (!state.getFluidState().isEmpty() && !canOcclude) return 1;
+        if (state.propagatesSkylightDown() && !canOcclude) return 0;
+        return 16;
     }
     /** Audited stock providers that read only state, never the world or context. */
     private static boolean contextFreeProvider(Class<?> type) {

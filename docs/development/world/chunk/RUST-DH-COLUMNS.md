@@ -1,5 +1,10 @@
 # Rust DH column producer
 
+> **Current state:** [Rust-only DH generation](RUST-DH-GENERATION.md) supersedes this page's
+> descriptions of Java fallback, compatibility and decline routes, Java light
+> storage and wrapper-replacement checks; those no longer exist. Details and
+> historical results below remain as recorded.
+
 Rust owns the admitted chunk-to-DH column builder, material ID assignment and
 immutable CPU point storage. The [full-data owner](RUST-DH-FULL-DATA.md) also owns
 mutable recipient storage, parent reduction and direct bulk operations;

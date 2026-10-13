@@ -1,12 +1,10 @@
 package net.minecraft.world.level.chunk;
 
-import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.Reference;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.block.NativeCollisionGeometry;
-import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 /** Read-only CPU projection of Rust-owned DH height fields, not a Java mirror. */
@@ -39,17 +37,6 @@ public final class NativeDhHeightmaps {
         var inputs = chunk.nativeDhSections();
         if (inputs == null) return null;
         try {
-            for (int index = 0; index < inputs.size(); index++) {
-                var owner = inputs.block(index);
-                // Preserve public wrapper replacements before native cache reuse.
-                if (!inputs.empty(index)) {
-                    for (int entry = 0, count = owner.paletteSize(); entry < count; entry++) {
-                        BlockState state = owner.paletteValue(entry);
-                        var wrapper = BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.get(state);
-                        if (wrapper != null && (wrapper.getClass() != BlockStateWrapper.class || wrapper.blockState != state)) return null;
-                    }
-                }
-            }
             MemorySegment pointer = (MemorySegment)CREATE.invokeExact(inputs.stageOwner());
             return pointer.address() == 0 ? null : new NativeDhHeightmaps(pointer);
         } catch (RuntimeException | Error e) { throw e; }

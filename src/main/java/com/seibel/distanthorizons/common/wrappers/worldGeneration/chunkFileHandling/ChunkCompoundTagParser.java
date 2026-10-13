@@ -8,7 +8,6 @@ import com.seibel.distanthorizons.core.level.IDhServerLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -362,152 +361,41 @@ public class ChunkCompoundTagParser
 	// chunk lighting //
 	//================//
 	
-	/** source: https://minecraft.wiki/w/Chunk_format */
-	public static CombinedChunkLightStorage readLight(ChunkAccess chunk, CompoundTag chunkData)
-	{
-		
-		CombinedChunkLightStorage combinedStorage = new CombinedChunkLightStorage(ChunkWrapper.getInclusiveMinBuildHeight(chunk), ChunkWrapper.getExclusiveMaxBuildHeight(chunk));
-		ChunkLightStorage blockLightStorage = combinedStorage.blockLightStorage;
-		ChunkLightStorage skyLightStorage = combinedStorage.skyLightStorage;
-		
-		boolean foundSkyLight = false;
-		
-		
-		
-		//===================//
-		// get NBT tags info //
-		//===================//
-		
-		Tag chunkSectionTags = chunkData.get("sections");
-		if (chunkSectionTags == null)
-		{
-			if (!lightingSectionErrorLogged)
-			{
-				lightingSectionErrorLogged = true;
-				LOGGER.error("No sections found for chunk at pos ["+chunk.getPos()+"] chunk data may be out of date.");
-			}
-			return null;
-		}
-		else if (!(chunkSectionTags instanceof ListTag))
-		{
-			if (!lightingSectionErrorLogged)
-			{
-				lightingSectionErrorLogged = true;
-				LOGGER.error("Chunk section tag list have unexpected type ["+chunkSectionTags.getClass().getName()+"], expected ["+ListTag.class.getName()+"].");
-			}
-			return null;
-		}
-		ListTag chunkSectionListTag = (ListTag) chunkSectionTags;
-		
-		
-		
-		//===================//
-		// get lighting info //
-		//===================//
-		
-		for (int sectionIndex = 0; sectionIndex < chunkSectionListTag.size(); sectionIndex++)
-		{
-			Tag chunkSectionTag = chunkSectionListTag.get(sectionIndex);
-			if (!(chunkSectionTag instanceof CompoundTag))
-			{
-				if (!lightingSectionErrorLogged)
-				{
-					lightingSectionErrorLogged = true;
-					LOGGER.error("Chunk section tag has an unexpected type ["+chunkSectionTag.getClass().getName()+"], expected ["+CompoundTag.class.getName()+"].");
-				}
-				return null;
-			}
-			CompoundTag chunkSectionCompoundTag = (CompoundTag) chunkSectionTag;
-			
-			
-			// if null all lights = 0
-			byte[] blockLightNibbleArray = CompoundTagUtil.getByteArray(chunkSectionCompoundTag, "BlockLight");
-			byte[] skyLightNibbleArray = CompoundTagUtil.getByteArray(chunkSectionCompoundTag, "SkyLight");
-			
-			if (blockLightNibbleArray != null 
-				&& skyLightNibbleArray != null)
-			{
-				// if any sky light was found then all lights above will be max brightness
-				if (skyLightNibbleArray.length != 0)
-				{
-					foundSkyLight = true;
-				}
-				
-				for (int relX = 0; relX < LodUtil.CHUNK_WIDTH; relX++)
-				{
-					for (int relZ = 0; relZ < LodUtil.CHUNK_WIDTH; relZ++)
-					{
-						// chunk sections are also 16 blocks tall
-						for (int relY = 0; relY < LodUtil.CHUNK_WIDTH; relY++)
-						{
-							int blockPosIndex = relY*16*16 + relZ*16 + relX;
-							byte blockLight = (blockLightNibbleArray.length == 0) ? 0 : getNibbleAtIndex(blockLightNibbleArray, blockPosIndex);
-							byte skyLight = (skyLightNibbleArray.length == 0) ? 0 : getNibbleAtIndex(skyLightNibbleArray, blockPosIndex);
-							if (skyLightNibbleArray.length == 0 && foundSkyLight)
-							{
-								skyLight = LodUtil.MAX_MC_LIGHT;
-							}
-							
-							int y = relY + (sectionIndex * LodUtil.CHUNK_WIDTH) + ChunkWrapper.getInclusiveMinBuildHeight(chunk);
-							blockLightStorage.set(relX, y, relZ, blockLight);
-							skyLightStorage.set(relX, y, relZ, skyLight);
-						}
-					}
-				}
-			}
-		}
-		
-		return combinedStorage;
-	}
-
-	/** Generation consumes a Rust light owner; public mutable imports retain readLight. */
+	/**
+	 * The chunk's saved light, imported into a Rust light owner, or null when the
+	 * saved data cannot be imported (missing or malformed sections, an
+	 * unsupported chunk). Without saved light the chunk is lit by DH instead.
+	 */
 	public static LoadedChunkLighting readLightingForGeneration(ChunkAccess chunk, CompoundTag chunkData)
 	{
 		var field = net.minecraft.world.level.chunk.NativeDhSavedLighting.read(chunk, chunkData);
-		if (field != null) return new LoadedChunkLighting(field, null);
-		var legacy = readLight(chunk, chunkData);
-		return legacy == null ? null : new LoadedChunkLighting(null, legacy);
+		if (field == null && !lightingSectionErrorLogged)
+		{
+			lightingSectionErrorLogged = true;
+			LOGGER.warn("Saved lighting for chunk at pos [" + chunk.getPos() + "] could not be imported; DH will light it. Further cases are not logged.");
+		}
+		return field == null ? null : new LoadedChunkLighting(field);
 	}
 
 	public static final class LoadedChunkLighting
 	{
 		private final net.minecraft.world.level.chunk.NativeDhLighting.Field field;
-		private final CombinedChunkLightStorage legacy;
-		private LoadedChunkLighting(net.minecraft.world.level.chunk.NativeDhLighting.Field field, CombinedChunkLightStorage legacy)
-		{ this.field = field; this.legacy = legacy; }
+		private LoadedChunkLighting(net.minecraft.world.level.chunk.NativeDhLighting.Field field) { this.field = field; }
 		public net.minecraft.world.level.chunk.NativeDhLighting.Field nativeField() { return field; }
+		/** Adopt the saved light when it is lit and fits the wrapper; otherwise DH lights the chunk. */
 		public void applyTo(ChunkWrapper wrapper)
 		{
-			if (field != null)
+			if (!field.hasAllocatedSections(false)) return;
+			if (wrapper.nativeDhLightingInput() != null && field.minY() == wrapper.getInclusiveMinBuildHeight()
+				&& field.maxY() == wrapper.getExclusiveMaxBuildHeight())
 			{
-				if (!field.hasAllocatedSections(false)) return;
-				if (wrapper.nativeDhLightingInput() != null && field.minY() == wrapper.getInclusiveMinBuildHeight()
-					&& field.maxY() == wrapper.getExclusiveMaxBuildHeight())
-				{
-					wrapper.adoptNativeDhLighting(field);
-					wrapper.setIsDhBlockLightCorrect(true);
-					wrapper.setIsDhSkyLightCorrect(true);
-					return;
-				}
+				wrapper.adoptNativeDhLighting(field);
+				wrapper.setIsDhBlockLightCorrect(true);
+				wrapper.setIsDhSkyLightCorrect(true);
 			}
-			ChunkLightStorage block = field == null ? legacy.blockLightStorage : field.copyToMutableStorage(false);
-			ChunkLightStorage sky = field == null ? legacy.skyLightStorage : field.copyToMutableStorage(true);
-			if (block != null && !block.isEmpty()) { wrapper.setBlockLightStorage(block); wrapper.setIsDhBlockLightCorrect(true); }
-			if (sky != null && !sky.isEmpty()) { wrapper.setSkyLightStorage(sky); wrapper.setIsDhSkyLightCorrect(true); }
 		}
 	}
-	/** source: https://minecraft.wiki/w/Chunk_format#Block_Format */
-	private static byte getNibbleAtIndex(byte[] arr, int index)
-	{
-		if (index % 2 == 0)
-		{
-			return (byte)(arr[index/2] & 0x0F);
-		}
-		else
-		{
-			return (byte)((arr[index/2]>>4) & 0x0F);
-		}
-	}
+
 	
 	
 	
@@ -557,17 +445,7 @@ public class ChunkCompoundTagParser
 	// helper classes //
 	//================//
 	
-	public static class CombinedChunkLightStorage
-	{
-		public ChunkLightStorage blockLightStorage;
-		public ChunkLightStorage skyLightStorage;
-		
-		public CombinedChunkLightStorage(int minY, int maxY)
-		{
-			this.blockLightStorage = ChunkLightStorage.createBlockLightStorage(minY, maxY);
-			this.skyLightStorage = ChunkLightStorage.createSkyLightStorage(minY, maxY);
-		}
-	}
+
 	
 	
 	

@@ -400,14 +400,10 @@ class NativeDhColumnsTest {
         var bytes=new ByteArrayOutputStream();try(var output=new ObjectOutputStream(bytes)){output.writeObject(original);}
         try(var input=new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))){var restored=input.readObject();assertInstanceOf(LongArrayList.class,restored);assertEquals(original,restored);}
     }
-    @Test void customWorldCacheOverridesAndUnreadyBiomesDeclineBeforeNativePublication() {
+    @Test void customWorldsAndUnreadyBiomesDeclineBeforeNativePublication() {
         var source=chunk(0,0);var wrapper=light(source);var callbacks=new int[1];
         var custom=(ILevelWrapper)Proxy.newProxyInstance(ILevelWrapper.class.getClassLoader(),new Class<?>[]{ILevelWrapper.class},(p,m,a)->{callbacks[0]++;throw new AssertionError(m);});
         assertNull(NativeDhColumns.build(custom,wrapper,1));assertEquals(0,callbacks[0]);
-        var holder=pattern.getFirst();var replacement=BiomeWrapper.getBiomeWrapper(pattern.get(1),level);
-        var previous=BiomeWrapper.WRAPPER_BY_BIOME.put(holder,replacement);
-        try { assertNull(NativeDhColumns.build(level,wrapper,1)); }
-        finally { if(previous==null)BiomeWrapper.WRAPPER_BY_BIOME.remove(holder);else BiomeWrapper.WRAPPER_BY_BIOME.put(holder,previous); }
         source.setPersistedStatus(ChunkStatus.EMPTY);assertNull(NativeDhColumns.build(level,wrapper,1));
     }
     @Test void savedLightOwnerDirectlyFeedsTheWholeColumnProducer() {
@@ -421,10 +417,8 @@ class NativeDhColumnsTest {
         var imported=com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkCompoundTagParser.readLightingForGeneration(source,tag);
         assertNotNull(imported.nativeField());var actual=new ChunkWrapper(source,level);imported.applyTo(actual);
         assertSame(imported.nativeField(),actual.nativeDhLightingInput().previous());
-        var expected=new ChunkWrapper(source,level);
-        var legacy=com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkCompoundTagParser.readLight(source,tag);
-        expected.setBlockLightStorage(legacy.blockLightStorage);expected.setSkyLightStorage(legacy.skyLightStorage);expected.setIsDhBlockLightCorrect(true);
-        try(var nativeSource=LodDataBuilder.createFromChunk(level,actual);var compatible=LodDataBuilder.createFromChunk(level,expected)) {
+        // The Java reference builder reads the same imported light through the wrapper.
+        try(var nativeSource=LodDataBuilder.createFromChunk(level,actual);var compatible=JavaLodBuilderReference.build(level,actual)) {
             int nativeColumns=0;
             for(int x=0;x<64;x++)for(int z=0;z<64;z++) {
                 var a=nativeSource.getColumnAtRelPos(x,z);var b=compatible.getColumnAtRelPos(x,z);

@@ -31,9 +31,6 @@ public final class NativeDhColumns {
     private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_dh_columns_release",
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final MemorySegment owner, points, offsets;
-    private static final class UnsupportedInput extends RuntimeException {
-        UnsupportedInput() { super(null, null, false, false); }
-    }
     private final BlockBiomeWrapperPair[] compatibilityPairs;
     private final long pos;
     private final int chunkX, chunkZ, compression, sourceHash;
@@ -57,8 +54,6 @@ public final class NativeDhColumns {
                 var rawState = Block.stateById(state); var holder = biomes.get(biome);
                 var blockWrapper = state == 0 ? BlockStateWrapper.AIR : BlockStateWrapper.fromBlockState(rawState, level);
                 var biomeWrapper = BiomeWrapper.getBiomeWrapper(holder, level);
-                if (blockWrapper.getClass() != BlockStateWrapper.class || state != 0 && blockWrapper.blockState != rawState
-                    || biomeWrapper.getClass() != BiomeWrapper.class || biomeWrapper.biome != holder) throw new UnsupportedInput();
                 compatibilityPairs[id] = BlockBiomeWrapperPair.get(blockWrapper, biomeWrapper);
             }
             owner = pointer.reinterpret(1, arena, NativeDhColumns::release); attached = true;
@@ -91,16 +86,31 @@ public final class NativeDhColumns {
                 if (biomeValues == null) {
                     biomeValues = q.binding.values;
                     if (!matchesRegistry(biomeValues, registry)) return null;
-                } else if (biomeValues != q.binding.values) return null;
+                } else if (biomeValues != q.binding.values && !sameHolders(biomeValues, q.binding.values)) return null;
             }
             var pos = chunk.getPos();
             MemorySegment pointer = (MemorySegment)BUILD.invokeExact(sections.stageOwner(), input.heights().stageOwner(), input.previous().stageOwner(),
                 pos.x, pos.z, compression);
             return pointer.address() == 0 ? null : new NativeDhColumns(pointer, metadata, biomeValues, level);
-        } catch (UnsupportedInput e) { return null; }
-        catch (RuntimeException | Error e) { throw e; }
+        } catch (RuntimeException | Error e) { throw e; }
         catch (Throwable e) { throw new IllegalStateException("Cannot build native DH columns", e); }
         finally { Reference.reachabilityFence(sections); Reference.reachabilityFence(input); }
+    }
+    /** The last pair of bindings proven to hold the same holders in the same order. */
+    private record Equivalent(java.lang.ref.WeakReference<List<Holder<Biome>>> a, java.lang.ref.WeakReference<List<Holder<Biome>>> b) {}
+    private static volatile Equivalent equivalent;
+    /**
+     * Sections of one chunk can come from different container factories, each
+     * with its own binding over the same frozen biome registry. Identical
+     * holders in identical order give identical biome IDs, so they are one binding.
+     */
+    private static boolean sameHolders(List<Holder<Biome>> a, List<Holder<Biome>> b) {
+        var proof = equivalent;
+        if (proof != null && (proof.a().get() == a && proof.b().get() == b || proof.a().get() == b && proof.b().get() == a)) return true;
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) if (a.get(i) != b.get(i)) return false;
+        equivalent = new Equivalent(new java.lang.ref.WeakReference<>(a), new java.lang.ref.WeakReference<>(b));
+        return true;
     }
     /** The last binding proven to match its registry; both are fixed after load. */
     private record Validated(java.lang.ref.WeakReference<List<Holder<Biome>>> values, java.lang.ref.WeakReference<Object> registry) {}

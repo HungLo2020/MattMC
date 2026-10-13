@@ -448,17 +448,15 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 							
 							// Native columns merge straight into the recipients; no producer data source.
 							var nativeColumns = LodDataBuilder.nativeColumnsFromChunk(this.level.getLevelWrapper(), chunkWrapper);
+							// A chunk that cannot be converted (logged once) contributes no LOD data.
 							if (nativeColumns != null && nativeColumnsConsumer != null)
 							{
 								nativeColumnsConsumer.accept(nativeColumns);
 							}
-							else
+							else if (nativeColumns != null)
 							{
-								try (FullDataSourceV2 dataSource = nativeColumns != null
-									? FullDataSourceV2.createNative(nativeColumns)
-									: LodDataBuilder.createFromChunk(this.level.getLevelWrapper(), chunkWrapper))
+								try (FullDataSourceV2 dataSource = FullDataSourceV2.createNative(nativeColumns))
 								{
-									LodUtil.assertTrue(dataSource != null);
 									dataSourceConsumer.accept(dataSource);
 								}
 							}

@@ -95,7 +95,7 @@ class NativeDhHeightmapsTest {
             assertThrows(IndexOutOfBoundsException.class,()->wrapper.getSolidHeightMapValue(-1,0));
         }
     }
-    @Test void originalCallbacksAndPublicWrapperOverridesRemainCompatible() {
+    @Test void customChunksKeepCallbacksAndContextualStatesHaveDhFacts() {
         var source=HeightmapFixtures.chunk("solid",-64,32,0);
         var calls=new ArrayList<Long>();
         var custom=new ProtoChunk(source.getPos(),UpgradeData.EMPTY,source.getSections(),new net.minecraft.world.ticks.ProtoChunkTicks<>(),new net.minecraft.world.ticks.ProtoChunkTicks<>(),LevelHeightAccessor.create(-64,32),null,null) {
@@ -104,16 +104,15 @@ class NativeDhHeightmapsTest {
         assertNull(NativeDhHeightmaps.build(custom));assertTrue(calls.isEmpty());
         var wrapper=new ChunkWrapper(custom,level);assertFalse(calls.isEmpty());
         assertEquals(-33,wrapper.getSolidHeightMapValue(0,0));
-        BlockState stone=Blocks.STONE.defaultBlockState();
-        BlockStateWrapper previous=BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(stone,BlockStateWrapper.AIR);
-        try {
-            assertNull(NativeDhHeightmaps.build(source));
-            assertEquals(-64,new ChunkWrapper(source,level).getSolidHeightMapValue(0,0));
-        } finally {if(previous==null)BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.remove(stone);else BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(stone,previous);}
-        // Moving piston collision is contextual and must execute the old path.
-        var states=new PalettedContainer<>(Blocks.MOVING_PISTON.defaultBlockState(),Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
+        // States without cached collision geometry (moving pistons) still have DH
+        // facts: the same context-free policy BlockStateWrapper uses.
+        var piston=Blocks.MOVING_PISTON.defaultBlockState();
+        var states=new PalettedContainer<>(piston,Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
         var dynamic=HeightmapFixtures.withSections(new LevelChunkSection[]{new LevelChunkSection(states,null)},0,16);
-        assertNull(NativeDhHeightmaps.build(dynamic));
+        var maps=NativeDhHeightmaps.build(dynamic);assertNotNull(maps);
+        assertEquals(net.minecraft.world.level.block.NativeCollisionGeometry.dhSolid(piston)?15:0,maps.solid(0,0));
+        assertEquals(net.minecraft.world.level.block.NativeCollisionGeometry.dhOpacity(piston)!=0?15:0,maps.blocking(0,0));
+        assertEquals(BlockStateWrapper.fromBlockState(piston,level).getOpacity(),net.minecraft.world.level.block.NativeCollisionGeometry.dhOpacity(piston));
     }
     @Test void rebuiltFieldsDoNotMutateRetainedViewsAndMcMapsRemainAvailable() {
         var source=HeightmapFixtures.chunk("empty",-64,32,0);
@@ -193,11 +192,6 @@ class NativeDhHeightmapsTest {
         var changed = NativeDhHeightmaps.build(source); assertNotNull(changed);
         assertNotEquals(ownerAddress(first), ownerAddress(changed)); assertEquals(-34, changed.solid(0, 0)); assertEquals(-33, first.solid(0, 0));
         one.createDhHeightMaps(); assertEquals(ownerAddress(changed), ownerAddress((NativeDhHeightmaps) field.get(one)));
-        // Cached native results never bypass public wrapper compatibility admission.
-        var stone = Blocks.STONE.defaultBlockState();
-        var prior = BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(stone, BlockStateWrapper.AIR);
-        try { assertNull(NativeDhHeightmaps.build(source)); }
-        finally { if (prior == null) BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.remove(stone); else BlockStateWrapper.WRAPPER_BY_BLOCK_STATE.put(stone, prior); }
     }
 
 }

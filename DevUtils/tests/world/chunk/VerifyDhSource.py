@@ -28,7 +28,11 @@ def main():
     parser.add_argument("--pairs", type=int, default=6)
     parser.add_argument("--rounds", type=int, default=1000)
     parser.add_argument("--warmup-rounds", type=int, default=1000)
-    parser.add_argument("--mode", choices=("create", "merge", "cull", "parent", "downsample"), required=True)
+    parser.add_argument("--mode", choices=("create", "merge", "cull", "parent", "downsample", "generation"), required=True)
+    parser.add_argument("--recreate-heightmaps", action="store_true",
+                        help="generation mode: build wrappers as freshly generated chunks instead of saved ones")
+    parser.add_argument("--per-side-checksums", action="store_true",
+                        help="require equal checksums within each side only, for an intended output change")
     args = parser.parse_args()
     if not 2 <= args.pairs <= 50 or args.rounds < 1 or args.warmup_rounds < 1:
         parser.error("pairs must be 2..50; measured and warmup rounds must be positive")
@@ -50,14 +54,16 @@ def main():
     protocol = {"scope": "synthetic CPU DH source lifecycle/update workload, not server ticks/FPS or gameplay acceptance",
                 "rounds": args.rounds, "warmup": f"five {args.warmup_rounds}-round rounds in every JVM", "pairs": args.pairs,
                 "order": [side for pair in range(args.pairs) for side in (["Frozen", "Current"] if pair % 2 == 0 else ["Current", "Frozen"])],
-                "pins": pins, "java": str(args.java), "classpaths": classpaths, "mode": args.mode}
+                "pins": pins, "java": str(args.java), "classpaths": classpaths, "mode": args.mode,
+                "recreate_heightmaps": args.recreate_heightmaps, "per_side_checksums": args.per_side_checksums}
     (args.output / "protocol.json").write_text(json.dumps(protocol, indent=2) + "\n")
     rows = []
     for number, side in enumerate(protocol["order"]):
         if digest(images[side]) != pins["native"][side]:
             raise RuntimeError("Native image changed during timing")
         command = [str(args.java), "--enable-native-access=ALL-UNNAMED", "-Xmx2G",
-                   "-Dmattmc.rust.natives.dir=" + str(natives[side].resolve()), "-cp", classpaths[side],
+                   "-Dmattmc.rust.natives.dir=" + str(natives[side].resolve()),
+                   "-Ddh.verify.recreate=" + str(args.recreate_heightmaps).lower(), "-cp", classpaths[side],
                    "net.minecraft.world.level.levelgen.DhSourceVerification", str(args.rounds), str(args.warmup_rounds), args.mode]
         start = time.time_ns()
         result = subprocess.run(command, text=True, capture_output=True, timeout=180)
@@ -72,8 +78,9 @@ def main():
         rows.append(row)
         (args.output / "runs.json").write_text(json.dumps(rows, indent=2) + "\n")
         print(number, side, round(row["elapsed_ns"] / 1e6, 3), "ms", flush=True)
-    if len({row["checksum"] for row in rows}) != 1:
-        raise RuntimeError("Frozen/Current checksum mismatch")
+    groups = [[row for row in rows if row["side"] == side] for side in classpaths] if args.per_side_checksums else [rows]
+    if any(len({row["checksum"] for row in group}) != 1 for group in groups):
+        raise RuntimeError("Checksum mismatch" if args.per_side_checksums else "Frozen/Current checksum mismatch")
     medians = {side: statistics.median(row["elapsed_ns"] for row in rows if row["side"] == side) / 1e6 for side in classpaths}
     report = {"scope": protocol["scope"], "median_ms": medians,
               "current_over_frozen": medians["Current"] / medians["Frozen"], "pins": pins, "runs": rows}

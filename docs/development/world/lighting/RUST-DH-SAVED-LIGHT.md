@@ -1,5 +1,10 @@
 # Rust saved DH lighting
 
+> **Current state:** [Rust-only DH generation](../chunk/RUST-DH-GENERATION.md) supersedes this page's
+> descriptions of Java fallback, compatibility and decline routes, Java light
+> storage and wrapper-replacement checks; those no longer exist. Details and
+> historical results below remain as recorded.
+
 Source reviewed at [`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8). Suite results, timings, profiles and hardware/capture checks below are
 implementation-author reports. This documentation review inspected source and
 fixture assertions; it did not rerun Java/Rust suites, clients, captures or

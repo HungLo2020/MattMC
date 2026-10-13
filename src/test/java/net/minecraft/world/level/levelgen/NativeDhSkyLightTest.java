@@ -3,7 +3,6 @@ package net.minecraft.world.level.levelgen;
 import com.seibel.distanthorizons.api.enums.config.EDhApiWorldCompressionMode;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import com.seibel.distanthorizons.core.generation.DhLightingEngine;
 import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
@@ -42,7 +41,7 @@ class NativeDhSkyLightTest {
                 points.add(FullDataPointUtil.encode(random.nextInt(materials), height, top - height, (byte) random.nextInt(16), (byte) 0));
                 top -= height;
             }
-            // A native column, as merged and decoded sources hold; Java lists keep the Java bake.
+            // A native column, as merged and decoded sources hold.
             var column = NativeDhColumnList.empty();
             column.addElements(0, points.toLongArray());
             source.setSingleColumn(column, x, z, EDhApiWorldGenerationStep.LIGHT, EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS);
@@ -61,7 +60,7 @@ class NativeDhSkyLightTest {
                     // Readers that escaped before the bake must see the baked points.
                     LongList[] escaped = new LongList[64];
                     for (int i = 0; i < 64; i++) escaped[i] = rust.getColumnAtRelPos(i, (i * 7) % 64);
-                    DhLightingEngine.INSTANCE.bakeDataSourceSkyLightInJava(java, maxSky);
+                    JavaSkyBakeReference.bake(java, maxSky);
                     assertTrue(NativeDhSkyLight.tryBake(policy, rust.nativeSource(), rust.mapping.size(), maxSky), "native bake ran");
                     for (int x = 0; x < 64; x++) for (int z = 0; z < 64; z++) {
                         LongList expected = java.getColumnAtRelPos(x, z), actual = rust.getColumnAtRelPos(x, z);
