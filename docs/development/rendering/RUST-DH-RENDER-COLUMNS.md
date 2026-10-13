@@ -4,6 +4,9 @@
 > `RenderDataPointReducingList` fallback and custom-view admission were removed;
 > rejected input throws `IllegalArgumentException` with the destination
 > untouched, as in Frozen. See [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
+> The body below preserves this earlier ownership and verification checkpoint;
+> its Java compatibility routes and retired commands are historical unless the
+> current build guide explicitly retains them.
 
 Rust owns the admitted complete compact render-column reduction.
 Ordinary `RenderDataPointUtil.mergeMultiData` calls borrow existing canonical

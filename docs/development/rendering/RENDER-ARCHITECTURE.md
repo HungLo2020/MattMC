@@ -148,20 +148,20 @@ Admitted DH world preparation includes native [height fields](../world/chunk/RUS
 [same-detail updates](../world/chunk/RUST-DH-SOURCE-UPDATES.md) and
 [change hashes](../world/chunk/RUST-DH-CHANGE-HASH.md). The separate
 [render-column reduction](RUST-DH-RENDER-COLUMNS.md) consumes compact CPU storage.
-[Render-source points and dense semantics](RUST-DH-RENDER-SOURCE.md) now belong
-to Rust. Interior box production resolves four numeric windows from one scoped
-CPU owner; boundary neighbors retain borrowed spans. Java retains contextual
-color callbacks, sparse bindings and source traversal.
+[Render-source points and dense semantics](RUST-DH-RENDER-SOURCE.md) belong
+to Rust. The current [DH render build](RUST-DH-RENDER-BUILD.md) converts whole
+full-data sources and traverses whole render sections in Rust, including neighbor
+selection, box production, merging and packet encoding. Java retains contextual
+block/color queries, sparse semantic bindings and lifecycle calls. Requested
+semantic sidecars, debug source flags and water-input probes still use Java loops.
 Native [source metadata](../world/chunk/RUST-DH-SOURCE-METADATA.md) now owns
 generation/compression/uniformity and direct parent inputs. Java retains
 admission and wrapper/list identities, update orchestration,
 persistence, quadtree inputs, contextual color callbacks/material resolution,
-source traversal and collector lifecycle orchestration. Ordinary [box production](RUST-DH-VERTICAL-FACES.md)
-now owns geometry, stock shades and neighbor-light/material splitting. Ordinary [quad builds](RUST-DH-QUADS.md)
-retain quad lists and greedy topology in Rust; [packet plans](RUST-DH-PACKETS.md)
-encode final vertices and companions. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
+and collector lifecycle orchestration. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
 moves those buffers directly into the ledger; requested Java projections serve
-diagnostics. Subclasses keep Java policy. These CPU owners are separate from the
+diagnostics. `LodQuadBuilder` is final and its old Java geometry, merge and
+subclass packet paths are removed. These CPU owners are separate from the
 DH render-column ledger and GPU resources. Preserve section-local snapshot timing
 and caller exclusion; no whole-world transaction or runtime/performance acceptance
 is implied by the ownership change.
@@ -626,43 +626,43 @@ The subsequent [contributor migration](../world/chunk/RUST-DH-CONTRIBUTORS.md)
 retains bounded point footprints, clipping and ID remapping in Rust instead of
 exporting Java point arrays; disabled preservation still skips that work. Java
 retained those later stages at that contributor checkpoint. The current
-[quad owner](RUST-DH-QUADS.md) supersedes ordinary Java quad storage and merging.
+[render build](RUST-DH-RENDER-BUILD.md) supersedes the ordinary Java build paths.
 
 Exact-topology merge restrictions require both the exact flag and the Rust
 geometry route. Use separate launches for A/B switches: the exact flag is
 latched at class initialization; live reads of the other flags do not establish
 a supported mid-session toggle or rebuild invalidation contract.
 
-The later [render-column reduction](RUST-DH-RENDER-COLUMNS.md) owns the complete
-compact reduction algorithm in Rust. Canonical Java views borrow existing heap
-storage for one bounded native call and direct destination publication; they do
-not construct or sort a second Java reducer graph. Contextual resolver callbacks,
-source traversal and contextual getter implementations remain Java; ordinary
-box/face construction is now [native](RUST-DH-VERTICAL-FACES.md). The admitted
-[cached tint path](../world/biome/RUST-DH-TINT.md) now samples retained inputs in Rust.
+The later [render-column reduction checkpoint](RUST-DH-RENDER-COLUMNS.md) moved the complete
+compact reduction algorithm into Rust. Its canonical Java views borrowed heap
+storage for bounded native calls and direct publication, while Java retained
+source traversal and contextual getters. The admitted
+[cached tint path](../world/biome/RUST-DH-TINT.md) samples retained inputs in Rust.
 
-The [full-data conversion migration](RUST-DH-CONVERSION.md) also moves
+The [full-data conversion checkpoint](RUST-DH-CONVERSION.md) moved
 cave/snow policy, tint transfer, point packing and adjacent-point merging into
-Rust. Ordinary input, output and overflow scratch stay in native storage.
-Conversion-scoped material facts and untinted colors avoid repeated Java queries;
-color reloads invalidate native reuse. Java retains contextual color providers,
-source traversal and semantic sidecar orchestration. Full CPU comparisons,
-source tests, seven lifecycle scenarios and three settled Frozen pairs pass;
-gameplay performance and broader rendering acceptance remain separate.
+Rust, with native input/output/scratch and cached material facts/untinted colors.
+Java still traversed sources and orchestrated semantic sidecars at that checkpoint.
+Its reported full CPU comparisons, source tests, seven lifecycle scenarios and
+three settled Frozen pairs remain scoped to that release; gameplay performance
+and broader rendering acceptance remain separate.
 
-Ordinary [quad builds](RUST-DH-QUADS.md) retain lists and merge topology in Rust.
-[Packet plans](RUST-DH-PACKETS.md) now select layers, determine ordered contextual
-callbacks and encode final vertices and semantic companions. Java supplies raw
-getter results and requested diagnostic arrays; ordinary final buffers transfer
-through the [native column owner](RUST-DH-COLUMN-HANDOFF.md). Subclass compatibility retains the
-Java implementation; VulkanicGAL GPU ownership is unchanged.
+The earlier [quad](RUST-DH-QUADS.md), [packet](RUST-DH-PACKETS.md) and
+[complete box](RUST-DH-VERTICAL-FACES.md) checkpoints moved topology, encoding,
+geometry and stock shading into Rust while retaining Java traversal and subclass
+or custom-shade compatibility. Their pinned verification describes those routes.
 
-[Complete box policy](RUST-DH-VERTICAL-FACES.md) borrows canonical neighbor
-words, owns horizontal visibility, fake-ocean geometry, vertical light intervals
-and semantic splits, and inserts faces directly into the quad owner. Stock
-shading consumes immutable mode/world/ambient/flat CPU facts. Source traversal
-and contextual material resolution still reside in Java; custom shade providers
-retain their ordered compatibility callbacks. Verification is recorded in that guide.
+At [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f),
+the [current DH render build](RUST-DH-RENDER-BUILD.md) also moves ordinary
+column/point traversal and neighbor selection into whole-source conversion and
+whole-section Rust calls. Java geometry, heap/custom-list fallbacks and subclass
+packet overrides are removed. All final packet layers use the
+[native column owner](RUST-DH-COLUMN-HANDOFF.md). Java still supplies configuration,
+contextual block/color and packet dirt/shade results, scheduling and lifecycle.
+Semantic diagnostic builds retain Java identity interning and span/contributor
+traversal; debug source-flag preparation and water-input probes also retain Java
+loops. VulkanicGAL GPU ownership is unchanged. Use the current guide's tests and
+cross-build render verifier; retired DevUtils drivers remain historical evidence.
 
 At the historical `fc1d529d` checkpoint, Java sorted each face list by
 [`LodQuadBuilder.sortForMerge`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java#L357-L420):

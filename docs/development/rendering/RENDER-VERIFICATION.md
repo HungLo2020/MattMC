@@ -885,7 +885,11 @@ For DH quad-layer changes, run the real builder regression:
   --tests com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodQuadBuilderLayerTest
 ```
 
-Use the already verified release native library for these Java-only changes.
+The command above isolates the historical Java-side layer regression against
+an already verified matching library. Current DH section and layer policy are
+Rust-owned: rebuild Java and the native library together for changes to that
+policy, then use the [current DH build tests](RUST-DH-RENDER-BUILD.md#tests).
+Do not reuse an older native image as verification of changed Rust source.
 The checks cover all six faces, opaque and translucent leaf colors, water at
 alpha 255, disabled transparency, and preserved semantic vertex/material bytes.
 Then compare real distant foliage using the original pack and shared DH source

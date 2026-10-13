@@ -1,7 +1,8 @@
 # Rust-only DH render build
 
-A DH render section becomes GPU-ready packets in three Rust calls, with no
-Java column or point loops:
+The ordinary DH render path moves source conversion, section construction and
+packet encoding through three Rust stages. Diagnostic sidecar and probe paths
+still contain Java loops, as described below:
 
 1. **Conversion**, once per full-data source (the section and its four
    neighbors): `mattmc_dh_render_convert_source` in
@@ -26,6 +27,12 @@ Java entry points:
 [`ColumnRenderBufferBuilder`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnRenderBufferBuilder.java)
 (per-build settings).
 
+Source reviewed at [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f). The measurements below are implementation-author reports;
+this documentation reconciliation inspected source and test assertions without
+rerunning suites, benchmarks or clients. The earlier
+[particle runtime matrix](RUST-PARTICLE-FRAMES.md#runtime-evidence) predates this
+section-build replacement and does not verify the integrated source.
+
 ## What Java still does
 
 - **Contextual queries during conversion.** Rust calls back for a block's
@@ -44,6 +51,13 @@ Java entry points:
 - **Settings and lifecycle.** Java reads the configuration once per source or
   section, owns the asynchronous scheduling in `LodRenderSection`, and supplies
   grass dirt colors and shades for the packet layers.
+
+Debug source-flag colors and capture-only water probes also retain Java scans.
+Semantic span/contributor construction can walk points in Java; the removal of
+the ordinary build loops is not a claim that every diagnostic or contextual
+callback has migrated. These paths are visible in
+[`ColumnRenderBufferBuilder`](https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/ColumnRenderBufferBuilder.java)
+and [`finishSemanticColumn`](https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/com/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer.java).
 
 ## Rules when changing this subsystem
 
@@ -110,13 +124,24 @@ python3 DevUtils/tests/world/chunk/VerifyDhSource.py --mode render --java "$JAVA
   --output build/dh-render-check --pairs 6 --rounds 6 --warmup-rounds 2
 ```
 
+The runner checks the selected native file before each launch and rejects
+nonmatching checksums by default. `--per-side-checksums` deliberately relaxes
+cross-side equality; it must not be used as parity evidence. The runner records
+a ratio but has no slower-than-baseline exit gate. Its initial driver hashes
+and native checks do not by themselves establish final source/class-image or
+mapped-library identity. Preserve any additional author-run provenance checks
+separately from what this script enforces.
+
 Add `--jvm-arg=-Ddh.verify.renderConfig=1` or `=2` for other settings presets,
 or a semantic launch switch such as
 `--jvm-arg=-Dmattmc.dev.rustGalDistantHorizons.exactMaterialTopology=true`.
 
 ## Measured results (2026-10-13)
 
-Against a build of the previous commit (`1490391f9`, "baseline") on the laptop.
+Against a build of the preceding Current implementation (`1490391f9`,
+"baseline") on the laptop. This baseline is not unchanged Frozen, despite the
+driver option names. These scoped CPU and moving-camera comparisons are
+separate from the preceding particle migration’s Current/Frozen matrix.
 
 **CPU, whole pipeline** (`--mode render`, medians; every pair's packet
 checksums matched):
@@ -146,3 +171,9 @@ both sides). Current published about 25% more DH columns within the same window,
 and its extra frame time sits in GC and DH asset preflight rather than in the
 build. The laptop swapped 1.6–3.9 GB in every run, so GC times vary widely
 between runs. Runs: `artifacts/performance/realworld-20261011/dhab5-*`.
+
+The moving runs process different numbers of columns under substantial swap
+pressure. Their CPU attribution and timing spread are author observations, not
+a controlled isolated throughput gain or broad frame-time, streaming or
+long-session memory acceptance. The diagnostic semantic CPU ratio of 1.01
+remains slower than the preceding implementation.

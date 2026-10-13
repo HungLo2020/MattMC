@@ -5,6 +5,9 @@
 > removed. See [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
 > `VerifyDhFaces` was retired; `NativeDhFacesTest` still replays its Frozen
 > fixture. Commands and results below are historical.
+> The body below preserves this earlier ownership and verification checkpoint;
+> its Java compatibility routes and retired commands are historical unless the
+> current build guide explicitly retains them.
 
 Source reviewed at [`b32fd91c`](https://github.com/HungLo2020/MattMC/commit/b32fd91c847f3660bebec4dcc8d268efcdd589c8). Suite results, timings, profiles and hardware/capture checks below are
 implementation-author reports. This documentation review inspected source and

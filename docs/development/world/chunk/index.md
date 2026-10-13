@@ -7,8 +7,9 @@
   columns and sky light with no Java fallback; route survey and removed paths.
 - [Rust-owned DH full-data source](RUST-DH-SOURCE.md): current ownership of the
   whole source in Rust, its update calls, rules and removed compatibility paths.
-- [Rust DH conversion readers](RUST-DH-CONVERSION-READERS.md): scoped primary-column
-  reads without persistent Java column wrappers during render conversion.
+- [Rust DH conversion readers](RUST-DH-CONVERSION-READERS.md): historical Java reader
+  checkpoint; the current [Rust-only render build](../../rendering/RUST-DH-RENDER-BUILD.md)
+  traverses full-data sources directly in Rust.
 
 - [Rust DH saved-metadata codecs](RUST-DH-METADATA-CODEC.md): primary-plane imports,
   bounded IO, fixed payloads with variable logical extents and Frozen verification.

@@ -5,6 +5,9 @@
 > admission described below; see [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
 > The policy and caching rules here still apply. `VerifyDhConversionPolicy` was
 > retired; the commands and results below are historical.
+> The body below preserves this earlier ownership and verification checkpoint;
+> its Java compatibility routes and retired commands are historical unless the
+> current build guide explicitly retains them.
 
 Rust owns the
 top-down full-data conversion policy: cave culling, avoided-block tint/light

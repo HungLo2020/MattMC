@@ -4,6 +4,9 @@
 > Rust call, and heap/custom list compatibility paths were removed; see
 > [Rust-only DH render build](RUST-DH-RENDER-BUILD.md). `VerifyDhRenderSource`
 > was retired; the commands and results below are historical.
+> The body below preserves this earlier ownership and verification checkpoint;
+> its Java compatibility routes and retired commands are historical unless the
+> current build guide explicitly retains them.
 
 Ordinary DH conversion writes render points into a Rust CPU owner.
 The [conversion policy](RUST-DH-CONVERSION.md) publishes directly from Rust and

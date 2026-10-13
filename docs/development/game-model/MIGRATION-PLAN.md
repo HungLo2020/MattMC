@@ -139,12 +139,16 @@ Follow the owner boundary relevant to the next change:
   [render-reduction](../rendering/RUST-DH-RENDER-COLUMNS.md) owners supersede
   earlier Java column, merge, identity-map and hash loops. Java retains admission,
   compatibility wrappers, orchestration/public metadata, persistence, contextual
-  colors/material resolution, source traversal and collector lifecycle calls.
+  colors/material resolution and collector lifecycle calls.
   [Complete box production](../rendering/RUST-DH-VERTICAL-FACES.md) owns admitted
   face geometry, stock shading and neighbor-light/material splits.
   Ordinary [quad builds](../rendering/RUST-DH-QUADS.md) now move storage,
   opacity admission, premerging and greedy topology into Rust; Java retains
-  contextual source/material inputs plus subclass compatibility. Ordinary
+  contextual source/material inputs at that checkpoint. The current
+  [Rust-only DH build](../rendering/RUST-DH-RENDER-BUILD.md) also owns ordinary
+  source/section traversal and removes the Java quad subclass fallback. Java
+  retains contextual callbacks, requested semantic sidecar/probe loops and
+  asynchronous orchestration. Ordinary
   [semantic packets](../rendering/RUST-DH-PACKETS.md) move layer selection,
   callback planning, shading and byte packing into Rust; Java supplies raw
   contextual getter results. [Native column handoff](../rendering/RUST-DH-COLUMN-HANDOFF.md)
@@ -554,9 +558,10 @@ checkpoint. Current [packet plans](../rendering/RUST-DH-PACKETS.md) and
 Java final-packet encoding and transport. [Complete box production](../rendering/RUST-DH-VERTICAL-FACES.md)
 now owns top/bottom visibility, fake-ocean geometry, stock shading, adjacent
 light intervals and semantic splitting in Rust. Java supplies bounded CPU facts
-and borrows existing compact neighbors; source traversal, material resolution
-and custom callbacks remain Java. The box guide records its current checks;
-the reduction checkpoint below remains historical.
+and retains material resolution and contextual callbacks. Ordinary source and
+section traversal now belongs to the [Rust-only DH build](../rendering/RUST-DH-RENDER-BUILD.md);
+its current guide replaces the older Java traversal/fallback guidance.
+The box and reduction checkpoints below retain their historical verification.
 Actual Frozen3,616-case synthetic CPU replay is supplemental. Releaseee1676ec
 passes four focused Rust checks,27 architecture checks, five focused Java controls
 and full1,914 reported Java tests (two skips, zero failures/errors). Hardware,

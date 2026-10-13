@@ -173,21 +173,32 @@ skips exact block provenance in ordinary play while retaining it for exact
 material topology, capture/legacy observation and the explicit forced A/B
 build. At that checkpoint Java converted full data to render columns,
 constructed faces, sorted/merged quads and built semantic packets. The later
-[render-column](RUST-DH-RENDER-COLUMNS.md) and [quad](RUST-DH-QUADS.md) owners
-move reduction and ordinary greedy topology into Rust; Java retains contextual
-source traversal and contextual getters, plus subclass compatibility.
-[Complete box production](RUST-DH-VERTICAL-FACES.md) now owns admitted
-face geometry, stock shades and neighbor-light/material splitting. The later
-[packet owner](RUST-DH-PACKETS.md) moves layer selection, callback planning,
+[render-column](RUST-DH-RENDER-COLUMNS.md) and [quad](RUST-DH-QUADS.md) checkpoints
+moved reduction and ordinary greedy topology into Rust while Java retained
+source traversal, contextual getters and subclass compatibility.
+[Complete box production](RUST-DH-VERTICAL-FACES.md) then moved admitted
+face geometry, stock shades and neighbor-light/material splitting into Rust. The later
+[packet owner](RUST-DH-PACKETS.md) moved layer selection, callback planning,
 shading and vertex/companion encoding into Rust. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
-now moves final buffers into the ledger without ordinary Java packet transport;
-Java retains lifecycle calls, callback-event/results arrays and requested
-diagnostic projections. Native final payloads/companions remain allocated;
-the ordinary Java packet round trip is removed, while requested provenance
-and explicit compatibility packet APIs still copy Java arrays. Exact-material publication has its own narrower gate;
-forced preservation alone enables neither publication nor exact topology.
+removed ordinary Java packet transport. At that checkpoint Java retained
+lifecycle calls, callback-event/results arrays, diagnostic projections and
+explicit compatibility packet APIs.
 The earlier preservation-only reductions did not migrate those producers or change GPU ownership,
 or establish ordinary-play acceptance from diagnostic profiles.
+
+The current [Rust-only DH render build](RUST-DH-RENDER-BUILD.md), at
+[`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f),
+converts each source and builds each section in Rust, including ordinary
+column/point traversal and neighbor selection. The Java geometry, merge and
+subclass packet paths are removed; every build's final packets use the native
+column handoff. Java retains contextual block/color and packet dirt/shade queries,
+settings, scheduling and lifecycle. Requested semantic sidecars still traverse
+spans/contributors in Java; debug source flags and water-input probes also retain
+Java loops. Native final payloads/companions remain allocated, and requested
+diagnostic projections still copy Java arrays. Exact-material publication has
+its own narrower gate; forced preservation alone enables neither publication nor
+exact topology. The current CPU boundary does not establish broad gameplay parity
+or a performance gain.
 
 Reduced-color GPU columns now suballocate shared device vertex/index pages;
 packed-uniform pass owners also share geometry bindings per vertex page.

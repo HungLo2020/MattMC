@@ -15,13 +15,62 @@ driver does not compare Current/Frozen FPS or p99 against acceptance floors.
 
 ## October 13 current evidence boundary
 
-Source [`0d23141b`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3)
-is 34 implementation commits beyond documentation base `6b858d35`.
-The current [shadow-candidate guide](RUST-ENTITY-SHADOW-CANDIDATES.md#integrated-checkpoint-native-f29c8316)
+Source [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f)
+adds Rust-only DH render builds after the particle migration in
+[`f505bbbd`](https://github.com/HungLo2020/MattMC/commit/f505bbbd13bafcbec60e88170c6424668abe127e).
+The [root summary at this source](https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/SUMMARY.md)
+still reports the **particle native `6dc8870e` checkpoint**, not a new
+four-mode measurement of the later DH integration. Runtime results below are
+repository-author reports; this documentation review inspected source, drivers
+and tests without replaying clients or inspecting untracked runtime receipts.
+
+### Particle checkpoint: native `6dc8870e`
+
+The [particle runtime record](RUST-PARTICLE-FRAMES.md#runtime-evidence) reports
+two completed 6,000-frame rotating-camera pairs for vanilla and one per other
+mode. Medians include both vanilla pairs; saved inputs and observed JVM controls
+match, while live entity counts differ. The minimap is hidden.
+
+| Mode | FPS, Current / Frozen | p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1268.20 / 1246.60 | 3.530 / 3.720 |
+| Vanilla + DH | 786.50 / 656.10 | 4.623 / 6.955 |
+| Shaders | 343.40 / 305.30 | 6.288 / 8.177 |
+| Shaders + DH | 284.20 / 220.90 | 5.246 / 9.764 |
+
+All aggregated scoped FPS/p99 floors pass. The initial vanilla pair misses the
+FPS floor by 1.2% (1207.8 / 1222.4); it remains in the aggregate with the second
+pair (1328.6 / 1270.8). This is not an isolated particle gameplay gain or the
+full repeated acceptance protocol. The separate internal transport comparison
+uses prior Java transport, not Frozen: 64-particle batches take 18–19% more CPU,
+while 1,024-particle batches take 64–76% less. Java allocation reductions do
+not measure total native/GPU memory.
+
+The author reports passing particle comparisons, pipelined/synchronous lifetime
+windows and three lifecycle cases. Capture frames remain synchronous; hazy
+lifecycle images support structural transitions only. The failed cutout tint
+control and its corrected follow-up remain separate. Entry, first-turn terrain
+gaps/flicker, sustained streaming and long host/GPU memory acceptance stay open.
+Receipts: `build/native-particle-frame/`.
+
+### Later DH laptop workload
+
+The [Rust-only DH build results](RUST-DH-RENDER-BUILD.md#measured-results-2026-10-13)
+in `c357b63c` report a separate small-DH, moving-camera laptop comparison against
+baseline `1490391f9`, with four alternating 6,000-frame runs per side. Current /
+baseline medians are 116.7 / 119.8 FPS and 34.4 / 31.5 ms p99. DH columns built
+differ (about 518 / 414), and every run swaps 1.6–3.9 GB. These are not Frozen
+rows or a replacement for the particle matrix; the lower whole-pipeline CPU
+cost in that guide does not establish a gameplay FPS gain.
+
+### Earlier shadow and screen-shake checkpoints
+
+At source [`0d23141b`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3),
+the [shadow-candidate guide](RUST-ENTITY-SHADOW-CANDIDATES.md#integrated-checkpoint-native-f29c8316)
 records integrated native `f29c8316` after upstream `1490391f9`. Its fresh
-runtime evidence covers **one 6,000-frame pair per shader mode**. The root
-summary retains the predecessor's vanilla rows; it is not a fresh four-mode
-matrix on this native image:
+runtime evidence covers **one 6,000-frame pair per shader mode**. The then-current
+root summary retained the predecessor's vanilla rows; it was not a fresh
+four-mode matrix on that native image:
 
 | Mode | Native checkpoint | FPS, Current / Frozen | p99 ms, Current / Frozen |
 | --- | --- | --- | --- |

@@ -4,7 +4,36 @@
 
 ## October 13 current source and runtime scope
 
-The reviewed source is [`0d23141b`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3),
+The reviewed source is [`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f),
+following the preserved shadow, entity and world-owner checkpoints below.
+[Rust particle frames](RUST-PARTICLE-FRAMES.md) now own capture buffers,
+independent CPU snapshots and material-order transport; Java still owns
+simulation, interpolation, hooks and texture admission. The later
+[Rust-only DH render build](RUST-DH-RENDER-BUILD.md) removes ordinary Java
+column traversal, geometry and quad/packet fallback paths. Contextual callbacks,
+diagnostic sidecars and asynchronous lifecycle orchestration remain Java.
+Neither change completes the Java-free application target.
+
+The particle implementation author reports native `6dc8870e`, Rust 2,790/three
+ignored and Java 2,141/two skipped. Two clean 6,000-frame vanilla pairs and one
+pair per other mode pass their aggregate FPS/p99 floors. The first vanilla FPS
+shortfall remains in that aggregate; live entity counts differ. Three lifecycle
+cases and pipelined/synchronous windows are reported passing, with hazy lifecycle
+images supporting structural transitions only. The initial terrain-cutout tint
+control failure and corrected fixture results are retained in the owner guide.
+These are author records, not independent suite or image replays by this review.
+
+That matrix predates the subsequent DH section-build replacement. Its separate
+laptop comparison uses preceding Current `1490391f9`, not unchanged Frozen:
+default CPU ratio 0.76, semantic-preservation diagnostic ratio 1.01, and moving
+runs with different column counts and 1.6–3.9 GB of swap. It supplies no new
+integrated repeated four-mode, sustained streaming or memory acceptance.
+See the [current performance boundary](GAMEPLAY-PERFORMANCE.md#october-13-current-evidence-boundary)
+for the evidence chronology.
+
+### Earlier October 13 shadow checkpoint
+
+The earlier reviewed source is [`0d23141b`](https://github.com/HungLo2020/MattMC/commit/0d23141bdaf918ce7314fdf3cc2f846df35d04a3),
 34 implementation commits after documentation base `6b858d35`. Use the
 [current performance boundary](GAMEPLAY-PERFORMANCE.md#october-13-current-evidence-boundary)
 and subsystem guides for current scope; the checkpoints below preserve dated

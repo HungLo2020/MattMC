@@ -1,7 +1,15 @@
 # Rust particle capture and frames
 
-**Verified migration batch, 2026-10-13. Scope: particle capture and frame
-transport; particle simulation remains Java.**
+**Repository-author verification record, 2026-10-13. Scope: particle capture
+and frame transport; particle simulation remains Java.**
+
+This batch landed in
+[`f505bbbd`](https://github.com/HungLo2020/MattMC/commit/f505bbbd13bafcbec60e88170c6424668abe127e).
+The results below describe tested native `6dc8870e`, as recorded in the
+[committed author report](https://github.com/HungLo2020/MattMC/blob/f505bbbd13bafcbec60e88170c6424668abe127e/PROGRESS.md#current-implementation-batch).
+They do not verify the later Rust-only DH build in `c357b63c`. This documentation
+review inspected the implementation, driver and tests; it did not rerun suites,
+clients or profiles, or independently inspect the untracked captures/receipts.
 
 Quad particle extraction now writes immutable scalar facts into bounded native
 CPU buffers. Ordinary atlas layers transfer in bulk into the pending particle
@@ -52,8 +60,8 @@ CARGO_TARGET_DIR=build/rust/target cargo test --locked \
   particle_frame -- --test-threads=1
 ```
 
-The focused run passes 49 Java tests, including completion-failure cleanup,
-and two Rust tests. The controls cover native growth, immutable snapshots, closed views, layer
+The author reports 49 passing focused Java tests, including completion-failure
+cleanup, and two Rust tests. The controls cover native growth, immutable snapshots, closed views, layer
 rejection, combined capacity, rollback and exact encoding against the preceding
 semantic encoder. They are supplemental correctness checks; the runtime evidence below
 covers actual Frozen captures, gameplay and lifecycle transitions.
@@ -80,9 +88,10 @@ field/checksum and source/class/native guards. Its medians per 128 frames are:
 | 1,024 / scalar | 3.182 / 13.085 | 8,471,552 / 118,005,760 |
 
 These are internal transport measurements, not Frozen gameplay acceptance.
-Small batches regress 18–19% in the final run (about 1.1–1.4
-microseconds per frame). A direct-offset writer experiment did not reduce
-allocation and slowed the bulk case; it was reverted. The remaining scalar
+The 64-particle batches regress 18–19% in the final run (about 1.1–1.4
+microseconds per frame); 1,024-particle batches take 64–76% less CPU. The Java
+heap column excludes native storage and GPU memory. A direct-offset writer
+experiment did not reduce allocation and slowed the bulk case; it was reverted. The remaining scalar
 64-byte-per-particle allocation comes from the existing Java validation array,
 not the memory view. `measurement-4/` retains that failed experiment.
 
@@ -109,10 +118,10 @@ compression reclaimed 624,190,903 bytes; original JFRs remain.
 
 ## Runtime evidence
 
-Native `6dc8870e`, after documentation-only upstream `82df923b4`: two clean
-6,000-frame rotating-camera Current/Frozen pairs for vanilla, one per other
-mode. The table reports medians across all retained pairs. Saved inputs,
-camera/settings/pack and observed JVM controls match; live entity counts differ.
+The author reports native `6dc8870e`, after documentation-only upstream
+`82df923b4`: two completed 6,000-frame rotating-camera Current/Frozen pairs for
+vanilla, one per other mode. The table reports medians across all retained pairs.
+Saved inputs, camera/settings/pack and observed JVM controls match; live entity counts differ.
 These are scoped measurements with the minimap hidden, not an isolated gain,
 sustained streaming evaluation or broad parity acceptance.
 
@@ -123,10 +132,11 @@ sustained streaming evaluation or broad parity acceptance.
 | DH | 786.5 / 656.1 | 4.623 / 6.955 | 165 / 167 |
 | Shaders + DH | 284.2 / 220.9 | 5.246 / 9.764 | 165 / 164 |
 
-All scoped FPS and p99 floors pass. The first vanilla pair was
-1207.8/1222.4 FPS (1.2% below Frozen); the second was 1328.6/1270.8.
-Both remain in the aggregate, without timing exclusions. Separate pipelined and synchronous 6,000-frame lifetime windows
-complete cleanly. World unload/reload, resource reload and view-distance
+All aggregated scoped FPS and p99 floors pass. The first vanilla pair was
+1207.8/1222.4 FPS and failed its FPS floor (1.2% below Frozen); the second was
+1328.6/1270.8. Both remain in the aggregate, without timing exclusions. This is
+not the full repeated acceptance protocol. Separate pipelined and synchronous
+6,000-frame lifetime windows complete cleanly. World unload/reload, resource reload and view-distance
 decrease also pass. Receipts: `build/native-particle-frame/{runtime,gameplay-comparison}.json`.
 
 The ordinary-atlas shriek pair passes: all 632 pixels selected by its delayed

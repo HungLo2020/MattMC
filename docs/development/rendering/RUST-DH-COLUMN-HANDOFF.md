@@ -4,6 +4,9 @@
 > column; the subclass packet route and `recordOwnedRustSemanticBuiltColumn`
 > were removed. `VerifyDhQuads`/`VerifyDhPackets` were retired; commands and
 > results below are historical. See [Rust-only DH render build](RUST-DH-RENDER-BUILD.md).
+> The body below preserves this earlier ownership and verification checkpoint;
+> its Java compatibility routes and retired commands are historical unless the
+> current build guide explicitly retains them.
 
 Source reviewed at [`660d19e1`](https://github.com/HungLo2020/MattMC/commit/660d19e1b865bf6a2b481300de3aafc934e406b5). Suite totals, timings, lifecycle runs and image comparisons below are
 implementation-author reports. This review inspected source and fixture
