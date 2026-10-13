@@ -2,7 +2,7 @@
 
 Wool, carpets, glass, concrete, terracotta, beds, banners and Shulker Boxes, with every registered color.
 
-This catalog contains **199 registered forms**. Names and IDs identify blocks; the last column links related placed-block guides where available. Read each guide’s scope before applying it to a variant.
+This catalog contains **200 registered forms**. Names and IDs identify blocks; the last column links related placed-block guides where available. Read each guide’s scope before applying it to a variant.
 
 Names use English localization where available. A † marks a readable registry-name label without a separate English entry; the exact ID is authoritative.
 
@@ -10,6 +10,7 @@ Names use English localization where available. A † marks a readable registry-
 
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
+| Amber | [`minecraft:amber`](https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/minecraft/world/level/block/Blocks.java#L3998) | [Amber](../Amber.md) |
 | Black Banner | [`minecraft:black_banner`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3540) | [Banners](../Banners.md#colors-and-crafted-banners) |
 | Black Bed | [`minecraft:black_bed`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L681) | [Beds](../Bed.md) |
 | Black Carpet | [`minecraft:black_carpet`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3269) | [Wool and Carpet](../WoolAndCarpet.md) |

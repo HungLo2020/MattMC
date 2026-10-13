@@ -6,6 +6,8 @@ Ambersol is the placeable item for the [Ambersol block](../blocks/Ambersol.md), 
 
 The item is included in the Creative inventory and is registered as `minecraft:ambersol`. Place it overhead to produce the block's downward lighting effect. See the block page for the required pickaxe, light level, placement behavior, and the unresolved natural-generation details.
 
+For blocked or interrupted columns, follow [shaft setup and troubleshooting](../blocks/Ambersol.md#shaft-setup-and-troubleshooting). The invisible [Ambersol Light](../blocks/Ambersol.md#ambersol-light) cells beneath the source are a separate block form, not additional placed Ambersol items.
+
 The item uses the block's standard registered item form; no separate item-only ability is established here.
 
 ## Related pages

@@ -68,6 +68,9 @@ Recent focused reviews address concrete player decisions:
 - **Sorting stored items:** [Hopper filtering](../../gameplay/blocks/Hopper.md#item-filtering)
   explains reserved slots, component-sensitive matching, the 2-to-3 Comparator threshold
   and why an unsuitable output inventory can drain filter material
+- **Lighting a shaft:** [Ambersol troubleshooting](../../gameplay/blocks/Ambersol.md#shaft-setup-and-troubleshooting)
+  distinguishes transmitting blocks from obstructions and explains refreshing the column;
+  its internal light cells have their own precise family section
 - **Repairing and recycling:** [Grindstone edge cases](../../gameplay/blocks/Grindstone.md)
   and [enchanted-book use](../../gameplay/items/EnchantedBook.md) explain
   eligibility, input consumption and the result a player should expect

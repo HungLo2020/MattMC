@@ -11,7 +11,7 @@ Names use English localization where available. A † marks a readable registry-
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
 | Ambersol | [`minecraft:ambersol`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5960) | [Ambersol](../Ambersol.md) |
-| Ambersol Light † | [`minecraft:ambersol_light`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5961) | [Ambersol](../Ambersol.md) |
+| Ambersol Light † | [`minecraft:ambersol_light`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5961) | [Ambersol Light](../Ambersol.md#ambersol-light) |
 | Black Candle | [`minecraft:black_candle`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5900) | [Candles](../Candles.md#black-candle) |
 | Blue Candle | [`minecraft:blue_candle`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5896) | [Candles](../Candles.md#blue-candle) |
 | Brown Candle | [`minecraft:brown_candle`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5897) | [Candles](../Candles.md#brown-candle) |

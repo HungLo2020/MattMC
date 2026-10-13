@@ -34,7 +34,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Allium** — [Small and tall flowers](Flowers.md#allium) (related guide); `minecraft:allium`
 - **Amber** — [Amber](Amber.md) (related guide); `minecraft:amber`
 - **Ambersol** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol`
-- **Ambersol Light †** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol_light`
+- **Ambersol Light †** — [Ambersol Light](Ambersol.md#ambersol-light) (related guide); `minecraft:ambersol_light`
 - **Amethyst Cluster** — [Amethyst, buds and clusters](Amethyst.md#cluster) (related guide); `minecraft:amethyst_cluster`
 - **Ancient Debris** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:ancient_debris`
 - **Ancient Leaves** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#ancient-leaves-decoration-decay-and-drops) (related guide); `minecraft:ancient_leaves`
