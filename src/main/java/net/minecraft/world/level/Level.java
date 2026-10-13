@@ -704,6 +704,25 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 		return list;
 	}
 
+    /** Preserve the original world query callbacks while projecting only shake sources. */
+    public List<Entity> getScreenShakeSources(@Nullable Entity excluded,AABB query) {
+        if(getClass()!=net.minecraft.client.multiplayer.ClientLevel.class && getClass()!=net.minecraft.server.level.ServerLevel.class) {
+            var result=new java.util.ArrayList<Entity>();
+            for(Entity entity:getEntities(excluded,query))
+                if(entity instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(entity);
+            return result;
+        }
+        Profiler.get().incrementCounter("getEntities");
+        var result=new java.util.ArrayList<Entity>();
+        this.getEntities().collectScreenShakeSources(query,excluded,result);
+        // The original dragon-part getters still run, even for rejected capabilities.
+        for(EnderDragonPart part:this.dragonParts()) {
+            if(part!=excluded && part.parentMob!=excluded && net.minecraft.world.entity.EntitySelector.NO_SPECTATORS.test(part)
+                && query.intersects(part.getBoundingBox()) && part instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(part);
+        }
+        return result;
+    }
+
 	@Override
 	public <T extends Entity> List<T> getEntities(EntityTypeTest<Entity, T> entityTypeTest, AABB aABB, Predicate<? super T> predicate) {
 		List<T> list = Lists.<T>newArrayList();

@@ -104,7 +104,7 @@ final class NativeClassInstanceStorage<T> {
             token=(long)ALLOCATE.invokeExact(owner);int slot=(int)token;
             if(slot>=bindings.length){int size=Math.max(slot+1,Math.multiplyExact(bindings.length,2));bindings=Arrays.copyOf(bindings,size);generations=Arrays.copyOf(generations,size);}
             bindings[slot]=object;generations[slot]=token;
-            if(geometry!=null)geometry.attachSectionBinding(owner,token,STOCK_NON_SPECTATOR.get(object.getClass()));
+            if(geometry!=null)geometry.attachSectionBinding(owner,token,STOCK_NON_SPECTATOR.get(object.getClass()),object instanceof net.alexscaves.server.entity.util.ShakesScreen);
             return token;
         }catch(Throwable t){
             if(token!=0)finish(token);

@@ -48,6 +48,12 @@ public class LevelEntityGetterAdapter<T extends EntityAccess> implements LevelEn
         else this.sectionStorage.collectEntities(query,excluded,predicate,result);
     }
 
+    @Override
+    public void collectScreenShakeSources(AABB query,T excluded,java.util.ArrayList<T> result) {
+        if(getClass()!=LevelEntityGetterAdapter.class)LevelEntityGetter.super.collectScreenShakeSources(query,excluded,result);
+        else this.sectionStorage.collectScreenShakeSources(query,excluded,result);
+    }
+
 	@Override
 	public <U extends T> void get(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer) {
 		this.sectionStorage.getEntities(entityTypeTest, aABB, abortableIterationConsumer);

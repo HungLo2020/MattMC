@@ -23,5 +23,13 @@ public interface LevelEntityGetter<T extends EntityAccess> {
         get(query,entity->{if(entity!=excluded && predicate.test(entity))result.add(entity);});
     }
 
+    default void collectScreenShakeSources(AABB query,T excluded,java.util.ArrayList<T> result) {
+        var all=new java.util.ArrayList<T>();
+        @SuppressWarnings({"unchecked","rawtypes"})
+        java.util.function.Predicate<? super T> predicate=(java.util.function.Predicate)net.minecraft.world.entity.EntitySelector.NO_SPECTATORS;
+        collectEntities(query,excluded,predicate,all);
+        for(T entity:all)if(entity instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(entity);
+    }
+
 	<U extends T> void get(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer);
 }

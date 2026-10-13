@@ -41,7 +41,7 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
     private static final MethodHandle QUERY_TYPED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_query_typed",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle COLLECT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_collect_non_spectators",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS),Linker.Option.critical(true));
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT),Linker.Option.critical(true));
     private static final MethodHandle CURSOR_CLOSE=handle("cursor_close",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_RELEASE=handle("cursor_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final Arena scope;
@@ -178,12 +178,12 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
             if(accessible(section))return section.getEntities(type,query,consumer);
             return AbortableIterationConsumer.Continuation.CONTINUE;
         }
-        void collectNonSpectators(AABB query,T excluded,java.util.function.Predicate<? super T> predicate,java.util.ArrayList<T> result) {
+        void collectNonSpectators(AABB query,T excluded,java.util.function.Predicate<? super T> predicate,java.util.ArrayList<T> result,boolean screenShake) {
             if(collectionRows==null){collectionRows=new long[258];collectionOutput=MemorySegment.ofArray(collectionRows);}
             AbortableIterationConsumer<T> callback=null;
             try {
                 while(true) {
-                    int count=(int)COLLECT.invokeExact(handle,collectionOutput);
+                    int count=(int)COLLECT.invokeExact(handle,collectionOutput,screenShake?2:0);
                     if(count==-2)throw rangeFailure(view.get(ValueLayout.JAVA_LONG,8),view.get(ValueLayout.JAVA_LONG,16));
                     if(count<0)throw new IllegalStateException("Entity collection status "+count);
                     boolean reserved=false;
@@ -207,7 +207,7 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
                         throw new IllegalStateException("Entity collection status "+status);
                     }
                     if(callback==null)callback=entity->{
-                        if(entity!=excluded && predicate.test(entity))result.add(entity);
+                        if(entity!=excluded && predicate.test(entity) && (!screenShake || entity instanceof net.alexscaves.server.entity.util.ShakesScreen))result.add(entity);
                         return AbortableIterationConsumer.Continuation.CONTINUE;
                     };
                     EntitySection<T> section=section();

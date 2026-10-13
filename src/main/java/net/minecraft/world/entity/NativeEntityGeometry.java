@@ -101,8 +101,11 @@ public final class NativeEntityGeometry {
         /** Links two retained CPU owners once; does not export a geometry array. */
         public void attachSectionBinding(MemorySegment section,long token) { attachSectionBinding(section,token,false); }
         public void attachSectionBinding(MemorySegment section,long token,boolean nonSpectator) {
+            attachSectionBinding(section,token,nonSpectator,false);
+        }
+        public void attachSectionBinding(MemorySegment section,long token,boolean nonSpectator,boolean screenShake) {
             try {
-                int status=(int)ATTACH_SECTION.invokeExact(section,token,owner,nonSpectator?1:0);
+                int status=(int)ATTACH_SECTION.invokeExact(section,token,owner,(nonSpectator?1:0)|(screenShake?2:0));
                 if(status!=0)throw new IllegalStateException("Cannot attach section geometry");
             }catch(Throwable failure){throw failure(failure);}finally{Reference.reachabilityFence(this);}
         }

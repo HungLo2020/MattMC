@@ -61,6 +61,63 @@ public final class VerifySectionMembers {
             return spectator;
         }
     }
+    static class ShakeEntity extends SpatialEntity implements net.alexscaves.server.entity.util.ShakesScreen {
+        @Override public float getScreenShakeAmount(float partial){throw new AssertionError("Effect invoked during collection");}
+    }
+    static class ShakeCallback extends ShakeEntity {
+        Runnable hook;
+        boolean spectator;
+        @Override public boolean isSpectator(){events.add("shake-spectator:"+ordinal);var call=hook;hook=null;if(call!=null)call.run();return spectator;}
+    }
+    static void shakeCollect(LevelEntityGetter<SpatialEntity> getter,AABB query,SpatialEntity excluded,ArrayList<SpatialEntity> result) {
+        try {
+            var method=LevelEntityGetter.class.getMethod("collectScreenShakeSources",AABB.class,EntityAccess.class,ArrayList.class);
+            method.invoke(getter,query,excluded,result);
+        } catch(NoSuchMethodException frozen) {
+            var all=new ArrayList<SpatialEntity>();
+            collect(getter,query,excluded,net.minecraft.world.entity.EntitySelector.NO_SPECTATORS,all);
+            for(var e:all)if(e instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(e);
+        } catch(java.lang.reflect.InvocationTargetException e){throw propagate(e.getCause());}
+        catch(ReflectiveOperationException e){throw new IllegalStateException(e);}
+    }
+    static void screenShakeQueries(PrintWriter out) throws Exception {
+        for(int size:new int[]{0,1,3,129,257})for(int frequency:new int[]{0,1,16})for(int scattered=0;scattered<2;scattered++)for(int mode=0;mode<10;mode++) {
+            try(var scope=java.lang.foreign.Arena.ofConfined()) {
+                var storage=new EntitySectionStorage<SpatialEntity>(SpatialEntity.class,k->Visibility.TRACKED);
+                LevelEntityGetter<SpatialEntity> getter=new LevelEntityGetterAdapter<>(new EntityLookup<SpatialEntity>(),storage);
+                var members=new ArrayList<SpatialEntity>();var sections=new ArrayList<EntitySection<SpatialEntity>>();
+                int middle=size/2;
+                for(int i=0;i<size;i++) {
+                    boolean shake=frequency>0 && i%frequency==0;
+                    var e=spatial(i,scope,i==middle?(shake?ShakeCallback.class:SpectatorEntity.class):(shake?ShakeEntity.class:SpatialEntity.class));
+                    e.setBoundingBox(new AABB(0,0,0,1,1,1));members.add(e);
+                    var section=storage.getOrCreateSection(net.minecraft.core.SectionPos.asLong(scattered==0?0:i,0,0));section.add(e);sections.add(section);
+                }
+                var query=new AABB(-1,-1,-1,16.0*Math.max(2,size)+1,2,2);
+                if(size>0) {
+                    var special=members.get(middle);final int action=mode;
+                    Runnable hook=()->{
+                        switch(action) {
+                            case 2 -> {if(middle+1<size)members.get(middle+1).setBoundingBox(new AABB(-10,0,0,-9,1,1));}
+                            case 3 -> {if(middle+1<size)sections.get(middle+1).remove(members.get(middle+1));}
+                            case 4 -> sections.get(middle).add(members.get(0));
+                            case 5 -> {var nested=new ArrayList<SpatialEntity>();shakeCollect(getter,query,null,nested);events.add("nested:"+nested.stream().map(e->e.ordinal).toList());}
+                            case 6 -> {try{var added=spatial(size,scope,ShakeEntity.class);added.setBoundingBox(new AABB(0,0,0,1,1,1));storage.getOrCreateSection(net.minecraft.core.SectionPos.asLong(size,0,0)).add(added);}catch(Exception e){throw new IllegalStateException(e);}}
+                            case 7 -> throw new IllegalStateException("selector failure");
+                        }
+                    };
+                    if(special instanceof ShakeCallback c){c.hook=hook;c.spectator=mode==1;}
+                    else {var c=(SpectatorEntity)special;c.spectatorHook=hook;c.spectator=mode==1;}
+                    if(mode==8)special.setBoundingBox(new AABB(0,0,0,1,1,1){@Override public boolean intersects(AABB box){events.add("custom-bounds");return true;}});
+                }
+                var excluded=size>0 && mode==9?members.get(middle):null;
+                call(out,"shake:"+size+":"+frequency+":"+scattered+":"+mode,()->{
+                    var result=new ArrayList<SpatialEntity>();shakeCollect(getter,query,excluded,result);
+                    events.add("sources:"+result.stream().map(e->e.ordinal).toList());
+                });
+            }
+        }
+    }
     static final java.lang.reflect.Method COLLECT=collectionMethod();
     static java.lang.reflect.Method collectionMethod() {
         try{return LevelEntityGetter.class.getMethod("collectEntities",AABB.class,EntityAccess.class,java.util.function.Predicate.class,ArrayList.class);}
@@ -329,6 +386,7 @@ public final class VerifySectionMembers {
             worldQueries(out);
             typedWorldQueries(out);
             collectedQueries(out);
+            screenShakeQueries(out);
             try(var scope=java.lang.foreign.Arena.ofConfined()) {
                 int x=(1<<21)-2;
                 double edge=x*16.0;

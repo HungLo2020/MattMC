@@ -90,7 +90,22 @@ public class EntitySectionStorage<T extends EntityAccess> {
             return;
         }
         try(var cursor=this.sections.spatialCursor(query.minX,query.minY,query.minZ,query.maxX,query.maxY,query.maxZ)) {
-            cursor.collectNonSpectators(query,excluded,predicate,result);
+            cursor.collectNonSpectators(query,excluded,predicate,result,false);
+        }
+    }
+
+    /** Filter immutable effect capability only after all original bounds/selector callbacks. */
+    public void collectScreenShakeSources(AABB query,T excluded,java.util.ArrayList<T> result) {
+        @SuppressWarnings({"unchecked","rawtypes"})
+        java.util.function.Predicate<? super T> predicate=(java.util.function.Predicate)net.minecraft.world.entity.EntitySelector.NO_SPECTATORS;
+        if(getClass()!=EntitySectionStorage.class || result.getClass()!=java.util.ArrayList.class) {
+            var all=new java.util.ArrayList<T>();
+            collectEntities(query,excluded,predicate,all);
+            for(T entity:all)if(entity instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(entity);
+            return;
+        }
+        try(var cursor=this.sections.spatialCursor(query.minX,query.minY,query.minZ,query.maxX,query.maxY,query.maxZ)) {
+            cursor.collectNonSpectators(query,excluded,predicate,result,true);
         }
     }
 

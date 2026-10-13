@@ -27,6 +27,12 @@ class NativeEntityCollectionTest {
         boolean spectator;
         @Override public boolean isSpectator(){if(hook!=null){var call=hook;hook=null;call.run();}return spectator;}
     }
+    static class Shake extends Fixture implements net.alexscaves.server.entity.util.ShakesScreen {
+        @Override public float getScreenShakeAmount(float partialTick){throw new AssertionError("Effect ran during collection");}
+    }
+    static class CallbackShake extends Callback implements net.alexscaves.server.entity.util.ShakesScreen {
+        @Override public float getScreenShakeAmount(float partialTick){throw new AssertionError("Effect ran during collection");}
+    }
     private static final AABB BOX=new AABB(-1,-1,-1,4097,2,2);
     @BeforeAll static void bootstrap(){net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();}
 
@@ -42,6 +48,54 @@ class NativeEntityCollectionTest {
     static LevelEntityGetter<Entity> getter(EntitySectionStorage<Entity> storage){return new LevelEntityGetterAdapter<>(new EntityLookup<>(),storage);}
     static ArrayList<Entity> collect(LevelEntityGetter<Entity> getter,Entity excluded){
         var result=new ArrayList<Entity>();getter.collectEntities(BOX,excluded,EntitySelector.NO_SPECTATORS,result);return result;
+    }
+
+    @Test void screenShakeWorldQueryRetainsOnlySourcesAcrossBatchesAndExcludesCamera() throws Exception {
+        try(var scope=Arena.ofConfined()) {
+            var storage=new EntitySectionStorage<>(Entity.class,k->Visibility.TRACKED);
+            var expected=new ArrayList<Entity>();
+            for(int i=0;i<514;i++) {
+                var entity=fixture(scope,i%3==0?Shake.class:Fixture.class);
+                storage.getOrCreateSection(SectionPos.asLong(i/2,0,0)).add(entity);
+                if(entity instanceof Shake)expected.add(entity);
+            }
+            var excluded=expected.remove(127);
+            var level=mock(ServerLevel.class,CALLS_REAL_METHODS);
+            doReturn(getter(storage)).when(level).getEntities();doReturn(List.of()).when(level).dragonParts();
+            assertEquals(expected,level.getScreenShakeSources(excluded,BOX));
+            assertEquals(expected,level.getScreenShakeSources(excluded,BOX));
+        }
+    }
+    @Test void rejectedCapabilityStillInvokesSpectatorAndBoundsBeforeLaterSelection() throws Exception {
+        try(var scope=Arena.ofConfined()) {
+            var storage=new EntitySectionStorage<>(Entity.class,k->Visibility.TRACKED);
+            var first=storage.getOrCreateSection(0);
+            var source=fixture(scope,Shake.class);first.add(source);
+            var callback=(Callback)fixture(scope,Callback.class);first.add(callback);
+            var events=new ArrayList<String>();
+            callback.setBoundingBox(new AABB(0,0,0,1,1,1){
+                @Override public boolean intersects(AABB box){events.add("bounds");return true;}
+            });
+            var later=fixture(scope,Shake.class);
+            callback.hook=()->{events.add("spectator");storage.getOrCreateSection(SectionPos.asLong(1,0,0)).add(later);};
+            var result=new ArrayList<Entity>();getter(storage).collectScreenShakeSources(BOX,null,result);
+            assertEquals(List.of(source,later),result);assertEquals(List.of("bounds","spectator"),events);
+            result.clear();events.clear();callback.hook=()->fail("Excluded callback must not test spectator");
+            getter(storage).collectScreenShakeSources(BOX,callback,result);
+            assertEquals(List.of(source,later),result);assertEquals(List.of("bounds"),events);
+        }
+    }
+    @Test void screenShakeSelectionPreservesCustomGetterAndSpectatorDispatch() throws Exception {
+        try(var scope=Arena.ofConfined()) {
+            var storage=new EntitySectionStorage<>(Entity.class,k->Visibility.TRACKED);
+            var source=fixture(scope,Shake.class);var rejected=(CallbackShake)fixture(scope,CallbackShake.class);
+            rejected.spectator=true;storage.getOrCreateSection(0).add(rejected);
+            var result=new ArrayList<Entity>();getter(storage).collectScreenShakeSources(BOX,null,result);assertTrue(result.isEmpty());
+            var custom=new LevelEntityGetterAdapter<Entity>(new EntityLookup<>(),storage) {
+                @Override public void collectEntities(AABB box,Entity excluded,java.util.function.Predicate<? super Entity> predicate,ArrayList<Entity> into){into.add(source);}
+            };
+            custom.collectScreenShakeSources(BOX,null,result);assertEquals(List.of(source),result);
+        }
     }
 
     @Test void productionLevelQueryCollectsAcrossBatchesAndPreservesExclusion() throws Exception {

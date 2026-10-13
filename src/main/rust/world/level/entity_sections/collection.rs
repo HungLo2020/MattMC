@@ -13,6 +13,7 @@ use super::*;
 pub unsafe extern "C" fn mattmc_section_index_collect_non_spectators(
     cursor: *mut c_void,
     output: *mut u64,
+    required: u32,
 ) -> i32 {
     let Some(lease) = cursor.cast::<Lease>().as_mut() else {
         return -1;
@@ -56,6 +57,7 @@ pub unsafe extern "C" fn mattmc_section_index_collect_non_spectators(
                     bounds,
                     lease.view.token,
                     member_cursor,
+                    required,
                     &mut out[2..],
                     &mut count,
                 )
@@ -117,7 +119,7 @@ mod tests {
                     members,
                     token,
                     body,
-                    i32::from(index != callback)
+                    i32::from(index != callback) | if index % 3 == 0 { 2 } else { 0 }
                 ),
                 0
             );
@@ -133,6 +135,28 @@ mod tests {
     }
 
     #[test]
+    fn capability_filter_projects_only_sources_but_stops_at_rejected_callbacks() {
+        unsafe {
+            let owner = mattmc_section_index_create();
+            let first = section(owner, encode(0, 0, 0), 130, usize::MAX);
+            let second = section(owner, encode(1, 0, 0), 12, 5);
+            let bounds = [-1., -1., -1., 33., 2., 2.];
+            let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+            let mut out = [0; 258];
+            assert_eq!(mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 2), 46);
+            assert_eq!(out[0], 3); // Callback member 5 lacks the capability, but must still run.
+            assert_eq!(out[1] as u32, 5);
+            for i in 0..44 { assert_eq!(out[3 + i * 2] as u32, 1 + i as u32 * 3); }
+            assert_eq!(out[91] as u32, 1);
+            assert_eq!(out[93] as u32, 4);
+            mattmc_section_index_cursor_release(cursor);
+            mattmc_section_members_release(first);
+            mattmc_section_members_release(second);
+            mattmc_section_index_release(owner);
+        }
+    }
+
+    #[test]
     fn collection_batches_across_sections_and_resumes_large_sections() {
         unsafe {
             let owner = mattmc_section_index_create();
@@ -142,12 +166,12 @@ mod tests {
             let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
             let mut out = [0; 258];
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 128
             );
             assert_eq!(out[0], 1);
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 5
             );
             assert_eq!(out[0], 0);
@@ -162,7 +186,7 @@ mod tests {
                 0
             );
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 128
             );
             mattmc_section_index_cursor_release(cursor);
@@ -181,11 +205,11 @@ mod tests {
             let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
             let mut out = [0; 258];
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 128
             );
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 1
             );
             assert_eq!(out[0], 3);
@@ -194,7 +218,7 @@ mod tests {
             // Java resumes and finishes the original section; its callback may add this column.
             let future = section(owner, encode(1, 0, 0), 1, usize::MAX);
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 1
             );
             assert_eq!(out[0], 0);
@@ -216,7 +240,7 @@ mod tests {
             let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
             let mut out = [0; 258];
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 1
             );
             assert_eq!(out[0], 4);
@@ -237,19 +261,19 @@ mod tests {
             let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
             let mut out = [0; 258];
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 128
             );
             mattmc_section_index_cursor_close(cursor);
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 0
             );
             assert_eq!(out[0], 0);
             mattmc_section_index_spatial_reopen(cursor, bounds.as_ptr());
             mattmc_section_members_visibility(members, -1);
             assert_eq!(
-                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr()),
+                mattmc_section_index_collect_non_spectators(cursor, out.as_mut_ptr(), 0),
                 0
             );
             assert_eq!(out[0], 2);

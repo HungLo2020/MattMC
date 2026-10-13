@@ -556,7 +556,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		AABB aabb = cameraEntity.getBoundingBox().inflate(SCREEN_SHAKE_SEARCH_RADIUS);
 		
 		// Find nearby entities that implement ShakesScreen
-		for (Entity entity : this.minecraft.level.getEntities(cameraEntity, aabb)) {
+		for (Entity entity : this.minecraft.level.getScreenShakeSources(cameraEntity, aabb)) {
 			if (entity instanceof ShakesScreen shakesScreen) {
 				double entityDistance = entity.distanceTo(cameraEntity);
 				if (shakesScreen.canFeelShake(cameraEntity) && entityDistance < distance) {

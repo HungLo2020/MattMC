@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--screen-shake', action='store_true', help='Measure effect-source collection and the original consumer capability loop')
     args = parser.parse_args()
     assert args.java_home, 'JDK 25 required'
     out = args.output.resolve(); out.mkdir(parents=True, exist_ok=False)
@@ -29,6 +30,8 @@ def main():
     assert not subprocess.check_output(['git', '-C', str(FROZEN), 'status', '--porcelain'])
     result = {'pins': pin, 'passed': False,
               'scope': '4096 production getter collections per sample, including result allocation, projection and sparse consumption. Full identity/order checked before timing. 64 warmups, eight compiler-quiet samples (at most 16 attempts, all measured-JIT samples retained separately), three interleaved JVMs per side. Current control uses the previous get/callback sequence on candidate storage; Frozen is unchanged. Excludes gameplay and native memory.'}
+    if args.screen_shake:
+        result['scope'] = '4096 screen-shake source collections and capability loops per sample. Current uses retained native selection; control collects all non-spectators on candidate storage; unchanged Frozen uses its original getter. Four section layouts, three source frequencies, two callback frequencies; 64 warmups and eight compiler-quiet samples in three interleaved JVMs per side. Scoped CPU/Java allocation, not gameplay or total memory.'
     env = os.environ.copy()
     for key in ('JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS'): env.pop(key, None)
     env.update(JAVA_HOME=str(jdk.parent), PATH=str(jdk) + os.pathsep + env.get('PATH', ''))
@@ -48,21 +51,22 @@ def main():
             classes = out / side; classes.mkdir()
             run([str(jdk / 'javac'), '-cp', cp, '-d', str(classes),
                  str(ROOT / 'DevUtils/tests/world/entity/VerifySectionMembers.java'),
-                 str(ROOT / 'DevUtils/tests/world/entity/BenchmarkEntityCollection.java')], side+'-compile.log')
+                 str(ROOT / 'DevUtils/tests/world/entity/BenchmarkEntityCollection.java'),
+                 str(ROOT / 'DevUtils/tests/world/entity/BenchmarkScreenShakeSources.java')], side+'-compile.log')
             for base in cp.split(os.pathsep):
                 for namespace in ('net/minecraft/world/level', 'net/minecraft/world/entity', 'net/minecraft/util'):
                     images.update({str(p): sha(p) for p in (Path(base) / namespace).rglob('*.class')})
             images.update({str(p): sha(p) for p in classes.rglob('*.class')})
             commands[side] = [str(jdk / 'java'), '-Xms1g', '-Xmx1g', '-XX:+UseG1GC', '-Xbatch',
                               '--enable-native-access=ALL-UNNAMED', '-Dmattmc.rust.natives.dir='+str(native.parent),
-                              '-cp', str(classes)+os.pathsep+cp, 'BenchmarkEntityCollection']
+                              '-cp', str(classes)+os.pathsep+cp, 'BenchmarkScreenShakeSources' if args.screen_shake else 'BenchmarkEntityCollection']
         result['class_images'] = images
         samples = {side: [] for side in ('current', 'frozen', 'control')}; result['samples'] = samples
         result['rejected_jit'] = {}
         for index, side in enumerate(['current', 'frozen', 'control'] * 3):
             data = run(commands['frozen' if side == 'frozen' else 'current']+[side], f'{index}-{side}.log')
             rows = [list(map(int, match.split())) for match in re.findall(r'COLLECTION_TIMING ([0-9 -]+)', data)]
-            assert len(rows) == 128 and all(len(row) == 8 and row[7] == 0 for row in rows), (side, 'missing samples or measured JIT', rows)
+            assert len(rows) == (192 if args.screen_shake else 128) and all(len(row) == 8 and row[7] == 0 for row in rows), (side, 'missing samples or measured JIT', rows)
             result['rejected_jit'][f'{index}-{side}'] = [list(map(int, match.split())) for match in re.findall(r'COLLECTION_REJECTED_JIT ([0-9 -]+)', data)]
             if side != 'frozen': assert 'NATIVE_IMAGE '+pin['native'] in data
             loaded = re.findall(r'CLASS_IMAGE (\w+) (\S+)', data); assert len(loaded) == 4

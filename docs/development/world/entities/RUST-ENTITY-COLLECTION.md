@@ -37,6 +37,99 @@ Implementation: [native collector](https://github.com/HungLo2020/MattMC/blob/mas
 [Java cursor](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/entity/NativeEntitySectionIndex.java)
 and [production caller](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/Level.java).
 
+## Screen-shake source selection
+
+Screen-shake selection now filters immutable capability inside the retained
+Rust membership query. `GameRenderer` requests source identities through
+`Level.getScreenShakeSources`; it no longer projects all ordinary nearby entities
+into a temporary Java list before rejecting their capabilities. The numeric
+shake reducer, effect callbacks, random offsets and pose application remain Java.
+This is source-selection ownership, not completion of camera-effect migration.
+
+The latest diagnostic gameplay profile at `b48b9eb7d`'s source contains 64
+render-thread collector samples; truncated stacks do not establish the exact
+caller distribution. Inspection identifies screen shake as a per-frame consumer
+that needs only a small capability subset. Profiling identifies avoidable work;
+it does not establish a speedup for this candidate.
+
+- Registration publishes immutable capability bits alongside the retained
+  geometry binding; there is no per-frame class scan or duplicated member list.
+  Bit 0 admits the stock non-spectator result; bit 1 identifies shake sources.
+- Check original bounds and spectator behavior before filtering capabilities.
+  Rejected entities can still mutate later members, throw or insert future
+  sections. Native traversal must yield before those callbacks.
+- Complete collection before evaluating any shake distance/intensity callback.
+  Preserve source order, duplicates, camera exclusion and dragon-part getter
+  ordering. Subclassed worlds, getters and storage retain original dispatch.
+- Capability bits belong to a generational membership binding and are cleared
+  on slot reuse. They do not change entity simulation or GPU ownership.
+
+Eight focused Java integration tests and 30 native membership tests pass, including
+production world queries, rejected-entity callbacks and custom getter dispatch.
+The actual-Frozen corpus matches all 7,186 cases, including 300 new source-selection
+cases with ordered callback and mutation traces. Source/class/native guards pass.
+Native `5e09c034` also passes the nine-JVM component comparison with source,
+class, native identity and output guards. Six measured-JIT samples were excluded
+and retained. The full check passes 2,785 Rust tests (three ignored) and 2,133
+Java tests (two skipped), including parity and slow suites. The scoped runtime
+checkpoint below also passes.
+Each sample includes 4,096 result allocations, collections and the original
+consumer's capability loop. There are 64 warmups and eight compiler-quiet samples
+per workload in three interleaved JVMs per side. The control uses the previous
+Current non-spectator collector on candidate storage; Frozen is unchanged.
+
+| Sources / layout | CPU ms, Current / previous consumer / Frozen | Java heap MB, Current / previous consumer / Frozen |
+| --- | --- | --- |
+| None, 256 sections | 34.80 / 43.28 / 28.51 | 0.098 / 6.521 / 18.874 |
+| Every 16th, 256 sections | 35.61 / 43.78 / 29.32 | 0.426 / 6.521 / 18.874 |
+| Every entity, 256 sections | 42.18 / 43.17 / 37.75 | 6.521 / 6.521 / 18.874 |
+| None, one section / 128 entities | 2.138 / 5.562 / 2.419 | 0.098 / 2.261 / 8.749 |
+| Every 16th, one section / 128 entities | 2.373 / 5.836 / 3.577 | 0.328 / 2.261 / 8.749 |
+
+Scattered no-source CPU improves 19.6% against the previous consumer, with 98.5%
+less Java allocation. Dense no-source CPU is 11.6% below Frozen. Scattered and
+one-entity query CPU still lag Frozen; the one-entity no-source case measures
+0.468/0.466/0.071 ms Current/control/Frozen. These scoped improvements do not
+establish a gameplay gain or native/total memory bound. Callback-heavy cases,
+all raw samples and identity receipts are in `build/native-screen-shake/measurement-1/`.
+
+```sh
+python3 DevUtils/tests/world/entity/VerifyEntityCollection.py \
+  --java-home /path/to/jdk25 --output build/screen-shake/measurement --screen-shake
+```
+
+### Screen-shake runtime checkpoint
+
+One fresh 6,000-frame pair per mode on native `5e09c034`:
+
+| Mode | FPS, Current / Frozen | p99 ms, Current / Frozen | Peak RSS GiB, Current / Frozen |
+| --- | --- | --- | --- |
+| Vanilla | 1289.3 / 1190.4 | 3.332 / 3.787 | 5.03 / 4.37 |
+| Shaders | 359.3 / 318.5 | 4.714 / 7.190 | 5.82 / 6.16 |
+| DH | 814.9 / 684.8 | 3.826 / 6.050 | 6.04 / 5.99 |
+| Shaders + DH | 275.9 / 227.9 | 5.363 / 8.484 | 8.48 / 7.64 |
+
+All scoped FPS/p99 floors pass. Saved inputs and live JVM controls match;
+entity counts are 190/181, 184/182, 167/166 and 165/167 in table order.
+Single pairs do not establish an isolated gain or sustained acceptance. RSS
+covers short client sessions; no GPU-memory metric or long-session bound is proven.
+
+Vanilla and shader+DH settled pairs and three lifecycle checks (world reload,
+resource reload, view-distance reduction) pass with zero Vulkan validation
+errors. All seven original images were viewed: coast pairs closely align;
+heavy blue haze limits the three lifecycle initial images to structural evidence.
+These checks do not close first-turn pop-in/flicker, first shader-world
+presentation, broad entity/rig visuals or visible active-dinosaur shake coverage.
+The numerical shake behavior is unchanged; source-selection oracle results
+must not be reported as complete camera-effect or gameplay parity.
+
+Final source/class/native/Frozen/input/JVM guards pass. Five presenter
+correlations and nine native identities match. Thirteen completed test-world
+copies were retired, preserving originals, logs, samples and identity receipts
+under `build/native-screen-shake/` and
+`artifacts/graphics-captures/validation/native-screen-shake-20261013/`.
+Subsequent measurements below are historical collector checkpoints.
+
 ## Verification commands
 
 Use JDK 25 and build the current native library before the Frozen observer:

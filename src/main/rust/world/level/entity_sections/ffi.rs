@@ -221,10 +221,10 @@ pub unsafe extern "C" fn mattmc_section_members_remove(
 /// pointer is retained, and world transfer preserves this view's identity.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_members_attach_geometry(
-    owner: *const c_void, token: u64, body: *const super::super::entity_geometry::Body, non_spectator: i32,
+    owner: *const c_void, token: u64, body: *const super::super::entity_geometry::Body, capabilities: i32,
 ) -> i32 {
     let (Some(c), Some(body)) = (owner.cast::<Context>().as_ref(), body.as_ref()) else { return -1; };
-    c.bindings.attach_geometry(token, body.retained_view(), non_spectator != 0);
+    c.bindings.attach_geometry(token, body.retained_view(), capabilities as u32);
     0
 }
 
@@ -259,7 +259,7 @@ impl Context {
     /// Append pure stock matches without invoking Java or opening future sections.
     /// Stop at the first bounds/spectator callback, leaving its iterator position intact.
     pub(super) fn collect_non_spectators(&self, bounds: [f64; 6], section: u64,
-        mut cursor: i32, out: &mut [u64], count: &mut usize) -> CollectionStep {
+        mut cursor: i32, required: u32, out: &mut [u64], count: &mut usize) -> CollectionStep {
         let groups = self.groups.lock().unwrap();
         let members = &groups[0];
         if members.size() == 0 { return CollectionStep::Done; }
@@ -275,7 +275,8 @@ impl Context {
             };
             match geometry.intersects(token, bounds) {
                 Some(false) => {},
-                Some(true) if geometry.non_spectator(token) => {
+                Some(true) if geometry.has_capabilities(token, 1) => {
+                    if !geometry.has_capabilities(token, required) { cursor += 1; continue; }
                     out[2 * *count] = section;
                     out[2 * *count + 1] = token;
                     *count += 1;
