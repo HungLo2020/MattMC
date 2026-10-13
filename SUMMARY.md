@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | Vanilla | 1289.30 / 1190.40 | 3.332 / 3.787 |
 | Vanilla + DH | 814.90 / 684.80 | 3.826 / 6.050 |
-| Shaders | 359.30 / 318.50 | 4.714 / 7.190 |
-| Shaders + DH | 275.90 / 227.90 | 5.363 / 8.484 |
-Native5e09c034: one6000-frame pair/mode passes scoped FPS/p99 floors. Inputs/JVM controls match; entity counts differ. Two settled pairs/three lifecycles pass,VUID0; hazy images structural only. Current peak RSS5.03–8.48GiB; sustained performance/memory acceptance remains open.
-Rust2785/Java2133/Frozen7186 pass. No-source collection CPU34.80/43.28/28.51ms Current/prior consumer/Frozen per4096queries; Java heap0.098/6.52/18.87MB. Frozen CPU gaps remain. [Report](docs/development/world/entities/RUST-ENTITY-COLLECTION.md#screen-shake-source-selection). Broad Java migration remains unfinished.
+| Shaders | 357.00 / 312.60 | 5.098 / 7.935 |
+| Shaders + DH | 282.80 / 225.80 | 5.889 / 9.223 |
+Shader rows: nativef29c8316 after upstream1490391f9, one clean6000-frame pair/mode; scoped FPS/p99 floors pass. Vanilla rows retain native5e09c034. Inputs/JVM controls match; entity counts differ. One settled pair/three lifecycles pass,VUID0; hazy gates structural only. Long/GPU memory acceptance stays open.
+Rust2788/Java2137/Frozen108 bounds pass. Shadow capture CPU7–44% below prior transport; mixed-holder Java heap25–26% lower. [Report](docs/development/rendering/RUST-ENTITY-SHADOW-CANDIDATES.md). Broad Java migration remains unfinished.

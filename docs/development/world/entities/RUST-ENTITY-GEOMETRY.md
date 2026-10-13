@@ -195,3 +195,15 @@ Receipts: `build/native-entity-geometry-living-consumer/`.
 Allocation profiles identified ordinary Java inflation as avoidable frame work.
 The earlier range/readiness timing matrix predates this implementation and
 missed vanilla p99. Do not use it to claim this slice's speed or acceptance.
+
+## Rejected distance-query experiment (2026-10-13)
+
+A retained Rust distance query matched 10,675 actual Frozen cases, including
+custom callbacks and numeric edges, but added more boundary/admission work
+than the small Java calculation it replaced. For 256 stationary entities,
+CPU was 0.630 ms versus Frozen 0.149 ms and the prior-Java control 0.167 ms;
+moving-camera cases also regressed. The prototype was removed and the published
+implementation rebuilt successfully. No runtime acceptance was attempted.
+Evidence and the rejected patch remain in `build/native-render-distance/`.
+Future distance migration should absorb the surrounding producer and consumer,
+not add per-entity native reads for this calculation alone.

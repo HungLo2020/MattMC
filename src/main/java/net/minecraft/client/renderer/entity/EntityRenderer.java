@@ -152,6 +152,16 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 
 	/** Copies gameplay culling facts without constructing or querying a shadow frustum. */
 	public final net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord copyEntityCulling(T entity, Vec3 camera) {
+		return captureEntityCulling(entity, camera, null);
+	}
+
+	/** Capture directly into Rust-owned query storage, without intermediate records. */
+	public final void captureEntityShadowCandidate(T entity, Vec3 camera, net.vulkanic.bridge.EntityShadowQuery query) {
+		captureEntityCulling(entity, camera, java.util.Objects.requireNonNull(query));
+	}
+
+	private net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord captureEntityCulling(
+			T entity, Vec3 camera, net.vulkanic.bridge.EntityShadowQuery query) {
 		var client = Minecraft.getInstance();
 		boolean passenger = entity.hasIndirectPassenger(client.player);
 		boolean affected = this.affectedByCulling(entity);
@@ -168,12 +178,18 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.PLAYER_GROUP;
 		if (affected && !passenger && HookRegistry.entityRendererHooksAffectShadowPass())
 			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.UNRESOLVED_HOOKS;
+		AABB holderBounds = null;
 		net.vulkanic.bridge.VulkanicGalBridge.WorldAabbRecord holder = null;
 		if (entity instanceof Leashable leashable && leashable.getLeashHolder() != null) {
 			Entity leashHolder = leashable.getLeashHolder();
 			// Frozen does not inflate the holder's renderer-specific bounds.
-			holder = copiedEntityBounds(this.entityRenderDispatcher.getRenderer(leashHolder).getBoundingBoxForCulling(leashHolder));
+			holderBounds = java.util.Objects.requireNonNull(this.entityRenderDispatcher.getRenderer(leashHolder).getBoundingBoxForCulling(leashHolder));
+			if (query == null) holder = copiedEntityBounds(holderBounds);
 			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.LEASH_HOLDER;
+		}
+		if (query != null) {
+			query.add(flags, bounds, holderBounds);
+			return null;
 		}
 		return new net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord(flags,copiedEntityBounds(bounds),holder);
 	}

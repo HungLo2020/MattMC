@@ -535,7 +535,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			if (dispatcherCamera != null && !renderer.rustShadowCullingEligible(entity, dispatcherCamera.getPosition()))
 				continue;
 			this.rustShadowCandidateEntities.add(entity);
-			if (query != null) query.add(renderer.copyEntityCulling(entity, dispatcherCamera.getPosition()));
+			if (query != null) renderer.captureEntityShadowCandidate(entity, dispatcherCamera.getPosition(), query);
 		}
 		Vec3 submitCamera = this.levelRenderState.cameraRenderState.pos;
 		boolean decided = query != null && submitCamera != null

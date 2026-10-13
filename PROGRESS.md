@@ -21,11 +21,14 @@
 - General simulation, networking and startup/platform remain Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
 
 ## Current implementation batch
-- Screen-shake source selection (verified checkpoint): Rust filters retained immutable effect capability before Java projection; GameRenderer consumes selected sources. Numeric shake policy/state and behavior callbacks still Java. Guide: docs/development/world/entities/RUST-ENTITY-COLLECTION.md.
-- Native5e09c034 passes full Rust2785/3ignored and Java2133/2skip; actual Frozen7186 cases include300 new source-selection callback/mutation cases. Nine-JVM CPU comparison passes source/class/native/output guards; six measured-JIT samples retained separately. Evidence: build/native-screen-shake/.
-- Scattered no-source CPU34.80/43.28/28.51ms Current/prior consumer/Frozen (19.6% below prior), Java heap0.098/6.52/18.87MB per4096queries. Dense no-source CPU2.14/5.56/2.42ms; scattered/small-query Frozen gaps remain. No isolated gameplay gain claimed.
-- Four6000-frame pairs pass scoped FPS/p99 floors (SUMMARY); matched inputs/JVM controls, entities190/181,184/182,167/166,165/167. Two settled pairs/three lifecycles pass,VUID0; seven originals/five presenter/nine native identities reviewed. Hazy gates structural only; RSS5.03–8.48GiB, long memory open. Thirteen completed copies retired; originals/logs/samples retained.
-- Previous published batch b48b9eb7d: retained generation capture, Rust2784/Java2130/Frozen generation/collision/tick cases pass; binding samples48→1. Seventeen world copies retired and1.20GB lossless JSON savings. Evidence/limits: docs/development/world/levelgen/RUST-STAGE-HANDOFF.md. Broader Java migration remains unfinished.
+
+- Integrated upstream1490391f9 (Rust-only DH generation) without conflicts; all18 local paths preserved. Combined nativef29c8316 verification passes; ready for incremental publication.
+- Rust owns bounded shadow candidate CPU storage/growth/admission output; Java writes immutable captures directly, preserving callback order. Ordinary render-state extraction/bounds inflation remain Java. Guide: docs/development/rendering/RUST-ENTITY-SHADOW-CANDIDATES.md.
+- Combined full Rust2788/3ignored and Java2137/2skip pass; Frozen108 bounds/native replay and fresh DH generation16-chunk checksums pass. Saved DH height differences remain explicitly outside exact parity. CPU7–44% below prior capture transport, mixed-holder Java heap25–26% lower;192 compiler-quiet samples/24 JVMs. No isolated gameplay gain claimed.
+- Fresh6000-frame pairs: shaders357.0/312.6FPS,p995.098/7.935ms; shaders+DH282.8/225.8FPS,p995.889/9.223ms Current/Frozen. Both scoped floors pass. Prior nativecd299 two-pair results and excluded/replaced timing overlap remain historical. Evidence: build/native-shadow-candidates/integrated/.
+- Inputs/liveJVM/source/class/native/Frozen guards pass; entities181/183 and165/167 differ. Settled pair/three lifecycles pass,VUID0; five originals/four presenter/six native identities reviewed. Hazy gates structural only. Current RSS5.92/7.73GiB; long/GPU memory open. Eight completed copies retired; originals/failures retained.
+- Rejected render-distance prototype matched10675 Frozen cases but stationary256 CPU0.630/0.149ms Current/Frozen; restored published implementation and rebuilt successfully. Evidence: build/native-render-distance/; world/entities/RUST-ENTITY-GEOMETRY.md.
+- Previous40546c86c: Rust screen-shake source selection; Rust2785/Java2133/Frozen7186 pass. No-source collection CPU34.80/43.28/28.51ms Current/prior/Frozen, Java heap0.098/6.52/18.87MB. Four mode pairs/two settled pairs/three lifecycles pass; Frozen CPU gaps remain. Guide: world/entities/RUST-ENTITY-COLLECTION.md.
 
 ## Earlier DH checkpoints
 
@@ -95,6 +98,3 @@
 - Protected stashes:12345bcea835a6969b164f1a358ecd44a5bb22ab andc979e5de03a6682327a293fec0fc5150eaacf0bb. No workflow stash needed.
 - Explicitly stage reviewed paths; never force-push/reset/blanket-stage. Preserve incoming and local work together on upstream master.
 - Prune only recognized completed copies after clients exit; preserve originals/profiles/failures/unknown or active scopes and open-defect worlds. Never clean during timing. Fresh paired model JFRs retained: two completed worlds retired; verified lossless JSON compression reclaimed641680011bytes.
-- Prior manifests record large cache/archive/video retirement. Latest point-codec cleanup retired21 completed copies/2.29GiB while preserving1550 selected evidence hashes and all originals/profiles/failures.
-- Metadata/IO cleanup retired29 completed copies, reclaiming3.11GiB;1387 selected evidence hashes unchanged. Interrupted final DH scope, all originals/profiles/per-frame diagnostics and protected inputs remain.
-- Light-input cleanup retired21 completed copies/2.29GiB with1548 selected evidence hashes unchanged; all originals/profiles/per-frame diagnostics and failed RSS/legacy-shutdown scopes remain.

@@ -64,6 +64,8 @@ each module there has a short README with its own file map.
   OpenGL vertex inputs without changing its renderer or source files.
 - [Underground shader lighting checks](UNDERGROUND-SHADER-CHECKS.md): prepare
   equivalent cave captures and distinguish fog, shadow and volumetric inputs.
+- [Rust shadow candidate storage](RUST-ENTITY-SHADOW-CANDIDATES.md): bounded
+  native capture buffers, callback boundaries and verification status.
 - [Entity shadow ordering checks](ENTITY-SHADOW-CHECKS.md): exercise typed orb
   placement boundaries through CPU capture and copied-world shader sessions.
 - [Terrain movement checks](TERRAIN-MOVEMENT-CHECKS.md): use ordinary isolated
