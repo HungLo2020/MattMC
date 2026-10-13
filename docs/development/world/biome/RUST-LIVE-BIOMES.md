@@ -76,6 +76,60 @@ the later manual recorder, Java allocation and lazy mesh-binding changes through
 [`90d31038`](https://github.com/HungLo2020/MattMC/commit/90d31038f246143bc2c4449e6b9db896f83e0d58);
 those changes have not been remeasured by this documentation review.
 
+## Live biome identity queries
+
+Ordinary `BiomeManager.getBiome` selection and exact-stock client
+`getNoiseBiome` reads use the retained world owner.
+Rust selects the fiddled-distance corner and reads the current primary palette
+without exporting a section or walking Java chunk/palette objects. Java resolves
+the returned registry ID to the existing holder. The shared selection kernel
+also serves custom noise sources, which still receive one `getNoiseBiome`
+callback at the selected quart coordinate; there is no second Java selection loop.
+
+Loaded compatibility chunks decline native identity queries. Missing and
+out-of-range chunks use the captured default biome. Height clamping, signed
+coordinate wrapping, palette growth and shared single-palette mutations must
+remain identical to Frozen. During biome packet replacement the bridge declines
+so callbacks can observe the partially updated Java source in its original order.
+Client/cache subclasses retain source dispatch. No native lock spans Java callbacks.
+
+The October 12 profile of published native `561b048e` contains 45 render-thread
+leaf samples in `ClientChunkCache.getChunk`, including 20 stacks through biome
+lookup. It includes loading work and motivates this slice; it is not an isolated
+cost estimate or performance acceptance. Receipts: `build/native-frame-input-profile/`.
+The query checkpoint passes 162,701 actual Frozen coordinate comparisons,
+eight Java owner/integration tests and nine focused Rust tests. Full serial
+Rust passes 2,737 tests (three ignored); all Java tiers pass 2,060 tests
+(two skipped). Six interleaved JVMs, with five warmups and eight samples each,
+measure 1,048,576 scalar-source queries at median **76.07 ms Current versus
+216.02 ms Frozen**, with zero Java heap allocation on both sides. This is
+64.8% less CPU time for selection, excluding retained world lookup, simulation
+and GPU work. The oracle and source/class/native guards pass for native
+`487cebcc`. One clean 6,000-frame vanilla pair measures Current/Frozen
+**1,320.6/1,068.7 FPS**, p99 **3.736/4.428 ms**. This is an iteration pair,
+not a repeated all-mode matrix or an isolated gameplay improvement claim.
+Both settled vanilla and Iris+DH comparisons pass with zero VUIDs; all four
+originals were reviewed. World unload/reload, resource reload and view-distance
+reduction also pass. Their three reviewed captures are heavily hazy and establish
+structural lifecycle evidence only. Seven originals, five presenter correlations,
+six loaded native identities and final source/native/Frozen guards are retained.
+Broad gameplay, transient terrain defects and long-session memory remain open.
+
+Receipts: `build/native-biome-query/verified-scalar/`, `iteration.json` and
+`image-review.json`; runtime originals are in
+`artifacts/graphics-captures/validation/native-biome-query-iteration-20261012/`.
+Nine completed copied workspaces were retired. Both JFR originals remain;
+hash-verified compression of derived profile JSON reclaimed 625,594,176 bytes.
+Run the focused tests and oracle:
+
+```sh
+./gradlew -PmattmcRustProfile=release test --tests '*NativeBiomeWorldTest'
+python3 DevUtils/tests/world/biome/VerifyBiomeQueries.py --java-home /path/to/jdk25
+# Optional isolated scalar-source CPU comparison; run with other workloads stopped:
+python3 DevUtils/tests/world/biome/VerifyBiomeQueries.py --java-home /path/to/jdk25 \
+  --output build/biome-query-benchmark --benchmark
+```
+
 ## Boundaries to preserve
 
 - Only the standard factory's frozen `MappedRegistry` binding is admitted.
@@ -134,8 +188,8 @@ and [`NativeBiomeWorld`](https://github.com/HungLo2020/MattMC/blob/master/src/ma
 Shared producer: [`NativeBiomeChunkInputs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeBiomeChunkInputs.java).
 
 ```sh
-CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::chunk::biomes
-CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml world::level::biome::live
+CARGO_TARGET_DIR=build/rust/target cargo test --locked --profile suite --manifest-path src/main/rust/Cargo.toml world::level::chunk::biomes
+CARGO_TARGET_DIR=build/rust/target cargo test --locked --profile suite --manifest-path src/main/rust/Cargo.toml world::level::biome::live
 ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeLiveBiomeSectionTest' --tests '*NativeLiveBlockSectionTest'
 ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests '*NativeBiomeFogTest' --tests '*NativeBiomeWorldTest'
 ./gradlew -PmattmcRustProfile=release test parityTest -x testRustNative

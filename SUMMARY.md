@@ -6,5 +6,5 @@
 | Vanilla + DH | 796.85 / 873.55 | 3.363 / 4.368 |
 | Shaders | 347.40 / 314.85 | 5.376 / 7.484 |
 | Shaders + DH | 264.00 / 226.95 | 6.492 / 9.940 |
-FPS rows describe published native a9286e05: DH misses Frozen by 8.8%; the 13.25 GiB startup RSS failure remains open. The conversion-policy candidate has no runtime/FPS acceptance.
-DH full-source CPU Current/preceding/Frozen50.29/63.57/64.69ms; heap5.85/34.23/29.85MB. Rust policy/colors/scratch pass output/guard checks;22.3% faster Frozen in this CPU fixture. Rust2736/Java2058 pass (3ignored/2skipped); 7lifecycle/3settled pairs pass,VUID0; no new FPS acceptance. Integrated check/Wiki pass. [Report](docs/development/rendering/RUST-DH-CONVERSION.md).
+FPS rows describe published native a9286e05: DH misses Frozen by 8.8%; the 13.25 GiB startup RSS failure remains open. New biome-query iteration: vanilla1320.6/1068.7FPS, p993.736/4.428ms; one pair, not new all-mode acceptance.
+Live-biome selection CPU76.07/216.02ms Current/Frozen (64.8% faster, zero Java allocation); direct retained client reads. Frozen162701 cases, Rust2737/Java2060 pass (3ignored/2skipped); 2settled pairs/3lifecycles pass,VUID0. [Report](docs/development/world/biome/RUST-LIVE-BIOMES.md).

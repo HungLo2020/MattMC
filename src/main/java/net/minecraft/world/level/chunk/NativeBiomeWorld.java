@@ -34,6 +34,11 @@ public final class NativeBiomeWorld {
     private static final MethodHandle SAMPLE_FOG = handle("sample_fog", FunctionDescriptor.of(ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_DOUBLE,
         ValueLayout.JAVA_DOUBLE, ValueLayout.ADDRESS));
+    private static final MethodHandle BIOME = handle("biome", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    private static final MethodHandle BIOME_AT_BLOCK = handle("biome_at_block", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final ThreadLocal<MemorySegment> RESULT = ThreadLocal.withInitial(() -> Arena.ofAuto().allocate(24, 8));
     private final NativeLiveBiomeSection.Binding<?> binding;
     private final long epoch;
@@ -98,6 +103,24 @@ public final class NativeBiomeWorld {
         try { if ((int) RANGE.invokeExact(owner, epoch, x, z, radius) != 0) disable(); }
         catch (Throwable failure) { throw failure(failure); }
         finally { Reference.reachabilityFence(this); }
+    }
+    @Nullable
+    public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome(int x, int y, int z) {
+        if (!enabled) return null;
+        try { return identity((int) BIOME.invokeExact(owner, epoch, x, y, z)); }
+        catch (Throwable failure) { throw failure(failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
+    @Nullable
+    public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biomeAtBlock(long seed, int x, int y, int z) {
+        if (!enabled) return null;
+        try { return identity((int) BIOME_AT_BLOCK.invokeExact(owner, epoch, seed, x, y, z)); }
+        catch (Throwable failure) { throw failure(failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
+    @SuppressWarnings("unchecked")
+    private net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> identity(int id) {
+        return id < 0 ? null : (net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome>) binding.values.get(id);
     }
     @Nullable
     public Vec3 sample(Vec3 position) { return sample(position, SAMPLE); }

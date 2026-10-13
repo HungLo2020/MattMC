@@ -152,6 +152,11 @@ impl Owner {
     pub fn lease(&self) -> Arc<Generation> {
         Arc::clone(&self.state.lock().unwrap().generation)
     }
+    /// Read the current primary generation without copying a whole biome section.
+    pub(crate) fn value(&self, index: usize) -> Option<u32> {
+        let state = self.state.lock().unwrap();
+        (index < CELLS && self.is_valid()).then(|| state.generation.value(index))
+    }
     pub fn copy(&self) -> Self {
         let state = self.state.lock().unwrap();
         let g = &state.generation;

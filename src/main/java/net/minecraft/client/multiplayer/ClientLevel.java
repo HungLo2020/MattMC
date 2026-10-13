@@ -931,6 +931,24 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		return this.dragonParts;
 	}
 
+	@Override
+	public Holder<Biome> getBiomeAtBlock(long seed, int x, int y, int z) {
+		if (this.getClass() == ClientLevel.class && this.chunkSource.getClass() == ClientChunkCache.class) {
+			Holder<Biome> biome = this.chunkSource.nativeBiomeAtBlock(seed, x, y, z);
+			if (biome != null) return biome;
+		}
+		return super.getBiomeAtBlock(seed, x, y, z);
+	}
+
+	@Override
+	public Holder<Biome> getNoiseBiome(int x, int y, int z) {
+		if (this.getClass() == ClientLevel.class && this.chunkSource.getClass() == ClientChunkCache.class) {
+			Holder<Biome> biome = this.chunkSource.nativeNoiseBiome(x, y, z);
+			if (biome != null) return biome;
+		}
+		return super.getNoiseBiome(x, y, z);
+	}
+
 	public Holder<Biome> getUncachedNoiseBiome(int i, int j, int k) {
 		return this.registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS);
 	}

@@ -4,6 +4,27 @@ use std::sync::Mutex;
 pub struct World(Mutex<LiveBiomeFields>);
 
 /// # Safety
+/// Live world pinned for this synchronous identity query. No callbacks.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_biome_world_biome(
+    world: *const World, epoch: u64, x: i32, y: i32, z: i32,
+) -> i32 {
+    world.as_ref().and_then(|w| w.0.lock().unwrap().biome(epoch, [x, y, z]))
+        .map_or(-1, |id| id as i32)
+}
+
+/// # Safety
+/// Same owner contract as `mattmc_live_biome_world_biome`. Selects and reads
+/// the biome directly, without an intermediate Java chunk/palette traversal.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_biome_world_biome_at_block(
+    world: *const World, epoch: u64, seed: i64, x: i32, y: i32, z: i32,
+) -> i32 {
+    let quart = super::super::fiddled_distance::quart(seed, [x, y, z]);
+    mattmc_live_biome_world_biome(world, epoch, quart[0], quart[1], quart[2])
+}
+
+/// # Safety
 /// Colors is a live aligned immutable span. Its contents are copied once.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_live_biome_world_create_colors(

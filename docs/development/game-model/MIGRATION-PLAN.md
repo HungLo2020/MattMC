@@ -247,6 +247,9 @@ Follow the owner boundary relevant to the next change:
 - **Live biomes and colors:** the [admitted palette owner and direct raw sky/fog consumers](../world/biome/RUST-LIVE-BIOMES.md)
   are native. The loaded-world index and DH columns share the same immutable
   primary-owner binding; unchanged publication reuses it after identity checks.
+  Ordinary corner selection and retained client identity reads also run in
+  Rust. The guide records Frozen CPU parity, scalar speedup and scoped gameplay
+  checks; broader all-mode performance acceptance remains separate.
   Rust reuses exact-position colors only after validating the world revision
   and retained source generations. Java retains chunk lifecycle events,
   compatibility sampling, terrain tint/blending and later brightness/weather

@@ -15,6 +15,45 @@ import static org.mockito.Mockito.*;
 class NativeBiomeWorldTest {
     @BeforeAll static void load() { NativeLiveBiomeSectionTest.load(); }
 
+    @Test void directIdentityReadsClampHeightAndObservePrimaryMutationWithoutRepublishing() throws Exception {
+        var chunk=chunk(2,7);var world=NativeBiomeWorld.create(factory(),0,32);assertNotNull(world);
+        world.range(0,0,3);world.replace(chunk);
+        var values=NativeLiveBiomeSectionTest.values;
+        for(int section=0;section<2;section++) {
+            @SuppressWarnings("unchecked") var biomes=(PalettedContainer<Holder<Biome>>)chunk.getSection(section).getBiomes();
+            for(int i=0;i<64;i++)biomes.getAndSet(i&3,i>>4,i>>2&3,values.get(section*64+i));
+        }
+        for(int y:new int[]{Integer.MIN_VALUE,-1,0,1,3,4,7,8,Integer.MAX_VALUE}) {
+            int clamped=Math.max(0,Math.min(7,y));
+            for(int x=0;x<4;x++)for(int z=0;z<4;z++)
+                assertSame(values.get((clamped/4)*64+((clamped&3)<<4)+(z<<2)+x),world.biome(x,y,z));
+        }
+        assertSame(values.get(0),world.biome(-1,0,0));
+        world.range(10,10,1);assertSame(values.get(0),world.biome(1,1,1));
+        world.range(0,0,3);assertSame(values.get(21),world.biome(1,1,1));
+        chunk.setNativeSectionArrayEscapeListener(()->world.replace(chunk));
+        chunk.getSections();assertNull(world.biome(1,1,1));assertNull(world.biomeAtBlock(7,6,6,6));
+        world.remove(0,0);assertSame(values.get(0),world.biome(1,1,1));
+    }
+
+    @Test void clientManagerConsumesNativeIdentityAndCompatibilityKeepsSourceDispatch() throws Exception {
+        var chunk=chunk(2,7);var world=NativeBiomeWorld.create(factory(),0,32);assertNotNull(world);
+        world.range(0,0,3);world.replace(chunk);
+        var level=mock(ClientLevel.class,CALLS_REAL_METHODS);
+        var cache=mock(net.minecraft.client.multiplayer.ClientChunkCache.class,CALLS_REAL_METHODS);
+        Field nativeWorld=cache.getClass().getDeclaredField("nativeBiomes");nativeWorld.setAccessible(true);nativeWorld.set(cache,world);
+        Field source=ClientLevel.class.getDeclaredField("chunkSource");source.setAccessible(true);source.set(level,cache);
+        var manager=new net.minecraft.world.level.biome.BiomeManager(level,7);
+        assertSame(NativeLiveBiomeSectionTest.values.get(7),manager.getBiome(new net.minecraft.core.BlockPos(6,6,6)));
+        assertSame(NativeLiveBiomeSectionTest.values.get(7),level.getNoiseBiome(1,1,1));
+        verify(level,never()).getChunk(anyInt(),anyInt(),any(),anyBoolean());
+        doReturn(null).when(level).getChunk(anyInt(),anyInt(),any(),anyBoolean());
+        doReturn(NativeLiveBiomeSectionTest.values.get(91)).when(level).getUncachedNoiseBiome(anyInt(),anyInt(),anyInt());
+        chunk.setNativeSectionArrayEscapeListener(()->world.replace(chunk));chunk.getSections();
+        assertSame(NativeLiveBiomeSectionTest.values.get(91),manager.getBiome(new net.minecraft.core.BlockPos(6,6,6)));
+        verify(level,times(1)).getChunk(anyInt(),anyInt(),any(),anyBoolean());
+    }
+
     @Test void mutableSectionArrayEscapeDeclinesNativeSamplingBeforeCallerReplacement() throws Exception {
         var strategy = NativeLiveBiomeSectionTest.strategy;
         var values = NativeLiveBiomeSectionTest.values;

@@ -60,6 +60,14 @@ public class ClientChunkCache extends ChunkSource {
 		return this.nativeBiomes == null ? null : this.nativeBiomes.sampleFog(position);
 	}
 
+	public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> nativeNoiseBiome(int x, int y, int z) {
+		return this.nativeBiomes == null || this.readingBiomePacket ? null : this.nativeBiomes.biome(x, y, z);
+	}
+
+	public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> nativeBiomeAtBlock(long seed, int x, int y, int z) {
+		return this.nativeBiomes == null || this.readingBiomePacket ? null : this.nativeBiomes.biomeAtBlock(seed, x, y, z);
+	}
+
 	private void publishNativeBiomes(LevelChunk chunk) {
 		if (this.nativeBiomes == null || this.readingBiomePacket) return;
 		var storage = this.storage;

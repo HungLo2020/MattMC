@@ -28,18 +28,10 @@
 - Integrated upstream f1de16e11 (sky/id-map/GUI) and7c49a0a21 (batched native section reclamation, pressure collections, DH creation-site reductions). Also integrated2b979072d test tiers/affected runner, preserving all27 pending files; no stash needed.
 - Historical matrices and limitations remain in rendering/GAMEPLAY-PERFORMANCE.md and the relevant world/lighting/chunk guides; they do not verify newer sources.
 
-## Verified metadata and bulk-IO checkpoint
+## Historical metadata and bulk-IO checkpoint
 
-- Native691c0b95 owns generation/compression/uniformity payload policy against primary planes. Private byte-array streams use bulk input; streaming decompressors preserve error prefixes.
-- Initial JFR found162/285 hydration CPU samples in single-byte ByteArrayInputStream.read. The later28-sample profile is too small to quantify a new bottleneck or normalized allocation improvement.
-- Actual Frozen exposed short-list backing-capacity/EOF-prefix mismatch. Fixed-payload native consumption and compatibility controls now preserve logical size and partial mutations.
-- Full Rust2723/3ignored and Java/parity2043/2skip pass. Actual Frozen606 metadata rows/303 cases and696830 point rows/170 cases match, including48 saved metadata and120 saved point blobs; all guards pass.
-- Real24-DTO predecessor/current/Frozen hydration78.73/43.62/41.51ms:44.6% faster predecessor, still5.1% slower Frozen. Checksums/source/native/class/predecessor/corpus guards pass; contextual material resolution omitted.
-- Seven lifecycle scenarios and vanilla/DH/Iris+DH settled pairs pass,VUID0. All13 originals/10 Current identities reviewed. Seven heavily hazy gate views establish structural evidence only.
-- Controller exited143 after both final DH clients completed clean captures; signal origin unconfirmed. Existing harness recovered the comparison from guarded originals without client rerun. Failure/recovery receipts retained.
-- All20 exact6000-frame runs clean; every live JVM control matches before measurement. Current/Frozen FPS1317.80/1264.50,753.75/701.45,348.45/313.65,264.55/225.95; p99ms3.563/3.710,3.992/6.264,4.679/7.220,6.270/8.842.
-- All FPS/p99 floors PASS in this measured scope. Integrated upstream sky/id-map/GUI changes are included; no isolated metadata whole-game gain claimed. DH RSS8.83–9.40GiB,combined9.00/9.15GiB below guard; long memory remains open.
-- Final source/native/class/Frozen/prompt, three prepared-input and saved-corpus guards pass; no clients remain. Guide: world/chunk/RUST-DH-METADATA-CODEC.md. Receipts: build/native-dh-metadata-codec/.
+- Rust payload policy and bulk byte-array IO match Frozen606 metadata and696830 point rows. Real24-DTO hydration78.73/43.62/41.51ms predecessor/Current/Frozen; Current44.6% faster predecessor,5.1% slower Frozen.
+- Full Rust2723/Java2043, seven lifecycle/three settled pairs and20 matched frame windows passed at native691c0b95. This historical matrix does not verify later binaries; original failures/profiles remain in build/native-dh-metadata-codec/ and world/chunk/RUST-DH-METADATA-CODEC.md.
 
 ## Verified light-section input checkpoint
 
@@ -79,10 +71,17 @@
 - Native561b048e: Rust policy/untinted-color reuse/reload invalidation/native overflow scratch. Full-source CPU50.29/63.57/64.69ms(Current/preceding/Frozen), heap5.85/34.23/29.85MB;22.3% faster Frozen, outputs/10oracles/guards pass. Rust2736/3ignored, Java2058/2skip pass. Seven lifecycle and3settled Frozen pairs pass,VUID0;13 originals/10 Current identities reviewed. No new FPS acceptance. Integrated test/parity/slow tiers pass1863/184/11,2skip; Wiki passes.
 - Retired3 older copied worlds/308773838bytes and the runtime harness retired10 new completed copies; originals, failures and receipts retained. Receipt: build/native-dh-conversion-policy/retention.json.
 
+## Live biome query checkpoint
+
+- Native487cebcc moves ordinary fiddled-distance selection and client biome identity reads into Rust's retained sections; Java resolves holders and dispatches unsupported/custom sources. No Java selection loop or section export remains on the admitted path.
+- Frozen162701 coordinate cases, Java8/native9 boundary tests, full Rust2737/3ignored and Java2060/2skip pass. Scalar selection1048576queries:76.07/216.02ms Current/Frozen,64.8% faster, zero Java heap on both sides; excludes world lookup/GPU.
+- One clean6000-frame vanilla pair:1320.6/1068.7FPS and p993.736/4.428ms Current/Frozen. Two settled image pairs and three lifecycle cases pass,VUID0; seven originals/five presenter identities/six native images reviewed. Gate haze establishes structural evidence only; no new all-mode acceptance.
+- Sources/native/Frozen guards pass. Retired nine completed world copies; lossless profile JSON archival reclaimed625594176bytes, originals retained. Guide: world/biome/RUST-LIVE-BIOMES.md; receipts: build/native-biome-query/.
+
 ## Next work and open acceptance
 
 - Continue migrating performance-relevant world-state producers with their consumers, removing Java packing followed by Rust reconstruction. Finish and publish each verified batch before starting another implementation batch.
-- Next: profile the next world-state/frame-input ownership slice and migrate its producer with its consumer. Native561b048e is the verified conversion checkpoint. CPU fixtures omit texture/tint resolution; new gameplay/FPS and long memory remain open. Startup RSS, shutdown rejection and whole-game performance remain open.
+- Next: use the fresh profile to target remaining world-state/frame-input preparation and move its producer/consumer together. Broader gameplay FPS, startup RSS, shutdown rejection and long memory remain open.
 - First shader world frame, first-turn nearby terrain pop-in/flicker, sustained streaming and long host/GPU memory remain unproved. Settled images do not resolve transient gaps.
 - Broad gameplay remains open: transparency, particles/weather, entities/items/hands, GUI/HUD, resource packs, representative shaders and DH combinations. The latest rotating workload hides the minimap.
 - Rain foreground visibility and Current-only waypoint chat differ despite initial-image tolerance; whole weather/HUD parity is not established.

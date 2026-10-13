@@ -42,6 +42,7 @@ pub struct LiveBiomeFields {
     range: Option<(i32, i32, i32)>,
     colors: [Arc<[u32]>; 2],
     fallback: [u32; 2],
+    fallback_id: u32,
     chunks: HashMap<(i32, i32), Chunk>,
     window: Option<Window>,
 }
@@ -78,6 +79,7 @@ impl LiveBiomeFields {
             range: None,
             colors,
             fallback,
+            fallback_id: fallback_id as u32,
             chunks: HashMap::new(),
             window: None,
         })
@@ -99,6 +101,27 @@ impl LiveBiomeFields {
             // Match Frozen Storage.inRange exactly, including MIN_VALUE abs.
             x.wrapping_sub(cx).wrapping_abs() <= r && z.wrapping_sub(cz).wrapping_abs() <= r
         })
+    }
+    /// Direct identity query from primary sections. Unsupported loaded chunks
+    /// decline; only truly absent/out-of-range chunks use the world's default.
+    pub(crate) fn biome(&self, epoch: u64, quart: [i32; 3]) -> Option<u32> {
+        if epoch != self.epoch {
+            return None;
+        }
+        let [x, y, z] = quart;
+        if !self.in_range(x >> 2, z >> 2) {
+            return Some(self.fallback_id);
+        }
+        let Some(chunk) = self.chunks.get(&(x >> 2, z >> 2)) else {
+            return Some(self.fallback_id);
+        };
+        let y = (y.clamp(self.min_y, self.max_y) - self.min_y) as usize;
+        let owner = match chunk {
+            Chunk::Native(owners) => &owners[y / 4],
+            Chunk::Retained(inputs) => inputs.owner(y / 4),
+            Chunk::Compatibility => return None,
+        };
+        owner.value(((y & 3) << 4) | ((z as usize & 3) << 2) | (x as usize & 3))
     }
     fn admissible(&self, epoch: u64, position: (i32, i32)) -> bool {
         epoch == self.epoch
@@ -279,6 +302,32 @@ impl LiveBiomeFields {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn identity_queries_follow_aliases_growth_range_and_compatibility() {
+        let colors: Arc<[u32]> = (0..512).collect::<Vec<_>>().into();
+        let mut world = LiveBiomeFields::new(9, -4, 8, [colors.clone(), colors], 0, 16).unwrap();
+        let bottom = Arc::new(Owner::load(0, 0, &[3], &[], 512, 9).unwrap());
+        let alias = bottom.copy();
+        let top = Arc::new(Owner::load(0, 0, &[7], &[], 512, 9).unwrap());
+        assert!(world.replace(9, (-1, 0), vec![bottom.clone(), top].into()));
+        assert_eq!(world.biome(8, [-1, 0, 0]), None);
+        assert_eq!(world.biome(9, [-1, i32::MIN, 0]), Some(3));
+        assert_eq!(world.biome(9, [-1, i32::MAX, 0]), Some(7));
+        assert!(alias.read_single(11));
+        assert_eq!(world.biome(9, [-1, -4, 0]), Some(11));
+        assert!(bottom.write(3, 19).is_some());
+        assert_eq!(world.biome(9, [-1, -4, 0]), Some(19));
+        assert!(world.set_range(9, [10, 10], 1));
+        assert_eq!(world.biome(9, [-1, -4, 0]), Some(0));
+        assert!(world.set_range(9, [0, 0], 3));
+        bottom.invalidate();
+        assert_eq!(world.biome(9, [-1, -4, 0]), None);
+        assert!(world.compatibility(9, (-1, 0)));
+        assert_eq!(world.biome(9, [-1, 0, 0]), None);
+        assert!(world.remove(9, (-1, 0)));
+        assert_eq!(world.biome(9, [-1, 0, 0]), Some(0));
+    }
+
     #[test]
     fn recorded_frozen_colors_cross_live_palette_index_and_both_consumers() {
         use std::io::{Cursor, Read};

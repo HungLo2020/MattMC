@@ -100,7 +100,9 @@ fuse eligible writes and recount directly, [immutable rebuild snapshots](../worl
 provide bulk state-ID halos, and [section color owners](../world/biome/RUST-SECTION-COLORS.md)
 share resolver lattice samples within a capture. [Live biome owners](../world/biome/RUST-LIVE-BIOMES.md)
 retain admitted palettes and the loaded-client index used by direct raw sky/fog
-sampling and generation-validated result reuse. Shared [chunk-input bindings](../world/chunk/RUST-DH-CHUNK-INPUTS.md)
+sampling and generation-validated result reuse. Ordinary biome queries also
+select corners and read admitted client identities directly from those owners;
+Java resolves returned holder identities. See that guide for verification scope. Shared [chunk-input bindings](../world/chunk/RUST-DH-CHUNK-INPUTS.md)
 retain primary block/counter owners and a separately admitted biome collection;
 world-color sampling and DH columns share that collection without repeating its
 publication packing. [Client residency](../world/chunk-loading/RUST-CLIENT-RESIDENCY.md)
