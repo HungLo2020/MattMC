@@ -44,6 +44,8 @@ Put the Comparator's rear directly against a supported container such as a [Ches
 
 For a nonempty container, the calculation is 1 plus the rounded-down value of 14 times its average fullness. For example, a container with every slot half filled with ordinary 64-stack items gives 8. A normal double Chest is read as a combined container.
 
+For a practical threshold example, see [Hopper item filtering](Hopper.md#item-filtering): five occupied slots can still read only 2, and one additional matching item can raise that reading to 3. The count depends on stack limits and reserved filler items, not on the number of occupied slots alone.
+
 A [Crafter uses a different 0–9 reading](Crafter.md#comparator-signal): it counts slots that are disabled or nonempty, rather than stack fullness. Do not apply the storage-container formula to that block.
 
 **Chest access matters in this implementation.** The Chest reading uses the container-access check: a redstone-conducting block above the lid, or a sitting Cat that blocks access, can make the reading 0 even when items remain inside. Keep the test Chest unobstructed. Container-content changes notify nearby Comparators; they do not require a block-state change of the kind an Observer watches.

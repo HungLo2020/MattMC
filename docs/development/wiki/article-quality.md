@@ -65,6 +65,9 @@ Recent focused reviews address concrete player decisions:
 - **Choosing and connecting controls:** [Lever controls](../../gameplay/blocks/Lever.md)
   and [shared redstone power](../../gameplay/redstone/Redstone.md) distinguish
   support-side power, sustained signals and environmental removal
+- **Sorting stored items:** [Hopper filtering](../../gameplay/blocks/Hopper.md#item-filtering)
+  explains reserved slots, component-sensitive matching, the 2-to-3 Comparator threshold
+  and why an unsuitable output inventory can drain filter material
 - **Repairing and recycling:** [Grindstone edge cases](../../gameplay/blocks/Grindstone.md)
   and [enchanted-book use](../../gameplay/items/EnchantedBook.md) explain
   eligibility, input consumption and the result a player should expect

@@ -22,7 +22,7 @@ The coordinated three-hour review covers wiki, monthly changelog, and issue trac
 - If the default tip is an ancestor of the wiki branch, no source sync is needed.
 - If a fast-forward is possible, advance only the wiki branch to the inspected source tip.
 - If diverged, perform a real three-way Git merge of the inspected default tip into the wiki branch, preserving both parents and all branch documentation. Never replace the branch tree wholesale with the default tree.
-- Use an ordinary merge commit for published diverged history, not a rebase or force-push. Stop and report conflicts rather than discarding either side. Do not overwrite another writer's changes.
+- Use an ordinary merge commit for published diverged history, not a rebase or force-push. Under the resumed reconciliation instruction of 2026-10-13, resolve ordinary documentation prose conflicts by comparing the common base, preserved draft and incoming source, retaining useful content, stable anchors and dated evidence. Stop and report unsafe concurrent changes, unavoidable content loss or a substantive decision that the authorized scope does not settle. Do not discard either side or overwrite another writer's changes.
 - Read the repository's `sync-and-resume` skill where available. For an existing working checkout, follow its change-only preservation steps; never discard unrelated staged, unstaged, or untracked work.
 
 ### Connector-based publication fallback

@@ -3309,3 +3309,10 @@ Linked the bounded [#771 progress review](https://github.com/HungLo2020/MattMC/i
 - Reconstructed the consequential JVM-control correction: older 9c9f085c passes used unmatched collector/heap/JIT settings. Their tables and anchors remain historical, alongside subsequent failed and passing checkpoints. Current shader single-pair results and predecessor vanilla rows do not form one repeated, integrated four-mode matrix.
 - Reconciled bounded shadow capture and direct native DH generation with remaining Java producer callbacks, author-only CPU/runtime records and saved-heightmap differences. Strict leash/HUD, temporal, sustained-streaming and host/GPU memory acceptance remain open.
 - Required full strict build, directory-index/link/anchor, source-pin, whitespace and independent final-tree/history checks apply to the reconstructed combined documentation before guarded nonforce promotion and terminal deployment. This documentation work does not rerun gameplay, Java/Rust suites, benchmarks or original-image reviews.
+
+
+## Batch 404: Hopper filtering and safe continuation
+
+Expanded the existing [Hopper owner](../../gameplay/blocks/Hopper.md#item-filtering) with practical reserved-slot filtering, matching item data, Comparator threshold arithmetic and output-inventory failure cases. The companion item and Comparator pages route to that single explanation. The source-derived setup and control contract are not a tested automatic sorter, throughput or overflow-safety guarantee; no game or runtime suite was run. Existing block-directory IDs, categories, article headings and historical evidence are preserved.
+
+The [continuation procedure](continuation.md#sync-without-rewriting-history) now reflects the resumed instruction to reconcile ordinary documentation prose conflicts safely, while stopping for unsafe concurrency, unavoidable content loss or decisions outside the authorized scope. Required full documentation checks, strict build, immutable-source/anchor/history/registry validation and independent review precede guarded nonforce publication and terminal deployment verification.
