@@ -22,6 +22,7 @@ final class NativeClassInstanceStorage<T> {
     private static final MethodHandle ATTACH_INDEX=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_attach_members",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle NEW_GROUP=handle("new_group",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
+    private static final MethodHandle BIND_TYPE=handle("bind_type",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG));
     private static final MethodHandle ALLOCATE=handle("allocate",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle FINISH=handle("finish_binding",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS,ValueLayout.JAVA_LONG));
     private static final MethodHandle RETIRED=handle("retired",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
@@ -162,6 +163,10 @@ final class NativeClassInstanceStorage<T> {
                 }
             }
             Reference.reachabilityFence(NativeClassInstanceStorage.this);
+        }
+        void bindType(long identity) {
+            try { if((int)BIND_TYPE.invokeExact(owner,id,identity)!=0)throw new IllegalStateException("Cannot bind section member type"); }
+            catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(NativeClassInstanceStorage.this);}
         }
         int modifications(){return header.get(ValueLayout.JAVA_INT,16);}
         private void bindRows() {

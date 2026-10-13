@@ -55,6 +55,10 @@ public class EntitySection<T extends EntityAccess> {
         return entityAccess.getBoundingBox().intersects(aABB);
     }
 
+    final <U extends T> AbortableIterationConsumer.Continuation consumeNativeTypedBatch(Class<U> type,AABB query,AbortableIterationConsumer<? super U> consumer,ClassInstanceMultiMap.QueryBatch batch) {
+        return this.storage.consumeTypedBatch(type,query,EntitySection::intersectsBounds,consumer,batch);
+    }
+
     final void attachNativeIndex(java.lang.foreign.MemorySegment index,long token) {
         // Overrides may change visibility, emptiness or query behavior.
         if(getClass()==EntitySection.class)this.storage.attachSectionIndex(index,token);

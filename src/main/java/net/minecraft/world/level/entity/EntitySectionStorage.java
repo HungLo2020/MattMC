@@ -80,6 +80,15 @@ public class EntitySectionStorage<T extends EntityAccess> {
 	}
 
 	public <U extends T> void getEntities(EntityTypeTest<T, U> entityTypeTest, AABB aABB, AbortableIterationConsumer<U> abortableIterationConsumer) {
+        if(getClass()==EntitySectionStorage.class && entityTypeTest instanceof EntityTypeTest.ClassTest<T,U> stock && stock.getBaseClass()!=null) {
+            long identity=net.minecraft.util.ClassInstanceMultiMap.queryTypeIdentity(stock.getBaseClass());
+            try(var cursor=this.sections.spatialCursor(aABB.minX,aABB.minY,aABB.minZ,aABB.maxX,aABB.maxY,aABB.maxZ)) {
+                while(cursor.hasNext() && cursor.advanceQuery(true,identity)) {
+                    if(cursor.consumeTyped(stock,aABB,abortableIterationConsumer).shouldAbort())return;
+                }
+            }
+            return;
+        }
 		this.forEachAccessibleNonEmptySection(aABB, entitySection -> entitySection.getEntities(entityTypeTest, aABB, abortableIterationConsumer));
 	}
 

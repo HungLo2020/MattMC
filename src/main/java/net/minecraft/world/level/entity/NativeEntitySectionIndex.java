@@ -38,6 +38,8 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
     private static final MethodHandle CURSOR_NEXT=handle("cursor_next",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
     private static final MethodHandle QUERY_NEXT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_query_next",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS),Linker.Option.critical(true));
+    private static final MethodHandle QUERY_TYPED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_section_index_query_typed",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS),Linker.Option.critical(true));
     private static final MethodHandle CURSOR_CLOSE=handle("cursor_close",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle CURSOR_RELEASE=handle("cursor_release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final Arena scope;
@@ -147,9 +149,11 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
                 return status==1;
             }catch(Throwable t){throw failure(t);}finally{Reference.reachabilityFence(NativeEntitySectionIndex.this);}
         }
-        boolean advanceQuery(boolean scanMembers) {
+        boolean advanceQuery(boolean scanMembers) { return advanceQuery(scanMembers,0); }
+        boolean advanceQuery(boolean scanMembers,long typeIdentity) {
             try {
-                int status=(int)QUERY_NEXT.invokeExact(handle,scanMembers?1:0,matches.output);
+                int status=typeIdentity==0?(int)QUERY_NEXT.invokeExact(handle,scanMembers?1:0,matches.output)
+                    :(int)QUERY_TYPED.invokeExact(handle,typeIdentity,matches.output);
                 if(status==-2)throw rangeFailure(view.get(ValueLayout.JAVA_LONG,8),view.get(ValueLayout.JAVA_LONG,16));
                 if(status==-4)throw new java.util.ConcurrentModificationException();
                 if(status==-5)throw new NoSuchElementException();
@@ -162,6 +166,12 @@ final class NativeEntitySectionIndex<T extends EntityAccess> {
             EntitySection<T> section=section();
             if(matches.count>0)return section.consumeNativeBatch(query,consumer,matches);
             if(accessible(section))return section.getEntities(query,consumer);
+            return AbortableIterationConsumer.Continuation.CONTINUE;
+        }
+        <U extends T> AbortableIterationConsumer.Continuation consumeTyped(EntityTypeTest.ClassTest<T,U> type,AABB query,AbortableIterationConsumer<U> consumer) {
+            EntitySection<T> section=section();
+            if(matches.count>0)return section.consumeNativeTypedBatch(type.getBaseClass(),query,consumer,matches);
+            if(accessible(section))return section.getEntities(type,query,consumer);
             return AbortableIterationConsumer.Continuation.CONTINUE;
         }
         boolean accessible(EntitySection<T> section) {

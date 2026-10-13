@@ -55,6 +55,7 @@ pub(super) struct View {
 }
 
 pub(super) struct Members {
+    pub(super) query_type: u64,
     array: Arc<Array>,
     pub(super) view: View,
 }
@@ -79,6 +80,7 @@ impl Default for Members {
     fn default() -> Self {
         let array = Arc::new(Array::new(0, None));
         Self {
+            query_type: 0,
             array,
             view: View {
                 pointer: AtomicU64::new(0),

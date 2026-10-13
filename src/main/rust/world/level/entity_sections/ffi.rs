@@ -74,6 +74,19 @@ pub unsafe extern "C" fn mattmc_section_members_new_group(owner: *const c_void) 
     groups.push(Box::new(Members::with_bindings(c.bindings.clone())));
     id
 }
+/// Publish a successfully constructed Java class group under a stable CPU type
+/// identity. Zero is reserved for untyped queries; no class objects are retained.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_members_bind_type(owner: *const c_void, group: i32, identity: u64) -> i32 {
+    let Some(c) = owner.cast::<Context>().as_ref() else { return -1; };
+    if identity == 0 { return -1; }
+    let mut groups = c.groups.lock().unwrap();
+    if groups.iter().enumerate().any(|(i, m)| i != group as usize && m.query_type == identity) { return -1; }
+    let Some(m) = groups.get_mut(group as usize) else { return -1; };
+    if m.query_type != 0 && m.query_type != identity { return -1; }
+    m.query_type = identity;
+    0
+}
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_members_allocate(owner: *const c_void) -> u64 {
     owner
@@ -235,16 +248,27 @@ pub unsafe extern "C" fn mattmc_section_members_intersections(
 }
 
 /// None yields for Java status/custom-section behavior; zero skips this section.
-/// A positive result is the first root-member batch and its iterator version.
+/// A positive result is the first selected member batch and its iterator version.
 impl Context {
-    pub(super) fn query(&self, bounds: Option<[f64; 6]>, out: &mut [u64]) -> Option<(i32, i32)> {
+    pub(super) fn query(&self, bounds: Option<[f64; 6]>, type_identity: u64, out: &mut [u64]) -> Option<(i32, i32)> {
         let groups = self.groups.lock().unwrap();
         let m = &groups[0];
         if m.size() == 0 { return Some((0, 0)); }
         match self.visibility.load(Ordering::Acquire) {
             0 => Some((0, 0)),
             1 | 2 => match bounds {
-                Some(bounds) => Some((scan(self, m, 0, m.modifications(), bounds, out), m.modifications())),
+                Some(bounds) => {
+                    // Admission remains lazy: an unknown class must yield to
+                    // Java even when its eventual group would contain no hits.
+                    let m = if type_identity == 0 { m } else {
+                        let Some(group) = groups.iter().find(|m| m.query_type == type_identity) else { return Some((-1, 0)); };
+                        group
+                    };
+                    // Java's typed collection returns before acquiring an
+                    // iterator when empty; no geometry lease is needed here.
+                    if m.size() == 0 { return Some((0, 0)); }
+                    Some((scan(self, m, 0, m.modifications(), bounds, out), m.modifications()))
+                },
                 None => Some((-1, 0)), // Accessible, but this traversal must not inspect entity bounds.
             },
             _ => None, // Preserve a null visibility's Java failure after the empty check.

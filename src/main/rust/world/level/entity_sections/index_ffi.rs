@@ -408,6 +408,18 @@ pub unsafe extern "C" fn mattmc_section_index_cursor_next(cursor: *mut c_void) -
 /// A match batch packs its iterator version in the high half of out[1].
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_section_index_query_next(cursor: *mut c_void, scan_members: i32, output: *mut u64) -> i32 {
+    query_next(cursor, scan_members != 0, 0, output)
+}
+
+/// Stock class queries may scan an already admitted typed group. Unknown types
+/// yield to Java at the original section boundary for lazy admission/failure.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_section_index_query_typed(cursor: *mut c_void, type_identity: u64, output: *mut u64) -> i32 {
+    if type_identity == 0 { return -1; }
+    query_next(cursor, true, type_identity, output)
+}
+
+unsafe fn query_next(cursor: *mut c_void, scan_members: bool, type_identity: u64, output: *mut u64) -> i32 {
     let Some(l) = cursor.cast::<Lease>().as_mut() else { return -1; };
     if output.is_null() || l.bounds.is_none() { return -1; }
     let out = std::slice::from_raw_parts_mut(output, 130);
@@ -418,7 +430,7 @@ pub unsafe extern "C" fn mattmc_section_index_query_next(cursor: *mut c_void, sc
         if l.view.token == 0 { continue; }
         if let Some((_, context)) = d.members.get(l.view.token as u32 as usize)
             .and_then(Option::as_ref).filter(|(token, _)| *token == l.view.token) {
-            if let Some((count, modifications)) = context.query(if scan_members != 0 { l.bounds } else { None }, out) {
+            if let Some((count, modifications)) = context.query(if scan_members { l.bounds } else { None }, type_identity, out) {
                 if count == 0 { continue; }
                 if count == -2 { return -4; } // Iterator modification failure.
                 if count == -3 { return -5; } // Failed mutation left no next element.
@@ -546,6 +558,48 @@ mod tests {
             assert_eq!((*owner.cast::<Index>()).data.lock().unwrap().cursors.len(), 2);
             assert_eq!(mattmc_section_index_cursor_next(second), 0);
             mattmc_section_index_cursor_release(second);
+            mattmc_section_index_release(owner);
+        }
+    }
+
+    #[test]
+    fn typed_query_yields_until_admission_then_scans_only_the_selected_group() {
+        use super::super::ffi::{mattmc_section_members_new_group, mattmc_section_members_bind_type};
+        unsafe {
+            let owner = mattmc_section_index_create();
+            insert(owner, encode(0, 0, 0));
+            let members = mattmc_section_members_create();
+            mattmc_section_members_visibility(members, 1);
+            let first = mattmc_section_members_allocate(members);
+            let second = mattmc_section_members_allocate(members);
+            mattmc_section_members_add(members, 0, first, std::ptr::null_mut());
+            mattmc_section_members_add(members, 0, second, std::ptr::null_mut());
+            mattmc_section_index_attach_members(owner, mattmc_section_index_get(owner, encode(0, 0, 0)), members);
+            let bounds = [0., 0., 0., 1., 1., 1.];
+            let cursor = mattmc_section_index_spatial_cursor(owner, bounds.as_ptr());
+            let mut out = [0; 130];
+            assert_eq!(mattmc_section_index_query_typed(cursor, 42, out.as_mut_ptr()), 129);
+            mattmc_section_index_cursor_close(cursor);
+            let group = mattmc_section_members_new_group(members);
+            assert_eq!(mattmc_section_members_bind_type(members, group, 42), 0);
+            assert_eq!(mattmc_section_members_bind_type(members, 0, 42), -1);
+            assert_eq!(mattmc_section_members_bind_type(members, group, 43), -1);
+            mattmc_section_index_spatial_reopen(cursor, bounds.as_ptr());
+            assert_eq!(mattmc_section_index_query_typed(cursor, 42, out.as_mut_ptr()), 0); // Empty typed group; root is nonempty.
+            mattmc_section_index_cursor_close(cursor);
+            mattmc_section_members_add(members, group, second, std::ptr::null_mut());
+            mattmc_section_members_finish_binding(members, first);
+            mattmc_section_members_finish_binding(members, second);
+            mattmc_section_index_spatial_reopen(cursor, bounds.as_ptr());
+            assert_eq!(mattmc_section_index_query_typed(cursor, 42, out.as_mut_ptr()), 1);
+            assert_eq!(out[2] as u32, second as u32);
+            assert_eq!(out[1] >> 32, 1); // Typed group's modification count, not root's two inserts.
+            mattmc_section_index_cursor_close(cursor);
+            mattmc_section_members_visibility(members, -1);
+            mattmc_section_index_spatial_reopen(cursor, bounds.as_ptr());
+            assert_eq!(mattmc_section_index_query_typed(cursor, 42, out.as_mut_ptr()), 130); // Null visibility precedes typed filtering.
+            mattmc_section_index_cursor_release(cursor);
+            mattmc_section_members_release(members);
             mattmc_section_index_release(owner);
         }
     }

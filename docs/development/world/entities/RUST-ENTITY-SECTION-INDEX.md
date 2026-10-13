@@ -5,8 +5,9 @@ Rust library for its primary coordinate map, ordered key index, chunk relations
 and spatial coordinate search. Both client and server section managers use
 that storage. Java retains section behavior bindings, initial visibility
 callbacks and consumer callbacks. Primary section visibility and combined
-untyped traversal/member scanning now reside in Rust; see the current
-[range-query verification scope](RUST-ENTITY-SECTIONS.md#range-queries).
+untyped/stock-class traversal and member scanning reside in Rust. See the
+[member-query constraints](RUST-ENTITY-SECTIONS.md#range-queries) and the current
+stock typed traversal results below.
 The subsequent [residency owner](RUST-ENTITY-RESIDENCY.md) moves primary chunk
 residency and persistence admission into Rust with scoped verification.
 Transition orchestration, behavior callbacks and persistence I/O remain further
@@ -67,11 +68,86 @@ Preserve these callback boundaries:
   rewind mechanism that retains the original live cursor nodes.
 - Check member modification and geometry revisions before consuming cached
   matches. Keep iterator end/failure ordering, including failed mutations.
-- Typed queries use native accessibility filtering but retain Java class
-  admission and section dispatch. Custom casts may move entities before
-  their bounds check; they cannot use an ordinary bounds prefilter.
+- Stock `forClass` queries select admitted typed groups in Rust. Java assigns
+  a stable CPU class identity once and registers each group after successful
+  lazy construction. Unknown classes yield at the original section boundary;
+  empty roots/hidden sections still skip class admission, and null visibility
+  still fails before type selection. No Java class object is stored in Rust.
+- Custom casts retain ordered Java dispatch because they may move entities
+  before their bounds check. Custom section/storage behavior also retains its
+  callback boundaries. A typed batch carries its own group's modification
+  count and geometry revision, so callbacks invalidate prefetched matches.
 - Custom section/storage overrides and null visibility retain their Java
   behavior. No native lock spans a Java callback.
+
+### Stock typed traversal: scoped verification, 2026-10-13
+
+Combined traversal now consumes stock class groups, including
+empty typed groups in otherwise nonempty sections. The native section cursor
+returns the first typed match batch directly to its consumer; Java no longer
+re-enters each admitted nonmatching section. Existing typed member arrays and
+primary geometry are consumed in place. Java retains class descriptors, lazy
+membership construction and entity behavior; full type-system/simulation
+migration remains open. The pre-change gameplay profile at `efe94ff71` identifies
+section-query boundary work; it does not measure this migration's improvement.
+
+Verification adds derived-class cold/warm queries, nested callbacks, over-128
+match batches and future-section mutation to the actual Frozen observer.
+Final native `a9928d75` passes 2,764 Rust tests (3 ignored), 2,102 Java tests (2
+skipped), and all 6,735 actual Frozen observer cases. The first timing attempt
+was rejected for measured JIT activity. Subsequent attempts keep
+output outside sample loops and use matching `-Xbatch` controls with 32
+warmups and eight compiler-quiet samples in nine alternating JVMs.
+
+Per 4,096 production typed queries over 256 one-entity sections:
+
+| Workload | Current ms | Prior Java traversal ms | Frozen ms |
+| --- | ---: | ---: | ---: |
+| Empty typed groups | 23.37 | 45.04 | 25.16 |
+| No bounds hits | 35.00 | 73.83 | 34.22 |
+| All bounds hits | 63.71 | 79.01 | 35.88 |
+
+Warmed Current Java allocation is zero, versus 16.88 MB for the traversal
+control and 16.88–50.43 MB for Frozen. These are component results, not total
+memory or gameplay acceptance. Small-section CPU and all-hit Frozen gaps
+remain. Source/class/native/Frozen guards pass; final receipts are in
+`build/native-typed-section/oracle-3/`. The rejected timing is in `oracle-1/`;
+`oracle-2/` records the previous candidate at 33.61 ms for empty groups.
+Skipping their unnecessary geometry lock reduces that cost to 23.37 ms,
+about 7% below Frozen. Bounds misses remain about 2% above Frozen and all-hit
+queries remain substantially slower. These gaps guide further migration.
+
+One fresh 6,000-frame Current/Frozen gameplay pair per mode passes the scoped
+FPS and p99 floors:
+
+| Mode | FPS, Current / Frozen | p99 ms, Current / Frozen |
+| --- | --- | --- |
+| Vanilla | 1241.4 / 1095.0 | 3.522 / 4.213 |
+| Shaders | 354.9 / 300.0 | 5.356 / 7.122 |
+| DH | 801.0 / 693.5 | 4.060 / 6.067 |
+| Shaders + DH | 278.9 / 227.5 | 5.769 / 8.859 |
+
+Inputs and JVM controls match; live entity counts are respectively 190/190,
+180/178, 165/166 and 164/166. These single pairs do not isolate this migration's
+throughput gain or establish sustained performance acceptance. Vanilla and
+shaders+DH settled comparisons and world unload/reload, resource reload and
+view-distance decrease pass with zero VUIDs. Seven original images, five
+Current presentation correlations and nine native identities were checked.
+Hazy lifecycle images establish structural behavior only; first-turn continuity,
+the first shader world frame, broad visual coverage and long-running memory remain open.
+Thirteen completed copied worlds were retired with originals unchanged.
+
+Receipts: `build/native-typed-section/{runtime,gameplay-comparison,final-integrity}.json`.
+Originals: `artifacts/graphics-captures/validation/native-typed-section-20261013/`.
+Reproduce the component comparison:
+
+```sh
+python3 DevUtils/tests/world/entity/VerifySectionMembers.py \
+  --java-home /path/to/jdk25 --output build/typed-world-query \
+  --typed-world-benchmark --java-scan-control-ref e0cf94984
+```
+
+### Historical combined untyped traversal
 
 Native `a554bfbc` passes 2,746 Rust tests (three ignored), 2,070 Java tests
 (two skipped), 6,663 exact Frozen membership/world-query cases and 6,721 index

@@ -31,9 +31,11 @@ def main():
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--typed-world-benchmark", action="store_true", help="Measure stock class traversal with retained typed groups; implies --world-benchmark")
     parser.add_argument("--world-benchmark", action="store_true", help="Measure 4096 enclosing world queries per sample; implies --benchmark")
     parser.add_argument("--java-scan-control-ref", default="49e26cd8a7c31b6500a20ab39fa2aad8eef14d04", help="Published Java scan source used by --benchmark; remaining classes/native image stay current")
     args = parser.parse_args()
+    args.world_benchmark |= args.typed_world_benchmark
     if not args.java_home:
         parser.error('--java-home or JAVA_HOME must identify JDK25')
     output = args.output.resolve()
@@ -115,7 +117,7 @@ def main():
                             if (Path(base) / resource).is_file())
                 assert path.is_relative_to(repo) and sha(path) == digest
                 checked[str(path)] = digest
-            assert len(checked) == (17 if side == 'current' else 7)
+            assert len(checked) == (18 if side == 'current' else 7)
             images[side] = checked
             if side == 'current':
                 assert 'NATIVE_IMAGE ' + pins['native'] + ' ' + str(native) in data
@@ -159,13 +161,15 @@ def main():
             samples={'current':[],'frozen':[],'java_scan_control':[]}
             for index,side in enumerate(['current','frozen','java_scan_control']*3):
                 command=[str(jdk / 'java'),'-Xms1g','-Xmx1g','-XX:+UseG1GC']
+                if args.typed_world_benchmark:command+=['-Xbatch']
                 if side!='frozen':command+=['--enable-native-access=ALL-UNNAMED','-Dmattmc.rust.natives.dir='+str(native.parent)]
                 command+=['-cp',str(output / 'oracle' / side)+os.pathsep+classpaths[side],'BenchmarkSectionQueries']
-                if args.world_benchmark:command+=['world']
+                if args.world_benchmark:command+=['world-typed' if args.typed_world_benchmark else 'world']
                 data=run(command,f'benchmark-{index}-{side}.log')
                 lines=[line.split('[STDOUT]: ',1)[-1] for line in data.splitlines()]
                 rows=[list(map(int,line.split()[1:])) for line in lines if line.startswith('SECTION_TIMING ')]
-                assert len(rows)==96
+                assert len(rows)==(128 if args.typed_world_benchmark else 96)
+                if args.typed_world_benchmark:assert all(len(row)==6 and row[5]==0 for row in rows), (side, "timed compilation", rows)
                 samples[side].extend(rows)
             summaries={}
             for size,hits in {(r[0],r[1]) for r in samples['current']}:
@@ -173,7 +177,9 @@ def main():
                 assert len({r[4] for rows in matching.values() for r in rows})==1
                 summaries[f'{size}-members-{hits}-hits']={side:{'median_ms':statistics.median(r[2] for r in rows)/1e6,'median_java_bytes':statistics.median(r[3] for r in rows)} for side,rows in matching.items()}
             result['benchmark']={'scope':'32768 production section queries per sample; prebuilt entities. Nine alternating JVMs, five warmups/eight samples per workload. Excludes gameplay/GPU/native allocation.', 'samples':samples,'summaries':summaries}
+            if args.typed_world_benchmark:result['benchmark']['typed']=True
             if args.world_benchmark:result['benchmark']['scope']='4096 production EntitySectionStorage queries per sample; one primary entity per section. Nine alternating JVMs, five warmups/eight samples per workload. Excludes gameplay/GPU/native allocation.'
+            if args.typed_world_benchmark:result['benchmark']['scope']='4096 stock typed EntitySectionStorage queries per sample; 32 warmups/eight compiler-quiet samples in nine alternating JVMs with matched -Xbatch. Includes empty typed groups, no bounds hits and all hits; excludes gameplay/GPU/native allocation.'
     finally:
         result['guards_pass'] = (sources(ROOT) == pins['current']
                                 and sources(FROZEN) == pins['frozen']

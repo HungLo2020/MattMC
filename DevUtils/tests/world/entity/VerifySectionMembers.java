@@ -51,9 +51,11 @@ public final class VerifySectionMembers {
         @Override protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput out){}
         @Override public boolean hurtServer(net.minecraft.server.level.ServerLevel level,net.minecraft.world.damagesource.DamageSource source,float damage){return false;}
     }
-    static SpatialEntity spatial(int id,java.lang.foreign.Arena scope) throws Exception {
+    static final class SpatialTyped extends SpatialEntity {}
+    static SpatialEntity spatial(int id,java.lang.foreign.Arena scope) throws Exception { return spatial(id,scope,SpatialEntity.class); }
+    static SpatialEntity spatial(int id,java.lang.foreign.Arena scope,Class<? extends SpatialEntity> type) throws Exception {
         Class<?> unsafe=Class.forName("sun.misc.Unsafe");var field=unsafe.getDeclaredField("theUnsafe");field.setAccessible(true);
-        var entity=(SpatialEntity)unsafe.getMethod("allocateInstance",Class.class).invoke(field.get(null),SpatialEntity.class);
+        var entity=(SpatialEntity)unsafe.getMethod("allocateInstance",Class.class).invoke(field.get(null),type);
         entity.ordinal=id;entity.setId(id);
         AABB box=new AABB(id*2,0,0,id*2+1,1,1);
         try {
@@ -178,6 +180,40 @@ public final class VerifySectionMembers {
             }
         }
     }
+    static void typedWorldQueries(PrintWriter out) throws Exception {
+        for(int size:new int[]{0,1,5,260})for(int warm=0;warm<2;warm++)for(int mode=0;mode<9;mode++) {
+            try(var scope=java.lang.foreign.Arena.ofConfined()) {
+                var storage=new EntitySectionStorage<SpatialEntity>(SpatialEntity.class,k->Visibility.TRACKED);
+                var section=storage.getOrCreateSection(0);
+                long futureKey=net.minecraft.core.SectionPos.asLong(1,0,0);
+                var future=storage.getOrCreateSection(futureKey);
+                var box=new AABB(-1,-1,-1,33,2,2);var outside=new AABB(0,8,0,1,9,1);
+                var members=new ArrayList<SpatialEntity>();
+                for(int i=0;i<size;i++) {
+                    var e=spatial(i,scope,i%2==0?SpatialTyped.class:SpatialEntity.class);
+                    e.setBoundingBox(mode==1?outside:box);section.add(e);members.add(e);
+                }
+                var later=spatial(size,scope,SpatialTyped.class);later.setBoundingBox(mode==2?outside:box);future.add(later);
+                var type=EntityTypeTest.<SpatialEntity,SpatialTyped>forClass(SpatialTyped.class);
+                if(warm!=0)storage.getEntities(type,box,e->AbortableIterationConsumer.Continuation.CONTINUE);
+                int action=mode;
+                call(out,"typed-world:"+size+":"+warm+":"+mode,()->storage.getEntities(type,box,e->{
+                    events.add("typed:"+e.ordinal);
+                    if(e.ordinal==0)switch(action) {
+                        case 2 -> later.setBoundingBox(box);
+                        case 3 -> future.updateChunkStatus(Visibility.HIDDEN);
+                        case 4 -> {storage.remove(futureKey);storage.getOrCreateSection(futureKey).add(later);}
+                        case 5 -> {section.remove(members.getLast());return AbortableIterationConsumer.Continuation.ABORT;}
+                        case 6 -> {if(size>1)section.remove(members.getLast());}
+                        case 7 -> storage.getEntities(type,box,n->{events.add("typed-nested:"+n.ordinal);return AbortableIterationConsumer.Continuation.CONTINUE;});
+                        case 8 -> {if(size>2)members.get(2).setBoundingBox(outside);}
+                        default -> {}
+                    }
+                    return AbortableIterationConsumer.Continuation.CONTINUE;
+                }));
+            }
+        }
+    }
     static String labels(Collection<?> values) {
         var result=new ArrayList<String>();for(Object value:values)result.add(label(value));return result.toString();
     }
@@ -216,6 +252,7 @@ public final class VerifySectionMembers {
         try(var out=new PrintWriter(buffer)) {
             spatialQueries(out);
             worldQueries(out);
+            typedWorldQueries(out);
             // Root and cached typed membership, duplicates, live immutable views and snapshots.
             var values=new ClassInstanceMultiMap<Member>(Member.class);
             var typed=values.find(Typed.class);var root=values.find(Member.class);
@@ -322,7 +359,7 @@ public final class VerifySectionMembers {
         classes.add(EntityTypeTest.forClass(Member.class).getClass().getName());
         classes.add(EntityTypeTest.forExactClass(Member.class).getClass().getName());
         if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.NativeClassInstanceStorage","net.minecraft.util.NativeClassInstanceStorage$Group","net.minecraft.util.NativeClassInstanceStorage$Group$1","net.minecraft.util.NativeClassInstanceStorage$Group$MemberSpliterator","net.minecraft.util.NativeClassInstanceStorage$Captured","net.minecraft.world.entity.NativeEntityGeometry","net.minecraft.world.entity.NativeEntityGeometry$Body"));
-        if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.ClassInstanceMultiMap$QueryBatch","net.minecraft.world.level.entity.NativeEntitySectionIndex","net.minecraft.world.level.entity.NativeEntitySectionIndex$Cursor"));
+        if(args[1].equals("current"))classes.addAll(List.of("net.minecraft.util.ClassInstanceMultiMap$1","net.minecraft.util.ClassInstanceMultiMap$QueryBatch","net.minecraft.world.level.entity.NativeEntitySectionIndex","net.minecraft.world.level.entity.NativeEntitySectionIndex$Cursor"));
         for(String name:classes)try(var in=Class.forName(name).getResourceAsStream("/"+name.replace('.','/')+".class")){System.out.println("CLASS "+name+" "+sha(in.readAllBytes()));}
         if(args[1].equals("current")) {
             var nativePath=Path.of(System.getProperty("mattmc.rust.natives.dir"),"mattmc_rust-linux-x64.so").toRealPath();

@@ -14,6 +14,17 @@ import net.minecraft.world.entity.NativeEntityGeometry;
 import net.minecraft.world.phys.AABB;
 
 public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
+    private static final java.util.concurrent.atomic.AtomicLong NEXT_QUERY_TYPE = new java.util.concurrent.atomic.AtomicLong();
+    private static final ClassValue<Long> QUERY_TYPES = new ClassValue<>() {
+        @Override protected Long computeValue(Class<?> type) {
+            long identity=NEXT_QUERY_TYPE.incrementAndGet();
+            if(identity==0)throw new IllegalStateException("Section query type identities exhausted");
+            return identity;
+        }
+    };
+    /** Stable semantic class identity; neither a Java object pointer nor a GPU handle. */
+    public static long queryTypeIdentity(Class<?> type) { return QUERY_TYPES.get(type); }
+
     /** Reusable bounded CPU output for the enclosing native section cursor. No entity references. */
     public static final class QueryBatch {
         final long[] rows = new long[130];
@@ -34,6 +45,7 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
 	public ClassInstanceMultiMap(Class<T> class_) {
 		this.baseClass = class_;
 		this.byClass.put(class_, this.allInstances);
+        if(class_!=null)this.allInstances.bindType(queryTypeIdentity(class_));
 	}
 
     public boolean add(T object) { return add(object,null); }
@@ -79,6 +91,7 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
             var list = this.byClass.computeIfAbsent(class_, class_x -> {
                 var group=this.nativeStorage.newGroup();
                 group.copyMatching(this.allInstances,class_x);
+                group.bindType(queryTypeIdentity(class_x));
                 return group;
             });
 			return (Collection<S>)Collections.unmodifiableCollection(list);
@@ -104,6 +117,13 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
         this.find(type); // Preserve lazy class admission and group construction.
         NativeClassInstanceStorage<S>.Group group=(NativeClassInstanceStorage.Group)this.byClass.get(type);
         return group.forEachIntersecting(query,bounds,consumer);
+    }
+
+    /** The index scanned this already admitted class group before returning. */
+    @SuppressWarnings({"unchecked","rawtypes"})
+    public <S> AbortableIterationConsumer.Continuation consumeTypedBatch(Class<S> type,AABB query,BiPredicate<? super S,AABB> bounds,AbortableIterationConsumer<? super S> consumer,QueryBatch batch) {
+        NativeClassInstanceStorage<S>.Group group=(NativeClassInstanceStorage.Group)this.byClass.get(type);
+        return group.forEachIntersecting(query,bounds,consumer,batch,batch.count,batch.expected);
     }
 
 	public Iterator<T> iterator() {

@@ -66,7 +66,39 @@ class EntitySectionStorageNativeTest {
             }
         };
         storage.getEntities(new AABB(0,0,0,1,1,1),entity->{fail("Override supplies no entities");return AbortableIterationConsumer.Continuation.CONTINUE;});
-        assertEquals(java.util.List.of("override"),calls);
+        storage.getEntities(EntityTypeTest.forClass(EntityAccess.class),new AABB(0,0,0,1,1,1),entity->{fail("Typed query must preserve traversal override");return AbortableIterationConsumer.Continuation.CONTINUE;});
+        assertEquals(java.util.List.of("override","override"),calls);
+    }
+    interface Selected extends EntityAccess {}
+    @Test void typedGroupsRemainLazyAndObserveFutureMutations() {
+        var storage=new EntitySectionStorage<EntityAccess>(EntityAccess.class,k->Visibility.TRACKED);
+        var section=storage.getOrCreateSection(0);
+        var other=mock(EntityAccess.class);
+        var selected=mock(Selected.class);
+        var box=new AABB(0,0,0,33,2,2);
+        org.mockito.Mockito.when(other.getBoundingBox()).thenReturn(box);
+        org.mockito.Mockito.when(selected.getBoundingBox()).thenReturn(box);
+        section.add(other);
+        var type=EntityTypeTest.<EntityAccess,Selected>forClass(Selected.class);
+        storage.getEntities(type,box,e->{fail("Initial typed group is empty");return AbortableIterationConsumer.Continuation.CONTINUE;});
+        section.add(selected);
+        var later=mock(Selected.class);org.mockito.Mockito.when(later.getBoundingBox()).thenReturn(box);
+        var seen=new ArrayList<EntityAccess>();
+        storage.getEntities(type,box,e->{
+            seen.add(e);
+            if(e==selected)storage.getOrCreateSection(SectionPos.asLong(1,0,0)).add(later);
+            return AbortableIterationConsumer.Continuation.CONTINUE;
+        });
+        assertEquals(java.util.List.of(selected,later),seen);
+        org.mockito.Mockito.verify(other,org.mockito.Mockito.never()).getBoundingBox();
+    }
+    @Test void typedNullClassFailsOnlyWhenAnAccessibleNonemptySectionIsVisited() {
+        var storage=new EntitySectionStorage<EntityAccess>(EntityAccess.class,k->Visibility.TRACKED);
+        var type=EntityTypeTest.<EntityAccess,EntityAccess>forClass(null);
+        var box=new AABB(0,0,0,1,1,1);
+        assertDoesNotThrow(()->storage.getEntities(type,box,null));
+        storage.getOrCreateSection(0).add(mock(EntityAccess.class));
+        assertThrows(NullPointerException.class,()->storage.getEntities(type,box,null));
     }
     @Test void retainedSectionVisibilityChangesAfterRemovalRemainLocalToThatSection() {
         var storage=new EntitySectionStorage<EntityAccess>(EntityAccess.class,chunk->Visibility.TRACKED);
