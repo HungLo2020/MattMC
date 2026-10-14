@@ -8,4 +8,5 @@ pub mod state;
 pub mod sound;
 pub mod map_color;
 pub mod registry;
+pub mod entity;
 pub mod tags;

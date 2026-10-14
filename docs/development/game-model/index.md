@@ -7,9 +7,9 @@
 > sound/offset settings, block-family configuration, map palette/shading and
 > state policy are current. Java still
 > supplies block factories, objects/codecs, shapes, blocked light, contextual
-> predicates, sound policy/resource callbacks and world callbacks. Remaining
-> content registries, behavior and
-> component systems are proposals.
+> predicates, sound policy/resource callbacks and world callbacks.
+> [Entity type definitions](ENTITY-TYPES.md) are also Rust-owned. Remaining
+> content registries, behavior and component systems are proposals.
 > “Implemented” describes source ownership, not completion of every acceptance
 > check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
 > The surveys behind the proposal are dated 2026-10-07.
@@ -98,6 +98,8 @@ one set of systems.
   compared with today.
 - [Migration plan](MIGRATION-PLAN.md): the order to build this alongside Java,
   parity checks, and open decisions.
+- [Entity type definitions](ENTITY-TYPES.md) (current): the Rust catalog of every
+  entity type's identity and intrinsic settings, and how Java projects it.
 - [Rust block registry](RUST-BLOCK-REGISTRY.md) (current): how Phase 1 works,
   how to add a column or consumer, constraints and tests.
 - [Native block state definitions](BLOCK-DEFINITIONS.md) (current work): ordered

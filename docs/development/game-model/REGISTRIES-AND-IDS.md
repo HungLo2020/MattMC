@@ -38,8 +38,11 @@ Data-driven registries keep Java storage, but Rust resolves their
 (network IDs, known packs, tag ID lists) of each frozen registry set for
 client synchronization. These snapshots are not typed content registries.
 
+[Entity type definitions](ENTITY-TYPES.md) are Rust-owned: names, registry
+order and every intrinsic setting; Java registers projections in Rust order.
+
 Still separate:
-- items, entity types and biomes: no Rust content registry yet
+- items and biomes: no Rust content registry yet
 - rendering's own meshing-state columns (models, materials, passes,
   shader-pack IDs, tint, sprites), which rendering owns by design; their
   block facts come from the registry

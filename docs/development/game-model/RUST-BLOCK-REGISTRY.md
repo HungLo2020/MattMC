@@ -58,7 +58,8 @@ fluid facts from the [fluid registry](FLUID-DEFINITIONS.md).
   by exact box list, with face 0 empty. The face table holds
   `Shapes.faceShapeOccludes` for every pair; Java computes it at export.
 
-Items, entity types, tags and biomes are not in this shared registry yet.
+Items, tags and biomes are not in this shared registry yet; entity types have
+their own [Rust catalog](ENTITY-TYPES.md).
 Existing native consumers may still use separately supplied Java metadata;
 the shared model remains future work (see the [migration plan](MIGRATION-PLAN.md)).
 
