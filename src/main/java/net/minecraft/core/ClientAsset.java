@@ -1,7 +1,6 @@
 package net.minecraft.core;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
 import io.netty.buffer.ByteBuf;
 import java.util.function.UnaryOperator;
 import net.minecraft.network.codec.StreamCodec;
@@ -19,7 +18,6 @@ public interface ClientAsset {
 
 	public record ResourceTexture(ResourceLocation id, ResourceLocation texturePath) implements ClientAsset.Texture {
 		public static final Codec<ClientAsset.ResourceTexture> CODEC = ResourceLocation.CODEC.xmap(ClientAsset.ResourceTexture::new, ClientAsset.ResourceTexture::id);
-		public static final MapCodec<ClientAsset.ResourceTexture> DEFAULT_FIELD_CODEC = CODEC.fieldOf("asset_id");
 		public static final StreamCodec<ByteBuf, ClientAsset.ResourceTexture> STREAM_CODEC = ResourceLocation.STREAM_CODEC
 			.map(ClientAsset.ResourceTexture::new, ClientAsset.ResourceTexture::id);
 

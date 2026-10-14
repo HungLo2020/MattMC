@@ -16,8 +16,8 @@
 - Rust client residency/ranges own loaded-chunk slots, coordinates and selection; Java binds behavior objects and delivers events.
 - Rust entity geometry/removal/camera membership, ticking order, visible ID/UUID tracking, section membership/index/range scans and manager residency serve production client/server consumers.
 - Java retains entity simulation, behavior callbacks, visibility-transition orchestration, persistence I/O and the loading inbox.
-- Rust owns numerical fog policy, water transitions and rain history. Java retains ordered getters, environment dispatch/hooks and final scalar projections.
-- Rust owns atlases/model baking, ordinary GUI item templates and the star-field producer. Java retains font/layout and remaining frame-input extraction/orchestration.
+- Rust owns numerical fog policy, water transitions and rain history. Java retains ordered getters, environment dispatch/hooks and final scalar projections. Rust owns atlases/model baking, ordinary GUI item templates and the star-field producer. Java retains font/layout and remaining frame-input extraction/orchestration.
+- Rust owns content definitions/identities: entity types, items+default components (SNBT), component types, entity data serializers, synched IDs, and parses/stores/encodes the 18 data-driven entity/item/biome registries (datapacks still define them). Java keeps codecs for text, holders, effects, int providers, particles. Frozen/pre-change parity: 27883 content + 37418 fuzz rows; DH p99 59.8/68.5ms. Guide: game-model/DATA-DEFINITIONS.md.
 - General simulation, networking and startup/platform remain Java. src/main/rust/app/mod.rs is empty; Java removal is far from complete.
 
 ## Current implementation batch

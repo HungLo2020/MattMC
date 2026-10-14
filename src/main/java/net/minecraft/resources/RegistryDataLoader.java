@@ -282,6 +282,17 @@ public class RegistryDataLoader {
 		Resource resource,
 		RegistrationInfo registrationInfo
 	) throws IOException {
+		if (decoder instanceof NativeData.DataCodec<?> nativeData) {
+			// Rust parses its data-driven registries' files itself (`content/data`).
+			byte[] bytes;
+			try (java.io.InputStream inputStream = resource.open()) {
+				bytes = inputStream.readAllBytes();
+			}
+			@SuppressWarnings("unchecked")
+			E object = (E)nativeData.decodeFile(registryOps, bytes).getOrThrow();
+			writableRegistry.register(resourceKey, object, registrationInfo);
+			return;
+		}
 		Reader reader = resource.openAsReader();
 
 		try {

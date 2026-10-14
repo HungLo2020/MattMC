@@ -86,28 +86,6 @@ public record Equippable(
 		Equippable::new
 	);
 
-	public static Equippable llamaSwag(DyeColor dyeColor) {
-		return builder(EquipmentSlot.BODY)
-			.setEquipSound(SoundEvents.LLAMA_SWAG)
-			.setAsset((ResourceKey<EquipmentAsset>)EquipmentAssets.CARPETS.get(dyeColor))
-			.setAllowedEntities(EntityType.LLAMA, EntityType.TRADER_LLAMA)
-			.setCanBeSheared(true)
-			.setShearingSound(SoundEvents.LLAMA_CARPET_UNEQUIP)
-			.build();
-	}
-
-	public static Equippable saddle() {
-		HolderGetter<EntityType<?>> holderGetter = BuiltInRegistries.acquireBootstrapRegistrationLookup(BuiltInRegistries.ENTITY_TYPE);
-		return builder(EquipmentSlot.SADDLE)
-			.setEquipSound(SoundEvents.HORSE_SADDLE)
-			.setAsset(EquipmentAssets.SADDLE)
-			.setAllowedEntities(holderGetter.getOrThrow(EntityTypeTags.CAN_EQUIP_SADDLE))
-			.setEquipOnInteract(true)
-			.setCanBeSheared(true)
-			.setShearingSound(SoundEvents.SADDLE_UNEQUIP)
-			.build();
-	}
-
 	public static Equippable harness(DyeColor dyeColor) {
 		HolderGetter<EntityType<?>> holderGetter = BuiltInRegistries.acquireBootstrapRegistrationLookup(BuiltInRegistries.ENTITY_TYPE);
 		return builder(EquipmentSlot.BODY)

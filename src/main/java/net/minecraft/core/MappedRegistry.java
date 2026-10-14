@@ -271,6 +271,11 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 		return this.byKey.containsKey(resourceKey);
 	}
 
+	/** Binds registered values to their holders ahead of {@link #freeze}, which binds them again. */
+	public void bindRegisteredValues() {
+		this.byValue.forEach((object, reference) -> reference.bindValue(object));
+	}
+
 	@Override
 	public Registry<T> freeze() {
 		if (this.frozen) {

@@ -423,8 +423,10 @@ export of remaining Java state facts; see Phase 2 below.
 
 Not done in Phase 1, by design:
 - This block-fact phase does not own items with default components or biome
-  definitions. Entity type definitions now have a separate native catalog;
-  registry/tag query snapshots do not transfer all Java value authority.
+  definitions; separate content owners now do: [entity types](ENTITY-TYPES.md),
+  [item definitions](ITEM-DEFINITIONS.md), [content identities](CONTENT-IDENTITIES.md)
+  and [data-driven definitions](DATA-DEFINITIONS.md) (biomes and entity/item
+  registries). Registry/tag query snapshots do not transfer all Java value authority.
   Existing native systems can still consume separate
   Java-supplied data, such as [biome-search inputs](../world/biome/RUST-BIOME-SEARCH.md).
   General shared registries remain future work; this phase covers block facts.

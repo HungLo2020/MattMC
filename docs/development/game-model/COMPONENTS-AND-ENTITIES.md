@@ -21,7 +21,8 @@
 > Broad gameplay and long-session memory
 > acceptance remain separate from implemented ownership.
 > [Entity type definitions](ENTITY-TYPES.md) (identity and intrinsic settings)
-> are Rust-owned; entity components and synchronized data are not.
+> and [synchronized data IDs and serializers](CONTENT-IDENTITIES.md) are
+> Rust-owned; entity components and live synchronized values are not.
 > See the [game model index](index.md).
 
 ## The model

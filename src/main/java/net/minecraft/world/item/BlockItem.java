@@ -1,6 +1,5 @@
 package net.minecraft.world.item;
 
-import java.util.Map;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -180,10 +179,6 @@ public class BlockItem extends Item {
 
 	public Block getBlock() {
 		return this.block;
-	}
-
-	public void registerBlocks(Map<Block, Item> map, Item item) {
-		map.put(this.getBlock(), item);
 	}
 
 	@Override

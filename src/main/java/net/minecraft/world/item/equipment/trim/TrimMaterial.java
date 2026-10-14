@@ -1,7 +1,6 @@
 package net.minecraft.world.item.equipment.trim;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -12,12 +11,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.RegistryFileCodec;
 
 public record TrimMaterial(MaterialAssetGroup assets, Component description) {
-	public static final Codec<TrimMaterial> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				MaterialAssetGroup.MAP_CODEC.forGetter(TrimMaterial::assets), ComponentSerialization.CODEC.fieldOf("description").forGetter(TrimMaterial::description)
-			)
-			.apply(instance, TrimMaterial::new)
-	);
+	public static final Codec<TrimMaterial> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.TRIM_MATERIAL, false, net.minecraft.resources.NativeDataProjections::trimMaterial, net.minecraft.resources.NativeDataProjections::trimMaterialOut);
 	public static final StreamCodec<RegistryFriendlyByteBuf, TrimMaterial> DIRECT_STREAM_CODEC = StreamCodec.composite(
 		MaterialAssetGroup.STREAM_CODEC, TrimMaterial::assets, ComponentSerialization.STREAM_CODEC, TrimMaterial::description, TrimMaterial::new
 	);

@@ -36,8 +36,8 @@ public class HoeItem extends Item {
 		)
 	);
 
-	public HoeItem(ToolMaterial toolMaterial, float f, float g, Item.Properties properties) {
-		super(properties.hoe(toolMaterial, f, g));
+	public HoeItem(Item.Properties properties) {
+		super(properties);
 	}
 
 	@Override

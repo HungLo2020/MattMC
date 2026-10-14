@@ -1,7 +1,6 @@
 package net.minecraft.world.entity.animal;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import net.minecraft.core.ClientAsset;
 import net.minecraft.core.Holder;
@@ -17,22 +16,10 @@ import net.minecraft.world.entity.variant.SpawnPrioritySelectors;
 
 public record CatVariant(ClientAsset.ResourceTexture assetInfo, SpawnPrioritySelectors spawnConditions)
 	implements PriorityProvider<SpawnContext, SpawnCondition> {
-	public static final Codec<CatVariant> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ClientAsset.ResourceTexture.DEFAULT_FIELD_CODEC.forGetter(CatVariant::assetInfo),
-				SpawnPrioritySelectors.CODEC.fieldOf("spawn_conditions").forGetter(CatVariant::spawnConditions)
-			)
-			.apply(instance, CatVariant::new)
-	);
-	public static final Codec<CatVariant> NETWORK_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(ClientAsset.ResourceTexture.DEFAULT_FIELD_CODEC.forGetter(CatVariant::assetInfo)).apply(instance, CatVariant::new)
-	);
+	public static final Codec<CatVariant> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.CAT_VARIANT, false, net.minecraft.resources.NativeDataProjections::cat, net.minecraft.resources.NativeDataProjections::catOut);
+	public static final Codec<CatVariant> NETWORK_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.CAT_VARIANT, true, net.minecraft.resources.NativeDataProjections::cat, net.minecraft.resources.NativeDataProjections::catOut);
 	public static final Codec<Holder<CatVariant>> CODEC = RegistryFixedCodec.create(Registries.CAT_VARIANT);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Holder<CatVariant>> STREAM_CODEC = ByteBufCodecs.holderRegistry(Registries.CAT_VARIANT);
-
-	private CatVariant(ClientAsset.ResourceTexture resourceTexture) {
-		this(resourceTexture, SpawnPrioritySelectors.EMPTY);
-	}
 
 	@Override
 	public List<PriorityProvider.Selector<SpawnContext, SpawnCondition>> selectors() {

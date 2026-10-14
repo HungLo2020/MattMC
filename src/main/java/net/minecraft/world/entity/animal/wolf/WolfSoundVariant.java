@@ -1,7 +1,6 @@
 package net.minecraft.world.entity.animal.wolf;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -18,22 +17,8 @@ public record WolfSoundVariant(
 	Holder<SoundEvent> pantSound,
 	Holder<SoundEvent> whineSound
 ) {
-	public static final Codec<WolfSoundVariant> DIRECT_CODEC = getWolfSoundVariantCodec();
-	public static final Codec<WolfSoundVariant> NETWORK_CODEC = getWolfSoundVariantCodec();
+	public static final Codec<WolfSoundVariant> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.WOLF_SOUND_VARIANT, false, net.minecraft.resources.NativeDataProjections::wolfSound, net.minecraft.resources.NativeDataProjections::wolfSoundOut);
+	public static final Codec<WolfSoundVariant> NETWORK_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.WOLF_SOUND_VARIANT, true, net.minecraft.resources.NativeDataProjections::wolfSound, net.minecraft.resources.NativeDataProjections::wolfSoundOut);
 	public static final Codec<Holder<WolfSoundVariant>> CODEC = RegistryFixedCodec.create(Registries.WOLF_SOUND_VARIANT);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Holder<WolfSoundVariant>> STREAM_CODEC = ByteBufCodecs.holderRegistry(Registries.WOLF_SOUND_VARIANT);
-
-	private static Codec<WolfSoundVariant> getWolfSoundVariantCodec() {
-		return RecordCodecBuilder.create(
-			instance -> instance.group(
-					SoundEvent.CODEC.fieldOf("ambient_sound").forGetter(WolfSoundVariant::ambientSound),
-					SoundEvent.CODEC.fieldOf("death_sound").forGetter(WolfSoundVariant::deathSound),
-					SoundEvent.CODEC.fieldOf("growl_sound").forGetter(WolfSoundVariant::growlSound),
-					SoundEvent.CODEC.fieldOf("hurt_sound").forGetter(WolfSoundVariant::hurtSound),
-					SoundEvent.CODEC.fieldOf("pant_sound").forGetter(WolfSoundVariant::pantSound),
-					SoundEvent.CODEC.fieldOf("whine_sound").forGetter(WolfSoundVariant::whineSound)
-				)
-				.apply(instance, WolfSoundVariant::new)
-		);
-	}
 }

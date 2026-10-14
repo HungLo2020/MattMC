@@ -1,7 +1,5 @@
 package net.minecraft.world.level.biome;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Optional;
 import java.util.OptionalInt;
 import net.minecraft.core.Holder;
@@ -12,27 +10,6 @@ import net.minecraft.util.random.WeightedList;
 import org.jetbrains.annotations.Nullable;
 
 public class BiomeSpecialEffects {
-	public static final Codec<BiomeSpecialEffects> CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				Codec.INT.fieldOf("fog_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.fogColor),
-				Codec.INT.fieldOf("water_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.waterColor),
-				Codec.INT.fieldOf("water_fog_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.waterFogColor),
-				Codec.INT.fieldOf("sky_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.skyColor),
-				Codec.INT.optionalFieldOf("foliage_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.foliageColorOverride),
-				Codec.INT.optionalFieldOf("dry_foliage_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.dryFoliageColorOverride),
-				Codec.INT.optionalFieldOf("grass_color").forGetter(biomeSpecialEffects -> biomeSpecialEffects.grassColorOverride),
-				BiomeSpecialEffects.GrassColorModifier.CODEC
-					.optionalFieldOf("grass_color_modifier", BiomeSpecialEffects.GrassColorModifier.NONE)
-					.forGetter(biomeSpecialEffects -> biomeSpecialEffects.grassColorModifier),
-				AmbientParticleSettings.CODEC.optionalFieldOf("particle").forGetter(biomeSpecialEffects -> biomeSpecialEffects.ambientParticleSettings),
-				SoundEvent.CODEC.optionalFieldOf("ambient_sound").forGetter(biomeSpecialEffects -> biomeSpecialEffects.ambientLoopSoundEvent),
-				AmbientMoodSettings.CODEC.optionalFieldOf("mood_sound").forGetter(biomeSpecialEffects -> biomeSpecialEffects.ambientMoodSettings),
-				AmbientAdditionsSettings.CODEC.optionalFieldOf("additions_sound").forGetter(biomeSpecialEffects -> biomeSpecialEffects.ambientAdditionsSettings),
-				WeightedList.codec(Music.CODEC).optionalFieldOf("music").forGetter(biomeSpecialEffects -> biomeSpecialEffects.backgroundMusic),
-				Codec.FLOAT.fieldOf("music_volume").orElse(1.0F).forGetter(biomeSpecialEffects -> biomeSpecialEffects.backgroundMusicVolume)
-			)
-			.apply(instance, BiomeSpecialEffects::new)
-	);
 	private final int fogColor;
 	private final int waterColor;
 	private final int waterFogColor;
@@ -279,7 +256,6 @@ public class BiomeSpecialEffects {
 		};
 
 		private final String name;
-		public static final Codec<BiomeSpecialEffects.GrassColorModifier> CODEC = StringRepresentable.fromEnum(BiomeSpecialEffects.GrassColorModifier::values);
 
 		public abstract int modifyColor(double d, double e, int i);
 

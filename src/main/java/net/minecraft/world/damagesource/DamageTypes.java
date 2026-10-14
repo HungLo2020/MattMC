@@ -1,7 +1,6 @@
 package net.minecraft.world.damagesource;
 
 import net.minecraft.core.registries.Registries;
-import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
@@ -57,64 +56,4 @@ public interface DamageTypes {
 	ResourceKey<DamageType> OUTSIDE_BORDER = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("outside_border"));
 	ResourceKey<DamageType> GENERIC_KILL = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("generic_kill"));
 	ResourceKey<DamageType> MACE_SMASH = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("mace_smash"));
-
-	static void bootstrap(BootstrapContext<DamageType> bootstrapContext) {
-		bootstrapContext.register(IN_FIRE, new DamageType("inFire", 0.1F, DamageEffects.BURNING));
-		bootstrapContext.register(CAMPFIRE, new DamageType("inFire", 0.1F, DamageEffects.BURNING));
-		bootstrapContext.register(LIGHTNING_BOLT, new DamageType("lightningBolt", 0.1F));
-		bootstrapContext.register(ON_FIRE, new DamageType("onFire", 0.0F, DamageEffects.BURNING));
-		bootstrapContext.register(LAVA, new DamageType("lava", 0.1F, DamageEffects.BURNING));
-		bootstrapContext.register(HOT_FLOOR, new DamageType("hotFloor", 0.1F, DamageEffects.BURNING));
-		bootstrapContext.register(IN_WALL, new DamageType("inWall", 0.0F));
-		bootstrapContext.register(CRAMMING, new DamageType("cramming", 0.0F));
-		bootstrapContext.register(DROWN, new DamageType("drown", 0.0F, DamageEffects.DROWNING));
-		bootstrapContext.register(STARVE, new DamageType("starve", 0.0F));
-		bootstrapContext.register(CACTUS, new DamageType("cactus", 0.1F));
-		bootstrapContext.register(
-			FALL, new DamageType("fall", DamageScaling.WHEN_CAUSED_BY_LIVING_NON_PLAYER, 0.0F, DamageEffects.HURT, DeathMessageType.FALL_VARIANTS)
-		);
-		bootstrapContext.register(
-			ENDER_PEARL, new DamageType("fall", DamageScaling.WHEN_CAUSED_BY_LIVING_NON_PLAYER, 0.0F, DamageEffects.HURT, DeathMessageType.FALL_VARIANTS)
-		);
-		bootstrapContext.register(FLY_INTO_WALL, new DamageType("flyIntoWall", 0.0F));
-		bootstrapContext.register(FELL_OUT_OF_WORLD, new DamageType("outOfWorld", 0.0F));
-		bootstrapContext.register(GENERIC, new DamageType("generic", 0.0F));
-		bootstrapContext.register(MAGIC, new DamageType("magic", 0.0F));
-		bootstrapContext.register(WITHER, new DamageType("wither", 0.0F));
-		bootstrapContext.register(DRAGON_BREATH, new DamageType("dragonBreath", 0.0F));
-		bootstrapContext.register(DRY_OUT, new DamageType("dryout", 0.1F));
-		bootstrapContext.register(SWEET_BERRY_BUSH, new DamageType("sweetBerryBush", 0.1F, DamageEffects.POKING));
-		bootstrapContext.register(FREEZE, new DamageType("freeze", 0.0F, DamageEffects.FREEZING));
-		bootstrapContext.register(STALAGMITE, new DamageType("stalagmite", 0.0F));
-		bootstrapContext.register(FALLING_BLOCK, new DamageType("fallingBlock", 0.1F));
-		bootstrapContext.register(FALLING_ANVIL, new DamageType("anvil", 0.1F));
-		bootstrapContext.register(FALLING_STALACTITE, new DamageType("fallingStalactite", 0.1F));
-		bootstrapContext.register(STING, new DamageType("sting", 0.1F));
-		bootstrapContext.register(MOB_ATTACK, new DamageType("mob", 0.1F));
-		bootstrapContext.register(MOB_ATTACK_NO_AGGRO, new DamageType("mob", 0.1F));
-		bootstrapContext.register(PLAYER_ATTACK, new DamageType("player", 0.1F));
-		bootstrapContext.register(SPEAR, new DamageType("spear", 0.1F));
-		bootstrapContext.register(ARROW, new DamageType("arrow", 0.1F));
-		bootstrapContext.register(TRIDENT, new DamageType("trident", 0.1F));
-		bootstrapContext.register(MOB_PROJECTILE, new DamageType("mob", 0.1F));
-		bootstrapContext.register(SPIT, new DamageType("mob", 0.1F));
-		bootstrapContext.register(FIREWORKS, new DamageType("fireworks", 0.1F));
-		bootstrapContext.register(UNATTRIBUTED_FIREBALL, new DamageType("onFire", 0.1F, DamageEffects.BURNING));
-		bootstrapContext.register(FIREBALL, new DamageType("fireball", 0.1F, DamageEffects.BURNING));
-		bootstrapContext.register(WITHER_SKULL, new DamageType("witherSkull", 0.1F));
-		bootstrapContext.register(THROWN, new DamageType("thrown", 0.1F));
-		bootstrapContext.register(BULLET, new DamageType("bullet", 0.1F));
-		bootstrapContext.register(INDIRECT_MAGIC, new DamageType("indirectMagic", 0.0F));
-		bootstrapContext.register(THORNS, new DamageType("thorns", 0.1F, DamageEffects.THORNS));
-		bootstrapContext.register(EXPLOSION, new DamageType("explosion", DamageScaling.ALWAYS, 0.1F));
-		bootstrapContext.register(PLAYER_EXPLOSION, new DamageType("explosion.player", DamageScaling.ALWAYS, 0.1F));
-		bootstrapContext.register(SONIC_BOOM, new DamageType("sonic_boom", DamageScaling.ALWAYS, 0.0F));
-		bootstrapContext.register(
-			BAD_RESPAWN_POINT, new DamageType("badRespawnPoint", DamageScaling.ALWAYS, 0.1F, DamageEffects.HURT, DeathMessageType.INTENTIONAL_GAME_DESIGN)
-		);
-		bootstrapContext.register(OUTSIDE_BORDER, new DamageType("outsideBorder", 0.0F));
-		bootstrapContext.register(GENERIC_KILL, new DamageType("genericKill", 0.0F));
-		bootstrapContext.register(WIND_CHARGE, new DamageType("mob", 0.1F));
-		bootstrapContext.register(MACE_SMASH, new DamageType("mace_smash", 0.1F));
-	}
 }

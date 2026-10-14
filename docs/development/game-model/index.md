@@ -8,8 +8,11 @@
 > state policy are current. Java still
 > supplies block factories, objects/codecs, shapes, blocked light, contextual
 > predicates, sound policy/resource callbacks and world callbacks.
-> [Entity type definitions](ENTITY-TYPES.md) are also Rust-owned. Remaining
-> content registries, behavior and component systems are proposals.
+> [Entity type definitions](ENTITY-TYPES.md), [content identities](CONTENT-IDENTITIES.md)
+> (component types, entity data serializers, synchronized data),
+> [item definitions](ITEM-DEFINITIONS.md) and the decoded
+> [data-driven definitions](DATA-DEFINITIONS.md) (biomes, entity variants,
+> enchantments and other entity and item registries) are also Rust-owned. Behavior and the general component store are proposals.
 > “Implemented” describes source ownership, not completion of every acceptance
 > check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
 > The surveys behind the proposal are dated 2026-10-07.
@@ -100,6 +103,12 @@ one set of systems.
   parity checks, and open decisions.
 - [Entity type definitions](ENTITY-TYPES.md) (current): the Rust catalog of every
   entity type's identity and intrinsic settings, and how Java projects it.
+- [Content identities](CONTENT-IDENTITIES.md) (current): data component types,
+  entity data serializers and synchronized entity data IDs.
+- [Item definitions](ITEM-DEFINITIONS.md) (current): the Rust item catalog,
+  default components as SNBT and the two-step Java projection.
+- [Data-driven definitions](DATA-DEFINITIONS.md) (current): biomes and the
+  data-driven entity and item registries, parsed, stored and encoded by Rust.
 - [Rust block registry](RUST-BLOCK-REGISTRY.md) (current): how Phase 1 works,
   how to add a column or consumer, constraints and tests.
 - [Native block state definitions](BLOCK-DEFINITIONS.md) (current work): ordered

@@ -32,7 +32,7 @@ The [shared property owner](PROPERTY-DEFINITIONS.md) declares all 134 properties
 (123 shared and 11 for integrated content). The block registry shares their
 schemas directly, without importing definitions from Java.
 
-Data-driven registries keep Java storage, but Rust resolves their
+Other data-driven registries keep Java storage, but Rust resolves their
 [tags](../resources/TAGS-AND-REGISTRIES.md#tag-loading) and holds
 [identity snapshots](../resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
 (network IDs, known packs, tag ID lists) of each frozen registry set for
@@ -40,9 +40,14 @@ client synchronization. These snapshots are not typed content registries.
 
 [Entity type definitions](ENTITY-TYPES.md) are Rust-owned: names, registry
 order and every intrinsic setting; Java registers projections in Rust order.
+So are [item definitions](ITEM-DEFINITIONS.md) and the
+[content identities](CONTENT-IDENTITIES.md) (component types, entity data
+serializers, synchronized data IDs). [Biomes and the data-driven entity and item
+registries](DATA-DEFINITIONS.md) stay data driven, but Rust parses, stores and
+encodes them.
 
 Still separate:
-- items and biomes: no Rust content registry yet
+- live item stacks and entity data values (gameplay storage)
 - rendering's own meshing-state columns (models, materials, passes,
   shader-pack IDs, tint, sprites), which rendering owns by design; their
   block facts come from the registry

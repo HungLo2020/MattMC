@@ -3,6 +3,8 @@
 //! objects are projections of these definitions; they declare only behavior
 //! factories. See docs/development/game-model/ENTITY-TYPES.md.
 mod catalog;
+mod serializers;
+mod synched;
 #[cfg(test)]
 mod tests;
 
@@ -171,6 +173,80 @@ pub fn export() -> Vec<u8> {
         }
     }
     out
+}
+
+/// Entity data serializers, by network ID.
+pub fn serializers() -> &'static [&'static str] {
+    serializers::SERIALIZERS
+}
+
+/// An entity class that defines synchronized data fields.
+#[derive(Clone, Copy, Debug)]
+pub struct SynchedClass {
+    /// Java binary class name.
+    pub class: &'static str,
+    /// The nearest superclass that also defines fields; IDs continue after its last.
+    pub base: Option<&'static str>,
+    /// Java field name and serializer name, in definition order.
+    pub fields: &'static [(&'static str, &'static str)],
+}
+
+pub fn synched_classes() -> &'static [SynchedClass] {
+    synched::SYNCHED_CLASSES
+}
+
+/// The ID of each class's first field: one after its base's last, else 0.
+pub fn synched_first_ids() -> Vec<u32> {
+    let classes = synched_classes();
+    let index: std::collections::HashMap<_, _> = classes.iter().enumerate().map(|(i, c)| (c.class, i)).collect();
+    let mut first = vec![u32::MAX; classes.len()];
+    fn resolve(i: usize, classes: &[SynchedClass], index: &std::collections::HashMap<&str, usize>, first: &mut [u32], depth: usize) -> u32 {
+        assert!(depth < classes.len(), "synched data base cycle at {}", classes[i].class);
+        if first[i] == u32::MAX {
+            first[i] = match classes[i].base {
+                None => 0,
+                Some(base) => {
+                    let b = *index.get(base).unwrap_or_else(|| panic!("unknown synched base {base}"));
+                    resolve(b, classes, index, first, depth + 1) + classes[b].fields.len() as u32
+                }
+            };
+        }
+        first[i]
+    }
+    for i in 0..classes.len() {
+        resolve(i, classes, &index, &mut first, 0);
+    }
+    first
+}
+
+/// Text table for Java: one line per class, "class base first_id serializer...",
+/// with base "-" for none.
+pub fn export_synched() -> String {
+    let first = synched_first_ids();
+    synched_classes().iter().zip(first).map(|(c, id)| {
+        let fields: Vec<_> = c.fields.iter().map(|(_, s)| *s).collect();
+        format!("{} {} {} {}\n", c.class, c.base.unwrap_or("-"), id, fields.join(" "))
+    }).collect()
+}
+
+/// Content identity tables as text: 0 component types, 1 serializers, 2 synched data, 3 items.
+/// Copies into `out` when it fits; returns the full length, or -1 for an unknown table.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_content_identity_export(table: i32, out: *mut u8, capacity: i64) -> i64 {
+    catch_unwind(AssertUnwindSafe(|| {
+        let text = match table {
+            0 => crate::content::component::export(),
+            1 => serializers().iter().map(|s| format!("{s}\n")).collect(),
+            2 => export_synched(),
+            3 => crate::content::item::export(),
+            _ => return -1,
+        };
+        if !out.is_null() && capacity >= text.len() as i64 {
+            std::ptr::copy_nonoverlapping(text.as_ptr(), out, text.len());
+        }
+        text.len() as i64
+    }))
+    .unwrap_or(-1)
 }
 
 /// Copies the export table into `out` when it fits; returns its full length.

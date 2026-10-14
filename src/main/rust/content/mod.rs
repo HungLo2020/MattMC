@@ -9,4 +9,8 @@ pub mod sound;
 pub mod map_color;
 pub mod registry;
 pub mod entity;
+pub mod component;
+pub mod item;
+pub mod data;
+pub mod json;
 pub mod tags;

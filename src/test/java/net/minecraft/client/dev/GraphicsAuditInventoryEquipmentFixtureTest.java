@@ -16,8 +16,8 @@ class GraphicsAuditInventoryEquipmentFixtureTest {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
 		registries = new net.minecraft.core.RegistrySetBuilder()
-			.add(net.minecraft.core.registries.Registries.TRIM_PATTERN, net.minecraft.world.item.equipment.trim.TrimPatterns::bootstrap)
-			.add(net.minecraft.core.registries.Registries.TRIM_MATERIAL, net.minecraft.world.item.equipment.trim.TrimMaterials::bootstrap)
+			.add(net.minecraft.core.registries.Registries.TRIM_PATTERN, net.minecraft.resources.NativeData.bootstrap(net.minecraft.resources.NativeData.Kind.TRIM_PATTERN, net.minecraft.world.item.equipment.trim.TrimPattern.DIRECT_CODEC))
+			.add(net.minecraft.core.registries.Registries.TRIM_MATERIAL, net.minecraft.resources.NativeData.bootstrap(net.minecraft.resources.NativeData.Kind.TRIM_MATERIAL, net.minecraft.world.item.equipment.trim.TrimMaterial.DIRECT_CODEC))
 			.build(net.minecraft.core.RegistryAccess.EMPTY);
     }
 

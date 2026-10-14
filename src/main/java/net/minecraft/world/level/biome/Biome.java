@@ -2,8 +2,6 @@ package net.minecraft.world.level.biome;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import java.util.Optional;
 import net.minecraft.Util;
@@ -35,23 +33,11 @@ import net.sodium.client.world.biome.BiomeColorMaps;
 import org.jetbrains.annotations.Nullable;
 
 public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBiome {
-	public static final Codec<Biome> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				Biome.ClimateSettings.CODEC.forGetter(biome -> biome.climateSettings),
-				BiomeSpecialEffects.CODEC.fieldOf("effects").forGetter(biome -> biome.specialEffects),
-				BiomeGenerationSettings.CODEC.forGetter(biome -> biome.generationSettings),
-				MobSpawnSettings.CODEC.forGetter(biome -> biome.mobSettings)
-			)
-			.apply(instance, Biome::new)
+	public static final Codec<Biome> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(
+		net.minecraft.resources.NativeData.Kind.BIOME, false, NativeBiomes::project, NativeBiomes::unproject
 	);
-	public static final Codec<Biome> NETWORK_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				Biome.ClimateSettings.CODEC.forGetter(biome -> biome.climateSettings),
-				BiomeSpecialEffects.CODEC.fieldOf("effects").forGetter(biome -> biome.specialEffects)
-			)
-			.apply(
-				instance, (climateSettings, biomeSpecialEffects) -> new Biome(climateSettings, biomeSpecialEffects, BiomeGenerationSettings.EMPTY, MobSpawnSettings.EMPTY)
-			)
+	public static final Codec<Biome> NETWORK_CODEC = net.minecraft.resources.NativeData.codec(
+		net.minecraft.resources.NativeData.Kind.BIOME, true, NativeBiomes::project, NativeBiomes::unproject
 	);
 	public static final Codec<Holder<Biome>> CODEC = RegistryFileCodec.create(Registries.BIOME, DIRECT_CODEC);
 	public static final Codec<HolderSet<Biome>> LIST_CODEC = RegistryCodecs.homogeneousList(Registries.BIOME, DIRECT_CODEC);
@@ -97,6 +83,11 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		this.specialEffects = biomeSpecialEffects;
 		// Sodium: Initialize biome colors (merged from BiomeMixin)
 		sodium$setupColors();
+	}
+
+	/** The Rust-stored definition this biome projects (`content/data`), or 0 for biomes built in Java. */
+	public long nativeHandle() {
+		return ((net.minecraft.resources.NativeData.DataCodec<Biome>)DIRECT_CODEC).nativeHandle(this);
 	}
 
 	public int getSkyColor() {
@@ -402,17 +393,6 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public record ClimateSettings(boolean hasPrecipitation, float temperature, Biome.TemperatureModifier temperatureModifier, float downfall) {
-		public static final MapCodec<Biome.ClimateSettings> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					Codec.BOOL.fieldOf("has_precipitation").forGetter(climateSettings -> climateSettings.hasPrecipitation),
-					Codec.FLOAT.fieldOf("temperature").forGetter(climateSettings -> climateSettings.temperature),
-					Biome.TemperatureModifier.CODEC
-						.optionalFieldOf("temperature_modifier", Biome.TemperatureModifier.NONE)
-						.forGetter(climateSettings -> climateSettings.temperatureModifier),
-					Codec.FLOAT.fieldOf("downfall").forGetter(climateSettings -> climateSettings.downfall)
-				)
-				.apply(instance, Biome.ClimateSettings::new)
-		);
 	}
 
 	public static enum Precipitation implements StringRepresentable {
@@ -458,7 +438,6 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		};
 
 		private final String name;
-		public static final Codec<Biome.TemperatureModifier> CODEC = StringRepresentable.fromEnum(Biome.TemperatureModifier::values);
 
 		public abstract float modifyTemperature(BlockPos blockPos, float f);
 

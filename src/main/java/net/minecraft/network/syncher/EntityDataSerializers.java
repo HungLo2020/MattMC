@@ -141,6 +141,13 @@ public class EntityDataSerializers {
 		return SERIALIZERS.byId(i);
 	}
 
+	/** The serializer's name in the Rust catalog. */
+	public static String nameOf(EntityDataSerializer<?> entityDataSerializer) {
+		int id = getSerializedId(entityDataSerializer);
+		if (id < 0) throw new IllegalArgumentException("Unregistered entity data serializer " + entityDataSerializer);
+		return net.minecraft.core.NativeContentIdentities.serializers().get(id);
+	}
+
 	public static int getSerializedId(EntityDataSerializer<?> entityDataSerializer) {
 		return SERIALIZERS.getId(entityDataSerializer);
 	}
@@ -149,43 +156,20 @@ public class EntityDataSerializers {
 	}
 
 	static {
-		registerSerializer(BYTE);
-		registerSerializer(INT);
-		registerSerializer(LONG);
-		registerSerializer(FLOAT);
-		registerSerializer(STRING);
-		registerSerializer(COMPONENT);
-		registerSerializer(OPTIONAL_COMPONENT);
-		registerSerializer(ITEM_STACK);
-		registerSerializer(BOOLEAN);
-		registerSerializer(ROTATIONS);
-		registerSerializer(BLOCK_POS);
-		registerSerializer(OPTIONAL_BLOCK_POS);
-		registerSerializer(DIRECTION);
-		registerSerializer(OPTIONAL_LIVING_ENTITY_REFERENCE);
-		registerSerializer(BLOCK_STATE);
-		registerSerializer(OPTIONAL_BLOCK_STATE);
-		registerSerializer(PARTICLE);
-		registerSerializer(PARTICLES);
-		registerSerializer(VILLAGER_DATA);
-		registerSerializer(OPTIONAL_UNSIGNED_INT);
-		registerSerializer(POSE);
-		registerSerializer(CAT_VARIANT);
-		registerSerializer(COW_VARIANT);
-		registerSerializer(WOLF_VARIANT);
-		registerSerializer(WOLF_SOUND_VARIANT);
-		registerSerializer(FROG_VARIANT);
-		registerSerializer(PIG_VARIANT);
-		registerSerializer(CHICKEN_VARIANT);
-		registerSerializer(OPTIONAL_GLOBAL_POS);
-		registerSerializer(PAINTING_VARIANT);
-		registerSerializer(ZOMBIE_NAUTILUS_VARIANT);
-		registerSerializer(SNIFFER_STATE);
-		registerSerializer(ARMADILLO_STATE);
-		registerSerializer(COPPER_GOLEM_STATE);
-		registerSerializer(WEATHERING_COPPER_STATE);
-		registerSerializer(VECTOR3);
-		registerSerializer(QUATERNION);
-		registerSerializer(RESOLVABLE_PROFILE);
+		// Network IDs follow the Rust catalog (content/entity/serializers.rs),
+		// which names each serializer by its field here.
+		var byName = new java.util.HashMap<String, EntityDataSerializer<?>>();
+		for (var field : EntityDataSerializers.class.getDeclaredFields()) {
+			if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) && EntityDataSerializer.class.isAssignableFrom(field.getType())) {
+				try { byName.put(field.getName().toLowerCase(java.util.Locale.ROOT), (EntityDataSerializer<?>) field.get(null)); }
+				catch (IllegalAccessException e) { throw new IllegalStateException(e); }
+			}
+		}
+		for (String name : net.minecraft.core.NativeContentIdentities.serializers()) {
+			var serializer = byName.remove(name);
+			if (serializer == null) throw new IllegalStateException("No entity data serializer named " + name);
+			registerSerializer(serializer);
+		}
+		if (!byName.isEmpty()) throw new IllegalStateException("Entity data serializers missing from the Rust catalog: " + byName.keySet());
 	}
 }

@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.util.ClassTreeIdRegistry;
 import org.apache.commons.lang3.ObjectUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -16,7 +15,6 @@ import org.slf4j.Logger;
 public class SynchedEntityData {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int MAX_ID_VALUE = 254;
-	static final ClassTreeIdRegistry ID_REGISTRY = new ClassTreeIdRegistry();
 	private final SyncedDataHolder entity;
 	private final SynchedEntityData.DataItem<?>[] itemsById;
 	private boolean isDirty;
@@ -37,7 +35,8 @@ public class SynchedEntityData {
 			}
 		}
 
-		int i = ID_REGISTRY.define(class_);
+		// IDs come from the Rust catalog (content/entity/synched.rs).
+		int i = net.minecraft.core.NativeContentIdentities.defineSynched(class_, EntityDataSerializers.nameOf(entityDataSerializer));
 		if (i > MAX_ID_VALUE) {
 			throw new IllegalArgumentException("Data value id is too big with " + i + "! (Max is " + MAX_ID_VALUE + ")");
 		} else {
@@ -142,7 +141,7 @@ public class SynchedEntityData {
 
 		public Builder(SyncedDataHolder syncedDataHolder) {
 			this.entity = syncedDataHolder;
-			this.itemsById = new SynchedEntityData.DataItem[SynchedEntityData.ID_REGISTRY.getCount(syncedDataHolder.getClass())];
+			this.itemsById = new SynchedEntityData.DataItem[net.minecraft.core.NativeContentIdentities.synchedCount(syncedDataHolder.getClass())];
 		}
 
 		public <T> SynchedEntityData.Builder define(EntityDataAccessor<T> entityDataAccessor, T object) {

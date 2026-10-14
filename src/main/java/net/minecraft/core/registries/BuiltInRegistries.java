@@ -154,6 +154,7 @@ import org.slf4j.Logger;
 public class BuiltInRegistries {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Map<ResourceLocation, Supplier<?>> LOADERS = Maps.<ResourceLocation, Supplier<?>>newLinkedHashMap();
+	private static final Map<ResourceLocation, Registry<?>> BY_LOCATION = new java.util.concurrent.ConcurrentHashMap<>();
 	private static final WritableRegistry<WritableRegistry<?>> WRITABLE_REGISTRY = new MappedRegistry<>(
 		ResourceKey.createRegistryKey(Registries.ROOT_REGISTRY_NAME), Lifecycle.stable()
 	);
@@ -354,12 +355,14 @@ public class BuiltInRegistries {
 		Bootstrap.checkBootstrapCalled(() -> "registry " + resourceKey.location());
 		ResourceLocation resourceLocation = resourceKey.location();
 		LOADERS.put(resourceLocation, (Supplier)() -> registryBootstrap.run(writableRegistry));
+		BY_LOCATION.put(resourceLocation, writableRegistry);
 		WRITABLE_REGISTRY.register((ResourceKey<WritableRegistry<?>>)(ResourceKey)resourceKey, writableRegistry, RegistrationInfo.BUILT_IN);
 		return writableRegistry;
 	}
 
 	public static void bootStrap() {
 		createContents();
+		net.minecraft.world.item.NativeItems.bindComponents();
 		freeze();
 		validate(REGISTRY);
 	}
@@ -394,8 +397,24 @@ public class BuiltInRegistries {
 		});
 	}
 
+	/** The built-in registry named {@code resourceLocation}, or null; unlike {@link #REGISTRY}, it answers during bootstrap. */
+	@org.jetbrains.annotations.Nullable
+	public static Registry<?> builtInRegistry(ResourceLocation resourceLocation) {
+		return BY_LOCATION.get(resourceLocation);
+	}
+
 	public static <T> HolderGetter<T> acquireBootstrapRegistrationLookup(Registry<T> registry) {
 		return ((WritableRegistry)registry).createRegistrationLookup();
+	}
+
+	/**
+	 * Binds every built-in registry's registered values, as freezing would,
+	 * so content definitions can decode entries by name before tags freeze.
+	 */
+	public static void bindValuesBeforeFreeze() {
+		for (Registry<?> registry : BY_LOCATION.values()) {
+			((MappedRegistry<?>)registry).bindRegisteredValues();
+		}
 	}
 
 	private static void bindBootstrappedTagsToEmpty(Registry<?> registry) {

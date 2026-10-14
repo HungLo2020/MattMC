@@ -1,7 +1,6 @@
 package net.minecraft.world.entity.animal.nautilus;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -18,29 +17,12 @@ import net.minecraft.world.entity.variant.SpawnPrioritySelectors;
 
 public record ZombieNautilusVariant(ModelAndTexture<ZombieNautilusVariant.ModelType> modelAndTexture, SpawnPrioritySelectors spawnConditions)
 	implements PriorityProvider<SpawnContext, SpawnCondition> {
-	public static final Codec<ZombieNautilusVariant> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ModelAndTexture.codec(ZombieNautilusVariant.ModelType.CODEC, ZombieNautilusVariant.ModelType.NORMAL)
-					.forGetter(ZombieNautilusVariant::modelAndTexture),
-				SpawnPrioritySelectors.CODEC.fieldOf("spawn_conditions").forGetter(ZombieNautilusVariant::spawnConditions)
-			)
-			.apply(instance, ZombieNautilusVariant::new)
-	);
-	public static final Codec<ZombieNautilusVariant> NETWORK_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ModelAndTexture.codec(ZombieNautilusVariant.ModelType.CODEC, ZombieNautilusVariant.ModelType.NORMAL)
-					.forGetter(ZombieNautilusVariant::modelAndTexture)
-			)
-			.apply(instance, ZombieNautilusVariant::new)
-	);
+	public static final Codec<ZombieNautilusVariant> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.ZOMBIE_NAUTILUS_VARIANT, false, net.minecraft.resources.NativeDataProjections::zombieNautilus, net.minecraft.resources.NativeDataProjections::zombieNautilusOut);
+	public static final Codec<ZombieNautilusVariant> NETWORK_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.ZOMBIE_NAUTILUS_VARIANT, true, net.minecraft.resources.NativeDataProjections::zombieNautilus, net.minecraft.resources.NativeDataProjections::zombieNautilusOut);
 	public static final Codec<Holder<ZombieNautilusVariant>> CODEC = RegistryFixedCodec.create(Registries.ZOMBIE_NAUTILUS_VARIANT);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Holder<ZombieNautilusVariant>> STREAM_CODEC = ByteBufCodecs.holderRegistry(
 		Registries.ZOMBIE_NAUTILUS_VARIANT
 	);
-
-	private ZombieNautilusVariant(ModelAndTexture<ZombieNautilusVariant.ModelType> modelAndTexture) {
-		this(modelAndTexture, SpawnPrioritySelectors.EMPTY);
-	}
 
 	@Override
 	public List<PriorityProvider.Selector<SpawnContext, SpawnCondition>> selectors() {
@@ -51,7 +33,6 @@ public record ZombieNautilusVariant(ModelAndTexture<ZombieNautilusVariant.ModelT
 		NORMAL("normal"),
 		WARM("warm");
 
-		public static final Codec<ZombieNautilusVariant.ModelType> CODEC = StringRepresentable.fromEnum(ZombieNautilusVariant.ModelType::values);
 		private final String name;
 
 		private ModelType(String name) {

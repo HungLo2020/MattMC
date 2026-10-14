@@ -1,9 +1,6 @@
 package net.minecraft.world.item.equipment.trim;
 
-import net.minecraft.Util;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.data.worldgen.BootstrapContext;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
@@ -26,34 +23,6 @@ public class TrimPatterns {
 	public static final ResourceKey<TrimPattern> HOST = registryKey("host");
 	public static final ResourceKey<TrimPattern> FLOW = registryKey("flow");
 	public static final ResourceKey<TrimPattern> BOLT = registryKey("bolt");
-
-	public static void bootstrap(BootstrapContext<TrimPattern> bootstrapContext) {
-		register(bootstrapContext, SENTRY);
-		register(bootstrapContext, DUNE);
-		register(bootstrapContext, COAST);
-		register(bootstrapContext, WILD);
-		register(bootstrapContext, WARD);
-		register(bootstrapContext, EYE);
-		register(bootstrapContext, VEX);
-		register(bootstrapContext, TIDE);
-		register(bootstrapContext, SNOUT);
-		register(bootstrapContext, RIB);
-		register(bootstrapContext, SPIRE);
-		register(bootstrapContext, WAYFINDER);
-		register(bootstrapContext, SHAPER);
-		register(bootstrapContext, SILENCE);
-		register(bootstrapContext, RAISER);
-		register(bootstrapContext, HOST);
-		register(bootstrapContext, FLOW);
-		register(bootstrapContext, BOLT);
-	}
-
-	public static void register(BootstrapContext<TrimPattern> bootstrapContext, ResourceKey<TrimPattern> resourceKey) {
-		TrimPattern trimPattern = new TrimPattern(
-			defaultAssetId(resourceKey), Component.translatable(Util.makeDescriptionId("trim_pattern", resourceKey.location())), false
-		);
-		bootstrapContext.register(resourceKey, trimPattern);
-	}
 
 	private static ResourceKey<TrimPattern> registryKey(String string) {
 		return ResourceKey.create(Registries.TRIM_PATTERN, ResourceLocation.withDefaultNamespace(string));

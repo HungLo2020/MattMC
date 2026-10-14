@@ -1,6 +1,5 @@
 package net.minecraft.world.item;
 
-import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -43,11 +42,5 @@ public class StandingAndWallBlockItem extends BlockItem {
 		}
 
 		return blockState2 != null && levelReader.isUnobstructed(blockState2, blockPos, CollisionContext.empty()) ? blockState2 : null;
-	}
-
-	@Override
-	public void registerBlocks(Map<Block, Item> map, Item item) {
-		super.registerBlocks(map, item);
-		map.put(this.wallBlock, item);
 	}
 }

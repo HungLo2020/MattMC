@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -16,18 +15,13 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.Interaction;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.boss.EnderDragonPart;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.component.ItemAttributeModifiers;
-import net.minecraft.world.item.component.Tool;
-import net.minecraft.world.item.component.Weapon;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
@@ -58,26 +52,6 @@ public class SpearItem extends Item {
 		super(properties);
 		this.thrustDamage = thrustDamage;
 		this.woodenSounds = woodenSounds;
-	}
-
-	public static Item.Properties createProperties(ToolMaterial toolMaterial, float attackDamage, float attackSpeed) {
-		return toolMaterial.applySwordProperties(new Item.Properties(), attackDamage, attackSpeed)
-			.component(DataComponents.WEAPON, new Weapon(1));
-	}
-
-	public static ItemAttributeModifiers createAttributes(ToolMaterial toolMaterial, float attackDamage, float attackSpeed) {
-		return ItemAttributeModifiers.builder()
-			.add(
-				Attributes.ATTACK_DAMAGE,
-				new AttributeModifier(BASE_ATTACK_DAMAGE_ID, attackDamage + toolMaterial.attackDamageBonus(), AttributeModifier.Operation.ADD_VALUE),
-				EquipmentSlotGroup.MAINHAND
-			)
-			.add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, attackSpeed, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
-			.build();
-	}
-
-	public static Tool createToolProperties() {
-		return new Tool(List.of(), 1.0F, 2, false);
 	}
 
 	@Override

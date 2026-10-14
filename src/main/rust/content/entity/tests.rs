@@ -65,3 +65,30 @@ fn names_are_unique_and_the_export_table_parses() {
     let needed = unsafe { mattmc_entity_types_export(std::ptr::null_mut(), 0) };
     assert_eq!(needed as usize, table.len());
 }
+
+fn identities() -> Vec<String> {
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(include_bytes!("../../../../test/resources/content/frozen-content-identities.txt.gz").as_slice())
+        .read_to_string(&mut text)
+        .unwrap();
+    text.lines().map(str::to_owned).collect()
+}
+
+#[test]
+fn component_types_serializers_and_synched_ids_match_frozen() {
+    let rows = identities();
+    let components: Vec<String> = crate::content::component::definitions().iter().enumerate()
+        .map(|(i, d)| format!("component_type {i} minecraft:{} persistent={} cached={} stream=true", d.name, d.persistent, d.cached)).collect();
+    assert_eq!(components, rows.iter().filter(|r| r.starts_with("component_type ")).cloned().collect::<Vec<_>>());
+    let serializer_rows: Vec<String> = serializers().iter().enumerate().map(|(i, s)| format!("serializer {i} {s}")).collect();
+    assert_eq!(serializer_rows, rows.iter().filter(|r| r.starts_with("serializer ")).cloned().collect::<Vec<_>>());
+    let first = synched_first_ids();
+    let mut synched = Vec::new();
+    for (class, id) in synched_classes().iter().zip(first) {
+        for (k, (field, serializer)) in class.fields.iter().enumerate() {
+            synched.push(format!("synched {} base={} {} {field} {serializer}", class.class, class.base.unwrap_or("none"), id as usize + k));
+            assert!(serializers().contains(serializer), "{serializer}");
+        }
+    }
+    assert_eq!(synched, rows.iter().filter(|r| r.starts_with("synched ")).cloned().collect::<Vec<_>>());
+}

@@ -4,14 +4,11 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import net.logging.LogUtils;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import net.minecraft.Util;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderSet;
@@ -26,19 +23,6 @@ import org.slf4j.Logger;
 public class BiomeGenerationSettings {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final BiomeGenerationSettings EMPTY = new BiomeGenerationSettings(HolderSet.direct(), List.of());
-	public static final MapCodec<BiomeGenerationSettings> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				ConfiguredWorldCarver.LIST_CODEC
-					.promotePartial(Util.prefix("Carver: ", LOGGER::error))
-					.fieldOf("carvers")
-					.forGetter(biomeGenerationSettings -> biomeGenerationSettings.carvers),
-				PlacedFeature.LIST_OF_LISTS_CODEC
-					.promotePartial(Util.prefix("Features: ", LOGGER::error))
-					.fieldOf("features")
-					.forGetter(biomeGenerationSettings -> biomeGenerationSettings.features)
-			)
-			.apply(instance, BiomeGenerationSettings::new)
-	);
 	private final HolderSet<ConfiguredWorldCarver<?>> carvers;
 	private final List<HolderSet<PlacedFeature>> features;
 	private final Supplier<List<ConfiguredFeature<?, ?>>> flowerFeatures;
@@ -56,6 +40,15 @@ public class BiomeGenerationSettings {
 				.collect(ImmutableList.toImmutableList())
 		);
 		this.featureSet = Suppliers.memoize(() -> (Set<PlacedFeature>)list.stream().flatMap(HolderSet::stream).map(Holder::value).collect(Collectors.toSet()));
+	}
+
+	/** The carver set and per-step feature sets as decoded, for native definitions. */
+	HolderSet<ConfiguredWorldCarver<?>> carverSet() {
+		return this.carvers;
+	}
+
+	List<HolderSet<PlacedFeature>> featureSets() {
+		return this.features;
 	}
 
 	public Iterable<Holder<ConfiguredWorldCarver<?>>> getCarvers() {

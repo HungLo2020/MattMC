@@ -43,6 +43,11 @@ public class RegistryOps<T> extends DelegatingOps<T> {
 		return this.lookupProvider.lookup(resourceKey).map(RegistryOps.RegistryInfo::owner);
 	}
 
+	/** Whether references into registries this context lacks decode as bare keys; see {@link RegistryOps.RegistryInfoLookup#keepsUnresolvedKeys}. */
+	public boolean keepsUnresolvedKeys() {
+		return this.lookupProvider.keepsUnresolvedKeys();
+	}
+
 	public <E> Optional<HolderGetter<E>> getter(ResourceKey<? extends Registry<? extends E>> resourceKey) {
 		return this.lookupProvider.lookup(resourceKey).map(RegistryOps.RegistryInfo::getter);
 	}
@@ -124,5 +129,14 @@ public class RegistryOps<T> extends DelegatingOps<T> {
 
 	public interface RegistryInfoLookup {
 		<T> Optional<RegistryOps.RegistryInfo<T>> lookup(ResourceKey<? extends Registry<? extends T>> resourceKey);
+
+		/**
+		 * True only for content definitions decoded before data-driven
+		 * registries exist (Rust item components): a reference such as an
+		 * {@code EitherHolder} key then stays a key instead of failing.
+		 */
+		default boolean keepsUnresolvedKeys() {
+			return false;
+		}
 	}
 }

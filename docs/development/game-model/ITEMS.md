@@ -1,6 +1,8 @@
 # Items (proposal)
 
-> Proposal; not implemented. See the [game model index](index.md).
+> Proposal. Item definitions and default components are now Rust-owned: see
+> [item definitions](ITEM-DEFINITIONS.md). Stacks, behavior and the component
+> store below are not implemented. See the [game model index](index.md).
 
 ## Today
 
