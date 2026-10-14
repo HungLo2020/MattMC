@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -250,32 +251,32 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	}
 
 	private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier) {
-        return this.submitThrowingTask(throwingSupplier, discarded -> {});
-    }
-    private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier,
-        java.util.function.Consumer<T> discard) {
-		return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
-			if (!this.shutdownRequested.get()) {
+		return this.submitThrowingTask(throwingSupplier, discarded -> {});
+	}
+
+	private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier,
+		java.util.function.Consumer<T> discard) {
+		// Serialize admission with close so no task can be queued behind shutdown.
+		synchronized (this.shutdownRequested) {
+			if (this.shutdownRequested.get()) {
+				return CompletableFuture.failedFuture(new RejectedExecutionException("IOWorker is closed"));
+			}
+			return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
+				// Admitted work drains before the lower-priority shutdown barrier.
 				try {
 					T result = throwingSupplier.get();
-                    if (!completableFuture.complete(result)) discard.accept(result);
-				} catch (Exception var4) {
-					completableFuture.completeExceptionally(var4);
+					if (!completableFuture.complete(result)) discard.accept(result);
+				} catch (Exception exception) {
+					completableFuture.completeExceptionally(exception);
+				} finally {
+					this.tellStorePending();
 				}
-			}
-
-			this.tellStorePending();
-		});
+			});
+		}
 	}
 
 	private <T> CompletableFuture<T> submitTask(Supplier<T> supplier) {
-		return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
-			if (!this.shutdownRequested.get()) {
-				completableFuture.complete(supplier.get());
-			}
-
-			this.tellStorePending();
-		});
+		return this.submitThrowingTask(supplier::get);
 	}
 
 	private void storePendingChunk() {
@@ -308,7 +309,11 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	}
 
 	public void close() throws IOException {
-		if (this.shutdownRequested.compareAndSet(false, true)) {
+		boolean close;
+		synchronized (this.shutdownRequested) {
+			close = this.shutdownRequested.compareAndSet(false, true);
+		}
+		if (close) {
 			this.waitForShutdown();
 			this.consecutiveExecutor.close();
 

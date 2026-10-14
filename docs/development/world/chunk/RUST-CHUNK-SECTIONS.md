@@ -300,9 +300,92 @@ review inspected their definitions but did not rerun them:
   tape-writer exception or test a supplier that throws before returning
   `Encoded`.
 
-[#818](https://github.com/HungLo2020/MattMC/issues/818) therefore retains a broader
-completion boundary, as recorded in [the current progress review](https://github.com/HungLo2020/MattMC/issues/818#issuecomment-6034310140):
-`write()`/supplier failures still need exceptional future completion, and deterministic pending-write coalescing, reopen, concurrent-save
-and failure-recovery coverage remain separate. The new load throwing-task wrapper
-does not repair `submitTask` for saves. No runtime reproduction, live save test
-or world-damage observation is claimed by this documentation review.
+## Save-failure completion and shutdown
+
+`IOWorker` uses the exception-completing task wrapper for ordinary and encoded
+save suppliers. An exception before a supplier returns data completes its save
+future exceptionally, so attached reporting/accounting handlers run; it does not
+replace an earlier pending value. `Encoded.failure` still fails at `runStore`.
+Supplier failures do not poison subsequent saves, reads, scans or synchronization.
+
+Task admission is serialized with shutdown. Tasks admitted before `close()`
+drain before its lower-priority shutdown barrier; requests made after shutdown
+starts return failed futures with `RejectedExecutionException`, including reads
+and synchronization. `synchronize()` is multi-stage: when close races its pending
+write wait, the later flush/barrier task may be rejected, so its returned future
+fails explicitly even though the earlier accepted writes drain. Callers requiring
+a successful synchronization must await it before closing. This prevents silently
+abandoned foreground futures.
+The exception wrapper catches `Exception`, not `Error` subclasses.
+
+Run the focused headless integration and existing native recovery cases with a
+matching native library and JDK25:
+
+```sh
+./gradlew test -x testRustNative --tests '*IOWorkerFailureRecoveryTest' --tests '*NativeChunkSectionsTest.malformedSnapshotCompletesSaveAccountingAndRecovers' --tests '*NativeChunkSectionsTest.chunkMapSaveReportsFailureAndReleasesActualAccounting' --tests '*NativeChunkSectionsTest.recoveryFfiFixturesMatchCleanJavaAndNativeSections' --tests '*NativeChunkSectionsTest.rejectedSectionThenValidChunkOnTheSameThread' --tests '*NativeChunkSectionsTest.unwritableTapeFailsTheStore' -PmattmcTestForks=1
+cargo test --manifest-path src/main/rust/Cargo.toml storage::chunk::tests:: -- --test-threads=1
+```
+
+The integration tests use the actual worker, priority executor, native region
+storage and temporary local-filesystem files (which may reside on tmpfs). Latches force pending reads/coalescing before a
+background write can run; a blocking region-file directory induces a real write
+failure. Coverage includes throwing normal/encoded suppliers, save-completion
+accounting callbacks, later successful saves, disk and pending reads/scans,
+concurrent writes, synchronization, close admission races and reopening.
+The malformed-snapshot case calls real `write()` and background `encode()` with
+`future::join`, matching the supplier shape used by `ChunkMap`. Its accounting
+check attaches a caller callback to the actual save future; it does not start a
+server or instantiate `ChunkMap`.
+
+The separate `chunkMapSaveReportsFailureAndReleasesActualAccounting` case invokes
+the actual private `ChunkMap.save`, background encode, inherited `writeEncoded`
+and production completion callback with real snapshots, worker and native files.
+It checks the actual `activeChunkWrites` field, reporting arguments, and healthy
+follow-up/reopen. The server, POI and DH boundaries and snapshot acquisition are
+stubbed; this is a partially mocked boundary integration, not a live server or a
+verification of `MinecraftServer`'s crash-report file output.
+
+For a scoped pre/post scheduling-overhead comparison, run the opt-in benchmark
+against both revisions with the same JDK/native profile and otherwise idle host:
+
+```sh
+MATTMC_IOWORKER_WARMUPS=5 MATTMC_IOWORKER_TRIALS=9 ./gradlew performanceTest -x testRustNative --tests '*IOWorkerThroughputBenchmark'
+```
+
+It emits `IOWORKER_THROUGHPUT` records (defaults: five measured trials after two
+warmups; the command above increases both), using identical ordered 256-chunk datasets (seed 818, 4 KiB payloads) on normal
+and pre-encoded routes. Timing includes worker creation, admission, writes,
+flush and close; fixture encoding and reopened-content checks are outside the
+interval. Records include process CPU time, GC count/time and JIT compilation time
+deltas as noise diagnostics. These are process-wide counters; background JVM work
+can contribute. Normal precedes encoded on each trial, so route order and continued
+warmup also matter. It has no timing assertions. Compare repeated matched JVM runs
+with identical configuration and retain all trials, including outliers; this is a small local-filesystem/storage workload, not physical-disk or live-game acceptance,
+nor a throughput promise
+for live snapshots, full worlds or the renderer.
+
+The Rust FFI recovery regression reuses the actual thread-local encoder across
+twelve malformed block/biome rejections, intervening zero-bit containers and
+forced insufficient-output-buffer retries. Successful tapes must match a fresh
+encoder byte for byte and equal shared clean-Java oracle resources; rejected and
+too-small calls must leave output guards untouched. The two files in
+`src/test/resources/storage/`, `chunk-recovery-valid-sections.bin` and
+`chunk-recovery-zero-sections.bin`, are named `sections` records serialized by
+`SerializableChunkData.write()` with native sections disabled and test-only
+block/biome `PalettedContainer` subclasses that bypass the exact-class native live,
+resize and packing admission guards, then the retained Java
+`NativeNbt.TapeWriter.writeTag`. Merely disabling native sections is insufficient
+for an independent oracle because ordinary block palettes can still use native
+packing. The native bridge comparison uses separate ordinary containers. The valid section at Y=0 is stone/plains
+except element zero is dirt/desert; the zero-bit fixture is all stone/plains.
+The Java regression regenerates these bytes in memory and compares both the
+checked-in resources and actual native bridge output. Rust compares its fresh
+encoder with the same resources before every recovered tape is checked against
+that oracle. These are test artifacts, not full NBT documents or saved worlds.
+The direct compaction cleanup regression remains alongside them.
+
+These cases address the remaining save-future boundary tracked in
+[#818](https://github.com/HungLo2020/MattMC/issues/818). They are bounded headless
+storage checks, not a live-world durability, shutdown-under-process-crash or
+whole-game performance claim. Earlier review notes above describe their original
+commits, not current verification.
