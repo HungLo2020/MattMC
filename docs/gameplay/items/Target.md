@@ -14,6 +14,8 @@ Place it with a clear shooting face and connect the circuit beside it. There is 
 
 Closer-to-center impacts give stronger pulses. Arrows and thrown Tridents take the 20-game-tick path; other handled projectiles take the 8-game-tick path. A new hit while the reset tick is pending does not replace or extend the live pulse. See [Pulse duration and repeated hits](../blocks/Target.md#pulse-duration-and-repeated-hits) before using it as a shot counter. [Hit timing][target-hit] · [Trident type][trident]
 
+For Bullseye range, accuracy and credit troubleshooting, use the canonical [advancement guidance](../blocks/Target.md#earning-bullseye).
+
 ## Sources and verification
 
 Source-reviewed on 2026-10-02 at `96e5604a6abaec697de2004b1ba9775e303bfba7`; no crafting, placement, projectile or circuit gameplay test was run.

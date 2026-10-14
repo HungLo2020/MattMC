@@ -11,6 +11,8 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
+- Latest default-branch snapshot synchronized: `f29d038b9c993dfbf3f98c7652cb5e921d70523b`, preserving the separately reported swarm-protocol, DH scheduling, Composter and native time/weather corrections. Batch 419 authors only current migration-policy guidance and Target player coverage; it does not implement those fixes or enter the reserved weather/time scope.
+
 - Latest default-branch snapshot synchronized: `d458cef2e24d745ef719c0ad862b6a4a2a40b186`, preserving native content source `6b136158` and the separately published agent-skill setup. Batch 418 reconciles stale item/registry ownership routes and source-author evidence limits. A fresh isolated checkout recovered the published history; no code-owner candidate or skill file is edited.
 
 - Latest default-branch snapshot synchronized: `46cb83c59faf42bf3435da92c24f39f2c9617b2e`, preserving the incoming 72-path native decoration/template update after the #825 merge. A stalled payload-read call was interrupted before any commit/ref publication; the intact four-page draft was stashed, cleanly reapplied and revalidated. Batch 417 also reconciles current ownership and bounded working-tree/oracle/preparation evidence.
@@ -3390,3 +3392,9 @@ Reconciled architecture, resource and game-model routes with native item default
 All incoming source and the separately reported skill setup are preserved. Publisher-authored changes are documentation only; gameplay directories, categories, registered IDs and accepted prompts remain unchanged. Full strict documentation, source/anchor/history and whitespace checks plus independent review precede guarded publication in a window coordinated with the separate code owner.
 
 Source/evidence review: [#771](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6174608599). The raw-SNBT catalog refactor [#857](https://github.com/HungLo2020/MattMC/issues/857#issuecomment-6174611480) remains open.
+
+## Batch 419: Bullseye troubleshooting and current migration acceptance
+
+Expanded the Target owner with the actual Bullseye strength-15, horizontal-30-block, player/projectile-at-hit conditions, 50-XP reward and troubleshooting when a lamp flashes without credit. The item route links the canonical explanation. Source inspected; no advancement attempt or gameplay run. Existing strong sampled core articles, alphabetical IDs and separate categories remain unchanged.
+
+Added one canonical interim migration-acceptance guide and linked testing, render verification and the migration plan to the owner's October 14 decisions: matched Frozen workloads, alternative 10% general/25% attributable boundary allowances (without an extra aggregate application gate), mandatory correctness, diagnostic pre-change Current and rolling desktop checks during its own development. Pending client coverage stays explicit; historical failures and final targets remain unchanged. Corrected one stale native-content ownership route in the plan. Incoming source/skill histories and the reserved weather/time work are preserved. Full strict/source/anchor/history/whitespace checks and independent review precede a coordinated nonforce publication and terminal deployment.

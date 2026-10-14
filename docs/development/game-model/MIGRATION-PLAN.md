@@ -10,8 +10,10 @@
 > See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md) and
 > [game model index](index.md).
 
-Each phase is a normal migration slice: parity tests against Java, a
-production-path benchmark, and docs.
+Each phase is a normal migration slice with local correctness evidence and
+documentation. Apply the [current interim acceptance policy](../tooling/MIGRATION-ACCEPTANCE.md)
+for matched Frozen performance comparisons and rolling desktop client checks;
+record pending coverage without holding every slice for a separate client signoff.
 
 <a id="current-priority-2026-10-09"></a>
 
@@ -55,11 +57,13 @@ Follow the owner boundary relevant to the next change:
   now handle bundled pack IO/discovery/selection, namespace stacks and tag
   planning/resolution, and build [texture atlases](../resources/ATLASES.md) and
   bake [block/item models](../resources/MODELS.md). Java retains regex and
-  element-lookup callbacks, reload orchestration, object codecs, item
-  definitions, the baked model objects and typed registry storage.
+  element-lookup callbacks, reload orchestration, delegated object codecs and
+  the baked model/registry objects. Native [item definitions](ITEM-DEFINITIONS.md),
+  [content identities](CONTENT-IDENTITIES.md) and [data-driven definitions](DATA-DEFINITIONS.md)
+  now own their separate catalogs and decoded values; Java behavior/live values remain.
   [Identity snapshots](../resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
   publish frozen IDs/known-pack masks/tag lists for synchronization; they do
-  not replace item/entity/biome registries or establish an atomic generation
+  not themselves replace the separate definition owners or establish an atomic generation
   across resource/model/atlas/mesh consumers. The linked verification records
   have their own historical source/library identity and acceptance limits.
 - **Server scheduling:** [chunk-task queues](../world/chunk-loading/RUST-CHUNK-TASKS.md)

@@ -7,6 +7,7 @@ World-generation drivers and their Java agent helpers live in
 for commands and prerequisites.
 
 - [Developer Tips and Tools](DEV-TIPS-TOOLS.md): Git workflows for investigating changes.
+- [Interim migration acceptance](MIGRATION-ACCEPTANCE.md): Frozen comparison allowances, local correctness and rolling desktop client checks.
 - [Running tests quickly](TESTING.md): affected-test runs, Rust `suite` profile, Java `test`/`parityTest`/`slowTest` tiers, forks, cached Rust tests and memory-protected runs.
 - [Native builds and running clients](NATIVE-BUILDS.md): atomic library staging, shared-build constraints and isolated verification.
 - [Shared Agent Skills](AGENT-SKILLS.md): skill locations, invocation, and maintaining shared skills.

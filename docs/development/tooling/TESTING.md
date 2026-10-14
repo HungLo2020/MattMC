@@ -5,6 +5,9 @@ tests for what you changed. Run the full suites (`check`) for milestones,
 cross-cutting changes and the
 [validation driver](../rendering/RENDER-VERIFICATION.md#one-command-validation).
 Profile and timing notes further down describe their recorded configurations.
+The [current interim migration policy](MIGRATION-ACCEPTANCE.md) defines Frozen
+performance allowances and rolling desktop client checks; local correctness
+validation remains required, and missing client coverage must stay explicit.
 
 | Goal | Command |
 | --- | --- |

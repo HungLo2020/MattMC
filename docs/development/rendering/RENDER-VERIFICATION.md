@@ -4,6 +4,13 @@ What to run before calling a rendering change done. Frozen, the unmodified
 Java reference checkout, is the correctness baseline: compare against it,
 don't change it.
 
+For migration publication, apply the [October 14 interim acceptance policy](../tooling/MIGRATION-ACCEPTANCE.md):
+local correctness checks remain required, while the desktop checks accumulated
+client/render/FPS behavior during its own development. There is no separate
+per-slice desktop signoff queue. The protocols below describe how to obtain and
+report evidence; pending checks are not passes. Historical strict performance
+verdicts remain recorded under their original rules.
+
 Large historical capture inputs may be stored as lossless `.gz` archives.
 The lifecycle gate reads matching plain and gzip client logs directly; restore
 the original file before running other tools that require its plain path;

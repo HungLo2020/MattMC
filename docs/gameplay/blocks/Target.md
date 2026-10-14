@@ -49,9 +49,17 @@ A hit increments the Target Hit statistic and checks the Target-hit advancement 
 
 The credited strength is calculated for that individual hit. Even while the block is busy with an earlier pulse, the new hit can be credited using its own strength without changing the live redstone output. A hit statistic therefore is not a count of distinct output pulses. [Hit and pending-pulse ordering][target-hit]
 
+## Earning Bullseye
+
+For the bundled **Bullseye** advancement, land a **strength-15 hit** while you and the projectile are **at least 30 blocks apart horizontally**. Aim near the center of a Target face and stay comfortably beyond 30 blocks until impact; height does not count toward the range requirement. The check uses your current position and the projectile's position when the hit is processed, not its total flight distance. The bundled criterion has no projectile-type restriction and rewards **50 experience points**. [Current criterion][bullseye-current] · [Player/projectile context][credit-context] · [Horizontal distance][credit-distance]
+
+If a lamp flashes but the advancement stays incomplete, first check the individual hit's accuracy, horizontal range and player ownership. Any strength can flash the lamp, and an earlier pulse can hide the new shot's strength. A projectile without a server-player owner can power the block without giving you credit. Keep your position stable for a range attempt rather than moving closer before the shot lands. [Hit credit and pulse ordering][credit-hit] · [Trigger conditions][credit-trigger]
+
 ## Sources and verification
 
 Source-reviewed on 2026-10-02 at `96e5604a6abaec697de2004b1ba9775e303bfba7`. No gameplay test of hit accuracy, pulse timing, attribution or circuits was run. Examples assume normal loaded, ticking blocks and no unrelated power; projectile-specific effects can need separate checks.
+
+The Bullseye guidance was source-reviewed on 2026-10-14 at `b7c56e72047d818f46ce20e0053fdd206352bb48`; no advancement attempt or gameplay test was run. Earlier scoring/circuit review remains dated above.
 
 Related: [Target item](../items/Target.md) · [Bow](../items/Bow.md) · [Arrow](../items/Arrow.md) · [Redstone basics](../redstone/Redstone.md) · [Blocks](Blocks.md)
 
@@ -77,3 +85,9 @@ Related: [Target item](../items/Target.md) · [Bow](../items/Bow.md) · [Arrow](
 [comparator]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/ComparatorBlock.java#L72-L117
 [trigger]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/advancements/critereon/TargetBlockTrigger.java#L19-L40
 [bullseye]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/advancement/adventure/bullseye.json
+
+[bullseye-current]: https://github.com/HungLo2020/MattMC/blob/b7c56e72047d818f46ce20e0053fdd206352bb48/src/main/resources/data/minecraft/advancement/adventure/bullseye.json
+[credit-context]: https://github.com/HungLo2020/MattMC/blob/b7c56e72047d818f46ce20e0053fdd206352bb48/src/main/java/net/minecraft/advancements/critereon/EntityPredicate.java#L171-L176
+[credit-distance]: https://github.com/HungLo2020/MattMC/blob/b7c56e72047d818f46ce20e0053fdd206352bb48/src/main/java/net/minecraft/advancements/critereon/DistancePredicate.java#L33-L40
+[credit-hit]: https://github.com/HungLo2020/MattMC/blob/b7c56e72047d818f46ce20e0053fdd206352bb48/src/main/java/net/minecraft/world/level/block/TargetBlock.java#L44-L60
+[credit-trigger]: https://github.com/HungLo2020/MattMC/blob/b7c56e72047d818f46ce20e0053fdd206352bb48/src/main/java/net/minecraft/advancements/critereon/TargetBlockTrigger.java#L19-L40
