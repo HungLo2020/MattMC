@@ -26,6 +26,8 @@ content registries or a shared model/atlas/mesh reload generation.
   preprocessing, stitching and mip levels.
 - [Block and item models](MODELS.md): model and blockstate files, discovery,
   texture resolution and baking.
+- [Recipe-crafted advancements](RECIPE-ADVANCEMENTS.md): loaded recipe keys,
+  stable criterion names and headless output/award verification.
 - [Verification](VERIFICATION.md): the parity and performance drivers, what
   they cover and what they do not.
 
