@@ -29,9 +29,21 @@ Sugar Cane breaks instantly and does not require a particular harvesting tool. A
 
 MattMC's empty-hand harvest/reset and **3 × 3 hoe harvest** belong to the separate Wheat-style crop implementation. Sugar Cane does not inherit those controls. [Crop controls][crop] · [Cane implementation][cane]
 
+## Piston harvesting without replanting
+
+Aim an ordinary [Piston](Pistons.md) horizontally at the **second Cane block above the soil**, leaving the bottom Cane untouched. A powered extension destroys the Cane in front of its head instead of moving it. The current native definition supplies this destroy-on-push rule, and the Piston runs the ordinary block-drop path. Under normal block-drop rules, the hit block gives one Sugar Cane item; no Sticky Piston or Silk Touch is needed. [Native definition][harvest-definition] · [Physical rule][harvest-physics] · [Piston selection][harvest-selection] · [Destruction and drops][harvest-piston] · [Loot][harvest-loot]
+
+If a third Cane block stands above the cut, losing its support schedules its own destruction. This is a subsequent block update, not a second item stored in the Piston. Leave the soil and adjacent water in place so the remaining bottom block can survive. Cutting the bottom block instead removes the renewable base and requires replanting. [Support and scheduled removal][harvest-cane]
+
+**Retract the Piston after the cut.** A head left extended occupies the space where the remaining Cane needs to grow; the growth callback requires that space to be empty. For a simple manually triggered setup, use side or rear power, allow extension to finish, then switch it off. A permanently powered Piston is not a continuously harvesting machine. [Piston power and retraction](Pistons.md#facing-and-power) · [Growth-space check][harvest-growth]
+
+The harvest appears as loose items around the broken blocks, rather than entering an inventory automatically. Arrange collection separately using the [Hopper collection rules](Hopper.md), and do not assume every dropped item will land in one Hopper's pickup area. Block drops must be enabled. This setup is source-derived; no in-game farm, collection-efficiency or harvest-rate test was run. [Item-drop creation and game rule][harvest-drops]
+
 Related: [Sugar Cane item and crafting](../items/SugarCane.md) · [Pumpkin and Melon farming](PumpkinAndMelon.md) · [Wheat](Wheat.md) · [Blocks](Blocks.md)
 
 ## Sources and verification
+
+The piston-harvesting section was source-reviewed on **2026-10-14** at `eb55738dc2f83d2fd367d215a1116397a8042c08`, including native push properties, active piston destruction, support loss, growth-space and loose-drop rules. It does not establish a tested automatic circuit or timed yield. The earlier planting/growth review below retains its original scope.
 
 Source-reviewed on **2026-10-01** at `4285adff2e35307c277a3a5bf54ebd064aa5e64b`. Registration, current callbacks, biome-feature wiring, and bundled loot were checked. No in-game growth, generation, harvesting, or Bone Meal test was run. World settings and data packs can change the opportunities and drops described here.
 
@@ -58,3 +70,12 @@ The [world-generation loader][worldgen] reads biome and feature data used by [bi
 [desert]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/worldgen/biome/desert.json
 [swamp]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/worldgen/biome/swamp.json
 [badlands]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/worldgen/biome/badlands.json
+
+[harvest-definition]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/rust/content/block/definitions/catalog.rs#L308
+[harvest-physics]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/rust/content/block/definitions/physics.rs#L116-L119
+[harvest-selection]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/java/net/minecraft/world/level/block/piston/PistonStructureResolver.java#L37-L45
+[harvest-piston]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/java/net/minecraft/world/level/block/piston/PistonBaseBlock.java#L289-L300
+[harvest-loot]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/resources/data/minecraft/loot_table/blocks/sugar_cane.json
+[harvest-cane]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/java/net/minecraft/world/level/block/SugarCaneBlock.java#L44-L112
+[harvest-growth]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/java/net/minecraft/world/level/block/SugarCaneBlock.java#L51-L69
+[harvest-drops]: https://github.com/HungLo2020/MattMC/blob/eb55738dc2f83d2fd367d215a1116397a8042c08/src/main/java/net/minecraft/world/level/block/Block.java#L381-L425

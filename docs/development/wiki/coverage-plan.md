@@ -3366,3 +3366,7 @@ Expanded the Crafting Table owner with separate player grids, absent block inven
 ## Batch 415: Respawn Anchor dispenser refueling
 
 Filled a practical omission in the existing anchor owner: Glowstone-block consumption, full-anchor retained fuel, non-anchor ejection and separation from player spawn/explosion interaction. The Dispenser guide links the canonical explanation without duplicating the detailed rules. Existing strong sampled owners and all alphabetical/category/registry entries remain unchanged. Source dispatch and callbacks were reviewed; no gameplay/circuit/explosion test or held #825 publication occurred. Strict documentation validation and independent review precede guarded publication.
+
+## Batch 416: Renewable Sugar Cane piston harvesting
+
+Expanded the existing plant owner with second-block cutting, retained soil/water/base, unsupported upper Cane, retraction before regrowth and separate loose-item collection. The Piston guide routes to that canonical explanation. Current native push properties and active destruction/growth callbacks were source-reviewed; no farm, circuit, collection-efficiency or runtime test was run. Already substantive sampled core owners and all directory/category/registry entries remain unchanged. Full documentation validation and independent review precede guarded publication; held #825 work remains separate.
