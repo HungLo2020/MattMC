@@ -8,9 +8,13 @@ Ordinary mining gives **one Kelp per plant block**, with no tool or Silk Touch r
 
 Plant it in [suitable full-strength water](../blocks/Kelp.md#planting-and-water), or process it using the [Dried Kelp cooking recipes](DriedKelp.md#drying-kelp). The raw item has no food component; **Dried Kelp** is the edible form. Raw Kelp is not a default Furnace fuel. [Planting][kelp] · [Raw item registration][kelp-item] · [Food registration][dry-item] · [Fuel list][fuel]
 
+Kelp also helps prepare a source-water shaft for a [Bubble Column](../blocks/BubbleColumns.md#preparing-source-water-with-kelp). Follow that source-reviewed, untested sequence to prepare the water, clear the plants and install the final base.
+
 Related: [Dried Kelp](DriedKelp.md) · [Dried Kelp Block](DriedKelpBlock.md) · [Seagrass](Seagrass.md) · [Items](Items.md)
 
 ## Sources and verification
+
+The Bubble Column route uses the owner's [2026-10-14 preparation review](../blocks/BubbleColumns.md#verification-and-related-pages); the original item review below is unchanged.
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Registration, placement, both plant loot tables, food distinction, and default fuels checked. No in-game test was run.
 
