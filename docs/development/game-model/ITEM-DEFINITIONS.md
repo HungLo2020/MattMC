@@ -10,7 +10,8 @@ other integrated content). Java declares only each item's behavior factory:
 
 - **Identity:** the name and, by catalog position, the registry ID.
 - **Block binding:** the block a `BlockItem` places, plus aliases such as wall
-  torches, wall signs and cauldron variants. Rust fills `Item.BY_BLOCK`.
+  torches, wall signs and cauldron variants. Rust declares the bindings;
+  Java `NativeItems.bindBlocks` fills `Item.BY_BLOCK`.
 - **Description prefix** (`block.` or `item.`), **crafting remainder** and
   **required features**.
 - **Default components:** the common set (former `COMMON_ITEM_COMPONENTS`)
@@ -52,7 +53,9 @@ Components can name entries of data-driven registries (jukebox songs, trim
 materials, instruments, chicken variants) that do not exist at bootstrap.
 The definition decode keeps those as `EitherHolder` keys. Only this
 bootstrap context opts in, through `RegistryInfoLookup.keepsUnresolvedKeys`;
-saves and the network reject bare keys as before.
+ordinary codec contexts do not opt into this unresolved-key fallback.
+The separate Java packet stream codec can carry either a holder or a resource
+key; the save-codec control does not prove network rejection of keys.
 
 ## Working on it
 
@@ -62,6 +65,10 @@ saves and the network reject bare keys as before.
   `PotDecorations.EMPTY` is stored as `[]` because its save form names bricks,
   which register later.
 
+The current catalog still embeds raw SNBT. The requested structured-definition
+cleanup remains tracked in [#857](https://github.com/HungLo2020/MattMC/issues/857#issuecomment-6174611480);
+native ownership does not mean that refactor is complete.
+
 ## Checks
 
 ```bash
@@ -70,13 +77,14 @@ cargo test --manifest-path src/main/rust/Cargo.toml --lib content::item
 JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --sections items item_stacks --output build/item-verification
 ```
 
-- The Rust test rebuilds every item row of Frozen's dump
-  (`src/test/resources/content/frozen-items.txt.gz`).
+- The Rust test compares normalized item rows with Frozen's dump
+  (`src/test/resources/content/frozen-items.txt.gz`): Java class names and
+  `UNDECODABLE` markers are stripped, and empty pot decoration is normalized.
 - `NativeItemsTest` compares the live registry with that dump. It also checks
   that each stored component re-encodes to its SNBT, that order mismatches are
   rejected and that ordinary save contexts still reject bare keys.
-- `NativeItemsTest` also checks Rust's SNBT parse of every catalog value
-  against Java's `TagParser`.
+- `NativeItemsTest` also compares Rust's SNBT parse of the 1,728 per-item
+  overrides against Java's `TagParser`; that loop does not include common defaults.
 - The `items` section of `VerifyContent` covers definitions and components.
   `item_stacks` encodes each item's default stack and an edited stack (name,
   repair cost, damage, a removed default) in save and network form.
@@ -85,7 +93,7 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --sect
 
 - Pre-change Current and Frozen item dumps were identical, and the catalog was
   generated from them.
-- On the final code, the `items` (23,014 rows) and `item_stacks` (3,792 rows,
+- The source author reports that on the final code, the `items` (23,014 rows) and `item_stacks` (3,792 rows,
   all round-tripping) sections match Frozen and pre-change Current in
   alternating JVMs.
-- Bootstrap timing is in [data-driven definitions](DATA-DEFINITIONS.md#performance).
+- Bootstrap timing and shared [verification limits](DATA-DEFINITIONS.md#verification-2026-10-13) are in the data-definition owner. The documentation review did not rerun these suites or inspect unbundled runtime captures; definition/stack equality is not complete item-use or rendered-feature acceptance.

@@ -11,6 +11,8 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
+- Latest default-branch snapshot synchronized: `d458cef2e24d745ef719c0ad862b6a4a2a40b186`, preserving native content source `6b136158` and the separately published agent-skill setup. Batch 418 reconciles stale item/registry ownership routes and source-author evidence limits. A fresh isolated checkout recovered the published history; no code-owner candidate or skill file is edited.
+
 - Latest default-branch snapshot synchronized: `46cb83c59faf42bf3435da92c24f39f2c9617b2e`, preserving the incoming 72-path native decoration/template update after the #825 merge. A stalled payload-read call was interrupted before any commit/ref publication; the intact four-page draft was stashed, cleanly reapplied and revalidated. Batch 417 also reconciles current ownership and bounded working-tree/oracle/preparation evidence.
 
 - Previous default-branch snapshot synchronized: `c16c511d4677f53d108d8971ded4ef3a232e81d1`, the separately authorized #825 repair merge (PR #887). Batch 417 preserves its eight-path data/test/developer-guide change and reconciles stale player troubleshooting; it authors no implementation and does not rerun the code owner’s historical tests.
@@ -3380,3 +3382,11 @@ Expanded the existing plant owner with second-block cutting, retained soil/water
 Reconciled the Crafter and Advancements/Statistics owners with the merged recipe-key correction, retaining the historical mismatch and stable anchors. Added practical four-goal conditions: loose Crafter output/nearby players, four accepted sherds, any trim and eight distinct exclusive trims. Preserved intentionally inactive recipe rewards and linked the code owner’s bounded headless verification rather than claiming live-client acceptance. The code merge and its successful deployment preceded this docs-only publication window; incoming history and all directory/category entries are preserved. Full strict/link/source/whitespace checks and independent review precede publication.
 
 The final source guard advanced to `46cb83c5` before publication. The combined batch preserves that implementation and adds architecture, failure-driver, stage-installation and Slice 3 provenance qualifications; no runtime tests were rerun.
+
+## Batch 418: Native content ownership and verification routes
+
+Reconciled architecture, resource and game-model routes with native item defaults, component/serializer identities and data-driven definitions. Java behavior factories, live values, holder/context bindings, delegated codecs and reload orchestration remain explicit. The canonical data-definition guide distinguishes exact observer-text comparisons from broader correctness, initial-only identity records, separately reported suite totals, the synthetic warm-loop regression and swapped small-DH timing. Existing historical measurements and missing rendered-feature evidence remain. No runtime suite was rerun.
+
+All incoming source and the separately reported skill setup are preserved. Publisher-authored changes are documentation only; gameplay directories, categories, registered IDs and accepted prompts remain unchanged. Full strict documentation, source/anchor/history and whitespace checks plus independent review precede guarded publication in a window coordinated with the separate code owner.
+
+Source/evidence review: [#771](https://github.com/HungLo2020/MattMC/issues/771#issuecomment-6174608599). The raw-SNBT catalog refactor [#857](https://github.com/HungLo2020/MattMC/issues/857#issuecomment-6174611480) remains open.

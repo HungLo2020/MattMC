@@ -54,6 +54,9 @@ The JUnit test and the Rust test compare against Frozen's recorded dump
 
 ## Verification (2026-10-13)
 
-The 97 component types, 38 serializers and 580 synchronized fields match
-Frozen and pre-change Current row for row (`VerifyContent.py`, two
-alternating pairs). The Rust and JUnit fixture tests pass.
+The source author reports that 97 component types, 38 serializers and 580
+synchronized fields match Frozen and pre-change Current row for row
+(`VerifyContent.py`, two alternating pairs), with passing Rust and JUnit
+fixtures. These are reported results, not reruns by the documentation review.
+See the shared [driver and acceptance limits](DATA-DEFINITIONS.md#verification-2026-10-13);
+identity equality does not verify live synchronized-value storage or packet dispatch.

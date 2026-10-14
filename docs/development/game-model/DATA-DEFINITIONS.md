@@ -44,8 +44,9 @@ nautilus variants.
 
 [`NativeData`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/resources/NativeData.java)
 owns the FFI and the generic codec. Each projection keeps its stored
-definition alive, and the definition is released when the object is
-collected. Projections live in
+definition alive, with native release registered through a Java Cleaner.
+Collection does not establish a deterministic release deadline or a bounded
+reload-memory result. Projections live in
 [`NativeDataProjections`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/resources/NativeDataProjections.java)
 and, for biomes,
 [`NativeBiomes`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/biome/NativeBiomes.java).
@@ -73,8 +74,14 @@ resource keys remain.
 
 ## Performance
 
-All measurements are medians of alternating fresh JVMs on the release native
-library (`DevUtils/tests/content/TimeContent.py`, 2026-10-13).
+The following are source-author measurements from 2026-10-13, not new
+documentation-review runs. Bootstrap/decode numbers are medians of alternating
+fresh JVMs on the release native library.
+[`TimeContent.py`](https://github.com/HungLo2020/MattMC/blob/6b136158a2a3860e1be61d9a6ea4fdf7b47013f0/DevUtils/tests/content/TimeContent.py)
+reports medians without enforcing a performance threshold. Its biome timing
+runs after the full worldgen registry load and at least one warmup round, even
+with `--rounds 1`; the original “first pass” labels below are author descriptions,
+not proof of an untouched cold biome-codec path.
 
 - **Against pre-change Current, cold single pass (10 pairs):** bootstrap
   3,592 ms against 3,584 ms, and worldgen registry load 522 ms against 517 ms
@@ -83,13 +90,16 @@ library (`DevUtils/tests/content/TimeContent.py`, 2026-10-13).
   4,000 ms, and worldgen load 557 ms against 545 ms (within the run-to-run
   spread). The first biome pass is 11.5 ms against 16.9 ms.
 - **Synthetic warm loop:** after 300 decodes of the same files, the JIT-warmed
-  Java path is faster (4.7 ms against 6.4 ms per 68 biomes). Real loads decode
-  each file once per world load or `/reload`, so they never reach this state.
+  Java path is faster (4.7 ms against 6.4 ms per 68 biomes). This repeated-file
+  workload differs from a single load; it remains a measured regression for
+  that scope, not evidence that every repeated-load workload is unaffected.
 - **Gameplay** (small DH fixture, moving camera, four alternating runs per side
   against pre-change Current): average FPS 82.3 against 81.2, median frame
   8.59 ms against 8.46 ms, and p99 59.8 ms against 68.5 ms. Swap reached
   2.3–4.7 GB, so one run per side is an outlier. Runs:
-  `artifacts/performance/realworld-20261011/dhab10-*`.
+  `artifacts/performance/realworld-20261011/dhab10-*`. This swapped, small-fixture
+  comparison does not establish a matched four-mode Frozen floor, isolated
+  content-migration speedup or sustained gameplay/memory acceptance.
 
 Copy FFI bytes through direct `ByteBuffer`s (`segment.asByteBuffer()`), not
 heap segments (`MemorySegment.ofArray`, `toArray`). In an earlier build, heap
@@ -101,7 +111,9 @@ regression.
 
 ## Known differences
 
-- Error messages differ from DFU's text. The same inputs are accepted and rejected.
+- Error messages differ from DFU's text. The recorded corpus matches the
+  observer's normalized outcomes; parse and encode failures can both become
+  `ERR`, so this is not a universal acceptance/error-equivalence guarantee.
 - A rejected file stops at its first error. The load error report can then
   list fewer missing references than Frozen's, but the load fails either way.
 - `VanillaRegistries.createLookup()` (IDE-only command validation and data
@@ -115,7 +127,9 @@ regression.
 
 ## Verification (2026-10-13)
 
-Run with alternating fresh JVMs on the final code:
+The source author records the following alternating fresh-JVM results. The
+documentation review inspected implementation and driver assertions; it did
+not rerun these experiments or independently inspect their external artifacts:
 
 - **Frozen:** the `data_registries` section has 362 identical rows (two pairs),
   and `DataFuzzReference` has 37,418 identical rows (37,003 mutated cases).
@@ -128,12 +142,30 @@ Run with alternating fresh JVMs on the final code:
   save, Current, pre-change Current and Frozen all failed before reaching the
   world (`artifacts/graphics-captures/feature-parity/shared-content-20261013*`).
   Rendered item, trim and banner parity is therefore unverified. The
-  definitions behind them match Frozen exactly (above).
+  definition dumps match within the recorded observer scope (above).
+
+The later [integration commit](https://github.com/HungLo2020/MattMC/commit/6b136158a2a3860e1be61d9a6ea4fdf7b47013f0)
+reports 2,825 Rust and 2,188 Java tests, separately from this page's 2,808/2,147
+checkpoint. Preserve both provenances; they are not one independently rerun suite.
+
+[`VerifyContent.py`](https://github.com/HungLo2020/MattMC/blob/6b136158a2a3860e1be61d9a6ea4fdf7b47013f0/DevUtils/tests/content/VerifyContent.py)
+gates exact dump equality across sides and repeatability within each side. It
+records initial checkout identities and observer/driver hashes, but does not
+require a pinned clean Frozen checkout, prove the mapped native library or
+compiled production-class identities, or reseal those inputs after execution.
+The selected reference must already have compiled main classes. Report which
+reference and build were used; do not inherit stronger guards from other oracles.
+Equal rows can include `round_trip=false`, `UNDECODABLE`, `UNEQUAL` or `ERROR`
+on both sides. The comparator does not independently reject those markers;
+successful round trips require inspecting the dump as well as its equality
+result. Fuzz equality covers the deterministic cases and normalized outcomes emitted by
+the observer, not every malformed input, callback, reload or live-world behavior.
 
 ## Checks
 
 ```bash
-cargo test --manifest-path src/main/rust/Cargo.toml --lib content::data content::json
+cargo test --manifest-path src/main/rust/Cargo.toml --lib content::data
+cargo test --manifest-path src/main/rust/Cargo.toml --lib content::json
 ./gradlew -PmattmcRustProfile=release test --tests '*NativeDataTest' --tests '*NativeBiomesTest'
 JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --sections data_registries --output build/data-verification
 JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --observer DataFuzzReference --output build/data-fuzz
@@ -141,9 +173,10 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --obse
 
 - The Rust tests decode, encode and re-decode every shipped file, and check
   the decode rules and encode order.
-- `NativeDataTest` encodes a Java-built copy of every loaded element and
-  compares it with the original. It also builds the data generator registries
-  from the pack.
+- `NativeDataTest` encodes Java-built copies of loaded non-biome elements
+  and compares them with their originals. Its generator-registry loop also
+  excludes biomes. `NativeBiomesTest` separately covers biome copy/codec
+  behavior; it does not remove the generator-biome limitation above.
 - The `data_registries` section compares each element's registry ID, tags,
   save encoding and network encoding with Frozen.
 - [`DataFuzzReference`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/DataFuzzReference.java)

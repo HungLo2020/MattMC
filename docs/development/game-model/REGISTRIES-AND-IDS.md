@@ -32,7 +32,9 @@ The [shared property owner](PROPERTY-DEFINITIONS.md) declares all 134 properties
 (123 shared and 11 for integrated content). The block registry shares their
 schemas directly, without importing definitions from Java.
 
-Other data-driven registries keep Java storage, but Rust resolves their
+Java registry containers retain holder/object bindings and publication, while
+[admitted data definitions](DATA-DEFINITIONS.md) have separate native storage.
+Rust also resolves their
 [tags](../resources/TAGS-AND-REGISTRIES.md#tag-loading) and holds
 [identity snapshots](../resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
 (network IDs, known packs, tag ID lists) of each frozen registry set for

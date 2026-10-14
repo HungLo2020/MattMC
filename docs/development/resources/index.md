@@ -10,9 +10,12 @@ resource reload's texture atlases and block/item model geometry are also built
 in Rust at
 [`71762d60`](https://github.com/HungLo2020/MattMC/commit/71762d602195e0cc5ca29006a2bed1603b53eab8).
 Java keeps the `PackResources`/`ResourceManager` API that callers use,
-metadata section codecs, element codecs, item definitions, the baked model and
-atlas objects its consumers use, reload orchestration and the registries' Java
-objects. Filter regex matching and planned element lookups still invoke Java.
+metadata section codecs, delegated element codecs, the baked model and atlas
+objects its consumers use, reload orchestration and the registries' Java objects.
+[Item definitions](../game-model/ITEM-DEFINITIONS.md) and supported
+[data-driven definitions](../game-model/DATA-DEFINITIONS.md) now have separate
+Rust owners; Java retains behavior factories, projections and contextual holder
+resolution. Filter regex matching and planned element lookups still invoke Java.
 Identity snapshots support synchronization; they are not authoritative typed
 content registries or a shared model/atlas/mesh reload generation.
 

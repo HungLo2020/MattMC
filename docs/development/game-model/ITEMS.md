@@ -21,7 +21,9 @@ proposal's 83 `Item` subclasses is a historical source-survey figure.
 declares 97 `DataComponentType` fields for food, tools, durability,
 enchantments, equippable data and other properties. Since 1.20.5 much item data
 and behavior is component-driven, while specialized hooks still live in item
-classes. `Item.Properties` mostly sets components. An `ItemStack` is an item,
+classes. The former `Item.Properties` builder now projects the native catalog;
+its defaults bind after built-in registration through Java component codecs.
+An `ItemStack` is an item,
 a count, and a patch of component changes over the item's default components.
 
 ## Proposal

@@ -498,10 +498,22 @@ The 11 declarations for integrated content retain their distinct identities.
 files, orders them and resolves their members; Java performs the element
 lookups it plans. [`content/registry`](resources/TAGS-AND-REGISTRIES.md#registry-identity-snapshot)
 holds identity snapshots of frozen registry sets (network IDs, known packs, tag
-ID lists) behind registry and tag synchronization; registry storage and
-element codecs remain Java.
+ID lists) behind registry and tag synchronization. Java retains registry/holder
+objects and publication; the separate [data-definition owner](game-model/DATA-DEFINITIONS.md)
+now parses, stores and encodes the admitted biome, entity-variant and item-related
+definitions. Delegated values and inline packet stream codecs retain Java routes.
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/contextual-predicate functions, motion/solid/custom flags and contextual gameplay, and native item definitions and general gameplay components remain unfinished. The [entity type catalog](game-model/ENTITY-TYPES.md) now supplies all 239 registered type identities and intrinsic settings; Java projects those definitions and retains behavior factories, entity instances and their field reads. Static type authority does not complete entity gameplay or lifecycle ownership. `content` must not depend on its consumers.
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/contextual-predicate functions, motion/solid/custom flags and contextual gameplay, while general gameplay components remain unfinished. The [entity type catalog](game-model/ENTITY-TYPES.md) now supplies all 239 registered type identities and intrinsic settings; Java projects those definitions and retains behavior factories, entity instances and their field reads. Static type authority does not complete entity gameplay or lifecycle ownership.
+
+[`content/item`](game-model/ITEM-DEFINITIONS.md) now owns item identities, block
+bindings and default-component SNBT; Java constructs behavior objects and decodes
+component values through their bindings during bootstrap.
+[`content/component` and synchronized-data catalogs](game-model/CONTENT-IDENTITIES.md)
+own type/serializer order and field IDs, not live item-stack patches or entity
+values. [`content/data`](game-model/DATA-DEFINITIONS.md) owns supported data-driven
+definitions while packs remain their source; Java supplies projections, contextual
+holder resolution and delegated codecs. Use those canonical guides for adding
+content and their bounded verification evidence. `content` must not depend on its consumers.
 
 ### `render/`
 
@@ -517,7 +529,7 @@ Important current subdirectories:
 - `render/dh_columns/`: whole-source full-data conversion, primary render-point storage, compact reduction, water/material companions and bounded scratch. Rust reads full-data sources directly; Java supplies contextual block/color queries and requested semantic sidecars. See the current [DH render build](rendering/RUST-DH-RENDER-BUILD.md) and historical [render-column checkpoint](rendering/RUST-DH-RENDER-COLUMNS.md).
 - `render/dh_quads/`: whole-section traversal and neighbor selection, box visibility/geometry/shading, greedy topology, semantic packet plans and scoped column builds. Rust encodes final buffers and moves them directly into the ledger; Java supplies settings, contextual packet queries, lifecycle calls and requested diagnostic projections. See the current [DH render build](rendering/RUST-DH-RENDER-BUILD.md) and [native handoff](rendering/RUST-DH-COLUMN-HANDOFF.md).
 - `render/clouds/`: built-in DH cloud motion, placement, culling and color-change history in CPU owners. Java retains texture/API boxes, world-color queries and callbacks; see [cloud preparation](rendering/RUST-DH-CLOUDS.md).
-- `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). This does not implement native item registries or gameplay.
+- `render/items/`: immutable authored item poses and world/hand composition in CPU owners. Java retains models, tints, topology and parent animation; see [item preparation](rendering/RUST-ITEM-LAYERS.md). Definition authority belongs to [content/item](game-model/ITEM-DEFINITIONS.md); this rendering owner does not implement item gameplay.
 - `render/scene/`: wire and data vocabulary shared by Java and the renderers, including immutable native terrain selections consumed directly by frame decoding ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).
 - `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
 - `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).
@@ -535,7 +547,7 @@ manager (namespace stacks, filters, sidecar metadata). `assets/textures/`
 builds texture atlases (sprite sources, PNG decoding, Sodium preprocessing,
 stitching, mip levels) and `assets/models/` loads, resolves and bakes block and
 item models. Java keeps the `PackResources`/`ResourceManager` API, metadata
-section codecs, item definitions and the atlas and baked model objects its
+section codecs, item behavior/projection bindings and the atlas and baked model objects its
 consumers use; see [resource packs and registries](resources/index.md),
 [texture atlases](resources/ATLASES.md) and [models](resources/MODELS.md).
 `assets/map_image.rs` performs bounded indexed-map PNG encoding for the
