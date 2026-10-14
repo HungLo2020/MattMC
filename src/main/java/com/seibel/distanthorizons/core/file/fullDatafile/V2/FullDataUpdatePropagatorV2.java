@@ -161,8 +161,8 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			for (Long parentUpdatePos : updatePosByParentPos.keySet())
 			{
 				// stop if there are already a bunch of updates queued
-				if (this.updatingPosSet.size() > maxUpdateTaskCount
-					|| executor.getQueueSize() > maxUpdateTaskCount
+				if (this.updatingPosSet.size() >= maxUpdateTaskCount
+					|| executor.getQueueSize() >= maxUpdateTaskCount
 					|| !this.updatingPosSet.add(parentUpdatePos))
 				{
 					break;
@@ -242,10 +242,13 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 							
 							this.updatingPosSet.remove(parentUpdatePos);
 						}
-					});
+					}, () -> this.updatingPosSet.remove(parentUpdatePos));
 				}
 				catch (RejectedExecutionException ignore)
-				{ /* the executor was shut down, it should be back up shortly and able to accept new jobs */ }
+				{
+					// No data was applied: retain the DB flag for the next propagation pass.
+					this.updatingPosSet.remove(parentUpdatePos);
+				}
 				catch (Exception e)
 				{
 					this.updatingPosSet.remove(parentUpdatePos);
@@ -270,8 +273,8 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			for (long parentUpdatePos : childUpdatePosList)
 			{
 				// stop if there are already a bunch of updates queued
-				if (this.updatingPosSet.size() > maxUpdateTaskCount
-					|| executor.getQueueSize() > maxUpdateTaskCount)
+				if (this.updatingPosSet.size() >= maxUpdateTaskCount
+					|| executor.getQueueSize() >= maxUpdateTaskCount)
 				{
 					break;
 				}
@@ -358,10 +361,13 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 							
 							this.updatingPosSet.remove(parentUpdatePos);
 						}
-					});
+					}, () -> this.updatingPosSet.remove(parentUpdatePos));
 				}
 				catch (RejectedExecutionException ignore)
-				{ /* the executor was shut down, it should be back up shortly and able to accept new jobs */ }
+				{
+					// No data was applied: retain the DB flag for the next propagation pass.
+					this.updatingPosSet.remove(parentUpdatePos);
+				}
 				catch (Exception e)
 				{
 					this.updatingPosSet.remove(parentUpdatePos);

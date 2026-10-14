@@ -99,7 +99,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	 * Encapsulates everything between pulling data from the database (including neighbors)
 	 * up to the point when geometry data is uploaded to the GPU.
 	 */
-	private CompletableFuture<Void> getAndBuildRenderDataFuture = null;
+	private volatile CompletableFuture<Void> getAndBuildRenderDataFuture = null;
 	@Nullable
 	public CompletableFuture<Void> getRenderDataBuildFuture() { return this.getAndBuildRenderDataFuture; } 
 	
@@ -167,221 +167,196 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	/** @return true if the upload started, false if it wasn't able to for any reason */
 	public synchronized boolean uploadRenderDataToGpuAsync()
 	{
-		if (!net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
+		if (this.closed || !net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+			|| this.getAndBuildRenderDataFuture != null)
 		{
-			// The Rust whole-frame renderer is the only consumer of built
-			// sections; without it a build would be converted and discarded.
-			return false;
-		}
-		
-		if (this.getAndBuildRenderDataFuture != null)
-		{
-			// don't accidentally queue multiple uploads at the same time
 			return false;
 		}
 		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
-		if (executor == null || executor.isTerminated())
+		if (executor == null || executor.isShutdown())
 		{
 			return false;
 		}
-		
-		// Only queue a some of the upload tasks at a time,
-		// this means the closer (higher priority) tasks will load first.
-		// This also prevents issues where the nearby tasks are canceled due to
-		// LOD detail level changing, and having holes in the world
 		if (this.uploadTaskCountRef.getAndIncrement() > executor.getPoolSize())
 		{
 			this.uploadTaskCountRef.decrementAndGet();
 			return false;
 		}
-		net.vulkanic.world.DistantHorizonsSemanticCollector.recordSemanticBuildAttempt(this.pos);
-		
-		try
+
+		CompletableFuture<Void> future = new CompletableFuture<>();
+		Runnable command = () ->
 		{
-			CompletableFuture<Void> future = new CompletableFuture<>();
-			this.getAndBuildRenderDataFuture = future; // TODO should use a setter/getter to guard against replacing an incomplete future
-			future.handle((voidObj, throwable) -> 
+			if (future.isDone())
 			{
-				// this has to fire are the end of every added future, otherwise we'll lock up and nothing will load
-				this.uploadTaskCountRef.decrementAndGet(); // TODO there is an issue where this variable isn't decremented properly, preventing LODs from loading in, or loading much slower
-				return null; 
-			});
-			
-			this.getAndBuildRenderDataRunnable = () ->
+				return;
+			}
+			try
 			{
 				this.getAndRefreshRenderingBeacons();
-				this.getAndUploadRenderDataToGpuAsync()
-					.thenRun(() -> 
-					{
-						// the future is passed in separately (IE not using the local var) to prevent any possible race condition null pointers
-						future.complete(null);
-						// the task is done, we don't need to track these anymore
-						this.getAndBuildRenderDataFuture = null;
-						this.getAndBuildRenderDataRunnable = null;
-					});
-			};
-			executor.execute(this.getAndBuildRenderDataRunnable);
-			
-			return true;
-		}
-		catch (RejectedExecutionException ignore)
-		{
-			this.getAndBuildRenderDataFuture.complete(null);
-			this.getAndBuildRenderDataFuture = null;
-			this.getAndBuildRenderDataRunnable = null;
-			
-			/* the thread pool was probably shut down because it's size is being changed, just wait a sec and it should be back */
-			return false;
-		}
-	}
-	private CompletableFuture<Void> getAndUploadRenderDataToGpuAsync()
-	{
-		// get the center pos data
-		return this.getRenderSourceForPosAsync(this.pos, null)
-			.thenCompose((ColumnRenderSource thisRenderSource) -> 
+				this.getAndUploadRenderDataToGpuAsync(future).whenComplete((ignored, failure) ->
+				{
+					if (failure == null) future.complete(null);
+					else future.completeExceptionally(failure);
+				});
+			}
+			catch (Throwable failure)
 			{
-				try
-				{
-					if (thisRenderSource == null)
-					{
-						// nothing needs to be rendered
-						// TODO how doesn't this cause infinite file handler loops?
-						//  to trigger an upload we check if the buffer is null, and we aren't
-						//  setting the render buffer here
-						return CompletableFuture.completedFuture(null);
-					}
-					
-					
-					boolean enableTransparency = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
-					LodQuadBuilder lodQuadBuilder = new LodQuadBuilder(enableTransparency, this.level.getClientLevelWrapper());
-					
-					
-					// get the adjacent positions
-					// needs to be done async to prevent threads waiting on the same positions to be processed
-					final CompletableFuture<ColumnRenderSource>[] adjacentLoadFutures = new CompletableFuture[4];
-					
-					if (Config.Client.Advanced.Graphics.Experimental.onlyLoadCenterLods.get())
-					{
-						// TODO temporary test, long term something else should be done to so we can get adjacent lighting data
-						//  probably a change to the LOD data format
-						adjacentLoadFutures[0] = CompletableFuture.completedFuture(null);
-						adjacentLoadFutures[1] = CompletableFuture.completedFuture(null);
-						adjacentLoadFutures[2] = CompletableFuture.completedFuture(null);
-						adjacentLoadFutures[3] = CompletableFuture.completedFuture(null);
-					}
-					else
-					{
-						adjacentLoadFutures[0] = this.getRenderSourceForPosAsync(this.pos, EDhDirection.NORTH);
-						adjacentLoadFutures[1] = this.getRenderSourceForPosAsync(this.pos, EDhDirection.SOUTH);
-						adjacentLoadFutures[2] = this.getRenderSourceForPosAsync(this.pos, EDhDirection.EAST);
-						adjacentLoadFutures[3] = this.getRenderSourceForPosAsync(this.pos, EDhDirection.WEST);
-					}
-					
-					return CompletableFuture.allOf(adjacentLoadFutures).thenRun(() ->
-					{
-						try (ColumnRenderSource northRenderSource = adjacentLoadFutures[0].get();
-							ColumnRenderSource southRenderSource = adjacentLoadFutures[1].get();
-							ColumnRenderSource eastRenderSource = adjacentLoadFutures[2].get();
-							ColumnRenderSource westRenderSource = adjacentLoadFutures[3].get())
-						{
-							ColumnRenderSource[] adjacentRenderSections = new ColumnRenderSource[EDhDirection.CARDINAL_COMPASS.length];
-							adjacentRenderSections[EDhDirection.NORTH.compassIndex] = northRenderSource;
-							adjacentRenderSections[EDhDirection.SOUTH.compassIndex] = southRenderSource;
-							adjacentRenderSections[EDhDirection.EAST.compassIndex] = eastRenderSource;
-							adjacentRenderSections[EDhDirection.WEST.compassIndex] = westRenderSource;
-							
-							boolean[] adjIsSameDetailLevel = new boolean[EDhDirection.CARDINAL_COMPASS.length];
-							adjIsSameDetailLevel[EDhDirection.NORTH.compassIndex] = this.isAdjacentPosSameDetailLevel(EDhDirection.NORTH);
-							adjIsSameDetailLevel[EDhDirection.SOUTH.compassIndex] = this.isAdjacentPosSameDetailLevel(EDhDirection.SOUTH);
-							adjIsSameDetailLevel[EDhDirection.EAST.compassIndex] = this.isAdjacentPosSameDetailLevel(EDhDirection.EAST);
-							adjIsSameDetailLevel[EDhDirection.WEST.compassIndex] = this.isAdjacentPosSameDetailLevel(EDhDirection.WEST);
-							
-							// the render sources are only needed by this synchronous method,
-							// then they can be closed
-							ColumnRenderBufferBuilder.makeLodRenderData(lodQuadBuilder, thisRenderSource, this.level, adjacentRenderSections, adjIsSameDetailLevel);
-							this.uploadToGpuAsync(lodQuadBuilder);
-						}
-						catch (Exception e)
-						{
-							LOGGER.error("Unexpected error while loading LodRenderSection [" + DhSectionPos.toString(this.pos) + "] adjacent data, Error: [" + e.getMessage() + "].", e);
-						}
-						finally
-						{
-							// Packet construction is synchronous; the collector owns its copies.
-							lodQuadBuilder.close();
-							thisRenderSource.close();
-						}
-					});
-				}
-				catch (Exception e)
-				{
-					LOGGER.error("Unexpected error while loading LodRenderSection ["+DhSectionPos.toString(this.pos)+"], Error: [" + e.getMessage() + "].", e);
-					return CompletableFuture.completedFuture(null);
-				}
-			});
-	}
-	/** 
-	 * async is done so each thread can run without waiting on others 
-	 * @param direction the direction to load relative to the given position, null will return the given position
-	 */
-	private CompletableFuture<ColumnRenderSource> getRenderSourceForPosAsync(long pos, @Nullable EDhDirection direction) 
-	{
-		if (direction != null)
+				future.completeExceptionally(failure);
+			}
+		};
+		this.getAndBuildRenderDataFuture = future;
+		this.getAndBuildRenderDataRunnable = command;
+		future.whenComplete((ignored, failure) ->
 		{
-			pos = DhSectionPos.getAdjacentPos(pos, direction);
-		}
-		final long finalPos = pos;
-		
-		
+			this.uploadTaskCountRef.decrementAndGet();
+			synchronized (this)
+			{
+				if (this.getAndBuildRenderDataFuture == future)
+				{
+					this.getAndBuildRenderDataFuture = null;
+					this.getAndBuildRenderDataRunnable = null;
+				}
+			}
+			// The captured executor owns this command even if ThreadPoolUtil was replaced.
+			executor.remove(command);
+		});
 		try
 		{
-			PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
-			if (executor == null || executor.isTerminated())
+			net.vulkanic.world.DistantHorizonsSemanticCollector.recordSemanticBuildAttempt(this.pos);
+			executor.execute(command, () -> future.cancel(false));
+			return true;
+		}
+		catch (RejectedExecutionException ignored)
+		{
+			future.cancel(false);
+			return false;
+		}
+		catch (RuntimeException | Error failure)
+		{
+			future.completeExceptionally(failure);
+			throw failure;
+		}
+	}
+
+	private CompletableFuture<Void> getAndUploadRenderDataToGpuAsync(CompletableFuture<Void> owner)
+	{
+		CompletableFuture<ColumnRenderSource> centerFuture = this.getRenderSourceForPosAsync(this.pos, null);
+		owner.whenComplete((ignored, failure) -> { if (owner.isCancelled()) centerFuture.cancel(false); });
+		return centerFuture.thenCompose(center ->
+		{
+			if (center == null) return CompletableFuture.completedFuture(null);
+			if (owner.isDone())
 			{
-				// should only happen if the threadpool is actively being re-sized
+				center.close();
 				return CompletableFuture.completedFuture(null);
 			}
-			
-			
-			// queue loading the render data
-			CompletableFuture<ColumnRenderSource> loadFuture = new CompletableFuture<>();
-			executor.execute(() ->
+			@SuppressWarnings("unchecked")
+			CompletableFuture<ColumnRenderSource>[] neighbors = new CompletableFuture[4];
+			try
 			{
-				// generate new render source
-				try (FullDataSourceV2 fullDataSource =
-						// no direction means get the center LOD		
-						(direction == null)
-						? this.fullDataSourceProvider.get(finalPos)
-						: this.fullDataSourceProvider.getAdjForDirection(finalPos, direction.opposite()))
+				for (int index = 0; index < EDhDirection.CARDINAL_COMPASS.length; index++)
 				{
-					ColumnRenderSource columnRenderSource = FullDataToRenderDataTransformer.transformFullDataToRenderSource(fullDataSource, this.levelWrapper);
-					loadFuture.complete(columnRenderSource);
+					EDhDirection direction = EDhDirection.CARDINAL_COMPASS[index];
+					neighbors[direction.compassIndex] = Config.Client.Advanced.Graphics.Experimental.onlyLoadCenterLods.get()
+						? CompletableFuture.completedFuture(null) : this.getRenderSourceForPosAsync(this.pos, direction);
 				}
-				catch (Exception e)
+				return this.buildRenderDataAsync(center, neighbors, owner);
+			}
+			catch (Throwable failure)
+			{
+				center.close();
+				for (CompletableFuture<ColumnRenderSource> neighbor : neighbors)
 				{
-					LOGGER.error("Unexpected issue creating render data for pos: ["+DhSectionPos.toString(finalPos)+"], error: ["+e.getMessage()+"].", e);
+					if (neighbor != null) neighbor.thenAccept(source -> { if (source != null) source.close(); });
 				}
-				finally
-				{
-					// A failed load counts as a missing position (no-op after success);
-					// an uncompleted future would leave this section's build and its
-					// upload slot waiting forever.
-					loadFuture.complete(null);
-				}
-			});
-			
-			return loadFuture;
-		}
-		catch (RejectedExecutionException ignore)
+				return CompletableFuture.failedFuture(failure);
+			}
+		});
+	}
+
+	/** Owns every successful load until the aggregate terminates, including exceptional allOf results. */
+	CompletableFuture<Void> buildRenderDataAsync(ColumnRenderSource center,
+		CompletableFuture<ColumnRenderSource>[] neighbors, CompletableFuture<Void> owner)
+	{
+		owner.whenComplete((ignored, failure) ->
 		{
-			// the thread pool was probably shut down because it's size is being changed, just wait a sec and it should be back
-			return CompletableFuture.completedFuture(null);
-		}
-		catch (Exception e)
+			if (owner.isCancelled())
+			{
+				for (CompletableFuture<ColumnRenderSource> neighbor : neighbors) neighbor.cancel(false);
+			}
+		});
+		return CompletableFuture.allOf(neighbors).thenCompose(ignored ->
 		{
-			LOGGER.error("Unexpected issue getting and creating render data for pos: ["+DhSectionPos.toString(pos)+"], error: ["+e.getMessage()+"].", e);
-			return CompletableFuture.completedFuture(null);
+			if (owner.isDone()) return CompletableFuture.completedFuture(null);
+			boolean transparency = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
+			try (LodQuadBuilder builder = new LodQuadBuilder(transparency, this.level.getClientLevelWrapper()))
+			{
+				ColumnRenderSource[] adjacent = new ColumnRenderSource[EDhDirection.CARDINAL_COMPASS.length];
+				boolean[] sameDetail = new boolean[EDhDirection.CARDINAL_COMPASS.length];
+				for (EDhDirection direction : EDhDirection.CARDINAL_COMPASS)
+				{
+					adjacent[direction.compassIndex] = neighbors[direction.compassIndex].join();
+					sameDetail[direction.compassIndex] = this.isAdjacentPosSameDetailLevel(direction);
+				}
+				ColumnRenderBufferBuilder.makeLodRenderData(builder, center, this.level, adjacent, sameDetail);
+				// Packet construction is synchronous; the collector owns its copies.
+				return this.uploadToGpuAsync(builder, owner);
+			}
+		}).whenComplete((ignored, failure) ->
+		{
+			try (center;
+				ColumnRenderSource north = completedSource(neighbors[0]);
+				ColumnRenderSource south = completedSource(neighbors[1]);
+				ColumnRenderSource west = completedSource(neighbors[2]);
+				ColumnRenderSource east = completedSource(neighbors[3]))
+			{
+				// Close all successfully acquired native owners, even when another load failed.
+			}
+		});
+	}
+
+	private static ColumnRenderSource completedSource(CompletableFuture<ColumnRenderSource> future)
+	{
+		return future.isCompletedExceptionally() ? null : future.getNow(null);
+	}
+
+	/** Each load has its own terminal future and closes a result that loses a cancellation race. */
+	private CompletableFuture<ColumnRenderSource> getRenderSourceForPosAsync(long pos, @Nullable EDhDirection direction)
+	{
+		final long finalPos = direction == null ? pos : DhSectionPos.getAdjacentPos(pos, direction);
+		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
+		CompletableFuture<ColumnRenderSource> future = new CompletableFuture<>();
+		if (executor == null)
+		{
+			future.cancel(false);
+			return future;
 		}
+		Runnable command = () ->
+		{
+			if (future.isDone()) return;
+			try (FullDataSourceV2 fullData = direction == null
+				? this.fullDataSourceProvider.get(finalPos)
+				: this.fullDataSourceProvider.getAdjForDirection(finalPos, direction.opposite()))
+			{
+				ColumnRenderSource source = FullDataToRenderDataTransformer.transformFullDataToRenderSource(fullData, this.levelWrapper);
+				if (!future.complete(source) && source != null) source.close();
+			}
+			catch (Throwable failure)
+			{
+				future.completeExceptionally(failure);
+				LOGGER.error("Unexpected issue creating render data for pos: [" + DhSectionPos.toString(finalPos) + "].", failure);
+			}
+		};
+		future.whenComplete((source, failure) -> { if (future.isCancelled()) executor.remove(command); });
+		try
+		{
+			executor.execute(command, () -> future.cancel(false));
+		}
+		catch (RejectedExecutionException ignored)
+		{
+			future.cancel(false);
+		}
+		return future;
 	}
 	private boolean isAdjacentPosSameDetailLevel(EDhDirection direction)
 	{
@@ -390,20 +365,20 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		detailLevel += DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL;
 		return detailLevel == DhSectionPos.getDetailLevel(this.pos);
 	}
-	private void uploadToGpuAsync(LodQuadBuilder lodQuadBuilder)
+	private CompletableFuture<Void> uploadToGpuAsync(LodQuadBuilder builder, CompletableFuture<Void> owner)
 	{
-		if (this.bufferUploadFuture != null)
+		if (owner.isDone()) return CompletableFuture.completedFuture(null);
+		CompletableFuture<LodBufferContainer> upload = ColumnRenderBufferBuilder.uploadBuffersAsync(this.level, this.pos, builder);
+		synchronized (this)
 		{
-			// shouldn't normally happen, but just in case canceling the previous future
-			// prevents the CPU from working on something that won't be used
-			this.bufferUploadFuture.cancel(true);
+			if (this.getAndBuildRenderDataFuture == owner && !owner.isDone()) this.bufferUploadFuture = upload;
 		}
-		
-		this.bufferUploadFuture = ColumnRenderBufferBuilder.uploadBuffersAsync(this.level, this.pos, lodQuadBuilder);
-		this.bufferUploadFuture.thenAccept((buffer) ->
+		return upload.thenAccept(buffer -> this.installBuiltContainer(buffer, owner)).whenComplete((ignored, failure) ->
 		{
-			this.installBuiltContainer(buffer);
-			this.getAndBuildRenderDataFuture = null;
+			synchronized (this)
+			{
+				if (this.bufferUploadFuture == upload) this.bufferUploadFuture = null;
+			}
 		});
 	}
 
@@ -414,10 +389,15 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	 */
 	void installBuiltContainer(LodBufferContainer buffer)
 	{
+		this.installBuiltContainer(buffer, null);
+	}
+
+	private void installBuiltContainer(LodBufferContainer buffer, @Nullable CompletableFuture<Void> owner)
+	{
 		LodBufferContainer containerToClose;
 		synchronized (this)
 		{
-			if (this.closed)
+			if (this.closed || (owner != null && (owner.isDone() || this.getAndBuildRenderDataFuture != owner)))
 			{
 				containerToClose = buffer;
 			}
@@ -794,23 +774,12 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			container.close();
 		}
 		
-		// removes any in-progress futures since they aren't needed any more
+		// The owner callback removes queued work from its original executor, clears
+		// retained busy fields and returns the upload slot exactly once. Already
+		// running loads still own and close their native results on completion.
 		CompletableFuture<Void> buildFuture = this.getAndBuildRenderDataFuture;
-		if (buildFuture != null)
-		{
-			// remove the task from our executor if present
-			// note: don't cancel the task since that prevents cleanup, we just don't want it to run
-			PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
-			if (executor != null && !executor.isTerminated())
-			{
-				Runnable runnable = this.getAndBuildRenderDataRunnable;
-				if (runnable != null)
-				{
-					executor.remove(runnable);
-				}
-			}
-		}
-		
+		if (buildFuture != null) buildFuture.cancel(false);
+
 		CompletableFuture<LodBufferContainer> uploadFuture = this.bufferUploadFuture;
 		if (uploadFuture != null)
 		{

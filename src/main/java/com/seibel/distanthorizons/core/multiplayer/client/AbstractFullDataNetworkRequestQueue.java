@@ -24,6 +24,7 @@ import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.ratelimiting.SupplierBasedRateLimiter;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.world.DhApiWorldProxy;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 
@@ -144,8 +145,14 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 			RequestQueueEntry newEntry = new RequestQueueEntry(dataSourceConsumer, clientTimestamp);
 			newEntry.future.whenComplete((requestResult, throwable) ->
 			{
-				this.waitingTasksBySectionPos.remove(sectionPos);
-				
+				this.waitingTasksBySectionPos.remove(sectionPos, newEntry);
+				if (throwable != null)
+				{
+					if (newEntry.decodeFuture != null) newEntry.decodeFuture.cancel(false);
+					if (newEntry.networkDataSourceFuture != null) newEntry.networkDataSourceFuture.cancel(false);
+					if (!(throwable instanceof CancellationException)) this.failedRequests.incrementAndGet();
+					return;
+				}
 				switch (requestResult)
 				{
 					case SUCCEEDED:
@@ -202,12 +209,12 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 				break;
 			}
 			
-			this.sendNextRequest(targetPos);
+			if (!this.sendNextRequest(targetPos)) break;
 		}
 		
 		return true;
 	}
-	private void sendNextRequest(DhBlockPos2D targetPos)
+	private boolean sendNextRequest(DhBlockPos2D targetPos)
 	{
 		Map.Entry<Long, RequestQueueEntry> mapEntry = this.waitingTasksBySectionPos.entrySet().stream()
 				.filter(task -> task.getValue().networkDataSourceFuture == null)
@@ -217,7 +224,7 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 		if (mapEntry == null)
 		{
 			this.pendingTasksSemaphore.release();
-			return;
+			return false;
 		}
 		
 		long sectionPos = mapEntry.getKey();
@@ -227,13 +234,13 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 		{
 			entry.future.cancel(false);
 			this.pendingTasksSemaphore.release();
-			return;
+			return true;
 		}
 		
 		if (!this.onBeforeRequest(sectionPos, entry.future))
 		{
 			this.pendingTasksSemaphore.release();
-			return;
+			return true;
 		}
 		
 		Long offsetEntryTimestamp = entry.updateTimestamp != null
@@ -265,32 +272,55 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 					dataSourceDto.applyToChildren = DhSectionPos.getDetailLevel(dataSourceDto.pos) > DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
 					dataSourceDto.applyToParent = DhSectionPos.getDetailLevel(dataSourceDto.pos) < DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL + 12;
 					
-					AbstractExecutorService executor = ThreadPoolUtil.getNetworkCompressionExecutor();
-					if (executor == null)
+					PriorityTaskPicker.Executor executor = ThreadPoolUtil.getNetworkCompressionExecutor();
+					if (executor == null || entry.future.isDone())
 					{
-						LOGGER.warn("Unable to handle FullDataPayload - getNetworkCompressionExecutor() is null");
 						dataSourceDto.close();
-						return null;
+						return entry.future.cancel(false);
 					}
-					
-					CompletableFuture.runAsync(() ->
-					{
+
+					CompletableFuture<Void> decodeFuture = new CompletableFuture<>();
+					entry.decodeFuture = decodeFuture;
+					Runnable decode = () -> {
+						Throwable decodeFailure = null;
 						try
 						{
+							if (entry.future.isDone() || decodeFuture.isCancelled()) return;
 							this.level.updateBeaconBeamsForSectionPos(dataSourceDto.pos, response.payload.beaconBeams);
-							
-							FullDataSourceV2 fullDataSource = dataSourceDto.createDataSource(this.level.getLevelWrapper(), null);
-							entry.dataSourceConsumer.accept(fullDataSource);
+							FullDataSourceV2 source = dataSourceDto.createDataSource(this.level.getLevelWrapper(), null);
+							try
+							{
+								if (entry.future.isDone()) { source.close(); return; }
+								entry.dataSourceConsumer.accept(source);
+							}
+							catch (Throwable error) { source.close(); throw error; }
 						}
-						catch (Exception e)
-						{
-							throw new RuntimeException(e);
-						}
-						finally
-						{
+						catch (Throwable error) { decodeFailure = error; }
+						finally { dataSourceDto.close(); }
+						if (decodeFailure == null) decodeFuture.complete(null);
+						else decodeFuture.completeExceptionally(decodeFailure);
+					};
+					decodeFuture.whenComplete((ignored, failure) -> {
+						if (decodeFuture.isCancelled()) executor.remove(decode);
+						if (failure == null) entry.future.complete(ERequestResult.SUCCEEDED);
+						else if (failure instanceof CancellationException) entry.future.cancel(false);
+						else entry.future.complete(ERequestResult.FAILED);
+					});
+					try
+					{
+						executor.execute(decode, () -> {
 							dataSourceDto.close();
+							decodeFuture.cancel(false);
+						});
+						// The request may have been cancelled before decodeFuture was installed.
+						if (entry.future.isDone())
+						{
+							decodeFuture.cancel(false);
+							executor.remove(decode);
 						}
-					}, executor);
+					}
+					catch (RejectedExecutionException ignored) { decodeFuture.cancel(false); }
+					return null;
 				}
 				else
 				{
@@ -346,6 +376,8 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 			
 			return entry.future.complete(ERequestResult.SUCCEEDED);
 		});
+		if (entry.future.isDone()) dataSourceFuture.cancel(false);
+		return true;
 	}
 	
 	
@@ -403,10 +435,8 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 				for (RequestQueueEntry entry : this.waitingTasksBySectionPos.values())
 				{
 					entry.future.cancel(alsoInterruptRunning);
-					if (entry.networkDataSourceFuture != null && entry.networkDataSourceFuture.cancel(alsoInterruptRunning))
-					{
-						this.pendingTasksSemaphore.release();
-					}
+					if (entry.networkDataSourceFuture != null) entry.networkDataSourceFuture.cancel(alsoInterruptRunning);
+					if (entry.decodeFuture != null) entry.decodeFuture.cancel(alsoInterruptRunning);
 				}
 			}
 			while (!this.pendingTasksSemaphore.tryAcquire(Short.MAX_VALUE) && stopwatch.elapsed(TimeUnit.SECONDS) < SHUTDOWN_TIMEOUT_SECONDS);
@@ -466,7 +496,9 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 		
 		/** Will be null until the request has been sent to the server */
 		@CheckForNull
-		public CompletableFuture<FullDataSourceResponseMessage> networkDataSourceFuture;
+		public volatile CompletableFuture<FullDataSourceResponseMessage> networkDataSourceFuture;
+		/** Owns decoding and the consumer handoff, including queued-task cancellation. */
+		public volatile CompletableFuture<Void> decodeFuture;
 		
 		/** when this reaches zero then the request will be canceled. */
 		public int retryAttempts = MAX_RETRY_ATTEMPTS;

@@ -179,6 +179,7 @@ public class DataMigratorV1 implements IDebugRenderable, AutoCloseable
 						LOGGER.info("Migrating [" + this.levelId + "] - [" + numFormat.format(progressCount) + "/" + numFormat.format(totalMigrationCount) + "]...");
 						
 						ArrayList<CompletableFuture<Void>> updateFutureList = new ArrayList<>();
+						AtomicBoolean batchCancelled = new AtomicBoolean(false);
 						for (int i = 0; i < legacyDataSourceList.size() && this.migrationThreadRunning.get(); i++)
 						{
 							FullDataSourceV1 legacyDataSource = legacyDataSourceList.get(i);
@@ -192,14 +193,34 @@ public class DataMigratorV1 implements IDebugRenderable, AutoCloseable
 								
 								// the actual update process can be moderately expensive due to having to update
 								// the render data along with the full data, so running it async on the update threads gains us a good bit of speed
-								CompletableFuture<Void> future = this.dataUpdater.updateDataSourceAsync(newDataSource);
-								updateFutureList.add(future);
-								future.thenRun(() ->
+								try
 								{
-									// after the update finishes the legacy data source can be safely deleted
-									this.v1DataSourceProvider.repo.deleteWithKey(legacyDataSource.getPos());
+									CompletableFuture<Void> future = this.dataUpdater.updateDataSourceAsync(newDataSource)
+										.whenComplete((ignored, failure) ->
+										{
+											Throwable cause = failure;
+											while ((cause instanceof ExecutionException || cause instanceof CompletionException)
+												&& cause.getCause() != null) cause = cause.getCause();
+											if (cause instanceof CancellationException) batchCancelled.set(true);
+											try
+											{
+												// A rejected or cancelled update leaves the legacy row available.
+												if (failure == null) this.v1DataSourceProvider.repo.deleteWithKey(legacyDataSource.getPos());
+											}
+											finally
+											{
+												newDataSource.close();
+											}
+										});
+									// Wait for ownership cleanup too, before selecting the next batch.
+									updateFutureList.add(future);
+								}
+								catch (RuntimeException | Error failure)
+								{
+									// Submission may fail before returning a stage to own this source.
 									newDataSource.close();
-								});
+									throw failure;
+								}
 							}
 							catch (Exception e)
 							{
@@ -222,6 +243,14 @@ public class DataMigratorV1 implements IDebugRenderable, AutoCloseable
 						}
 						catch (ExecutionException e)
 						{
+							// allOf exposes one failure, which may hide a different cancelled row.
+							if (batchCancelled.get())
+							{
+								// An unavailable updater cannot make progress in this run. Leave
+								// rows for a later reopen instead of repeatedly selecting them.
+								this.migrationThreadRunning.set(false);
+								break;
+							}
 							LOGGER.warn("Migration update failed. Migration will re-try the same positions again. Error:" + e.getMessage(), e);
 						}
 						

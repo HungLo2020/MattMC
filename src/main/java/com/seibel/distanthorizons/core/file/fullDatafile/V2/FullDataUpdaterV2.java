@@ -12,6 +12,7 @@ import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
 import com.seibel.distanthorizons.core.util.threading.PositionalLockProvider;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
@@ -69,49 +70,64 @@ public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 	{
 		if (this.isShutdownRef.get())
 		{
-			return CompletableFuture.completedFuture(null);
+			return cancelledUpdate();
 		}
 		
-		AbstractExecutorService executor = ThreadPoolUtil.getChunkToLodBuilderExecutor();
+		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getChunkToLodBuilderExecutor();
 		if (executor == null || executor.isTerminated())
 		{
-			return CompletableFuture.completedFuture(null);
+			return cancelledUpdate();
 		}
 		
 		
-		try
+		long updatePos = inputDataSource.getPos();
+		this.markUpdateStart(updatePos);
+		// 0 = queued, 1 = running, 2 = released. Cancellation is a terminal signal,
+		// not proof that native work stopped: retain a running update's count until
+		// it returns. The caller, not this updater, owns the input source.
+		AtomicInteger ownership = new AtomicInteger(0);
+		CompletableFuture<Void> future = executor.runAsync(() ->
 		{
-			this.markUpdateStart(inputDataSource.getPos());
-			return CompletableFuture.runAsync(() ->
+			if (!ownership.compareAndSet(0, 1)) return;
+			try
 			{
-				try
-				{
-					this.updateDataSource(inputDataSource);
-				}
-				catch (Exception e)
-				{
-					LOGGER.error("Unexpected error in async data source update at pos: ["+ DhSectionPos.toString(inputDataSource.getPos())+"], error: ["+e.getMessage()+"].", e);
-				}
-				finally
-				{
-					this.markUpdateEnd(inputDataSource.getPos());
-				}
-			}, executor);
-		}
-		catch (RejectedExecutionException ignore)
+				this.updateDataSource(inputDataSource);
+			}
+			catch (CancellationException cancelled)
+			{
+				throw cancelled;
+			}
+			catch (Exception e)
+			{
+				LOGGER.error("Unexpected error in async data source update at pos: ["+ DhSectionPos.toString(updatePos)+"], error: ["+e.getMessage()+"].", e);
+			}
+			finally
+			{
+				ownership.set(2);
+				this.markUpdateEnd(updatePos);
+			}
+		});
+		// Registration after submission also handles inline completion/rejection.
+		future.whenComplete((ignored, failure) ->
 		{
-			// can happen if the executor was shutdown while this task was queued
-			this.markUpdateEnd(inputDataSource.getPos());
-			return CompletableFuture.completedFuture(null);
-		}
+			if (ownership.compareAndSet(0, 2)) this.markUpdateEnd(updatePos);
+		});
+		return future;
 	}
 	
+	private static CompletableFuture<Void> cancelledUpdate()
+	{
+		CompletableFuture<Void> future = new CompletableFuture<>();
+		future.cancel(false);
+		return future;
+	}
+
 	/** After this method returns the inputData will be written to file. */
 	public void updateDataSource(@NotNull FullDataSourceV2 inputData)
 	{
 		if (this.isShutdownRef.get())
 		{
-			return;
+			throw new CancellationException("Full data updater is shut down.");
 		}
 		
 		
