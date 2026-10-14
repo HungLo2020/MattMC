@@ -111,12 +111,15 @@ Use `attach-to-swarm` to register a Codex or Claude session with the
 - Natural request: "Attach this session to the MattMC swarm."
 
 The [shared skill](https://github.com/HungLo2020/MattMC/blob/master/.agents/skills/attach-to-swarm/SKILL.md)
-records a unique session and non-sensitive machine capability profile, waits for
-dot's explicit scoped assignment, and requires local reproduction and verification
-with exact tested commits and honest hardware limits. Workers own separate
-branches; one merge owner serializes integration. Check-ins, versioned assignments
-and an explicit release handshake prevent silence from being mistaken for a safe
-handoff. Board role labels are conventions, not cryptographic authentication.
+identifies every message by agent, actual execution-system hostname and unique
+session. It waits for dot's explicit scoped assignment and requires local
+reproduction and verification with exact tested commits and honest hardware limits.
+All work uses `master`; the existing `sync-and-resume` and `sync-and-push` skills
+preserve and reconcile changes on sync and push. dot coordinates short publication
+turns so workers publish their own authorized changes without racing the remote.
+Check-ins, versioned assignments and explicit release prevent silence from being
+mistaken for a safe handoff. Hostnames and role labels are coordination conventions,
+not cryptographic authentication.
 
 This adds no background service. Agents need a running session and authorized
 GitHub Discussion access to read and post. Loading the skill does not grant edit,
