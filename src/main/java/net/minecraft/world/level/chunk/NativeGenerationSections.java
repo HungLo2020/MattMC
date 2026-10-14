@@ -91,6 +91,82 @@ public final class NativeGenerationSections {
         return install(PROTO, section, handle, index);
     }
 
+    /**
+     * A section's stage result prepared for publication without touching the
+     * chunk: an adopted native owner with its counters, or an exported palette.
+     * {@link #commit} installs it.
+     */
+    public static final class Prepared {
+        final LevelChunkSection section;
+        final NativeLiveBlockSection owner;
+        final int requestedBits, nonEmpty, ticking, fluid;
+        final java.util.List<net.minecraft.world.level.block.state.BlockState> palette;
+        final long[] raw;
+
+        private Prepared(LevelChunkSection section, NativeLiveBlockSection owner, int requestedBits, java.util.List<net.minecraft.world.level.block.state.BlockState> palette,
+                         long[] raw, int nonEmpty, int ticking, int fluid) {
+            this.section = section;
+            this.owner = owner;
+            this.requestedBits = requestedBits;
+            this.palette = palette;
+            this.raw = raw;
+            this.nonEmpty = nonEmpty;
+            this.ticking = ticking;
+            this.fluid = fluid;
+        }
+
+        /** An exported (compatibility) result for {@code section}. */
+        public static Prepared exported(LevelChunkSection section, int requestedBits, java.util.List<net.minecraft.world.level.block.state.BlockState> palette, long[] raw,
+                                        int nonEmpty, int ticking, int fluid) {
+            return new Prepared(section, null, requestedBits, palette, raw, nonEmpty, ticking, fluid);
+        }
+
+        /** Publishes the result; nothing here calls native code or can fail on its inputs. */
+        public void commit() {
+            if (this.owner != null) this.section.installNativeGenerated(this.owner, this.nonEmpty, this.ticking, this.fluid);
+            else this.section.installGenerated(this.requestedBits, this.palette, this.raw, this.nonEmpty, this.ticking, this.fluid);
+        }
+    }
+
+    /** The prepared native result (null untouched), or {@link #COMPATIBILITY} when the original export is needed. */
+    public static final Prepared COMPATIBILITY = new Prepared(null, null, 0, null, null, 0, 0, 0);
+
+    public static Prepared prepareNoise(LevelChunkSection section, long handle, int index) {
+        return prepare(NOISE, section, handle, index);
+    }
+
+    public static Prepared prepareProto(LevelChunkSection section, long handle, int index) {
+        return prepare(PROTO, section, handle, index);
+    }
+
+    private static Prepared prepare(MethodHandle operation, LevelChunkSection section, long handle, int index) {
+        if (section.getClass() != LevelChunkSection.class) return COMPATIBILITY;
+        var states = section.getStates();
+        if (states.getClass() != PalettedContainer.class || states.nativeLiveBlocks() == null) return COMPATIBILITY;
+        var result = RESULT.get();
+        try {
+            int status = (int)operation.invokeExact(handle, index, Block.BLOCK_STATE_REGISTRY.size(),
+                    section.generatedGlobalPaletteBits(), result);
+            if (status == 0) return null;
+            if (status == 2) return COMPATIBILITY;
+            if (status != 1) throw new IllegalStateException("Invalid native generation result: " + status);
+            // Adopted now (its cleaner frees it if publication never happens), installed at commit.
+            var owner = NativeLiveBlockSection.adoptOwned(result.getAtIndex(ValueLayout.ADDRESS, 0));
+            return new Prepared(section, owner, 0, null, null, result.getAtIndex(ValueLayout.JAVA_INT, 2),
+                    result.getAtIndex(ValueLayout.JAVA_INT, 3), result.getAtIndex(ValueLayout.JAVA_INT, 4));
+        } catch (RuntimeException | Error failure) { throw failure; }
+        catch (Throwable failure) { throw new IllegalStateException("Cannot prepare native generation section", failure); }
+    }
+
+    /** Verification only: {@code -Dmattmc.worldgen.stagePublishFailAfter=N} fails the Nth prepared section. */
+    private static final java.util.concurrent.atomic.AtomicLong PUBLISH_FAIL = new java.util.concurrent.atomic.AtomicLong(
+            Long.getLong("mattmc.worldgen.stagePublishFailAfter", -1));
+
+    /** Counts one prepared result; throws at the injected publication failure. */
+    public static void preparedHook() {
+        if (PUBLISH_FAIL.get() >= 0 && PUBLISH_FAIL.getAndDecrement() == 1) throw new IllegalStateException("Injected stage publication failure");
+    }
+
     /** 0 untouched, 1 installed, 2 requires the original compatibility export. */
     private static int install(MethodHandle operation, LevelChunkSection section, long handle, int index) {
         if (section.getClass() != LevelChunkSection.class) return 2;

@@ -69,6 +69,8 @@ improvement. A native executable and complete Java removal remain unfinished.
   Do not infer a guarantee that all custom callbacks are untouched. Preserve
   these actual admission boundaries without normalizing imported palettes.
   [Admission source](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java#L62-L89)
+- Palette-ID lookup during writes uses a multiplicative hash of the state ID
+  (`StateIds`); nothing iterates the map, so it cannot affect palette order.
 - Preserve packed padding, palette order, unused entries and requested global
   configuration bits. A resize uses fresh zero padding and first occurrence in
   storage order. Hash palettes append the overflow entry before growing.

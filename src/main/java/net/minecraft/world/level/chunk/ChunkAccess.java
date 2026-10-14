@@ -233,6 +233,11 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		this.getOrCreateHeightmapUnprimed(types).setRawData(this, types, ls);
 	}
 
+	/** Native decoration verification: forget a heightmap so the next read primes it again. */
+	public void nativeDropHeightmap(Heightmap.Types types) {
+		this.heightmaps.remove(types);
+	}
+
 	public Heightmap getOrCreateHeightmapUnprimed(Heightmap.Types types) {
 		return (Heightmap)this.heightmaps.computeIfAbsent(types, typesx -> new Heightmap(this, typesx));
 	}

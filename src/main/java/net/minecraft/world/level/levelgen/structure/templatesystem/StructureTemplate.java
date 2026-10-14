@@ -262,11 +262,14 @@ public class StructureTemplate {
 		if (this.palettes.isEmpty()) {
 			return false;
 		} else {
-			List<StructureTemplate.StructureBlockInfo> list = structurePlaceSettings.getRandomPalette(this.palettes, blockPos).blocks();
+			StructureTemplate.Palette palette = structurePlaceSettings.getRandomPalette(this.palettes, blockPos);
+			List<StructureTemplate.StructureBlockInfo> list = palette.blocks();
 			if ((!list.isEmpty() || !structurePlaceSettings.isIgnoreEntities() && !this.entityInfoList.isEmpty())
 				&& this.size.getX() >= 1
 				&& this.size.getY() >= 1
 				&& this.size.getZ() >= 1) {
+				// Rust processes and writes the blocks over the bound decoration region when it can.
+				if (NativeTemplates.place(this, palette, list, serverLevelAccessor, blockPos, blockPos2, structurePlaceSettings, randomSource, i)) return true;
 				BoundingBox boundingBox = structurePlaceSettings.getBoundingBox();
 				List<BlockPos> list2 = Lists.<BlockPos>newArrayListWithCapacity(structurePlaceSettings.shouldApplyWaterlogging() ? list.size() : 0);
 				List<BlockPos> list3 = Lists.<BlockPos>newArrayListWithCapacity(structurePlaceSettings.shouldApplyWaterlogging() ? list.size() : 0);
@@ -477,7 +480,7 @@ public class StructureTemplate {
 		return list3;
 	}
 
-	private void placeEntities(
+	void placeEntities(
 		ServerLevelAccessor serverLevelAccessor,
 		BlockPos blockPos,
 		Mirror mirror,
@@ -844,9 +847,11 @@ public class StructureTemplate {
 
 	public static final class Palette {
 		private final List<StructureTemplate.StructureBlockInfo> blocks;
-		private final Map<Block, List<StructureTemplate.StructureBlockInfo>> cache = Maps.<Block, List<StructureTemplate.StructureBlockInfo>>newHashMap();
+		// Worker threads share templates: one builds a structure start's jigsaws while another
+		// places a piece's data markers, so these caches must be safe to fill concurrently.
+		private final Map<Block, List<StructureTemplate.StructureBlockInfo>> cache = new java.util.concurrent.ConcurrentHashMap<>();
 		@Nullable
-		private List<StructureTemplate.JigsawBlockInfo> cachedJigsaws;
+		private volatile List<StructureTemplate.JigsawBlockInfo> cachedJigsaws;
 
 		Palette(List<StructureTemplate.StructureBlockInfo> list) {
 			this.blocks = list;

@@ -22,6 +22,11 @@ impl Xoroshiro {
         }
     }
 
+    /// `(seedLo, seedHi)`.
+    pub fn state(&self) -> (i64, i64) {
+        (self.lo, self.hi)
+    }
+
     pub fn next_long(&mut self) -> i64 {
         let l = self.lo;
         let m = self.hi;

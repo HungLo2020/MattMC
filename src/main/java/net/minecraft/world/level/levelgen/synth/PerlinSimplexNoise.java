@@ -65,6 +65,8 @@ public class PerlinSimplexNoise {
 	}
 
 	private volatile NativeNoise nativeNoise;
+	/** The validated native state, for Rust callers that evaluate this noise directly. */
+	public NativeNoiseState nativeState() { return nativeNoise(); }
 	NativeNoise nativeNoise() {
 		NativeNoise value = nativeNoise;
 		if (value == null) {

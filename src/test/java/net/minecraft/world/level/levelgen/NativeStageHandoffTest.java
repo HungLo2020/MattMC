@@ -167,6 +167,29 @@ class NativeStageHandoffTest {
             assertNull(field(chunk.getSection(0).getStates(), "data"));
         }
     }
+    @Test void aFailureWhilePreparingResultsPublishesNothing() throws Exception {
+        var chunk = fresh();
+        var sectionZero = SectionFingerprint.of(chunk.getSection(0));
+        var sectionOne = SectionFingerprint.of(chunk.getSection(1));
+        long[] surface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG).getRawData().clone();
+        Field countdown = NativeGenerationSections.class.getDeclaredField("PUBLISH_FAIL");
+        countdown.setAccessible(true);
+        var publishFail = (java.util.concurrent.atomic.AtomicLong)countdown.get(null);
+        try (var stage = NativeProtoChunk.create(chunk)) {
+            assertNotNull(stage);
+            stage.set(1, -16, 1, Blocks.STONE.defaultBlockState(), false);
+            stage.set(2, 0, 2, Blocks.DIRT.defaultBlockState(), false);
+            // The second prepared section fails: neither section, the heightmaps nor marks change.
+            publishFail.set(2);
+            assertThrows(IllegalStateException.class, stage::install);
+        } finally {
+            publishFail.set(-1);
+        }
+        assertEquals(sectionZero, SectionFingerprint.of(chunk.getSection(0)));
+        assertEquals(sectionOne, SectionFingerprint.of(chunk.getSection(1)));
+        assertArrayEquals(surface, chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG).getRawData());
+        for (var marks : chunk.getPostProcessing()) assertTrue(marks == null || marks.isEmpty());
+    }
     @Test void noiseInstallKeepsUntouchedCustomChunkAccessorsUncalled() {
         var registries = NativeNoiseFillTest.registries;
         var setting = registries.lookupOrThrow(net.minecraft.core.registries.Registries.NOISE_SETTINGS)

@@ -12,6 +12,20 @@ public class MarsagliaPolarGaussian {
 		this.randomSource = randomSource;
 	}
 
+	/** Native decoration: the cached second value travels with the random state. */
+	public boolean nativeHas() {
+		return this.haveNextNextGaussian;
+	}
+
+	public double nativeValue() {
+		return this.nextNextGaussian;
+	}
+
+	public void nativeSet(boolean has, double value) {
+		this.haveNextNextGaussian = has;
+		this.nextNextGaussian = value;
+	}
+
 	public void reset() {
 		this.haveNextNextGaussian = false;
 	}

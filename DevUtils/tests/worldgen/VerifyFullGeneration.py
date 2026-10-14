@@ -12,12 +12,14 @@ parallel scheduling without fingerprints.
   python3 DevUtils/tests/worldgen/VerifyFullGeneration.py --output build/full-generation/t1 --timing --pairs 3
 """
 import argparse
+import fcntl
 import gzip
 import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -31,6 +33,19 @@ JDK = ROOT / 'libraries/jdk/linux-x64/bin'
 def sha(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def wait_for_memory(heap, log):
+    """Hold a launch until the heap plus ZGC and native overhead fits in free memory."""
+    need = int(heap.rstrip('Gg')) + 4
+    while True:
+        with open('/proc/meminfo') as stream:
+            info = {line.split(':')[0]: int(line.split()[1]) for line in stream}
+        free = info['MemAvailable'] // (1024 * 1024)
+        if free >= need:
+            return
+        print(f'waiting for memory: {free} GiB available, {need} GiB needed', file=log, flush=True)
+        time.sleep(30)
 
 
 def run_logged(command, log, cwd, env):
@@ -59,6 +74,10 @@ def prepare(side, repo, out, env, skip_build):
     return classpath, jar
 
 
+def native_dir(side, args):
+    return (args.reference_root if side == 'reference' else ROOT) / 'build/rust/native'
+
+
 def launch(side, label, classpath, jar, out, args, env):
     run = out / label
     run.mkdir()
@@ -79,13 +98,15 @@ sync-chunk-writes=false
 generate-structures=true
 spawn-protection=0
 ''')
-    command = ['taskset', '-c', args.cpus, str(JDK / 'java'), '-Xms2G', '-Xmx8G', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders',
+    wait_for_memory(args.heap, sys.stderr)
+    command = ['taskset', '-c', args.cpus, str(JDK / 'java'), '-Xms2G', f'-Xmx{args.heap}', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders',
                f'-Dmax.bg.threads={1 if not args.timing else args.workers}',
                f'-Daudit.output={run}', f'-Daudit.serial={str(not args.timing).lower()}', f'-Daudit.hash={str(not args.timing).lower()}',
                f'-Daudit.radius={args.radius}', f'-Daudit.rounds={args.rounds}', f'-Daudit.warmups={args.warmups}',
-               f'-Daudit.dimensions={args.dimensions}', f'-Daudit.resume={str(args.resume).lower()}', f'-javaagent:{jar}']
-    if side.startswith('current'):
-        command += ['--enable-native-access=ALL-UNNAMED', f'-Dmattmc.rust.natives.dir={NATIVE.parent}']
+               f'-Daudit.dimensions={args.dimensions}', f'-Daudit.resume={str(args.resume).lower()}',
+               f'-Daudit.biomes={args.biomes}', f'-Daudit.structures={args.structures}', f'-javaagent:{jar}']
+    if side.startswith('current') or side == 'reference':
+        command += ['--enable-native-access=ALL-UNNAMED', f'-Dmattmc.rust.natives.dir={native_dir(side, args)}']
     if side == 'current-java':
         # Same build with every native decoration route switched off: the pre-change Java path.
         command += ['-Dmattmc.worldgen.javaDecoration=true']
@@ -185,7 +206,9 @@ def main():
     parser.add_argument('--rounds', type=int, default=1)
     parser.add_argument('--warmups', type=int, default=0)
     parser.add_argument('--dimensions', default='', help='comma-separated dimension IDs; default all')
-    parser.add_argument('--sides', default='frozen,current', help='frozen, current, or current-java (native decoration off)')
+    parser.add_argument('--sides', default='frozen,current',
+                        help='frozen, current, current-java (native decoration off) or reference (--reference-root)')
+    parser.add_argument('--reference-root', type=Path, help='another checkout, for example a pre-change worktree under build/')
     parser.add_argument('--timing', action='store_true', help='parallel generation without fingerprints')
     parser.add_argument('--resume', action='store_true', help='carve each region, save and unload it, then finish it to FULL from disk')
     parser.add_argument('--pairs', type=int, default=1, help='alternating Frozen/Current launches')
@@ -195,25 +218,42 @@ def main():
     parser.add_argument('--skip-build', action='store_true')
     parser.add_argument('--remove-worlds', action='store_true', help='delete generated worlds after fingerprinting')
     parser.add_argument('--jvm-arg', action='append', default=[])
+    parser.add_argument('--heap', default='8G', help='server -Xmx, the same on every side')
+    parser.add_argument('--biomes', default='', help='comma-separated biome IDs: also measure a region around the nearest of each')
+    parser.add_argument('--structures', default='', help='comma-separated structure IDs: also measure a region around the nearest start of each')
     parser.add_argument('--compare-to', type=Path, action='append', default=[],
                         help='earlier run directory (for example a pre-change Current side) to compare the first side against')
     args = parser.parse_args()
     out = args.output.resolve()
+    if args.reference_root:
+        args.reference_root = args.reference_root.resolve()
     if not out.is_relative_to(ROOT / 'build'):
         parser.error('output must be under build/')
     out.mkdir(parents=True, exist_ok=False)
+    # One driver at a time: concurrent 8 GiB servers exhaust memory and the kernel kills them.
+    lock = (ROOT / 'build/full-generation/.driver.lock').open('w')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print('another VerifyFullGeneration run holds the lock; waiting', flush=True)
+        fcntl.flock(lock, fcntl.LOCK_EX)
     sides = args.sides.split(',')
     if 'frozen' in sides:
         assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=FROZEN, text=True).strip() == FROZEN_HEAD
         assert not subprocess.check_output(['git', 'status', '--porcelain', '--', 'src', 'build.gradle'], cwd=FROZEN)
     env = {**os.environ, 'JAVA_HOME': str(JDK.parent), 'PATH': str(JDK) + os.pathsep + os.environ.get('PATH', '')}
     builds = {side.split('-')[0] for side in sides}
-    prepared = {side: prepare(side, ROOT if side == 'current' else FROZEN, out, env, args.skip_build) for side in builds}
+    roots = {'current': ROOT, 'frozen': FROZEN, 'reference': args.reference_root}
+    if 'reference' in builds and not args.reference_root:
+        parser.error('--sides reference needs --reference-root')
+    prepared = {side: prepare(side, roots[side], out, env, args.skip_build) for side in builds}
     prepared = {side: prepared[side.split('-')[0]] for side in sides}
     receipt = {'args': {k: str(v) for k, v in vars(args).items()},
                'current_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                'current_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain', '--', 'src'], cwd=ROOT)),
-               'native_sha256': sha(NATIVE) if any(s.startswith('current') for s in sides) else None, 'frozen_head': FROZEN_HEAD, 'runs': []}
+               'native_sha256': sha(NATIVE) if any(s.startswith('current') for s in sides) else None, 'frozen_head': FROZEN_HEAD,
+               'reference_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=args.reference_root, text=True).strip()
+               if args.reference_root else None, 'runs': []}
     results = {}
     for pair in range(args.pairs):
         order = list(enumerate(sides)) if pair % 2 == 0 else list(reversed(list(enumerate(sides))))

@@ -2,15 +2,16 @@ use super::super::super::synth::{noise_eval, State};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub(super) struct Point {
+pub(crate) struct Point {
     pub x: i32,
     pub y: i32,
     pub z: i32,
     pub offset: i32,
 }
 
+/// `Σ (Mth.invSqrt(distSqr + offset) + noise)` in Java's order.
 #[inline]
-fn accumulate(points: &[Point], x: f64, y: f64, z: f64, noise: f64) -> f64 {
+pub(crate) fn accumulate(points: &[Point], x: f64, y: f64, z: f64, noise: f64) -> f64 {
     let mut value = 0.0;
     for p in points {
         let dx = x - p.x as f64;

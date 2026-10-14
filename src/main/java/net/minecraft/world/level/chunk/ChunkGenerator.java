@@ -332,10 +332,68 @@ public abstract class ChunkGenerator {
 			try {
 				Registry<PlacedFeature> registry2 = worldGenLevel.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
 				int j = Math.max(GenerationStep.Decoration.values().length, i);
-
-				for (int k = 0; k < j; k++) {
-					int m = 0;
+				// Rust runs the whole loop when it can, calling back for structures and Java features;
+				// Java's loop below finishes from a resume point, or runs it all when Rust declines.
+				int startStep = 0, resumeAfter = -1;
+				if (nativeRegion != null) {
+					long structureSteps = 0;
 					if (structureManager.shouldGenerateStructures()) {
+						for (int k = 0; k < j && k < 64; k++) {
+							if (!map.getOrDefault(k, Collections.emptyList()).isEmpty()) structureSteps |= 1L << k;
+						}
+					}
+					var sequence = new net.minecraft.world.level.levelgen.NativeDecoration.Sequence() {
+						@Override
+						public void structures(int k) {
+							int m = 0;
+							for (Structure structure : map.getOrDefault(k, Collections.emptyList())) {
+								worldgenRandom.setFeatureSeed(l, m, k);
+								Supplier<String> supplier = () -> (String)registry.getResourceKey(structure).map(Object::toString).orElseGet(structure::toString);
+
+								try {
+									worldGenLevel.setCurrentlyGenerating(supplier);
+									structureManager.startsForStructure(sectionPos, structure)
+										.forEach(structureStart -> structureStart.placeInChunk(worldGenLevel, structureManager, ChunkGenerator.this, worldgenRandom, getWritableArea(chunkAccess), chunkPos));
+								} catch (Exception var29) {
+									CrashReport crashReport = CrashReport.forThrowable(var29, "Feature placement");
+									crashReport.addCategory("Feature").setDetail("Description", supplier::get);
+									throw new ReportedException(crashReport);
+								}
+
+								m++;
+							}
+						}
+
+						@Override
+						public void feature(int k, int p) {
+							PlacedFeature placedFeature = (PlacedFeature)((FeatureSorter.StepFeatureData)list.get(k)).features().get(p);
+							Supplier<String> supplier2 = () -> (String)registry2.getResourceKey(placedFeature).map(Object::toString).orElseGet(placedFeature::toString);
+							worldgenRandom.setFeatureSeed(l, p, k);
+
+							try {
+								worldGenLevel.setCurrentlyGenerating(supplier2);
+								placedFeature.placeWithBiomeCheck(worldGenLevel, ChunkGenerator.this, worldgenRandom, blockPos);
+							} catch (Exception var30) {
+								CrashReport crashReport2 = CrashReport.forThrowable(var30, "Feature placement");
+								crashReport2.addCategory("Feature").setDetail("Description", supplier2::get);
+								throw new ReportedException(crashReport2);
+							}
+						}
+					};
+					long decorated = net.minecraft.world.level.levelgen.NativeDecoration.decorate(this.nativeDecorationPrograms, nativeRegion, this, worldGenLevel,
+						worldgenRandom, l, set, structureSteps, blockPos, list, j, sequence);
+					if (decorated == net.minecraft.world.level.levelgen.NativeDecoration.DECORATION_DONE) {
+						startStep = j;
+					} else if (decorated != net.minecraft.world.level.levelgen.NativeDecoration.DECORATION_DECLINED) {
+						startStep = (int)(decorated >>> 32);
+						resumeAfter = (int)decorated;
+					}
+				}
+
+				for (int k = startStep; k < j; k++) {
+					boolean resumed = k == startStep && resumeAfter >= 0;
+					int m = 0;
+					if (structureManager.shouldGenerateStructures() && !resumed) {
 						List<Structure> structList = map.getOrDefault(k, Collections.emptyList());
 						for (Structure structure : structList) {
 							worldgenRandom.setFeatureSeed(l, m, k);
@@ -343,8 +401,12 @@ public abstract class ChunkGenerator {
 
 							try {
 								worldGenLevel.setCurrentlyGenerating(supplier);
+								long started = net.minecraft.world.level.levelgen.NativeDecoration.PROFILE ? System.nanoTime() : 0;
 								structureManager.startsForStructure(sectionPos, structure)
 									.forEach(structureStart -> structureStart.placeInChunk(worldGenLevel, structureManager, this, worldgenRandom, getWritableArea(chunkAccess), chunkPos));
+								if (net.minecraft.world.level.levelgen.NativeDecoration.PROFILE) {
+									net.minecraft.world.level.levelgen.NativeDecoration.profile("structure " + supplier.get(), System.nanoTime() - started, false);
+								}
 							} catch (Exception var29) {
 								CrashReport crashReport = CrashReport.forThrowable(var29, "Feature placement");
 								crashReport.addCategory("Feature").setDetail("Description", supplier::get);
@@ -374,15 +436,21 @@ public abstract class ChunkGenerator {
 
 						for (int o = 0; o < n; o++) {
 							int p = is[o];
+							if (resumed && p <= resumeAfter) continue;
 							PlacedFeature placedFeature = (PlacedFeature)stepFeatureData2.features().get(p);
 							Supplier<String> supplier2 = () -> (String)registry2.getResourceKey(placedFeature).map(Object::toString).orElseGet(placedFeature::toString);
 							worldgenRandom.setFeatureSeed(l, p, k);
 
 							try {
 								worldGenLevel.setCurrentlyGenerating(supplier2);
-								if (nativeRegion == null
-									|| !net.minecraft.world.level.levelgen.NativeDecoration.place(this.nativeDecorationPrograms, nativeRegion, this, worldGenLevel, worldgenRandom, placedFeature, l, p, k, blockPos)) {
+								long started = net.minecraft.world.level.levelgen.NativeDecoration.PROFILE ? System.nanoTime() : 0;
+								boolean placedNatively = nativeRegion != null
+									&& net.minecraft.world.level.levelgen.NativeDecoration.place(this.nativeDecorationPrograms, nativeRegion, this, worldGenLevel, worldgenRandom, placedFeature, l, p, k, blockPos);
+								if (!placedNatively) {
 									placedFeature.placeWithBiomeCheck(worldGenLevel, this, worldgenRandom, blockPos);
+								}
+								if (net.minecraft.world.level.levelgen.NativeDecoration.PROFILE) {
+									net.minecraft.world.level.levelgen.NativeDecoration.profile(supplier2.get(), System.nanoTime() - started, placedNatively);
 								}
 							} catch (Exception var30) {
 								CrashReport crashReport2 = CrashReport.forThrowable(var30, "Feature placement");
@@ -402,7 +470,7 @@ public abstract class ChunkGenerator {
 				crashReport3.addCategory("Generation").setDetail("CenterX", chunkPos.x).setDetail("CenterZ", chunkPos.z).setDetail("Decoration Seed", l);
 				throw new ReportedException(crashReport3);
 			} finally {
-				if (nativeRegion != null) nativeRegion.close();
+				if (nativeRegion != null) net.minecraft.world.level.levelgen.NativeDecoration.release(nativeRegion);
 			}
 		}
 	}

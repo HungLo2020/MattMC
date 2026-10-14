@@ -1,105 +1,173 @@
 # Native biome decoration
 
-`ChunkGenerator.applyBiomeDecoration` keeps Java's step loop, structure
-placement and feature seeds. For each placed feature, it first offers the
-feature to [`NativeDecoration`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeDecoration.java).
-A supported feature then runs entirely in
-[`levelgen/decoration/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/decoration)
-in one call: `setFeatureSeed`, every placement modifier, the configured
-feature's draws, region reads and section writes. Every other feature keeps
-Java's path, in the same order and with the same seeds.
+`ChunkGenerator.applyBiomeDecoration` hands its whole step loop to
+[`NativeDecoration.decorate`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeDecoration.java).
+[`decoration/sequence.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/decoration/sequence.rs)
+then runs every generation step in one call per chunk:
+
+1. the step's structures, through a Java upcall (`Sequence.structures`);
+2. the union of the present biomes' placed features, in index order, each
+   after `setFeatureSeed(decoration, index, step)`;
+3. each feature's compiled program in
+   [`levelgen/decoration/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/decoration),
+   or Java's `placeWithBiomeCheck` through an upcall (`Sequence.feature`).
+
+Java still gathers the present biome set (from section palettes) and owns
+structure placement and every feature without a program. When the loop
+declines before running, Java's own loop runs, offering each placed feature
+to `NativeDecoration.place` one at a time.
 
 ## What runs in Rust
 
 | Piece | Supported now | Rust file |
 | --- | --- | --- |
+| Loop | steps, structure slots, biome union, feature seeds, Java fallbacks | `sequence.rs` |
 | Random | `WorldgenRandom` over Xoroshiro, through `BitRandomSource`'s derivations | `random.rs` |
-| Modifiers | `count` (constant, uniform), `in_square`, `height_range` (uniform, trapezoid, biased to bottom), `biome`, `rarity_filter` | `placement.rs` |
-| Features | `minecraft:ore` (`OreFeature`, exact class and `Feature.ORE`) | `ore.rs` |
-| Rules | tag, block, block-state and always-true tests; random block and random block-state tests | `program.rs` |
-| Region | 3×3 proto chunks: live block/counter/biome owners, WG heightmaps | `region.rs` |
+| Modifiers | `count`, `in_square`, `height_range` (uniform, trapezoid, biased, very biased), `biome`, `rarity_filter`, `block_predicate_filter`, `heightmap`, `surface_water_depth_filter`, `count_on_every_layer`, `environment_scan`, `random_offset`, `noise_threshold_count`, `noise_based_count`, `surface_relative_threshold_filter` | `placement.rs` |
+| Int providers | constant, uniform, biased-to-bottom, weighted list, clamped, clamped normal | `program.rs`, `simple.rs` |
+| Float providers | constant, uniform, clamped normal, trapezoid | `program.rs`, `simple.rs` |
+| State providers | simple, weighted, rule-based, randomized int | `tree/mod.rs`, `vegetation.rs` |
+| Predicates | true/all/any/not, matching blocks/tags/fluids, solid, replaceable, inside world bounds, has sturdy face, would-survive (saplings); anything else asks Java | `program.rs`, `placement.rs` |
+| Features | ore, replace blobs, glowstone, springs, the three selectors, trees (every vanilla trunk, foliage, root placer and decorator, pale moss), random patch and flower patches, simple block, block column, seagrass, sea pickle, kelp, disk, vines, forest rock, underwater magma, multiface growth (glow lichen, sculk vein), geode, monster room, delta, basalt columns, coral claw/tree/mushroom, lake, sculk patch, pointed and large dripstone, dripstone cluster, blue ice, ice spike, iceberg, `freeze_top_layer`, bamboo, huge mushrooms, huge fungi, weeping and twisting vines, basalt pillar, scattered ore, chorus plant, End island, vegetation patches (moss, pale moss, clay pools), desert well | `ore.rs`, `simple.rs`, `tree/`, `vegetation.rs`, `geode.rs`, `rooms.rs`, `nether.rs`, `coral.rs`, `lakes.rs`, `sculk.rs`, `dripstone.rs`, `ice.rs`, `freeze.rs`, `plants.rs`, `end.rs`, `patch.rs`, `rooms.rs` |
+| Templates | `StructureTemplate.placeInWorld` for structure pieces ([guide](../structure/RUST-STRUCTURE-TEMPLATES.md)) | `template.rs` |
+| Region | 3×3 proto chunks: live block/counter/biome owners, WG and final heightmaps, sky-light sources | `region.rs` |
+| `setBlock` | `WorldGenRegion.setBlock` → `ProtoChunk.setBlockState` | `write.rs`, `facts.rs` |
 
-`ScatteredOreFeature`, trees, vegetation, nested selectors and structures are
-Java. Custom feature classes, custom rule tests and other modifiers make the
-whole placed feature Java.
+Any other configured feature inside a supported selector, patch or placement
+runs as a **Java leaf**: Rust hands Java the random's state through an upcall,
+Java places it and returns the state. Top-level programs use Java leaves only
+under `count_on_every_layer` or `environment_scan`, where the eager scans pay
+for the upcall. **Java steps** run small pieces that need block entities or
+registries (monster-room loot and spawner mob, desert-well suspicious sand,
+pale moss patches, a water lake's freezing pass) the same way.
+
+Still Java: End spikes (crystal entities), the End gateway and platform,
+fossils (their two template placements run natively), planted huge fungi, and
+features without an encoder. Structure starts and legacy (non-template)
+structure pieces such as mineshafts also stay Java; at about 3% of the
+overworld feature step, mineshafts are the largest of those. They run through the step
+loop's upcall in Java's order. `freeze_top_layer` reads block light from Java
+(a pure upcall); its biome temperature is a pure function of position, so
+Java's per-thread temperature cache never changes a result.
 
 ## Contracts to preserve
 
 - **Draw order.** Java's placement streams are lazy: each modifier's
   `getPositions` runs as its `flatMap` reaches it, so draws interleave depth
   first with the feature's own draws. `placement.rs` walks modifiers
-  recursively in that order. `count` draws its count before any element;
-  `in_square` draws X then Z.
-- **JVM trigonometry.** `OreFeature` calls `Math.sin/cos`. HotSpot's x86_64
-  stubs differ from the platform libm in the last bit for 66,193 of the
-  16,777,216 possible ore angles. [`core/java_trig.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/core/java_trig.rs)
-  transcribes the stubs; its test checks every ore angle against a HotSpot
-  25.0.1 hash. Rust builds `Mth.SIN` from that port. At startup Java compares
-  it with its own table; any difference disables native decoration.
-- **Region semantics.** Reads outside the 3×3 neighbourhood raise the same
-  `WorldGenRegion.getChunk` crash. Far writes are refused and logged by
-  Java's own `ensureCanWrite`. Ore writes use `LevelChunkSection.setBlockState(…, false)`
-  semantics: section and native counters only, no heightmap or block-entity work.
-- **Views.** When a native write grows a palette, Java reloads that section's
-  CPU view after the call.
+  recursively in that order. `count_on_every_layer` is eager and re-samples
+  its count at every loop check; Rust memoises each column's ground layers
+  because nothing writes while positions are collected.
+- **JVM arithmetic.** HotSpot's x86_64 `sin`/`cos` stubs are transcribed in
+  [`core/java_trig.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/core/java_trig.rs)
+  and checked over every ore and fancy-branch angle. Rust builds `Mth.SIN`
+  from that port; Java compares it at startup and any difference disables
+  native decoration. Float expressions keep Java's `float`/`double` widening.
+- **Hash-set order.** Trees record logs and leaves, and vegetation patches
+  their ground blocks, in `java.util.HashSet` order;
+  [`java_set.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/decoration/java_set.rs)
+  emulates it, including `HashMap`'s tree bins: a bucket of nine keys in a
+  table of 64 or more becomes a red-black tree whose new keys follow their
+  tree parent and whose root moves to the front. That order outlives a later
+  split, and a cave moss patch reaches it.
+- **Survival rules.** `canSurvive` checks compile in `NativeDecorationEncoder.survival`
+  to predicates over state sets: always, `mayPlaceOn` for vegetation whose
+  rule reads only the state below, seagrass, tall seagrass, sea pickles,
+  growing plants (kelp), corals and double plants. Shape-dependent sets
+  (sturdy faces, support shapes) are built without a world; a dynamic-shape
+  state found at run time asks Java's exact test instead. Any other block
+  asks Java at the position.
+- **Gaussian cache.** `WorldgenRandom.setSeed` never resets its
+  `MarsagliaPolarGaussian`, so a cached gaussian carries from one placed feature
+  to the next. Rust keeps it with the random and hands it across every upcall
+  and between programs. `Math.log` in the draw comes from Java (a pure upcall):
+  HotSpot's intrinsic need not match libm bit for bit. So do `Math.pow` with
+  non-integer exponents and `sin`/`cos` off the transcribed stub's main path;
+  HotSpot computes `Math.pow(x, 2.0)` as `x * x` (checked on the bundled JDK).
+- **Region semantics.** Rust binds the 3×3 chunks it may write. Reads beyond
+  them (sculk cursors wander that far) go to `WorldGenRegion` through pure
+  upcalls (block state, height, noise biome), so they see and fail exactly as
+  Java's reads do. Far writes are refused by Java's own `ensureCanWrite`. Ore
+  writes use `LevelChunkSection.setBlockState(…, false)`.
+- **`setBlock`.** `write.rs` follows `WorldGenRegion.setBlock` exactly: far
+  writes refused, void air outside the world, section and counter writes,
+  light notifications for lit chunks with `ChunkSkyLightSources.update` in
+  place, final heightmaps primed and updated. POI, block-entity stubs,
+  post-processing marks, light-engine calls and ticks are recorded in call
+  order and replayed by Java after the call or before any upcall.
+- **Upcalls.** A sync upcall first gives Java everything Rust holds (views,
+  heightmaps, sky sources, primed maps, events), runs the Java step, then
+  refreshes the binding Rust reads. Operations: `updateShapeAtEdge`, beehive
+  checks and bees, Java leaves, Java predicates, a step's structures and a
+  Java-route feature. Pure upcalls (no sync): `Math` functions, block light,
+  and reads beyond the bound 3×3.
 - **No partial fallback.** A program declines (`JAVA_ROUTE`) only before its
-  first draw. Program creation requires counter policies for every state a
-  target can replace or write, so section writes cannot decline mid-placement.
-  A binding failure after writes throws; it never reruns the feature in Java.
+  first draw; inside the loop that feature is placed by Java instead. Program
+  creation requires counter policies for every state it can write. A binding
+  failure after writes throws the same "Feature placement" crash Java raises.
+  If the binding no longer holds after a Java feature, the loop stops and
+  Java's loop continues from the next feature.
 
-## Gates
+## Gates and switches
 
-A decoration call binds a region only when the level is a plain
-`WorldGenRegion`, the center is a non-upgrading plain `ProtoChunk`, all nine
-chunks are plain `ProtoChunk`s with the region's height, every section has
-canonical native block, counter and biome owners sharing one biome binding,
-and the native block registry is ready. Before each placement, Java re-checks
-those owners and copies the current `OCEAN_FLOOR_WG` heightmaps; Java features
-run in between and may change them.
+A region binds only when the level is a plain `WorldGenRegion`, all nine
+chunks are plain `ProtoChunk`s with the region's height and canonical native
+owners, and the native block registry is ready. The native loop also needs
+the write path (every chunk at CARVERS or later with the final heightmap set,
+and each lit chunk's light engine and sky sources) and a plan for the region
+context. Programs and the plan are cached per generator, keyed by the tag
+generation, biome binding and `minGenY`/`genDepth`.
 
-A chunk restored from disk at CARVERS reloads only its final heightmaps, so its
-WG heightmaps are unprimed. `ChunkAccess.getHeight` primes one at its first
-read and later writes never update it. Rust does the same: it primes the map
-from current blocks at the first native read (`region.rs`, using the shared
-heightmap masks) and Java installs it after the call. This needs a registry
-without custom `BlockState` subclasses; otherwise an unprimed map keeps that
-placement in Java.
+Unprimed WG heightmaps (chunks restored from disk at CARVERS) are primed by
+Rust at the first read, exactly as `ChunkAccess.getHeight` primes them,
+unless a custom `BlockState` subclass is registered.
 
-Programs are cached per generator and placed feature, keyed by the tag
-generation, biome binding and generation context (`minGenY`, `genDepth`).
-A height range that is empty in the context stays in Java, which warns.
-`-Dmattmc.worldgen.javaDecoration=true` or `DEBUG_FEATURE_COUNT` keeps every
-feature in Java. `NativeDecoration.statistics()` reports bound regions,
-native/Java placements and why bound placements fell back.
+| Property | Effect |
+| --- | --- |
+| `mattmc.worldgen.javaDecoration` | every feature on Java's path (the pre-change code) |
+| `mattmc.worldgen.javaSequence` | Java's step loop, one native call per placed feature |
+| `mattmc.worldgen.decorationJavaKinds=10,11` | keep these outermost program kinds in Java (bisecting) |
+| `mattmc.worldgen.verifyDecoration` | shadow-verify every native placement (Java's loop) |
+| `mattmc.worldgen.decorationProfile` | per-feature and per-structure time by route (Java's loop) |
+| `mattmc.worldgen.decorationDebug` | log encoder declines, rejected programs and loop declines |
+| `mattmc.worldgen.decorationTest` | verification: `fail:N` fails the Nth native write, `javafail:N` the Nth Java `setBlock` |
+
+`NativeDecoration.statistics()` (the audit's `native_decoration`) reports
+bound regions, native/Java placements, sequenced and declined loops, native
+placements by kind and replayed events by kind.
 
 ## Verify
 
 ```sh
 CARGO_TARGET_DIR=build/rust/target cargo test --locked --manifest-path src/main/rust/Cargo.toml \
-  --profile suite --lib -- world::level::levelgen::decoration core::java_trig
+  --profile suite --lib -j 8 -- world::level::levelgen::decoration core::java_trig
 python3 DevUtils/tests/worldgen/VerifyFullGeneration.py --output build/full-generation/<label> \
-  --sides current --compare-to build/full-generation/<pre-change>/current-0
+  --rounds 2 --sides current --compare-to build/full-generation/<pre-change>/reference0-0
+python3 DevUtils/tests/worldgen/VerifyFullGeneration.py --output build/full-generation/<label> --timing \
+  --radius 4 --rounds 2 --sides current --dimensions minecraft:overworld,minecraft:primordial_caves,minecraft:the_nether \
+  --jvm-arg=-Dmattmc.worldgen.verifyDecoration=true
 ```
 
 The [FULL-chunk driver](../RUST-FULL-GENERATION.md) is the acceptance check.
-Compare against pre-change Current in every dimension, and against Frozen
+Compare against pre-change Current in every dimension and against Frozen
 where Frozen is reproducible. Check `native_decoration` in `regions.json` to
-confirm the native route ran. See [recorded results](RUST-DECORATION-RESULTS.md).
+confirm the native route ran.
 
-For workloads that are not repeatable even on Java's route (parallel
-generation, chunks restored from disk), run with
-`--jvm-arg=-Dmattmc.worldgen.verifyDecoration=true`. Every native placement
-is then undone, replayed on Java's route with the same seeded random, and
-compared state by state; `verified`/`mismatched` appear in the statistics and
-mismatches are logged. The mode is slow and leaves palette order unlike a
-normal run, so never use its worlds as parity output.
+Shadow verification undoes each native placement, replays it on Java's route
+with the same seeded random and compares blocks, heightmaps, sky sources,
+ticks and post-processing. It needs Java's loop, so it never exercises
+`sequence.rs`; FULL parity does. Its worlds keep extra post-processing marks
+and block-entity stubs from the undone placement: never use them as parity
+output. Profile with `decorationProfile` to choose the next feature by cost.
+See [recorded results](RUST-DECORATION-RESULTS.md).
 
 ## Adding a feature family
 
 1. Read the Java feature and every helper it calls; list each draw, read and write.
-2. Add the configured feature to `program.rs` and its encoder in
-   `NativeDecoration.encode`, declining exact classes it cannot reproduce.
-3. Implement it beside `ore.rs`. Writes through `WorldGenRegion.setBlock`
-   need heightmap, block-entity, post-processing and POI behaviour, which
-   `region.rs` does not provide yet.
-4. Run the FULL-chunk driver against pre-change Current and Frozen, then time it.
+2. Add it to `vegetation.rs` (or its own file) with a decoder that reads
+   states it writes through `Reader::write_state` and sets through `Reader::set`,
+   and its encoder in `NativeDecorationEncoder` matching the exact feature
+   instance and configuration class. Compile `canSurvive` with `survival`.
+3. Read through `level_block_state` (void air outside the world) and write
+   through `set_block`; predicates through `Placement::test`.
+4. Run FULL parity, shadow verification and a profile, then time it.

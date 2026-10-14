@@ -169,6 +169,7 @@ public final class FullGenAudit {
 		long cpu = ((com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getProcessCpuTime();
 		long gc = gcMillis();
 		long start = System.nanoTime();
+		if (ORDERED_FEATURES) decorateInOrder(server, level, positions);
 		if (!SERIAL) {
 			server.submit(() -> positions.forEach(p -> level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_LOADING, p, 0))).get();
 		}
@@ -179,10 +180,10 @@ public final class FullGenAudit {
 			}
 			futures.add(level.getChunkSource().getChunkFuture(pos.x, pos.z, ChunkStatus.FULL, true));
 			if (SERIAL) {
-				futures.getLast().get(15, TimeUnit.MINUTES);
+				futures.getLast().get(Integer.getInteger("audit.chunkTimeoutSeconds", 180), TimeUnit.SECONDS);
 			}
 		}
-		CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).get(30, TimeUnit.MINUTES);
+		CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).get(Integer.getInteger("audit.regionTimeoutSeconds", 900), TimeUnit.SECONDS);
 		long elapsed = System.nanoTime() - start;
 		long cpuEnd = ((com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getProcessCpuTime();
 		Map<String, Object> row = new LinkedHashMap<>();
@@ -244,6 +245,39 @@ public final class FullGenAudit {
 	}
 
 	static final int CARVERS_RADIUS = 33 - net.minecraft.server.level.ChunkLevel.byStatus(ChunkStatus.CARVERS);
+	static final int FEATURES_RADIUS = 33 - net.minecraft.server.level.ChunkLevel.byStatus(ChunkStatus.FEATURES);
+	/** Serial runs decorate the region and a one-chunk margin in a fixed order first (default on). */
+	static final boolean ORDERED_FEATURES = SERIAL && !"false".equals(System.getProperty("audit.orderedFeatures"));
+	static final Map<ServerLevel, List<ChunkPos>> DECORATED = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/**
+	 * Decorates every chunk of the region and a one-chunk margin, one at a time
+	 * in row order, before any FULL request. Every write a region chunk receives
+	 * comes from one of these decorations, so their order no longer depends on
+	 * how the scheduler interleaves neighbours.
+	 */
+	static void decorateInOrder(MinecraftServer server, ServerLevel level, List<ChunkPos> positions) throws Exception {
+		int minX = positions.stream().mapToInt(p -> p.x).min().orElseThrow() - 1, maxX = positions.stream().mapToInt(p -> p.x).max().orElseThrow() + 1;
+		int minZ = positions.stream().mapToInt(p -> p.z).min().orElseThrow() - 1, maxZ = positions.stream().mapToInt(p -> p.z).max().orElseThrow() + 1;
+		List<ChunkPos> margin = new ArrayList<>();
+		for (int z = minZ; z <= maxZ; z++) {
+			for (int x = minX; x <= maxX; x++) margin.add(new ChunkPos(x, z));
+		}
+		int injectAt = Integer.getInteger("audit.injectAtChunk", -1);
+		for (int index = 0; index < margin.size(); index++) {
+			ChunkPos pos = margin.get(index);
+			if (index == injectAt) {
+				// Failure verification: this chunk's decoration fails a few writes in, on either route.
+				Class.forName("net.minecraft.world.level.levelgen.NativeDecoration").getMethod("armTestFailure", String.class)
+					.invoke(null, System.getProperty("audit.injectFailure"));
+				System.out.println("FULLGEN_INJECTED_AT " + pos);
+			}
+			server.submit(() -> level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_LOADING, pos, FEATURES_RADIUS)).get();
+			level.getChunkSource().getChunkFuture(pos.x, pos.z, ChunkStatus.FEATURES, true)
+				.get(Integer.getInteger("audit.chunkTimeoutSeconds", 180), TimeUnit.SECONDS);
+		}
+		DECORATED.put(level, margin);
+	}
 
 	/**
 	 * Carves the region and a two-chunk margin, saves and unloads it, then loads
@@ -295,8 +329,46 @@ public final class FullGenAudit {
 		return result;
 	}
 
+	/**
+	 * Startup spawn preparation can leave dependency generation in flight; serial
+	 * requests interleaved with it decorate in a timing-dependent order. Wait
+	 * until the level's holder count has been stable for three seconds.
+	 */
+	static void settle(MinecraftServer server, ServerLevel level) throws Exception {
+		int stable = 0, last = -1;
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+		while (stable < 6 && System.nanoTime() < deadline) {
+			int size = server.submit(() -> level.getChunkSource().chunkMap.size()).get();
+			stable = size == last ? stable + 1 : 0;
+			last = size;
+			Thread.sleep(500);
+		}
+		System.out.println("FULLGEN_SETTLED " + level.dimension().location() + " holders " + last);
+	}
+
+	/**
+	 * Failure verification: the persisted status of every chunk of the first
+	 * measured region and a two-chunk margin, read from storage without loading.
+	 */
+	static void inspect(MinecraftServer server, List<ServerLevel> levels, int radius) throws Exception {
+		Map<String, Map<String, String>> statuses = new TreeMap<>();
+		for (ServerLevel level : levels) {
+			Map<String, String> chunks = new TreeMap<>();
+			for (ChunkPos pos : positions(64, -48, radius + 2)) {
+				var tag = level.getChunkSource().chunkMap.read(pos).get(60, TimeUnit.SECONDS);
+				chunks.put(pos.x + "," + pos.z, tag.map(t -> t.getStringOr("Status", "?")).orElse("absent"));
+			}
+			statuses.put(level.dimension().location().toString(), chunks);
+		}
+		Files.writeString(OUTPUT.resolve("statuses.json"), GSON.toJson(statuses));
+		Files.writeString(OUTPUT.resolve("complete.json"), GSON.toJson(Map.of("success", true, "inspected", true)));
+		System.out.println("FULLGEN_COMPLETE");
+	}
+
 	static void release(MinecraftServer server, ServerLevel level, List<ChunkPos> positions) throws Exception {
 		server.submit(() -> positions.forEach(p -> level.getChunkSource().removeTicketWithRadius(TicketType.PLAYER_LOADING, p, 0))).get();
+		List<ChunkPos> decorated = DECORATED.remove(level);
+		if (decorated != null) server.submit(() -> decorated.forEach(p -> level.getChunkSource().removeTicketWithRadius(TicketType.PLAYER_LOADING, p, FEATURES_RADIUS))).get();
 		List<ChunkPos> restored = RESUMED.remove(level);
 		if (restored != null) server.submit(() -> restored.forEach(p -> level.getChunkSource().removeTicketWithRadius(TicketType.PLAYER_LOADING, p, CARVERS_RADIUS))).get();
 		server.submit(() -> level.save(null, true, false)).get();
@@ -322,9 +394,21 @@ public final class FullGenAudit {
 			if (levels.isEmpty()) {
 				throw new IllegalArgumentException("No matching dimensions");
 			}
+			if (Boolean.getBoolean("audit.inspect")) {
+				inspect(server, levels, radius);
+				server.halt(false);
+				return;
+			}
+			String inject = System.getProperty("audit.injectFailure", "");
 			List<Map<String, Object>> rows = new ArrayList<>();
 			try (BufferedWriter dump = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(OUTPUT.resolve("chunks.txt.gz"))), StandardCharsets.UTF_8))) {
 				for (ServerLevel level : levels) {
+					settle(server, level);
+					if (!inject.isBlank() && Integer.getInteger("audit.injectAtChunk", -1) < 0) {
+						// Armed after startup's spawn chunks, so the failure lands in a measured region.
+						Class.forName("net.minecraft.world.level.levelgen.NativeDecoration").getMethod("armTestFailure", String.class).invoke(null, inject);
+						System.out.println("FULLGEN_INJECTED " + inject);
+					}
 					for (int w = 0; w < warmups; w++) {
 						List<ChunkPos> positions = positions(2048 + w * 128, 2048, warmRadius);
 						Map<String, Object> row = region(server, level, "warmup-" + w, positions, dump);
@@ -332,9 +416,60 @@ public final class FullGenAudit {
 						release(server, level, positions);
 					}
 					for (int i = 0; i < rounds; i++) {
-						// Round 0 includes the origin region, where spawn-adjacent structures cluster.
-						List<ChunkPos> positions = positions(i == 0 ? 0 : 64 * i, i == 0 ? 0 : -48 * i, radius);
+						// Away from spawn: startup prepares and unloads spawn chunks in parallel,
+						// so a region overlapping them is not repeatable on either side.
+						List<ChunkPos> positions = positions(64 * (i + 1), -48 * (i + 1), radius);
 						rows.add(region(server, level, "measure-" + i, positions, dump));
+						Files.writeString(OUTPUT.resolve("regions.json"), GSON.toJson(rows));
+						release(server, level, positions);
+					}
+					// Regions around the nearest listed biomes (from 4096, 4096, away from spawn),
+					// for features those biomes alone place.
+					// Regions must stay apart: a region that reaches chunks an earlier one
+					// generated resumes them from disk, which is not repeatable.
+					List<ChunkPos> used = new ArrayList<>();
+					// Regions around the nearest start of each listed structure (from 4096, 4096).
+					for (String structure : System.getProperty("audit.structures", "").split(",")) {
+						if (structure.isBlank()) continue;
+						var registry = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+						var holder = registry.get(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.STRUCTURE,
+							net.minecraft.resources.ResourceLocation.parse(structure)));
+						ChunkPos center = null;
+						for (int t = 0; t < 8 && center == null && holder.isPresent(); t++) {
+							var origin = new net.minecraft.core.BlockPos(4096 + 3072 * t, 64, 4096 - 2048 * t);
+							var found = server.submit(() -> level.getChunkSource().getGenerator()
+								.findNearestMapStructure(level, net.minecraft.core.HolderSet.direct(holder.get()), origin, 100, false)).get();
+							if (found == null) continue;
+							var candidate = new ChunkPos(found.getFirst());
+							if (used.stream().noneMatch(u -> Math.max(Math.abs(u.x - candidate.x), Math.abs(u.z - candidate.z)) <= 2 * radius + 24)) center = candidate;
+						}
+						if (center == null) {
+							System.out.println("FULLGEN_STRUCTURE_MISSING " + level.dimension().location() + " " + structure);
+							continue;
+						}
+						used.add(center);
+						List<ChunkPos> positions = positions(center.x, center.z, radius);
+						rows.add(region(server, level, "structure-" + structure.replace(':', '_'), positions, dump));
+						Files.writeString(OUTPUT.resolve("regions.json"), GSON.toJson(rows));
+						release(server, level, positions);
+					}
+					for (String biome : System.getProperty("audit.biomes", "").split(",")) {
+						if (biome.isBlank()) continue;
+						ChunkPos center = null;
+						for (int t = 0; t < 12 && center == null; t++) {
+							var found = level.findClosestBiome3d(holder -> holder.is(net.minecraft.resources.ResourceLocation.parse(biome)),
+								new net.minecraft.core.BlockPos(4096 + 3072 * t, 64, 4096 - 2048 * t), 6400, 32, 64);
+							if (found == null) continue;
+							var candidate = new ChunkPos(found.getFirst());
+							if (used.stream().noneMatch(u -> Math.max(Math.abs(u.x - candidate.x), Math.abs(u.z - candidate.z)) <= 2 * radius + 24)) center = candidate;
+						}
+						if (center == null) {
+							System.out.println("FULLGEN_BIOME_MISSING " + level.dimension().location() + " " + biome);
+							continue;
+						}
+						used.add(center);
+						List<ChunkPos> positions = positions(center.x, center.z, radius);
+						rows.add(region(server, level, "biome-" + biome.replace(':', '_'), positions, dump));
 						Files.writeString(OUTPUT.resolve("regions.json"), GSON.toJson(rows));
 						release(server, level, positions);
 					}
@@ -348,6 +483,34 @@ public final class FullGenAudit {
 			try {
 				Files.writeString(OUTPUT.resolve("failed.txt"), t.toString());
 			} catch (Exception ignored) {
+			}
+			if (!System.getProperty("audit.injectFailure", "").isBlank()) {
+				// A failed generation task keeps the chunk map busy, so stopServer never
+				// saves. Save what every loaded chunk holds now, as a save would publish it.
+				try {
+					// In-memory statuses at the failure, then a flushed save of the same chunks.
+					Map<String, String> memory = new TreeMap<>();
+					ServerLevel overworld = server.overworld();
+					server.submit(() -> {
+						for (ChunkPos pos : positions(64, -48, Integer.getInteger("audit.radius", 4) + 2)) {
+							var holder = overworld.getChunkSource().chunkMap.getVisibleChunkIfPresent(pos.toLong());
+							var chunk = holder == null ? null : holder.getLatestChunk();
+							memory.put(pos.x + "," + pos.z, chunk == null ? "unloaded" : chunk.getPersistedStatus().toString());
+						}
+					}).get(60, TimeUnit.SECONDS);
+					Files.writeString(OUTPUT.resolve("statuses-memory.json"), GSON.toJson(memory));
+					for (ServerLevel level : server.getAllLevels()) {
+						server.submit(() -> level.save(null, false, false)).get(120, TimeUnit.SECONDS);
+						level.getChunkSource().chunkMap.flushWorker();
+					}
+					Files.writeString(OUTPUT.resolve("saved.txt"), "saved after failure");
+				} catch (Exception e) {
+					try {
+						Files.writeString(OUTPUT.resolve("save-failed.txt"), e.toString());
+					} catch (Exception ignored) {
+					}
+				}
+				Runtime.getRuntime().halt(3);
 			}
 		}
 		server.halt(false);

@@ -25,6 +25,16 @@ public class XoroshiroRandomSource implements RandomSource {
 		this.randomNumberGenerator = new Xoroshiro128PlusPlus(l, m);
 	}
 
+	/** Native decoration: the generator whose state crosses to Rust. */
+	/** Native decoration verification: the gaussian cache, saved and restored with the generator. */
+	public MarsagliaPolarGaussian nativeGaussian() {
+		return this.gaussianSource;
+	}
+
+	public Xoroshiro128PlusPlus nativeGenerator() {
+		return this.randomNumberGenerator;
+	}
+
 	private XoroshiroRandomSource(Xoroshiro128PlusPlus xoroshiro128PlusPlus) {
 		this.randomNumberGenerator = xoroshiro128PlusPlus;
 	}

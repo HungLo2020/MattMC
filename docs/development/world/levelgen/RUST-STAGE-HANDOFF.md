@@ -43,12 +43,15 @@ and import/export entries beside each stage. See
   result transfers one owned pointer; consume it once. No native registry/cache,
   GPU handle, frame ownership or renderer ABI changes are involved.
 
-Java still orchestrates chunks, biome inputs, marks and heightmap publication.
-The generation-stage dense representation and live packed representation remain
-separate Rust formats. Input copying and output packing/allocation remain; this
-is native-only capture/adoption, not zero-copy transfer. Output counters are published
-through the Java bridge separately after live-owner adoption; whole-chunk
-failure atomicity is not established. General save/network enumeration still uses temporary
+Java still orchestrates chunks and biome inputs. Publication is two-phase
+(`NativeGenerationSections.Prepared`): NOISE and SURFACE/CARVERS first read
+every modified section (adopting native owners or exporting palettes), both
+WG heightmaps and the post-processing marks out of Rust, then commit them to
+the chunk in plain Java. A failure while preparing leaves the chunk as it was
+(`NativeStageHandoffTest.aFailureWhilePreparingResultsPublishesNothing`,
+`-Dmattmc.worldgen.stagePublishFailAfter=N`). The generation-stage dense
+representation and live packed representation remain separate Rust formats;
+input copying and output packing/allocation remain. General save/network enumeration still uses temporary
 Java compatibility projections; further producer/consumer migration remains work.
 
 ## Current retained-input follow-up

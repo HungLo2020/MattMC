@@ -1,6 +1,26 @@
 //! Authoritative live block palettes and packed storage. Java may retain atomic
 //! read views of a generation; only this owner changes words or palette policy.
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// Palette-ID lookup for state IDs: one multiply instead of SipHash on every
+/// write. Lookup only; no palette order depends on map iteration.
+#[derive(Default)]
+struct StateHash(u64);
+impl Hasher for StateHash {
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.0 = (self.0.rotate_left(8) ^ byte as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        }
+    }
+    fn write_u32(&mut self, value: u32) {
+        self.0 = (value as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+type StateIds = HashMap<u32, u32, BuildHasherDefault<StateHash>>;
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc, Mutex, Weak,
@@ -118,7 +138,7 @@ impl Generation {
 }
 struct State {
     generation: Arc<Generation>,
-    ids: HashMap<u32, u32>,
+    ids: StateIds,
     /// Generations replaced since Java last loaded a view. Java's previous
     /// view may still be read, so `view` hands these to Java to pin with it.
     retired: Vec<Arc<Generation>>,
@@ -322,7 +342,7 @@ impl Owner {
         {
             return None;
         }
-        let mut ids = HashMap::new();
+        let mut ids = StateIds::default();
         let mut entries = Vec::new();
         for (i, &value) in palette.iter().enumerate() {
             if value < 0 || value as u32 >= limit || ids.insert(value as u32, i as u32).is_some() {
@@ -471,7 +491,7 @@ impl Owner {
         let global = requested > 8;
         let new_bits = if global { self.global_bits } else { requested };
         let mut entries = Vec::new();
-        let mut ids = HashMap::new();
+        let mut ids = StateIds::default();
         let mut packed = vec![0u64; ENTRIES.div_ceil(64 / new_bits)];
         let per = 64 / new_bits;
         for i in 0..ENTRIES {

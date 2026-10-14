@@ -159,6 +159,11 @@ public class WorldGenRegion implements WorldGenLevel {
 		return this.center;
 	}
 
+	/** Native decoration replays {@link #setBlock}'s POI notification after its call. */
+	public void nativeUpdatePoi(BlockPos blockPos, BlockState old, BlockState state) {
+		this.level.updatePOIOnBlockStateChange(blockPos, old, state);
+	}
+
 	@Override
 	public boolean hasChunk(int i, int j) {
 		int k = this.center.getPos().getChessboardDistance(i, j);
@@ -290,6 +295,7 @@ public class WorldGenRegion implements WorldGenLevel {
 
 	@Override
 	public boolean setBlock(BlockPos blockPos, BlockState blockState, int i, int j) {
+		if (net.minecraft.world.level.levelgen.NativeDecoration.JAVA_FAIL_TEST) net.minecraft.world.level.levelgen.NativeDecoration.javaWriteHook();
 		if (!this.ensureCanWrite(blockPos)) {
 			return false;
 		} else {

@@ -12,6 +12,11 @@ public class WorldgenRandom extends LegacyRandomSource {
 		this.randomSource = randomSource;
 	}
 
+	/** Native decoration: the wrapped source. */
+	public RandomSource nativeSource() {
+		return this.randomSource;
+	}
+
 	public int getCount() {
 		return this.count;
 	}

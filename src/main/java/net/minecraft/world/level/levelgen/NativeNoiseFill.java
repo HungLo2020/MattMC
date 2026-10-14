@@ -529,10 +529,17 @@ final class NativeNoiseFill {
         // untouched sections never call getSection during result installation.
         boolean nativeChunk = this.chunkAccess.getClass() == net.minecraft.world.level.chunk.ProtoChunk.class
             || this.chunkAccess.getClass() == net.minecraft.world.level.chunk.LevelChunk.class;
+        // Prepare every result before the chunk changes: a failure leaves it untouched.
+        List<NativeGenerationSections.Prepared> prepared = new ArrayList<>();
         for (int index = 0; index < this.chunkAccess.getSectionsCount(); index++) {
             LevelChunkSection section = nativeChunk ? this.chunkAccess.getSection(index) : null;
-            int nativeResult = section == null ? 2 : NativeGenerationSections.installNoise(section, handle, index);
-            if (nativeResult == 0 || nativeResult == 1) continue;
+            var result = section == null ? NativeGenerationSections.COMPATIBILITY : NativeGenerationSections.prepareNoise(section, handle, index);
+            if (result == null) continue;
+            if (result != NativeGenerationSections.COMPATIBILITY) {
+                NativeGenerationSections.preparedHook();
+                prepared.add(result);
+                continue;
+            }
             if (info == null) { info = new int[7]; palette = new int[256]; raw = new long[4096]; }
             int written = (int)SECTION.invokeExact(handle, index, MemorySegment.ofArray(info), MemorySegment.ofArray(palette), palette.length,
                 MemorySegment.ofArray(raw), raw.length);
@@ -541,21 +548,25 @@ final class NativeNoiseFill {
             List<BlockState> states = new ArrayList<>(info[2]);
             for (int entry = 0; entry < info[2]; entry++) states.add(Block.stateById(palette[entry]));
             if (section == null) section = this.chunkAccess.getSection(index);
-            section.installGenerated(info[0], states, java.util.Arrays.copyOf(raw, info[3]), info[4], info[5], info[6]);
+            NativeGenerationSections.preparedHook();
+            prepared.add(NativeGenerationSections.Prepared.exported(section, info[0], states, java.util.Arrays.copyOf(raw, info[3]), info[4], info[5], info[6]));
         }
-        Heightmap oceanFloor = this.chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
-        Heightmap worldSurface = this.chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
-        long[] ocean = new long[oceanFloor.getRawData().length], surface = new long[ocean.length];
+        int words = NativeProtoChunk.heightmapWords(this.chunkAccess);
+        long[] ocean = new long[words], surface = new long[words];
         int length = (int)HEIGHTMAPS.invokeExact(handle, MemorySegment.ofArray(ocean), MemorySegment.ofArray(surface), ocean.length);
         if (length != ocean.length) throw new IllegalStateException("Native noise fill heightmap size " + length);
-        oceanFloor.setRawData(this.chunkAccess, Heightmap.Types.OCEAN_FLOOR_WG, ocean);
-        worldSurface.setRawData(this.chunkAccess, Heightmap.Types.WORLD_SURFACE_WG, surface);
         int[] positions = new int[3 * 64];
         int count = (int)POST_PROCESS.invokeExact(handle, MemorySegment.ofArray(positions), 64);
         if (count < 0) {
             positions = new int[3 * -count];
             count = (int)POST_PROCESS.invokeExact(handle, MemorySegment.ofArray(positions), -count);
         }
+        for (var result : prepared) result.commit();
+        Heightmap oceanFloor = this.chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
+        Heightmap worldSurface = this.chunkAccess.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
+        if (oceanFloor.getRawData().length != words) throw new IllegalStateException("Native noise fill heightmap size " + oceanFloor.getRawData().length);
+        oceanFloor.setRawData(this.chunkAccess, Heightmap.Types.OCEAN_FLOOR_WG, ocean);
+        worldSurface.setRawData(this.chunkAccess, Heightmap.Types.WORLD_SURFACE_WG, surface);
         BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
         for (int index = 0; index < count; index++) {
             position.set(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]);

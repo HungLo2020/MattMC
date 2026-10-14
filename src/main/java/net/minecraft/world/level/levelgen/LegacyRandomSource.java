@@ -58,6 +58,11 @@ public class LegacyRandomSource implements BitRandomSource {
 		this.seed.set(l & 281474976710655L);
 	}
 
+	/** Native decoration: this source's gaussian cache (a {@code WorldgenRandom} keeps its own). */
+	public MarsagliaPolarGaussian nativeGaussian() {
+		return this.gaussianSource;
+	}
+
 	@Override
 	public double nextGaussian() {
 		return this.gaussianSource.nextGaussian();

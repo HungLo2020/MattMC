@@ -16,11 +16,26 @@ pub(crate) fn mix_stafford13(mut seed: i64) -> i64 {
 
 pub(crate) struct WorldgenRandom {
     source: Xoroshiro,
+    /// `MarsagliaPolarGaussian`'s cached second value. `WorldgenRandom.setSeed`
+    /// never resets it, so it carries from one placed feature to the next.
+    pub(crate) gaussian: Option<f64>,
+}
+
+/// A gaussian cache as two words for Java: `[have, value bits]`.
+pub(crate) fn gaussian_words(gaussian: Option<f64>) -> [i64; 2] {
+    match gaussian {
+        Some(value) => [1, value.to_bits() as i64],
+        None => [0, 0],
+    }
+}
+
+pub(crate) fn gaussian_from(have: i64, bits: i64) -> Option<f64> {
+    (have != 0).then(|| f64::from_bits(bits as u64))
 }
 
 impl WorldgenRandom {
     pub(crate) fn new(seed: i64) -> Self {
-        let mut random = Self { source: Xoroshiro::new(0, 0) };
+        let mut random = Self { source: Xoroshiro::new(0, 0), gaussian: None };
         random.set_seed(seed);
         random
     }
@@ -45,6 +60,15 @@ impl WorldgenRandom {
     /// `WorldgenRandom.setFeatureSeed`.
     pub(crate) fn set_feature_seed(&mut self, decoration: i64, index: i32, step: i32) {
         self.set_seed(decoration.wrapping_add(index as i64).wrapping_add(10_000i64.wrapping_mul(step as i64)));
+    }
+
+    /// The Xoroshiro state, handed to Java for a feature that still runs there.
+    pub(crate) fn state(&self) -> (i64, i64) {
+        self.source.state()
+    }
+
+    pub(crate) fn set_state(&mut self, lo: i64, hi: i64) {
+        self.source = Xoroshiro::new(lo, hi);
     }
 
     /// `WorldgenRandom.next`: the high bits of one Xoroshiro long.
@@ -76,6 +100,11 @@ impl WorldgenRandom {
         let high = self.next(32) as i64;
         let low = self.next(32) as i64;
         (high << 32).wrapping_add(low)
+    }
+
+    /// `BitRandomSource.nextBoolean`.
+    pub(crate) fn next_boolean(&mut self) -> bool {
+        self.next(1) != 0
     }
 
     pub(crate) fn next_float(&mut self) -> f32 {

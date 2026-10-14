@@ -198,16 +198,26 @@ final class NativeProtoChunk implements AutoCloseable {
         }
     }
 
-    /** Installs every modified section, both heightmaps and the post-processing marks. */
+    /**
+     * Publishes every modified section, both heightmaps and the post-processing
+     * marks. Everything is read out of Rust first; only then does the chunk
+     * change, so a failure while preparing leaves it as it was.
+     */
     void install() {
         try {
             int[] info = null;
             int[] palette = null;
             long[] raw = null;
             LevelChunkSection[] sections = this.chunk.getSectionsForRead();
+            List<NativeGenerationSections.Prepared> prepared = new ArrayList<>();
             for (int index = 0; index < sections.length; index++) {
-                int nativeResult = NativeGenerationSections.installProto(sections[index], this.handle, index);
-                if (nativeResult == 0 || nativeResult == 1) continue;
+                var result = NativeGenerationSections.prepareProto(sections[index], this.handle, index);
+                if (result == null) continue;
+                if (result != NativeGenerationSections.COMPATIBILITY) {
+                    NativeGenerationSections.preparedHook();
+                    prepared.add(result);
+                    continue;
+                }
                 if (info == null) { info = new int[6]; palette = new int[4096]; raw = new long[4096]; }
                 int written = (int)SECTION.invokeExact(this.handle, index, MemorySegment.ofArray(info), MemorySegment.ofArray(palette), palette.length,
                     MemorySegment.ofArray(raw), raw.length);
@@ -215,15 +225,19 @@ final class NativeProtoChunk implements AutoCloseable {
                 if (written != 1) throw new IllegalStateException("Native chunk section overflow");
                 List<BlockState> states = new ArrayList<>(info[1]);
                 for (int entry = 0; entry < info[1]; entry++) states.add(Block.stateById(palette[entry]));
-                sections[index].installGenerated(info[0], states, Arrays.copyOf(raw, info[2]), info[3], info[4], info[5]);
+                NativeGenerationSections.preparedHook();
+                prepared.add(NativeGenerationSections.Prepared.exported(sections[index], info[0], states, Arrays.copyOf(raw, info[2]), info[3], info[4], info[5]));
             }
-            this.syncHeightmaps();
+            long[][] heightmaps = this.readHeightmaps();
             int[] positions = new int[3 * 256];
             int count = (int)POST_PROCESS.invokeExact(this.handle, MemorySegment.ofArray(positions), 256);
             if (count < 0) {
                 positions = new int[3 * -count];
                 count = (int)POST_PROCESS.invokeExact(this.handle, MemorySegment.ofArray(positions), -count);
             }
+            // Commit: plain Java publication only.
+            for (var result : prepared) result.commit();
+            this.writeHeightmaps(heightmaps);
             BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
             for (int index = 0; index < count; index++) {
                 this.chunk.markPosForPostprocessing(position.set(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]));
@@ -233,6 +247,27 @@ final class NativeProtoChunk implements AutoCloseable {
         } catch (Throwable error) {
             throw new IllegalStateException("Native chunk install failed", error);
         }
+    }
+
+    /** The world-generation heightmaps' Rust values (surface, floor), without touching the chunk. */
+    private long[][] readHeightmaps() throws Throwable {
+        int words = heightmapWords(this.chunk);
+        long[] a = new long[words], b = new long[words];
+        int length = (int)HEIGHTMAPS.invokeExact(this.handle, MemorySegment.ofArray(a), MemorySegment.ofArray(b), a.length);
+        if (length != a.length) throw new IllegalStateException("Native chunk heightmap size " + length);
+        return new long[][] {a, b};
+    }
+
+    private void writeHeightmaps(long[][] heightmaps) {
+        this.chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG).setRawData(this.chunk, Heightmap.Types.WORLD_SURFACE_WG, heightmaps[0]);
+        this.chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG).setRawData(this.chunk, Heightmap.Types.OCEAN_FLOOR_WG, heightmaps[1]);
+    }
+
+    /** A {@code Heightmap}'s raw word count for the chunk's height. */
+    static int heightmapWords(net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        int bits = net.minecraft.util.Mth.ceillog2(chunk.getHeight() + 1);
+        int perWord = 64 / bits;
+        return (256 + perWord - 1) / perWord;
     }
 
     @Override

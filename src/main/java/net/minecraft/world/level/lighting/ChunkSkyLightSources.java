@@ -30,6 +30,15 @@ public class ChunkSkyLightSources {
 		this.heightmap = new SimpleBitStorage(j, 256);
 	}
 
+	/** Native decoration: the live packed storage, edited in place across one call. */
+	public long[] nativeRaw() {
+		return this.heightmap.getRaw();
+	}
+
+	public int nativeBits() {
+		return ((net.minecraft.util.SimpleBitStorage)this.heightmap).getBits();
+	}
+
 	public void fillFrom(ChunkAccess chunkAccess) {
 		if (net.minecraft.world.level.chunk.NativeSkyLightSources.fill(chunkAccess, this.minY, this.heightmap)) return;
 		this.fillFromJava(chunkAccess);

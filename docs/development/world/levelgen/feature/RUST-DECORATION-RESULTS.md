@@ -6,7 +6,7 @@ They describe this version only; rerun the [FULL-chunk driver](../RUST-FULL-GENE
 before claiming them for a later change. Receipts are under `build/full-generation/`.
 
 These are implementation-author measurements, not suites or captures rerun by
-this documentation review. The later [origin-region qualification](../RUST-FULL-GENERATION.md#known-differences-2026-10-13)
+this documentation review. The later [origin-region qualification](../RUST-FULL-GENERATION.md#known-differences-2026-10-14)
 records one of nine Current runs with nine differing trees; immediate native-on
 and Java-route reruns matched. Thus the identical Current runs below describe
 those attempts, not universal determinism. Resumed generation is also not a
@@ -64,3 +64,66 @@ than Frozen. Primordial Caves cannot be compared with Frozen's feature time,
 because Frozen places far fewer ores there. **The Nether feature step is 17%
 slower than Frozen on both routes**: the gap predates this change and stays
 open. Nether FULL generation as a whole is 2.2× faster than Frozen.
+
+## Slice 2: `setBlock` features (replace blobs, glowstone, springs)
+
+Uncommitted working-tree results, 2026-10-13. The oracle moved off spawn
+(regions at chunk (64,−48) and (128,−96)); there, Frozen and a pre-change
+reference checkout (`build/reference-342352375`) each repeat exactly.
+
+- **Parity:** 648 FULL chunks identical to the reference; identical to Frozen
+  except Primordial Caves (intentional ores). Nether native placements: 68
+  replace-blobs, 484 glowstone, 1,283 springs; replayed events included 34 light
+  checks, one section-status change and 1,127 fluid ticks.
+- **Shadow replay:** 41,029 native placements under 4-worker parallel
+  generation, 0 mismatches in blocks, final heightmaps, sky sources, ticks and
+  post-processing.
+- **Timing** (same method as above; medians of three launches; "Java route"
+  now includes the faster live-owner palette lookup):
+
+| Dimension | Feature step: native / Java route / Frozen | FULL wall time: native / Java route / Frozen |
+| --- | --- | --- |
+| Overworld | 1,754 / 2,164 / 2,362 ms | 7.25 / 7.75 / 13.28 s |
+| Primordial Caves | 4,273 / 4,563 / 3,878 ms | 9.81 / 9.97 / 13.91 s |
+| Nether | 757 / 970 / 810 ms | 3.73 / 4.01 / 8.03 s |
+
+The Nether feature step is now 6.5% faster than Frozen; the earlier gap closed.
+
+## Slice 3: the step loop, templates and the feature tail
+
+Uncommitted working-tree results, 2026-10-14. Rust runs the whole step loop,
+structure templates and every vanilla feature except End spikes, the End
+gateway and platform, and fossils' own code (their templates are native). All
+parity runs use the ordered pre-pass.
+
+- **Pre-change Current** (`build/reference-342352375`): identical in 648
+  standard chunks, 17 overworld and 8 Nether/End biome regions, and the
+  interrupted (`--resume`) runs. Overworld and Nether structure regions differ
+  only in End-city shulker yaw and in jigsaw piece boxes of a reloaded start
+  (see [known differences](../RUST-FULL-GENERATION.md#known-differences-2026-10-14)).
+- **Frozen:** identical in all biome regions and in the overworld, Nether and
+  End standard regions; Primordial Caves differs as before (intentional ores).
+- **Shadow replay:** 0 mismatches over 78,285 overworld and 9,193 Nether/End
+  biome-suite placements, and 19,012 placements in four desert regions with
+  desert wells forced to every chunk (26 wells; the Java route matched too).
+  Vegetation patches found that `HashMap` tree bins change `HashSet` order;
+  [`java_set.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/decoration/java_set.rs)
+  now emulates them, checked against Java.
+- **Failure paths:** an injected failure on either route raises the "Feature
+  placement" crash in the same chunk; nothing at FEATURES or later is held or
+  persisted.
+- Rust suite 2,810 passed (3 ignored); Java 1,950 passed (2 skipped).
+
+**Timing** (`timing-final`; same method as above, medians of three launches):
+
+| Dimension | Feature step: native / Java route / Frozen | FULL wall time: native / Java route / Frozen |
+| --- | --- | --- |
+| Overworld | 1,511 / 2,096 / 2,377 ms | 6.94 / 7.63 / 13.19 s |
+| Primordial Caves | 1,589 / 4,503 / 3,866 ms | 6.98 / 9.92 / 13.77 s |
+| Nether | 566 / 985 / 796 ms | 3.49 / 3.88 / 7.91 s |
+| End | 101 / 110 / 98 ms | 0.92 / 1.02 / 1.81 s |
+
+The End feature step is level with Frozen (runs 98–106 ms against 95–107 ms);
+the remaining Java time there is End-city placement. Across dimensions most
+Java-route time left is structure orchestration (trial chambers, mineshaft
+legacy pieces, End cities), measured with `decorationProfile`.

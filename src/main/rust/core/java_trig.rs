@@ -272,4 +272,16 @@ mod tests {
         }
         assert_eq!(hash, 2_485_921_060_041_987_419);
     }
+
+    /// Every `FancyTrunkPlacer` branch angle, `(nextFloat() * 2F) * Math.PI`, folded the same way.
+    #[test]
+    fn every_fancy_branch_angle_matches_hotspot() {
+        let mut hash = 0i64;
+        for k in 0..(1u32 << 24) {
+            let x = f64::from(k as f32 * 5.960_464_5e-8_f32 * 2.0f32) * std::f64::consts::PI;
+            hash = hash.wrapping_mul(31).wrapping_add(super::sin(x).unwrap().to_bits() as i64);
+            hash = hash.wrapping_mul(31).wrapping_add(super::cos(x).unwrap().to_bits() as i64);
+        }
+        assert_eq!(hash, 586_961_934_660_303_604);
+    }
 }

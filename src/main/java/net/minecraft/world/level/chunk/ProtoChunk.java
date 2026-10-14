@@ -124,6 +124,12 @@ public class ProtoChunk extends ChunkAccess {
 		}
 	}
 
+	/** Native decoration replays light notifications through the chunk's own engine. */
+	@Nullable
+	public LevelLightEngine nativeLightEngine() {
+		return this.lightEngine;
+	}
+
 	@Nullable
 	@Override
 	public BlockState setBlockState(BlockPos blockPos, BlockState blockState, int i) {

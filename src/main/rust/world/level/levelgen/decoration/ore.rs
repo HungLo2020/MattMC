@@ -46,8 +46,10 @@ pub(crate) fn shape(size: i32) -> Box<[f64]> {
 /// `Direction.values()` order for `Feature.isAdjacentToAir`.
 const DIRECTIONS: [[i32; 3]; 6] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
 
-pub(crate) fn place(placement: &mut Placement, origin: [i32; 3]) -> Result<bool> {
-    let Feature::Ore { size, .. } = placement.program.feature;
+pub(crate) fn place(placement: &mut Placement, feature: &Feature, origin: [i32; 3]) -> Result<bool> {
+    let Feature::Ore { size, .. } = *feature else {
+        unreachable!("dispatched by feature kind")
+    };
     let [x, y, z] = origin;
     let f = placement.random.next_float() * std::f64::consts::PI as f32;
     let g = size as f32 / 8.0;
@@ -68,23 +70,44 @@ pub(crate) fn place(placement: &mut Placement, origin: [i32; 3]) -> Result<bool>
     for s in min_x..=min_x + width {
         for t in min_z..=min_z + width {
             if min_y <= placement.region.height(OCEAN_FLOOR_WG, s, t)? {
-                return place_vein(placement, [x0, x1, z0, z1, y0, y1], [min_x, min_y, min_z], width, height);
+                return place_vein(placement, feature, [x0, x1, z0, z1, y0, y1], [min_x, min_y, min_z], width, height);
             }
         }
     }
     Ok(false)
 }
 
-fn place_vein(placement: &mut Placement, ends: [f64; 6], min: [i32; 3], width: i32, height: i32) -> Result<bool> {
-    let Feature::Ore { size, discard_chance_on_air_exposure, ref targets } = placement.program.feature;
+fn place_vein(placement: &mut Placement, feature: &Feature, ends: [f64; 6], min: [i32; 3], width: i32, height: i32) -> Result<bool> {
+    let Feature::Ore { size, discard_chance_on_air_exposure, ref targets, ref shape } = *feature else {
+        unreachable!("dispatched by feature kind")
+    };
     let [x0, x1, z0, z1, y0, y1] = ends;
-    let mut samples = Vec::with_capacity(size as usize + 6);
-    samples.extend_from_slice(&[x0, x1, y0, y1, z0, z1]);
+    let mut scratch = std::mem::take(&mut placement.scratch);
+    scratch.samples.clear();
+    scratch.samples.extend_from_slice(&[x0, x1, y0, y1, z0, z1]);
     for _ in 0..size {
-        samples.push(placement.random.next_double());
+        scratch.samples.push(placement.random.next_double());
     }
-    let spans = feature::ore_spans(&samples, &placement.program.ore_shape, min);
-    let mut visited = vec![0u64; ((width * height * width) as usize).div_ceil(64)];
+    feature::ore_spans(&scratch.samples, shape, min, &mut scratch.spheres, &mut scratch.spans);
+    scratch.visited.clear();
+    scratch.visited.resize(((width * height * width) as usize).div_ceil(64), 0);
+    let result = place_spans(placement, &scratch.spans, &mut scratch.visited, min, width, height, size, discard_chance_on_air_exposure, targets);
+    placement.scratch = scratch;
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+fn place_spans(
+    placement: &mut Placement,
+    spans: &[i32],
+    visited: &mut [u64],
+    min: [i32; 3],
+    width: i32,
+    height: i32,
+    _size: i32,
+    discard_chance_on_air_exposure: f32,
+    targets: &[super::program::Target],
+) -> Result<bool> {
     let mut placed = 0;
     for span in spans.chunks_exact(4) {
         let (bx, by) = (span[0], span[1]);
@@ -146,4 +169,94 @@ fn can_place(
         }
     }
     Ok(true)
+}
+
+/// `ScatteredOreFeature`: up to `size` single blocks within seven of the
+/// origin, through `WorldGenRegion` reads and `setBlock(…, 2)`.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Scattered {
+    size: i32,
+    discard_chance_on_air_exposure: f32,
+    targets: Vec<super::program::Target>,
+}
+
+/// `Math.round(float)`: nearest, ties towards positive infinity.
+fn round(value: f32) -> i32 {
+    let floor = value.floor();
+    (if value - floor >= 0.5 { floor + 1.0 } else { floor }) as i32
+}
+
+impl Scattered {
+    /// The ore words: size, discard chance, then (rule, probability, set, state) per target.
+    pub(crate) fn read(reader: &mut super::program::Reader) -> Option<Self> {
+        let size = reader.next().filter(|size| (0..=64).contains(size))?;
+        let discard_chance_on_air_exposure = reader.float()?;
+        let count = reader.count(64)?;
+        let mut targets = Vec::with_capacity(count);
+        for _ in 0..count {
+            let rule = reader.next()?;
+            let probability = reader.float()?;
+            let set = reader.set()?;
+            let state = reader.write_state()?;
+            let probability = match rule {
+                1 => None,
+                2 => Some(probability),
+                _ => return None,
+            };
+            targets.push(super::program::Target { set, probability, state });
+        }
+        Some(Self { size, discard_chance_on_air_exposure, targets })
+    }
+
+    pub(crate) fn place(&self, placement: &mut Placement, origin: [i32; 3]) -> Result<bool> {
+        let count = placement.random.next_int(self.size + 1);
+        for j in 0..count {
+            let reach = j.min(7) as f32;
+            let mut offset = [0; 3];
+            for axis in offset.iter_mut() {
+                let a = placement.random.next_float();
+                let b = placement.random.next_float();
+                *axis = round((a - b) * reach);
+            }
+            let pos = [origin[0] + offset[0], origin[1] + offset[1], origin[2] + offset[2]];
+            let state = placement.region.level_block_state(pos[0], pos[1], pos[2])?;
+            for target in &self.targets {
+                if self.can_place(placement, state, target, pos)? {
+                    placement.region.set_block(pos[0], pos[1], pos[2], target.state, 2)?;
+                    break;
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    /// `OreFeature.canPlaceOre` over `WorldGenRegion.getBlockState`.
+    fn can_place(&self, placement: &mut Placement, state: u32, target: &super::program::Target, pos: [i32; 3]) -> Result<bool> {
+        if !placement.program.in_set(target.set, state) {
+            return Ok(false);
+        }
+        if let Some(probability) = target.probability {
+            if placement.random.next_float() >= probability {
+                return Ok(false);
+            }
+        }
+        let discard = self.discard_chance_on_air_exposure;
+        let skip_air_check = if discard <= 0.0 {
+            true
+        } else if discard >= 1.0 {
+            false
+        } else {
+            placement.random.next_float() >= discard
+        };
+        if skip_air_check {
+            return Ok(true);
+        }
+        for [dx, dy, dz] in DIRECTIONS {
+            let neighbour = placement.region.level_block_state(pos[0] + dx, pos[1] + dy, pos[2] + dz)?;
+            if placement.region.registry().flags(crate::content::block::StateId(neighbour as u16)).contains(crate::content::block::StateFlags::AIR) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
 }

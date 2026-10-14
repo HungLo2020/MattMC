@@ -26,6 +26,20 @@ public class Xoroshiro128PlusPlus {
 		}
 	}
 
+	/** Native decoration hands this state to Rust and back around a Java feature. */
+	public long nativeSeedLo() {
+		return this.seedLo;
+	}
+
+	public long nativeSeedHi() {
+		return this.seedHi;
+	}
+
+	public void nativeSetState(long lo, long hi) {
+		this.seedLo = lo;
+		this.seedHi = hi;
+	}
+
 	public long nextLong() {
 		long l = this.seedLo;
 		long m = this.seedHi;
