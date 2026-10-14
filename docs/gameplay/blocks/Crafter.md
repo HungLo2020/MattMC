@@ -74,30 +74,39 @@ Each successful activation consumes **one Oak Log** and produces **four Oak Plan
 
 ## Advancement troubleshooting
 
-Crafting another Crafter in this block can produce the item without completing
-**Crafters Crafting Crafters**. The bundled advancement has a source-predicted
-recipe-ID mismatch at `bffd0eef`: it asks for `minecraft:crafter`, while the
-bundled recipe loads as `minecraft:crafting/crafter`. The trigger requires the
-same recipe key, so the inspected resources do not satisfy that condition.
-The loader keeps the `crafting/` part of the recipe path; it does not flatten it
-to the output item's ID. [Advancement condition][crafter-advancement-current] ·
-[Recipe][crafter-recipe-current] · [Recipe loading][recipe-load-current] ·
-[Path-to-ID conversion][recipe-path-current] · [Exact-key condition][recipe-trigger-current]
+**Crafters Crafting Crafters** requires making a Crafter **in a Crafter**. The
+bundled recipe condition was repaired in [PR #887](https://github.com/HungLo2020/MattMC/pull/887)
+on October 14: it now matches `minecraft:crafting/crafter`. Crafting the item
+at a Crafting Table uses a different trigger. [Corrected condition][crafter-advancement-current] ·
+[Recipe][crafter-recipe-current] · [Exact-key condition][recipe-trigger-current]
 
-There is also a separate output-route condition: the nearby-player trigger runs
-only when an output stack is **ejected into the world**. An output fully accepted
-by the container in front does not reach that call. Eligible players are searched
-in a **17×17×17-block box centered on the Crafter**, not within a 17-block radius.
-Even ejecting the result while nearby does not resolve the bundled recipe-ID
-mismatch, so this is not a verified workaround. [Output and trigger path][crafter-trigger-current]
+Load the Crafter recipe, stay nearby, and activate the block with room for the
+result to eject. The nearby-player trigger runs only when an output stack is
+**ejected into the world**. An output fully accepted by the container in front
+does not reach that call, even though crafting succeeds. Eligible players are
+searched in a **17×17×17-block box centered on the Crafter**, not within a
+17-block radius. The trigger runs immediately after ejection; picking up the
+item is not a prerequisite. [Output and trigger path][crafter-trigger-current]
 
-This limitation concerns advancement completion, not whether the valid recipe
-produces a Crafter. It is also separate from MattMC's intentionally inactive
-recipe-unlocking rewards. See [Advancements and statistics](../mechanics/AdvancementsAndStatistics.md#rewards-and-notifications)
-for that distinction. This focused source review has **no in-game reproduction**;
-data-pack overrides or later fixes can change the criterion or recipe ID.
-[Issue #825](https://github.com/HungLo2020/MattMC/issues/825) tracks the shared
-recipe-key mismatch, including the bundled decorated-pot and armor-trim goals.
+This remains separate from MattMC's intentionally inactive recipe-unlocking
+rewards. See [Advancements and statistics](../mechanics/AdvancementsAndStatistics.md#crafting-goals-that-stay-incomplete)
+for the other repaired recipe goals and their ingredient/pattern conditions.
+
+**Historical limitation:** the earlier `bffd0eef` review found the criterion
+using `minecraft:crafter` while the loader retained the recipe's `crafting/`
+path. That mismatch, tracked in [#825](https://github.com/HungLo2020/MattMC/issues/825),
+is fixed in the current bundled resources. It did not prevent item production.
+[Earlier condition][crafter-advancement-history] · [Recipe loading][recipe-load-current] ·
+[Path-to-ID conversion][recipe-path-current]
+
+The focused update was source-reviewed on **2026-10-14** at `c16c511d4677f53d108d8971ded4ef3a232e81d1`.
+The fix's recorded headless integration tests exercised real crafting output,
+listeners and progress awards, with world/player queries and network/reward
+effects supplied by test doubles. They include loose-output success and
+front-container/out-of-range controls. This documentation pass did not rerun
+those tests or verify a live-world/client award. See the
+[verification record](../../development/resources/RECIPE-ADVANCEMENTS.md#verification).
+Data-pack overrides can still change the criteria and recipes.
 
 ## Related pages
 
@@ -142,9 +151,11 @@ Source-reviewed at `fb7d6979fb8d9773cfe05f084c6085f35feb885c` on 2026-10-02 agai
 [planks]: https://github.com/HungLo2020/MattMC/blob/fb7d6979fb8d9773cfe05f084c6085f35feb885c/src/main/resources/data/minecraft/recipe/crafting/oak_planks.json
 [oak-logs]: https://github.com/HungLo2020/MattMC/blob/fb7d6979fb8d9773cfe05f084c6085f35feb885c/src/main/resources/data/minecraft/tags/item/oak_logs.json
 
-[crafter-advancement-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/resources/data/minecraft/advancement/adventure/crafters_crafting_crafters.json#L1-L10
-[crafter-recipe-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/resources/data/minecraft/recipe/crafting/crafter.json
-[recipe-load-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/world/item/crafting/RecipeManager.java#L60-L83
-[recipe-path-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/resources/FileToIdConverter.java#L23-L33
-[recipe-trigger-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/advancements/critereon/RecipeCraftedTrigger.java#L45-L52
-[crafter-trigger-current]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/java/net/minecraft/world/level/block/CrafterBlock.java#L187-L223
+[crafter-advancement-current]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/resources/data/minecraft/advancement/adventure/crafters_crafting_crafters.json#L1-L10
+[crafter-recipe-current]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/resources/data/minecraft/recipe/crafting/crafter.json
+[recipe-load-current]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/java/net/minecraft/world/item/crafting/RecipeManager.java#L60-L83
+[recipe-path-current]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/java/net/minecraft/resources/FileToIdConverter.java#L23-L33
+[recipe-trigger-current]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/java/net/minecraft/advancements/critereon/RecipeCraftedTrigger.java#L45-L52
+[crafter-trigger-current]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/java/net/minecraft/world/level/block/CrafterBlock.java#L187-L223
+
+[crafter-advancement-history]: https://github.com/HungLo2020/MattMC/blob/bffd0eef886a446a480cf62166da2eba448eb574/src/main/resources/data/minecraft/advancement/adventure/crafters_crafting_crafters.json#L1-L10

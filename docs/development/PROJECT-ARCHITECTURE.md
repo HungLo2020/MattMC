@@ -402,13 +402,17 @@ realistic renderer/server acceptance; preserve the owner-specific timing limits.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.
-[Native ore decoration](world/levelgen/feature/RUST-DECORATION.md) owns the
-admitted ore placed-feature program, modifier/random draw order and direct
-region writes. Java retains decoration step ordering, structure placement,
-feature seeds and unsupported/custom feature execution. The
-[FULL-chunk verifier](world/levelgen/RUST-FULL-GENERATION.md) compares serialized
-chunk fields, with explicit origin-region variance and resumed-generation limits;
-this is not a claim that all world generation has migrated.
+[Native decoration](world/levelgen/feature/RUST-DECORATION.md) now owns admitted
+step sequencing, feature seeds, placement programs and region writes, with
+[native template placement](world/levelgen/structure/RUST-STRUCTURE-TEMPLATES.md).
+Java still gathers biome inputs, orchestrates chunks and supplies structure,
+unsupported-feature and contextual callbacks. End spikes, gateway/platform,
+fossil orchestration and planted huge fungi retain Java logic; follow the owner
+for exact admission. The [FULL-chunk verifier](world/levelgen/RUST-FULL-GENERATION.md)
+uses an ordered, off-spawn protocol in the latest author record; earlier origin
+and resume variance remains historical evidence. The [Slice 3 results](world/levelgen/feature/RUST-DECORATION-RESULTS.md#slice-3-the-step-loop-templates-and-the-feature-tail)
+are explicitly working-tree measurements, not independently established runtime
+acceptance of the committed source or complete world-generation migration.
 [Geode density fields](world/levelgen/feature/RUST-GEODE.md) use
 `world/level/levelgen/feature/geode/` for one grid batch; Java retains ordered
 random draws, placement decisions and world callbacks.

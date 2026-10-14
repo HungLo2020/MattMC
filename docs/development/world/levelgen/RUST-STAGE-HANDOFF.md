@@ -47,9 +47,12 @@ Java still orchestrates chunks and biome inputs. Publication is two-phase
 (`NativeGenerationSections.Prepared`): NOISE and SURFACE/CARVERS first read
 every modified section (adopting native owners or exporting palettes), both
 WG heightmaps and the post-processing marks out of Rust, then commit them to
-the chunk in plain Java. A failure while preparing leaves the chunk as it was
+the chunk through Java installation methods. A failure while preparing leaves the chunk as it was
 (`NativeStageHandoffTest.aFailureWhilePreparingResultsPublishesNothing`,
-`-Dmattmc.worldgen.stagePublishFailAfter=N`). The generation-stage dense
+`-Dmattmc.worldgen.stagePublishFailAfter=N`). This preparation fixture does not prove an
+infallible commit or whole-chunk rollback: canonical installation still reaches
+native owner invalidation, and compatibility installation can allocate/adopt.
+See [the installation paths](https://github.com/HungLo2020/MattMC/blob/46cb83c59faf42bf3435da92c24f39f2c9617b2e/src/main/java/net/minecraft/world/level/chunk/NativeGenerationSections.java). The generation-stage dense
 representation and live packed representation remain separate Rust formats;
 input copying and output packing/allocation remain. General save/network enumeration still uses temporary
 Java compatibility projections; further producer/consumer migration remains work.

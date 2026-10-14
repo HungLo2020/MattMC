@@ -11,7 +11,11 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest default-branch snapshot synchronized: `cdb9dc2b9c37d3f9b3fbdf7f09c06d0b5def3b31`, the separately authorized and already reported #818 fix merge. Batch 414 preserves that history without implementing bugs or publishing held #825 work; its authored scope is crafting-player documentation only.
+- Latest default-branch snapshot synchronized: `46cb83c59faf42bf3435da92c24f39f2c9617b2e`, preserving the incoming 72-path native decoration/template update after the #825 merge. A stalled payload-read call was interrupted before any commit/ref publication; the intact four-page draft was stashed, cleanly reapplied and revalidated. Batch 417 also reconciles current ownership and bounded working-tree/oracle/preparation evidence.
+
+- Previous default-branch snapshot synchronized: `c16c511d4677f53d108d8971ded4ef3a232e81d1`, the separately authorized #825 repair merge (PR #887). Batch 417 preserves its eight-path data/test/developer-guide change and reconciles stale player troubleshooting; it authors no implementation and does not rerun the code owner’s historical tests.
+
+- Previous default-branch snapshot synchronized: `cdb9dc2b9c37d3f9b3fbdf7f09c06d0b5def3b31`, the separately authorized and already reported #818 fix merge. Batch 414 preserves that history without implementing bugs or publishing held #825 work; its authored scope is crafting-player documentation only.
 
 - Previous source snapshot integrated: `79ff37b0e3e6ca329748418d08f2aacec5fdece4`, preserving three incoming commits and 53 changed paths (twelve wiki pages) after the separately published migration prompts. Batch 413 reconciles entity type authority, ore placed-feature ownership and FULL-chunk oracle limits. Existing goal prompts and the separately owned storage bug-fix work are unchanged.
 
@@ -3370,3 +3374,9 @@ Filled a practical omission in the existing anchor owner: Glowstone-block consum
 ## Batch 416: Renewable Sugar Cane piston harvesting
 
 Expanded the existing plant owner with second-block cutting, retained soil/water/base, unsupported upper Cane, retraction before regrowth and separate loose-item collection. The Piston guide routes to that canonical explanation. Current native push properties and active destruction/growth callbacks were source-reviewed; no farm, circuit, collection-efficiency or runtime test was run. Already substantive sampled core owners and all directory/category/registry entries remain unchanged. Full documentation validation and independent review precede guarded publication; held #825 work remains separate.
+
+## Batch 417: Recipe advancement player guidance after the repair
+
+Reconciled the Crafter and Advancements/Statistics owners with the merged recipe-key correction, retaining the historical mismatch and stable anchors. Added practical four-goal conditions: loose Crafter output/nearby players, four accepted sherds, any trim and eight distinct exclusive trims. Preserved intentionally inactive recipe rewards and linked the code owner’s bounded headless verification rather than claiming live-client acceptance. The code merge and its successful deployment preceded this docs-only publication window; incoming history and all directory/category entries are preserved. Full strict/link/source/whitespace checks and independent review precede publication.
+
+The final source guard advanced to `46cb83c5` before publication. The combined batch preserves that implementation and adds architecture, failure-driver, stage-installation and Slice 3 provenance qualifications; no runtime tests were rerun.

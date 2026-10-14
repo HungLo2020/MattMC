@@ -105,18 +105,23 @@ restored chunks prime WG heightmaps lazily, as vanilla does).
 injects a decoration failure and checks nothing past it is published. On the
 native route the Nth native block write fails mid-placement; on Java's route
 (`javaDecoration`) the Nth `WorldGenRegion.setBlock` throws. `--at-chunk K`
-arms it just before the Kth chunk of the ordered pass, so both routes fail in
-the same chunk. The audit then records in-memory chunk statuses, saves without
-flushing (a failed task keeps the chunk map busy, so `stopServer` never saves),
-and halts; a second launch reads every persisted status around the region.
+arms it just before zero-based chunk index K of the ordered pass, intending to
+align the failing chunk between routes. The audit records in-memory chunk
+statuses, uses the non-blocking level-save
+path, flushes the storage worker and halts; a second launch reads every persisted
+status around the region.
 
 ```sh
 python3 DevUtils/tests/worldgen/VerifyGenerationFailure.py --output build/generation-failure/<label> --writes 50 --at-chunk 30
 ```
 
-It accepts when both routes raise the "Feature placement" crash for the same
-decorating chunk and that chunk is neither held nor persisted at FEATURES or
-later.
+Its nonzero-exit gate checks each route separately: a parsed "Feature placement"
+crash/chunk, a save marker, a persisted entry for that chunk, and no FEATURES-or-later
+status in the inspected memory or persisted entry. It does **not** assert that
+the two reported chunk identities match. An absent memory entry can pass when
+the persisted status is below FEATURES; inspect `failure.json` for both details.
+This bounded injection does not establish rollback for arbitrary callbacks,
+later publication failures, process crashes or concurrent world activity.
 
 ## Known differences (2026-10-14)
 

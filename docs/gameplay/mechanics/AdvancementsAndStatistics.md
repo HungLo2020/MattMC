@@ -26,19 +26,33 @@ A quiet chat does not mean an advancement failed. Chat announcements require bot
 
 ### Crafting goals that stay incomplete
 
-The bundled Crafter, decorated-pot and armor-trim recipe goals have a
-**source-predicted recipe-key mismatch** in the reviewed build: their criteria
-use old flat recipe IDs, while active recipes retain `crafting/` or `smithing/`
-in their IDs. Successfully making the intended item therefore does not by
-itself establish that these goals can complete. [Issue #825](https://github.com/HungLo2020/MattMC/issues/825)
-records the four affected advancements and their exact criteria. This is a
-source/data finding, with no in-game award reproduction in this review;
-data-pack overrides or later repairs can change the outcome.
+The four bundled recipe goals affected by [#825](https://github.com/HungLo2020/MattMC/issues/825)
+have corrected recipe IDs following the October 14 [fix](https://github.com/HungLo2020/MattMC/pull/887).
+Their ingredient, output-route and distinct-pattern requirements still matter:
 
-See [Crafter advancement troubleshooting](../blocks/Crafter.md#advancement-troubleshooting)
-for its separate output-route and nearby-player conditions. The mismatch is
-separate from notification settings and intentionally inactive recipe-unlocking
-rewards; changing those does not repair the bundled criterion.
+| Goal | What to do |
+| --- | --- |
+| **Crafters Crafting Crafters** | Craft a Crafter in a Crafter while nearby and let its output eject; fully accepted front-container output does not dispatch the award. Follow [Crafter troubleshooting](../blocks/Crafter.md#advancement-troubleshooting) |
+| **Careful Restoration** | Craft and take a [Decorated Pot](../blocks/DecoratedPot.md) using four accepted Pottery Sherds. Mixed sherd types qualify; substituting a Brick in any ingredient position does not |
+| **Crafting a New Look** | Take a smithing result using any one of the 18 bundled [armor-trim patterns](ArmorTrims.md) |
+| **Smithing with Style** | Complete smithing outputs for all eight distinct patterns: Rib, Silence, Snout, Spire, Tide, Vex, Ward and Wayfinder. Repeating one does not satisfy another pattern |
+
+[Crafter condition][recipe-goal-crafter] · [Pot ingredient conditions][recipe-goal-pot] ·
+[Any-pattern requirement][recipe-goal-any] · [Eight-pattern requirement][recipe-goal-all]
+
+The earlier source review correctly identified old flat IDs that omitted
+`crafting/` or `smithing/`; that defect is now historical. Recipe-unlocking
+rewards remain intentionally inactive, and chat/toast settings remain separate
+from the actual progress award. Check the Advancements screen rather than
+judging completion from a notification alone.
+
+This focused section was source-reviewed on **2026-10-14** at `c16c511d4677f53d108d8971ded4ef3a232e81d1`.
+The fix records headless loader, crafting/smithing output and progress-award
+checks, including Brick substitution and repeated-pattern negative controls.
+Those checks use bounded world/player/network doubles; this documentation
+review did not rerun them or claim live-client, multiplayer or persisted-reload
+acceptance. See the [verification scope](../../development/resources/RECIPE-ADVANCEMENTS.md#verification).
+Custom data packs can replace these requirements.
 
 ### Extra rewards in Skyblock
 
@@ -128,3 +142,11 @@ Related: [Mechanics](Mechanics.md) · [Local worlds](LocalWorlds.md) · [Multipl
 [english-loader]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/client/resources/language/ClientLanguage.java#L35-L72
 [english-deprecated]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/locale/DeprecatedTranslationsInfo.java#L73-L92
 [stats-sort-order]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/client/gui/screens/achievement/StatsScreen.java#L528-L551
+
+[recipe-goal-crafter]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/resources/data/minecraft/advancement/adventure/crafters_crafting_crafters.json
+
+[recipe-goal-pot]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/resources/data/minecraft/advancement/adventure/craft_decorated_pot_using_only_sherds.json
+
+[recipe-goal-any]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/resources/data/minecraft/advancement/adventure/trim_with_any_armor_pattern.json
+
+[recipe-goal-all]: https://github.com/HungLo2020/MattMC/blob/c16c511d4677f53d108d8971ded4ef3a232e81d1/src/main/resources/data/minecraft/advancement/adventure/trim_with_all_exclusive_armor_patterns.json

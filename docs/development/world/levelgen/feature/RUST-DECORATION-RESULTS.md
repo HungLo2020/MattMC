@@ -91,9 +91,17 @@ The Nether feature step is now 6.5% faster than Frozen; the earlier gap closed.
 
 ## Slice 3: the step loop, templates and the feature tail
 
-Uncommitted working-tree results, 2026-10-14. Rust runs the whole step loop,
-structure templates and every vanilla feature except End spikes, the End
-gateway and platform, and fossils' own code (their templates are native). All
+Uncommitted working-tree results, 2026-10-14. These remain author-reported
+measurements after the documentation was committed in `46cb83c5`; the committed
+record does not independently identify an exact tested commit/native image.
+No runtime suite was rerun for this documentation review. The ordered pre-pass
+and off-spawn setup differ from the earlier unordered/origin protocol; preserve
+those earlier failures rather than treating the workloads as interchangeable.
+See [source review #775](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6171699188).
+
+Rust runs the admitted step loop, structure templates and supported vanilla
+feature programs. End spikes, the End gateway and platform, fossils' own code
+(their templates are native) and planted huge fungi retain Java logic. All
 parity runs use the ordered pre-pass.
 
 - **Pre-change Current** (`build/reference-342352375`): identical in 648
@@ -111,7 +119,9 @@ parity runs use the ordered pre-pass.
   now emulates them, checked against Java.
 - **Failure paths:** an injected failure on either route raises the "Feature
   placement" crash in the same chunk; nothing at FEATURES or later is held or
-  persisted.
+  persisted. This is the author's recorded outcome; the checked-in driver gates
+  per-route statuses but does not compare failed chunk identities and permits
+  an absent in-memory entry. See [the exact acceptance limits](../RUST-FULL-GENERATION.md#interrupted-and-failed-generation).
 - Rust suite 2,810 passed (3 ignored); Java 1,950 passed (2 skipped).
 
 **Timing** (`timing-final`; same method as above, medians of three launches):
