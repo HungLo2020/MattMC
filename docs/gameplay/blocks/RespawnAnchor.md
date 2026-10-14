@@ -20,6 +20,30 @@ An off-hand Glowstone block gets a chance to charge a non-full anchor before the
 
 Selecting another anchor or a working [Bed](Bed.md) replaces the saved respawn point. Multiple players can select the same anchor, but the charges belong to that placed block and are shared. Moving an anchor item does not move anyone's saved position: charge and select the newly placed block. [Stored position and selection][anchor] [server-player] · [Bed selection][bed]
 
+## Dispenser refueling
+
+Aim a **Dispenser directly at the anchor** and load it with Glowstone blocks.
+When an activation selects Glowstone, an anchor with fewer than four charges
+gains one charge and the Dispenser consumes one block. Glowstone Dust is not
+the registered charging item. Use only Glowstone in the Dispenser when you want
+predictable refueling; item selection and pulse timing follow the
+[Dispenser guide](DispenserAndDropper.md#how-the-item-is-selected).
+[Registered Glowstone action][dispenser-charge] · [Active dispatch][dispenser-dispatch]
+
+At four charges, this Dispenser action **keeps the Glowstone and fails without
+ejecting it**. It calls charging directly, not the player interaction that sets
+spawn or explodes an anchor. It therefore neither selects anyone's respawn point
+nor detonates a full anchor outside the Nether. The dangerous player-use rules
+below still apply. If the block in front is not an anchor, the action falls back
+to ordinary item ejection. [Full-anchor branches][dispenser-charge] · [Fallback ejection][dispenser-default]
+· [Direct charging versus player use][anchor-current]
+
+A Dropper does not perform this charging action. A redstone signal directly
+into the anchor also supplies no fuel. Use its comparator output to monitor
+charges, and keep a safely accessible manual spawn-selection position. This is
+a source-derived mechanism, not a tested automatic-refueling circuit.
+[Dropper distinction](DispenserAndDropper.md#dropper-transfer-and-ejection)
+
 ## Charges, light and comparator output
 
 | Stored charges | Emitted light | Comparator signal |
@@ -86,3 +110,14 @@ Related: [Anchor item](../items/RespawnAnchor.md) · [Crying Obsidian](Obsidian.
 [primordial-type]: https://github.com/HungLo2020/MattMC/blob/60699a119c4728a7bcaf15196f3c839cfcfd69dc/src/main/resources/data/minecraft/dimension_type/primordial_caves.json
 [normal]: https://github.com/HungLo2020/MattMC/blob/60699a119c4728a7bcaf15196f3c839cfcfd69dc/src/main/resources/data/minecraft/worldgen/world_preset/normal.json
 [explosion]: https://github.com/HungLo2020/MattMC/blob/60699a119c4728a7bcaf15196f3c839cfcfd69dc/src/main/java/net/minecraft/world/level/ServerExplosion.java
+
+Dispenser refueling was additionally source-reviewed on **2026-10-14** at
+`53fbc1daabead42a01a332e5bc45e24820c8e611`. No charging, redstone, dimension or
+explosion runtime test was run. Earlier manual-use and respawn evidence retains
+its original source scope.
+
+[dispenser-charge]: https://github.com/HungLo2020/MattMC/blob/53fbc1daabead42a01a332e5bc45e24820c8e611/src/main/java/net/minecraft/core/dispenser/DispenseItemBehavior.java#L356-L377
+[dispenser-dispatch]: https://github.com/HungLo2020/MattMC/blob/53fbc1daabead42a01a332e5bc45e24820c8e611/src/main/java/net/minecraft/world/level/block/DispenserBlock.java
+
+[dispenser-default]: https://github.com/HungLo2020/MattMC/blob/53fbc1daabead42a01a332e5bc45e24820c8e611/src/main/java/net/minecraft/core/dispenser/DefaultDispenseItemBehavior.java#L13-L26
+[anchor-current]: https://github.com/HungLo2020/MattMC/blob/53fbc1daabead42a01a332e5bc45e24820c8e611/src/main/java/net/minecraft/world/level/block/RespawnAnchorBlock.java#L77-L173

@@ -44,6 +44,12 @@ A Dropper can point up for upward item transfer. It needs a new activation for e
 
 ## Some verified Dispenser actions
 
+For [Respawn Anchor refueling](RespawnAnchor.md#dispenser-refueling), load
+Glowstone blocks and face the anchor directly. The linked owner explains the
+four-charge limit, retained fuel on failure, and why dispensing does not invoke
+the player's spawn-selection/explosion interaction.
+
+
 | Loaded item | Dispenser action |
 | --- | --- |
 | Arrow, Snowball, or Egg | Launches one projectile using that item's projectile settings |

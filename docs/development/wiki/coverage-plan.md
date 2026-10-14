@@ -3362,3 +3362,7 @@ Updated architecture/migration routes for native entity type definitions and adm
 ## Batch 414: Temporary crafting grids and returned containers
 
 Expanded the Crafting Table owner with separate player grids, absent block inventory/Hopper access, menu validity and safe cleanup. Consolidated recipe remainders in the shared crafting guide: empty-slot return, matching-component merge, inventory transfer and overflow drops, with Cake and Crafter routes. Existing strong sampled block articles, directories/categories and recipe definitions remain unchanged. Source-only review; no gameplay or bug-implementation tests were run. Full documentation checks, strict build and independent review precede publication.
+
+## Batch 415: Respawn Anchor dispenser refueling
+
+Filled a practical omission in the existing anchor owner: Glowstone-block consumption, full-anchor retained fuel, non-anchor ejection and separation from player spawn/explosion interaction. The Dispenser guide links the canonical explanation without duplicating the detailed rules. Existing strong sampled owners and all alphabetical/category/registry entries remain unchanged. Source dispatch and callbacks were reviewed; no gameplay/circuit/explosion test or held #825 publication occurred. Strict documentation validation and independent review precede guarded publication.
