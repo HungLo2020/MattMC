@@ -17,3 +17,6 @@
   Java/native parity checks.
 - [World Generation](levelgen/index.md): noise, density, surface evaluation,
   seed compatibility, and verification workflows.
+- [World time and weather](time-weather/index.md): native clock, weather-cycle
+  and sleep-threshold ownership, shared-random and derived-dimension contracts,
+  and Frozen/pre-change differential verification.

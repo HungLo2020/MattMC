@@ -162,9 +162,12 @@ import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapIndex;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.world.level.storage.DerivedLevelData;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.NativeWeatherTime;
+import net.minecraft.world.level.storage.PrimaryLevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -196,6 +199,8 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 	private final GameEventDispatcher gameEventDispatcher;
 	public boolean noSave;
 	private final SleepStatus sleepStatus;
+	/** Dimension-local weather levels over the world's native clock. */
+	private final NativeWeatherTime.View weather;
 	private int emptyTime;
 	private final PortalForcer portalForcer;
 	private final LevelTicks<Block> blockTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
@@ -235,6 +240,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 		this.server = minecraftServer;
 		this.customSpawners = list;
 		this.serverLevelData = serverLevelData;
+		this.weather = weatherView(serverLevelData);
 		ChunkGenerator chunkGenerator = levelStem.generator();
 		boolean bl3 = minecraftServer.forceSynchronousWrites();
 		DataFixer dataFixer = minecraftServer.getFixerUpper();
@@ -305,11 +311,45 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 	}
 
 	public void setWeatherParameters(int i, int j, boolean bl, boolean bl2) {
-		this.serverLevelData.setClearWeatherTime(i);
-		this.serverLevelData.setRainTime(j);
-		this.serverLevelData.setThunderTime(j);
-		this.serverLevelData.setRaining(bl);
-		this.serverLevelData.setThundering(bl2);
+		this.weather.setWeather(i, j, bl, bl2);
+	}
+
+	private static NativeWeatherTime.View weatherView(ServerLevelData serverLevelData) {
+		if (serverLevelData instanceof PrimaryLevelData primaryLevelData) {
+			return new NativeWeatherTime.View(primaryLevelData.weatherTimeClock(), true);
+		} else if (serverLevelData instanceof DerivedLevelData derivedLevelData) {
+			return new NativeWeatherTime.View(derivedLevelData.weatherTimeClock(), false);
+		} else {
+			throw new IllegalStateException("Unsupported server level data " + serverLevelData.getClass().getName());
+		}
+	}
+
+	@Override
+	protected void prepareWeather() {
+		this.weather.prepare();
+	}
+
+	@Override
+	public float getRainLevel(float f) {
+		NativeWeatherTime.Levels levels = this.weather.levels();
+		return Mth.lerp(f, levels.oRain(), levels.rain());
+	}
+
+	@Override
+	public void setRainLevel(float f) {
+		this.weather.setRainLevel(f);
+	}
+
+	@Override
+	public float getThunderLevel(float f) {
+		// One snapshot for both factors, matching Level's thunder * rain product.
+		NativeWeatherTime.Levels levels = this.weather.levels();
+		return Mth.lerp(f, levels.oThunder(), levels.thunder()) * Mth.lerp(f, levels.oRain(), levels.rain());
+	}
+
+	@Override
+	public void setThunderLevel(float f) {
+		this.weather.setThunderLevel(f);
 	}
 
 	@Override
@@ -337,8 +377,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 		int i = this.getGameRules().getInt(GameRules.RULE_PLAYERS_SLEEPING_PERCENTAGE);
 		if (this.sleepStatus.areEnoughSleeping(i) && this.sleepStatus.areEnoughDeepSleeping(i, this.players)) {
 			if (this.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT)) {
-				long l = this.levelData.getDayTime() + 24000L;
-				this.setDayTime(l - l % 24000L);
+				this.weather.skipToMorning();
 			}
 
 			this.wakeUpAllPlayers();
@@ -442,13 +481,13 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 
 	protected void tickTime() {
 		if (this.tickTime) {
-			long l = this.levelData.getGameTime() + 1L;
-			this.serverLevelData.setGameTime(l);
+			long l = this.weather.advanceGameTime();
 			Profiler.get().push("scheduledFunctions");
 			this.serverLevelData.getScheduledEvents().tick(this.server, l);
 			Profiler.get().pop();
+			// Functions may change rules or time; read both after they run.
 			if (this.serverLevelData.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT)) {
-				this.setDayTime(this.levelData.getDayTime() + 1L);
+				this.weather.advanceDayTime();
 			}
 		}
 	}
@@ -637,74 +676,19 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 
 	private void advanceWeatherCycle() {
 		boolean bl = this.isRaining();
-		if (this.dimensionType().hasSkyLight()) {
-			if (this.getGameRules().getBoolean(GameRules.RULE_WEATHER_CYCLE)) {
-				int i = this.serverLevelData.getClearWeatherTime();
-				int j = this.serverLevelData.getThunderTime();
-				int k = this.serverLevelData.getRainTime();
-				boolean bl2 = this.levelData.isThundering();
-				boolean bl3 = this.levelData.isRaining();
-				if (i > 0) {
-					i--;
-					j = bl2 ? 0 : 1;
-					k = bl3 ? 0 : 1;
-					bl2 = false;
-					bl3 = false;
-				} else {
-					if (j > 0) {
-						if (--j == 0) {
-							bl2 = !bl2;
-						}
-					} else if (bl2) {
-						j = THUNDER_DURATION.sample(this.random);
-					} else {
-						j = THUNDER_DELAY.sample(this.random);
-					}
-
-					if (k > 0) {
-						if (--k == 0) {
-							bl3 = !bl3;
-						}
-					} else if (bl3) {
-						k = RAIN_DURATION.sample(this.random);
-					} else {
-						k = RAIN_DELAY.sample(this.random);
-					}
-				}
-
-				this.serverLevelData.setThunderTime(j);
-				this.serverLevelData.setRainTime(k);
-				this.serverLevelData.setClearWeatherTime(i);
-				this.serverLevelData.setThundering(bl2);
-				this.serverLevelData.setRaining(bl3);
-			}
-
-			this.oThunderLevel = this.thunderLevel;
-			if (this.levelData.isThundering()) {
-				this.thunderLevel += 0.01F;
-			} else {
-				this.thunderLevel -= 0.01F;
-			}
-
-			this.thunderLevel = Mth.clamp(this.thunderLevel, 0.0F, 1.0F);
-			this.oRainLevel = this.rainLevel;
-			if (this.levelData.isRaining()) {
-				this.rainLevel += 0.01F;
-			} else {
-				this.rainLevel -= 0.01F;
-			}
-
-			this.rainLevel = Mth.clamp(this.rainLevel, 0.0F, 1.0F);
+		boolean bl2 = this.dimensionType().hasSkyLight();
+		this.weather.advanceWeather(bl2, bl2 && this.getGameRules().getBoolean(GameRules.RULE_WEATHER_CYCLE), this.random, ServerLevel::sampleWeatherDuration);
+		NativeWeatherTime.Levels levels = this.weather.levels();
+		float f = levels.rain();
+		float g = levels.thunder();
+		if (levels.oRain() != f) {
+			this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, f), this.dimension());
 		}
 
-		if (this.oRainLevel != this.rainLevel) {
-			this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, this.rainLevel), this.dimension());
-		}
-
-		if (this.oThunderLevel != this.thunderLevel) {
+		if (levels.oThunder() != g) {
 			this.server
 				.getPlayerList()
-				.broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, this.thunderLevel), this.dimension());
+				.broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, g), this.dimension());
 		}
 
 		if (bl != this.isRaining()) {
@@ -714,17 +698,22 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 				this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.START_RAINING, 0.0F));
 			}
 
-			this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, this.rainLevel));
-			this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, this.thunderLevel));
+			this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, f));
+			this.server.getPlayerList().broadcastAll(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, g));
 		}
+	}
+
+	/** Draws one requested weather duration from this level's own random source. */
+	private static int sampleWeatherDuration(RandomSource randomSource, int sample, int duration) {
+		IntProvider intProvider = sample == NativeWeatherTime.THUNDER_SAMPLE
+			? (duration != 0 ? THUNDER_DURATION : THUNDER_DELAY)
+			: (duration != 0 ? RAIN_DURATION : RAIN_DELAY);
+		return intProvider.sample(randomSource);
 	}
 
 	@VisibleForTesting
 	public void resetWeatherCycle() {
-		this.serverLevelData.setRainTime(0);
-		this.serverLevelData.setRaining(false);
-		this.serverLevelData.setThunderTime(0);
-		this.serverLevelData.setThundering(false);
+		this.weather.resetWeather();
 	}
 
 	public void resetEmptyTime() {

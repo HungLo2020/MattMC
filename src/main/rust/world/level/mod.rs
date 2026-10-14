@@ -13,3 +13,4 @@ pub(crate) mod entity_order;
 pub(crate) mod entity_lookup;
 pub(crate) mod entity_sections;
 pub(crate) mod random_ticks;
+pub(crate) mod weather_time;
