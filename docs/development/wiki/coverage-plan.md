@@ -11,7 +11,9 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest source snapshot integrated: `79ff37b0e3e6ca329748418d08f2aacec5fdece4`, preserving three incoming commits and 53 changed paths (twelve wiki pages) after the separately published migration prompts. Batch 413 reconciles entity type authority, ore placed-feature ownership and FULL-chunk oracle limits. Existing goal prompts and the separately owned storage bug-fix work are unchanged.
+- Latest default-branch snapshot synchronized: `cdb9dc2b9c37d3f9b3fbdf7f09c06d0b5def3b31`, the separately authorized and already reported #818 fix merge. Batch 414 preserves that history without implementing bugs or publishing held #825 work; its authored scope is crafting-player documentation only.
+
+- Previous source snapshot integrated: `79ff37b0e3e6ca329748418d08f2aacec5fdece4`, preserving three incoming commits and 53 changed paths (twelve wiki pages) after the separately published migration prompts. Batch 413 reconciles entity type authority, ore placed-feature ownership and FULL-chunk oracle limits. Existing goal prompts and the separately owned storage bug-fix work are unchanged.
 
 - Previous source snapshot integrated: `233003c84602ae62b7b67e6be53f71ae1b235327`. The final guard caught this twenty-one-path/two-guide tint migration before branch publication; the six-page draft was preserved, cleanly reapplied and revalidated. The earlier unreferenced candidate was not published. Current tint ownership and separate prior-Current laptop results are retained without treating them as a new Frozen matrix.
 
@@ -3356,3 +3358,7 @@ Reconciled the current performance and Goal 5 routes with native `e491d123`: all
 ## Batch 413: Entity definitions and native ore decoration
 
 Updated architecture/migration routes for native entity type definitions and admitted whole ore placed features, preserving Java behavior/orchestration boundaries. Qualified author-only swapped laptop results, current origin-region variance, resumed/shadow comparison scope and the FULL driver's comparison/identity limits. Preserved source histories, original headings and accepted prompts; no runtime suites were rerun. Documentation checks, strict build and independent review precede guarded publication coordinated with the separate code owner.
+
+## Batch 414: Temporary crafting grids and returned containers
+
+Expanded the Crafting Table owner with separate player grids, absent block inventory/Hopper access, menu validity and safe cleanup. Consolidated recipe remainders in the shared crafting guide: empty-slot return, matching-component merge, inventory transfer and overflow drops, with Cake and Crafter routes. Existing strong sampled block articles, directories/categories and recipe definitions remain unchanged. Source-only review; no gameplay or bug-implementation tests were run. Full documentation checks, strict build and independent review precede publication.

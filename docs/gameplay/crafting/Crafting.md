@@ -19,6 +19,31 @@ The server matches the grid against loaded crafting recipes and only provides an
 
 Closing either the personal crafting screen or the Crafting Table returns remaining grid ingredients to your inventory. **Anything that does not fit drops into the world**, so leave room and collect overflow. The grid is not permanent storage; use a chest for supplies. [Personal cleanup][craft-inventory] · [Table cleanup][craft-table-close] · [Return handling][craft-return] · [Overflow drops][craft-overflow]
 
+## Returned containers and other remainders
+
+Some recipes return an item from an ingredient slot as well as producing their
+main output. For example, [Cake crafting](../blocks/Cake.md#crafting-and-carrying)
+returns the Milk Buckets as empty Buckets. The recipe decides whether a remainder
+exists; do not assume every bottle, tool or ingredient is returned.
+[Recipe remainder lookup][current-remainder]
+
+When you take the crafted result, the menu consumes one ingredient from each
+occupied recipe slot and handles that slot's remainder. If the slot is empty,
+the remainder goes there. If the remaining stack is the same item **with the
+same components**, the stacks combine there. Otherwise it goes into your
+inventory. In Survival, anything that cannot be inserted drops into the world;
+Creative's infinite-materials insertion path can discard that uninsertable
+remainder instead. Leave space when you want to keep it.
+[Consumption and remainder handling][current-remainder] · [Inventory insertion][current-insertion]
+
+A Bucket appearing in the grid is therefore a returned ingredient container,
+not a second craftable output. Clear or refill the recipe pattern before the
+next craft, and leave inventory room when crafting recipes with remainders.
+Closing the screen then uses the ordinary grid cleanup described above. Automated
+[Crafter output and remainders](../blocks/Crafter.md#outputs-remainders-and-failures)
+have their own handling; these player-menu rules are not a promise about every
+processing machine.
+
 ## MattMC-specific checks
 
 Imported blocks may be present in Creative before every recipe or tag is correctly integrated. The [Pewen guide](../blocks/Pewen.md#recipes-and-tools-that-need-caution) records concrete ingredient/tag problems. Do not replace an unknown recipe with an upstream guess.
@@ -65,3 +90,11 @@ Shared grid positioning, ingredient-slot counting and close-screen returns were 
 [craft-table-close]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/inventory/CraftingMenu.java#L100-L103
 [craft-return]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/inventory/AbstractContainerMenu.java#L589-L613
 [craft-overflow]: https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/entity/player/Inventory.java#L302-L323
+
+Player-menu remainder placement was source-reviewed on **2026-10-14** at
+`cdb9dc2b9c37d3f9b3fbdf7f09c06d0b5def3b31`; no crafting, overflow or multiplayer
+runtime test was run.
+
+[current-remainder]: https://github.com/HungLo2020/MattMC/blob/cdb9dc2b9c37d3f9b3fbdf7f09c06d0b5def3b31/src/main/java/net/minecraft/world/inventory/ResultSlot.java#L71-L115
+
+[current-insertion]: https://github.com/HungLo2020/MattMC/blob/cdb9dc2b9c37d3f9b3fbdf7f09c06d0b5def3b31/src/main/java/net/minecraft/world/entity/player/Inventory.java#L249-L289
