@@ -50,8 +50,12 @@ totals.
 
 - **Frozen is not fully repeatable.** Two Frozen runs differed in 13
   overworld chunks near the origin and 3 chunks of a moss patch elsewhere.
-  Current repeated identically. Treat a Current/Frozen difference as real only
-  where Frozen agrees with itself.
+  Treat a Current/Frozen difference as real only where Frozen agrees with itself.
+- **The origin region is not a strict oracle on either side.** Its spawn
+  chunks generate during startup. In 1 of 9 Current runs, 9 trees near the
+  region's west edge differed; immediate reruns of that build, with native
+  decoration on and off, matched the baseline. Repeat a run before treating an
+  origin-region difference as a regression; the other regions repeated exactly.
 - **Primordial Caves** differs from Frozen in every chunk: commit `62becada6`
   made custom ore targets resolve their bundled host tags, so Current places
   ores Frozen never placed. Compare Primordial Caves against pre-change Current.
