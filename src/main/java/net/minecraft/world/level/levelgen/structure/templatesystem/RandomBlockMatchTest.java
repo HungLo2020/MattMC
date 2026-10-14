@@ -19,6 +19,15 @@ public class RandomBlockMatchTest extends RuleTest {
 	private final Block block;
 	private final float probability;
 
+	/** For native placement programs. */
+	public Block block() {
+		return this.block;
+	}
+
+	public float probability() {
+		return this.probability;
+	}
+
 	public RandomBlockMatchTest(Block block, float f) {
 		this.block = block;
 		this.probability = f;

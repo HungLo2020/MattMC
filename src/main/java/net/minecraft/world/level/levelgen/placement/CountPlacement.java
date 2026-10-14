@@ -12,6 +12,11 @@ public class CountPlacement extends RepeatingPlacement {
 		.xmap(CountPlacement::new, countPlacement -> countPlacement.count);
 	private final IntProvider count;
 
+	/** For native placement programs. */
+	public IntProvider countProvider() {
+		return this.count;
+	}
+
 	private CountPlacement(IntProvider intProvider) {
 		this.count = intProvider;
 	}

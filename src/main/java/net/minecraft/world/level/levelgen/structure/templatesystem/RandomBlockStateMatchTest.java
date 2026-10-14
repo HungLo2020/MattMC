@@ -17,6 +17,15 @@ public class RandomBlockStateMatchTest extends RuleTest {
 	private final BlockState blockState;
 	private final float probability;
 
+	/** For native placement programs. */
+	public BlockState blockState() {
+		return this.blockState;
+	}
+
+	public float probability() {
+		return this.probability;
+	}
+
 	public RandomBlockStateMatchTest(BlockState blockState, float f) {
 		this.blockState = blockState;
 		this.probability = f;

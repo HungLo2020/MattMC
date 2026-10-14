@@ -9,6 +9,11 @@ public class RarityFilter extends PlacementFilter {
 	public static final MapCodec<RarityFilter> CODEC = ExtraCodecs.POSITIVE_INT.fieldOf("chance").xmap(RarityFilter::new, rarityFilter -> rarityFilter.chance);
 	private final int chance;
 
+	/** For native placement programs. */
+	public int chance() {
+		return this.chance;
+	}
+
 	private RarityFilter(int i) {
 		this.chance = i;
 	}

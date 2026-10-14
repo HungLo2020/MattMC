@@ -83,6 +83,8 @@ public abstract class ChunkGenerator {
 	public static final Codec<ChunkGenerator> CODEC = BuiltInRegistries.CHUNK_GENERATOR.byNameCodec().dispatchStable(ChunkGenerator::codec, Function.identity());
 	protected final BiomeSource biomeSource;
 	private final Supplier<List<FeatureSorter.StepFeatureData>> featuresPerStep;
+	/** Compiled native decoration programs for this generator's placed features. */
+	public final net.minecraft.world.level.levelgen.NativeDecoration.Programs nativeDecorationPrograms = new net.minecraft.world.level.levelgen.NativeDecoration.Programs();
 	private final Function<Holder<Biome>, BiomeGenerationSettings> generationSettingsGetter;
 
 	public ChunkGenerator(BiomeSource biomeSource) {
@@ -325,6 +327,7 @@ public abstract class ChunkGenerator {
 			});
 			set.retainAll(this.biomeSource.possibleBiomes());
 			int i = list.size();
+			NativeDecorationRegion nativeRegion = net.minecraft.world.level.levelgen.NativeDecoration.bind(worldGenLevel, chunkAccess, this);
 
 			try {
 				Registry<PlacedFeature> registry2 = worldGenLevel.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
@@ -377,7 +380,10 @@ public abstract class ChunkGenerator {
 
 							try {
 								worldGenLevel.setCurrentlyGenerating(supplier2);
-								placedFeature.placeWithBiomeCheck(worldGenLevel, this, worldgenRandom, blockPos);
+								if (nativeRegion == null
+									|| !net.minecraft.world.level.levelgen.NativeDecoration.place(this.nativeDecorationPrograms, nativeRegion, this, worldGenLevel, worldgenRandom, placedFeature, l, p, k, blockPos)) {
+									placedFeature.placeWithBiomeCheck(worldGenLevel, this, worldgenRandom, blockPos);
+								}
 							} catch (Exception var30) {
 								CrashReport crashReport2 = CrashReport.forThrowable(var30, "Feature placement");
 								crashReport2.addCategory("Feature").setDetail("Description", supplier2::get);
@@ -395,6 +401,8 @@ public abstract class ChunkGenerator {
 				CrashReport crashReport3 = CrashReport.forThrowable(var31, "Biome decoration");
 				crashReport3.addCategory("Generation").setDetail("CenterX", chunkPos.x).setDetail("CenterZ", chunkPos.z).setDetail("Decoration Seed", l);
 				throw new ReportedException(crashReport3);
+			} finally {
+				if (nativeRegion != null) nativeRegion.close();
 			}
 		}
 	}

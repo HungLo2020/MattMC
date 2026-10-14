@@ -7,3 +7,4 @@ pub(crate) mod json;
 pub(crate) mod parallel;
 pub mod java_log;
 pub(crate) mod java_hash;
+pub(crate) mod java_trig;

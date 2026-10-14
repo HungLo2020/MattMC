@@ -24,6 +24,7 @@ world/level/
     ├── synth/       # Noise families, their optimized kernels, state and FFI
     ├── density/     # Programs, evaluation, cell kernels, End islands and FFI
     ├── feature/     # Ore/geode geometry and FFI
+    ├── decoration/  # Native placed features: placement, ore, region binding
     ├── router/      # Slice/template and point programs, preliminary levels
     ├── noise_fill/  # Cell traversal, block fill and generated sections
     ├── biome_fill/  # Climate sampling, search order and biome-container replay
@@ -118,9 +119,10 @@ compatibility paths and complete-caller verification.
 
 ### Feature geometry
 
-`feature/ore/` owns ore spheres and ordered spans. Java retains random sources,
-block rules and writes. See [ore geometry](feature/RUST-ORE.md) for compatibility
-constraints and focused verification.
+`feature/ore/` owns ore spheres and ordered spans. On the Java route, Java keeps
+random sources, block rules and writes; see [ore geometry](feature/RUST-ORE.md).
+[Native decoration](feature/RUST-DECORATION.md) in `decoration/` runs whole ore
+placed features, including their modifiers, draws, rules and section writes.
 
 ### Java integration
 

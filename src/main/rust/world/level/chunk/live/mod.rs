@@ -507,7 +507,7 @@ impl Owner {
         s.ids = ids;
         Some((old, true))
     }
-    pub(super) fn write_counts(
+    pub(crate) fn write_counts(
         &self,
         counts: &super::counters::Owner,
         index: usize,

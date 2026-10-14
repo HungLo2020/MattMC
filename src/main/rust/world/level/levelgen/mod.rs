@@ -2,6 +2,7 @@
 //! from noise kernels, density evaluation, aquifers and resumable surface rules.
 pub(crate) mod aquifer;
 pub(crate) mod carver;
+pub(crate) mod decoration;
 pub(crate) mod biome_fill;
 pub(crate) mod blending;
 pub(crate) mod density;

@@ -145,6 +145,20 @@ public class WorldGenRegion implements WorldGenLevel {
 		throw new ReportedException(crashReport);
 	}
 
+	/** Native decoration: this step's block-state write radius. */
+	public int nativeBlockStateWriteRadius() {
+		return this.generatingStep.blockStateWriteRadius();
+	}
+
+	/** Native decoration: the largest chessboard distance {@link #getChunk} serves. */
+	public int nativeDependencyRadius() {
+		return this.generatingStep.directDependencies().size() - 1;
+	}
+
+	public ChunkAccess nativeCenter() {
+		return this.center;
+	}
+
 	@Override
 	public boolean hasChunk(int i, int j) {
 		int k = this.center.getPos().getChessboardDistance(i, j);

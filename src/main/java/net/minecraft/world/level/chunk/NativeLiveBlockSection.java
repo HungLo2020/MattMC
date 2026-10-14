@@ -197,6 +197,12 @@ final class NativeLiveBlockSection {
         } finally { Reference.reachabilityFence(v); }
     }
     int bits() { return view.bits; }
+    /** After a native write grew the palette: Java's view must follow the owner's new generation. */
+    void reloadViewAfterNativeWrite() {
+        var current = this.view;
+        try { this.view = loadView(current); }
+        finally { Reference.reachabilityFence(current); Reference.reachabilityFence(this); }
+    }
     int requestedBits() { return view.requested; }
     boolean isSingle(Object value) { return view.bits == 0 && get(0) == value; }
     int write(int index, int id) {

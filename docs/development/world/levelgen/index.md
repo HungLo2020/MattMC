@@ -5,7 +5,8 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
 
 - [Carving](carver/index.md): canyon geometry, live-mask ordering and focused verification.
 - [Old-terrain Blending](blending/index.md): batched height grids and saved-world compatibility.
-- [Feature Generation](feature/index.md): ore geometry, geode density fields and placement verification.
+- [Feature Generation](feature/index.md): native decoration of placed features, ore geometry, geode density fields.
+- [FULL-chunk Verification](RUST-FULL-GENERATION.md): Frozen/Current FULL-chunk parity, resume and timing driver.
 - [Heightmaps](heightmap/index.md): packed chunk-column reconstruction and parity checks.
 - [Noise Evaluation](RUST-NOISE.md): sampler behavior and parity checks.
 - [Density Evaluation](RUST-DENSITY.md): expression evaluation, batching, and verification.
