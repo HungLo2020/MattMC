@@ -422,8 +422,10 @@ export of remaining Java state facts; see Phase 2 below.
   shader-pack IDs, tint and sprites.
 
 Not done in Phase 1, by design:
-- The shared registry does not yet own items with default components, entity
-  types, tags or biomes. Existing native systems can still consume separate
+- This block-fact phase does not own items with default components or biome
+  definitions. Entity type definitions now have a separate native catalog;
+  registry/tag query snapshots do not transfer all Java value authority.
+  Existing native systems can still consume separate
   Java-supplied data, such as [biome-search inputs](../world/biome/RUST-BIOME-SEARCH.md).
   General shared registries remain future work; this phase covers block facts.
 
@@ -454,7 +456,10 @@ The remaining registry-definition migration below is unfinished.
   family parameters. Java retains factories,
   `Registry.register`, state objects, codecs and cache initialization;
   startup checks keep native and Java IDs aligned.
-- Broader content registries and the builders proposed in
+- [Entity type definitions](ENTITY-TYPES.md) now originate in the Rust catalog
+  for all 239 registered types; Java retains behavior factories and live objects.
+  Definition parity does not establish AI, movement, persistence or lifecycle parity.
+- Remaining content registries and the builders proposed in
   [adding content](ADDING-CONTENT.md) remain future work.
 - Remaining shape, blocked-light and contextual predicate producers still
   need migration with independent parity checks. Format 9 imports face IDs/truth

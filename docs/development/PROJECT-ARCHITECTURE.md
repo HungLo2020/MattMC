@@ -402,6 +402,13 @@ realistic renderer/server acceptance; preserve the owner-specific timing limits.
 [Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
 `world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
 resolution and callback delivery.
+[Native ore decoration](world/levelgen/feature/RUST-DECORATION.md) owns the
+admitted ore placed-feature program, modifier/random draw order and direct
+region writes. Java retains decoration step ordering, structure placement,
+feature seeds and unsupported/custom feature execution. The
+[FULL-chunk verifier](world/levelgen/RUST-FULL-GENERATION.md) compares serialized
+chunk fields, with explicit origin-region variance and resumed-generation limits;
+this is not a claim that all world generation has migrated.
 [Geode density fields](world/levelgen/feature/RUST-GEODE.md) use
 `world/level/levelgen/feature/geode/` for one grid batch; Java retains ordered
 random draws, placement decisions and world callbacks.
@@ -490,7 +497,7 @@ holds identity snapshots of frozen registry sets (network IDs, known packs, tag
 ID lists) behind registry and tag synchronization; registry storage and
 element codecs remain Java.
 
-Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/contextual-predicate functions, motion/solid/custom flags and contextual gameplay, and Rust item/entity registries and general gameplay components remain proposals. `content` must not depend on its consumers.
+Content definitions and registries belong here. Use this for native representations of blocks, items, fluids, models, recipes, data-driven definitions, and other game content metadata. Today it holds the [block registry](game-model/RUST-BLOCK-REGISTRY.md) (`content/block/`): every block, property and block state with per-state columns, built from native identity/domain/default declarations plus a lazy export of remaining Java state facts. World and storage subsystems derive their tables from it, and terrain meshing combines its block facts with render-owned columns. The block registry is immutable for the process lifetime; rendering's cache and resource lifecycle remain separate. Java still owns block behavior factories, shape/blocked-light/contextual-predicate functions, motion/solid/custom flags and contextual gameplay, and native item definitions and general gameplay components remain unfinished. The [entity type catalog](game-model/ENTITY-TYPES.md) now supplies all 239 registered type identities and intrinsic settings; Java projects those definitions and retains behavior factories, entity instances and their field reads. Static type authority does not complete entity gameplay or lifecycle ownership. `content` must not depend on its consumers.
 
 ### `render/`
 

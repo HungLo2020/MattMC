@@ -28,7 +28,9 @@ the defaults and fallbacks with the same float arithmetic.
 [`NativeEntityTypes`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/entity/NativeEntityTypes.java)
 reads one table from `mattmc_entity_types_export` when `EntityType` initializes.
 `EntityType.register` takes the definition at the next registry ID. If its name
-differs, registration fails, so Java and Rust cannot drift. It then builds the
+differs or the catalog ID is out of range, registration fails. The separate
+Java fixture checks full registry/catalog count equality; the per-entry production
+guard does not itself prove that every trailing catalog entry was consumed. It then builds the
 `EntityType` with resolved dimensions and attachments. An unknown immune block
 or feature flag also fails registration. `EntityType.Builder` no longer exists.
 
@@ -61,7 +63,18 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyEntityTypes.py --
   Frozen and Current. The full dumps must be identical. It covers definitions
   only, not gameplay, saving or rendering.
 
+The live driver records source/observer identities but does not fingerprint the
+loaded native library or compiled observer. Frozen classes must already exist;
+bootstrap timing covers `Bootstrap.bootStrap()`, not isolated entity registration.
+Definition equality does not verify factory behavior, simulation, save/load or
+rendering lifecycles. Preserve exact-binary guards separately when required.
+
 ## Verification (2026-10-13)
+
+The following are implementation-author reports at
+[`3423523`](https://github.com/HungLo2020/MattMC/commit/34235237568a44a99ef5ba2cd2c29b5d5a6c6852).
+This documentation review inspected source and test definitions without rerunning
+those suites, JVM measurements or gameplay captures.
 
 - Pre-change Current and Frozen dumps were identical for all 239 types; the
   catalog was generated from that dump.
@@ -76,5 +89,6 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyEntityTypes.py --
 - **Gameplay** (small DH fixture, moving camera, three alternating runs per side
   against pre-change Current): every run completed with about 120 live entities
   and the same pre-existing log errors on both sides. Median frame time was
-  5.99 ms against 6.13 ms, with 1.4–4.7 GB of swap, so this shows no regression,
-  not a gain. Runs: `artifacts/performance/realworld-20261011/dhab7-*`.
+  5.99 ms against 6.13 ms, with 1.4–4.7 GB of swap, so this does not establish a gain or absence of regression under broad
+  matched acceptance. This predecessor comparison is not a Frozen gameplay
+  matrix or sustained-memory proof. Runs: `artifacts/performance/realworld-20261011/dhab7-*`.

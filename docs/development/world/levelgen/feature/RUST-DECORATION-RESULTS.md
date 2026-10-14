@@ -5,6 +5,14 @@ on 2026-10-13 against Current `94e748593` (pre-change) and Frozen `7a4d18171`.
 They describe this version only; rerun the [FULL-chunk driver](../RUST-FULL-GENERATION.md)
 before claiming them for a later change. Receipts are under `build/full-generation/`.
 
+These are implementation-author measurements, not suites or captures rerun by
+this documentation review. The later [origin-region qualification](../RUST-FULL-GENERATION.md#known-differences-2026-10-13)
+records one of nine Current runs with nine differing trees; immediate native-on
+and Java-route reruns matched. Thus the identical Current runs below describe
+those attempts, not universal determinism. Resumed generation is also not a
+strict whole-world oracle; per-placement shadow replay has a different scope
+and its altered palette order must not be used as normal parity output.
+
 ## Correctness
 
 Seed 42, two 81-chunk regions in each of the four dimensions (648 FULL chunks),
@@ -30,6 +38,11 @@ serial requests on one worker, on the committed build (`ore-final`):
   table at every startup.
 - Rust suite 2,797 passed (3 ignored); Java 1,947 + 183 parity tests passed
   (2 skipped). Server logs have no new errors.
+
+The parallel shadow count above follows this dedicated result and the source
+commit (37,469). The root `PROGRESS.md` at the same source reports 44,416;
+these records are not reconciled here and must not be combined into a single
+verified total. Both report 20,116 resumed placements.
 
 ## Performance
 

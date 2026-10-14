@@ -11,7 +11,9 @@ At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is vis
 
 ## Branch and source checkpoint
 
-- Latest source snapshot integrated: `233003c84602ae62b7b67e6be53f71ae1b235327`. The final guard caught this twenty-one-path/two-guide tint migration before branch publication; the six-page draft was preserved, cleanly reapplied and revalidated. The earlier unreferenced candidate was not published. Current tint ownership and separate prior-Current laptop results are retained without treating them as a new Frozen matrix.
+- Latest source snapshot integrated: `79ff37b0e3e6ca329748418d08f2aacec5fdece4`, preserving three incoming commits and 53 changed paths (twelve wiki pages) after the separately published migration prompts. Batch 413 reconciles entity type authority, ore placed-feature ownership and FULL-chunk oracle limits. Existing goal prompts and the separately owned storage bug-fix work are unchanged.
+
+- Previous source snapshot integrated: `233003c84602ae62b7b67e6be53f71ae1b235327`. The final guard caught this twenty-one-path/two-guide tint migration before branch publication; the six-page draft was preserved, cleanly reapplied and revalidated. The earlier unreferenced candidate was not published. Current tint ownership and separate prior-Current laptop results are retained without treating them as a new Frozen matrix.
 
 - Previous source snapshot integrated: `6af38fa321799dd2b1e730317f4963a7e7e1cc1f`, preserved during the standalone migration-prompt correction. Its thirteen paths include four wiki pages and the flat-item owner. Batch 410 reconciles current rendering evidence and verification limits; the accepted root prompts remain unchanged.
 
@@ -3350,3 +3352,7 @@ The current source chain was inspected from server breaking order through the ho
 ## Batch 410: Flat GUI ownership and integrated evidence
 
 Reconciled the current performance and Goal 5 routes with native `e491d123`: all FPS floors pass, both shader p99 floors fail. Preserved earlier particle and pre-integration results, corrected component-verifier limits, and linked the scoped owner evidence. These are author-reported runtime results and source-reviewed controls, not new runtime executions. No gameplay/catalog entries or standalone migration prompts changed. Full documentation validation and independent review precede guarded publication.
+
+## Batch 413: Entity definitions and native ore decoration
+
+Updated architecture/migration routes for native entity type definitions and admitted whole ore placed features, preserving Java behavior/orchestration boundaries. Qualified author-only swapped laptop results, current origin-region variance, resumed/shadow comparison scope and the FULL driver's comparison/identity limits. Preserved source histories, original headings and accepted prompts; no runtime suites were rerun. Documentation checks, strict build and independent review precede guarded publication coordinated with the separate code owner.

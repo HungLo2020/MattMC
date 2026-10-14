@@ -46,6 +46,23 @@ flight. Timing runs report per-region wall time, process CPU and synchronous
 time per `ChunkStatusTasks` step. Asynchronous NOISE work is not in those step
 totals.
 
+## Reading the result safely
+
+Inspect `comparison.json` and every requested region rather than treating exit
+status zero as a parity verdict: the driver records and prints differences but
+does not exit nonzero merely because `identical` is false. Timing summaries
+also have no performance-threshold exit gate. Non-timing comparison uses the
+first launch per side; additional pairs are not automatically folded into a
+repeatability verdict. Preserve each attempt when investigating variance.
+
+The driver checks Frozen HEAD and selected source cleanliness before running,
+and records Current HEAD/dirty state and a selected native-file hash initially.
+It does not finally reseal source/native/class images or verify the library
+mapped by each process. Record those controls separately when required by the
+[acceptance requirements](../../RUST-MIGRATION.md); `--skip-build` is not proof
+that compiled classes match source. No runtime replay was performed by this
+documentation review.
+
 ## Known differences (2026-10-13)
 
 - **Frozen is not fully repeatable.** Two Frozen runs differed in 13
