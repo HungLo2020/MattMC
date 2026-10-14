@@ -12,6 +12,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
@@ -459,9 +460,18 @@ public class ComposterBlock extends Block implements WorldlyContainerHolder {
 		}
 
 		@Override
+		public ItemStack removeItem(int i, int j) {
+			// Hopper extraction is tentative until its explicit setChanged call.
+			// Failed insertion restores this slot without consuming the world batch.
+			return ContainerHelper.removeItem(this.items, i, j);
+		}
+
+		@Override
 		public void setChanged() {
-			ComposterBlock.empty(null, this.state, this.level, this.pos);
-			this.changed = true;
+			if (!this.changed && this.isEmpty()) {
+				ComposterBlock.empty(null, this.state, this.level, this.pos);
+				this.changed = true;
+			}
 		}
 	}
 }

@@ -163,6 +163,39 @@ evicted pages in compressed RAM instead of disk swap, for example
 and `compression-algorithm = zstd`, plus `vm.swappiness = 150` and
 `vm.page-cluster = 0` in `/etc/sysctl.d/`; it takes effect after a reboot.
 
+
+## Composter transfer regression
+
+Run `./gradlew test --tests '*ComposterHopperTransferTest'` for the real Hopper
+transaction with a controlled world boundary, rollback, manual harvesting,
+input and maturation controls. The temporary ready-output container delays its
+world reset until the Hopper explicitly commits a successful extraction; a
+restored nonempty slot is not a commit.
+
+For live server and persistence acceptance, compile the intended runtime first,
+then run [VerifyComposterTransfers.py](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/server/VerifyComposterTransfers.py):
+
+```sh
+python3 DevUtils/tests/server/VerifyComposterTransfers.py \
+  --java /path/to/jdk/bin/java --classpath-file /path/to/main-classpath.txt \
+  --native-dir build/rust/native --output /new/disposable/output
+```
+
+The classpath file must contain the compiled main runtime classpath, including
+its dependencies and resources, using the platform path separator. The driver
+does not build classes. It starts the real dedicated server on loopback, checks
+actual game-time advancement and inventory/block state, then saves and restarts
+the disposable world. The output directory must be new; it retains commands,
+logs, binary hashes and machine-readable results. No existing save is opened.
+Use `--port` for a different free loopback port. Manual player harvesting is
+covered by the Java fixture, not simulated by console commands.
+
+`--class-overlay ORIGINAL_CLASSES --expect-original-loss` is only a baseline
+probe for [#796](https://github.com/HungLo2020/MattMC/issues/796); its expected
+loss result never establishes candidate acceptance. Normal mode must pass all
+preservation and exact-once checks. Compare the recorded code/native hashes
+and identical driver versions when reporting before/after results.
+
 ## Troubleshooting
 
 - *No tests found for given includes*: check the class name and which task the
